@@ -42,7 +42,12 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		f := newAutoRenewedValidatorFixture(tc, env, validatorWeight+gasAmount)
 
 		pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
-		rewardsCalculator := reward.NewCalculator(GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)))
+		upgrades, err := info.NewClient(f.randomWalletNodeURI.URI).Upgrades(tc.DefaultContext())
+		require.NoError(tc, err)
+		rewardsCalculator := reward.NewPrimaryNetworkCalculator(
+			GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)),
+			*upgrades,
+		)
 
 		var (
 			delegator1RewardKey  = e2e.NewPrivateKey(tc)
@@ -76,8 +81,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		)
 		tc.By("verifying delegator1 is active and checking the supply mint", func() {
 			supplyBeforeSecondCycle = currentSupply(tc, pvmClient)
-			delegator1StakingDuration := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
-			delegator1PotentialRewards = rewardsCalculator.Calculate(delegator1StakingDuration, delegator1Weight, supplyBeforeDelegator1)
+			stakeStartTime, delegator1StakingDuration := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
+			delegator1PotentialRewards = rewardsCalculator.Calculate(stakeStartTime, delegator1StakingDuration, delegator1Weight, supplyBeforeDelegator1)
 			require.Equal(tc, supplyBeforeDelegator1+delegator1PotentialRewards, supplyBeforeSecondCycle)
 		})
 
@@ -123,8 +128,11 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		var validatorSecondCyclePotentialRewards uint64
 		tc.By("checking supply was increased by the second cycle's potential reward on renewal", func() {
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards + restakingDelegateeRewards
+			validator := currentValidator(tc, pvmClient, f.validatorNode.NodeID)
+			stakeStartTime := time.Unix(int64(validator.StartTime), 0)
 
 			validatorSecondCyclePotentialRewards = rewardsCalculator.Calculate(
+				stakeStartTime,
 				stakingPeriod,
 				expectedValidatorWeight,
 				supplyBeforeSecondCycle,
@@ -149,8 +157,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		)
 		tc.By("verifying delegator2 is active and checking the supply mint", func() {
 			supplyAfterDelegator2 = currentSupply(tc, pvmClient)
-			actualDelegator2Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
-			delegator2PotentialRewards = rewardsCalculator.Calculate(actualDelegator2Period, delegator2Weight, supplyBeforeDelegator2)
+			stakeStartTime, actualDelegator2Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
+			delegator2PotentialRewards = rewardsCalculator.Calculate(stakeStartTime, actualDelegator2Period, delegator2Weight, supplyBeforeDelegator2)
 			require.Equal(tc, supplyBeforeDelegator2+delegator2PotentialRewards, supplyAfterDelegator2)
 		})
 

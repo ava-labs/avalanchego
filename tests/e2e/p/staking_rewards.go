@@ -277,17 +277,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				adminClient  = admin.NewClient(nodeURI.URI)
 				rewardConfig = GetRewardConfig(tc, adminClient)
 				calculator   = reward.NewPrimaryNetworkCalculator(rewardConfig, *upgrades)
-
-				// ACP-285 reduces the primary network MinConsumptionRate after
-				// Helicon based on each staker's start time.
-				alphaStartTime = time.Unix(int64(alphaValidator.StartTime), 0)
-				gammaStartTime = time.Unix(int64(gammaDelegator.StartTime), 0)
 			)
 
+			// ACP-285 selects the primary-network rate from each staker's start time.
 			var (
-				expectedValidationReward = calculator.Calculate(alphaStartTime, actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+				expectedValidationReward = calculator.Calculate(time.Unix(int64(alphaValidator.StartTime), 0), actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
 
-				potentialDelegationReward                      = calculator.Calculate(gammaStartTime, actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				potentialDelegationReward                      = calculator.Calculate(time.Unix(int64(gammaDelegator.StartTime), 0), actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
 				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
 			)
 

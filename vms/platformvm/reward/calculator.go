@@ -27,11 +27,6 @@ type calculator struct {
 	supplyCap                uint64
 }
 
-type primaryNetworkCalculator struct {
-	config        Config
-	upgradeConfig upgrade.Config
-}
-
 // NewCalculator returns a calculator for the provided reward config as-is.
 // It does not account for reward changes introduced by network upgrades.
 func NewCalculator(c Config) Calculator {
@@ -40,15 +35,6 @@ func NewCalculator(c Config) Calculator {
 		minConsumptionRate:       new(big.Int).SetUint64(c.MinConsumptionRate),
 		mintingPeriod:            new(big.Int).SetUint64(uint64(c.MintingPeriod)),
 		supplyCap:                c.SupplyCap,
-	}
-}
-
-// NewPrimaryNetworkCalculator returns a calculator for primary network staking
-// rewards. It applies primary network reward upgrades.
-func NewPrimaryNetworkCalculator(c Config, upgradeConfig upgrade.Config) Calculator {
-	return &primaryNetworkCalculator{
-		config:        c,
-		upgradeConfig: upgradeConfig,
 	}
 }
 
@@ -86,22 +72,36 @@ func (c *calculator) Calculate(_ time.Time, stakedDuration time.Duration, staked
 	return min(remainingSupply, finalReward)
 }
 
+type primaryNetworkCalculator struct {
+	config        Config
+	upgradeConfig upgrade.Config
+}
+
+// NewPrimaryNetworkCalculator returns a calculator for primary network staking
+// rewards. It applies primary network reward upgrades.
+func NewPrimaryNetworkCalculator(c Config, upgradeConfig upgrade.Config) Calculator {
+	return &primaryNetworkCalculator{
+		config:        c,
+		upgradeConfig: upgradeConfig,
+	}
+}
+
 func (c *primaryNetworkCalculator) Calculate(stakeStartTime time.Time, stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
 	cfg := configForStakeStart(c.config, c.upgradeConfig, stakeStartTime)
 	return NewCalculator(cfg).Calculate(stakeStartTime, stakedDuration, stakedAmount, currentSupply)
 }
-
-const (
-	// ACP-285 lowers primary network MinConsumptionRate to 7.5%.
-	heliconMinConsumptionRateTarget          uint64 = 75_000
-	heliconMinConsumptionRateReductionPeriod        = 90 * 24 * time.Hour
-)
 
 func configForStakeStart(
 	rewardConfig Config,
 	upgradeConfig upgrade.Config,
 	stakeStartTime time.Time,
 ) Config {
+	const (
+		// ACP-285 lowers primary network MinConsumptionRate to 7.5%.
+		heliconMinConsumptionRateTarget          uint64 = 75_000
+		heliconMinConsumptionRateReductionPeriod        = 90 * 24 * time.Hour
+	)
+
 	if !upgradeConfig.IsHeliconActivated(stakeStartTime) ||
 		rewardConfig.MinConsumptionRate <= heliconMinConsumptionRateTarget {
 		return rewardConfig

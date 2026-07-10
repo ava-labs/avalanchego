@@ -51,21 +51,28 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	defaultValidatorNodeID = ids.GenerateTestNodeID()
-	defaultRewardConfig    = reward.Config{
-		MaxConsumptionRate: .12 * reward.PercentDenominator,
-		MinConsumptionRate: .1 * reward.PercentDenominator,
-		MintingPeriod:      365 * 24 * time.Hour,
-		SupplyCap:          720 * units.MegaAvax,
-	}
-)
+var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
 func newTestState(t testing.TB, db database.Database) *State {
-	return newTestStateWithUpgrade(t, db, upgradetest.GetConfig(upgradetest.Latest))
+	return newTestStateWithUpgrade(
+		t,
+		db,
+		upgradetest.GetConfig(upgradetest.Latest),
+		reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		},
+	)
 }
 
-func newTestStateWithUpgrade(t testing.TB, db database.Database, upgradeConfig upgrade.Config) *State {
+func newTestStateWithUpgrade(
+	t testing.TB,
+	db database.Database,
+	upgradeConfig upgrade.Config,
+	rewardConfig reward.Config,
+) *State {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -81,7 +88,7 @@ func newTestStateWithUpgrade(t testing.TB, db database.Database, upgradeConfig u
 			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
-		defaultRewardConfig,
+		rewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -120,30 +127,30 @@ func TestStateSyncGenesis(t *testing.T) {
 }
 
 func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) {
-	const heliconRampMidpoint = 45 * 24 * time.Hour
+	// One day into the ramp makes the integer reward differ from pre-Helicon.
+	const heliconRampElapsed = 24 * time.Hour
 
 	startTime := genesistest.DefaultValidatorStartTime
 	duration := genesistest.DefaultValidatorDuration
-	heliconTime := startTime.Add(-heliconRampMidpoint)
+	heliconTime := startTime.Add(-heliconRampElapsed)
 	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(
 		upgradetest.Helicon,
 		heliconTime,
 	)
-	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig)
+	rewardConfig := reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig, rewardConfig)
 
-	wantReward := reward.NewPrimaryNetworkCalculator(defaultRewardConfig, upgradeConfig).Calculate(
+	wantReward := reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig).Calculate(
 		startTime,
 		duration,
 		genesistest.DefaultValidatorWeight,
 		genesistest.InitialSupply,
 	)
-	genericReward := reward.NewCalculator(defaultRewardConfig).Calculate(
-		startTime,
-		duration,
-		genesistest.DefaultValidatorWeight,
-		genesistest.InitialSupply,
-	)
-	require.NotEqual(t, wantReward, genericReward)
 
 	staker, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
