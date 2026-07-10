@@ -120,16 +120,6 @@ type TrieDB struct {
 	log logging.Logger
 }
 
-// A proposalRef is an element in a doubly-linked list of proposals.
-// Available in the [TrieDB.committable] map by state root, and linked together
-// by parent-child relationships.
-type proposalRef struct {
-	p      *ffi.Proposal
-	root   common.Hash
-	parent *proposalRef
-	child  *proposalRef
-}
-
 func New(config Config) (*TrieDB, error) {
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -227,11 +217,15 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 	return nil
 }
 
-// Commit ensures the given root is persisted to disk. The given root MUST have
-// been previously provided to [TrieDB.Update]. any error returned from this
-// function should be treated as fatal.
+// Commit ensures the given root is persisted to disk. If a proposal
+// corresponding with this root is not found, Commit will return nil.
+//
+// Any error returned from this function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	if _, ok := t.committable.Get(root); !ok {
+		// Ideally, one would check that the root is on disk, since one should
+		// never pass a non-existent root to Commit. However, Firewood loses
+		// all commit history on startup.
 		return nil
 	}
 
@@ -258,8 +252,8 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	}
 	log("committing proposal",
 		zap.Stringer("root", root),
-		zap.Int("totalCommitted", len(committed)),
-		zap.Int("numProposals", t.committable.Len()),
+		zap.Int("total_committed", len(committed)),
+		zap.Int("remaining_proposals", t.committable.Len()),
 	)
 
 	return nil

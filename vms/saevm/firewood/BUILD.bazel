@@ -14,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/firewood",
+        "//utils/linked",
         "//utils/logging",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
@@ -36,6 +37,7 @@ go_library(
 go_test(
     name = "firewood_test",
     srcs = ["triedb_test.go"],
+    data = glob(["testdata/**"]),
     embed = [":firewood"],
     deps = [
         "//utils",
@@ -51,6 +53,7 @@ go_test(
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
