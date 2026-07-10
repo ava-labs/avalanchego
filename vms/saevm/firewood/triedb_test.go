@@ -111,6 +111,11 @@ func (s *SUT) nextHash() common.Hash {
 // createAccount creates an account, modelling an EVM contract deployment. When
 // an account has been destructed earlier in the current transaction, that
 // accound could be resurrected.
+//
+// The created account is EIP-168 empty, to encourage collisions in journal
+// handling and set states of deleted accounts.
+// To guarantee an account is persisted, one must also call
+// [SUT.updateAccount] or [SUT.setStorage] on the account.
 func (s *SUT) createAccount(t *testing.T) {
 	param := s.r.byte()
 	var addr common.Address
@@ -134,7 +139,6 @@ func (s *SUT) createAccount(t *testing.T) {
 
 	s.fwState.CreateAccount(addr)
 	s.hashState.CreateAccount(addr)
-
 }
 
 func (s *SUT) updateAccount(t *testing.T) {
@@ -286,6 +290,11 @@ func (s *SUT) diskCommit(t *testing.T) {
 }
 
 func (s *SUT) copyStateDB() {
+	// The StateDB copy is NOT safe to be done in the middle of a transaction.
+	// The journal isn't copied, so any "touches" (EIP-168 empty accounts with
+	// storage) are lost, so the account will NOT be deleted as expected.
+	s.finalise()
+
 	s.fwState = s.fwState.Copy()
 	s.hashState = s.hashState.Copy()
 }
@@ -343,6 +352,12 @@ func FuzzStateRoot(f *testing.F) {
 		{
 			opCreateAccount, 0,
 			opUpdateAccount, 0,
+			opStateDBCommit,
+			opDiskCommit,
+		},
+		{
+			opCreateAccount, 0,
+			opUpdateAccount, 0,
 			opSetStorage, 0,
 			opStateDBCommit,
 			opDiskCommit,
@@ -356,6 +371,7 @@ func FuzzStateRoot(f *testing.F) {
 		},
 		{
 			opCreateAccount, 0,
+			opUpdateAccount, 0,
 			opFinalise,
 			opSelfDestruct6780, 0,
 			opStateDBCommit,
