@@ -1,0 +1,122 @@
+name: build-linux-packages
+
+# Unified workflow for RPM and DEB packaging. Replaces the per-format
+# build-{rpm,deb}-release.yml — common build/validate behavior lives in the
+# ./.github/packaging/actions/build-package composite action; format/arch
+# differences are captured by the matrix below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build packages for'
+        required: true
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/packaging/**"
+      - ".github/workflows/build-linux-packages.yml"
+      - ".github/workflows/upload-pkg-s3.yml"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - format: rpm
+            arch: amd64
+            runner: ubuntu-22.04
+            package_arch: x86_64
+          - format: rpm
+            arch: arm64
+            runner: ubuntu-22.04-arm
+            package_arch: aarch64
+          - format: deb
+            arch: amd64
+            runner: ubuntu-22.04
+            package_arch: amd64
+          - format: deb
+            arch: arm64
+            runner: ubuntu-22.04-arm
+            package_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.build.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # When building an older tag via workflow_dispatch, the tag's
+      # .github/packaging tree may be stale or absent. Replace it
+      # wholesale with the workflow branch's version so that this build
+      # uses the current packaging implementation and composite action.
+      # Split into two steps because actions/checkout (which provides
+      # the master-side tree) and the mv (which applies it) cannot be
+      # combined.
+      - name: Overlay packaging scripts from workflow branch
+        if: github.event.inputs.tag
+        uses: actions/checkout@v5
+        with:
+          path: .packaging-overlay
+          sparse-checkout: .github/packaging
+
+      - name: Apply packaging overlay
+        if: github.event.inputs.tag
+        run: |
+          rm -rf .github/packaging
+          mv .packaging-overlay/.github/packaging .github/packaging
+          rm -rf .packaging-overlay
+        shell: bash
+
+      - name: Build and validate ${{ matrix.format }} (${{ matrix.package_arch }})
+        id: build
+        uses: ./.github/packaging/actions/build-package
+        with:
+          format: ${{ matrix.format }}
+          package-arch: ${{ matrix.package_arch }}
+          tag-input: ${{ github.event.inputs.tag }}
+          gpg-private-key: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PRIVATE_KEY || '' }}
+          gpg-passphrase: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PASSPHRASE || '' }}
+          release: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
+
+  # Release-only S3 upload. Delegates to the shared upload-pkg-s3
+  # workflow so id-token: write stays scoped to that workflow's job —
+  # never granted to a job that checks out a tag tree and runs
+  # packaging scripts.
+  upload-s3:
+    needs: build
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - pkg-format: deb
+            arches: '["amd64","arm64"]'
+            distros: jammy noble
+            s3-prefix: linux/debs/ubuntu
+          - pkg-format: rpm
+            arches: '["x86_64","aarch64"]'
+            distros: el9
+            s3-prefix: linux/rpms/rhel
+    uses: ./.github/workflows/upload-pkg-s3.yml
+    with:
+      pkg-format: ${{ matrix.pkg-format }}
+      tag: ${{ needs.build.outputs.tag }}
+      arches: ${{ matrix.arches }}
+      packages: avalanchego subnet-evm
+      distros: ${{ matrix.distros }}
+      s3-prefix: ${{ matrix.s3-prefix }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+      BUCKET: ${{ secrets.BUCKET }}

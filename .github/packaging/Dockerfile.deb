@@ -1,29 +1,34 @@
-# Build container for RPM packaging of avalanchego and subnet-evm.
+# Build container for DEB packaging of avalanchego and subnet-evm.
 #
-# Based on Rocky Linux 9 (glibc 2.34) to match RHEL 9.x target.
-# Source tree is bind-mounted at runtime, not COPY'd.
+# Based on Ubuntu 22.04 (jammy) so the produced binary's glibc floor
+# matches the oldest supported target release. Source tree is bind-mounted
+# at runtime, not COPY'd.
 #
-# Usage (via build-builder-image.sh, which fetches GO_CHECKSUM automatically):
-#   .github/packaging/scripts/build-builder-image.sh
-#   docker run --rm -v .:/build -v ./build/rpm:/output avalanchego-rpm-builder ...
+# Usage (via build-builder-image.sh with DOCKERFILE=Dockerfile.deb):
+#   DOCKERFILE=Dockerfile.deb .github/packaging/scripts/build-builder-image.sh
+#   docker run --rm -v .:/build -v ./build/deb:/output avalanchego-deb-builder ...
 
-FROM rockylinux:9
+FROM ubuntu:22.04
 
 ARG GO_VERSION
 ARG GO_CHECKSUM
 ARG TARGETARCH
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install build dependencies
 # - gcc: required for cgo (CGO_ENABLED=1 in scripts/constants.sh)
 # - gettext: envsubst for nfpm config template expansion
-# - gnupg2: GPG signing of RPM packages
+# - gnupg: GPG key import for nfpm-native DEB signing
 # - git: version detection in build scripts
-RUN dnf install -y \
+# - curl: downloading Go and nfpm
+RUN apt-get update && apt-get install -y \
         gcc \
         gettext \
-        gnupg2 \
+        gnupg \
         git \
-    && dnf clean all
+        curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Go (with SHA256 verification)
 RUN curl -fsSL -o /tmp/go.tar.gz \

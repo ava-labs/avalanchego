@@ -356,7 +356,12 @@ The tag push triggers these workflows automatically:
 
 - `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
 - `build-macos-release.yml` - macOS zip
-- `build-ubuntu-amd64-release.yml` / `build-ubuntu-arm64-release.yml` - Debian packages
+- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the
+  `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally
+  publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to
+  `linux/debs/ubuntu/{jammy,noble}/`. The `upload-rpms-s3` job publishes `.rpm` packages to
+  `linux/rpms/rhel/el9/{arch}/` and `GPG-KEY-avalanchego` to `linux/rpms/rhel/el9/`.
+  The same per-arch `.deb` is published under both jammy and noble; it is not rebuilt per Ubuntu release.
 - `publish_docker_image.yml` - Docker images
 
 Artifacts produced:
