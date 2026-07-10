@@ -33,11 +33,11 @@ var _ state.Trie = (*accountTrie)(nil)
 // Note this is not concurrent safe.
 type accountTrie struct {
 	*baseTrie
-	parentRoot   common.Hash
-	root         common.Hash
-	pending      *ffi.Proposal
-	tdb          *TrieDB
-	lastHashSize int
+	parentRoot       common.Hash
+	root             common.Hash
+	pending          *ffi.Proposal
+	tdb              *TrieDB
+	lastProposalSize int
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
@@ -75,7 +75,7 @@ func (a *accountTrie) Hash() common.Hash {
 // is, creates a new proposal with the addiotional changes and updates the
 // internal state.
 func (a *accountTrie) updateProposal() error {
-	if a.lastHashSize == len(a.updateOps) {
+	if a.lastProposalSize == len(a.updateOps) {
 		return nil
 	}
 
@@ -88,7 +88,7 @@ func (a *accountTrie) updateProposal() error {
 	a.pending = proposal
 	a.reader = proposal
 	a.root = common.Hash(proposal.Root())
-	a.lastHashSize = len(a.updateOps) // Avoid re-hashing until next update
+	a.lastProposalSize = len(a.updateOps) // Avoid re-hashing until next update
 	return nil
 }
 

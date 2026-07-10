@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
@@ -23,7 +22,9 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 	"go.uber.org/zap"
 
-	_ "github.com/ava-labs/libevm/trie" // comment resolution
+	// comment resolution
+	_ "github.com/ava-labs/libevm/core/state"
+	_ "github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -203,7 +204,6 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 //nolint:revive // removing names loses context.
 func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
 	possible := t.pending
-	t.pending = nil
 	if possible == nil {
 		// Update will never be called if no state change is proposed.
 		return fmt.Errorf("no pending proposal to update for root %s", root)
@@ -213,6 +213,11 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 		return fmt.Errorf("proposal root %s does not match update root %s", gotRoot, root)
 	}
 
+	if _, ok := t.committable.Get(root); ok {
+		return fmt.Errorf("root %s already queued for commit", root)
+	}
+
+	t.pending = nil
 	t.committable.Put(root, possible) // appends to list
 	return nil
 }
@@ -232,11 +237,12 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	// Iterator iterates from oldest to newest
 	var committed []common.Hash
 	for it := t.committable.NewIterator(); it.Next(); {
+		proposalRoot := it.Key()
 		if err := it.Value().Commit(); err != nil {
-			return fmt.Errorf("committing proposal for root %s: %w", it.Key(), err)
+			return fmt.Errorf("committing proposal with root %s: %w", proposalRoot, err)
 		}
-		committed = append(committed, it.Key())
-		if it.Key() == root {
+		committed = append(committed, proposalRoot)
+		if proposalRoot == root {
 			// Guaranteed to be hit because of the above check
 			break
 		}
@@ -252,7 +258,7 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	}
 	log("committing proposal",
 		zap.Stringer("root", root),
-		zap.Int("total_committed", len(committed)),
+		zap.Stringers("committed", committed),
 		zap.Int("remaining_proposals", t.committable.Len()),
 	)
 
@@ -261,17 +267,14 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 
 // newProposal creates a new proposal from either a committable proposal or the tip of the database.
 func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*ffi.Proposal, error) {
-	var propose func([]ffi.BatchOp) (*ffi.Proposal, error)
 	switch parent, foundProposal := t.committable.Get(parentRoot); {
 	case foundProposal:
-		propose = parent.Propose
+		return parent.Propose(batchOps)
 	case parentRoot == common.Hash(t.Firewood.Root()):
-		propose = t.Firewood.Propose
+		return t.Firewood.Propose(batchOps)
 	default:
 		return nil, fmt.Errorf("parent root %+x is not proposable", parentRoot)
 	}
-
-	return propose(batchOps)
 }
 
 // trieCommit considers the provided proposal as canonical.
@@ -289,7 +292,6 @@ func (t *TrieDB) trieCommit(p *ffi.Proposal) {
 // destructed account's storage trie, since Firewood will prefix-delete the
 // storage trie and does not implement an iterator.
 func (*TrieDB) Scheme() string {
-	var _ state.StateDB // protect import
 	return rawdb.HashScheme
 }
 

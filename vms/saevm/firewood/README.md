@@ -6,7 +6,7 @@ This package integrates [Firewood](https://github.com/ava-labs/firewood), a Rust
 
 ## Use
 
-`TrieDB` implements `triedb.DBOverride` (acting as `triedb.HashDB` for compatibility) and is passed to `state.NewDatabaseWithConfig` via `TrieDBConfig.BackendConstructor`. The `state.RegisterDatabaseInterceptor` registered in `init()` ensures that any `state.Database` backed by this `TrieDB` uses Firewood's custom trie implementations instead of the standard ones.
+`TrieDB` implements `triedb.DBOverride` (acting as `triedb.HashDB` for compatibility) and is passed to `state.NewDatabaseWithConfig` via `Config.BackendConstructor`. The `state.RegisterDatabaseInterceptor` registered in `init()` ensures that any `state.Database` backed by this `TrieDB` uses Firewood's custom trie implementations instead of the standard ones.
 
 ```go
 cfg := firewood.DefaultConfig(dataDir, log)
@@ -19,13 +19,9 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both should be explicitly freed to avoid leaking Rust memory - otherwise we must rely on Go's garbage collector to eventually call `runtime.AddCleanup`.
 
-All proposals tracked by the `TrieDB` are either explicitly freed (via `Drop`) or committed. Proposals are dropped in the following functions:
+All proposals tracked by the `TrieDB` are either explicitly freed (via `Drop`) or committed. Proposals are only explicitly dropped in `TrieDB.Close`. All pending and committable proposals are dropped before the database is closed.
 
-- `TrieDB.Close`: all pending and committable proposals are dropped before the database is closed.
-- `TrieDB.Commit`: proposals are committed in ancestor-first order; if any commit fails, the remaining proposals are dropped rather than leaked.
-- `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it.
-
-Revisions are freed when possible (e.g. in `accountTrie.hash` when unused), but in general, they will be freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
+Revisions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
 
 ## Operation Model
 
