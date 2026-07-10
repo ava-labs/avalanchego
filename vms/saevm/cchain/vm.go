@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
@@ -65,6 +66,8 @@ type VM struct {
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
+
+	lastWaitForEvent utils.Atomic[time.Time]
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -321,10 +324,22 @@ func earliestBuildTime(b *blocks.Block) time.Time {
 // block has elapsed, then waits for a transaction to be in the txpool or for
 // the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
-	// txpools are cleared after block execution, so we may still have
-	// transactions in the txpool while blocks containing those transactions are
-	// processing.
+	// Throttle to avoid busy looping: the txpools only clear after block
+	// execution, so pending txs can re-signal while their block is processing.
+	{
+		defer func() {
+			vm.lastWaitForEvent.Set(time.Now())
+		}()
+
+		const minimumDelay = 100 * time.Millisecond
+		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
+		timeToWait := minimumDelay - sinceLastCall
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(timeToWait):
+		}
+	}
 
 	// Pace block building on the ACP-226 minimum block delay before consulting
 	// the event sources so that the mempools are queried when we are actually

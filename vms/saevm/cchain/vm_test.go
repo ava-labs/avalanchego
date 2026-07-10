@@ -1537,13 +1537,15 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
+// waitForEventResult carries a [VM.WaitForEvent] return out of a goroutine.
+type waitForEventResult struct {
+	msg snowcommon.Message
+	err error
+}
+
 // TestWaitForEventMinDelayPacing exercises WaitForEvent's ACP-226 min-delay
 // pacing.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
-	type result struct {
-		msg snowcommon.Message
-		err error
-	}
 	tests := []struct {
 		name string
 		// cancelDuringDelay releases WaitForEvent by canceling its context while
@@ -1586,10 +1588,10 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				done := make(chan result, 1)
+				done := make(chan waitForEventResult, 1)
 				go func() {
 					msg, err := sut.WaitForEvent(ctx)
-					done <- result{msg, err}
+					done <- waitForEventResult{msg, err}
 				}()
 
 				// Blocked on the pacing timer until we release it.
@@ -1606,6 +1608,47 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestWaitForEventThrottle asserts that consecutive [VM.WaitForEvent] calls
+// are throttled even when a pending tx is available and the preferred block's
+// ACP-226 minimum delay has elapsed.
+func TestWaitForEventThrottle(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// See [TestWaitForEventMinDelayPacing] for why the SUT has no RPC
+		// transport and MUST NOT build blocks.
+		key := txtest.NewKey(t)
+		timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+		ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
+		w := newWallet(key, sut.ctx, nil)
+
+		gossipTx := toGossipTx(w.newMinimalTx(t))
+		if err := sut.gossipSet.Add(gossipTx); err != nil {
+			require.ErrorIsf(t, err, txpool.ErrAlreadyKnown, "%T.gossipSet.Add()", sut.VM)
+		}
+		sut.pushGossiper.Add(gossipTx)
+
+		// Skip the min-delay pacing so only the throttle can block.
+		clock.Advance(2 * dynamic.InitialDelayExponent.DelayDuration())
+
+		msg, err := sut.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent() first call", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, msg, "%T.WaitForEvent() first call event", sut.VM)
+
+		done := make(chan waitForEventResult, 1)
+		go func() {
+			msg, err := sut.WaitForEvent(ctx)
+			done <- waitForEventResult{msg, err}
+		}()
+
+		// Blocked on the throttle timer until synctest fires it.
+		synctest.Wait()
+		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
+
+		got := <-done
+		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
+	})
 }
 
 // TestEmptyBlocksDisallowed asserts that empty blocks are not allowed.
