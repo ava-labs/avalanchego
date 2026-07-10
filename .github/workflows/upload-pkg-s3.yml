@@ -94,7 +94,7 @@ jobs:
           : "${BUCKET:?BUCKET secret is required}"
 
           PKG_DIR="build/${PKG_FORMAT}"
-          KEY_FILENAME="$(printf '%s' "${PKG_FORMAT}" | tr '[:lower:]' '[:upper:]')-GPG-KEY-avalanchego"
+          KEY_FILENAME="GPG-KEY-avalanchego"
           # DISTROS and PACKAGES are space-separated strings — no jq required.
           for distro in ${DISTROS}; do
             for pkg in ${PACKAGES}; do
