@@ -9,7 +9,6 @@ go_library(
         "//tests",
         "//tests/antithesis",
         "//tests/fixture/tmpnet",
-        "//upgrade/upgradetest",
         "@org_uber_go_zap//:zap",
     ],
 )
