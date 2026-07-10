@@ -13,6 +13,7 @@ package_group(
     packages = [
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
+        "//node",
         "//tests/e2e/p",
     ],
 )
@@ -85,6 +86,7 @@ go_library(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/sae",
+        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/types",
         "//x/blockdb",
@@ -169,6 +171,7 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/params",
+        "//vms/saevm/sae/rpc",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
         "//vms/saevm/vmtest",

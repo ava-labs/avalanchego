@@ -1004,7 +1004,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting validator rules: %w", err)
 	}
 
 	switch {

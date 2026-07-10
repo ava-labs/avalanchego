@@ -1282,6 +1282,43 @@ func TestRPCTxFeeCap(t *testing.T) {
 	}
 }
 
+func TestUnprotectedTxs(t *testing.T) {
+	tests := []struct {
+		name                string
+		allowUnprotectedTxs bool
+		wantErr             testerr.Want
+	}{
+		{
+			name:                "rejected_when_disallowed",
+			allowUnprotectedTxs: false,
+			wantErr:             testerr.Contains("only replay-protected (EIP-155) transactions allowed over RPC"),
+		},
+		{
+			name:                "accepted_when_allowed",
+			allowUnprotectedTxs: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnprotectedTxs
+			}))
+			// HomesteadSigner produces a pre-EIP-155 (replay-unprotected) tx
+			tx := sut.wallet.SignTx(t, types.HomesteadSigner{}, 0, &types.LegacyTx{
+				To:       &zeroAddr,
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			})
+			require.False(t, tx.Protected(), "tx.Protected()")
+
+			err := sut.Client.SendTransaction(sut.Context(t), tx)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("SendTransaction() %s", diff)
+			}
+		})
+	}
+}
+
 func TestDebugRPCs(t *testing.T) {
 	ctx, sut := newSUT(t, 0, withDebugAPI())
 

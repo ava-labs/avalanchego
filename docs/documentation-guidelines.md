@@ -10,6 +10,23 @@ These guidelines apply to documentation for any repository content whose correct
 use, review, or evolution requires more context than code comments and tests
 alone can provide.
 
+## Index
+
+- [Motivation](#motivation)
+- [Definition](#definition)
+- [A four-layer framework](#a-four-layer-framework)
+  - [What this looks like in practice](#what-this-looks-like-in-practice)
+- [Scope](#scope)
+- [Non-goals](#non-goals)
+- [When to add or expand documentation](#when-to-add-or-expand-documentation)
+- [What belongs in repository documentation](#what-belongs-in-repository-documentation)
+- [What does not belong](#what-does-not-belong)
+- [Location and naming](#location-and-naming)
+- [Discoverability](#discoverability)
+- [Recommended structure](#recommended-structure)
+- [Single document or multiple](#single-document-or-multiple)
+- [Updating documentation during work](#updating-documentation-during-work)
+
 ## Motivation
 
 Historically, repository documentation has skewed toward *what something is* and
