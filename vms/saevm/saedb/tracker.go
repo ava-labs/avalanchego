@@ -234,6 +234,7 @@ func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
 	}
 	if !pruningDisabled {
 		return nil
+	}
 	if !c.AllowMissingTries {
 		return fmt.Errorf("%w (set allow-missing-tries=true to proceed)", ErrRefuseToCorruptArchiver)
 	}
