@@ -18,9 +18,41 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
+
+func TestGenesisCustomMinDelay(t *testing.T) {
+	tests := map[string]struct {
+		initialMinDelayMS uint64
+		wantDelayExcess   acp226.DelayExcess
+	}{
+		"default": {
+			initialMinDelayMS: 0,
+			wantDelayExcess:   acp226.InitialDelayExcess,
+		},
+		"custom": {
+			initialMinDelayMS: 5,
+			wantDelayExcess:   acp226.DesiredDelayExcess(5),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+
+			// TestGraniteChainConfig and its extra are shared globals, copy before mutating.
+			config := params.Copy(params.TestGraniteChainConfig)
+			params.GetExtra(&config).InitialMinDelayMS = test.initialMinDelayMS
+			block, err := (&Genesis{Config: &config}).Commit(db, tdb)
+			require.NoError(t, err)
+			require.Equal(t, test.wantDelayExcess, *customtypes.GetHeaderExtra(block.Header()).MinDelayExcess)
+		})
+	}
+}
 
 func TestGenesisEthUpgrades(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
