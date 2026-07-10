@@ -26,8 +26,8 @@ The packaging pipeline builds two packages per format and architecture:
 | --- | --- | --- | --- |
 | RPM | `avalanchego` | `/var/opt/avalanchego/bin/avalanchego` | `glibc >= 2.34` |
 | RPM | `subnet-evm` | `/var/opt/avalanchego/plugins/<VM_ID>` | `glibc >= 2.34` |
-| DEB | `avalanchego` | `/usr/local/bin/avalanchego` | `libc6 (>= 2.35)` |
-| DEB | `subnet-evm` | `/usr/local/lib/avalanchego/plugins/<VM_ID>` | `libc6 (>= 2.35)` |
+| DEB | `avalanchego` | `/usr/bin/avalanchego` | `libc6 (>= 2.35)` |
+| DEB | `subnet-evm` | `/usr/lib/avalanchego/plugins/<VM_ID>` | `libc6 (>= 2.35)` |
 
 `<VM_ID>` is sourced from `graft/subnet-evm/scripts/constants.sh`.
 
@@ -176,8 +176,12 @@ Ubuntu glibc, which is typically newer than the intended jammy floor.
 
 ### Why workflows overlay `.github/packaging` for manual tag builds
 
-`workflow_dispatch` accepts an arbitrary tag, including tags created before this
-packaging implementation existed in the repository.
+`workflow_dispatch` accepts any tag whose source tree the current packaging
+implementation can still build, including tags created before this packaging
+implementation existed in the repository. The practical floor is the commit that
+introduced `graft/` populated with both coreth and subnet-evm: `lib-build-common.sh`
+sources `graft/subnet-evm/scripts/{build,constants}.sh`, so tags predating `graft`
+cannot be rebuilt (see "Implications for maintainers" below).
 
 Those older tags may not contain:
 
@@ -371,7 +375,8 @@ If you change this area, preserve these unless you are intentionally revisiting
 the design:
 
 - RPMs install under `/var/opt/avalanchego/...`
-- DEBs install under `/usr/local/...`
+- DEBs install under `/usr/bin` and `/usr/lib` (Debian Policy §9.1.2 forbids
+  `/usr/local` for packaged files)
 - Subnet-EVM installs under the VM ID from
   `graft/subnet-evm/scripts/constants.sh`
 - RPM release builds target glibc 2.34 / Rocky Linux 9 compatibility

@@ -12,7 +12,6 @@ set -euo pipefail
 : "${NFPM_PACKAGER:?NFPM_PACKAGER must be set (rpm or deb)}"
 
 NFPM_PACKAGER="${NFPM_PACKAGER,,}"
-pkg_format_upper="${NFPM_PACKAGER^^}"
 
 REPO_ROOT="/build"
 PACKAGING_DIR="${REPO_ROOT}/.github/packaging"
@@ -31,7 +30,7 @@ export NFPM_CHANGELOG="${REPO_ROOT}/build/nfpm-changelog.yml"
 export NFPM_SIGNING_KEY="${REPO_ROOT}/build/gpg/signing-key.asc"
 GPG_KEY_FILE="${GPG_KEY_FILE:-}"
 
-echo "=== Building ${PACKAGE} ${pkg_format_upper} for ${PACKAGE_ARCH} (tag: ${TAG}) ==="
+echo "=== Building ${PACKAGE} ${NFPM_PACKAGER^^} for ${PACKAGE_ARCH} (tag: ${TAG}) ==="
 
 init_build_env
 build_binary "${PACKAGE}"
@@ -44,7 +43,7 @@ GPG_PUBLIC_KEY="${OUTPUT_DIR}/GPG-KEY-avalanchego"
 # nfpm reads the signing passphrase from a packager-specific env var
 # (NFPM_RPM_PASSPHRASE, NFPM_DEB_PASSPHRASE, ...); mirror our format-
 # agnostic GPG_KEY_PASSPHRASE into the name nfpm expects.
-nfpm_passphrase_var="NFPM_${pkg_format_upper}_PASSPHRASE"
+nfpm_passphrase_var="NFPM_${NFPM_PACKAGER^^}_PASSPHRASE"
 export "${nfpm_passphrase_var}=${GPG_KEY_PASSPHRASE:-}"
 
 # Ephemeral keys use a known throwaway passphrase so local and CI builds
@@ -53,7 +52,7 @@ if [[ -z "${GPG_KEY_FILE}" ]]; then
     use_ephemeral_gpg_passphrase "${nfpm_passphrase_var}"
 fi
 
-setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${pkg_format_upper}"
+setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${NFPM_PACKAGER^^}"
 
 # ── Package with nfpm ─────────────────────────────────────────────
 
@@ -68,4 +67,4 @@ run_nfpm_package \
     "${NFPM_PACKAGER}" \
     "${PKG_PATH}"
 
-echo "${pkg_format_upper} built: ${PKG_PATH}"
+echo "${NFPM_PACKAGER^^} built: ${PKG_PATH}"

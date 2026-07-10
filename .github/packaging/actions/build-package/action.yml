@@ -32,6 +32,10 @@ inputs:
     default: 'false'
 
 outputs:
+  # The tag is derived purely from the dispatch input / git ref (see
+  # workflow-setup-packaging.sh); it is independent of `format` and
+  # `package-arch`. Callers that fan this action out across a matrix can
+  # therefore rely on every leg emitting the same tag value.
   tag:
     description: 'Resolved package tag (e.g. v1.14.1 or v0.0.0-pr.<sha>)'
     value: ${{ steps.setup.outputs.tag }}
