@@ -42,7 +42,7 @@ func main() {
 // upgrade schedule.
 func newNetwork() (*tmpnet.Network, error) {
 	network := &tmpnet.Network{
-		Owner: "antithesis-avalanchego",
+		Owner: baseImageName,
 		Nodes: tmpnet.NewNodesOrPanic(nodeCount),
 	}
 	genesis, err := network.DefaultGenesis()
