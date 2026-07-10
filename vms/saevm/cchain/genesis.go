@@ -240,6 +240,7 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	rawdb.WriteFinalizedBlockHash(b, hash)
 	rawdb.WriteHeadBlockHash(b, hash)
 	rawdb.WriteHeadHeaderHash(b, hash)
+	rawdb.WriteHeadFastBlockHash(b, hash)
 	rawdb.WriteChainConfig(b, hash, config)
 	return b.Write()
 }
