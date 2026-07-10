@@ -18,7 +18,6 @@ on:
     paths:
       - ".github/packaging/**"
       - ".github/workflows/build-linux-packages.yml"
-      - ".github/workflows/upload-pkg-s3.yml"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -47,6 +46,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+    # All four matrix legs resolve the same tag: the composite action derives
+    # it only from the dispatch input / git ref (see workflow-setup-packaging.sh),
+    # never from format or arch. The job output is therefore a last-writer-wins
+    # race between legs, but every leg writes the identical value, so downstream
+    # consumers (upload-debs-s3) read a stable tag regardless of which leg wins.
     outputs:
       tag: ${{ steps.build.outputs.tag }}
 
@@ -54,6 +58,28 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # Defense in depth: workflow_dispatch accepts an arbitrary ref, and non-PR
+      # events import the real signing key. The overlay below replaces only
+      # .github/packaging, so the repo-root build helpers and the graft tree still
+      # run from the checked-out ref. Refuse to proceed unless the dispatched input
+      # names an actual tag in origin (not a branch), so the key can never sign
+      # arbitrary branch content.
+      # tag-push events are already constrained to refs/tags/v* by the `on:` filter.
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.14.1)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/sign a non-tag ref" >&2
+            exit 1
+          fi
 
       # When building an older tag via workflow_dispatch, the tag's
       # .github/packaging tree may be stale or absent. Replace it
@@ -88,35 +114,51 @@ jobs:
           gpg-passphrase: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PASSPHRASE || '' }}
           release: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
 
-  # Release-only S3 upload. Delegates to the shared upload-pkg-s3
-  # workflow so id-token: write stays scoped to that workflow's job —
-  # never granted to a job that checks out a tag tree and runs
-  # packaging scripts.
-  upload-s3:
+  # Release-only DEB S3 upload. Runs in its own job so id-token: write is
+  # never granted to a job that checks out and executes PR-controlled
+  # packaging scripts. RPM S3 publishing can land as a sibling job later.
+  upload-debs-s3:
     needs: build
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        deb_arch: [amd64, arm64]
+    runs-on: ubuntu-22.04
     permissions:
       id-token: write
       contents: read
-    strategy:
-      matrix:
-        include:
-          - pkg-format: deb
-            arches: '["amd64","arm64"]'
-            distros: jammy noble
-            s3-prefix: linux/debs/ubuntu
-          - pkg-format: rpm
-            arches: '["x86_64","aarch64"]'
-            distros: el9
-            s3-prefix: linux/rpms/rhel
-    uses: ./.github/workflows/upload-pkg-s3.yml
-    with:
-      pkg-format: ${{ matrix.pkg-format }}
-      tag: ${{ needs.build.outputs.tag }}
-      arches: ${{ matrix.arches }}
-      packages: avalanchego subnet-evm
-      distros: ${{ matrix.distros }}
-      s3-prefix: ${{ matrix.s3-prefix }}
-    secrets:
-      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
-      BUCKET: ${{ secrets.BUCKET }}
+
+    steps:
+      - name: Download DEB artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: debs-${{ matrix.deb_arch }}
+          path: build/deb
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Install aws cli
+        run: |
+          if ! command -v aws &>/dev/null; then
+            sudo snap install aws-cli --classic
+          fi
+
+      - name: Upload DEBs to S3
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          DEB_ARCH: ${{ matrix.deb_arch }}
+          BUCKET: ${{ secrets.BUCKET }}
+        run: |
+          for release in jammy noble; do
+            aws s3 cp "build/deb/avalanchego-${TAG}-${DEB_ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
+            aws s3 cp "build/deb/subnet-evm-${TAG}-${DEB_ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
+            aws s3 cp "build/deb/GPG-KEY-avalanchego" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/"
+          done

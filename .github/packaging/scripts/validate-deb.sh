@@ -70,9 +70,11 @@ for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
             dpkg -i "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
             dpkg -i "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
 
+            # These install paths must match the nfpm `dst` values in
+            # .github/packaging/nfpm/{avalanchego,subnet-evm}-deb.yml.
             bash /smoke-test.sh \
-                /usr/local/bin/avalanchego \
-                "/usr/local/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}" \
+                /usr/bin/avalanchego \
+                "/usr/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}" \
                 "${GIT_COMMIT}"
         '
 done

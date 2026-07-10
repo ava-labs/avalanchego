@@ -9,8 +9,10 @@ depends:
   - "libc6 (>= 2.35)"
 contents:
   - src: "${BINARY_PATH}"
-    # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh
-    dst: /usr/local/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}
+    # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh.
+    # Debian Policy §9.1.2: packaged files must not live under /usr/local.
+    # Keep this path in sync with .github/packaging/scripts/validate-deb.sh.
+    dst: /usr/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}
     file_info:
       mode: 0755
 changelog: "${NFPM_CHANGELOG}"

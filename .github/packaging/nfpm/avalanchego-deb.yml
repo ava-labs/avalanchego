@@ -9,7 +9,9 @@ depends:
   - "libc6 (>= 2.35)"
 contents:
   - src: "${BINARY_PATH}"
-    dst: /usr/local/bin/avalanchego
+    # Debian Policy §9.1.2: packaged files must not live under /usr/local.
+    # Keep this path in sync with .github/packaging/scripts/validate-deb.sh.
+    dst: /usr/bin/avalanchego
     file_info:
       mode: 0755
 changelog: "${NFPM_CHANGELOG}"
