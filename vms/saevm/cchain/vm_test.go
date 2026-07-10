@@ -1429,7 +1429,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	sut.waitForPendingTxs(ctx, t)
+	sut.WaitForPendingTxs(t)
 
 	t.Run("build", func(t *testing.T) {
 		_, err := sut.BuildBlock(ctx, nil)
@@ -1438,7 +1438,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 
 	t.Run("verify", func(t *testing.T) {
 		clock.Set(heliconTime)
-		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+		valid := sut.buildVerify(t, sut.LastAcceptedID(t))
 
 		hdr := valid.Header()
 		preHeliconMS := uint64(preHeliconTime.UnixMilli()) //#nosec G115 -- Known non-negative
