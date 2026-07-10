@@ -68,8 +68,8 @@ type SUT struct {
 
 	// Per-transaction tracking, reset at every transaction boundary
 	// see [SUT.finaliseTx])
-	createdThisTx    set.Set[common.Address]
-	destructedThisTx []common.Address // addresses destructed this tx, eligible for resurrection
+	createdThisTx    set.Set[common.Address] // eligible for selfdestruct6780
+	destructedThisTx set.Set[common.Address] // eligible for resurrection
 }
 
 func newSUT(t *testing.T, r *reader) *SUT {
@@ -80,14 +80,15 @@ func newSUT(t *testing.T, r *reader) *SUT {
 	fwState := newStateDB(t, fwDB, root)
 	hashState := newStateDB(t, hashDB, root)
 	return &SUT{
-		r:             r,
-		fwDB:          fwDB,
-		fwState:       fwState,
-		hashDB:        hashDB,
-		hashState:     hashState,
-		lastRoot:      root,
-		accounts:      make(map[common.Address]*account),
-		createdThisTx: set.NewSet[common.Address](0),
+		r:                r,
+		fwDB:             fwDB,
+		fwState:          fwState,
+		hashDB:           hashDB,
+		hashState:        hashState,
+		lastRoot:         root,
+		accounts:         make(map[common.Address]*account),
+		createdThisTx:    set.NewSet[common.Address](0),
+		destructedThisTx: set.NewSet[common.Address](0),
 	}
 }
 
@@ -111,19 +112,17 @@ func (s *SUT) selectAddr(param byte) common.Address {
 // [SUT.updateAccount] or [SUT.setStorage] on the account.
 func (s *SUT) createAccount(t *testing.T) {
 	param := s.r.byte()
-	var addr common.Address
-	if len(s.destructedThisTx) > 0 && param&1 == 0 {
-		// choose a previously destructed account to resurrect.
-		i := int(param>>1) % len(s.destructedThisTx)
-		addr = s.destructedThisTx[i]
+	addr := common.BytesToAddress(hash(param).Bytes())
+	if _, ok := s.accounts[addr]; ok {
+		t.Logf("skipping account creation (addr=%s) because it already exists", addr)
+		return // skip creation if account already exists
+	}
+	if s.destructedThisTx.Contains(addr) {
+		// The account was destructed earlier this tx, so this is a
+		// resurrection.
 		t.Logf("resurrecting destructed account (addr=%s)", addr)
-		s.destructedThisTx = utils.DeleteIndex(s.destructedThisTx, i)
+		s.destructedThisTx.Remove(addr)
 	} else {
-		addr = common.BytesToAddress(hash(param).Bytes())
-		if _, ok := s.accounts[addr]; ok {
-			t.Logf("skipping account creation (addr=%s) because it already exists", addr)
-			return // skip creation if account already exists
-		}
 		t.Logf("creating new account (addr=%s)", addr)
 	}
 
@@ -183,7 +182,7 @@ func (s *SUT) selfDestruct6780() {
 
 	delete(s.accounts, addr)
 	s.createdThisTx.Remove(addr)
-	s.destructedThisTx = append(s.destructedThisTx, addr)
+	s.destructedThisTx.Add(addr)
 	s.addrs = utils.DeleteIndex(s.addrs, i)
 }
 
@@ -273,7 +272,7 @@ func (s *SUT) read(t *testing.T) {
 // and any accounts destructed this transaction can no longer be resurrected.
 func (s *SUT) finaliseTx() {
 	s.createdThisTx.Clear()
-	s.destructedThisTx = s.destructedThisTx[:0]
+	s.destructedThisTx.Clear()
 }
 
 func (s *SUT) finalise() {
