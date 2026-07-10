@@ -26,7 +26,10 @@ on:
         required: true
         type: string
       distros:
-        description: 'Space-separated distro identifiers, e.g. "jammy noble" or "el9"'
+        description: >-
+          Space-separated distro identifiers, e.g. "jammy noble" or "el9". Each artifact
+          is a single build fanned out to one S3 directory per identifier by the upload
+          loop; listing two (jammy noble) publishes the same build under both.
         required: true
         type: string
       s3-prefix:
@@ -95,6 +98,8 @@ jobs:
 
           PKG_DIR="build/${PKG_FORMAT}"
           KEY_FILENAME="GPG-KEY-avalanchego"
+          # One build per arch, fanned out to a directory per distro. Listing
+          # "jammy noble" publishes the identical .deb under both.
           # DISTROS and PACKAGES are space-separated strings — no jq required.
           for distro in ${DISTROS}; do
             for pkg in ${PACKAGES}; do

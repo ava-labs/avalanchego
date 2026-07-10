@@ -361,6 +361,7 @@ The tag push triggers these workflows automatically:
   publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to
   `linux/debs/ubuntu/{jammy,noble}/`. The `upload-rpms-s3` job publishes `.rpm` packages to
   `linux/rpms/rhel/el9/{arch}/` and `GPG-KEY-avalanchego` to `linux/rpms/rhel/el9/`.
+  The same per-arch `.deb` is published under both jammy and noble; it is not rebuilt per Ubuntu release.
 - `publish_docker_image.yml` - Docker images
 
 Artifacts produced:
