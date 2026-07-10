@@ -202,6 +202,11 @@ func (s *SUT) setStorage(t *testing.T) {
 
 	s.fwState.SetState(addr, key, val)
 	s.hashState.SetState(addr, key, val)
+
+	// To prevent cyclical roots (A -> B -> A), update nonce
+	acc.nonce++
+	s.fwState.SetNonce(addr, acc.nonce)
+	s.hashState.SetNonce(addr, acc.nonce)
 }
 
 // Reads 1 byte from the reader to select account and key
@@ -222,7 +227,7 @@ func (s *SUT) deleteStorage() {
 	s.fwState.SetState(addr, key, common.Hash{})
 	s.hashState.SetState(addr, key, common.Hash{})
 
-	// To prevent cyclicaly roots (A -> B -> A), update nonce
+	// To prevent cyclical roots (A -> B -> A), update nonce
 	acc.nonce++
 	s.fwState.SetNonce(addr, acc.nonce)
 	s.hashState.SetNonce(addr, acc.nonce)
