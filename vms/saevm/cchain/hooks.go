@@ -445,6 +445,11 @@ func (b *builder) BuildBlock(
 
 	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
 	// state is encoded in other fields.
+	//
+	// TODO(JonathanOppenheimer): These bytes grow with the number of
+	// warp transactions (up to 61 B each, see vms/evm/predicate) and
+	// are not accounted against the block byte budget reserved by
+	// blockByteOverhead in the sae package.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,

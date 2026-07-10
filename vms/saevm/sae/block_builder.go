@@ -133,9 +133,23 @@ var (
 	errExecutionLagging      = errors.New("execution lagging for settlement")
 )
 
-// blockByteOverhead is the fixed per-block framing reserved below the maximum
-// message size M: the ProposerVM certificate, the block header, signature,
-// and message framing.
+// blockByteOverhead reserves space below the maximum message size M for every
+// non-transaction byte of a gossiped block. Worst-case contributions:
+//
+//   - ProposerVM certificate: [staking.MaxCertificateLen]
+//   - Block header, all fields except Extra: ~660 B ([types.Header]) plus
+//     anything registered via libevm's RegisterExtras. The C-Chain's
+//     customtypes are roughly ~110 B.
+//   - ProposerVM wrapper and codec framing (vms/proposervm/block): 90 B
+//   - ProposerVM block signature (staking permits RSA-4096): <=512 B
+//   - P2P message framing, including worst-case zstd expansion of
+//     incompressible tx bytes (message, network/peer): ~150 B
+//   - RLP list headers: ~10 B
+//
+// The non-certificate contributions total ~1.5 KiB; 6 KiB leaves 4x headroom.
+//
+// Note that hook-injected bytes (header.Extra, extData) are not covered --
+// see the TODOs in buildWithTxs and the C-Chain hook's BuildBlock.
 const blockByteOverhead = staking.MaxCertificateLen + 6*units.KiB
 
 // maxBlockTxBytes caps a block's serialized transaction bytes, reserving
