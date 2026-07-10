@@ -46,15 +46,12 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 
 	select {
 	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
-		e.metrics.markEnqueued(block.EthBlock().GasLimit())
-		if wc, err := worstCaseGasTime(e.hooks, block.Header()); err != nil {
+		if err := e.metrics.markEnqueued(block); err != nil {
 			e.log.Warn(
 				"Failed to derive worst-case gas time for metrics",
 				zap.Uint64("block_height", block.Height()),
 				zap.Error(err),
 			)
-		} else {
-			e.metrics.markAccepted(wc)
 		}
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
@@ -76,26 +73,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-// worstCaseGasTime reconstructs the worst-case gas time that the block with
-// the given header committed to, from its base fee and gas config.
-func worstCaseGasTime(hooks hook.Points, hdr *types.Header) (*gastime.Time, error) {
-	// The base fee MAY be nil (a pre-SAE header) and must be capped at
-	// [math.MaxUint64] to provide the correct type to [gastime.New].
-	var baseFee uint64
-	switch bf := hdr.BaseFee; {
-	case bf == nil:
-		baseFee = 0
-	case bf.IsUint64():
-		baseFee = bf.Uint64()
-	default:
-		baseFee = math.MaxUint64
-	}
-
-	target, cfg := hooks.GasConfigAfter(hdr)
-	return gastime.New(hooks.BlockTime(hdr), target, gas.Price(baseFee), cfg)
-}
-
-const emergencyPlaybookLink = "https://github.com/ava-labs/strevm/issues/28"
+const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
 
 func (e *Executor) processQueue() {
 	defer close(e.done)

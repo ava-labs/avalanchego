@@ -6,10 +6,13 @@ package saexec
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -22,6 +25,9 @@ var queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Second
 var executeBlockBuckets = prometheus.ExponentialBuckets(500*time.Microsecond.Seconds(), 2, 16)
 
 type metrics struct {
+	// hooks derives each enqueued block's worst-case gas time from its header.
+	hooks hook.Points
+
 	lastExecutedHeight prometheus.Gauge
 
 	// queueDuration tracks a block's entire lifetime from acceptance into the
@@ -64,6 +70,7 @@ type metrics struct {
 
 func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hook.Points) (*metrics, error) {
 	m := &metrics{
+		hooks: hooks,
 		lastExecutedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_executed_height",
 			Help: "Height of the latest block that completed async execution.",
@@ -99,7 +106,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 			Help: "Cumulative gas limit (worst-case gas) of blocks accepted into the execution queue.",
 		}),
 		lastExecutedGasTime: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "last_executed_gas_time_timestamp_seconds",
+			Name: "last_executed_gas_time_seconds",
 			Help: "Gas time reached by the latest executed block, as a Unix timestamp.",
 		}),
 		gasTimeWallTimeGap: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -130,7 +137,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 
 	// Seed the gauges from the last-executed block so startup and steady state
 	// report the same signals.
-	worstCase, err := worstCaseGasTime(hooks, lastExecuted.Header())
+	worstCase, err := m.worstCaseGasTime(lastExecuted.Header())
 	if err != nil {
 		return nil, fmt.Errorf("deriving worst-case gas time of block %d: %w", lastExecuted.Height(), err)
 	}
@@ -167,10 +174,37 @@ func (m *metrics) observeExecuteDuration(d time.Duration) {
 
 // markEnqueued records that a block with the given gas limit has been accepted
 // into the execution queue.
-func (m *metrics) markEnqueued(gasLimit uint64) {
+func (m *metrics) markEnqueued(block *blocks.Block) error {
+	gasLimit := float64(block.EthBlock().GasLimit())
 	m.executionQueueBlocks.Inc()
-	m.executionQueueGasLimit.Add(float64(gasLimit))
-	m.acceptedGasLimit.Add(float64(gasLimit))
+	m.executionQueueGasLimit.Add(gasLimit)
+	m.acceptedGasLimit.Add(gasLimit)
+
+	worstCase, err := m.worstCaseGasTime(block.Header())
+	if err != nil {
+		return err
+	}
+	m.markAccepted(worstCase)
+	return nil
+}
+
+// worstCaseGasTime reconstructs the worst-case gas time that the block with
+// the given header committed to, from its base fee and gas config.
+func (m *metrics) worstCaseGasTime(hdr *types.Header) (*gastime.Time, error) {
+	// The base fee MAY be nil (a pre-SAE header) and must be capped at
+	// [math.MaxUint64] to provide the correct type to [gastime.New].
+	var baseFee uint64
+	switch bf := hdr.BaseFee; {
+	case bf == nil:
+		baseFee = 0
+	case bf.IsUint64():
+		baseFee = bf.Uint64()
+	default:
+		baseFee = math.MaxUint64
+	}
+
+	target, cfg := m.hooks.GasConfigAfter(hdr)
+	return gastime.New(m.hooks.BlockTime(hdr), target, gas.Price(baseFee), cfg)
 }
 
 // markAccepted records the worst-case pricing admitted by consensus for the
@@ -181,18 +215,17 @@ func (m *metrics) markAccepted(worstCase *gastime.Time) {
 	m.gasTarget.Set(float64(worstCase.Target()))
 }
 
-// markExecuted records that the block at the given height, with the given gas
-// limit, has finished executing, having been charged gasCharged gas and
-// advanced the gas-time clock to executedBy at wall time wall. It advances the
-// last-executed height and gas-time gauges, removes the block from the queue
-// gauges, and adds to the cumulative executed totals.
-func (m *metrics) markExecuted(height, gasCharged, gasLimit uint64, executedBy *gastime.Time, wall time.Time) {
-	m.lastExecutedHeight.Set(float64(height))
+// markExecuted records that the block has finished executing with the given
+// results. It advances the last-executed height and gas-time gauges, removes
+// the block from the queue gauges, and adds to the cumulative executed totals.
+func (m *metrics) markExecuted(b *types.Block, results *ExecutionResults) {
+	gasLimit := float64(b.GasLimit())
+	m.lastExecutedHeight.Set(float64(b.NumberU64()))
 	m.executionQueueBlocks.Dec()
-	m.executionQueueGasLimit.Sub(float64(gasLimit))
-	m.executedGasCharged.Add(float64(gasCharged))
-	m.executedGasLimit.Add(float64(gasLimit))
-	m.markExecutedGasTime(executedBy, wall)
+	m.executionQueueGasLimit.Sub(gasLimit)
+	m.executedGasCharged.Add(float64(results.GasConsumed))
+	m.executedGasLimit.Add(gasLimit)
+	m.markExecutedGasTime(results.FinishBy.Gas, results.FinishBy.Wall)
 }
 
 // markExecutedGasTime records the gas-time state realized by the most recently
