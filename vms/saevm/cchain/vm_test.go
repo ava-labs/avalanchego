@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -106,6 +107,7 @@ type (
 		vmConfig   config
 		db         database.Database
 		state      snow.State
+		upgrades   upgrade.Config
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -170,6 +172,14 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
+// withHeliconTime schedules the Helicon activation at t rather than at
+// genesis, leaving the rest of the upgrade schedule unchanged.
+func withHeliconTime(t time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.upgrades.HeliconTime = t
+	})
+}
+
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
 // the test move the clock forward (e.g. past Tau to settle a block).
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
@@ -220,6 +230,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
+			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -235,6 +246,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
+	snowCtx.NetworkUpgrades = cfg.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
@@ -268,6 +280,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
+
+	// The engine sets the preference to the last accepted block when entering
+	// normal operation.
+	if cfg.state == snow.NormalOp {
+		lastAccepted, err := vm.LastAccepted(ctx)
+		require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
+		require.NoErrorf(tb, vm.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", vm)
+	}
 	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
@@ -1476,5 +1496,49 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 
 		err = sut.VerifyBlock(ctx, nil, parsed)
 		require.ErrorIsf(t, err, errEmptyBlock, "%T.VerifyBlock() should not allow empty blocks", sut.VM)
+	})
+}
+
+// TestPreHeliconBlocksDisallowed verifies blocks cannot be built or verified
+// before Helicon activates, but can still be parsed.
+func TestPreHeliconBlocksDisallowed(t *testing.T) {
+	key := txtest.NewKey(t)
+	// Schedule Helicon after the other upgrades so a pre-Helicon timestamp is
+	// representable without deactivating the rest of the schedule.
+	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
+	preHeliconTime := heliconTime.Add(-time.Second)
+	timeOpt, clock := withVMTime(preHeliconTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(key.EthAddress()),
+		withHeliconTime(heliconTime),
+		timeOpt,
+	)
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	sut.waitForPendingTxs(ctx, t)
+
+	t.Run("build", func(t *testing.T) {
+		_, err := sut.BuildBlock(ctx, nil)
+		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.BuildBlock() should not build before Helicon", sut.VM)
+	})
+
+	t.Run("verify", func(t *testing.T) {
+		clock.Set(heliconTime)
+		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+		hdr := valid.Header()
+		preHeliconMS := uint64(preHeliconTime.UnixMilli()) //#nosec G115 -- Known non-negative
+		hdr.Time = preHeliconMS / 1000
+		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
+
+		rewound := valid.EthBlock().WithSeal(hdr)
+		buf, err := rlp.EncodeToBytes(rewound)
+		require.NoErrorf(t, err, "rlp.EncodeToBytes(rewound block)")
+		parsed, err := sut.ParseBlock(ctx, buf)
+		require.NoErrorf(t, err, "%T.ParseBlock(rewound block)", sut.VM)
+
+		err = sut.VerifyBlock(ctx, nil, parsed)
+		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
 	})
 }

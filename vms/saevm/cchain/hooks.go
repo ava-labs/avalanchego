@@ -277,11 +277,18 @@ type builder struct {
 	desired      desiredParams
 }
 
+var errHeliconUnactivated = errors.New("helicon is not activated")
+
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
+	now := b.now()
+	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
+		return nil, errHeliconUnactivated
+	}
+
 	// TODO(StephenButtolph): Enforce the minimum block time here.
-	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
@@ -295,7 +302,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			Time:             now / 1000,
+			Time:             nowMS / 1000,
 			BlobGasUsed:      new(uint64),
 			ExcessBlobGas:    new(uint64),
 			ParentBeaconRoot: new(common.Hash),
@@ -307,7 +314,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
-			TimeMilliseconds: &now,
+			TimeMilliseconds: &nowMS,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
 			TargetExponent:   &te,

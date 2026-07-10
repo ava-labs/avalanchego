@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
@@ -249,6 +250,14 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		)
 		require.NoError(err)
 		require.Positive(balance.Cmp(big.NewInt(0)))
+
+		// Waiting for the ephemeral validator to be settled before stopping its
+		// node avoids polluting later specs: an active validator whose node is
+		// stopped fails its uptime check at end time and burns its (and its
+		// delegator's) potential rewards from the supply mid-spec.
+		tc.By("waiting for the added validator and delegator to be settled", func() {
+			requireValidatorRemoved(tc, platformvm.NewClient(nodeURI.URI), nodeID, "validator should have been settled at its end time")
+		})
 
 		tc.By("stopping validator node to free up resources for a bootstrap check")
 		require.NoError(node.Stop(tc.DefaultContext()))

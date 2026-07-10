@@ -13,6 +13,7 @@ package_group(
     packages = [
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
+        "//node",
         "//tests/e2e/p",
     ],
 )
