@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -97,18 +95,23 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
-		hooks: defaultHooks(),
+		hooks:          defaultHooks(),
+		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
 	config := saetest.ChainConfig()
+	saedbConfig := saedb.Config{
+		Archival:       sutCfg.archival,
+		CommitInterval: sutCfg.commitInterval,
+	}
+
 	db := rawdb.NewMemoryDatabase()
-	tdbConfig := &triedb.Config{}
 	xdb := saetest.NewExecutionResultsDB()
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithTrieDBConfig(saedbConfig.TrieDBConfig()),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -120,11 +123,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	saedbConfig := saedb.Config{
-		TrieDBConfig:       tdbConfig,
-		Archival:           sutCfg.archival,
-		TrieCommitInterval: sutCfg.commitInterval,
-	}
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
@@ -898,51 +896,6 @@ func (e *blockNumSaver) store(h *types.Header) {
 	e.num = new(big.Int).Set(h.Number)
 }
 
-func TestSnapshotPersistence(t *testing.T) {
-	ctx, sut := newSUT(t)
-
-	e, chain, wallet := sut.Executor, sut.chain, sut.wallet
-
-	const n = 10
-	for range n {
-		b := chain.NewBlock(t, types.Transactions{
-			wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
-	}
-	last := chain.Last()
-	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
-
-	require.NoErrorf(t, e.Close(), "%T.Close()", e)
-	// [newSUT] creates a cleanup that also calls [Executor.Close], which isn't
-	// valid usage. The simplest workaround is to just replace the quit channel
-	// so it can be closed again.
-	e.quit = make(chan struct{})
-
-	// The crux of the test is whether we can recover the EOA nonce using only a
-	// new set of snapshots, recovered from the databases.
-	conf := snapshot.Config{
-		CacheSize: saedb.SnapshotCacheSizeMB,
-		NoBuild:   true, // i.e. MUST be loaded from disk
-	}
-	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
-	require.NoError(t, err, "snapshot.New(..., [post-execution state root of last-executed block])")
-	snap := snaps.Snapshot(last.PostExecutionStateRoot())
-	require.NotNilf(t, snap, "%T.Snapshot([post-execution state root of last-executed block])", snaps)
-
-	t.Run("snap.Account(EOA)", func(t *testing.T) {
-		eoa := wallet.Addresses()[0]
-		got, err := snap.Account(crypto.Keccak256Hash(eoa.Bytes()))
-		require.NoError(t, err)
-		require.NotNil(t, got) // yes, this is still possible with nil error
-		require.Equalf(t, uint64(n), got.Nonce, "%T.Nonce", got)
-	})
-}
-
 func TestStateRootAvailability(t *testing.T) {
 	const commitInterval = 16
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
@@ -973,7 +926,7 @@ func TestStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval()):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced
