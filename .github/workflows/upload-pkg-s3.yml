@@ -1,6 +1,6 @@
 name: upload-pkg-s3
 
-# Release-only S3 publication for build-{deb,rpm}-release.yml.
+# Release-only S3 publication for build-linux-packages.yml.
 #
 # Lives in its own workflow so id-token: write stays narrowly scoped to the
 # upload job — never granted to a job that checks out a tag tree and runs
