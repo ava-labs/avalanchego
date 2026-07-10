@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego
 // tools/external/go.mod for usage details.
 
 // - To update the go version across all go.mod and go.work files:
-//     task update-go-version -- <version>
+//     task go:update-version -- <version>
 //
 // - The following files must also be updated manually:
 //   - CONTRIBUTING.md

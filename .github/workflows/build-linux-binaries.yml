@@ -28,11 +28,10 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh avalanchego:build-gomod
 
       - name: Build subnet-evm plugin
-        working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh subnet-evm:build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
@@ -98,11 +97,10 @@ jobs:
       - run: go version
 
       - name: Build the avalanchego binaries
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh avalanchego:build-gomod
 
       - name: Build subnet-evm plugin
-        working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh subnet-evm:build
 
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
@@ -150,6 +148,6 @@ jobs:
           path: /tmp/avalanchego/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz
 
       - name: Cleanup
-        run: |
+        run: |-
           rm -rf ./build
           rm -rf /tmp/avalanchego

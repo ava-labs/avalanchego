@@ -1,4 +1,4 @@
-name: Tests
+name: AvalancheGo
 
 on:
   push:
@@ -17,38 +17,37 @@ env:
 permissions:
   contents: read
 
-# Cancel ongoing workflow runs if a new one is started
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  tests-required:
+  avalanchego-required:
     if: ${{ always() }}
     needs:
-      - Unit
-      - Fuzz
-      - e2e
-      - e2e_schedule_latest
-      - e2e_post_latest
-      - e2e_kube
-      - e2e_existing_network
-      - Upgrade
-      - Lint
-      - tausecondslint
-      - links-lint
-      - check_generated_protobuf
-      - check_mockgen
-      - check_canotogen
-      - check_contract_bindings
-      - check_go_mod_tidy
-      - test_build_image
-      - test_build_antithesis_avalanchego_images
-      - test_build_antithesis_xsvm_images
-      - e2e_bootstrap_monitor
-      - load
-      - load_kube_kind
-      - robustness
+      - avalanchego-test-unit-gomod
+      - avalanchego-test-fuzz
+      - avalanchego-test-e2e-gomod
+      - avalanchego-test-e2e-gomod-schedule-latest
+      - avalanchego-test-e2e-gomod-post-latest
+      - avalanchego-test-e2e-kube
+      - avalanchego-test-e2e-gomod-existing-network
+      - avalanchego-test-upgrade
+      - avalanchego-lint
+      - avalanchego-check-tauseconds
+      - avalanchego-check-markdown-links
+      - avalanchego-check-generate-protobuf
+      - avalanchego-check-generate-mocks
+      - avalanchego-check-generate-canoto
+      - avalanchego-check-generate-load-contract-bindings
+      - go-check-mod-tidy
+      - avalanchego-test-build-image
+      - avalanchego-test-build-antithesis-images
+      - avalanchego-test-build-antithesis-images-xsvm
+      - avalanchego-test-bootstrap-monitor-e2e
+      - avalanchego-test-load
+      - avalanchego-test-load-kube-kind
+      - avalanchego-test-robustness
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -70,7 +69,8 @@ jobs:
             exit 1
           fi
 
-  Unit:
+  avalanchego-test-unit-gomod:
+    name: avalanchego-test-unit-gomod (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -79,20 +79,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - name: test-unit
+      - name: Run unit tests
         shell: bash
-        run: ./scripts/run_task.sh test-unit
+        run: ./scripts/run_task.sh avalanchego:test-unit-gomod
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
-  Fuzz:
+
+  avalanchego-test-fuzz:
+    name: avalanchego-test-fuzz
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - name: test-fuzz
+      - name: Run fuzz smoke test
         shell: bash
-        run: ./scripts/run_task.sh test-fuzz
-  e2e:
+        run: ./scripts/run_task.sh avalanchego:test-fuzz
+
+  avalanchego-test-e2e-gomod:
+    name: avalanchego-test-e2e-gomod (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -103,7 +107,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci
+          run: ./scripts/run_task.sh avalanchego:test-e2e-gomod-ci
           artifact_prefix: e2e-${{ matrix.os }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -114,14 +118,16 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_schedule_latest:
+
+  avalanchego-test-e2e-gomod-schedule-latest:
+    name: avalanchego-test-e2e-gomod-schedule-latest
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci -- --activate-latest-after=4m
+          run: ./scripts/run_task.sh avalanchego:test-e2e-gomod-ci -- --activate-latest-after=4m
           artifact_prefix: e2e-schedule-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -132,14 +138,16 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_post_latest:
+
+  avalanchego-test-e2e-gomod-post-latest:
+    name: avalanchego-test-e2e-gomod-post-latest
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci -- --activate-latest-after=0
+          run: ./scripts/run_task.sh avalanchego:test-e2e-gomod-ci -- --activate-latest-after=0
           artifact_prefix: e2e-post-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -150,13 +158,15 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_kube:
+
+  avalanchego-test-e2e-kube:
+    name: avalanchego-test-e2e-kube
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-kube-ci
+          run: ./scripts/run_task.sh avalanchego:test-e2e-kube-ci
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
@@ -168,14 +178,16 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_existing_network:
+
+  avalanchego-test-e2e-gomod-existing-network:
+    name: avalanchego-test-e2e-gomod-existing-network
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-existing-ci
+          run: ./scripts/run_task.sh avalanchego:test-e2e-existing-gomod-ci
           artifact_prefix: e2e-existing-network
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -185,14 +197,16 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  Upgrade:
+
+  avalanchego-test-upgrade:
+    name: avalanchego-test-upgrade
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Run e2e tests
+      - name: Run upgrade tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-upgrade
+          run: ./scripts/run_task.sh avalanchego:test-upgrade
           artifact_prefix: upgrade
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -202,15 +216,19 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  Lint:
+
+  avalanchego-lint:
+    name: avalanchego-lint
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
-      - name: Runs all lint checks
+      - name: Run all lint checks
         shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh lint-all-ci
-  tausecondslint:
+        run: ./scripts/run_task.sh avalanchego:lint-ci
+
+  avalanchego-check-tauseconds:
+    name: avalanchego-check-tauseconds
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -221,57 +239,63 @@ jobs:
             echo "TauSeconds would be interpreted as nanoseconds, not seconds"
             exit 1
           fi
-  links-lint:
-    name: Markdown Links Lint
+
+  avalanchego-check-markdown-links:
+    name: avalanchego-check-markdown-links
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
         with:
           fail_level: any
-  check_generated_protobuf:
-    name: Up-to-date protobuf
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
-      - uses: ./.github/actions/install-nix
-      - shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh check-generate-protobuf
-  check_mockgen:
-    name: Up-to-date mocks
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-mocks
-  check_canotogen:
-    name: Up-to-date canoto
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-canoto
-  check_contract_bindings:
-    name: Up-to-date contract bindings
+
+  avalanchego-check-generate-protobuf:
+    name: avalanchego-check-generate-protobuf
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
-        run: task check-generate-load-contract-bindings
-  check_go_mod_tidy:
-    name: Up-to-date go.mod and go.sum
+        run: ./scripts/run_task.sh avalanchego:check-generate-protobuf
+
+  avalanchego-check-generate-mocks:
+    name: avalanchego-check-generate-mocks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
-        run: ./scripts/run_task.sh check-go-mod-tidy
-  test_build_image:
-    name: Image build
+        run: ./scripts/run_task.sh avalanchego:check-generate-mocks
+
+  avalanchego-check-generate-canoto:
+    name: avalanchego-check-generate-canoto
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh avalanchego:check-generate-canoto
+
+  avalanchego-check-generate-load-contract-bindings:
+    name: avalanchego-check-generate-load-contract-bindings
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install-nix
+      - shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh avalanchego:check-generate-load-contract-bindings
+
+  go-check-mod-tidy:
+    name: go-check-mod-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh go:check-mod-tidy
+
+  avalanchego-test-build-image:
+    name: avalanchego-test-build-image
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -279,47 +303,51 @@ jobs:
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Check image build
         shell: bash
-        run: ./scripts/run_task.sh test-build-image
-  test_build_antithesis_avalanchego_images:
-    name: Build Antithesis avalanchego images
+        run: ./scripts/run_task.sh avalanchego:test-build-image
+
+  avalanchego-test-build-antithesis-images:
+    name: avalanchego-test-build-antithesis-images
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for avalanchego test setup
         shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
-  test_build_antithesis_xsvm_images:
-    name: Build Antithesis xsvm images
+        run: ./scripts/run_task.sh avalanchego:test-build-antithesis-images-avalanchego
+
+  avalanchego-test-build-antithesis-images-xsvm:
+    name: avalanchego-test-build-antithesis-images-xsvm
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for xsvm test setup
         shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
-  e2e_bootstrap_monitor:
-    name: Run bootstrap monitor e2e tests
+        run: ./scripts/run_task.sh avalanchego:test-build-antithesis-images-xsvm
+
+  avalanchego-test-bootstrap-monitor-e2e:
+    name: avalanchego-test-bootstrap-monitor-e2e
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
-      - name: Run e2e tests
+      - name: Run bootstrap monitor e2e tests
         shell: bash
-        run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
+        run: ./scripts/run_task.sh avalanchego:test-bootstrap-monitor-e2e
       - name: Collect kind diagnostics
         if: failure()
         uses: ./.github/actions/collect-kind-diagnostics
         with:
           artifact_name: bootstrap-monitor-kind-diagnostics
-  load:
-    name: Run process-based load test
+
+  avalanchego-test-load:
+    name: avalanchego-test-load
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-load -- --load-timeout=30s
+          run: ./scripts/run_task.sh avalanchego:test-load -- --load-timeout=30s
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -329,14 +357,15 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  load_kube_kind:
-    name: Run load test on kind cluster
+
+  avalanchego-test-load-kube-kind:
+    name: avalanchego-test-load-kube-kind
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
+          run: ./scripts/run_task.sh avalanchego:test-load-kube-kind -- --load-timeout=30s
           runtime: kube
           artifact_prefix: load-kube
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -347,15 +376,16 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  robustness:
+
+  avalanchego-test-robustness:
+    name: avalanchego-test-robustness
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
-      # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
         shell: bash
-        run: ./scripts/run_task.sh test-robustness
+        run: ./scripts/run_task.sh avalanchego:test-robustness
       - name: Collect kind diagnostics
         if: failure()
         uses: ./.github/actions/collect-kind-diagnostics

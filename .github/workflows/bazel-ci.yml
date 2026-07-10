@@ -1,7 +1,5 @@
 name: Bazel Jobs
 
-# Reusable Bazel CI workflow for one platform. This workflow is called by
-# bazel-ci-matrix.yml with a platform name and runner.
 on:
   workflow_call:
     inputs:
@@ -20,17 +18,15 @@ permissions:
   contents: read
 
 jobs:
-  # Aggregate the per-platform Bazel checks into one stable required job.
-  # GitHub Actions job graphs are static, so Bazel still runs inside each
-  # declared job.
-  bazel-required:
+  required:
     if: ${{ always() }}
     needs:
       - setup
-      - unit-main
-      - unit-coreth
-      - unit-subnet-evm
-      - e2e
+      - avalanchego-test-unit
+      - coreth-test-unit
+      - evm-test-unit
+      - subnet-evm-test-unit
+      - avalanchego-test-e2e
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -52,12 +48,8 @@ jobs:
             exit 1
           fi
 
-  # Prepare Bazel CI for this platform before the later jobs run. Similar in intent to
-  # setup-go, this job uses setup-bazel to check Bazel metadata and prepare cache
-  # state for the dependencies that subsequent jobs are expected to need. That shifts
-  # network access into one upfront step instead of having each later job discover
-  # missing dependencies on its own.
   setup:
+    name: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -65,17 +57,19 @@ jobs:
         with:
           initial-setup: true
 
-  unit-main:
+  avalanchego-test-unit:
+    name: avalanchego-test-unit
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-bazel
-      - name: Run unit tests with Bazel
+      - name: Run avalanchego unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        run: ./scripts/run_task.sh avalanchego:test-unit-bazel
 
-  unit-coreth:
+  coreth-test-unit:
+    name: coreth-test-unit
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -83,9 +77,21 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        run: ./scripts/run_task.sh coreth:test-unit-bazel
 
-  unit-subnet-evm:
+  evm-test-unit:
+    name: evm-test-unit
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+      - name: Run evm unit tests with Bazel
+        shell: bash
+        run: ./scripts/run_task.sh evm:test-unit-bazel
+
+  subnet-evm-test-unit:
+    name: subnet-evm-test-unit
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -93,9 +99,10 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        run: ./scripts/run_task.sh subnet-evm:test-unit-bazel
 
-  e2e:
+  avalanchego-test-e2e:
+    name: avalanchego-test-e2e
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -104,7 +111,7 @@ jobs:
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh bazel-test-e2e-ci
+          run: ./scripts/run_task.sh avalanchego:test-e2e-bazel-ci
           artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}

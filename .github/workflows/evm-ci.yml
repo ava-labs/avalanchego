@@ -11,11 +11,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  evm-shared-required:
+  required:
     if: ${{ always() }}
     needs:
-      - lint_test
-      - unit_test
+      - lint
+      - test-unit-gomod
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -37,26 +37,20 @@ jobs:
             exit 1
           fi
 
-  lint_test:
-    name: Lint
+  lint:
+    name: lint
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: ./graft/evm
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run all lint checks
-        run: ../../scripts/run_task.sh lint-all-ci
+        run: ./scripts/run_task.sh evm:lint-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: ../../scripts/run_task.sh check-go-mod-tidy
+        run: ./scripts/run_task.sh evm:check-go-mod-tidy
 
-  unit_test:
-    name: Unit Tests (${{ matrix.os }})
+  test-unit-gomod:
+    name: test-unit-gomod (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: ./graft/evm
     strategy:
       fail-fast: false
       matrix:
@@ -64,5 +58,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - run: ../../scripts/run_task.sh build-test
-      - run: ../../scripts/run_task.sh coverage
+      - run: ./scripts/run_task.sh evm:test-unit-gomod
+      - run: ./scripts/run_task.sh evm:coverage
