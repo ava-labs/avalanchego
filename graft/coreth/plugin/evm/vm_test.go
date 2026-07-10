@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -48,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -110,10 +112,8 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	fork := upgradetest.Latest
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork:       &fork,
 		ConfigJSON: configJSON,
 	})
 	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
@@ -1547,7 +1547,6 @@ func TestWaitForEvent(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name     string
-		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -1713,14 +1712,8 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
-			if testCase.Fork != nil {
-				fork = *testCase.Fork
-			}
 			vm := newDefaultTestVM()
-			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-				Fork: &fork,
-			})
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 			testCase.testCase(t, vm)
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
@@ -1746,13 +1739,10 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 // emulates server test
 func TestCreateHandlers(t *testing.T) {
 	var (
-		ctx  = t.Context()
-		fork = upgradetest.Latest
-		vm   = newDefaultTestVM()
+		ctx = t.Context()
+		vm  = newDefaultTestVM()
 	)
-	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: &fork,
-	})
+	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 	defer func() {
 		require.NoError(t, vm.Shutdown(ctx))
 	}()
@@ -2159,6 +2149,60 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 	}
 }
 
+// TestHeliconBlockValidation tests that blocks with Helicon timestamps cannot
+// be verified, cannot be built, but can be parsed.
+func TestHeliconBlockValidation(t *testing.T) {
+	ctx := t.Context()
+
+	// The chain config's upgrade schedule is derived from the snow context, so
+	// scheduling Helicon only requires updating the context.
+	snowCtx, prefixedDB, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
+
+	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
+	snowCtx.NetworkUpgrades.HeliconTime = heliconTime
+
+	vm := newDefaultTestVM()
+	err := vm.Initialize(
+		ctx,
+		snowCtx,
+		prefixedDB,
+		genesisBytes,
+		nil,
+		nil,
+		nil,
+		&enginetest.Sender{T: t, SendAppGossipF: func(context.Context, commonEng.SendConfig, []byte) error { return nil }},
+	)
+	require.NoErrorf(t, err, "%T.Initialize()", vm)
+	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping))
+	require.NoError(t, vm.SetState(ctx, snow.NormalOp))
+	defer func() {
+		require.NoErrorf(t, vm.Shutdown(ctx), "%T.Shutdown()", vm)
+	}()
+
+	vm.clock.Set(heliconTime)
+	signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
+	blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
+	require.NoError(t, err)
+
+	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	header := ethBlock.Header()
+	heliconTimestamp := uint64(heliconTime.Unix())
+	require.Less(t, header.Time, heliconTimestamp, "block builder shouldn't create Helicon blocks")
+
+	// Make malicious helicon block
+	header.Time = heliconTimestamp
+	customtypes.GetHeaderExtra(header).TimeMilliseconds = utils.PointerTo(heliconTimestamp * 1000)
+	modifiedEthBlock := ethBlock.WithSeal(header)
+	modifiedBytes, err := rlp.EncodeToBytes(modifiedEthBlock)
+	require.NoError(t, err, "rlp.EncodeToBytes(%T)", modifiedEthBlock)
+
+	modifiedBlock, err := vm.ParseBlock(ctx, modifiedBytes)
+	require.NoError(t, err, "Helicon blocks must be parsable")
+
+	err = modifiedBlock.Verify(ctx)
+	require.ErrorIsf(t, err, errIsHeliconBlock, "%T.Verify()", modifiedBlock)
+}
+
 func TestInspectDatabases(t *testing.T) {
 	var (
 		vm = newDefaultTestVM()
@@ -2208,7 +2252,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 
 			vm := newDefaultTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
@@ -2285,6 +2329,13 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				client, err := ethclient.Dial(server.URL)
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
+
+				// Verify the genesis state by checking the pre-funded balances at block 0.
+				for _, addr := range vmtest.TestEthAddrs {
+					balance, err := client.BalanceAt(ctx, addr, new(big.Int).SetUint64(0))
+					require.NoErrorf(t, err, "failed to get genesis balance for %s", addr)
+					require.Equalf(t, vmtest.InitialFund, balance, "unexpected genesis balance for %s", addr)
+				}
 
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)

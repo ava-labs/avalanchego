@@ -196,7 +196,7 @@ func createDB(t *testing.T) state.Database {
 	t.Cleanup(func() {
 		require.NoError(t, tdb.Close())
 	})
-	return firewood.NewStateAccessor(internalState, tdb)
+	return firewood.NewStateAccessor(internalState)
 }
 
 func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
