@@ -15,13 +15,13 @@ import (
 
 const (
 	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
-	// "use the default". The floor is 1000ms because the proposerVM block
-	// timestamp is currently whole-second granular: the slot clock only ticks
-	// once per second, so a sub-second window gains nothing. Sub-second windows
-	// (and a lower floor) arrive in a follow-up PR that adds millisecond-granular
-	// timestamps. The ceiling is the default window, since a larger window only
-	// slows failover.
-	MinProposerWindowMilliseconds = 1_000
+	// "use the default". The floor is 50ms: roughly the smallest window in which
+	// a proposer can build and propagate a block before its slot closes. A
+	// sub-second window only actually advances the slot clock when the chain also
+	// sets ProposerMillisecondTimestamps; without it, whole-second timestamps
+	// quantize the slot clock to ~1s and a sub-second window gains nothing. The
+	// ceiling is the default window, since a larger window only slows failover.
+	MinProposerWindowMilliseconds = 50
 	MaxProposerWindowMilliseconds = 5_000
 )
 
@@ -77,6 +77,20 @@ type Config struct {
 	// knob. Every validator of the Subnet's chains must use the same value or
 	// the Subnet loses liveness. The primary network (P/C/X) is unaffected.
 	ProposerWindowMilliseconds uint64 `json:"proposerWindowMilliseconds" yaml:"proposerWindowMilliseconds"`
+
+	// ProposerMillisecondTimestamps interprets the proposerVM wrapper block's
+	// timestamp as unix-milliseconds instead of unix-seconds, so that a
+	// sub-second ProposerWindowMilliseconds can actually advance (with
+	// whole-second timestamps the slot clock only ticks once per second, so a
+	// sub-second window gains nothing). It is opt-in and only meaningful
+	// alongside a sub-second proposer window.
+	//
+	// Invariant: this is a Subnet-wide consensus parameter, not a per-node knob.
+	// Every validator of the Subnet's chains must use the same value, and it must
+	// be fixed from genesis: enabling it on a chain that already has whole-second
+	// history misreads every old block. The primary network (P/C/X) is unaffected
+	// and always uses whole-second timestamps.
+	ProposerMillisecondTimestamps bool `json:"proposerMillisecondTimestamps" yaml:"proposerMillisecondTimestamps"`
 }
 
 func boolToInt(b bool) int {

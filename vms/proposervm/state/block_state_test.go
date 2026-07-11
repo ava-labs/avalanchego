@@ -41,6 +41,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		innerBlockBytes,
 		chainID,
 		key,
+		false,
 	)
 	require.NoError(err)
 
@@ -65,7 +66,7 @@ func TestBlockState(t *testing.T) {
 	a := require.New(t)
 
 	db := memdb.New()
-	bs := NewBlockState(db)
+	bs := NewBlockState(db, false)
 
 	testBlockState(a, bs)
 }
@@ -74,7 +75,7 @@ func TestMeteredBlockState(t *testing.T) {
 	a := require.New(t)
 
 	db := memdb.New()
-	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
+	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry(), false)
 	a.NoError(err)
 
 	testBlockState(a, bs)

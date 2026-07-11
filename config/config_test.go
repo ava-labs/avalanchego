@@ -592,6 +592,20 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"proposer millisecond timestamps": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"proposerMillisecondTimestamps": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ProposerMillisecondTimestamps)
+			},
+			expectedErr: nil,
+		},
 		"unset proposer window inherits the default": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
@@ -775,16 +789,19 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	}
 }
 
-// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
-// proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
-func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
+// TestPrimaryNetworkProposerConfigIsAlwaysDefault guards that the per-Subnet
+// proposerWindowMilliseconds and proposerMillisecondTimestamps settings can
+// never alter the primary network (P/C/X).
+func TestPrimaryNetworkProposerConfigIsAlwaysDefault(t *testing.T) {
 	require := require.New(t)
 
 	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
 
-	// Layer 1: the primary network's window is pinned to the default and never
-	// reads user input.
-	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+	// Layer 1: the primary network's proposer config is pinned to the defaults
+	// and never reads user input.
+	primaryCfg := getPrimaryNetworkConfig(setupViperFlags())
+	require.Equal(defaultWindowMS, primaryCfg.ProposerWindowMilliseconds)
+	require.False(primaryCfg.ProposerMillisecondTimestamps)
 
 	// Layer 2: tracking the primary network (the only way a subnet config could
 	// reach it) is rejected before any config is read.

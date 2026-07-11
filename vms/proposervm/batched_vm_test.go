@@ -658,6 +658,7 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 			buff,
 			chainID,
 			key,
+			false,
 		)
 		require.NoError(t, err)
 
