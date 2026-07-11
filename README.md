@@ -1,3 +1,12 @@
+> **FDE team branch.** Master plus all of the team's open PRs merged together:
+>
+> - [#5594 feat(proposervm): make proposal window duration configurable per-Subnet](https://github.com/ava-labs/avalanchego/pull/5594)
+> - [#5595 feat(proposervm): opt-in millisecond-granular block timestamps](https://github.com/ava-labs/avalanchego/pull/5595)
+> - [#5613 feat(node): add --p-chain-follow-only for read-only P-chain tracking](https://github.com/ava-labs/avalanchego/pull/5613)
+> - [#5624 feat(evm/firewood): flat state history for the Firewood state scheme](https://github.com/ava-labs/avalanchego/pull/5624)
+> - [#5629 feat(proposervm): dedup inner block bytes when the inner VM retains accepted blocks](https://github.com/ava-labs/avalanchego/pull/5629)
+> - [#5642 fix(evm): bound block builder wait so a full mempool cannot stall](https://github.com/ava-labs/avalanchego/pull/5642)
+
 <div align="center">
   <img src="resources/AvalancheLogoRed.png?raw=true">
 </div>
