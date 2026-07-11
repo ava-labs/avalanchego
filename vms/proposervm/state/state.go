@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -84,25 +86,25 @@ func timestampUnitName(unit []byte) string {
 	return "seconds"
 }
 
-func New(db *versiondb.Database, millisecondTimestamps bool) State {
+func New(db *versiondb.Database, getInnerBytes func(ids.ID) ([]byte, error), millisecondTimestamps bool, log logging.Logger) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	return &state{
 		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB, millisecondTimestamps),
+		BlockState:  NewBlockState(blockDB, getInnerBytes, millisecondTimestamps, log),
 		HeightIndex: NewHeightIndex(heightDB, db),
 		db:          db,
 	}
 }
 
-func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer, millisecondTimestamps bool) (State, error) {
+func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer, getInnerBytes func(ids.ID) ([]byte, error), millisecondTimestamps bool, log logging.Logger) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
-	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics, millisecondTimestamps)
+	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics, getInnerBytes, millisecondTimestamps, log)
 	if err != nil {
 		return nil, err
 	}

@@ -97,6 +97,7 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
+	_ block.RetainsAcceptedBlocksVM      = (*VM)(nil)
 	_ client.EthBlockParser              = (*VM)(nil)
 )
 
@@ -1134,6 +1135,13 @@ func (vm *VM) GetAcceptedBlock(ctx context.Context, blkID ids.ID) (snowman.Block
 		return nil, database.ErrNotFound
 	}
 	return blk, nil
+}
+
+// RetainsAcceptedBlocks declares that this VM durably retains the bytes of
+// every accepted block, retrievable via GetBlock, forever: accepted block
+// bodies are never pruned from the chain database.
+func (*VM) RetainsAcceptedBlocks() bool {
+	return true
 }
 
 // SetPreference sets what the current tail of the chain is
