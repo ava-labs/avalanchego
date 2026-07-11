@@ -49,6 +49,7 @@ func TestWindowerNoValidators(t *testing.T) {
 				makeValidatorState(t, test.validators),
 				subnetID,
 				randomChainID,
+				DefaultWindowDuration,
 				&logging.NoLog{},
 			)
 
@@ -93,7 +94,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, randomChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, randomChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	validatorDelay, err := w.Delay(t.Context(), 1, 0, validatorID, MaxVerifyWindows)
 	require.NoError(err)
@@ -101,22 +102,22 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	nonValidatorDelay, err := w.Delay(t.Context(), 1, 0, nonValidatorID, MaxVerifyWindows)
 	require.NoError(err)
-	require.Equal(MaxVerifyDelay, nonValidatorDelay)
+	require.Equal(MaxVerifyWindows*DefaultWindowDuration, nonValidatorDelay)
 }
 
 func TestDelayChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	expectedDelays1 := []time.Duration{
-		2 * WindowDuration,
-		5 * WindowDuration,
-		3 * WindowDuration,
-		4 * WindowDuration,
-		0 * WindowDuration,
-		1 * WindowDuration,
+		2 * DefaultWindowDuration,
+		5 * DefaultWindowDuration,
+		3 * DefaultWindowDuration,
+		4 * DefaultWindowDuration,
+		0 * DefaultWindowDuration,
+		1 * DefaultWindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
@@ -126,12 +127,12 @@ func TestDelayChangeByHeight(t *testing.T) {
 	}
 
 	expectedDelays2 := []time.Duration{
-		5 * WindowDuration,
-		1 * WindowDuration,
-		3 * WindowDuration,
-		4 * WindowDuration,
-		0 * WindowDuration,
-		2 * WindowDuration,
+		5 * DefaultWindowDuration,
+		1 * DefaultWindowDuration,
+		3 * DefaultWindowDuration,
+		4 * DefaultWindowDuration,
+		0 * DefaultWindowDuration,
+		2 * DefaultWindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays2 {
 		vdrID := validatorIDs[i]
@@ -156,16 +157,16 @@ func TestDelayChangeByChain(t *testing.T) {
 	require.NoError(err)
 
 	validatorIDs, vdrState := makeValidators(t, MaxVerifyWindows)
-	w0 := New(vdrState, subnetID, chainID0, &logging.NoLog{})
-	w1 := New(vdrState, subnetID, chainID1, &logging.NoLog{})
+	w0 := New(vdrState, subnetID, chainID0, DefaultWindowDuration, &logging.NoLog{})
+	w1 := New(vdrState, subnetID, chainID1, DefaultWindowDuration, &logging.NoLog{})
 
 	expectedDelays0 := []time.Duration{
-		5 * WindowDuration,
-		2 * WindowDuration,
-		0 * WindowDuration,
-		3 * WindowDuration,
-		1 * WindowDuration,
-		4 * WindowDuration,
+		5 * DefaultWindowDuration,
+		2 * DefaultWindowDuration,
+		0 * DefaultWindowDuration,
+		3 * DefaultWindowDuration,
+		1 * DefaultWindowDuration,
+		4 * DefaultWindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays0 {
 		vdrID := validatorIDs[i]
@@ -175,12 +176,12 @@ func TestDelayChangeByChain(t *testing.T) {
 	}
 
 	expectedDelays1 := []time.Duration{
-		0 * WindowDuration,
-		1 * WindowDuration,
-		4 * WindowDuration,
-		5 * WindowDuration,
-		3 * WindowDuration,
-		2 * WindowDuration,
+		0 * DefaultWindowDuration,
+		1 * DefaultWindowDuration,
+		4 * DefaultWindowDuration,
+		5 * DefaultWindowDuration,
+		3 * DefaultWindowDuration,
+		2 * DefaultWindowDuration,
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
@@ -194,7 +195,7 @@ func TestExpectedProposerChangeByHeight(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -243,7 +244,7 @@ func TestExpectedProposerChangeByChain(t *testing.T) {
 	}
 
 	for chainID, expectedProposerID := range expectedProposers {
-		w := New(vdrState, subnetID, chainID, &logging.NoLog{})
+		w := New(vdrState, subnetID, chainID, DefaultWindowDuration, &logging.NoLog{})
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 		require.NoError(err)
 		require.Equal(expectedProposerID, proposerID)
@@ -254,7 +255,7 @@ func TestExpectedProposerChangeBySlot(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -307,7 +308,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
 	_, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -323,7 +324,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 		// expected delay
 		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, proposerID, slot)
 		require.NoError(err)
-		require.Equal(time.Duration(slot)*WindowDuration, delay)
+		require.Equal(time.Duration(slot)*DefaultWindowDuration, delay)
 	}
 }
 
@@ -331,7 +332,7 @@ func TestMinDelayForProposer(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx            = t.Context()
@@ -341,17 +342,17 @@ func TestMinDelayForProposer(t *testing.T) {
 	)
 
 	expectedDelays := map[ids.NodeID]time.Duration{
-		validatorIDs[0]:          1 * WindowDuration,
-		validatorIDs[1]:          15 * WindowDuration,
-		validatorIDs[2]:          0 * WindowDuration,
-		validatorIDs[3]:          5 * WindowDuration,
-		validatorIDs[4]:          10 * WindowDuration,
-		validatorIDs[5]:          18 * WindowDuration,
-		validatorIDs[6]:          12 * WindowDuration,
-		validatorIDs[7]:          3 * WindowDuration,
-		validatorIDs[8]:          23 * WindowDuration,
-		validatorIDs[9]:          2 * WindowDuration,
-		ids.GenerateTestNodeID(): MaxLookAheadWindow,
+		validatorIDs[0]:          1 * DefaultWindowDuration,
+		validatorIDs[1]:          15 * DefaultWindowDuration,
+		validatorIDs[2]:          0 * DefaultWindowDuration,
+		validatorIDs[3]:          5 * DefaultWindowDuration,
+		validatorIDs[4]:          10 * DefaultWindowDuration,
+		validatorIDs[5]:          18 * DefaultWindowDuration,
+		validatorIDs[6]:          12 * DefaultWindowDuration,
+		validatorIDs[7]:          3 * DefaultWindowDuration,
+		validatorIDs[8]:          23 * DefaultWindowDuration,
+		validatorIDs[9]:          2 * DefaultWindowDuration,
+		ids.GenerateTestNodeID(): MaxLookAheadSlots * DefaultWindowDuration,
 	}
 
 	for nodeID, expectedDelay := range expectedDelays {
@@ -365,7 +366,7 @@ func BenchmarkMinDelayForProposer(b *testing.B) {
 	require := require.New(b)
 
 	_, vdrState := makeValidators(b, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx            = b.Context()
@@ -389,7 +390,7 @@ func TestTimeToSlot(t *testing.T) {
 		expectedSlot uint64
 	}{
 		{
-			timeOffset:   -WindowDuration,
+			timeOffset:   -DefaultWindowDuration,
 			expectedSlot: 0,
 		},
 		{
@@ -401,19 +402,101 @@ func TestTimeToSlot(t *testing.T) {
 			expectedSlot: 0,
 		},
 		{
-			timeOffset:   WindowDuration,
+			timeOffset:   DefaultWindowDuration,
 			expectedSlot: 1,
 		},
 		{
-			timeOffset:   2 * WindowDuration,
+			timeOffset:   2 * DefaultWindowDuration,
 			expectedSlot: 2,
 		},
 	}
+	w := New(makeValidatorState(t, nil), subnetID, randomChainID, DefaultWindowDuration, &logging.NoLog{})
 	for _, test := range tests {
 		t.Run(test.timeOffset.String(), func(t *testing.T) {
-			slot := TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
+			slot := w.TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
 			require.Equal(t, test.expectedSlot, slot)
 		})
+	}
+}
+
+// TestMinDelayForProposerCustomWindow pins that a non-default window scales the
+// slot math; every other test passes DefaultWindowDuration, so a silent revert
+// to the constant would not fail them.
+func TestMinDelayForProposerCustomWindow(t *testing.T) {
+	require := require.New(t)
+
+	// Non-round so that no slot-index multiple of it coincides with a
+	// DefaultWindowDuration result.
+	const customWindow = 137 * time.Millisecond
+
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID, customWindow, &logging.NoLog{})
+
+	var (
+		dummyCtx            = t.Context()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
+		slot         uint64 = 0
+	)
+
+	// Same fixtures as TestMinDelayForProposer: slot indices depend only on
+	// validator sampling, so only the multiplier (the window) differs.
+	expectedDelays := map[ids.NodeID]time.Duration{
+		validatorIDs[0]:          1 * customWindow,
+		validatorIDs[1]:          15 * customWindow,
+		validatorIDs[2]:          0 * customWindow,
+		validatorIDs[3]:          5 * customWindow,
+		validatorIDs[4]:          10 * customWindow,
+		validatorIDs[5]:          18 * customWindow,
+		validatorIDs[6]:          12 * customWindow,
+		validatorIDs[7]:          3 * customWindow,
+		validatorIDs[8]:          23 * customWindow,
+		validatorIDs[9]:          2 * customWindow,
+		ids.GenerateTestNodeID(): MaxLookAheadSlots * customWindow,
+	}
+
+	for nodeID, expectedDelay := range expectedDelays {
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		require.NoError(err)
+		require.Equal(expectedDelay, delay)
+	}
+}
+
+func TestTimeToSlotCustomWindow(t *testing.T) {
+	const customWindow = 137 * time.Millisecond
+
+	parentTime := time.Now()
+	tests := []struct {
+		timeOffset   time.Duration
+		expectedSlot uint64
+	}{
+		{timeOffset: -customWindow, expectedSlot: 0},
+		{timeOffset: 0, expectedSlot: 0},
+		{timeOffset: customWindow - time.Nanosecond, expectedSlot: 0},
+		{timeOffset: customWindow, expectedSlot: 1},
+		{timeOffset: 2 * customWindow, expectedSlot: 2},
+		{timeOffset: 10 * customWindow, expectedSlot: 10},
+	}
+	w := New(makeValidatorState(t, nil), subnetID, randomChainID, customWindow, &logging.NoLog{})
+	for _, test := range tests {
+		t.Run(test.timeOffset.String(), func(t *testing.T) {
+			slot := w.TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
+			require.Equal(t, test.expectedSlot, slot)
+		})
+	}
+}
+
+func TestNewWindowDurationFallback(t *testing.T) {
+	require := require.New(t)
+
+	parentTime := time.Now()
+	// A non-positive window falls back to DefaultWindowDuration; the fallback is
+	// also what keeps TimeToSlot's division from panicking on a zero window.
+	for _, windowDuration := range []time.Duration{0, -time.Second} {
+		w := New(makeValidatorState(t, nil), subnetID, randomChainID, windowDuration, &logging.NoLog{})
+		require.Equal(uint64(0), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration-time.Nanosecond)))
+		require.Equal(uint64(1), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration)))
+		require.Equal(uint64(2), w.TimeToSlot(parentTime, parentTime.Add(2*DefaultWindowDuration)))
 	}
 }
 
@@ -423,7 +506,7 @@ func TestProposerDistribution(t *testing.T) {
 	require := require.New(t)
 
 	validatorIDs, vdrState := makeValidators(t, 10)
-	w := New(vdrState, subnetID, fixedChainID, &logging.NoLog{})
+	w := New(vdrState, subnetID, fixedChainID, DefaultWindowDuration, &logging.NoLog{})
 
 	var (
 		dummyCtx               = t.Context()

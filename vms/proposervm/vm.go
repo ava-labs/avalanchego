@@ -49,6 +49,8 @@ const (
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
+	// DefaultWindowDuration is the default proposer slot length.
+	DefaultWindowDuration = proposer.DefaultWindowDuration
 	// DefaultNumHistoricalBlocks as 0 results in never deleting any historical
 	// blocks.
 	DefaultNumHistoricalBlocks uint64 = 0
@@ -161,7 +163,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.Config.WindowDuration, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -520,10 +522,10 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 			ctx,
 			childBlockHeight,
 			pChainHeight,
-			proposer.TimeToSlot(parentTimestamp, currentTime),
+			vm.Windower.TimeToSlot(parentTimestamp, currentTime),
 			parentTimestamp,
 		); err == nil {
-			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+			vm.proposerBuildSlotGauge.Set(float64(vm.Windower.TimeToSlot(parentTimestamp, nextStartTime)))
 		}
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(
