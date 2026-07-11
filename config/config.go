@@ -1400,6 +1400,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
+	nodeConfig.PChainFollowOnly = v.GetBool(PChainFollowOnlyKey)
+
 	// HTTP APIs
 	nodeConfig.HTTPConfig, err = getHTTPConfig(v)
 	if err != nil {

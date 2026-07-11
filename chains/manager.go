@@ -245,6 +245,10 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
+
+	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
+	// joining consensus.
+	PChainFollowOnly bool
 }
 
 type manager struct {
@@ -1408,6 +1412,7 @@ func (m *manager) createSnowmanChain(
 		DB:                             bootstrappingDB,
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
+		FollowOnly:                     m.PChainFollowOnly && ctx.ChainID == constants.PlatformChainID,
 	}
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
