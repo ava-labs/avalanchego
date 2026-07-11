@@ -25,9 +25,16 @@ import (
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
+
+	"github.com/ava-labs/avalanchego/database/pebbledb"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood/statehistory"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const firewoodDir = "firewood"
+const (
+	firewoodDir     = "firewood"
+	stateHistoryDir = "statehistory"
+)
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -56,6 +63,12 @@ type TrieDB struct {
 	// This is exported as read-only, with knowledge that the consumer will not close it
 	// and the latest state can be modified at any time.
 	Firewood *ffi.Database
+
+	// historyStore, when non-nil, receives every committed block's state
+	// changes as flat history rows. Rows for a block are flushed durably in
+	// [TrieDB.Commit] immediately before the Firewood proposal commit; see
+	// the [statehistory] package doc for the crash invariant.
+	historyStore *statehistory.Store
 }
 
 type proposals struct {
@@ -87,6 +100,10 @@ type possibleKey struct {
 type proposal struct {
 	*proposalMeta
 	handle *ffi.Proposal
+	// historyOps holds the block's state changes for the state history store,
+	// parked until the proposal is committed (uncommitted proposals are
+	// simply dropped). Always nil when state history is disabled.
+	historyOps []statehistory.Op
 }
 
 type proposalMeta struct {
@@ -106,6 +123,10 @@ type TrieDBConfig struct {
 	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
 	// possible to reap the latest persisted revision.
 	DeferredCommitInterval uint64
+	// EnableStateHistory opens a flat state history store (a separate pebble
+	// database under DatabaseDir) and records every committed block's state
+	// changes into it. See the [statehistory] package.
+	EnableStateHistory bool
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
@@ -169,6 +190,15 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
+	var historyStore *statehistory.Store
+	if config.EnableStateHistory {
+		historyDB, err := pebbledb.New(filepath.Join(config.DatabaseDir, stateHistoryDir), nil, logging.NoLog{}, nil)
+		if err != nil {
+			return nil, fmt.Errorf("opening state history database: %w", err)
+		}
+		historyStore = statehistory.New(historyDB)
+	}
+
 	initialRoot := fw.Root()
 	if initialRoot == ffi.EmptyRoot {
 		log.Debug("empty firewood database opened", "path", path)
@@ -179,7 +209,8 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	blockHashes := make(map[common.Hash]struct{})
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
-		Firewood: fw,
+		Firewood:     fw,
+		historyStore: historyStore,
 		proposals: proposals{
 			byStateRoot: make(map[common.Hash][]*proposal),
 			tree: &proposal{
@@ -225,6 +256,12 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
 	t.tree.root = common.Hash(t.Firewood.Root())
+}
+
+// HistoryStore returns the flat state history store, or nil when state
+// history is disabled.
+func (t *TrieDB) HistoryStore() *statehistory.Store {
+	return t.historyStore
 }
 
 // ClearAll resets the database to an empty state, without a genesis block committed.
@@ -291,6 +328,13 @@ func (t *TrieDB) Close() error {
 
 	// encourage finalizers to run before we wait, otherwise the database won't close properly.
 	go runtime.GC()
+
+	if t.historyStore != nil {
+		if err := t.historyStore.Close(); err != nil {
+			return fmt.Errorf("closing state history store: %w", err)
+		}
+		t.historyStore = nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -408,6 +452,16 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 		return err
 	}
 
+	// Flush the block's state history durably BEFORE the Firewood commit, so
+	// history can never fall behind the durable Firewood state. Crash replay
+	// re-commits blocks and rewrites these rows idempotently.
+	if t.historyStore != nil {
+		if err := t.historyStore.Flush(p.height, p.historyOps); err != nil {
+			return fmt.Errorf("flushing state history for block %d: %w", p.height, err)
+		}
+		p.historyOps = nil
+	}
+
 	if err := p.handle.Commit(); err != nil {
 		return fmt.Errorf("committing proposal %s: %w", root.Hex(), err)
 	}
@@ -450,7 +504,7 @@ func (ps *proposals) findProposalToCommitWhenLocked(root common.Hash) (*proposal
 }
 
 // createProposal creates a new proposal from the given layer
-func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal, error) {
+func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp, historyOps []statehistory.Op) (*proposal, error) {
 	propose := t.Firewood.Propose
 	if h := parent.handle; h != nil {
 		propose = h.Propose
@@ -470,7 +524,8 @@ func (t *TrieDB) createProposal(parent *proposal, ops []ffi.BatchOp) (*proposal,
 	}
 
 	p := &proposal{
-		handle: handle,
+		handle:     handle,
+		historyOps: historyOps,
 		proposalMeta: &proposalMeta{
 			blockHashes: make(map[common.Hash]struct{}),
 			parent:      parent.proposalMeta,
@@ -541,7 +596,7 @@ func (ps *proposals) removeProposalFromMap(meta *proposalMeta, drop bool) {
 // createProposals calculates the hash if the set of keys and values are
 // proposed from the given parent root.
 // All proposals created will be tracked for future use.
-func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (common.Hash, error) {
+func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp, historyOps []statehistory.Op) (common.Hash, error) {
 	start := time.Now()
 	defer func() {
 		hashTimer.Inc(time.Since(start).Milliseconds())
@@ -558,7 +613,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (com
 	)
 	if t.proposals.tree.root == parentRoot {
 		// Propose from the database root.
-		p, err := t.createProposal(t.proposals.tree, ops)
+		p, err := t.createProposal(t.proposals.tree, ops, historyOps)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}
@@ -573,7 +628,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (com
 	// Since we are only using the proposal to find the root hash,
 	// we can use the first proposal found.
 	for _, parent := range t.proposals.byStateRoot[parentRoot] {
-		p, err := t.createProposal(parent, ops)
+		p, err := t.createProposal(parent, ops, historyOps)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("proposing from root %s: %w", parentRoot.Hex(), err)
 		}
