@@ -10,15 +10,19 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
+
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	evmtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
+	_ types.Syncer = (*Syncer)(nil)
+
 	errBlocksToFetchRequired = errors.New("blocksToFetch must be greater than zero")
 	errFromHashRequired      = errors.New("fromHash must be non-zero when fromHeight is greater than zero")
 	errEmptyResponse         = errors.New("empty block response")
@@ -55,6 +59,12 @@ func NewSyncer(c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, b
 		blocksToFetch: blocksToFetch,
 	}, nil
 }
+
+// Name returns a human-readable name for logging.
+func (*Syncer) Name() string { return "Block Syncer" }
+
+// ID returns the stable identifier used for deduplication and metrics.
+func (*Syncer) ID() string { return "state_block_sync" }
 
 // Sync walks parents from fromHash, skips blocks already on disk, and fetches
 // the rest from peers in batches. It runs until blocksToFetch are satisfied,
@@ -102,7 +112,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // getBlocks requests up to numParents blocks ending at (hash, height), verifies
 // the returned chain links back from hash, scores the peer, and re-requests on
 // any network or verification failure until ctx ends.
-func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
+func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, numParents uint16) ([]*evmtypes.Block, error) {
 	req := &syncpb.GetBlockRequest{Height: height, NumParents: uint32(numParents)}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -130,7 +140,7 @@ func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, 
 
 // verifyBlocks decodes raw and reports whether it is the parent chain ending at
 // hash, in tip-first order.
-func verifyBlocks(hash common.Hash, numParents uint16, raw [][]byte) ([]*types.Block, error) {
+func verifyBlocks(hash common.Hash, numParents uint16, raw [][]byte) ([]*evmtypes.Block, error) {
 	if len(raw) == 0 {
 		return nil, errEmptyResponse
 	}
@@ -138,10 +148,10 @@ func verifyBlocks(hash common.Hash, numParents uint16, raw [][]byte) ([]*types.B
 		return nil, fmt.Errorf("%w: got %d requested %d", errTooManyBlocks, len(raw), numParents)
 	}
 
-	blocks := make([]*types.Block, len(raw))
+	blocks := make([]*evmtypes.Block, len(raw))
 	want := hash
 	for i, blockBytes := range raw {
-		block := new(types.Block)
+		block := new(evmtypes.Block)
 		if err := rlp.DecodeBytes(blockBytes, block); err != nil {
 			return nil, fmt.Errorf("%w at index %d: %w", errDecodeBlock, i, err)
 		}
