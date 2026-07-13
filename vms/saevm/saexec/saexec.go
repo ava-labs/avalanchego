@@ -76,7 +76,7 @@ func New(
 		return nil, err
 	}
 
-	m, err := newMetrics(reg, lastExecuted, hooks)
+	m, err := newMetrics(reg, lastExecuted, hooks, log)
 	if err != nil {
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}

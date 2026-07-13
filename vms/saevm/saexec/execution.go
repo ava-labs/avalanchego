@@ -46,13 +46,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 
 	select {
 	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
-		if err := e.metrics.markEnqueued(block); err != nil {
-			e.log.Warn(
-				"Failed to derive worst-case gas time for metrics",
-				zap.Uint64("block_height", block.Height()),
-				zap.Error(err),
-			)
-		}
+		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
