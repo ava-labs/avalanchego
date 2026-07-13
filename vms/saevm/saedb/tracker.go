@@ -6,6 +6,7 @@ package saedb
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
@@ -30,12 +31,18 @@ const (
 	// DefaultSnapshotCacheSizeMiB is the recommended snapshot cache size used
 	// by a [Tracker].
 	DefaultSnapshotCacheSizeMiB = 256
+
+	mibToBytes = 1024 * 1024
+
+	// maxCacheMiB is the largest MiB value that can be converted to bytes
+	// without overflowing an int.
+	maxCacheMiB = math.MaxInt / mibToBytes
 )
 
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
-	TrieCacheMiB     int    // size of the TrieDB cache
-	SnapshotCacheMiB int    // size of the snapshot cache - if 0, snapshots are disabled
+	TrieCacheMiB     uint64 // size of the TrieDB cache
+	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
 	Archival         bool   // if true, will store every state on disk
 	CommitInterval   uint64 // MUST be set to a non-zero value
 }
@@ -44,13 +51,19 @@ func (c Config) Verify() error {
 	if c.CommitInterval == 0 {
 		return errZeroCommitInterval
 	}
+	if c.TrieCacheMiB > maxCacheMiB {
+		return fmt.Errorf("%w: TrieCacheMiB (%d)", errCacheTooLarge, c.TrieCacheMiB)
+	}
+	if c.SnapshotCacheMiB > maxCacheMiB {
+		return fmt.Errorf("%w: SnapshotCacheMiB (%d)", errCacheTooLarge, c.SnapshotCacheMiB)
+	}
 	return nil
 }
 
 func (c Config) TrieDBConfig() *triedb.Config {
 	return &triedb.Config{
 		HashDB: &hashdb.Config{
-			CleanCacheSize: c.TrieCacheMiB,
+			CleanCacheSize: int(c.TrieCacheMiB) * mibToBytes, //#nosec G115 // checked in [Config.Verify]
 		},
 	}
 }
@@ -60,7 +73,7 @@ func (c Config) snapConfig() *snapshot.Config {
 		return nil
 	}
 	return &snapshot.Config{
-		CacheSize:  c.SnapshotCacheMiB,
+		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 // checked in [Config.Verify]
 		AsyncBuild: true,
 	}
 }
@@ -80,7 +93,10 @@ type Tracker struct {
 	log    logging.Logger
 }
 
-var errZeroCommitInterval = errors.New("commit interval must be non-zero")
+var (
+	errZeroCommitInterval = errors.New("commit interval must be non-zero")
+	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
+)
 
 // NewTracker provides a new [Tracker] on the underlying database.
 func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log logging.Logger) (*Tracker, error) {

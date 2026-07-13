@@ -38,8 +38,8 @@ type config struct {
 	// State & trie
 	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
 	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie; 0 uses the default (4096).
-	TrieCleanCache int    `json:"trie-clean-cache"`
-	SnapshotCache  int    `json:"snapshot-cache"`
+	TrieCleanCache uint64 `json:"trie-clean-cache"`
+	SnapshotCache  uint64 `json:"snapshot-cache"`
 	// AllowMissingTries    bool    `json:"allow-missing-tries"`
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`

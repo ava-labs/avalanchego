@@ -4,6 +4,7 @@
 package saedb
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -36,6 +37,16 @@ func TestNewTracker(t *testing.T) {
 			with: func(c *Config) {
 				c.SnapshotCacheMiB = 1
 			},
+		},
+		{
+			name:    "trie_cache_overflows_bytes",
+			with:    func(c *Config) { c.TrieCacheMiB = math.MaxInt },
+			wantErr: errCacheTooLarge,
+		},
+		{
+			name:    "snapshot_cache_overflows_bytes",
+			with:    func(c *Config) { c.SnapshotCacheMiB = math.MaxInt },
+			wantErr: errCacheTooLarge,
 		},
 	}
 
