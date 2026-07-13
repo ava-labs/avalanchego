@@ -167,32 +167,23 @@ func (s *Syncer) fulfill(ctx context.Context, hashes []common.Hash) error {
 	return nil
 }
 
-// getCode requests hashes through c, verifies every returned blob against its
-// hash, and scores the peer. It re-requests on any network or verification
-// failure until ctx ends.
+// getCode fetches code for hashes and verifies each blob against its hash.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetCodeResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		if err := verifyCode(hashes, resp.GetData()); err != nil {
-			outcome.Failure()
-			log.Debug("invalid code response, re-requesting", zap.Error(err))
-			continue
-		}
-
-		outcome.Success()
-		return resp.GetData(), nil
+	resp, err := c.Send(ctx, req,
+		func() *syncpb.GetCodeResponse { return &syncpb.GetCodeResponse{} },
+		func(resp *syncpb.GetCodeResponse) error {
+			if err := verifyCode(hashes, resp.GetData()); err != nil {
+				log.Debug("invalid code response, re-requesting", zap.Error(err))
+				return err
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
+	return resp.GetData(), nil
 }
 
 // verifyCode reports whether data is the code for hashes, in order.

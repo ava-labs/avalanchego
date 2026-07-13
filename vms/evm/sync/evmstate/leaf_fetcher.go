@@ -145,8 +145,8 @@ func (f *leafFetcher) syncTask(ctx context.Context, t task) error {
 	}
 }
 
-// getLeaves requests the range at start, verifies it, scores the peer, and re-requests
-// on any failure until ctx ends. It reports whether more leaves remain to the right.
+// getLeaves fetches and proof-verifies the leaf range at start, reporting whether
+// more leaves remain to the right.
 func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leafBatch, bool, error) {
 	root := t.Root()
 	req := &syncpb.GetLeafRequest{
@@ -155,28 +155,23 @@ func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leaf
 		StartKey:    start,
 		KeyLimit:    uint32(MaxLeavesLimit),
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return leafBatch{}, false, err
-		}
-
-		resp := &syncpb.GetLeafResponse{}
-		outcome, err := f.client.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		more, err := verifyLeaves(root, start, resp)
-		if err != nil {
-			outcome.Failure()
-			f.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
-			continue
-		}
-
-		outcome.Success()
-		return leafBatch{keys: resp.GetKeys(), vals: resp.GetValues()}, more, nil
+	var more bool
+	resp, err := f.client.Send(ctx, req,
+		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
+		func(resp *syncpb.GetLeafResponse) error {
+			m, err := verifyLeaves(root, start, resp)
+			if err != nil {
+				f.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+				return err
+			}
+			more = m
+			return nil
+		},
+	)
+	if err != nil {
+		return leafBatch{}, false, err
 	}
+	return leafBatch{keys: resp.GetKeys(), vals: resp.GetValues()}, more, nil
 }
 
 // verifyLeaves range-proves resp against root and reports whether more leaves remain.
