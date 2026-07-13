@@ -172,7 +172,7 @@ func Execute(
 	receiptStore ReceiptStore,
 	log logging.Logger,
 ) (*ExecutionResults, error) {
-	log.Debug("Executing block")
+	log.Trace("Executing block")
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -278,7 +278,7 @@ func Execute(
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
-	log.Debug(
+	log.Trace(
 		"Block execution complete",
 		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),

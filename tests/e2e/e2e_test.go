@@ -4,10 +4,7 @@
 package e2e_test
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -21,13 +18,10 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestE2E(t *testing.T) {
@@ -41,29 +35,6 @@ func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
-// upgradeConfig configures the latest upgrade:
-//   - activateLatestAfter < 0: leave latest unscheduled
-//   - activateLatestAfter == 0: activate latest from genesis
-//   - activateLatestAfter > 0: schedule latest that duration after starting
-func upgradeConfig(activateLatestAfter time.Duration) upgrade.Config {
-	const previous = upgradetest.Latest - 1
-	var upgrades upgrade.Config
-	switch {
-	case activateLatestAfter < 0:
-		upgrades = upgradetest.GetConfig(previous)
-	case activateLatestAfter == 0:
-		upgrades = upgradetest.GetConfig(upgradetest.Latest)
-	default:
-		upgrades = upgradetest.GetConfigWithUpgradeTime(
-			upgradetest.Latest,
-			time.Now().Add(activateLatestAfter),
-		)
-		upgradetest.SetTimesTo(&upgrades, previous, upgrade.InitiallyActiveTime)
-	}
-	upgrades.GraniteEpochDuration = 4 * time.Second
-	return upgrades
-}
-
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
@@ -74,21 +45,13 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	upgrades := upgradeConfig(flagVars.ActivateLatestAfter())
+	upgrades := tmpnet.UpgradeConfig(flagVars.ActivateLatestAfter())
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
 	)
 
-	upgradeJSON, err := json.Marshal(upgrades)
+	defaultFlags, err := tmpnet.UpgradeFlags(upgrades)
 	require.NoError(tc, err)
-
-	upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
-
-	defaultFlags := tmpnet.FlagsMap{
-		config.UpgradeFileContentKey: upgradeBase64,
-		// Ensure a min stake duration compatible with testing staking logic
-		config.MinStakeDurationKey: "1s",
-	}
 	defaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 
 	return e2e.NewTestEnvironment(

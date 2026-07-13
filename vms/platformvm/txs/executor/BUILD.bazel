@@ -27,6 +27,7 @@ go_library(
         "//utils/constants",
         "//utils/crypto/bls",
         "//utils/math",
+        "//utils/math/intmath",
         "//utils/set",
         "//utils/timer/mockable",
         "//vms/components/avax",

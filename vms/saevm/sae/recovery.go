@@ -5,12 +5,14 @@ package sae
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"iter"
-	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 
@@ -19,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
@@ -27,13 +28,12 @@ import (
 )
 
 type recovery struct {
-	db              ethdb.Database
-	xdb             types.ExecutionResults
-	chainConfig     *params.ChainConfig
-	log             logging.Logger
-	hooks           hook.Points
-	config          Config
-	lastSynchronous *blocks.Block
+	db          ethdb.Database
+	xdb         types.ExecutionResults
+	chainConfig *params.ChainConfig
+	log         logging.Logger
+	hooks       hook.Points
+	config      Config
 }
 
 func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*blocks.Block, error) {
@@ -44,37 +44,71 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.log)
 }
 
-func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
-	num := saedb.LastHeightWithExecutionRootCommitted(
-		rec.db,
-		rec.config.DBConfig,
-		rec.hooks,
-		rec.lastSynchronous.Height(),
-	)
-	if ls := rec.lastSynchronous; num == ls.Height() {
-		return ls, nil
+// lastCommittedBlock returns the highest settled block whose post-execution
+// state is available on disk. This is required because its post-execution state
+// is the basis for the worst-case checks needed for block verifications.
+func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
+	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig)
+	defer func() {
+		retErr = errors.Join(retErr, cache.TrieDB().Close())
+	}()
+
+	lastSettledHash := rawdb.ReadFinalizedBlockHash(rec.db)
+	if lastSettledHash == (common.Hash{}) {
+		return nil, errors.New("no finalized block recorded")
+	}
+	lastSettledHeight := rawdb.ReadHeaderNumber(rec.db, lastSettledHash)
+	if lastSettledHeight == nil {
+		return nil, fmt.Errorf("no height for finalized block %s", lastSettledHash)
 	}
 
-	b, err := rec.newCanonicalBlock(num, nil)
-	if err != nil {
-		return nil, err
+	// Search for highest settled post-execution state
+	// Invariant: The state is written to disk AFTER the block is written to
+	// disk. Therefore, the state can only lag behind the block read.
+	// Additionally, we assume any block has been written atomically, so
+	// if the last settled height was found, the underlying block is present.
+	// At minimum, [NewVM] requires a genesis block to be written (which is
+	// synchronous by definition).
+	//
+	// There's no reasonable cap on how far back to search, since the distance
+	// between the settler and settled block is unbounded, and node crashes
+	// must be accounted for.
+	for height := *lastSettledHeight; ; height-- {
+		ethB, err := canonicalBlock(rec.db, height)
+		if err != nil {
+			return nil, err
+		}
+
+		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.log, rec.db, rec.xdb, rec.chainConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
+			return b, nil
+		}
+
+		if b.Synchronous() {
+			return nil, fmt.Errorf("last synchronous block %d has no available post-execution state", height)
+		}
 	}
-	if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
-		return nil, err
-	}
-	return b, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
-	nums, _ := rawdb.ReadAllCanonicalHashes(rec.db, parent.NumberU64()+1, math.MaxUint64, math.MaxInt)
-
 	return func(yield func(*blocks.Block, error) bool) {
-		for _, num := range nums {
-			b, err := rec.newCanonicalBlock(num, parent)
+		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		if lastAcceptedHash == (common.Hash{}) {
+			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
+			// asynchronous blocks MUST be empty.
+			return
+		}
+
+		for curr := parent; curr.Hash() != lastAcceptedHash; {
+			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
 				return
 			}
-			parent = b
+			curr = b
 		}
 	}
 }
@@ -135,20 +169,17 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				return b.MarkSettled(blackhole)
 
-			case b.Height() == rec.lastSynchronous.Height()+1:
-				chain = append(chain, rec.lastSynchronous)
-
 			default:
 				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				if !b.Settled() && !parent.Synchronous() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {
