@@ -35,10 +35,11 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...H
 // proofs the handler really produced.
 func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLeafRequest) *syncpb.GetLeafResponse {
 	t.Helper()
-	resp := &syncpb.GetLeafResponse{}
-	outcome, err := c.sender.Send(ctx, req, resp)
+	resp, err := c.sender.Send(ctx, req,
+		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
+		func(*syncpb.GetLeafResponse) error { return nil },
+	)
 	require.NoError(t, err)
-	outcome.Success()
 	return resp
 }
 

@@ -63,28 +63,23 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		KeyLimit:    uint32(req.Limit),
 	}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return Leaves{}, false, err
-		}
-
-		pbResp := &syncpb.GetLeafResponse{}
-		outcome, err := c.sender.Send(ctx, pbReq, pbResp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		more, err := verifyRange(req, pbResp)
-		if err != nil {
-			outcome.Failure()
-			c.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
-			continue
-		}
-
-		outcome.Success()
-		return Leaves{Keys: pbResp.GetKeys(), Vals: pbResp.GetValues()}, more, nil
+	var more bool
+	pbResp, err := c.sender.Send(ctx, pbReq,
+		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
+		func(resp *syncpb.GetLeafResponse) error {
+			m, err := verifyRange(req, resp)
+			if err != nil {
+				c.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+				return err
+			}
+			more = m
+			return nil
+		},
+	)
+	if err != nil {
+		return Leaves{}, false, err
 	}
+	return Leaves{Keys: pbResp.GetKeys(), Vals: pbResp.GetValues()}, more, nil
 }
 
 // verifyRange reports whether more leaves remain to the right of resp.
