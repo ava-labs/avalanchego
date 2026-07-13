@@ -107,9 +107,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
-	for addr, acc := range sutCfg.extraAlloc {
-		alloc[addr] = acc
-	}
+	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
 		blockstest.WithTrieDBConfig(tdbConfig),
@@ -1066,23 +1064,17 @@ func TestArchivalStoresAll(t *testing.T) {
 }
 
 // TestProcessBeaconBlockRoot verifies that block execution performs the
-// EIP-4788 system call, storing the header's parent beacon block root via the
-// beacon-roots contract. [Execute] is shared by live execution and tracing replay,
-// so covering it here covers both paths.
+// EIP-4788 system call.
 //
-// The contract is deployed exactly as on mainnet: by sending the canonical
-// keyless ("Nick's method") presigned deployment transaction, which lands the
-// contract at [params.BeaconRootsStorageAddress]. A later block then carries a
-// parent beacon root, and we assert on the contract's observable behaviour by
-// querying it for that block's timestamp.
+// The contract is deployed according to the EIP, which lands the contract at
+// [params.BeaconRootsStorageAddress]. A later block then carries a parent
+// beacon root, and we assert on the contract's observable behaviour by querying
+// it for that block's timestamp.
 func TestProcessBeaconBlockRoot(t *testing.T) {
 	beaconRoot := common.HexToHash("0xbeef")
 
-	// Canonical EIP-4788 deployment transaction, reproduced field-for-field from
-	// https://eips.ethereum.org/EIPS/eip-4788#deployment. Every field MUST match
-	// the EIP exactly. This is required so the the keyless signature recovers to
-	// the canonical deployer 0x0B79..., whose nonce-0 creation lands the contract
-	// at [params.BeaconRootsStorageAddress].
+	// This is the canonical EIP-4788 deployment transaction from
+	// https://eips.ethereum.org/EIPS/eip-4788#deployment.
 	deployer := common.HexToAddress("0x0B799C86a49DEeb90402691F1041aa3AF2d3C875")
 	deployTx := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
@@ -1104,17 +1096,19 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 	tests := []struct {
 		name       string
 		beaconRoot *common.Hash
-		wantRoot   common.Hash
+		want       []byte
 		wantErr    testerr.Want
 	}{
 		{
 			name:       "stores parent beacon root, queryable via beacon-roots contract",
 			beaconRoot: &beaconRoot,
-			wantRoot:   beaconRoot,
+			want:       beaconRoot[:],
+			wantErr:    nil,
 		},
 		{
 			name:       "nil parent beacon root: nothing stored, query reverts",
 			beaconRoot: nil,
+			want:       nil,
 			wantErr:    testerr.Is(vm.ErrExecutionReverted),
 		},
 	}
