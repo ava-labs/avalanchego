@@ -87,7 +87,6 @@ import (
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	oraclepkg "github.com/ava-labs/avalanchego/network/p2p/oracle"
 	p2poracle "github.com/ava-labs/avalanchego/network/p2p/oracle/validator"
-	sidecarconfig "github.com/ava-labs/avalanchego/sidecar/config"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -501,19 +500,22 @@ func (vm *VM) Initialize(
 	}
 
 	if vm.config.Oracle.Endpoint != "" {
-		if vm.config.Oracle.SidecarConfigPath == "" {
-			return errors.New("oracle.endpoint is set but oracle.sidecar-config-path is empty; both are required to register the oracle handler")
+		if len(vm.config.Oracle.AllowedSources) == 0 {
+			return errors.New("oracle.endpoint is set but oracle.allowed-sources is empty; both are required to register the oracle handler")
 		}
-		allowed, err := loadAllowedOracleSources(vm.config.Oracle.SidecarConfigPath)
-		if err != nil {
-			return err
+		allowed := make(map[string]struct{}, len(vm.config.Oracle.AllowedSources))
+		for _, sourceType := range vm.config.Oracle.AllowedSources {
+			if !oraclepkg.IsKnownSourceType(sourceType) {
+				return fmt.Errorf("oracle.allowed-sources contains unknown source type %q; register it in network/p2p/oracle first", sourceType)
+			}
+			allowed[sourceType] = struct{}{}
 		}
 		sidecar, err := p2poracle.NewGRPCSidecarClient(vm.config.Oracle.Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
 		}
 		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar, allowed)); err != nil {
-			return err
+			return fmt.Errorf("failed to register oracle handler: %w", err)
 		}
 	}
 
@@ -532,26 +534,6 @@ func (vm *VM) registerOracleHandler(verifier acp118.Verifier) error {
 	return vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, handler)
 }
 
-// loadAllowedOracleSources reads the sidecar's config file and returns the set
-// of source types this node will accept signature requests for. The sidecar
-// config is the single source of truth for which oracles are supported; the
-// validator merely mirrors its top-level `verifiers` keys. Every declared key
-// is cross-checked against the compile-time registry in network/p2p/oracle,
-// which prevents typos from silently disabling verification.
-func loadAllowedOracleSources(path string) (map[string]struct{}, error) {
-	cfg, err := sidecarconfig.Load(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load oracle sidecar config: %w", err)
-	}
-	allowed := make(map[string]struct{}, len(cfg.Verifiers))
-	for _, sourceType := range cfg.SourceTypes() {
-		if !oraclepkg.IsKnownSourceType(sourceType) {
-			return nil, fmt.Errorf("sidecar config declares unknown source type %q; register it in network/p2p/oracle first", sourceType)
-		}
-		allowed[sourceType] = struct{}{}
-	}
-	return allowed, nil
-}
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
 	g := new(core.Genesis)
