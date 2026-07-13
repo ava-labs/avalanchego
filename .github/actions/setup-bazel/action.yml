@@ -10,6 +10,13 @@ inputs:
 runs:
   using: composite
   steps:
+    # setup-bazel is used both by the lightweight initial-setup job and by the
+    # heavier Bazel test jobs that consume the prepared cache state. Prune only
+    # for the latter, and only on Linux where this action is supported, to
+    # reduce disk pressure without adding extra churn to the initial cache-
+    # priming job.
+    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+      if: ${{ inputs.initial-setup != 'true' && runner.os == 'Linux' }}
     - id: cache-paths
       shell: bash
       run: |
