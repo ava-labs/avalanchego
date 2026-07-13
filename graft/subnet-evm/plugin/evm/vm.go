@@ -534,7 +534,6 @@ func (vm *VM) registerOracleHandler(verifier acp118.Verifier) error {
 	return vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, handler)
 }
 
-
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {

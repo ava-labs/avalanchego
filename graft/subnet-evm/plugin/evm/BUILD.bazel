@@ -75,7 +75,6 @@ go_library(
         "//network/p2p/gossip",
         "//network/p2p/oracle",
         "//network/p2p/oracle/validator",
-        "//sidecar/config",
         "//snow",
         "//snow/consensus/snowman",
         "//snow/engine/common",
