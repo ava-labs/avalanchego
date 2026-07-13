@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -1149,9 +1150,7 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Errorf("beacon-roots get() via StaticCall() %s", diff)
 			}
-			// On revert the contract returns no data, so [common.BytesToHash]
-			// yields the zero hash, matching wantRoot for the nil-root case.
-			assert.Equal(t, tt.wantRoot, common.BytesToHash(got), "parent beacon root returned by beacon-roots contract")
+			assert.Equal(t, tt.want, got, "parent beacon root returned by beacon-roots contract")
 		})
 	}
 }
