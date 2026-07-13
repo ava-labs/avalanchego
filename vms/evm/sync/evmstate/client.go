@@ -10,8 +10,8 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// Client sends state-trie leaf-range requests. Range-proof verification
-// is the caller's responsibility.
+// Client sends state-trie leaf-range requests. Range-proof
+// verification is the caller's responsibility.
 type Client = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
 // NewClient binds a [Client] at [p2p.EVMLeafRequestHandlerID] on n.
