@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -26,6 +27,8 @@ import (
 const numSyncWorkers = 5
 
 var (
+	_ types.Syncer = (*Syncer)(nil)
+
 	// ErrInputClosed reports that nothing will fetch what the caller is offering.
 	ErrInputClosed = errors.New("code syncer input is closed")
 
@@ -118,6 +121,12 @@ func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr erro
 func (s *Syncer) CloseInput() {
 	s.q.close()
 }
+
+// Name returns a human-readable name for logging.
+func (*Syncer) Name() string { return "Code Syncer" }
+
+// ID returns the stable identifier used for deduplication and metrics.
+func (*Syncer) ID() string { return "state_code_sync" }
 
 // Sync fetches until input closes and the queue drains, or ctx ends. Runs once.
 func (s *Syncer) Sync(ctx context.Context) error {
