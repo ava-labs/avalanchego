@@ -52,6 +52,7 @@ func runStateSync(t *testing.T, ctx context.Context, f *synctest.StateFixture) e
 }
 
 func TestHashDBSyncer_Reconstruction(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		accounts         []synctest.AccountDesc
@@ -84,6 +85,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 
@@ -101,6 +103,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 
 // TestHashDBSyncer_SegmentsLargeAccountTrie asserts a split account trie's concurrent segments feed one trie in order.
 func TestHashDBSyncer_SegmentsLargeAccountTrie(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
@@ -156,6 +159,7 @@ func requireStorageReconstructed(t *testing.T, target ethdb.Database, storage ma
 }
 
 func TestNewHashDBSyncer_Validation(t *testing.T) {
+	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	codeSyncer, err := code.NewSyncer(logging.NoLog{}, nil, db)
 	require.NoError(t, err)
@@ -180,6 +184,7 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 // TestHashDBSyncer_CancelPropagates checks a never-converging sync
 // returns the context error and tears down the code queue.
 func TestHashDBSyncer_CancelPropagates(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	f := synctest.NewStateFixture(t, []synctest.AccountDesc{{WithCode: true}, {WithCode: true}})
 
@@ -212,6 +217,7 @@ func TestHashDBSyncer_CancelPropagates(t *testing.T) {
 // TestHashDBSyncer_ResumesAfterInterrupt cancels a segmented sync partway,
 // then asserts resume finishes with fewer leaf fetches than a fresh sync.
 func TestHashDBSyncer_ResumesAfterInterrupt(t *testing.T) {
+	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := fillDistributedAccountTrie(t, trieDB, 8000)
 
