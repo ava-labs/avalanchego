@@ -17,6 +17,12 @@ package_group(
     ],
 )
 
+# The fixture generator regenerates and diffs the committed fixture.
+exports_files(
+    ["testdata/upgradechain_fixture.json"],
+    visibility = ["//graft/coreth/plugin/evm/upgradechain:__pkg__"],
+)
+
 go_library(
     name = "cchain",
     srcs = [
@@ -118,7 +124,9 @@ go_test(
         "vm_test.go",
         "warp_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":cchain"],
+    embedsrcs = ["testdata/upgradechain_fixture.json"],
     deps = [
         "//api",
         "//chains/atomic",

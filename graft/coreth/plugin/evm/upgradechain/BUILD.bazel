@@ -9,7 +9,6 @@ package(default_visibility = [
 go_library(
     name = "upgradechain",
     srcs = ["upgradechain.go"],
-    embedsrcs = ["fixture.json"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgradechain",
     visibility = ["//visibility:public"],
     deps = [
@@ -26,6 +25,7 @@ graft_go_test(
         "blocks_test.go",
         "generate_test.go",
     ],
+    data = ["//vms/saevm/cchain:testdata/upgradechain_fixture.json"],  # keep
     embed = [":upgradechain"],
     deps = [
         "//chains/atomic",

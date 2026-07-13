@@ -20,14 +20,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
-
-//go:embed fixture.json
-var fixtureJSON []byte
 
 // A Fixture is a complete, deterministic C-Chain history.
 type Fixture struct {
@@ -115,10 +110,11 @@ const (
 	NativeAssetCallTraceError = "incorrect number of top-level calls"
 )
 
-// Load parses and returns the embedded fixture.
-func Load() (*Fixture, error) {
+// Parse decodes a JSON-encoded fixture, as committed at
+// vms/saevm/cchain/testdata/upgradechain_fixture.json.
+func Parse(data []byte) (*Fixture, error) {
 	f := new(Fixture)
-	if err := json.Unmarshal(fixtureJSON, f); err != nil {
+	if err := json.Unmarshal(data, f); err != nil {
 		return nil, err
 	}
 	return f, nil

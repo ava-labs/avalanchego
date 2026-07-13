@@ -41,15 +41,17 @@ import (
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 )
 
-var update = flag.Bool("update", false, "regenerate fixture.json")
+var update = flag.Bool("update", false, "regenerate the committed fixture")
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
 	os.Exit(m.Run())
 }
 
+const fixturePath = "../../../../../vms/saevm/cchain/testdata/upgradechain_fixture.json"
+
 // TestFixtureUpToDate regenerates the fixture from scratch and requires that
-// it matches the committed fixture.json byte for byte.
+// it matches the committed fixture byte for byte.
 func TestFixtureUpToDate(t *testing.T) {
 	fx := generate(t)
 	got, err := json.MarshalIndent(fx, "", "\t")
@@ -57,11 +59,13 @@ func TestFixtureUpToDate(t *testing.T) {
 	got = append(got, '\n')
 
 	if *update {
-		require.NoError(t, os.WriteFile("fixture.json", got, 0o644), "os.WriteFile(fixture.json)")
+		require.NoError(t, os.WriteFile(fixturePath, got, 0o644), "os.WriteFile(%s)", fixturePath)
 		return
 	}
-	require.True(t, bytes.Equal(fixtureJSON, got),
-		"committed fixture.json is stale or the generator is nondeterministic; run `go generate ./plugin/evm/upgradechain` and inspect the diff")
+	committed, err := os.ReadFile(fixturePath)
+	require.NoError(t, err, "os.ReadFile(%s)", fixturePath)
+	require.True(t, bytes.Equal(committed, got),
+		"committed fixture is stale; run `go generate ./plugin/evm/upgradechain` and inspect the diff")
 }
 
 // forkSchedule returns the upgrade config the fixture chain is generated

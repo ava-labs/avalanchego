@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	_ "embed"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -30,14 +32,17 @@ import (
 	ethereum "github.com/ava-labs/libevm"
 )
 
+//go:embed testdata/upgradechain_fixture.json
+var upgradechainFixtureJSON []byte
+
 // newPreSAESUT boots the cchain VM on the [upgradechain] fixture's database,
 // modelling a node whose coreth-built history crosses every network upgrade
 // and which has just switched to this VM.
 func newPreSAESUT(t *testing.T) (context.Context, *SUT, *upgradechain.Fixture) {
 	t.Helper()
 
-	fx, err := upgradechain.Load()
-	require.NoError(t, err, "upgradechain.Load()")
+	fx, err := upgradechain.Parse(upgradechainFixtureJSON)
+	require.NoError(t, err, "upgradechain.Parse()")
 
 	// The fixture was dumped from the database handle coreth's VM received,
 	// which corresponds to the "chain" prefix of the SUT's base database.
