@@ -115,7 +115,7 @@ func (s *SUT) createAccount(t *testing.T) {
 	addr := common.BytesToAddress(hash(param).Bytes())
 	if _, ok := s.accounts[addr]; ok {
 		t.Logf("skipping account creation (addr=%s) because it already exists", addr)
-		return // skip creation if account already exists
+		return
 	}
 	if s.destructedThisTx.Contains(addr) {
 		// The account was destructed earlier this tx, so this is a
