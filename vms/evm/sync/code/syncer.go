@@ -284,36 +284,23 @@ func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
 	return nil
 }
 
-// getCode requests hashes through c and verifies every blob against its hash,
-// scoring the peer. Re-requests until ctx ends.
+// getCode fetches code for hashes and verifies each blob against its hash.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetCodeResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			log.Debug("code request failed, re-requesting", zap.Error(err))
-			continue
-		}
-
-		data := resp.GetData()
-		if err := verifyCode(hashes, data); err != nil {
-			outcome.Failure()
-			log.Debug("invalid code response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return data, nil
+	resp, err := c.Send(ctx, req,
+		func() *syncpb.GetCodeResponse { return &syncpb.GetCodeResponse{} },
+		func(resp *syncpb.GetCodeResponse) error {
+			if err := verifyCode(hashes, resp.GetData()); err != nil {
+				log.Debug("invalid code response, re-requesting", zap.Error(err))
+				return err
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
+	return resp.GetData(), nil
 }
 
 // verifyCode reports whether data is the code for hashes, in order.
