@@ -40,6 +40,13 @@ type Config struct {
 	CommitInterval   uint64 // MUST be set to a non-zero value
 }
 
+func (c Config) Verify() error {
+	if c.CommitInterval == 0 {
+		return errZeroCommitInterval
+	}
+	return nil
+}
+
 func (c Config) TrieDBConfig() *triedb.Config {
 	return &triedb.Config{
 		HashDB: &hashdb.Config{
@@ -49,7 +56,7 @@ func (c Config) TrieDBConfig() *triedb.Config {
 }
 
 func (c Config) snapConfig() *snapshot.Config {
-	if c.SnapshotCacheMiB == 0 {
+	if c.SnapshotCacheMiB <= 0 {
 		return nil
 	}
 	return &snapshot.Config{
@@ -77,8 +84,8 @@ var errZeroCommitInterval = errors.New("commit interval must be non-zero")
 
 // NewTracker provides a new [Tracker] on the underlying database.
 func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log logging.Logger) (*Tracker, error) {
-	if c.CommitInterval == 0 {
-		return nil, errZeroCommitInterval
+	if err := c.Verify(); err != nil {
+		return nil, err
 	}
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
 	var snaps *snapshot.Tree
@@ -136,7 +143,7 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 
 	tdb := t.cache.TrieDB()
 	if err := tdb.Commit(commit, false /* log */); err != nil {
-		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, settledRoot, because, height, err)
+		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, commit, because, height, err)
 	}
 	return nil
 }
@@ -165,13 +172,12 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 }
 
 // Close releases all resources associated with the `[triedb.Database]`
-// and persists `lastRoot` to the snapshot layer. `lastRoot` should be a
-// recent state root.
-func (t *Tracker) Close() (retErr error) {
+// and cancel any snapshot generation.
+func (t *Tracker) Close() error {
 	if t.snaps != nil {
 		// Cancel any background snapshot builds.
 		// MUST be done before closing the TrieDB, otherwise the background
-		// builds with race with the close.
+		// builds will race with the close.
 		t.snaps.Release()
 	}
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package saedb
 
 import (
@@ -12,12 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 )
 
-func TestNewTracker_CommitInterval(t *testing.T) {
-	defaults := func() Config {
-		return Config{
-			CommitInterval: 1,
-		}
-	}()
+func TestNewTracker(t *testing.T) {
+	defaults := Config{CommitInterval: 1}
+
 	tests := []struct {
 		name    string
 		with    func(*Config)
@@ -49,7 +49,7 @@ func TestNewTracker_CommitInterval(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 
 			tr, err := NewTracker(db, cfg, types.EmptyRootHash, log)
-			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorIs(t, err, tt.wantErr, "NewTracker()")
 			if err != nil {
 				return
 			}
