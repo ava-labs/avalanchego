@@ -28,6 +28,7 @@ import (
 )
 
 func TestVerifyLeaves(t *testing.T) {
+	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 	r := newResponder(trieDB, common.HashLength, nil)
@@ -58,6 +59,7 @@ func TestVerifyLeaves(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			more, err := verifyLeaves(root, nil, tt.resp)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -104,6 +106,7 @@ func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk task
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		numKeys      int
@@ -117,6 +120,7 @@ func TestLeafFetch_Batching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 
@@ -135,6 +139,7 @@ func TestLeafFetch_Batching(t *testing.T) {
 }
 
 func TestLeafFetch_ContextCancelled(t *testing.T) {
+	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
 	handler, _ := countingLeafHandler(trieDB)
@@ -145,6 +150,7 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 }
 
 func TestLeafFetch_RejectsTamperedResponse(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
@@ -169,6 +175,7 @@ func TestLeafFetch_RejectsTamperedResponse(t *testing.T) {
 }
 
 func TestLeafFetch_RecoversAfterBadResponses(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 

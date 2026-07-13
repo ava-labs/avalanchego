@@ -28,6 +28,7 @@ import (
 
 // TestStateTrie_SegmentedStorageReconstruct proves a storage trie split into concurrent segments reconstructs via snapshot re-read.
 func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
