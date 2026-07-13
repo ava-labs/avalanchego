@@ -172,7 +172,7 @@ func Execute(
 	receiptStore ReceiptStore,
 	log logging.Logger,
 ) (*ExecutionResults, error) {
-	log.Debug("Executing block")
+	log.Trace("Executing block")
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -196,15 +196,8 @@ func Execute(
 	header.BaseFee = baseFee.ToBig()
 
 	// EIP-4788: before processing any transactions, store the parent beacon
-	// block root via the system call. This mirrors [core.StateProcessor.Process]
-	// in coreth and is part of execution, so it MUST run during both actual and
-	// intra-block (tracing) execution to keep execution-derived state consistent.
-	// [core.NewEVMBlockContext] requires header.BaseFee, so it is built here.
-	blockCtx := core.NewEVMBlockContext(header, chainCtx, &header.Coinbase)
-	if beaconRoot := header.ParentBeaconRoot; beaconRoot != nil {
-		vmenv := vm.NewEVM(blockCtx, vm.TxContext{}, stateDB, config, vm.Config{})
-		core.ProcessBeaconBlockRoot(*beaconRoot, vmenv, stateDB)
-	}
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
@@ -290,7 +283,7 @@ func Execute(
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
-	log.Debug(
+	log.Trace(
 		"Block execution complete",
 		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),
@@ -301,7 +294,7 @@ func Execute(
 		BaseFee:     baseFee,
 		StateDB:     stateDB,
 		Signer:      signer,
-		BlockCtx:    blockCtx,
+		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 	}
