@@ -255,6 +255,7 @@ func Execute(
 			burned := new(uint256.Int).SetUint64(receipt.GasUsed)
 			burned.Mul(burned, baseFee)
 			stateDB.AddBalance(*burnAddr, burned)
+			stateDB.Finalise(true)
 		}
 	}
 
