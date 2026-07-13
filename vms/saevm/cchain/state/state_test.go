@@ -53,7 +53,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 
 	props := options.ApplyTo(&sutProperties{
 		db:  memdb.New(),
-		new: newState,
+		new: newStateWithNetworkID(constants.UnitTestID),
 	}, opts...)
 
 	chainDB := prefixdb.New([]byte("chain"), props.db)
@@ -110,10 +110,6 @@ func withNetworkID(networkID uint32) sutOption {
 	return options.Func[sutProperties](func(p *sutProperties) {
 		p.new = newStateWithNetworkID(networkID)
 	})
-}
-
-func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
-	return newStateWithNetworkID(constants.UnitTestID)(tb, db, sm)
 }
 
 func newStateWithNetworkID(networkID uint32) func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl {
@@ -434,28 +430,28 @@ func TestApply_BonusBlock(t *testing.T) {
 	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
 
 	tests := []struct {
-		name              string
-		networkID         uint32
-		height            uint64
-		wantSkipSharedMem bool
+		name               string
+		networkID          uint32
+		height             uint64
+		wantInSharedMemory bool
 	}{
 		{
-			name:              "mainnet_bonus_height",
-			networkID:         constants.MainnetID,
-			height:            bonusHeight,
-			wantSkipSharedMem: true,
+			name:               "mainnet_bonus_height",
+			networkID:          constants.MainnetID,
+			height:             bonusHeight,
+			wantInSharedMemory: false,
 		},
 		{
-			name:              "mainnet_non_bonus_height",
-			networkID:         constants.MainnetID,
-			height:            nonBonusHeight,
-			wantSkipSharedMem: false,
+			name:               "mainnet_non_bonus_height",
+			networkID:          constants.MainnetID,
+			height:             nonBonusHeight,
+			wantInSharedMemory: true,
 		},
 		{
-			name:              "non_mainnet_bonus_height",
-			networkID:         constants.FujiID,
-			height:            bonusHeight,
-			wantSkipSharedMem: false,
+			name:               "non_mainnet_bonus_height",
+			networkID:          constants.FujiID,
+			height:             bonusHeight,
+			wantInSharedMemory: true,
 		},
 	}
 
@@ -477,7 +473,7 @@ func TestApply_BonusBlock(t *testing.T) {
 			defer it.Release()
 			hasSharedMem := it.Next()
 			require.NoError(t, it.Error())
-			require.Equal(t, !test.wantSkipSharedMem, hasSharedMem, "shared memory written")
+			require.Equal(t, test.wantInSharedMemory, hasSharedMem, "shared memory written")
 		})
 	}
 }

@@ -20,16 +20,11 @@ var mainnetBonusBlocks = mustParseBonusBlocks()
 var bonusBlocksJSON []byte
 
 func mustParseBonusBlocks() map[uint64]struct{} {
-	var heights []uint64
+	var heights map[uint64]struct{}
 	if err := json.Unmarshal(bonusBlocksJSON, &heights); err != nil {
 		panic(err)
 	}
-
-	set := make(map[uint64]struct{}, len(heights))
-	for _, height := range heights {
-		set[height] = struct{}{}
-	}
-	return set
+	return heights
 }
 
 func (s *State) isBonus(height uint64) bool {
