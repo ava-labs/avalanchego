@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"golang.org/x/sync/errgroup"
 
@@ -128,9 +127,8 @@ func (c *callbackSyncer) syncTask(ctx context.Context, t task) error {
 	}
 }
 
-// getLeaves requests the range at start, verifies the proof, scores the peer, and
-// re-requests on any failure until ctx ends. It returns the leaves and whether more
-// remain to the right.
+// getLeaves fetches and proof-verifies the leaf range at start, returning the
+// leaves and whether more remain to the right.
 func getLeaves(ctx context.Context, c *Client, root, account common.Hash, start []byte) ([][]byte, [][]byte, bool, error) {
 	req := &syncpb.GetLeafRequest{
 		RootHash:    root.Bytes(),
@@ -138,28 +136,22 @@ func getLeaves(ctx context.Context, c *Client, root, account common.Hash, start 
 		StartKey:    start,
 		KeyLimit:    uint32(MaxLeavesLimit),
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, nil, false, err
-		}
-
-		resp := &syncpb.GetLeafResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		more, err := verifyLeaves(root, start, resp)
-		if err != nil {
-			outcome.Failure()
-			log.Debug("invalid leaf response, re-requesting", "err", err)
-			continue
-		}
-
-		outcome.Success()
-		return resp.GetKeys(), resp.GetValues(), more, nil
+	var more bool
+	resp, err := c.Send(ctx, req,
+		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
+		func(resp *syncpb.GetLeafResponse) error {
+			m, err := verifyLeaves(root, start, resp)
+			if err != nil {
+				return err
+			}
+			more = m
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, nil, false, err
 	}
+	return resp.GetKeys(), resp.GetValues(), more, nil
 }
 
 // verifyLeaves range-proves resp against root and reports whether more leaves remain.

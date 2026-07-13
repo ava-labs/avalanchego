@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,6 +31,7 @@ var (
 type Dispatcher[Req, Resp proto.Message] struct {
 	client *p2p.Client
 	peers  *p2p.PeerTracker
+	policy retryPolicy
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
@@ -37,21 +39,34 @@ func NewDispatcher[Req, Resp proto.Message](
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
+	opts ...RetryOption,
 ) *Dispatcher[Req, Resp] {
 	return &Dispatcher[Req, Resp]{
 		client: n.NewClient(handlerID, noopSampler{}),
 		peers:  peers,
+		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
 	}
 }
 
-// Send picks a peer and forwards to [SendTo], or returns errNoPeers
-// (unscored) when none is available.
-func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
-	nodeID, ok := d.peers.SelectPeer()
-	if !ok {
-		return nil, errNoPeers
-	}
-	return d.SendTo(ctx, nodeID, req, resp)
+// Send retries req through [SendTo] until verify accepts a response or ctx ends.
+// Each attempt gets a fresh Resp from newResp, so a failed one never merges into
+// the next.
+func (d *Dispatcher[Req, Resp]) Send(
+	ctx context.Context,
+	req Req,
+	newResp func() Resp,
+	verify func(Resp) error,
+) (Resp, error) {
+	return doRetry(ctx, d.policy, verify, func() (Resp, *Outcome, error) {
+		nodeID, ok := d.peers.SelectPeer()
+		if !ok {
+			var zero Resp
+			return zero, nil, errNoPeers
+		}
+		resp := newResp()
+		outcome, err := d.SendTo(ctx, nodeID, req, resp)
+		return resp, outcome, err
+	})
 }
 
 // SendTo sends req to nodeID. A pre-send context or marshal error

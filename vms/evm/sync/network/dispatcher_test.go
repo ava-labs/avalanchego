@@ -24,7 +24,7 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestDispatcher_Send(t *testing.T) {
+func TestDispatcher_SendTo(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
@@ -33,31 +33,22 @@ func TestDispatcher_Send(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		peers   []ids.NodeID
 		handler p2p.Handler
 		want    *syncpb.GetLeafResponse
 		wantErr error
 	}{
 		{
 			name:    "round trip",
-			peers:   []ids.NodeID{nodeID},
 			handler: echoHandler(wantBytes),
 			want:    want,
 		},
 		{
-			name:    "no peer to send to",
-			handler: p2p.NoOpHandler{},
-			wantErr: errNoPeers,
-		},
-		{
 			name:    "handler returns AppError",
-			peers:   []ids.NodeID{nodeID},
 			handler: errorHandler(),
 			wantErr: errHandlerFailed,
 		},
 		{
 			name:    "response bytes are not valid proto",
-			peers:   []ids.NodeID{nodeID},
 			handler: echoHandler([]byte{0xff, 0xff, 0xff}),
 			wantErr: errUnmarshalResponse,
 		},
@@ -66,13 +57,13 @@ func TestDispatcher_Send(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			_, tracker := newTestTracker(t, tt.peers...)
+			_, tracker := newTestTracker(t, nodeID)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
 			got := &syncpb.GetLeafResponse{}
-			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, got)
+			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				// Failures self-register, the caller gets no Outcome.
@@ -90,23 +81,14 @@ func TestDispatcher_Send(t *testing.T) {
 func TestDispatcher_ContextCancelled(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
-	released := make(chan struct{})
-	defer close(released)
-	handler := p2p.TestHandler{
-		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-			<-released
-			return nil, nil
-		},
-	}
-
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, tracker := newTestTracker(t, nodeID)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, handler, tracker,
+		t, ctx, nodeID, p2p.NoOpHandler{}, tracker,
 	)
-	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, outcome)
 }

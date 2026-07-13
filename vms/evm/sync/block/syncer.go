@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
@@ -109,33 +108,26 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return batch.Write()
 }
 
-// getBlocks requests up to numParents blocks ending at (hash, height), verifies
-// the returned chain links back from hash, scores the peer, and re-requests on
-// any network or verification failure until ctx ends.
+// getBlocks fetches up to numParents blocks ending at (hash, height), verified
+// to chain back from hash.
 func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, numParents uint16) ([]*evmtypes.Block, error) {
 	req := &syncpb.GetBlockRequest{Height: height, NumParents: uint32(numParents)}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetBlockResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		blocks, err := verifyBlocks(hash, numParents, resp.GetBlocks())
-		if err != nil {
-			outcome.Failure()
-			log.Debug("invalid block response, re-requesting", "err", err)
-			continue
-		}
-
-		outcome.Success()
-		return blocks, nil
+	var blocks []*evmtypes.Block
+	_, err := c.Send(ctx, req,
+		func() *syncpb.GetBlockResponse { return &syncpb.GetBlockResponse{} },
+		func(resp *syncpb.GetBlockResponse) error {
+			b, err := verifyBlocks(hash, numParents, resp.GetBlocks())
+			if err != nil {
+				return err
+			}
+			blocks = b
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
+	return blocks, nil
 }
 
 // verifyBlocks decodes raw and reports whether it is the parent chain ending at
