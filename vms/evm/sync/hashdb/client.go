@@ -80,36 +80,26 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		reqPB.AccountHash = req.Account.Bytes()
 	}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return Leaves{}, false, err
-		}
-
-		var resp syncpb.GetLeafResponse
-		outcome, err := c.sender.Send(ctx, reqPB, &resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			c.log.Debug("leaf request failed, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		more, err := verifyRange(c.minKey, req, &resp)
-		if err != nil {
-			outcome.Failure()
-			c.log.Debug("invalid leaf response, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return Leaves{
-			Keys: resp.GetKeys(),
-			Vals: resp.GetValues(),
-		}, more, nil
+	var more bool
+	resp, err := c.sender.Send(ctx, reqPB,
+		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
+		func(resp *syncpb.GetLeafResponse) error {
+			m, err := verifyRange(c.minKey, req, resp)
+			if err != nil {
+				c.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+				return err
+			}
+			more = m
+			return nil
+		},
+	)
+	if err != nil {
+		return Leaves{}, false, err
 	}
+	return Leaves{
+		Keys: resp.GetKeys(),
+		Vals: resp.GetValues(),
+	}, more, nil
 }
 
 var (
