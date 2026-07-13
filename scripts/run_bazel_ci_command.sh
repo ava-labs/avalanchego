@@ -81,4 +81,60 @@ if [[ -n "${BAZEL_CI_ENFORCE_DEPENDENCY_LIST-}" ]]; then
   assert_target_patterns_are_listed "${target_patterns}"
 fi
 
-exec bazelisk "${subcommand}" "$@"
+log_path_mount_state() {
+  local path="$1"
+
+  [[ -n "$path" && -e "$path" ]] || return 0
+
+  echo "--- path: $path ---"
+  findmnt -T "$path" || true
+  df -h "$path" || true
+  df -i "$path" || true
+  du -sh "$path" 2>/dev/null || true
+}
+
+log_disk_state() {
+  local phase="$1"
+  local output_base=""
+  local output_user_root=""
+  local execution_root=""
+
+  echo "=== bazel ci disk state (${phase}) ==="
+  df -h /
+  df -i / || true
+  df -h "$HOME" || true
+  df -h /mnt || true
+
+  echo "=== bazel ci paths (${phase}) ==="
+  bazelisk info output_base output_user_root execution_root bazel-bin bazel-testlogs 2>/dev/null || true
+
+  output_base="$(bazelisk info output_base 2>/dev/null || true)"
+  output_user_root="$(bazelisk info output_user_root 2>/dev/null || true)"
+  execution_root="$(bazelisk info execution_root 2>/dev/null || true)"
+
+  for path in \
+    "$output_base" \
+    "$output_user_root" \
+    "$execution_root" \
+    "$HOME/.cache/bazel-repository-cache" \
+    "$HOME/.cache/bazel-go-repository-modcache" \
+    "$HOME/.cache/bazelisk" \
+    "$HOME/.cache/bazel"; do
+    log_path_mount_state "$path"
+  done
+}
+
+log_failure_details() {
+  local output_base
+  output_base="$(bazelisk info output_base 2>/dev/null || true)"
+  [[ -n "$output_base" && -d "$output_base" ]] || return 0
+
+  echo "=== bazel ci largest output_base entries on failure ==="
+  du -xh --max-depth=2 "$output_base" 2>/dev/null | sort -h | tail -50 || true
+}
+
+log_disk_state "before"
+trap 'status=$?; if [[ $status -ne 0 ]]; then log_disk_state "failure"; log_failure_details; fi' EXIT
+bazelisk "${subcommand}" "$@"
+trap - EXIT
+log_disk_state "after"
