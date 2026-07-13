@@ -148,6 +148,7 @@ func TestSyncer(t *testing.T) {
 // fetched from the network at most once, exercising the in-flight dedup that
 // exists because accounts sharing a code hash enqueue it repeatedly.
 func TestSyncer_DedupesInFlight(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	nodeID := ids.GenerateTestNodeID()
@@ -226,6 +227,7 @@ func tamperingHandler() p2p.Handler {
 // marker rewritten by a concurrent AddCode mid-cleanup must still be cleared by a
 // sibling worker, which holds only because cleanup runs before the inFlight gate.
 func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	nodeID := ids.GenerateTestNodeID()
@@ -288,6 +290,7 @@ func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
 // end-to-end: many producers hammer AddCode for one hash and after sync no
 // to-fetch markers may remain.
 func TestSyncer_DuplicateAddCodeNoMarkerLeak(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		preWrite bool
@@ -298,6 +301,7 @@ func TestSyncer_DuplicateAddCodeNoMarkerLeak(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			nodeID := ids.GenerateTestNodeID()
