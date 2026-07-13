@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -26,6 +27,8 @@ import (
 const defaultNumWorkers = 5
 
 var (
+	_ types.Syncer = (*Syncer)(nil)
+
 	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
 	errCodeSizeExceeded  = errors.New("max code size exceeded")
 	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
@@ -92,6 +95,12 @@ func NewSyncer(c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash,
 	}
 }
 
+// Name returns a human-readable name for logging.
+func (*Syncer) Name() string { return "Code Syncer" }
+
+// ID returns the stable identifier used for deduplication and metrics.
+func (*Syncer) ID() string { return "state_code_sync" }
+
 // Sync runs the workers until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -115,7 +124,9 @@ func (s *Syncer) work(ctx context.Context) error {
 				return nil
 			}
 
-			// Slow path: code already on disk, just clear its marker.
+			// Slow path: code already on disk, just clear its marker. Kept ahead
+			// of the inFlight check so a marker a concurrent AddCode rewrote is
+			// always re-cleaned on its next dequeue, never orphaned.
 			if rawdb.HasCode(s.db, codeHash) {
 				if err := s.clearMarker(codeHash); err != nil {
 					return err
