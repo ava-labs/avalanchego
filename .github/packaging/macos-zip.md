@@ -32,8 +32,8 @@ Per architecture, the macOS packaging pipeline produces:
 Each Mach-O binary inside a zip carries an Apple code signature with the
 `runtime` hardened-runtime flag. Each zip is signed with the project's GPG
 key and submitted to Apple's notary service before being published. The
-order is load-bearing; see *Apple-sign / GPG-sign / notarize order* in the
-maintenance notes.
+order of those three operations matters; see *Apple-sign / GPG-sign /
+notarize order* in the maintenance notes.
 
 ### Main entrypoints
 
@@ -54,7 +54,7 @@ task packaging:test-build-macos-zip
 ```
 
 This runs in a `debian:stable-slim`-based Docker container that mirrors the
-toolchain of the CI sign-publish job (`p7zip-full`, `gnupg`, `openssl`, `jq`,
+toolchain of the CI sign job (`p7zip-full`, `gnupg`, `openssl`, `jq`,
 `rcodesign`). It exercises the production `build-zip-pkg.sh` unmodified
 against cross-compiled stub Mach-O binaries, then validates the produced zips
 in a fresh container.
@@ -83,55 +83,75 @@ key-materialization paths, regardless of secret availability.
 
 `.github/workflows/build-macos-release.yml` triggers on:
 
-- **tag push** (`push: tags: ["*"]`) - builds the macOS release for the
-  pushed tag
+- **tag push** (`push: tags: ["v*"]`) - builds the macOS release for the
+  pushed release tag
 - **workflow_dispatch** - builds for an explicitly provided tag
 
-The workflow runs two jobs:
+The workflow runs three jobs:
 
 1. `build-mac` (macos-14): builds the Mach-O binaries natively, uploads them
    as the `macos-binaries` workflow artifact.
-2. `sign-publish` (ubuntu-24.04): downloads `macos-binaries`, materializes
-   Apple credentials, Apple-signs the binaries, runs the production
+2. `sign` (ubuntu-24.04): downloads `macos-binaries`, materializes Apple
+   credentials, Apple-signs the binaries, runs the production
    `build-zip-pkg.sh` to zip and GPG-sign, submits each zip to Apple's notary
-   service, then publishes `*.zip` and `*.zip.sig` to
-   `s3://${secrets.BUCKET}/macos/` and as GitHub workflow artifacts.
+   service, and uploads the signed `*.zip` / `*.zip.sig` as GitHub workflow
+   artifacts. Holds the signing secrets; not granted `id-token: write`.
+3. `publish` (ubuntu-24.04): downloads the signed artifacts and uploads them to
+   `s3://${secrets.BUCKET}/macos/`. This is the only job with `id-token: write`
+   (AWS OIDC), and it holds no signing secrets and runs no packaging scripts.
 
 The workflow imports `secrets.RPM_GPG_PRIVATE_KEY` for GPG signing and the
 sec-team-issued `secrets.MACOS_SIGNING_*` and `secrets.MACOS_NOTARIZATION_*`
 for Apple signing and notarization. An empty `RPM_GPG_PRIVATE_KEY` fails the
-workflow at the `Import GPG key` step (see *Fail-fast on missing GPG secret*
+workflow at the `Build zips and GPG-sign` step (see *Fail-fast on missing GPG secret*
 below).
 
 ## Conceptual model
 
-The macOS pipeline intentionally splits the build and sign-publish stages
-across two GitHub runner images rather than doing everything on a macOS
-runner.
+The macOS pipeline intentionally splits work across three jobs and two GitHub
+runner images rather than doing everything on a macOS runner.
 
-### Two-job split: `build-mac` and `sign-publish`
+### Three-job split: `build-mac`, `sign`, `publish`
 
 | Job | Runner | Purpose |
 | --- | --- | --- |
 | `build-mac` | `macos-14` | native Mach-O build only |
-| `sign-publish` | `ubuntu-24.04` | Apple sign + GPG sign + notarize + upload |
+| `sign` | `ubuntu-24.04` | Apple sign + GPG sign + notarize; holds signing secrets, no `id-token` |
+| `publish` | `ubuntu-24.04` | download signed artifacts + upload to S3; `id-token: write`, no signing secrets |
+
+`sign` and `publish` are separate so that `id-token: write` (AWS OIDC) is never
+granted to the job that holds the signing secrets and runs packaging scripts.
+This mirrors `build-linux-packages.yml`, whose `upload-debs-s3` job is isolated
+for the same reason.
 
 Apple signing, notarization, and publishing all run on Linux because:
 
-- `indygreg/apple-code-sign-action@v1` is a Node JS action and runs on any
-  runner that supports Node 20+
-- the underlying `rcodesign` tool is cross-platform and ships pre-built Linux
-  binaries for both `x86_64` and `aarch64`
-- macOS GitHub-hosted minutes are roughly 10× the price of Linux minutes; the
+- `rcodesign` is cross-platform and ships pre-built Linux binaries for both
+  `x86_64` and `aarch64`, so Apple-signing and notary submission never need a
+  macOS host
+- macOS GitHub-hosted minutes are roughly 10x the price of Linux minutes; the
   parts of the pipeline that do not require a Mach-O build environment should
   not pay that premium
 
 ### Credential lifecycle
 
-All Apple credentials and the GPG key are materialized into `mktemp` files
-and are explicitly removed by the workflow's `Cleanup` step (which runs
-`if: always()`). They are not echoed via `GITHUB_OUTPUT` and never reach
-either the GitHub Releases page or the `s3://${BUCKET}/macos/` prefix.
+Each secret is materialized into a `mktemp` file **inside the single step that
+uses it**, removed by that step's `EXIT` trap (on success or failure), and its
+path is never exported through `$GITHUB_ENV`. So a given secret is on disk only
+for the duration of its own step, never while a different step runs:
+
+| Secret | Materialized + used + deleted in |
+| --- | --- |
+| Signing PKCS#12 | `Apple-sign binaries` |
+| GPG private key | `Build zips and GPG-sign` (raw P8 is decoded, used, and deleted here too) |
+| App Store Connect P8 + encoded API-key JSON | `Notarize zips` |
+
+All of this happens in the `sign` job; the `publish` job that assumes the AWS
+role holds no signing secrets at all. In particular, the notary API key is
+materialized only in `Notarize zips`, so it is not present while the earlier
+`Build zips and GPG-sign` step runs the checked-out packaging script. The
+credentials are not echoed via `GITHUB_OUTPUT` and never reach either the GitHub
+Releases page or the `s3://${BUCKET}/macos/` prefix.
 
 The local validator mirrors this: ephemeral Apple PKCS#12, GPG private key,
 and ECDSA P8 are all written into a `mktemp -d` stage directory cleaned up by
@@ -165,8 +185,8 @@ produces an artifact whose internal entries are `avalanchego` and `subnet-evm`
 ```
 
 Downstream steps reference `build/avalanchego` and `build/subnet-evm`
-explicitly, so the `path: build` is load-bearing - using `path: .` would
-land the files at the workspace root and break the rest of the workflow.
+explicitly, so the `path: build` matters here - using `path: .` would land
+the files at the workspace root and break the rest of the workflow.
 
 The production `build-zip-pkg.sh` then calls `7z a foo.zip build/avalanchego`,
 which preserves the `build/` prefix inside the zip. The validator therefore
@@ -179,54 +199,66 @@ The local validator (`build-macos-zip.sh`) invokes the production
 therefore exercises the same zip + GPG-sign code that runs in CI, not a copy.
 Behavioral divergence between local and CI is structurally avoided.
 
-The Apple-sign and notarize steps are not yet wrapped this way because they
-live inside the `indygreg/apple-code-sign-action@v1` Node JS action rather
-than in a separate script; the local validator invokes `rcodesign` directly
-with the same flag shapes the action uses.
+The Apple-sign, notarize, and API-key-encode steps call `rcodesign` directly
+in both places (CI's `sign` job and the local validator), with the
+same flags. CI installs `rcodesign` from the `indygreg/apple-platform-rs`
+release; the validator bakes it into its Docker image. Neither path depends
+on a third-party GitHub Action to reach the signing tool.
 
 ## Maintenance notes
 
 ### Why `rcodesign` rather than Apple's `codesign`
 
-Apple's `codesign` only runs on macOS. The sign-publish job runs on Linux for
+Apple's `codesign` only runs on macOS. The sign job runs on Linux for
 cost reasons (see *Two-job split* above), so the signing tool must work on
 Linux. `rcodesign` (from `indygreg/apple-platform-rs`) is a pure-Rust
 re-implementation of Apple code-signing and notary submission that works
-without macOS. It is the same tool wrapped by
-`indygreg/apple-code-sign-action`, so using `rcodesign` directly in the local
-validator and via the action in CI keeps the underlying signing
-implementation consistent across both paths.
+without macOS. Both the CI `sign` job and the local validator invoke
+`rcodesign` directly, so the underlying signing implementation is identical
+across both paths.
 
-### Why `indygreg/apple-code-sign-action@v1` is currently pinned by major tag
+### Why the signing tool is `rcodesign` invoked directly, not a GitHub Action
 
-The action is currently pinned to the floating `v1` tag rather than a full
-commit SHA. The pragmatic trade-off:
+Earlier revisions of this workflow wrapped signing and notarization in the
+`indygreg/apple-code-sign-action` GitHub Action, a thin Node wrapper that
+downloads `rcodesign` and shells out to it. It was dropped in favor of
+calling `rcodesign` directly because:
 
-- `v1` follows the same pinning pattern as other GitHub Actions in this
-  repository's release workflows (`actions/checkout@v5`,
-  `aws-actions/configure-aws-credentials@v6`, etc.). Internal consistency.
-- A retag of `v1` to a malicious commit would let an attacker exfiltrate the
-  PKCS#12 password and notarization API key. The action is on a personal
-  GitHub namespace (`indygreg/`), which is meaningfully higher supply-chain
-  risk than first-party `actions/*` and `aws-actions/*` pins.
+- The `sign` job already installs `rcodesign` (it needs it for
+  `encode-app-store-connect-api-key`) and the local validator already calls
+  it directly. Using the action for only the sign/notarize steps meant two
+  different ways of invoking the same tool inside one job.
+- The action lives in a personal GitHub namespace (`indygreg/`) and handled
+  the PKCS#12 password and notarization API key. A retag of its floating `v1`
+  to a malicious commit would have let it exfiltrate those secrets. This
+  repository SHA-pins third-party actions from non-vendor namespaces for
+  exactly this reason (GitHub's own `actions/*` and AWS's `aws-actions/*` stay
+  on version tags); `indygreg/` was the only non-vendor action on a floating
+  tag.
 
-The tarball that `indygreg/apple-platform-rs` ships is already SHA256-pinned
-in the local validator's Dockerfile (`Dockerfile.macos-zip`), via the
-`*.sha256` sidecar from the release. The CI workflow itself does not yet
-SHA-pin either the action or the rcodesign tarball it downloads inline.
+The remaining actions are all vendor ones (`actions/checkout`,
+`actions/*-artifact`, `aws-actions/configure-aws-credentials`). The
+`aws-actions/configure-aws-credentials` action runs only in the separate
+`publish` job, which holds no signing secrets; within the `sign` job, the
+`upload-artifact` that runs after signing does so only after every signing
+secret has already been deleted at its last point of use (see *Credential
+lifecycle*).
 
-When the upstream API stabilizes or supply-chain risk increases enough to
-justify the maintenance overhead, pin to a full commit SHA and enable
-Dependabot to update it.
+Supply-chain integrity of the tool itself is handled by pinning the
+`rcodesign` release tarball's SHA256 in this repository, rather than trusting
+the release's own `*.sha256` sidecar (a compromised release could replace the
+tarball and the sidecar together). The CI workflow verifies against
+`APPLE_CODESIGN_SHA256`; the local builder image passes the per-arch digest as
+a Docker build arg (both live next to the pinned version and must be updated
+together on a version bump).
 
 ### Apple-sign / GPG-sign / notarize order
 
 The CI workflow performs the signing operations in this order, and the
-order is load-bearing:
+order matters:
 
-1. **Apple-sign each Mach-O binary** (`rcodesign sign` via the action). The
-   signature is embedded inside the Mach-O via the `LC_CODE_SIGNATURE` load
-   command.
+1. **Apple-sign each Mach-O binary** (`rcodesign sign`). The signature is
+   embedded inside the Mach-O via the `LC_CODE_SIGNATURE` load command.
 2. **Zip each binary and detached-GPG-sign the resulting zip**
    (`build-zip-pkg.sh`). The GPG signature is over the zip bytes, which
    include the already-Apple-signed Mach-O.
@@ -242,9 +274,9 @@ Mach-O inside the zip would be unsigned.
 
 ### Fail-fast on missing GPG secret
 
-The `Import GPG key` step asserts that `RPM_GPG_PRIVATE_KEY` is non-empty
-and that the materialized key file is non-zero-size before exporting
-`GPG_KEY_FILE` to `$GITHUB_ENV`.
+The `Build zips and GPG-sign` step asserts that `RPM_GPG_PRIVATE_KEY` is
+non-empty and that the materialized key file is non-zero-size before it runs
+`build-zip-pkg.sh`.
 
 This is a deliberate guard against a previously-latent failure mode:
 
@@ -253,28 +285,28 @@ This is a deliberate guard against a previously-latent failure mode:
 - `build-zip-pkg.sh` tests `[[ -s "${GPG_KEY_FILE}" ]]` and silently takes
   the no-op signing branch on a zero-byte file (this branch is intentional;
   it lets the script be reused in contexts that do not have a key).
-- The subsequent `Upload zips to S3` step in the workflow unconditionally
-  copies `*.zip` and then `*.zip.sig`. Without the precondition, `*.zip`
-  is published successfully and then the upload fails on the missing
-  `*.zip.sig`, leaving an unsigned zip in the release bucket.
+- The downstream `publish` job's S3 upload copies `*.zip.sig` and `*.zip`.
+  Without the precondition, an unsigned zip could be produced and later
+  published without a signature.
 
 The precondition replaces "publish unsigned then error" with "fail at the
-import step with a clear message."
+zip-signing step with a clear message."
 
-### Why `secrets.RPM_GPG_PRIVATE_KEY` is shared with RPM signing
+### Why `secrets.RPM_GPG_PRIVATE_KEY` is shared across package formats
 
-The macOS zip workflow reuses the same GPG private key as the RPM packaging
-workflow rather than introducing a `MACOS_GPG_PRIVATE_KEY` secret.
+The macOS zip workflow reuses the same GPG private key as the RPM and DEB
+packaging workflows rather than introducing a `MACOS_GPG_PRIVATE_KEY` secret.
 
 Rationale: the GPG key identifies *the project*, not the package format. End
 users who want to verify "is this artifact really from ava-labs?" use the
-same key whether they downloaded an RPM or a macOS zip (Linux tarballs are
-currently unsigned; if they ever gain GPG signing, the same key would
-naturally be reused). Maintaining two keys for the same provenance claim
-would create rotation and trust-chain complexity without a corresponding
-security benefit. The `RPM_GPG_PRIVATE_KEY` secret name predates macOS zip
-signing; renaming it would require coordinated changes across multiple
-workflows. The name is historical; the key is project-wide.
+same key whether they downloaded an RPM, a DEB, or a macOS zip (plain Linux
+tarballs are currently unsigned; if they ever gain GPG signing, the same key
+would naturally be reused). Maintaining separate keys for the same provenance
+claim would create rotation and trust-chain complexity without a
+corresponding security benefit. The `RPM_GPG_PRIVATE_KEY` secret name
+predates both DEB and macOS zip signing; renaming it would require
+coordinated changes across multiple workflows. The name is historical; the
+key is project-wide.
 
 If the project ever needs per-format signing keys (for example, to support
 different rotation cadences), the migration path is: add new format-specific
@@ -306,8 +338,8 @@ boundary use the sec-team naming convention.
 
 ### Local validator scope
 
-The local validator is intentionally "Tier 1": it exercises the parts of the
-pipeline that are reproducible offline. What it does and does not cover:
+The local validator intentionally covers only the parts of the pipeline that
+are reproducible offline. What it does and does not cover:
 
 | Part | Local validator | Why |
 | --- | --- | --- |
@@ -316,12 +348,12 @@ pipeline that are reproducible offline. What it does and does not cover:
 | `rcodesign encode-app-store-connect-api-key` | yes, with `openssl`-generated ECDSA P8 | encode step is purely local, no network |
 | `rcodesign notary-submit` (notarization) | no | hardcoded `https://appstoreconnect.apple.com/notary/v2/submissions` endpoint in `app-store-connect/src/notary_api.rs`; no `--dry-run`, no env-var endpoint override |
 
-Reaching Tier 2 (running the indygreg action via `act`) or Tier 3 (mocking
-the notary HTTPS endpoint) would require more infrastructure than the
-current Tier-1 setup. Tier 1 covers ~80% of the value at ~5% of the
-complexity: any divergence between local and CI for the signing/zip/GPG
-path will surface; only Apple's notary submission itself is untested
-locally.
+The one part it cannot cover offline is Apple's notary submission itself
+(`rcodesign notary-submit`), which has to reach Apple's servers. Mocking that
+HTTPS endpoint would take more infrastructure than the rest of the validator
+combined, for the single step a real release exercises anyway. Everything
+else, any divergence between local and CI on the sign / zip / GPG path,
+surfaces locally.
 
 ### Stub Mach-O binaries in the local validator
 
@@ -366,8 +398,16 @@ revisiting the design:
 - Apple-sign runs before GPG-sign, which runs before notarize
 - ephemeral credentials never leak from the stage directory to the bind-
   mounted `OUTPUT_DIR` or the published artifacts
-- `Import GPG key` fails fast on an empty `RPM_GPG_PRIVATE_KEY` rather than
-  letting the no-op signing branch produce an unsigned release
+- `Build zips and GPG-sign` fails fast on an empty `RPM_GPG_PRIVATE_KEY`
+  rather than letting the no-op signing branch produce an unsigned release
+- each signing secret is materialized and deleted (EXIT trap) inside the single
+  step that uses it; secret paths are never exported through `$GITHUB_ENV`
+- S3 publishing lives in a separate `publish` job so `id-token: write` is never
+  granted to the job that holds signing secrets and runs packaging scripts
+- each zip's `.sig` is uploaded to S3 before the zip itself, so a partial
+  upload can never leave a consumable zip without its signature
+- the `rcodesign` tarball is verified against a repo-pinned SHA256, not the
+  upstream `*.sha256` sidecar
 - the macOS Mach-O binaries are built natively on `macos-14`; all other
   operations run on `ubuntu-24.04`
 
@@ -376,7 +416,7 @@ revisiting the design:
 The current design should be reconsidered if any of these change:
 
 - rcodesign gains a `--dry-run` flag or env-var endpoint override for
-  notarization (would enable a Tier 3 local mock)
+  notarization (would let the local validator cover notary submission too)
 - Apple migrates away from an rcodesign-compatible API (would force a fall-
   back to Apple's `notarytool` or `codesign`, which only run on macOS)
 - the security team rotates to a per-format GPG signing key (would require
@@ -384,7 +424,7 @@ The current design should be reconsidered if any of these change:
 - GPG signing moves to KMS / cloud-managed keys (would replace
   `setup_gpg`'s key-import branch with a remote-signing branch)
 - macOS GitHub-hosted minutes become cost-competitive with Linux (would
-  collapse the two-job split back into one)
+  collapse the native-build and signing jobs back onto one runner)
 - the project moves zip publishing off S3 / GitHub Releases to another
   distribution channel
 
@@ -404,7 +444,6 @@ The current design should be reconsidered if any of these change:
 
 ### Upstream tooling
 
-- [`indygreg/apple-code-sign-action`](https://github.com/indygreg/apple-code-sign-action) - GitHub Action wrapping rcodesign
 - [`indygreg/apple-platform-rs`](https://github.com/indygreg/apple-platform-rs) - rcodesign source; relevant code paths: `apple-codesign/src/cli/mod.rs` (CLI surface), `app-store-connect/src/notary_api.rs` (hardcoded notary endpoint)
 - [`rcodesign` documentation](https://gregoryszorc.com/docs/apple-codesign/stable/) - including [certificate management](https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_certificate_management.html) and [signing reference](https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_rcodesign_signing.html)
-- [Apple notary service overview](https://developer.apple.com/documentation/security/customizing_the_notarization_workflow)
+- [Apple notary service overview](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)

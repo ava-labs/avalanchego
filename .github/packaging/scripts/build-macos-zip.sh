@@ -108,6 +108,9 @@ done
 # branching (same path RPM/DEB packaging uses). The production script
 # (build-zip-pkg.sh) reads GPG_KEY_FILE and GPG_PASSPHRASE.
 
+# setup_gpg (called below) materializes the signing key at NFPM_SIGNING_KEY:
+# it writes the freshly-generated ephemeral key there, or copies the provided
+# key file to that path. Everything downstream reads the key from this path.
 INPUT_GPG_KEY_FILE="${GPG_KEY_FILE:-}"
 export NFPM_SIGNING_KEY="${STAGE}/gpg-signing-key.asc"
 export GPG_PASSPHRASE="${GPG_KEY_PASSPHRASE:-}"
@@ -139,13 +142,13 @@ done
 
 # ── App Store Connect API key encoding ──────────────────────────────
 #
-# Exercises the workflow's `Materialize Apple credentials` step's
-# encode-app-store-connect-api-key call. Purely local — no network.
+# Exercises the encode-app-store-connect-api-key call the workflow's
+# `Notarize zips` step performs. Purely local, no network.
 #
 # The output JSON contains the private signing key, so we keep it inside
 # the ephemeral STAGE (cleaned up by the EXIT trap) and never write it
 # to the bind-mounted OUTPUT_DIR. That mirrors the production workflow,
-# which mktemps these credentials and rms them in its Cleanup step.
+# which mktemps these credentials and removes them via the step's EXIT trap.
 # The parse-check happens inline here, while the file is still alive.
 
 APPLE_P8="${STAGE}/notarization.p8"

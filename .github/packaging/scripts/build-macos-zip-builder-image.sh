@@ -3,9 +3,9 @@
 # Build the macOS-zip validator Docker image with Go and rcodesign checksum
 # verification.
 #
-# Fetches the SHA256 checksum for the Go tarball from go.dev release metadata
-# and for rcodesign from its release sidecar file, then passes both to the
-# Docker build for integrity verification.
+# Fetches the SHA256 checksum for the Go tarball from go.dev release metadata,
+# uses a repo-pinned digest for rcodesign, then passes both to the Docker build
+# for integrity verification.
 #
 # Required env vars:
 #   GO_VERSION              - Go version to install (e.g., "1.24.12")
@@ -24,13 +24,27 @@ set -euo pipefail
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required but not found on PATH" >&2; exit 1; }
 
-# Map host arch to Go's and rcodesign's naming conventions
+# Map host arch to Go's naming convention, and pin the rcodesign release-tarball
+# SHA256 per arch. The digests are pinned in this repo
+# (rather than fetched from the release's own .sha256 sidecar) so a retagged or
+# replaced upstream release cannot swap the signing binary. Keep in sync with
+# APPLE_CODESIGN_SHA256 / APPLE_CODESIGN_PKG_VERSION in
+# .github/workflows/build-macos-release.yml. Digests are version-specific.
+readonly PINNED_APPLE_CODESIGN_VERSION="0.28.0"
 arch=$(uname -m)
 case "${arch}" in
-    x86_64)        goarch="amd64"; rcodesign_arch="x86_64-unknown-linux-musl" ;;
-    aarch64|arm64) goarch="arm64"; rcodesign_arch="aarch64-unknown-linux-musl" ;;
+    x86_64)        goarch="amd64"; rcodesign_checksum="d0f0e4c7915295a1e79fc8b775b354c76d621a52da4c6b841dc9f0585de06cca" ;;
+    aarch64|arm64) goarch="arm64"; rcodesign_checksum="1d3550680c0444b24b1387753f46efc7dcdb336f9001dbde4508f1c58da90b81" ;;
     *) echo "Unsupported arch: ${arch}" >&2; exit 1 ;;
 esac
+
+# The pinned digests above are only valid for one rcodesign version. Fail loudly
+# if the requested version has drifted, rather than verifying against the wrong
+# digest.
+if [[ "${APPLE_CODESIGN_VERSION}" != "${PINNED_APPLE_CODESIGN_VERSION}" ]]; then
+    echo "ERROR: no pinned rcodesign digest for version ${APPLE_CODESIGN_VERSION} (pinned: ${PINNED_APPLE_CODESIGN_VERSION}); update the digests in $(basename "$0")" >&2
+    exit 1
+fi
 
 # ── Go checksum ──────────────────────────────────────────────────────
 
@@ -45,21 +59,7 @@ if [[ -z "${go_checksum}" || "${go_checksum}" == "null" ]]; then
     exit 1
 fi
 echo "Go checksum: ${go_checksum}"
-
-# ── rcodesign checksum ───────────────────────────────────────────────
-
-rcodesign_filename="apple-codesign-${APPLE_CODESIGN_VERSION}-${rcodesign_arch}.tar.gz"
-# The tag uses a slash separator (apple-codesign/<ver>) that must be URL-
-# encoded as %2F in the download path.
-rcodesign_sha_url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_VERSION}/${rcodesign_filename}.sha256"
-echo "Fetching SHA256 checksum for ${rcodesign_filename}..."
-rcodesign_checksum=$(curl -fsSL "${rcodesign_sha_url}" | awk '{print $1}')
-
-if [[ -z "${rcodesign_checksum}" ]]; then
-    echo "ERROR: Could not fetch checksum for ${rcodesign_filename} from ${rcodesign_sha_url}" >&2
-    exit 1
-fi
-echo "rcodesign checksum: ${rcodesign_checksum}"
+echo "rcodesign checksum (pinned): ${rcodesign_checksum}"
 
 # ── Build ───────────────────────────────────────────────────────────
 
