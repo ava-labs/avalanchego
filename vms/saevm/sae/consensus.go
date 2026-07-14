@@ -33,9 +33,7 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID, _ *block.Context) er
 }
 
 // GetPreference returns the block the VM would currently build on top of, as
-// set by [VM.SetPreference]. It never returns nil: [NewVM] initializes the
-// preference to the last executed block, and SetPreference only overwrites it
-// with a block it successfully retrieved.
+// set by [NewVM] and [VM.SetPreference]. It never returns nil.
 func (vm *VM) GetPreference() *blocks.Block {
 	return vm.preference.Load()
 }
