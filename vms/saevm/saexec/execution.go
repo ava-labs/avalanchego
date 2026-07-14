@@ -257,7 +257,7 @@ func Execute(
 		// Finalise any state changes made by the hook as part of this
 		// transaction, mirroring the finalisation performed by
 		// [core.ApplyTransaction].
-		stateDB.Finalise(true)
+		stateDB.Finalise(rules.IsEIP158)
 	}
 
 	numTxs := len(b.Transactions())
