@@ -246,7 +246,6 @@ func Execute(
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
-		// Store the receipt as soon as possible to minimize user latency.
 		if r, ok := receiptStore.Load(tx.Hash()); ok {
 			r.Put(&Receipt{receipt, signer, tx})
 		}
