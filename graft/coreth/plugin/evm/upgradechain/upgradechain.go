@@ -26,7 +26,7 @@ import (
 
 // A Fixture is a complete, deterministic C-Chain history.
 type Fixture struct {
-	// Genesis is the JSON-encoded [core.Genesis] passed to the VM's
+	// Genesis is the JSON-encoded core.Genesis passed to the VM's
 	// Initialize method.
 	Genesis json.RawMessage `json:"genesis"`
 	// Upgrades is the [upgrade.Config] the chain was generated with.
@@ -61,7 +61,7 @@ type Block struct {
 	// Time is the block's timestamp in Unix seconds.
 	Time uint64 `json:"time"`
 	// RLP is the canonical encoding of the full block. Decoding it requires
-	// the coreth libevm extras to be registered; see [customtypes.Register].
+	// the coreth libevm extras to be registered; see customtypes.Register.
 	RLP hexutil.Bytes `json:"rlp"`
 	// State holds the watched accounts' post-execution state as coreth
 	// itself computed it, for asserting historical RPC results against.
@@ -79,30 +79,26 @@ type AccountState struct {
 	ANTBalance *hexutil.Big `json:"antBalance"`
 }
 
-// Heights of fixture blocks that consuming tests single out. The generator
-// asserts them, so they cannot silently drift when the block script changes.
+// Heights ([Block.Number]) of fixture blocks that consuming tests single
+// out. The generator asserts them, so they cannot silently drift.
 var (
-	// NativeAssetCallBlocks carry a functional nativeAssetCall transaction.
-	// The precompile's nested EVM call unbalances the callTracer's frame
-	// accounting, so tracing these blocks fails with
-	// [NativeAssetCallTraceError] — in coreth and in any VM replaying this
-	// history.
+	// NativeAssetCallBlocks carry a functional nativeAssetCall, whose nested
+	// EVM call makes tracing fail with [NativeAssetCallTraceError] — in
+	// coreth and in any replaying VM.
 	NativeAssetCallBlocks = []uint64{4, 8}
-)
 
-const (
-	// DeprecatedNativeAssetCallBlock carries a nativeAssetCall transaction
-	// executed while the precompile was deprecated, giving the fixture's
-	// only failed receipt.
+	// DeprecatedNativeAssetCallBlock's nativeAssetCall ran while the
+	// precompile was deprecated, giving the fixture's only failed receipt.
 	DeprecatedNativeAssetCallBlock uint64 = 7
-	// SendWarpMessageBlock carries the sendWarpMessage transaction, whose
-	// receipt logs the warp precompile's SendWarpMessage event.
-	SendWarpMessageBlock uint64 = 12
 
-	// NativeAssetCallTraceError is the exact error with which coreth's
-	// debug_trace* endpoints fail on [NativeAssetCallBlocks].
-	NativeAssetCallTraceError = "incorrect number of top-level calls"
+	// SendWarpMessageBlock's sendWarpMessage logs the warp precompile's
+	// SendWarpMessage event.
+	SendWarpMessageBlock uint64 = 12
 )
+
+// NativeAssetCallTraceError is the exact error from coreth's debug_trace*
+// endpoints on [NativeAssetCallBlocks].
+const NativeAssetCallTraceError = "incorrect number of top-level calls"
 
 // Parse decodes a JSON-encoded fixture, as committed at
 // vms/saevm/cchain/testdata/upgradechain_fixture.json.

@@ -32,7 +32,8 @@ var Schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
 type TestVMConfig struct {
 	IsSyncing bool
 	Fork      *upgradetest.Fork
-	Upgrades  *upgrade.Config
+	// If set, overrides the NetworkUpgrades derived from Fork.
+	Upgrades *upgrade.Config
 	// If genesisJSON is empty, defaults to the genesis corresponding to the
 	// fork.
 	GenesisJSON string

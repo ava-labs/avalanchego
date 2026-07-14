@@ -226,9 +226,9 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (h *hooks) BeforeExecutingBlock(statedb *state.StateDB, parent *types.Header, b *types.Block) error {
+func (h *hooks) BeforeExecutingBlock(statedb *state.StateDB, parent, header *types.Header) error {
 	config := corethparams.GetExtra(h.chainConfig)
-	if config.IsDurango(b.Time()) && !config.IsDurango(parent.Time) {
+	if config.IsDurango(header.Time) && !config.IsDurango(parent.Time) {
 		activateWarpPrecompile(statedb)
 	}
 	return nil

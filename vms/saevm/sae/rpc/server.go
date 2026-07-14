@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/eth/filters"
-	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
@@ -169,8 +168,8 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 
 	if !b.config.DisableTracing {
 		apis = append(apis, api{
-			// geth-specific APIs, with SAE overrides (see [tracersAPI]):
-			"debug", &tracersAPI{tracers.NewAPI(b), b},
+			// geth-specific APIs:
+			"debug", newTracersAPI(b),
 		})
 	}
 

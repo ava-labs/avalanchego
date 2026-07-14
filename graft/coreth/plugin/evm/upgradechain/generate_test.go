@@ -51,11 +51,13 @@ func TestMain(m *testing.M) {
 const fixturePath = "../../../../../vms/saevm/cchain/testdata/upgradechain_fixture.json"
 
 // TestFixtureUpToDate regenerates the fixture from scratch and requires that
-// it matches the committed fixture byte for byte.
+// it matches the committed fixture byte for byte. Under `go test -update` (see
+// the [update] flag) it instead overwrites the committed fixture.
 func TestFixtureUpToDate(t *testing.T) {
 	fx := generate(t)
 	got, err := json.MarshalIndent(fx, "", "\t")
 	require.NoError(t, err, "json.MarshalIndent(fixture)")
+	// .editorconfig mandates a final newline in committed files.
 	got = append(got, '\n')
 
 	if *update {
@@ -70,7 +72,9 @@ func TestFixtureUpToDate(t *testing.T) {
 
 // forkSchedule returns the upgrade config the fixture chain is generated
 // with. AP1-AP3 (and hence Berlin and London) are active at genesis; every
-// later scheduled upgrade activates one day after its predecessor.
+// later scheduled upgrade activates one day after its predecessor. This is
+// longer than an era's few 10-second block intervals, so adding blocks to an
+// era can never push the clock past the next upgrade.
 func forkSchedule() upgrade.Config {
 	cfg := upgradetest.GetConfig(upgradetest.ApricotPhase3)
 	at := func(days int) time.Time {
@@ -129,9 +133,8 @@ var errPChainHeightTooLow = errors.New("warp validator set unavailable below the
 
 // generate builds the full fixture: chain, blocks, and database dump.
 func generate(t *testing.T) *Fixture {
-	fork := upgradetest.ApricotPhase3
 	upgrades := forkSchedule()
-	genesisJSON := vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])
+	genesisJSON := vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.ApricotPhase3])
 
 	counter := crypto.CreateAddress(vmtest.TestEthAddrs[0], 0)
 	g := &generator{
@@ -151,7 +154,6 @@ func generate(t *testing.T) *Fixture {
 
 	g.setClock(t, upgrade.InitiallyActiveTime)
 	suite := vmtest.SetupTestVM(t, g.vm, vmtest.TestVMConfig{
-		Fork:        &fork,
 		Upgrades:    &upgrades,
 		GenesisJSON: genesisJSON,
 		// Disable pruning so every block's state root remains resolvable, and
@@ -164,6 +166,11 @@ func generate(t *testing.T) *Fixture {
 
 	g.buildAllBlocks(t)
 	g.pinNativeAssetCallTraceParity(t)
+
+	// The dump MUST follow a clean shutdown, matching a real handed-over
+	// database and removing geth's unclean-shutdown marker, whose wall-clock
+	// content would make the dump nondeterministic.
+	require.NoError(t, g.vm.Shutdown(t.Context()), "vm.Shutdown()")
 	g.dumpDatabase(t, suite)
 	return g.fixture
 }
@@ -209,12 +216,6 @@ func (g *generator) configureValidatorState(t *testing.T) {
 func (g *generator) dumpDatabase(t *testing.T, suite *vmtest.TestVMSuite) {
 	t.Helper()
 
-	// The dump MUST follow a clean shutdown: that is the state of a real
-	// handed-over database, and shutdown removes geth's unclean-shutdown
-	// marker, whose wall-clock content would make the dump nondeterministic.
-	// Only the VM's own database wrappers close, so the suite's separate
-	// handle remains iterable.
-	require.NoError(t, g.vm.Shutdown(t.Context()), "vm.Shutdown()")
 	g.fixture.Database = make(map[string]hexutil.Bytes)
 	it := suite.DB.NewIterator()
 	defer it.Release()

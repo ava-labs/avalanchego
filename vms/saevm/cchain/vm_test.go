@@ -98,16 +98,15 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis     core.Genesis
-		genesisJSON []byte
-		upgrades    *upgrade.Config
-		nodeID      ids.NodeID
-		networkID   uint32
-		validators  *warptest.Validators
-		now         func() time.Time
-		vmConfig    config
-		db          database.Database
-		state       snow.State
+		genesis    core.Genesis
+		upgrades   *upgrade.Config
+		nodeID     ids.NodeID
+		networkID  uint32
+		validators *warptest.Validators
+		now        func() time.Time
+		vmConfig   config
+		db         database.Database
+		state      snow.State
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -150,11 +149,10 @@ func withAccount(addr common.Address, acc types.Account) sutOption {
 	})
 }
 
-// withGenesisJSON passes the given bytes to [VM.Initialize] verbatim instead
-// of marshalling the [sutConfig.genesis] struct.
-func withGenesisJSON(b []byte) sutOption {
+// withGenesis replaces the SUT's entire default genesis.
+func withGenesis(g core.Genesis) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesisJSON = b
+		c.genesis = g
 	})
 }
 
@@ -263,12 +261,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
-	genesisBytes := cfg.genesisJSON
-	if genesisBytes == nil {
-		var err error
-		genesisBytes, err = json.Marshal(cfg.genesis)
-		require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
-	}
+	genesisBytes, err := json.Marshal(cfg.genesis)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
 	configBytes, err := json.Marshal(cfg.vmConfig)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)

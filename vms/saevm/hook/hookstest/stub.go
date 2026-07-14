@@ -250,7 +250,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 }
 
 // BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(*state.StateDB, *types.Header, *types.Block) error {
+func (*Stub) BeforeExecutingBlock(*state.StateDB, *types.Header, *types.Header) error {
 	return nil
 }
 

@@ -214,7 +214,7 @@ func Execute(
 		return nil, err
 	}
 
-	if err := hooks.BeforeExecutingBlock(stateDB, parent.Header(), b.EthBlock()); err != nil {
+	if err := hooks.BeforeExecutingBlock(stateDB, parent.Header(), header); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
 

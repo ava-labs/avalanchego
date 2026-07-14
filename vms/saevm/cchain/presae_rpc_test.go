@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/rlp"
@@ -62,9 +63,12 @@ func newPreSAESUT(t *testing.T) (context.Context, *SUT, *upgradechain.Fixture) {
 	upgrades := fx.Upgrades
 	upgrades.HeliconTime = time.Unix(int64(tip.Time)+1, 0) //#nosec G115 -- Known non-negative
 
+	var genesis core.Genesis
+	require.NoError(t, json.Unmarshal(fx.Genesis, &genesis), "unmarshalling fixture genesis")
+
 	ctx, sut := newSUT(t,
 		withDB(db),
-		withGenesisJSON(fx.Genesis),
+		withGenesis(genesis),
 		withUpgrades(upgrades),
 		timeOpt,
 	)
