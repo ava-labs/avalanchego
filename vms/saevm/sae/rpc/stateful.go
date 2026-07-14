@@ -156,9 +156,6 @@ func (b *backend) replay(ethB *types.Block, baseFee *uint256.Int) (*saexec.Execu
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
-	if ethB.NumberU64() == 0 {
-		return nil, bCtx, nil, nil, errors.New("no transactions in genesis")
-	}
 	txs := ethB.Transactions()
 	if txIndex < 0 || txIndex >= len(txs) {
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))

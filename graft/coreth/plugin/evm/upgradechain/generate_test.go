@@ -147,7 +147,7 @@ func generate(t *testing.T) *Fixture {
 		},
 	}
 
-	g.setClock(t, upgrade.InitiallyActiveTime)
+	g.setClock(upgrade.InitiallyActiveTime)
 	suite := vmtest.SetupTestVM(t, g.vm, vmtest.TestVMConfig{
 		Upgrades:    &upgrades,
 		GenesisJSON: genesisJSON,
@@ -222,8 +222,7 @@ func (g *generator) dumpDatabase(t *testing.T, suite *vmtest.TestVMSuite) {
 
 // setClock sets the VM's mocked clock, which drives block timestamps and
 // fork-rule selection.
-func (g *generator) setClock(t *testing.T, now time.Time) {
-	t.Helper()
+func (g *generator) setClock(now time.Time) {
 	g.vm.Clock().Set(now)
 }
 

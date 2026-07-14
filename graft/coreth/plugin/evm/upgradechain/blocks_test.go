@@ -47,117 +47,116 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 
 	// At least one block per historical upgrade; each note names the behavior
 	// exercised by consuming tests.
-	g.setClock(t, upgrades.ApricotPhase3Time.Add(10*time.Second))
+	g.setClock(upgrades.ApricotPhase3Time.Add(10*time.Second))
 	g.buildEthBlock(t, "apricotPhase3", "counter-contract deploy and AVAX transfer under dynamic fees",
 		g.counterDeployTx(t),
 		g.transferTx(t, 1),
 	)
 
-	g.advanceClock(t, 10*time.Second)
+	g.advanceClock(10*time.Second)
 	g.buildBlock(t, "apricotPhase3", "single atomic import of AVAX (pre-AP5 extData encoding)",
 		[]*corethatomic.Tx{g.importAVAX(t, 10*units.Avax)},
 		[]*types.Transaction{g.counterIncrementTx(t)},
 		nil,
 	)
 
-	g.advanceClock(t, 10*time.Second)
+	g.advanceClock(10*time.Second)
 	g.buildBlock(t, "apricotPhase3", "atomic import of a non-AVAX asset, funding a multicoin (ANT) balance",
 		[]*corethatomic.Tx{g.importANT(t, 1_000)},
 		[]*types.Transaction{g.transferTx(t, 8)},
 		nil,
 	)
 
-	g.advanceClock(t, 10*time.Second)
+	g.advanceClock(10*time.Second)
 	g.buildEthBlock(t, "apricotPhase3", "nativeAssetCall moving the imported ANT balance (functional precompile era)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
 	require.Equal(t, NativeAssetCallBlocks[0], g.tip(), "functional nativeAssetCall block height")
 
-	g.setClock(t, upgrades.ApricotPhase4Time)
+	g.setClock(upgrades.ApricotPhase4Time)
 	g.buildBlock(t, "apricotPhase4", "atomic export of AVAX with AP4 header fields (extDataGasUsed, blockGasCost)",
 		[]*corethatomic.Tx{g.exportAVAX(t, 1*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 2)},
 		nil,
 	)
 
-	g.setClock(t, upgrades.ApricotPhase5Time)
+	g.setClock(upgrades.ApricotPhase5Time)
 	g.buildBlock(t, "apricotPhase5", "two atomic imports batched into one block (post-AP5 extData encoding)",
 		[]*corethatomic.Tx{g.importAVAX(t, 3*units.Avax), g.importAVAX(t, 4*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 9)},
 		nil,
 	)
 
-	g.setClock(t, upgrades.ApricotPhasePre6Time)
+	g.setClock(upgrades.ApricotPhasePre6Time)
 	g.buildEthBlock(t, "apricotPhasePre6", "nativeAssetCall against the deprecated precompile (failing receipt)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
 	require.Equal(t, DeprecatedNativeAssetCallBlock, g.tip(), "deprecated nativeAssetCall block height")
 
-	g.setClock(t, upgrades.ApricotPhase6Time)
+	g.setClock(upgrades.ApricotPhase6Time)
 	g.buildEthBlock(t, "apricotPhase6", "nativeAssetCall functional again after AP6 re-enablement",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
 	require.Equal(t, NativeAssetCallBlocks[1], g.tip(), "functional nativeAssetCall block height")
 
-	g.setClock(t, upgrades.ApricotPhasePost6Time)
+	g.setClock(upgrades.ApricotPhasePost6Time)
 	g.buildEthBlock(t, "apricotPhasePost6", "plain transfer (no per-block format change)",
 		g.transferTx(t, 3),
 	)
 
-	g.setClock(t, upgrades.BanffTime)
+	g.setClock(upgrades.BanffTime)
 	g.buildBlock(t, "banff", "atomic AVAX export under Banff's AVAX-only restriction",
 		[]*corethatomic.Tx{g.exportAVAX(t, 1*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 10)},
 		nil,
 	)
 
-	g.setClock(t, upgrades.CortinaTime)
+	g.setClock(upgrades.CortinaTime)
 	g.buildEthBlock(t, "cortina", "counter increment under Cortina's 15M gas limit",
 		g.counterIncrementTx(t),
 	)
 
-	g.setClock(t, upgrades.DurangoTime)
+	g.setClock(upgrades.DurangoTime)
 	g.buildEthBlock(t, "durango", "sendWarpMessage precompile call emitting an unsigned warp message",
 		g.sendWarpMessageTx(t),
 	)
 	require.Equal(t, SendWarpMessageBlock, g.tip(), "sendWarpMessage block height")
 
-	g.advanceClock(t, 10*time.Second)
+	g.advanceClock(10*time.Second)
 	g.buildBlock(t, "durango", "getVerifiedWarpMessage with an access-list predicate (results in header extra), plus a transfer whose tracing replays the predicate transaction",
 		nil,
 		[]*types.Transaction{g.verifiedWarpMessageTx(t), g.transferTx(t, 11)},
 		&block.Context{PChainHeight: minValidPChainHeight},
 	)
 
-	g.setClock(t, upgrades.EtnaTime)
+	g.setClock(upgrades.EtnaTime)
 	g.buildEthBlock(t, "etna", "dynamic-fee transfer with Cancun header fields (blobGasUsed, excessBlobGas, parentBeaconRoot)",
 		g.dynamicFeeTransferTx(t, 4),
 	)
 
-	g.setClock(t, upgrades.FortunaTime)
+	g.setClock(upgrades.FortunaTime)
 	g.buildEthBlock(t, "fortuna", "dynamic-fee transfer with the ACP-176 fee state as the extra-data prefix",
 		g.dynamicFeeTransferTx(t, 5),
 	)
 
-	g.setClock(t, upgrades.GraniteTime)
+	g.setClock(upgrades.GraniteTime)
 	g.buildEthBlock(t, "granite", "first Granite block (timeMilliseconds, minDelayExcess header fields)",
 		g.transferTx(t, 6),
 	)
 
-	g.advanceClock(t, 2*time.Second)
+	g.advanceClock(2*time.Second)
 	g.buildEthBlock(t, "granite", "second Granite block, subject to the ACP-226 minimum block delay; three transactions so that tracing the last replays the first two",
 		g.transferTx(t, 7), g.transferTx(t, 12), g.transferTx(t, 13),
 	)
 
-	g.advanceClock(t, 2*time.Second)
+	g.advanceClock(2*time.Second)
 	g.buildEthBlock(t, "granite", "storage set-and-clear in one transaction, accruing an SSTORE refund that coreth discards (refunds disabled since AP1)",
 		g.storageClearTx(t),
 	)
 }
 
-func (g *generator) advanceClock(t *testing.T, d time.Duration) {
-	t.Helper()
-	g.setClock(t, g.vm.Clock().Time().Add(d))
+func (g *generator) advanceClock(d time.Duration) {
+	g.setClock(g.vm.Clock().Time().Add(d))
 }
 
 // tip returns the height of the most recently built block. Fixture blocks

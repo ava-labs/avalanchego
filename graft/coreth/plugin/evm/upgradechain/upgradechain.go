@@ -99,13 +99,3 @@ var (
 // NativeAssetCallTraceError is the exact error from coreth's debug_trace*
 // endpoints on [NativeAssetCallBlocks].
 const NativeAssetCallTraceError = "incorrect number of top-level calls"
-
-// Parse decodes a JSON-encoded fixture, as committed at
-// vms/saevm/cchain/testdata/upgradechain_fixture.json.
-func Parse(data []byte) (*Fixture, error) {
-	f := new(Fixture)
-	if err := json.Unmarshal(data, f); err != nil {
-		return nil, err
-	}
-	return f, nil
-}

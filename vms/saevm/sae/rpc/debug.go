@@ -105,15 +105,14 @@ func (t *tracersAPI) TraceBlockByHash(ctx context.Context, hash common.Hash, con
 	return t.traceBlock(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */), config)
 }
 
-// TraceTransaction and TraceCall replay through [backend.StateAtTransaction]
-// and [backend.StateAtBlock] respectively, which already provide the
-// consensus-execution semantics described on [tracersAPI], so libevm's
-// implementations serve them correctly.
-
+// TraceTransaction replays through [backend.StateAtTransaction]
+// so libevm's implementations serve them correctly.
 func (t *tracersAPI) TraceTransaction(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) (any, error) {
 	return t.inner.TraceTransaction(ctx, hash, config)
 }
 
+// TraceCall replays through [backend.StateAtBlock] so libevm's
+// implementations serve them correctly.
 func (t *tracersAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, numOrHash rpc.BlockNumberOrHash, config *tracers.TraceCallConfig) (any, error) {
 	return t.inner.TraceCall(ctx, args, numOrHash, config)
 }

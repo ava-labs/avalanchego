@@ -42,8 +42,8 @@ var upgradechainFixtureJSON []byte
 func newPreSAESUT(t *testing.T) (context.Context, *SUT, *upgradechain.Fixture) {
 	t.Helper()
 
-	fx, err := upgradechain.Parse(upgradechainFixtureJSON)
-	require.NoError(t, err, "upgradechain.Parse()")
+	fx := new(upgradechain.Fixture)
+	require.NoError(t, json.Unmarshal(upgradechainFixtureJSON, fx), "unmarshalling fixture")
 
 	// The fixture was dumped from the database handle coreth's VM received,
 	// which corresponds to the "chain" prefix of the SUT's base database.
@@ -124,12 +124,6 @@ func testBlockRPCs(ctx context.Context, t *testing.T, sut *SUT, fx *upgradechain
 	testTraceTransactionRPCs(ctx, t, sut, fb, eth)
 	testIntermediateRootsRPC(ctx, t, sut, fb, eth)
 	testLogsRPC(ctx, t, sut, fb)
-}
-
-// nativeAssetCallTraceBroken reports whether callTracing the block fails with
-// exactly [upgradechain.NativeAssetCallTraceError]
-func nativeAssetCallTraceBroken(number uint64) bool {
-	return slices.Contains(upgradechain.NativeAssetCallBlocks, number)
 }
 
 func testBlockLookupRPCs(ctx context.Context, t *testing.T, sut *SUT, fb upgradechain.Block, eth *types.Block) {
@@ -240,7 +234,7 @@ func testTraceBlockRPCs(ctx context.Context, t *testing.T, sut *SUT, fb upgradec
 			Error  string          `json:"error"`
 		}
 		err := rpcClient.CallContext(ctx, &traces, "debug_traceBlockByNumber", hexutil.Uint64(fb.Number), tracerConfig)
-		if nativeAssetCallTraceBroken(fb.Number) {
+		if slices.Contains(upgradechain.NativeAssetCallBlocks, fb.Number) {
 			require.EqualError(t, err, upgradechain.NativeAssetCallTraceError, "debug_traceBlockByNumber(%d) matches coreth", fb.Number)
 			err = rpcClient.CallContext(ctx, &traces, "debug_traceBlockByHash", fb.Hash, tracerConfig)
 			require.EqualError(t, err, upgradechain.NativeAssetCallTraceError, "debug_traceBlockByHash(%s) matches coreth", fb.Hash)
@@ -310,7 +304,7 @@ func testTraceTransactionRPCs(ctx context.Context, t *testing.T, sut *SUT, fb up
 				GasUsed hexutil.Uint64 `json:"gasUsed"`
 			}
 			err := sut.ethclient.Client().CallContext(ctx, &trace, "debug_traceTransaction", tx.Hash(), map[string]any{"tracer": "callTracer"})
-			if nativeAssetCallTraceBroken(fb.Number) {
+			if slices.Contains(upgradechain.NativeAssetCallBlocks, fb.Number) {
 				require.EqualError(t, err, upgradechain.NativeAssetCallTraceError, "debug_traceTransaction(%s) matches coreth", tx.Hash())
 				continue
 			}
