@@ -32,6 +32,12 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID, _ *block.Context) er
 	return nil
 }
 
+// GetPreference returns the block the VM would currently build on top of, as
+// set by [NewVM] and [VM.SetPreference]. It never returns nil.
+func (vm *VM) GetPreference() *blocks.Block {
+	return vm.preference.Load()
+}
+
 // AcceptBlock marks the block as [accepted], resulting in:
 //   - All blocks settled by this block having their [blocks.Block.MarkSettled]
 //     method called; and
@@ -59,6 +65,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
 		rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
+		rawdb.WriteHeadFastBlockHash(batch, b.Hash())
 
 		if err := batch.Write(); err != nil {
 			return err

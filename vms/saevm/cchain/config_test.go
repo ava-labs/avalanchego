@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -84,9 +85,34 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
 		},
 		{
+			name: "allow_unprotected_txs",
+			json: `{"allow-unprotected-txs":true}`,
+			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
+		},
+		{
 			name: "gas_target",
 			json: `{"gas-target":1000}`,
 			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
+		},
+		{
+			name: "batch_request_limit",
+			json: `{"batch-request-limit":50}`,
+			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
+		},
+		{
+			name: "batch_request_limit_explicit_zero",
+			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
+			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
+		},
+		{
+			name:    "batch_request_limit_too_large",
+			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
+			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
+		},
+		{
+			name: "min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
 		},
 		{
 			name: "warp_off_chain_messages",
@@ -100,21 +126,27 @@ func TestParseConfig(t *testing.T) {
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
+				"min-delay-target":3000,
 				"pruning-enabled":false,
 				"commit-interval":256,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
+				"allow-unprotected-txs":true,
+				"batch-request-limit":50,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
 				GasTarget:            utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
 				CommitInterval:       256,
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
+				AllowUnprotectedTxs:  true,
+				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},

@@ -87,6 +87,7 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -94,7 +95,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           role-duration-seconds: '43200'
-      - uses: actions/checkout@v5
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
         run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"

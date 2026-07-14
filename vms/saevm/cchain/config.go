@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
@@ -32,7 +33,9 @@ type config struct {
 	// GasTarget is the target gas per second this node votes for when building
 	// blocks under ACP-176. nil means follow the parent block.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-	// MinDelayTarget *uint64    `json:"min-delay-target,omitempty"`
+	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
+	// for; nil follows the parent.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
 	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
@@ -51,8 +54,10 @@ type config struct {
 
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
-	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
+	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
+	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
+	// 0 = no limit. An unset config uses the default (1000).
+	BatchRequestLimit uint64 `json:"batch-request-limit"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`
@@ -78,6 +83,7 @@ func defaultConfig() config {
 		Pruning:            true,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
 
@@ -91,6 +97,9 @@ func parseConfig(b []byte) (config, error) {
 
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+	if err := c.saeConfig(nil).RPCConfig.Verify(); err != nil {
+		return config{}, err
 	}
 	return c, nil
 }
@@ -108,6 +117,10 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			TrieDBConfig:       triedb.HashDefaults,
 			Archival:           !c.Pruning,
 			TrieCommitInterval: c.CommitInterval,
+		},
+		RPCConfig: rpc.Config{
+			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
+			BatchRequestLimit:   c.BatchRequestLimit,
 		},
 		Now: now,
 	}
@@ -134,6 +147,7 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 type desiredParams struct {
 	targetExponent *dynamic.TargetExponent
 	priceExponent  *dynamic.PriceExponent
+	delayExponent  *dynamic.DelayExponent
 }
 
 // desired returns c's user-facing targets as internal exponent votes.
@@ -146,6 +160,10 @@ func (c config) desired() desiredParams {
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
+	}
+	if c.MinDelayTarget != nil {
+		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
+		d.delayExponent = &e
 	}
 	return d
 }

@@ -71,12 +71,42 @@ go_sdk.from_file(go_mod = "//:go.mod")
 
 ### Version Pinning
 
-| Tool | Version | Pin Mechanism | Rationale |
-|------|---------|---------------|-----------|
-| Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.25.10 | `go.mod` via go_sdk.from_file | Single source of truth |
-| rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
-| gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
+This repo keeps version pins in the checked-in configuration consumed by the
+relevant tooling rather than duplicating them in documentation:
+
+- Bazel: `.bazelversion`
+- Go: `go.mod` (read by `go_sdk.from_file()`)
+- Bazel modules such as `rules_go` and Gazelle: `MODULE.bazel`
+
+When checking or updating a version, use those files as the source of truth.
+
+### Repository tools and external-dependency fetches
+
+Bazel CI uses two separate Gazelle `go_deps` extension instances:
+
+- the main `go_deps` instance reads `go.work` for the workspace modules and the
+  external repos they import
+- the isolated `tool_go_deps` instance reads `tools/external/go.mod` for
+  repo-owned helper tools that CI may need to launch before other Bazel tasks
+
+That split is intentional. The CI setup path needs to fetch the Bazel-owned
+`//tools/external:task` bootstrap target and warm external dependency caches
+without also depending on whatever local workspace state happens to exist in a
+particular checkout.
+
+For the same reason, `MODULE.bazel` intentionally omits `use_repo` bindings for
+workspace modules such as `avalanchego` and `graft/*`. Those modules are built
+from the local source tree, so binding their generated local-path repos is not
+needed for normal builds. Omitting them also keeps broad fetches such as
+`bazel fetch //...` from traversing personal workspace state like local
+symlinks or repo-adjacent directories while trying to prepare external
+repositories for CI.
+
+If future Bazel changes appear to make this split unnecessary, treat that as a
+behavioral change to validate rather than a cleanup to apply mechanically. The
+important invariant is that Bazel CI can bootstrap repo tools and prefetch the
+external dependencies its jobs need without coupling that setup step to
+machine-specific workspace state.
 
 ### Why Bazel 8?
 
@@ -509,9 +539,150 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
-That check includes the Bazel module metadata files, so lockfile drift is
-caught in the metadata phase rather than showing up later as a surprising
-working-tree mutation.
+In GitHub Actions, the Bazel jobs use the local
+`./.github/actions/setup-bazel` composite action. It prepares cache
+state for the dependencies those jobs are expected to need and sets
+`RUN_TASK_PREFER_BAZEL=1`. With that variable set, `run_task.sh` uses
+the Bazel-owned `//tools/external:task` target instead of bootstrapping
+`task` with `go tool` on runners where Go is already on `PATH`. That
+preference is only for CI; local developer use still defaults to the
+Go-based task bootstrap.
+
+See [Bazel CI External Dependency
+Caching](#bazel-ci-external-dependency-caching) for the motivation,
+cache-key design, checked-in list of Bazel CI target patterns used to
+prepare the build dependency cache, and enforcement model. This keeps
+repo tool bootstrapping and build dependency caching inside Bazel for
+the lighter-weight Bazel CI jobs. The E2E Bazel job uses the same cache
+setup before its heavier test wrapper.
+
+That check includes the Bazel module metadata files, so lockfile drift
+is caught in the metadata phase rather than showing up later as a
+surprising working-tree mutation.
+
+## Bazel CI External Dependency Caching
+
+### Why this exists
+
+The intent is similar to `actions/setup-go`: set up dependency caches once
+from a small amount of checked-in metadata so later CI jobs can reuse them
+instead of downloading the same things again. Bazel does not infer the right
+shared CI cache contents from `go.mod` alone, so this repo has to be more
+explicit about what it fetches ahead of time.
+
+The primary motivation is CI reliability, not just speed. This repo has seen
+GitHub Actions flakes when Bazel jobs had to download external dependencies and
+Go module data from the network in each job. Caching as much of that setup
+work as possible means fewer repeated network requests during the Bazel
+workflow, which reduces exposure to those infrastructure failures.
+
+### What is cached
+
+The Bazel CI cache setup restores and configures two kinds of cached data:
+
+- Bazel `repository_cache`
+- shared Gazelle `GOMODCACHE`
+
+The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
+keeps Go module downloads in each Bazel work area. That means a later job can
+still hit the network even after the setup fetch has already run. The action
+therefore enables both:
+
+- `GO_REPOSITORY_USE_HOST_MODCACHE=1`
+- `GOMODCACHE=...`
+
+### Cache key
+
+The GitHub Actions cache key is:
+`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh')}`
+with a same-platform restore prefix of
+`bazel-repo-${runner.os}-${runner.arch}-`.
+
+That split is intentional:
+- `runner.os` and `runner.arch` separate caches by platform
+- `.bazelversion` invalidates the cache when the Bazel version changes
+- `MODULE.bazel.lock` invalidates the cache when the pinned external
+  dependency set changes
+- `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
+  checked-in Bazel CI target patterns used by setup change
+- the broader same-platform restore key still gives a useful warm start
+  because these caches store downloaded dependency data, not per-run
+  build outputs
+
+### Checked-in list of Bazel CI target patterns used to prepare the build dependency cache
+
+This setup is similar in spirit to `actions/setup-go`: before the later Bazel
+CI jobs run, prepare cache state for the build dependencies they are expected
+to need so those jobs do not each discover missing dependencies on their own.
+
+The setup action first restores any previously saved dependency data,
+configures Bazel to use it, and fetches the Bazel-owned
+`//tools/external:task` bootstrap target before the workflow's first
+`./scripts/run_task.sh ...` invocation. In the per-platform `setup` job it is
+run with `initial-setup: true`; in that mode it also checks Bazel metadata and
+runs `./scripts/run_task.sh bazel-cache-ci-build-dependencies`, which
+delegates to `./scripts/cache_bazel_ci_build_dependencies.sh` and uses the
+checked-in list in `./scripts/bazel_ci_dependency_list.sh`.
+
+That checked-in list names both:
+- the Bazel bootstrap targets needed before the first CI task launch
+- the Bazel target patterns whose build dependencies the later CI jobs are
+  expected to need
+
+The list should cover what `bazel-ci.yml` actually runs, rather than trying to
+fetch everything Bazel could possibly reach. This avoids missing dependencies
+needed by the real CI jobs while also avoiding broader fetches that download
+unrelated repos and toolchains.
+
+A related design constraint is that this setup path must stay focused on
+external dependencies, not local workspace-module discovery. The isolated
+`tool_go_deps` extension and the omission of workspace-module `use_repo`
+bindings in `MODULE.bazel` are part of the same design: they let the setup job
+fetch Bazel-owned repo tools and warm caches for later jobs without making
+`bazel fetch` walk machine-specific workspace state.
+
+### Enforcement
+
+The Bazel CI tasks that consume this prepared cache state run through
+`./scripts/run_bazel_ci_command.sh`. When `BAZEL_CI_ENFORCE_DEPENDENCY_LIST=1`
+is set (as it is in `bazel-ci.yml`), that wrapper extracts the target patterns
+from its Bazel invocation and fails if they are not present in
+`bazel_ci_dependency_list.sh`.
+
+That keeps the checked-in list aligned with the Bazel CI jobs we actually run.
+It makes it harder for a new or changed Bazel CI job to start depending on a
+different set of external build dependencies without also updating the list of
+target patterns used by setup to prepare the cache.
+
+### Changing this safely
+
+When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
+`bazel_ci_dependency_list.sh`, or the Bazel module wiring that supports them,
+preserve these invariants:
+
+- CI can launch `task` without assuming a preinstalled repo-specific wrapper
+- the `setup` job prepares the dependency state later Bazel CI jobs are
+  expected to consume
+- the checked-in dependency list matches the Bazel target patterns actually run
+  by `bazel-ci.yml`
+- cache-prefetch behavior stays focused on external repositories and does not
+  start depending on developer-specific workspace state
+
+Validate changes proportionally:
+
+- run `./scripts/test_run_task_launcher.sh` when changing `run_task.sh` or its
+  Bazel bootstrap path so the launcher policy and working-directory behavior are
+  still covered
+- run the affected Bazel tasks through their normal entrypoints (for example
+  `task bazel-check-metadata`, `task bazel-cache-ci-build-dependencies`, and
+  the relevant `task bazel-test-*` targets) so the checked-in dependency list,
+  bootstrap target, and cache-preparation flow still agree
+- if you change which Bazel CI commands or target patterns the workflow runs,
+  update `scripts/bazel_ci_dependency_list.sh` in the same change rather than
+  letting CI discover the mismatch later
+- if you change `MODULE.bazel` or `MODULE.bazel.lock`, rerun the normal Bazel
+  metadata workflow and confirm the setup path still reaches repo tools and
+  external repos without traversing unintended local workspace state
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via
@@ -519,8 +690,9 @@ The GitHub Actions Bazel workflow also defines a single aggregate job,
 instead of tracking each underlying Bazel job separately. This reduces
 required-check maintenance to the workflow level.
 
-If `check-metadata` fails in CI, rebase or merge the target branch, run
-`task bazel-generate-metadata`, commit the resulting changes, and rerun CI.
+If the `setup` job fails its metadata check in CI, rebase or merge the target
+branch, run `task bazel-generate-metadata`, commit the resulting changes, and
+rerun CI.
 
 ### Apple CommandLineTools
 
