@@ -159,6 +159,12 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 
 	batch := s.db.NewBatch()
 	for _, t := range txs {
+		if s.isBonus(height) {
+			// Must avoid double overriding height index during replay.
+			if _, _, err := s.GetTx(t.ID()); err == nil {
+				continue
+			}
+		}
 		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}

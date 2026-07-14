@@ -478,6 +478,41 @@ func TestApply_BonusBlock(t *testing.T) {
 	}
 }
 
+func TestApply_BonusBlock_Index(t *testing.T) {
+	const (
+		bonusHeight    uint64 = 102972
+		nonBonusHeight uint64 = 102971
+	)
+	_, containsBonusHeight := mainnetBonusBlocks[bonusHeight]
+	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	_, containsNonBonusHeight := mainnetBonusBlocks[nonBonusHeight]
+	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+
+	s := newSUT(t, withNetworkID(constants.MainnetID))
+
+	var build builder
+	export := build.newExport()
+	id := export.ID()
+
+	s.apply(t, block{height: nonBonusHeight, txs: []*tx.Tx{export}})
+
+	got, height, err := s.GetTx(id)
+	require.NoErrorf(t, err, "%T.GetTx(%s) non-bonus", s.stateImpl, id)
+	require.Equalf(t, nonBonusHeight, height, "%T.GetTx(%s) non-bonus height", s.stateImpl, id)
+	if diff := cmp.Diff(export, got, txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T.GetTx(%d) non-bonus Tx diff (-want +got):\n%s", s.stateImpl, nonBonusHeight, diff)
+	}
+
+	// Apply same tx at bonus height and verify it is retrievable.
+	s.apply(t, block{height: bonusHeight, txs: []*tx.Tx{export}})
+	got, height, err = s.GetTx(id)
+	require.NoErrorf(t, err, "%T.GetTx(%s) bonus", s.stateImpl, id)
+	require.Equalf(t, nonBonusHeight, height, "%T.GetTx(%s) bonus height", s.stateImpl, id) // see NOT bonus
+	if diff := cmp.Diff(export, got, txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T.GetTx(%d) bonus Tx diff (-want +got):\n%s", s.stateImpl, bonusHeight, diff)
+	}
+}
+
 // TestApply_SortInvariant verifies that the order of txs passed to Apply does
 // not affect the resulting state.
 func TestApply_SortInvariant(t *testing.T) {
