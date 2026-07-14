@@ -64,7 +64,7 @@ func TestNewTracker(t *testing.T) {
 			if err != nil {
 				return
 			}
-			require.NoErrorf(t, tr.Close(), "%T.Close()", tr)
+			require.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr)
 
 			// If the snapshot is enabled, we would expect to find the root on disk.
 			var wantRoot common.Hash

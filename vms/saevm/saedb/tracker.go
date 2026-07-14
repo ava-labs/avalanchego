@@ -107,6 +107,8 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 	var snaps *snapshot.Tree
 	if snapConf := c.snapConfig(); snapConf != nil {
 		var err error
+		// This may log a warning if the VM did not shutdown gracefully, and
+		// start background generation.
 		snaps, err = snapshot.New(*snapConf, db, cache.TrieDB(), lastExecuted)
 		if err != nil {
 			return nil, err
@@ -189,8 +191,19 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 
 // Close releases all resources associated with the `[triedb.Database]`
 // and cancel any snapshot generation.
-func (t *Tracker) Close() error {
+func (t *Tracker) Close(lastRoot common.Hash) error {
+	var errs []error
 	if t.snaps != nil {
+		// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
+		// SAE so we don't mind flattening all snapshot layers to disk. Note that
+		// calling `Cap([disk root], 0)` returns an error when it's actually a
+		// no-op, so we ensure there are changes.
+		if lastRoot != t.snaps.DiskRoot() {
+			if err := t.snaps.Cap(lastRoot, 0); err != nil {
+				errs = append(errs, fmt.Errorf("%T.Cap(%s, 0): %v", t.snaps, lastRoot, err))
+			}
+		}
+
 		// Cancel any background snapshot builds.
 		// MUST be done before closing the TrieDB, otherwise the background
 		// builds will race with the close.
@@ -198,8 +211,8 @@ func (t *Tracker) Close() error {
 	}
 
 	if err := t.cache.TrieDB().Close(); err != nil {
-		return fmt.Errorf("triedb.Database.Close(): %v", err)
+		errs = append(errs, fmt.Errorf("triedb.Database.Close(): %v", err))
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
