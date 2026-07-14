@@ -330,11 +330,13 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// the event sources so that the mempools are queried when we are actually
 	// willing to build.
 	if preferred := vm.VM.GetPreference(); preferred != nil {
-		if now, minTime := vm.now(), earliestBuildTime(preferred); now.Before(minTime) {
+		minTime := earliestBuildTime(preferred)
+		timeToWait := minTime.Sub(vm.now())
+		if timeToWait > 0 {
 			select {
 			case <-ctx.Done():
 				return 0, context.Cause(ctx)
-			case <-time.After(minTime.Sub(now)):
+			case <-time.After(timeToWait):
 			}
 		}
 	}
