@@ -68,6 +68,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -1049,6 +1050,51 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 
 	wantBalance := new(uint256.Int).Sub(&preBalance, uint256.NewInt(totalCharged))
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
+}
+
+// TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
+// base fee) is credited to the blackhole address before the next transaction
+// executes.
+func TestFeesBurnedToBlackhole(t *testing.T) {
+	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+
+	contract := common.Address{'c', 'o', 'd', 'e'}
+	code := saetest.LogTopOfStackAfter(
+		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Ops(vm.BALANCE),
+	)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(w.Addresses()...),
+		withAccount(contract, types.Account{Code: code}),
+	)
+
+	const feePerGas = 2
+	txs := make([]*types.Transaction, 2)
+	for i := range txs {
+		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &contract,
+			Gas:       1e6,
+			GasTipCap: big.NewInt(1),
+			GasFeeCap: big.NewInt(2),
+		})
+		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction()", sut.ethclient)
+	}
+	sut.waitForPendingEthTxs(ctx, t, txs...)
+
+	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
+	blk := sut.runConsensusLoop(ctx, t)
+	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
+	receipts := blk.Receipts()
+	require.Lenf(t, receipts, len(txs), "%T.Receipts()", blk)
+
+	want := preBurn
+	for i, r := range receipts {
+		require.Lenf(t, r.Logs, 1, "%T.Logs", r)
+		got := r.Logs[0].Topics[0]
+		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
+		want.AddUint64(&want, feePerGas*r.GasUsed)
+	}
+	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that the cchain ParseBlock override accepts
