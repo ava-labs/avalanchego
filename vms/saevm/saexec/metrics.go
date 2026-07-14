@@ -61,14 +61,14 @@ type metrics struct {
 	lastExecutedGasTime prometheus.Gauge
 	gasTimeWallTimeGap  prometheus.Gauge
 
-	// accepted* are the worst-case pricing values admitted by consensus for
+	// worstCase* are the worst-case pricing values admitted by consensus for
 	// the latest enqueued block; executed* are the values realized by
 	// execution. gasTarget has no such pair because execution never moves it.
-	acceptedBaseFee   prometheus.Gauge
-	executedBaseFee   prometheus.Gauge
-	acceptedGasExcess prometheus.Gauge
-	executedGasExcess prometheus.Gauge
-	gasTarget         prometheus.Gauge
+	worstCaseBaseFee   prometheus.Gauge
+	executedBaseFee    prometheus.Gauge
+	worstCaseGasExcess prometheus.Gauge
+	executedGasExcess  prometheus.Gauge
+	gasTarget          prometheus.Gauge
 }
 
 func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hook.Points, log logging.Logger) (*metrics, error) {
@@ -117,17 +117,17 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 			Name: "gas_time_wall_time_gap_seconds",
 			Help: "Gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.",
 		}),
-		acceptedBaseFee: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "accepted_base_fee",
-			Help: "Worst-case base fee admitted by consensus for the latest block accepted into the execution queue.",
+		worstCaseBaseFee: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "worst_case_base_fee",
+			Help: "Worst-case base fee admitted by consensus for the latest enqueued block.",
 		}),
 		executedBaseFee: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "executed_base_fee",
 			Help: "Base fee realized by execution of the latest executed block.",
 		}),
-		acceptedGasExcess: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "accepted_gas_excess",
-			Help: "Worst-case gas excess admitted by consensus for the latest block accepted into the execution queue.",
+		worstCaseGasExcess: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "worst_case_gas_excess",
+			Help: "Worst-case gas excess admitted by consensus for the latest enqueued block.",
 		}),
 		executedGasExcess: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "executed_gas_excess",
@@ -135,7 +135,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 		}),
 		gasTarget: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "gas_target",
-			Help: "ACP-176 gas target in force as of the latest block accepted into the execution queue.",
+			Help: "ACP-176 gas target in force as of the latest enqueued block.",
 		}),
 	}
 
@@ -160,9 +160,9 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 		reg.Register(m.acceptedGasLimit),
 		reg.Register(m.lastExecutedGasTime),
 		reg.Register(m.gasTimeWallTimeGap),
-		reg.Register(m.acceptedBaseFee),
+		reg.Register(m.worstCaseBaseFee),
 		reg.Register(m.executedBaseFee),
-		reg.Register(m.acceptedGasExcess),
+		reg.Register(m.worstCaseGasExcess),
 		reg.Register(m.executedGasExcess),
 		reg.Register(m.gasTarget),
 	)
@@ -218,8 +218,8 @@ func (m *metrics) worstCaseGasTime(hdr *types.Header) (*gastime.Time, error) {
 // setWorstCasePricing records the worst-case pricing admitted by consensus
 // for the most recently enqueued block: base fee, gas excess, and gas target.
 func (m *metrics) setWorstCasePricing(worstCase *gastime.Time) {
-	m.acceptedBaseFee.Set(float64(worstCase.Price()))
-	m.acceptedGasExcess.Set(float64(worstCase.Excess()))
+	m.worstCaseBaseFee.Set(float64(worstCase.Price()))
+	m.worstCaseGasExcess.Set(float64(worstCase.Excess()))
 	m.gasTarget.Set(float64(worstCase.Target()))
 }
 
