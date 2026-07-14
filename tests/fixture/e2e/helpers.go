@@ -58,6 +58,10 @@ func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) *primary.Wallet {
+	return NewWalletWithConfig(tc, keychain, nodeURI, primary.WalletConfig{})
+}
+
+func NewWalletWithConfig(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI, config primary.WalletConfig) *primary.Wallet {
 	log := tc.Log()
 	log.Info("initializing a new wallet",
 		zap.Stringer("nodeID", nodeURI.NodeID),
@@ -68,7 +72,7 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 		nodeURI.URI,
 		keychain,
 		keychain,
-		primary.WalletConfig{},
+		config,
 	)
 	require.NoError(tc, err)
 	wallet := primary.NewWalletWithOptions(
@@ -133,7 +137,7 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *ethclient.Clien
 		zap.String("URI", nodeURI.URI),
 	)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
-	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	uri := fmt.Sprintf("http://%s/ext/bc/C/rpc", nodeAddress)
 	client, err := ethclient.Dial(uri)
 	require.NoError(tc, err)
 	return client

@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -616,6 +618,147 @@ func TestBlockOptions(t *testing.T) {
 			options, err := blk.Options(t.Context())
 			require.NoError(err)
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
+		})
+	}
+}
+
+// TestBlockOptionsACP267UptimeRequirement verifies that ACP-267 raises the
+// Primary Network uptime requirement to 90% for validations that start at or
+// after Helicon activates.
+func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
+	heliconTime := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+
+	type test struct {
+		name              string
+		fork              upgradetest.Fork
+		startTime         time.Time
+		uptime            float64
+		wantPrefersCommit bool
+	}
+
+	newBlock := func(t *testing.T, tt test) *Block {
+		t.Helper()
+
+		var (
+			nodeID     = ids.GenerateTestNodeID()
+			stakerTxID = ids.GenerateTestID()
+			stakerTx   = &txs.Tx{
+				Unsigned: &txs.AddPermissionlessValidatorTx{
+					Validator: txs.Validator{NodeID: nodeID},
+					Subnet:    constants.PrimaryNetworkID,
+				},
+				TxID: stakerTxID,
+			}
+			staker = &state.Staker{
+				StartTime: tt.startTime,
+				NodeID:    nodeID,
+				SubnetID:  constants.PrimaryNetworkID,
+			}
+			proposalTimestamp = tt.startTime.Add(time.Hour)
+		)
+
+		rewardValidatorTx, err := newRewardValidatorTx(t, stakerTxID)
+		require.NoError(t, err)
+
+		proposalBlock, err := block.NewBanffProposalBlock(
+			proposalTimestamp,
+			ids.GenerateTestID(),
+			1,
+			rewardValidatorTx,
+			nil,
+		)
+		require.NoError(t, err)
+
+		chainState := statetest.New(t, statetest.Config{})
+		chainState.AddTx(stakerTx, status.Committed)
+		require.NoError(t, chainState.PutCurrentValidator(staker))
+
+		ctx := snowtest.Context(t, snowtest.PChainID)
+
+		manager := &manager{
+			backend: &backend{
+				state: chainState,
+				ctx:   ctx,
+			},
+			txExecutorBackend: &executor.Backend{
+				Config: &config.Internal{
+					UptimePercentage: .8,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(
+						tt.fork,
+						heliconTime,
+					),
+				},
+				Uptimes: uptime.TestCalculator{
+					Percent: tt.uptime,
+				},
+			},
+		}
+
+		return &Block{
+			Block:   proposalBlock,
+			manager: manager,
+		}
+	}
+
+	tests := []test{
+		{
+			name:              "pre_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime.Add(-time.Second),
+			uptime:            .85,
+			wantPrefersCommit: true,
+		},
+		{
+			name:              "at_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime,
+			uptime:            .85,
+			wantPrefersCommit: false,
+		},
+		{
+			name:              "post_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime.Add(time.Hour),
+			uptime:            .9,
+			wantPrefersCommit: true,
+		},
+		{
+			name:              "without_helicon",
+			fork:              upgradetest.Granite,
+			startTime:         heliconTime.Add(time.Hour),
+			uptime:            .85,
+			wantPrefersCommit: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blk := newBlock(t, tt)
+			options, err := blk.Options(t.Context())
+			require.NoError(t, err)
+
+			proposalBlock := blk.Block.(*block.BanffProposalBlock)
+			commitBlock, err := block.NewBanffCommitBlock(
+				proposalBlock.Timestamp(),
+				proposalBlock.ID(),
+				proposalBlock.Height()+1,
+			)
+			require.NoError(t, err)
+
+			abortBlock, err := block.NewBanffAbortBlock(
+				proposalBlock.Timestamp(),
+				proposalBlock.ID(),
+				proposalBlock.Height()+1,
+			)
+			require.NoError(t, err)
+
+			var wantPreferred, wantAlternate block.Block = abortBlock, commitBlock
+			if tt.wantPrefersCommit {
+				wantPreferred, wantAlternate = commitBlock, abortBlock
+			}
+
+			require.Equal(t, wantPreferred, options[0].(*Block).Block)
+			require.Equal(t, wantAlternate, options[1].(*Block).Block)
 		})
 	}
 }

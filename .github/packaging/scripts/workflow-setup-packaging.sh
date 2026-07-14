@@ -26,6 +26,13 @@ OUTPUT="${GITHUB_OUTPUT:-/dev/stdout}"
 TAG_INPUT="${TAG_INPUT:-}"
 
 if [[ -n "${TAG_INPUT}" ]]; then
+    # Second layer behind the workflow's tag-existence gate: reject a malformed
+    # dispatch input before it reaches the signing step. The strong "is this an
+    # actual tag" check lives in build-linux-packages.yml (needs origin/network).
+    if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+        echo "ERROR: TAG_INPUT '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.14.1)" >&2
+        exit 1
+    fi
     TAG="${TAG_INPUT}"
 elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
     TAG="${GITHUB_REF/refs\/tags\//}"
