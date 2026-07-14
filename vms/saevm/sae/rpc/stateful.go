@@ -17,32 +17,13 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
-
-// noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
-// the tracer to skip end-of-block operations during partial replay.
-//
-// TODO(StephenButtolph): Properly abstract execution to not rely on method
-// suppression. It is fragile and could result in accidentially modifying the
-// block state or even disk state during tracing.
-type noEndOfBlockOps struct {
-	hook.Points
-}
-
-// EndOfBlockOps always returns nil.
-func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
-
-// AfterExecutingBlock always returns nil.
-func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
-	return nil
-}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -134,19 +115,11 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	return sdb, noopRelease, nil
 }
 
-// replayBlock re-executes up to maxNumTxs of ethB's transactions from its
-// parent's post-execution state via [saexec.Execute], suppressing end-of-block
-// operations and receipt broadcasting.
-func (b *backend) replayBlock(ethB *types.Block, maxNumTxs int, opts ...saexec.ExecuteOption) (*saexec.ExecutionResults, error) {
-	// The gas clock cannot reproduce a synchronous block's base fee, so
-	// restorable blocks replay with their originally executed one.
-	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */)); {
-	case err == nil:
-		opts = append(opts, saexec.WithBaseFee(target.ExecutedBaseFee()))
-	case !errors.Is(err, blocks.ErrNotFound):
-		return nil, fmt.Errorf("restoring block: %w", err)
-	}
-
+// replay begins a re-execution of ethB's transactions from its parent's
+// post-execution state with the given base fee (see [saexec.NewExecution]),
+// suppressing receipt broadcasting. End-of-block operations never run because
+// RPC callers MUST NOT call [saexec.Execution.Finish].
+func (b *backend) replay(ethB *types.Block, baseFee *uint256.Int) (*saexec.Execution, error) {
 	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)
@@ -155,22 +128,21 @@ func (b *backend) replayBlock(ethB *types.Block, maxNumTxs int, opts ...saexec.E
 	if err != nil {
 		return nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
-	return saexec.Execute(
+	return saexec.NewExecution(
 		block,
 		b,
-		maxNumTxs,
-		noEndOfBlockOps{b.Hooks()},
+		b.Hooks(),
 		b.ChainConfig(),
 		b.ChainContext(),
 		&saexec.NullReceiptStore{},
 		b.Logger(),
-		opts...,
+		baseFee,
 	)
 }
 
 // StateAtTransaction returns the execution environment of a particular
 // transaction within a block, replaying all preceding transactions with
-// [backend.replayBlock].
+// [backend.replay].
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
@@ -183,14 +155,29 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	result, err := b.replayBlock(ethB, txIndex)
-	if err != nil {
-		return nil, bCtx, nil, nil, err
+	// The gas clock cannot reproduce a synchronous block's base fee, so
+	// restorable blocks replay with their originally executed one.
+	var baseFee *uint256.Int
+	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */)); {
+	case err == nil:
+		baseFee = target.ExecutedBaseFee()
+	case !errors.Is(err, blocks.ErrNotFound):
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring block: %w", err)
 	}
 
-	msg, err := core.TransactionToMessage(txs[txIndex], result.Signer, result.BaseFee.ToBig())
+	exec, err := b.replay(ethB, baseFee)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
+	for range txIndex {
+		if _, err := exec.ExecuteNextTransaction(vm.Config{}); err != nil {
+			return nil, bCtx, nil, nil, err
+		}
+	}
+
+	msg, err := core.TransactionToMessage(txs[txIndex], exec.Signer(), exec.BaseFee().ToBig())
+	if err != nil {
+		return nil, bCtx, nil, nil, err
+	}
+	return msg, exec.BlockContext(), exec.StateDB(), noopRelease, nil
 }

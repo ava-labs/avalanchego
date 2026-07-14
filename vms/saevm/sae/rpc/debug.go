@@ -6,11 +6,15 @@ package rpc
 import (
 	"context"
 	"errors"
-	"math"
+	"math/big"
+	"sync"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
+	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -31,8 +35,8 @@ func (b *backend) SetHead(uint64) {
 //   - A synchronous block replays with the base fee it was executed with,
 //     which the gas clock cannot reproduce.
 //
-// The overrides replay via [backend.replayBlock] and
-// [backend.StateAtTransaction], both built on [saexec.Execute].
+// The overrides replay via [backend.replay], which drives a
+// [saexec.Execution] with full consensus-execution semantics.
 type tracersAPI struct {
 	*tracers.API
 	b *backend
@@ -57,11 +61,19 @@ func (t *tracersAPI) IntermediateRoots(ctx context.Context, hash common.Hash, _ 
 	if target.NumberU64() == 0 {
 		return nil, errGenesisNotTraceable
 	}
-	result, err := t.b.replayBlock(target.EthBlock(), math.MaxInt, saexec.WithIntermediateRoots())
+	exec, err := t.b.replay(target.EthBlock(), target.ExecutedBaseFee())
 	if err != nil {
 		return nil, err
 	}
-	return result.IntermediateRoots, nil
+
+	var roots []common.Hash
+	for range target.Transactions() {
+		if _, err := exec.ExecuteNextTransaction(vm.Config{}); err != nil {
+			return nil, err
+		}
+		roots = append(roots, exec.IntermediateRoot())
+	}
+	return roots, nil
 }
 
 // txTraceResult matches the JSON shape of the embedded block-tracing
@@ -110,13 +122,9 @@ func (*tracersAPI) StandardTraceBadBlockToFile(context.Context, common.Hash, *tr
 	return nil, errNotSupported
 }
 
-// traceBlock traces each transaction against its pre-state from
-// [backend.StateAtTransaction], via [tracers.TraceTx] to keep libevm's
-// per-transaction timeout and cancellation guardrails.
-//
-// TODO(JonathanOppenheimer): each [backend.StateAtTransaction] call replays
-// the transaction prefix, making a block trace O(|txs|^2) executions.
-// This is too slow.
+// traceBlock traces each transaction in a single replay of the block: the
+// tracer observes the same execution that advances the replay's state, so
+// each transaction executes exactly once.
 func (t *tracersAPI) traceBlock(ctx context.Context, numOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig) ([]*txTraceResult, error) {
 	block, err := t.b.restoreBlock(numOrHash)
 	if err != nil {
@@ -126,24 +134,120 @@ func (t *tracersAPI) traceBlock(ctx context.Context, numOrHash rpc.BlockNumberOr
 		return nil, errGenesisNotTraceable
 	}
 
-	txs := block.Transactions()
-	results := make([]*txTraceResult, len(txs))
-	for i, tx := range txs {
-		msg, vmctx, statedb, release, err := t.b.StateAtTransaction(ctx, block.EthBlock(), i, 0)
-		if err != nil {
+	timeout := tracers.DefaultTraceTimeout
+	if config != nil && config.Timeout != nil {
+		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
 			return nil, err
 		}
-		res, err := tracers.TraceTx(t.API, ctx, msg, &tracers.Context{
-			BlockHash:   block.Hash(),
-			BlockNumber: block.Number(),
+	}
+
+	exec, err := t.b.replay(block.EthBlock(), block.ExecutedBaseFee())
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		blockHash   = block.Hash()
+		blockNumber = block.Number()
+		txs         = block.Transactions()
+		results     = make([]*txTraceResult, len(txs))
+	)
+	for i, tx := range txs {
+		res, err := traceNextTx(ctx, exec, config, timeout, &tracers.Context{
+			BlockHash:   blockHash,
+			BlockNumber: blockNumber,
 			TxIndex:     i,
 			TxHash:      tx.Hash(),
-		}, vmctx, statedb, config)
-		release()
+		})
 		if err != nil {
 			return nil, err
 		}
 		results[i] = &txTraceResult{TxHash: tx.Hash(), Result: res}
 	}
 	return results, nil
+}
+
+// [traceNextTx] and [evmCancellingTracer] reimplement the tracer construction
+// and per-transaction timeout guardrails of geth's (unexported)
+// tracers.API.traceTx, as vendored in libevm:
+// https://github.com/ava-labs/libevm/blob/b01f9ada7d62/eth/tracers/api.go#L937
+//
+// The code deliberately stays close to traceTx, with two deviations:
+//
+//   - traceTx executes the transaction itself with a bare core.ApplyMessage,
+//     skipping the consensus-execution semantics described on [tracersAPI] —
+//     which is why it cannot be reused. Here the transaction instead executes
+//     inside [saexec.Execution.ExecuteNextTransaction], with the tracer
+//     attached via [vm.Config].
+//   - traceTx constructs the [vm.EVM] itself, giving it a handle on which to
+//     call vm.EVM.Cancel on timeout. Here the EVM is constructed inside
+//     core.ApplyTransaction, so [evmCancellingTracer] recovers the handle
+//     from [vm.EVMLogger.CaptureStart] instead.
+//
+// traceNextTx executes exec's next transaction with the configured tracer
+// attached, under the timeout guardrails described above.
+func traceNextTx(ctx context.Context, exec *saexec.Execution, config *tracers.TraceConfig, timeout time.Duration, txctx *tracers.Context) (any, error) {
+	if config == nil {
+		config = &tracers.TraceConfig{}
+	}
+	var inner tracers.Tracer
+	if config.Tracer != nil {
+		var err error
+		if inner, err = tracers.DefaultDirectory.New(*config.Tracer, txctx, config.TracerConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		// Default tracer is the struct logger
+		inner = logger.NewStructLogger(config.Config)
+	}
+	tracer := &evmCancellingTracer{Tracer: inner}
+
+	deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	go func() {
+		<-deadlineCtx.Done()
+		if errors.Is(deadlineCtx.Err(), context.DeadlineExceeded) {
+			tracer.Stop(errors.New("execution timeout"))
+		}
+	}()
+
+	if _, err := exec.ExecuteNextTransaction(vm.Config{Tracer: tracer}); err != nil {
+		return nil, err
+	}
+	return tracer.GetResult()
+}
+
+// evmCancellingTracer wraps a [tracers.Tracer] so that [tracers.Tracer.Stop]
+// also cancels the [vm.EVM] executing the traced transaction, mirroring the
+// vmenv.Cancel() performed by geth's traceTx (see [traceNextTx]).
+type evmCancellingTracer struct {
+	tracers.Tracer
+
+	mu      sync.Mutex
+	env     *vm.EVM
+	stopped bool
+}
+
+func (t *evmCancellingTracer) CaptureStart(env *vm.EVM, from, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+	t.mu.Lock()
+	t.env = env
+	stopped := t.stopped
+	t.mu.Unlock()
+
+	if stopped {
+		env.Cancel()
+	}
+	t.Tracer.CaptureStart(env, from, to, create, input, gas, value)
+}
+
+func (t *evmCancellingTracer) Stop(err error) {
+	t.mu.Lock()
+	t.stopped = true
+	env := t.env
+	t.mu.Unlock()
+
+	t.Tracer.Stop(err)
+	if env != nil {
+		env.Cancel()
+	}
 }
