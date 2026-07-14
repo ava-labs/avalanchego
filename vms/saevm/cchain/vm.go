@@ -14,11 +14,9 @@ import (
 	"net/http"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
 
 	_ "embed"
 
@@ -26,17 +24,14 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -54,9 +49,8 @@ type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
 	// These are configurable to speed up testing.
-	pullGossipPeriod     time.Duration
-	pushGossipPeriod     time.Duration
-	initialDelayExponent dynamic.DelayExponent
+	pullGossipPeriod time.Duration
+	pushGossipPeriod time.Duration
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
 	now func() time.Time
@@ -73,7 +67,6 @@ type VM struct {
 	// depends on.
 	onClose []func(context.Context) error
 
-	preference       atomic.Pointer[blocks.Block]
 	lastWaitForEvent utils.Atomic[time.Time]
 }
 
@@ -137,7 +130,6 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		vm.chainConfig,
-		vm.initialDelayExponent,
 		pendingTxs,
 		warpStorage,
 		vm.now,
@@ -321,19 +313,16 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return m, nil
 }
 
-func (vm *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
-	b, err := vm.GetBlock(ctx, id)
-	if err != nil {
-		return err
-	}
-	vm.preference.Store(b)
-	return vm.VM.SetPreference(ctx, id, bCtx)
+// earliestBuildTime returns the earliest wall-clock time at which a child of b
+// may be built.
+func earliestBuildTime(b *blocks.Block) time.Time {
+	h := b.Header()
+	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
-var errNoPreference = errors.New("no preferred block")
-
-// WaitForEvent blocks until the SAE VM emits an event or the cross-chain
-// txpool has a pending transaction.
+// WaitForEvent waits until the ACP-226 minimum block delay since the preferred
+// block has elapsed, then waits for a transaction to be in the txpool or for
+// the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// Throttle to avoid busy looping if we appear ready to build but keep
 	// encountering errors.
@@ -352,22 +341,22 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		}
 	}
 
-	// Wait until we are allowed to build a block on top of the preference.
-	{
-		parent := vm.preference.Load()
-		if parent == nil {
-			return 0, errNoPreference
-		}
-
-		minTime := minNextBlockTime(parent.Header())
+	// Pace block building on the ACP-226 minimum block delay before consulting
+	// the event sources so that the mempools are queried when we are actually
+	// willing to build.
+	minTime := earliestBuildTime(vm.VM.GetPreference())
+	if timeToWait := minTime.Sub(vm.now()); timeToWait > 0 {
 		select {
 		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(time.Until(minTime)):
+			return 0, context.Cause(ctx)
+		case <-time.After(timeToWait):
 		}
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	// Race the SAE event source against the cross-chain txpool. The winner's
+	// deferred cancel unblocks the loser, whose pending call returns and delivers
+	// its discarded result to the buffered channel, so neither goroutine leaks.
+	raceCtx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg snowcommon.Message
 		err error
@@ -375,30 +364,17 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := vm.VM.WaitForEvent(ctx)
+		msg, err := vm.VM.WaitForEvent(raceCtx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := vm.txpool.AwaitTxs(ctx)
+		err := vm.txpool.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 
 	r := <-results
 	return r.msg, r.err
-}
-
-// minNextBlockTime returns the earliest wall-clock time at which a child of h
-// is allowed by h's [acp226.DelayExcess].
-func minNextBlockTime(h *types.Header) time.Time {
-	e := customtypes.GetHeaderExtra(h)
-	if e.MinDelayExcess == nil {
-		return time.Time{}
-	}
-
-	mde := *e.MinDelayExcess
-	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
-	return customtypes.BlockTime(h).Add(delay)
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

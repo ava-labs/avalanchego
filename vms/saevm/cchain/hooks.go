@@ -57,7 +57,6 @@ func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	chainConfig *ethparams.ChainConfig,
-	initialDelayExponent dynamic.DelayExponent,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 	now func() time.Time,
@@ -82,7 +81,6 @@ func newHooks(
 		builder{
 			ctx,
 			chainConfig,
-			initialDelayExponent,
 			now,
 			poolTxs,
 			desired,
@@ -113,15 +111,14 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	return &builder{
 		h.ctx,
 		h.chainConfig,
-		h.initialDelayExponent,
 		func() time.Time {
 			return now
 		},
 		slices.Values(txs),
 		desiredParams{
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -146,6 +143,15 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 		return *pe
 	}
 	return dynamic.InitialPriceExponent
+}
+
+// delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
+// [dynamic.InitialDelayExponent] when the header does not carry one.
+func delayExponent(h *types.Header) dynamic.DelayExponent {
+	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
+		return dynamic.DelayExponent(*de)
+	}
+	return dynamic.InitialDelayExponent
 }
 
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
@@ -200,12 +206,17 @@ func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	}
 }
 
+// BlockTime returns the canonical wall-clock time of a block.
+//
+// The whole-second value is authoritative and the millisecond field only
+// refines it below the second, so the two can never disagree on which second a
+// block belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
 func (*hooks) BlockTime(h *types.Header) time.Time {
-	// Anchor the seconds component to h.Time so that the documented invariant
-	// BlockTime(h).Unix() == h.Time holds, taking only the sub-second component
-	// from TimeMilliseconds. This guards against malformed headers where
-	// TimeMilliseconds disagrees with Time (e.g. from a malicious peer), which
-	// would otherwise yield an unexpected block time.
+	return blockTime(h)
+}
+
+func blockTime(h *types.Header) time.Time {
 	ms := customtypes.HeaderTimeMilliseconds(h)
 	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
 	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
@@ -278,16 +289,18 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
-	ctx                  *snow.Context
-	chainConfig          *ethparams.ChainConfig
-	initialDelayExponent dynamic.DelayExponent
+	ctx         *snow.Context
+	chainConfig *ethparams.ChainConfig
 
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
 }
 
-var errHeliconUnactivated = errors.New("helicon is not activated")
+var (
+	errHeliconUnactivated = errors.New("helicon is not activated")
+	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+)
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
@@ -297,12 +310,14 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, errHeliconUnactivated
 	}
 
-	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
-
-	de := b.initialDelayExponent
-	if pde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pde != nil {
-		de = dynamic.DelayExponent(*pde)
+	de := delayExponent(parent)
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
+
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
 	// Enforce block-building separation against the parent's MinDelayExcess.
 	{
@@ -323,9 +338,11 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
+	// Move each dynamic parameter toward this node's vote (nil = no move).
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -345,7 +362,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   (*acp226.DelayExcess)(&de),
+			MinDelayExcess:   &minDelayExcess,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},

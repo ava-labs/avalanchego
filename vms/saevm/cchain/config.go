@@ -33,11 +33,9 @@ type config struct {
 	// GasTarget is the target gas per second this node votes for when building
 	// blocks under ACP-176. nil means follow the parent block.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-	// DelayTarget is the minimum delay between blocks (in milliseconds) that
-	// this node will attempt to use when creating blocks. If this config is not
-	// specified, the node will default to use the parent block's delay per
-	// second.
-	DelayTarget *uint64 `json:"min-delay-target,omitempty"`
+	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
+	// for; nil follows the parent.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
 	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
@@ -147,18 +145,14 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 // desiredParams bundles this node's votes for the dynamic consensus
 // parameters. A nil field means no vote.
 type desiredParams struct {
-	delayExponent  *dynamic.DelayExponent
 	targetExponent *dynamic.TargetExponent
 	priceExponent  *dynamic.PriceExponent
+	delayExponent  *dynamic.DelayExponent
 }
 
 // desired returns c's user-facing targets as internal exponent votes.
 func (c config) desired() desiredParams {
 	var d desiredParams
-	if c.DelayTarget != nil {
-		d.delayExponent = new(dynamic.DelayExponent)
-		*d.delayExponent = dynamic.DesiredDelayExponent(*c.DelayTarget)
-	}
 	if c.GasTarget != nil {
 		e := dynamic.DesiredTargetExponent(*c.GasTarget)
 		d.targetExponent = &e
@@ -166,6 +160,10 @@ func (c config) desired() desiredParams {
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
+	}
+	if c.MinDelayTarget != nil {
+		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
+		d.delayExponent = &e
 	}
 	return d
 }
