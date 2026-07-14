@@ -170,7 +170,7 @@ func Execute(
 	}
 	for range b.Transactions() {
 		if _, err := e.ExecuteNextTransaction(vm.Config{}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %v", errFatal, err)
 		}
 	}
 	return e.Finish()
@@ -293,7 +293,7 @@ func (e *Execution) ExecuteNextTransaction(vmCfg vm.Config) (*types.Receipt, err
 		vmCfg,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
+		return nil, fmt.Errorf("transaction execution errored (not reverted) [%d](%#x): %v", ti, tx.Hash(), err)
 	}
 
 	e.perTxClock.Tick(gas.Gas(receipt.GasUsed))

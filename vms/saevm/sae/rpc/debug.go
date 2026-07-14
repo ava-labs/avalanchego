@@ -56,12 +56,15 @@ func newTracersAPI(b *backend) *tracersAPI {
 // restoreAndReplay restores the block identified by numOrHash and begins a
 // replay of its transactions with the base fee it was originally executed with
 // (see [backend.replay]).
-func (t *tracersAPI) restoreAndReplay(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, *saexec.Execution, error) {
+func (t *tracersAPI) restoreAndReplay(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*blocks.Block, *saexec.Execution, error) {
 	target, err := t.b.restoreBlock(numOrHash)
 	if err != nil {
 		return nil, nil, err
 	}
-	exec, err := t.b.replay(target.EthBlock(), target.ExecutedBaseFee())
+	if err := target.WaitUntilExecuted(ctx); err != nil {
+		return nil, nil, err
+	}
+	exec, err := t.b.replay(ctx, target.EthBlock(), target.ExecutedBaseFee())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,7 +74,7 @@ func (t *tracersAPI) restoreAndReplay(numOrHash rpc.BlockNumberOrHash) (*blocks.
 // IntermediateRoots returns the state root after each of the block's
 // transactions. The roots exclude end-of-block operations.
 func (t *tracersAPI) IntermediateRoots(ctx context.Context, hash common.Hash, _ *tracers.TraceConfig) ([]common.Hash, error) {
-	target, exec, err := t.restoreAndReplay(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
+	target, exec, err := t.restoreAndReplay(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +90,7 @@ func (t *tracersAPI) IntermediateRoots(ctx context.Context, hash common.Hash, _ 
 }
 
 // txTraceResult matches the JSON shape of the embedded block-tracing
-// endpoints' unexported result type
+// endpoints' unexported result type.
 type txTraceResult struct {
 	TxHash common.Hash `json:"txHash"`
 	Result any         `json:"result,omitempty"`
@@ -105,14 +108,15 @@ func (t *tracersAPI) TraceBlockByHash(ctx context.Context, hash common.Hash, con
 	return t.traceBlock(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */), config)
 }
 
-// TraceTransaction replays through [backend.StateAtTransaction]
-// so libevm's implementations serve them correctly.
+// TraceTransaction delegates to libevm's implementation, which replays the
+// preceding transactions via [backend.StateAtTransaction] and so preserves
+// consensus-execution semantics.
 func (t *tracersAPI) TraceTransaction(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) (any, error) {
 	return t.inner.TraceTransaction(ctx, hash, config)
 }
 
-// TraceCall replays through [backend.StateAtBlock] so libevm's
-// implementations serve them correctly.
+// TraceCall delegates to libevm's implementation, which sources its state via
+// [backend.StateAtBlock] and so needs no replay loop of its own.
 func (t *tracersAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, numOrHash rpc.BlockNumberOrHash, config *tracers.TraceCallConfig) (any, error) {
 	return t.inner.TraceCall(ctx, args, numOrHash, config)
 }
@@ -129,7 +133,7 @@ func (t *tracersAPI) traceBlock(ctx context.Context, numOrHash rpc.BlockNumberOr
 		}
 	}
 
-	block, exec, err := t.restoreAndReplay(numOrHash)
+	block, exec, err := t.restoreAndReplay(ctx, numOrHash)
 	if err != nil {
 		return nil, err
 	}

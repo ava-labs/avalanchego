@@ -330,7 +330,7 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 }
 
 // activateWarpPrecompile marks the warp precompile's account as non-empty by
-// setting the nonce and code so it is  not pruned as an empty account during
+// setting the nonce and code so it is not pruned as an empty account during
 // state finalization (EIP-161) and so it appears as a contract to EVM code
 // introspection (e.g. EXTCODESIZE/EXTCODEHASH).
 func activateWarpPrecompile(statedb *state.StateDB) {

@@ -76,6 +76,9 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := bl.WaitUntilExecuted(ctx); err != nil {
+		return nil, nil, err
+	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
 	// root and the base fee from fields. At the time of writing, the returned
@@ -111,6 +114,9 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := bl.WaitUntilExecuted(ctx); err != nil {
+		return nil, nil, err
+	}
 
 	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 	if err != nil {
@@ -125,13 +131,18 @@ var errGenesisNotTraceable = errors.New("genesis is not traceable")
 // post-execution state with the given base fee (see [saexec.NewExecution]),
 // suppressing receipt broadcasting. End-of-block operations never run because
 // RPC callers MUST NOT call [saexec.Execution.Finish].
-func (b *backend) replay(ethB *types.Block, baseFee *uint256.Int) (*saexec.Execution, error) {
+func (b *backend) replay(ctx context.Context, ethB *types.Block, baseFee *uint256.Int) (*saexec.Execution, error) {
 	if ethB.NumberU64() == 0 {
 		return nil, errGenesisNotTraceable
 	}
 	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)
+	}
+	// [saexec.NewExecution] would otherwise block indefinitely on the parent's
+	// execution artifacts.
+	if err := parent.WaitUntilExecuted(ctx); err != nil {
+		return nil, err
 	}
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
@@ -166,12 +177,15 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	var baseFee *uint256.Int
 	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */)); {
 	case err == nil:
+		if err := target.WaitUntilExecuted(ctx); err != nil {
+			return nil, bCtx, nil, nil, err
+		}
 		baseFee = target.ExecutedBaseFee()
 	case !errors.Is(err, blocks.ErrNotFound):
 		return nil, bCtx, nil, nil, fmt.Errorf("restoring block: %w", err)
 	}
 
-	exec, err := b.replay(ethB, baseFee)
+	exec, err := b.replay(ctx, ethB, baseFee)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
