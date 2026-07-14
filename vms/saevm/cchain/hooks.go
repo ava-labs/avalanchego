@@ -289,9 +289,8 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
-	ctx         *snow.Context
-	chainConfig *ethparams.ChainConfig
-
+	ctx          *snow.Context
+	chainConfig  *ethparams.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
