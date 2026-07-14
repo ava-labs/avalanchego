@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
+	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
@@ -24,8 +25,8 @@ func (b *backend) SetHead(uint64) {
 	b.Logger().Info("debug_setHead called but not supported by SAE")
 }
 
-// tracersAPI wraps libevm's [tracers.API], overriding the endpoints that
-// re-execute a block's transactions in an internal loop of bare
+// tracersAPI selectively serves libevm's [tracers.API], reimplementing the
+// endpoints that re-execute a block's transactions in an internal loop of bare
 // core.ApplyMessage calls, which diverges from [saexec.Execute]:
 //
 //   - [saexec.Execute] credits each transaction's burnt base fee via
@@ -35,33 +36,42 @@ func (b *backend) SetHead(uint64) {
 //   - A synchronous block replays with the base fee it was executed with,
 //     which the gas clock cannot reproduce.
 //
-// The overrides replay via [backend.replay], which drives a
+// The reimplementations replay via [backend.replay], which drives a
 // [saexec.Execution] with full consensus-execution semantics.
+//
+// TODO(JonathanOppenheimer): properly support the remaining [tracers.API]
+// endpoints.
 type tracersAPI struct {
-	*tracers.API
-	b *backend
+	inner *tracers.API
+	b     *backend
 }
 
 func newTracersAPI(b *backend) *tracersAPI {
 	return &tracersAPI{
-		API: tracers.NewAPI(b),
-		b:   b,
+		inner: tracers.NewAPI(b),
+		b:     b,
 	}
 }
 
-var errGenesisNotTraceable = errors.New("genesis is not traceable")
+// restoreAndReplay restores the block identified by numOrHash and begins a
+// replay of its transactions with the base fee it was originally executed with
+// (see [backend.replay]).
+func (t *tracersAPI) restoreAndReplay(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, *saexec.Execution, error) {
+	target, err := t.b.restoreBlock(numOrHash)
+	if err != nil {
+		return nil, nil, err
+	}
+	exec, err := t.b.replay(target.EthBlock(), target.ExecutedBaseFee())
+	if err != nil {
+		return nil, nil, err
+	}
+	return target, exec, nil
+}
 
 // IntermediateRoots returns the state root after each of the block's
 // transactions. The roots exclude end-of-block operations.
 func (t *tracersAPI) IntermediateRoots(ctx context.Context, hash common.Hash, _ *tracers.TraceConfig) ([]common.Hash, error) {
-	target, err := t.b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
-	if err != nil {
-		return nil, err
-	}
-	if target.NumberU64() == 0 {
-		return nil, errGenesisNotTraceable
-	}
-	exec, err := t.b.replay(target.EthBlock(), target.ExecutedBaseFee())
+	target, exec, err := t.restoreAndReplay(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 	if err != nil {
 		return nil, err
 	}
@@ -95,53 +105,32 @@ func (t *tracersAPI) TraceBlockByHash(ctx context.Context, hash common.Hash, con
 	return t.traceBlock(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */), config)
 }
 
-// The remaining embedded [tracers.API] endpoints that replay blocks run the
-// same divergent core.ApplyMessage loops described on [tracersAPI], so they
-// are masked rather than served incorrectly.
-//
-// TODO(JonathanOppenheimer): properly support these RPCs.
-var errNotSupported = errors.New("not supported by SAE")
+// TraceTransaction and TraceCall replay through [backend.StateAtTransaction]
+// and [backend.StateAtBlock] respectively, which already provide the
+// consensus-execution semantics described on [tracersAPI], so libevm's
+// implementations serve them correctly.
 
-func (*tracersAPI) TraceChain(context.Context, rpc.BlockNumber, rpc.BlockNumber, *tracers.TraceConfig) ([]*txTraceResult, error) {
-	return nil, errNotSupported
+func (t *tracersAPI) TraceTransaction(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) (any, error) {
+	return t.inner.TraceTransaction(ctx, hash, config)
 }
 
-func (*tracersAPI) TraceBlock(context.Context, hexutil.Bytes, *tracers.TraceConfig) ([]*txTraceResult, error) {
-	return nil, errNotSupported
-}
-
-func (*tracersAPI) TraceBlockFromFile(context.Context, string, *tracers.TraceConfig) ([]*txTraceResult, error) {
-	return nil, errNotSupported
-}
-
-func (*tracersAPI) StandardTraceBlockToFile(context.Context, common.Hash, *tracers.StdTraceConfig) ([]string, error) {
-	return nil, errNotSupported
-}
-
-func (*tracersAPI) StandardTraceBadBlockToFile(context.Context, common.Hash, *tracers.StdTraceConfig) ([]string, error) {
-	return nil, errNotSupported
+func (t *tracersAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, numOrHash rpc.BlockNumberOrHash, config *tracers.TraceCallConfig) (any, error) {
+	return t.inner.TraceCall(ctx, args, numOrHash, config)
 }
 
 // traceBlock traces each transaction in a single replay of the block: the
 // tracer observes the same execution that advances the replay's state, so
 // each transaction executes exactly once.
 func (t *tracersAPI) traceBlock(ctx context.Context, numOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig) ([]*txTraceResult, error) {
-	block, err := t.b.restoreBlock(numOrHash)
-	if err != nil {
-		return nil, err
-	}
-	if block.NumberU64() == 0 {
-		return nil, errGenesisNotTraceable
-	}
-
 	timeout := tracers.DefaultTraceTimeout
 	if config != nil && config.Timeout != nil {
+		var err error
 		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
 			return nil, err
 		}
 	}
 
-	exec, err := t.b.replay(block.EthBlock(), block.ExecutedBaseFee())
+	block, exec, err := t.restoreAndReplay(numOrHash)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +158,7 @@ func (t *tracersAPI) traceBlock(ctx context.Context, numOrHash rpc.BlockNumberOr
 
 // [traceNextTx] and [evmCancellingTracer] reimplement the tracer construction
 // and per-transaction timeout guardrails of geth's (unexported)
-// tracers.API.traceTx, as vendored in libevm:
+// tracers.API.traceTx. See
 // https://github.com/ava-labs/libevm/blob/b01f9ada7d62/eth/tracers/api.go#L937
 //
 // The code deliberately stays close to traceTx, with two deviations:

@@ -173,7 +173,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_intermediateRoots
 			// - debug_standardTraceBadBlockToFile (not supported by SAE)
 			// - debug_standardTraceBlockToFile    (not supported by SAE)
-			// - debug_traceBadBlock
+			// - debug_traceBadBlock               (not supported by SAE)
 			// - debug_traceBlock                  (not supported by SAE)
 			// - debug_traceBlockByHash
 			// - debug_traceBlockByNumber

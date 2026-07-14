@@ -68,6 +68,10 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
+	// TODO(JonathanOppenheimer): [backend.restoreBlock] reads and decodes the
+	// full block body and receipts but this method only needs the header, the
+	// post-execution state root, and the executed base fee. Some sort of
+	// refactor could improve performance (maybe a reader?)
 	bl, err := b.restoreBlock(numOrHash)
 	if err != nil {
 		return nil, nil, err
@@ -115,11 +119,16 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	return sdb, noopRelease, nil
 }
 
+var errGenesisNotTraceable = errors.New("genesis is not traceable")
+
 // replay begins a re-execution of ethB's transactions from its parent's
 // post-execution state with the given base fee (see [saexec.NewExecution]),
 // suppressing receipt broadcasting. End-of-block operations never run because
 // RPC callers MUST NOT call [saexec.Execution.Finish].
 func (b *backend) replay(ethB *types.Block, baseFee *uint256.Int) (*saexec.Execution, error) {
+	if ethB.NumberU64() == 0 {
+		return nil, errGenesisNotTraceable
+	}
 	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)

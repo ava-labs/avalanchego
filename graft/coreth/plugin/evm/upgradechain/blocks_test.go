@@ -157,7 +157,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 
 func (g *generator) advanceClock(t *testing.T, d time.Duration) {
 	t.Helper()
-	g.setClock(t, g.clock.Add(d))
+	g.setClock(t, g.vm.Clock().Time().Add(d))
 }
 
 // tip returns the height of the most recently built block. Fixture blocks
@@ -222,7 +222,7 @@ func (g *generator) buildBlock(t *testing.T, fork, note string, atomicTxs []*cor
 		Time:    ethBlock.Time(),
 		RLP:     blk.Bytes(),
 		State:   g.watchedState(statedb),
-		Counter: statedb.GetState(g.counter, common.Hash{}).Big().Uint64(),
+		Counter: statedb.GetState(g.fixture.Counter, common.Hash{}).Big().Uint64(),
 	})
 }
 
@@ -246,7 +246,7 @@ func (g *generator) rules() extras.Rules {
 	config := g.vm.Ethereum().BlockChain().Config()
 	head := g.vm.Ethereum().BlockChain().CurrentHeader()
 	nextNumber := new(big.Int).Add(head.Number, big.NewInt(1))
-	ethRules := config.Rules(nextNumber, params.IsMergeTODO, uint64(g.clock.Unix()))
+	ethRules := config.Rules(nextNumber, params.IsMergeTODO, g.vm.Clock().Unix())
 	return *params.GetRulesExtra(ethRules)
 }
 
@@ -317,7 +317,7 @@ func (g *generator) counterIncrementTx(t *testing.T) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.LegacyTx{
 		Nonce:    g.nonce(),
-		To:       &g.counter,
+		To:       &g.fixture.Counter,
 		Gas:      50_000,
 		GasPrice: vmtest.InitialBaseFee,
 	})
@@ -395,7 +395,7 @@ func (g *generator) importTx(t *testing.T, utxos ...*avax.UTXO) *corethatomic.Tx
 	tx, err := corethatomic.NewImportTx(
 		g.ctx,
 		g.rules(),
-		uint64(g.clock.Unix()),
+		g.vm.Clock().Unix(),
 		g.ctx.XChainID,
 		vmtest.TestEthAddrs[0],
 		vmtest.InitialBaseFee,

@@ -111,15 +111,12 @@ func blsSigner(t *testing.T, scalar byte) *localsigner.LocalSigner {
 }
 
 type generator struct {
-	vm    *vm.VM
-	ctx   *snow.Context
-	clock time.Time // mirror of the VM's mocked clock
+	vm  *vm.VM
+	ctx *snow.Context
 
 	memory         *atomic.Memory
 	kc             *secp256k1fx.Keychain
 	warpValidators *warptest.Validators
-
-	counter common.Address // the counter contract, deployed in block 1
 
 	utxoTxID uint64 // distinct txIDs for seeded shared-memory UTXOs
 	ethNonce uint64 // next nonce for the single EVM sender
@@ -136,18 +133,16 @@ func generate(t *testing.T) *Fixture {
 	upgrades := forkSchedule()
 	genesisJSON := vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.ApricotPhase3])
 
-	counter := crypto.CreateAddress(vmtest.TestEthAddrs[0], 0)
 	g := &generator{
 		vm: vm.WrapVM(&evm.VM{}),
 		kc: secp256k1fx.NewKeychain(vmtest.TestKeys...),
 		// Fixed BLS keys so the embedded signed warp message, and hence the
 		// fixture, is deterministic.
 		warpValidators: warptest.NewValidatorsWithSigners(blsSigner(t, 1), blsSigner(t, 2)),
-		counter:        counter,
 		fixture: &Fixture{
 			Genesis:    json.RawMessage(genesisJSON),
 			Upgrades:   upgrades,
-			Counter:    counter,
+			Counter:    crypto.CreateAddress(vmtest.TestEthAddrs[0], 0), // the counter contract, deployed in block 1
 			ANTAssetID: antAssetID,
 		},
 	}
@@ -229,7 +224,6 @@ func (g *generator) dumpDatabase(t *testing.T, suite *vmtest.TestVMSuite) {
 // fork-rule selection.
 func (g *generator) setClock(t *testing.T, now time.Time) {
 	t.Helper()
-	g.clock = now
 	g.vm.Clock().Set(now)
 }
 
@@ -244,7 +238,7 @@ func (g *generator) watchedState(statedb *state.StateDB) map[common.Address]Acco
 		vmtest.TestEthAddrs[0],
 		vmtest.TestEthAddrs[1],
 		transferRecipient,
-		g.counter,
+		g.fixture.Counter,
 		evmconstants.BlackholeAddr,
 	} {
 		accounts[addr] = AccountState{
