@@ -311,7 +311,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 }
 
 // earliestBuildTime returns the earliest wall-clock time at which a child of b
-// may be built: b's timestamp plus b's ACP-226 minimum block delay.
+// may be built.
 func earliestBuildTime(b *blocks.Block) time.Time {
 	h := b.Header()
 	return blockTime(h).Add(delayExponent(h).DelayDuration())
