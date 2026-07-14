@@ -48,7 +48,7 @@ import (
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
-	// These are configurable to speed up testing.
+	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
 	pushGossipPeriod time.Duration
 
