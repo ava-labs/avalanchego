@@ -43,11 +43,11 @@ type Fixture struct {
 	// Blocks holds every accepted block, in height order, starting at
 	// height 1.
 	Blocks []Block `json:"blocks"`
-	// Database holds every key-value pair (sorted by key) of the VM's
-	// database after all Blocks were accepted. Written verbatim to an empty
-	// database, they recreate the state a coreth node would hand to its
-	// successor VM.
-	Database []KV `json:"database"`
+	// Database holds every key-value pair of the VM's database after all
+	// Blocks were accepted, keyed by the hex-encoded key. Written verbatim
+	// to an empty database, they recreate the state a coreth node would
+	// hand to its successor VM.
+	Database map[string]hexutil.Bytes `json:"database"`
 }
 
 // A Block is a single accepted block of the fixture chain.
@@ -77,12 +77,6 @@ type AccountState struct {
 	Nonce   uint64       `json:"nonce"`
 	// ANTBalance is the account's multicoin balance of [Fixture.ANTAssetID].
 	ANTBalance *hexutil.Big `json:"antBalance"`
-}
-
-// A KV is a single key-value pair of the dumped database.
-type KV struct {
-	Key   hexutil.Bytes `json:"k"`
-	Value hexutil.Bytes `json:"v"`
 }
 
 // Heights of fixture blocks that consuming tests single out. The generator

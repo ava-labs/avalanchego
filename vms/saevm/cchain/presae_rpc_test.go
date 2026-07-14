@@ -48,8 +48,10 @@ func newPreSAESUT(t *testing.T) (context.Context, *SUT, *upgradechain.Fixture) {
 	// which corresponds to the "chain" prefix of the SUT's base database.
 	db := memdb.New()
 	chainDB := prefixdb.New([]byte("chain"), db)
-	for _, kv := range fx.Database {
-		require.NoError(t, chainDB.Put(kv.Key, kv.Value), "seeding fixture database key %x", kv.Key)
+	for keyHex, value := range fx.Database {
+		key, err := hexutil.Decode(keyHex)
+		require.NoError(t, err, "decoding fixture database key %s", keyHex)
+		require.NoError(t, chainDB.Put(key, value), "seeding fixture database key %s", keyHex)
 	}
 
 	tip := fx.Blocks[len(fx.Blocks)-1]

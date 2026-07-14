@@ -215,13 +215,11 @@ func (g *generator) dumpDatabase(t *testing.T, suite *vmtest.TestVMSuite) {
 	// Only the VM's own database wrappers close, so the suite's separate
 	// handle remains iterable.
 	require.NoError(t, g.vm.Shutdown(t.Context()), "vm.Shutdown()")
+	g.fixture.Database = make(map[string]hexutil.Bytes)
 	it := suite.DB.NewIterator()
 	defer it.Release()
 	for it.Next() {
-		g.fixture.Database = append(g.fixture.Database, KV{
-			Key:   bytes.Clone(it.Key()),
-			Value: bytes.Clone(it.Value()),
-		})
+		g.fixture.Database[hexutil.Encode(it.Key())] = bytes.Clone(it.Value())
 	}
 	require.NoError(t, it.Error(), "iterating VM database")
 }
