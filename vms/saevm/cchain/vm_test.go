@@ -1051,7 +1051,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	for i, r := range receipts {
 		require.Lenf(t, r.Logs, 1, "%T.Logs", r)
 		got := r.Logs[0].Topics[0]
-		assert.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
+		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
 	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
