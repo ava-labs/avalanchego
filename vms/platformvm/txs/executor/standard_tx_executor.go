@@ -1496,17 +1496,22 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	}
 
 	var (
-		txID                     = e.tx.ID()
-		subnetID                 = txID
-		startTime                = uint64(currentTimestamp.Unix())
-		currentFees              = e.state.GetAccruedFees()
-		subnetToL1ConversionData = message.SubnetToL1ConversionData{
-			SubnetID:       subnetID,
-			ManagerChainID: tx.ManagerChainID,
-			ManagerAddress: tx.ManagerAddress,
-			Validators:     make([]message.SubnetToL1ConversionValidatorData, len(tx.Validators)),
-		}
+		txID           = e.tx.ID()
+		subnetID       = txID
+		managerChainID = tx.ManagerChainID
+		startTime      = uint64(currentTimestamp.Unix())
+		currentFees    = e.state.GetAccruedFees()
 	)
+	if managerChainID == txs.SelfManagerChainID {
+		managerChainID = subnetID
+	}
+
+	subnetToL1ConversionData := message.SubnetToL1ConversionData{
+		SubnetID:       subnetID,
+		ManagerChainID: managerChainID,
+		ManagerAddress: tx.ManagerAddress,
+		Validators:     make([]message.SubnetToL1ConversionValidatorData, len(tx.Validators)),
+	}
 
 	for i, vdr := range tx.Validators {
 		nodeID, err := ids.ToNodeID(vdr.NodeID)
@@ -1602,11 +1607,12 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	// Register the chain under the new subnet
 	e.state.AddL1Chain(subnetID, e.tx)
 	// Track the L1 conversion
+
 	e.state.SetSubnetToL1Conversion(
 		subnetID,
 		state.SubnetToL1Conversion{
 			ConversionID: conversionID,
-			ChainID:      tx.ManagerChainID,
+			ChainID:      managerChainID,
 			Addr:         tx.ManagerAddress,
 		},
 	)

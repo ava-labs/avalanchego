@@ -4701,6 +4701,128 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		})
 	}
 }
+func TestStandardExecutorCreateL1TxSelfManagerChainID(t *testing.T) {
+	require := require.New(t)
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(fx.InitializeVM(vm))
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // validationIDs
+			nil, // chainIDs
+		)
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	var (
+		nodeID         = ids.GenerateTestNodeID()
+		managerAddress = utils.RandomBytes(32)
+		vmID           = ids.GenerateTestID()
+		genesisData    = []byte("genesis")
+		ownerAddrs     = []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}
+	)
+	const weight = 1
+	validator := &txs.CreateL1Validator{
+		NodeID:  nodeID.Bytes(),
+		Weight:  weight,
+		Balance: 1,
+		Signer:  *pop,
+		RemainingBalanceOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: ownerAddrs,
+		},
+		DeactivationOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: ownerAddrs,
+		},
+	}
+	createL1Tx, err := wallet.IssueCreateL1Tx(
+		vmID,
+		genesisData,
+		txs.SelfManagerChainID,
+		managerAddress,
+		[]*txs.CreateL1Validator{validator},
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+
+	executor := &standardTxExecutor{
+		backend: &Backend{
+			Config:       defaultConfig,
+			Bootstrapped: utils.NewAtomic(true),
+			Fx:           fx,
+			FlowChecker:  flowChecker,
+			Ctx:          ctx,
+		},
+		feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+		tx:            createL1Tx,
+		state:         diff,
+	}
+	require.NoError(executor.backend.Fx.Bootstrapped())
+	require.NoError(createL1Tx.Unsigned.Visit(executor))
+
+	var (
+		txID     = createL1Tx.ID()
+		subnetID = txID
+	)
+
+	expectedConversionID, err := message.SubnetToL1ConversionID(message.SubnetToL1ConversionData{
+		SubnetID:       subnetID,
+		ManagerChainID: subnetID,
+		ManagerAddress: managerAddress,
+		Validators: []message.SubnetToL1ConversionValidatorData{
+			{
+				NodeID:       nodeID.Bytes(),
+				BLSPublicKey: pop.PublicKey,
+				Weight:       weight,
+			},
+		},
+	})
+	require.NoError(err)
+
+	stateConversion, err := diff.GetSubnetToL1Conversion(subnetID)
+	require.NoError(err)
+	require.Equal(
+		state.SubnetToL1Conversion{
+			ConversionID: expectedConversionID,
+			ChainID:      subnetID,
+			Addr:         managerAddress,
+		},
+		stateConversion,
+	)
+	unsigned := createL1Tx.Unsigned.(*txs.CreateL1Tx)
+	require.Equal(txs.SelfManagerChainID, unsigned.ManagerChainID)
+}
 
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {

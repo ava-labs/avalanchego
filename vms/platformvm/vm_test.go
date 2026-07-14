@@ -840,7 +840,7 @@ func TestCreateL1Chain(t *testing.T) {
 	tx, err := wallet.IssueCreateL1Tx(
 		vmID,
 		genesisData,
-		ids.Empty,
+		txs.SelfManagerChainID,
 		nil,
 		[]*txs.CreateL1Validator{
 			{
