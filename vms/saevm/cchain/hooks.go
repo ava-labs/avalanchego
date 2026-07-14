@@ -377,7 +377,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 // SAE will perform additional checks on the transactions to ensure they are
 // valid with respect to the worst-case state.
 func (b *builder) PotentialEndOfBlockOps(
-	_ context.Context,
+	ctx context.Context,
 	building *types.Header,
 	settledHash common.Hash,
 	source saetypes.BlockSource,
