@@ -259,6 +259,17 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 	return nil
 }
 
+// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
+// The C-Chain has historically credited the full fee (base + priority) to the
+// blackhole address, but libevm's state transition only credits the priority
+// fee to the coinbase (the blackhole address) and discards the base fee.
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
+	burned := new(uint256.Int).SetUint64(r.GasUsed)
+	burned.Mul(burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, burned)
+	return nil
+}
+
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {

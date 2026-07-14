@@ -251,6 +251,11 @@ func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) er
 	return nil
 }
 
+// AfterExecutingTransaction is a no-op that always returns nil.
+func (*Stub) AfterExecutingTransaction(*state.StateDB, uint256.Int, *types.Receipt) error {
+	return nil
+}
+
 // AfterExecutingBlock is a no-op that always returns nil.
 func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
