@@ -38,7 +38,7 @@ func newCalculatorsBeforeHelicon(config Config) []calculatorImplementation {
 	heliconTime := time.Time{}.Add(time.Second)
 	return []calculatorImplementation{
 		{
-			name:       "generic",
+			name:       "calculator",
 			calculator: NewCalculator(config),
 		},
 		{
@@ -182,6 +182,7 @@ func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
 	tests := []struct {
 		name               string
 		minConsumptionRate uint64
+		maxConsumptionRate uint64
 		stakeStartTime     time.Time
 		expectedReward     uint64
 	}{
@@ -207,13 +208,6 @@ func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
 			expectedReward:     205817226496,
 		},
 		{
-			// minRate remains 7.5% after the ramp.
-			name:               "after_ramp",
-			minConsumptionRate: 100_000,
-			stakeStartTime:     heliconTime.Add(heliconReductionPeriod + time.Second),
-			expectedReward:     205817226496,
-		},
-		{
 			// minRate = 8% - (8% - 7.5%) / 2 = 7.75%.
 			name:               "custom_min_rate_above_target",
 			minConsumptionRate: 80_000,
@@ -221,17 +215,72 @@ func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
 			expectedReward:     212647776318,
 		},
 		{
-			// minRate remains 1%, which is below the target.
+			// minRate = 1% + (7.5% - 1%) / 2 = 4.25%.
 			name:               "custom_min_rate_below_target",
 			minConsumptionRate: 10_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     117020078814,
+		},
+		{
+			name:               "below_target_at_helicon",
+			minConsumptionRate: 74_999,
+			stakeStartTime:     heliconTime,
+			expectedReward:     205814494276,
+		},
+		{
+			// A half-ramped one-unit increase rounds down to zero.
+			name:               "below_target_mid_ramp",
+			minConsumptionRate: 74_999,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205814494276,
+		},
+		{
+			name:               "below_target_at_ramp_end",
+			minConsumptionRate: 74_999,
 			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
-			expectedReward:     28222931131,
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "at_target_mid_ramp",
+			minConsumptionRate: 75_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "above_target_at_helicon",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime,
+			expectedReward:     205819958716,
+		},
+		{
+			// A half-ramped one-unit reduction rounds down to zero.
+			name:               "above_target_mid_ramp",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205819958716,
+		},
+		{
+			name:               "above_target_at_ramp_end",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     205817226496,
+		},
+		{
+			// Preserve minRate because the 7.5% target exceeds maxRate.
+			name:               "target_above_max",
+			minConsumptionRate: 10_000,
+			maxConsumptionRate: 20_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     27472321261,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config
 			cfg.MinConsumptionRate = tt.minConsumptionRate
+			if tt.maxConsumptionRate != 0 {
+				cfg.MaxConsumptionRate = tt.maxConsumptionRate
+			}
 			c := NewPrimaryNetworkCalculator(cfg, upgradeConfig)
 
 			reward := c.Calculate(

@@ -251,13 +251,18 @@ func currentValidator(
 	return validators[0]
 }
 
+type delegatorStakingPeriod struct {
+	startTime time.Time
+	duration  time.Duration
+}
+
 // waitForOneActiveDelegator waits until the validator with nodeID has exactly one
-// active delegator and returns its staking start time and duration.
+// active delegator and returns its staking period.
 func waitForOneActiveDelegator(
 	tc *e2e.GinkgoTestContext,
 	pvmClient *platformvm.Client,
 	nodeID ids.NodeID,
-) (time.Time, time.Duration) {
+) delegatorStakingPeriod {
 	tc.Eventually(func() bool {
 		validators, err := pvmClient.GetCurrentValidators(
 			tc.DefaultContext(),
@@ -271,7 +276,10 @@ func waitForOneActiveDelegator(
 	validator := currentValidator(tc, pvmClient, nodeID)
 	require.Len(tc, validator.Delegators, 1)
 	delegator := validator.Delegators[0]
-	return time.Unix(int64(delegator.StartTime), 0), time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
+	return delegatorStakingPeriod{
+		startTime: time.Unix(int64(delegator.StartTime), 0),
+		duration:  time.Duration(delegator.EndTime-delegator.StartTime) * time.Second,
+	}
 }
 
 // requireValidatorRemoved waits until the validator with nodeID is no longer

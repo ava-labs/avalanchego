@@ -37,12 +37,13 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 
 		env := e2e.GetEnv(tc)
 
-		requireHeliconActivated(tc, info.NewClient(env.GetRandomNodeURI().URI))
+		infoClient := info.NewClient(env.GetRandomNodeURI().URI)
+		requireHeliconActivated(tc, infoClient)
 
 		f := newAutoRenewedValidatorFixture(tc, env, validatorWeight+gasAmount)
 
 		pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
-		upgrades, err := info.NewClient(f.randomWalletNodeURI.URI).Upgrades(tc.DefaultContext())
+		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 		require.NoError(tc, err)
 		rewardsCalculator := reward.NewPrimaryNetworkCalculator(
 			GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)),
@@ -81,8 +82,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		)
 		tc.By("verifying delegator1 is active and checking the supply mint", func() {
 			supplyBeforeSecondCycle = currentSupply(tc, pvmClient)
-			stakeStartTime, delegator1StakingDuration := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
-			delegator1PotentialRewards = rewardsCalculator.Calculate(stakeStartTime, delegator1StakingDuration, delegator1Weight, supplyBeforeDelegator1)
+			delegator1Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
+			delegator1PotentialRewards = rewardsCalculator.Calculate(delegator1Period.startTime, delegator1Period.duration, delegator1Weight, supplyBeforeDelegator1)
 			require.Equal(tc, supplyBeforeDelegator1+delegator1PotentialRewards, supplyBeforeSecondCycle)
 		})
 
@@ -157,8 +158,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		)
 		tc.By("verifying delegator2 is active and checking the supply mint", func() {
 			supplyAfterDelegator2 = currentSupply(tc, pvmClient)
-			stakeStartTime, actualDelegator2Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
-			delegator2PotentialRewards = rewardsCalculator.Calculate(stakeStartTime, actualDelegator2Period, delegator2Weight, supplyBeforeDelegator2)
+			delegator2Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
+			delegator2PotentialRewards = rewardsCalculator.Calculate(delegator2Period.startTime, delegator2Period.duration, delegator2Weight, supplyBeforeDelegator2)
 			require.Equal(tc, supplyBeforeDelegator2+delegator2PotentialRewards, supplyAfterDelegator2)
 		})
 

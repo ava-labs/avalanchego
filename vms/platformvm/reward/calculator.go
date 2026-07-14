@@ -11,10 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	_ Calculator = (*calculator)(nil)
-	_ Calculator = (*primaryNetworkCalculator)(nil)
-)
+var _ Calculator = (*calculator)(nil)
 
 type Calculator interface {
 	Calculate(stakeStartTime time.Time, stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
@@ -77,6 +74,8 @@ type primaryNetworkCalculator struct {
 	upgradeConfig upgrade.Config
 }
 
+var _ Calculator = (*primaryNetworkCalculator)(nil)
+
 // NewPrimaryNetworkCalculator returns a calculator for primary network staking
 // rewards. It applies primary network reward upgrades.
 func NewPrimaryNetworkCalculator(c Config, upgradeConfig upgrade.Config) Calculator {
@@ -103,21 +102,36 @@ func configForStakeStart(
 	)
 
 	if !upgradeConfig.IsHeliconActivated(stakeStartTime) ||
-		rewardConfig.MinConsumptionRate <= heliconMinConsumptionRateTarget {
+		rewardConfig.MinConsumptionRate == heliconMinConsumptionRateTarget {
 		return rewardConfig
 	}
 
-	fullReduction := rewardConfig.MinConsumptionRate - heliconMinConsumptionRateTarget
-	reduction := fullReduction
-	if reductionEndTime := upgradeConfig.HeliconTime.Add(heliconMinConsumptionRateReductionPeriod); stakeStartTime.Before(reductionEndTime) {
-		elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
-		rampedReduction := new(big.Int).SetUint64(fullReduction)
-		rampedReduction.Mul(rampedReduction, big.NewInt(int64(elapsed)))
-		rampedReduction.Div(rampedReduction, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
-		reduction = rampedReduction.Uint64()
+	// Custom networks may configure a maximum below the Helicon target. Do not
+	// increase the minimum above their configured maximum.
+	if rewardConfig.MaxConsumptionRate < heliconMinConsumptionRateTarget {
+		return rewardConfig
 	}
 
-	rewardConfig.MinConsumptionRate -= reduction
+	fullChange := math.AbsDiff(
+		rewardConfig.MinConsumptionRate,
+		heliconMinConsumptionRateTarget,
+	)
+
+	change := fullChange
+	reductionEndTime := upgradeConfig.HeliconTime.Add(heliconMinConsumptionRateReductionPeriod)
+	if stakeStartTime.Before(reductionEndTime) {
+		elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
+		rampedChange := new(big.Int).SetUint64(fullChange)
+		rampedChange.Mul(rampedChange, big.NewInt(int64(elapsed)))
+		rampedChange.Div(rampedChange, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
+		change = rampedChange.Uint64()
+	}
+
+	if rewardConfig.MinConsumptionRate < heliconMinConsumptionRateTarget {
+		rewardConfig.MinConsumptionRate += change
+	} else {
+		rewardConfig.MinConsumptionRate -= change
+	}
 	return rewardConfig
 }
 
