@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
-	"github.com/ava-labs/libevm/params"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"

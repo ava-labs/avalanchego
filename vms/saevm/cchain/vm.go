@@ -36,12 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/libevm/params"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethcommon "github.com/ava-labs/libevm/common"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
@@ -56,7 +56,7 @@ type VM struct {
 	now func() time.Time
 
 	ctx          *snow.Context
-	chainConfig  *params.ChainConfig
+	chainConfig  *ethparams.ChainConfig
 	state        *state.State
 	txpool       *txpool.Txpool
 	gossipSet    *gossip.BloomSet[*gossipTx]
