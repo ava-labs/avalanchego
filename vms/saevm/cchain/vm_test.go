@@ -101,7 +101,6 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 type (
 	sutConfig struct {
 		genesis    core.Genesis
-		upgrades   *upgrade.Config
 		nodeID     ids.NodeID
 		networkID  uint32
 		validators *warptest.Validators
@@ -181,7 +180,7 @@ func withGenesis(g core.Genesis) sutOption {
 // every upgrade being active from genesis.
 func withUpgrades(u upgrade.Config) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrades = &u
+		c.upgrades = u
 	})
 }
 
@@ -293,9 +292,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
-	if cfg.upgrades != nil {
-		snowCtx.NetworkUpgrades = *cfg.upgrades
-	}
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
