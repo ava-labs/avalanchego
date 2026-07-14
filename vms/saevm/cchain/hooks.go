@@ -243,14 +243,6 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, _ *types.Transaction, r *types.Receipt) error {
-	var burned uint256.Int
-	burned.SetUint64(r.GasUsed)
-	burned.Mul(&burned, &baseFee)
-	db.AddBalance(constants.BlackholeAddr, &burned)
-	return nil
-}
-
 func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
 	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
 	// and this block is the first post-Durango block, we need to activate the
