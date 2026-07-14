@@ -341,16 +341,10 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		}
 	}
 
-	// Race the SAE VM's event source against the cross-chain txpool; whichever
-	// signals first wins.
-	//
-	// raceCtx exists to unblock the loser: it is canceled by the winner's
-	// deferred cancel as soon as either goroutine produces a result, so the
-	// other's still-pending WaitForEvent/AwaitTxs call returns promptly rather
-	// than lingering until the caller's ctx is canceled. results is buffered for
-	// both sends so the loser can always deliver its (discarded) result and
-	// exit, i.e. neither goroutine leaks.
-	raceCtx, cancel := context.WithCancel(ctx)
+    // Race the SAE event source against the cross-chain txpool. The winner's
+    // deferred cancel unblocks the loser, whose pending call returns and delivers
+    // its discarded result to the buffered channel, so neither goroutine leaks.
+    raceCtx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg snowcommon.Message
 		err error
