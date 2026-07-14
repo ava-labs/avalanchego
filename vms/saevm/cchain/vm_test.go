@@ -1538,10 +1538,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 }
 
 // TestWaitForEventMinDelayPacing exercises WaitForEvent's ACP-226 min-delay
-// pacing under synctest: the call stays blocked on the pacing timer until it is
-// released, either by the timer firing (returning PendingTxs) or by the context
-// being canceled (returning the cancellation cause). synctest lets us assert
-// "still blocked" without a real-time grace window.
+// pacing.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
 	type result struct {
 		msg snowcommon.Message
