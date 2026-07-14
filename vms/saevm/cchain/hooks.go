@@ -38,11 +38,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
+	"github.com/ava-labs/libevm/params"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
@@ -56,7 +56,7 @@ type hooks struct {
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
-	chainConfig *ethparams.ChainConfig,
+	chainConfig *params.ChainConfig,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 	now func() time.Time,
@@ -251,7 +251,7 @@ func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, 
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
 	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
 	// and this block is the first post-Durango block, we need to activate the
 	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
@@ -290,7 +290,7 @@ var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
 	ctx          *snow.Context
-	chainConfig  *ethparams.ChainConfig
+	chainConfig  *params.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
