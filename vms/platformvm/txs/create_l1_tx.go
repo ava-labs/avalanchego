@@ -16,8 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-var _ UnsignedTx = (*CreateL1Tx)(nil)
-var SelfManagerChainID = ids.ID{'m', 'a', 'n', 'a', 'g', 'e', 'r', ' ', 'o', 'n', ' ', 's', 'e', 'l', 'f'}
+var (
+	_ UnsignedTx = (*CreateL1Tx)(nil)
+
+	SelfManagerChainID = ids.ID{'m', 'a', 'n', 'a', 'g', 'e', 'r', ' ', 'o', 'n', ' ', 's', 'e', 'l', 'f'}
+)
 
 type CreateL1Tx struct {
 	// Metadata, inputs and outputs

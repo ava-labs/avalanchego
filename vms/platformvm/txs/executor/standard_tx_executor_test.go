@@ -293,7 +293,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				utxoIDs, err := env.state.UTXOIDs(
 					genesistest.DefaultFundedKeys[1].Address().Bytes(),
 					ids.Empty,
-					math.MaxInt32)
+					math.MaxInt32,
+				)
 				require.NoError(t, err)
 
 				for _, utxoID := range utxoIDs {
@@ -4701,6 +4702,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		})
 	}
 }
+
 func TestStandardExecutorCreateL1TxSelfManagerChainID(t *testing.T) {
 	require := require.New(t)
 	var (

@@ -882,7 +882,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		var (
 			address        = []byte{}
-			managerChainID = ids.Empty
+			managerChainID = txs.SelfManagerChainID
 		)
 
 		var createL1Tx *txs.Tx
@@ -912,7 +912,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		expectedConversionID, err := warpmessage.SubnetToL1ConversionID(warpmessage.SubnetToL1ConversionData{
 			SubnetID:       subnetID,
-			ManagerChainID: managerChainID,
+			ManagerChainID: subnetID,
 			ManagerAddress: address,
 			Validators: []warpmessage.SubnetToL1ConversionValidatorData{
 				{
@@ -930,7 +930,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				require.NoError(err)
 				require.False(subnet.IsPermissioned)
 				require.Equal(expectedConversionID, subnet.ConversionID)
-				require.Equal(managerChainID, subnet.ManagerChainID)
+				require.Equal(subnetID, subnet.ManagerChainID)
 				require.Equal(address, subnet.ManagerAddress)
 			})
 
