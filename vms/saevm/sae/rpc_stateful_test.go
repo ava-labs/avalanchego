@@ -27,8 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Register JS tracers, matching production where the C-Chain's EVM plugin
-	// registers them in the same process.
+	// Register JS tracers for [TestDebugTrace].
 	_ "github.com/ava-labs/libevm/eth/tracers/js"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -192,8 +191,16 @@ func TestDebugTrace(t *testing.T) {
 			args: []any{
 				hexutil.Uint64(depositBlock.NumberU64()),
 				map[string]any{
-					"tracer":  `{step: function() { for (;;) {} }, fault: function() {}, result: function() { return {}; }}`,
-					"timeout": "100ms",
+					"tracer": `{
+						step: function() {
+							for (;;) {}
+						},
+						fault: function() {},
+						result: function() {
+							return {};
+						}
+					}`,
+					"timeout": "10ms",
 				},
 			},
 			wantErr: testerr.Contains("execution timeout"),
