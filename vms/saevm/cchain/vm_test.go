@@ -1572,9 +1572,7 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 				// Build an in-process SUT with no real RPC transport: real
 				// sockets never reach a durable block under synctest, so the
 				// txpool is primed directly via the gossip set rather than
-				// through the absent Client. The SUT is a fully-initialized VM in
-				// [snow.NormalOp] whose only block is genesis (also its current
-				// preference), with exactly one pending transaction.
+				// through the absent Client.
 				//
 				// Do not build/execute blocks: these tests are only
 				// synctest-teardown-safe because they run no blocks (a block can
