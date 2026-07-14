@@ -906,7 +906,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			createL1Tx = tx
 		})
 
-		// subnetID == txID for CreateL1Tx per ACP spec
+		// subnetID == txID for CreateL1Tx
 		subnetID := createL1Tx.ID()
 		genesisValidationID := subnetID.Append(0)
 
@@ -977,6 +977,412 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 			})
 		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
+	})
+
+	ginkgo.It("creates an L1 using CreateL1Tx and updates its validators via the manager", func() {
+		env := e2e.GetEnv(tc)
+		nodeURI := env.GetRandomNodeURI()
+
+		tc.By("loading the wallet")
+		var (
+			keychain       = env.NewKeychain()
+			baseWallet     = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet        = baseWallet.P()
+			pClient        = platformvm.NewClient(nodeURI.URI)
+			proposerClient = proposervm.NewJSONRPCClient(nodeURI.URI, "P")
+			infoClient     = info.NewClient(nodeURI.URI)
+		)
+
+		tc.By("creating the chain genesis")
+		genesisKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+
+		genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
+			Timestamp: time.Now().Unix(),
+			Allocations: []genesis.Allocation{
+				{
+					Address: genesisKey.Address(),
+					Balance: math.MaxUint64,
+				},
+			},
+		})
+		require.NoError(err)
+
+		// The subnetID (= CreateL1Tx txID) is not known until after issuance,
+		// so the genesis validator starts without tracking and is restarted
+		// with tracking after the L1 is created.
+		tc.By("creating the genesis validator")
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
+
+		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
+		require.NoError(err)
+
+		genesisNodePK, err := bls.PublicKeyFromCompressedBytes(genesisNodePoP.PublicKey[:])
+		require.NoError(err)
+
+		// The manager lives on the chain created by this tx: the sentinel
+		// resolves to the txID (== subnetID == chainID) at execution.
+		address := []byte{}
+
+		var createL1Tx *txs.Tx
+		tc.By("issuing a CreateL1Tx", func() {
+			tx, err := pWallet.IssueCreateL1Tx(
+				constants.XSVMID,
+				genesisBytes,
+				txs.SelfManagerChainID,
+				address,
+				[]*txs.CreateL1Validator{
+					{
+						NodeID:  subnetGenesisNode.NodeID.Bytes(),
+						Weight:  genesisWeight,
+						Balance: genesisBalance,
+						Signer:  *genesisNodePoP,
+					},
+				},
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+			createL1Tx = tx
+		})
+
+		// subnetID == chainID == txID for CreateL1Tx, The
+		// sentinel manager chainID resolved to the same value.
+		subnetID := createL1Tx.ID()
+		managerChainID := subnetID
+
+		tc.By("verifying the L1 was created", func() {
+			expectedConversionID, err := warpmessage.SubnetToL1ConversionID(warpmessage.SubnetToL1ConversionData{
+				SubnetID:       subnetID,
+				ManagerChainID: managerChainID,
+				ManagerAddress: address,
+				Validators: []warpmessage.SubnetToL1ConversionValidatorData{
+					{
+						NodeID:       subnetGenesisNode.NodeID.Bytes(),
+						BLSPublicKey: genesisNodePoP.PublicKey,
+						Weight:       genesisWeight,
+					},
+				},
+			})
+			require.NoError(err)
+
+			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+			require.False(subnet.IsPermissioned)
+			require.Equal(expectedConversionID, subnet.ConversionID)
+			require.Equal(managerChainID, subnet.ManagerChainID)
+			require.Equal(address, subnet.ManagerAddress)
+		})
+
+		tc.By("restarting the genesis validator with the L1 tracked", func() {
+			subnetGenesisNode.Flags[config.TrackSubnetsKey] = subnetID.String()
+			require.NoError(subnetGenesisNode.Restart(tc.DefaultContext()))
+			e2e.WaitForHealthy(tc, subnetGenesisNode)
+		})
+
+		// Re-derive the URI after the restart in case ports changed.
+		subnetGenesisNodeURI := subnetGenesisNode.GetAccessibleURI()
+
+		awaitAcceptance := func(txID ids.ID) {
+			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
+				client := platformvm.NewClient(subnetGenesisNodeURI)
+				tc.Eventually(
+					func() bool {
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
+					},
+					tests.DefaultTimeout,
+					e2e.DefaultPollingInterval,
+					"transaction not accepted",
+				)
+			})
+		}
+
+		tc.By("connecting to the genesis validator")
+		var (
+			networkID           = env.GetNetwork().GetNetworkID()
+			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[*p2pmessage.InboundMessage](1)
+		)
+		stakingAddress, cancel, err := subnetGenesisNode.GetAccessibleStakingAddress(tc.DefaultContext())
+		require.NoError(err)
+		tc.DeferCleanup(cancel)
+		genesisPeer, err := peer.StartTestPeer(
+			tc.DefaultContext(),
+			stakingAddress,
+			networkID,
+			router.InboundHandlerFunc(func(_ context.Context, m *p2pmessage.InboundMessage) {
+				tc.Log().Info("received a message",
+					zap.Stringer("op", m.Op),
+					zap.Stringer("message", m.Message),
+					zap.Stringer("from", m.NodeID),
+				)
+				genesisPeerMessages.PushRight(m)
+			}),
+		)
+		require.NoError(err)
+
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
+			require.NoError(err)
+			require.Equal(expectedValidators, subnetValidators)
+		}
+
+		tc.By("verifying the validator set was initialized", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+			})
+		})
+
+		advanceProposerVMPChainHeight := func() {
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
+			if !upgrades.IsGraniteActivated(time.Now()) {
+				// Wait to ensure the next block will reference the last
+				// accepted P-chain height.
+				time.Sleep(timeToAdvancePChainWindow)
+				return
+			}
+
+			epochBefore, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
+
+			tc.By("waiting", func() {
+				timeToAdvanceEpoch := max(timeToAdvancePChainWindow, upgrades.GraniteEpochDuration)
+				time.Sleep(timeToAdvanceEpoch)
+			})
+
+			tc.By("issuing a dummy tx to advance the epoch", func() {
+				tx, err := pWallet.IssueBaseTx(
+					[]*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: pWallet.Builder().Context().AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100 * units.MicroAvax,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs: []ids.ShortID{
+										ids.GenerateTestShortID(),
+									},
+								},
+							},
+						},
+					},
+					tc.WithDefaultContext(),
+				)
+				require.NoError(err)
+				awaitAcceptance(tx.ID())
+			})
+
+			epochAfter, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
+			require.Greater(epochAfter.PChainHeight, epochBefore.PChainHeight)
+		}
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+
+		tc.By("creating the validator to register")
+		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
+			config.TrackSubnetsKey: subnetID.String(),
+		}))
+
+		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
+		require.NoError(err)
+
+		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
+		require.NoError(err)
+
+		tc.By("ensuring the subnet nodes are healthy", func() {
+			e2e.WaitForHealthy(tc, subnetGenesisNode)
+			e2e.WaitForHealthy(tc, subnetRegisterNode)
+		})
+
+		tc.By("creating the RegisterL1ValidatorMessage")
+		expiry := uint64(time.Now().Add(expiryDelay).Unix()) // This message will expire in 5 minutes
+		registerL1ValidatorMessage, err := warpmessage.NewRegisterL1Validator(
+			subnetID,
+			subnetRegisterNode.NodeID,
+			registerNodePoP.PublicKey,
+			expiry,
+			warpmessage.PChainOwner{},
+			warpmessage.PChainOwner{},
+			registerWeight,
+		)
+		require.NoError(err)
+		registerValidationID := registerL1ValidatorMessage.ValidationID()
+
+		tc.By("registering the validator", func() {
+			tc.By("creating the unsigned warp message")
+			// The manager message originates from the L1's own chain:
+			// sourceChainID == managerChainID == subnetID.
+			unsignedRegisterL1Validator := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+				networkID,
+				managerChainID,
+				must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+					address,
+					registerL1ValidatorMessage.Bytes(),
+				)).Bytes(),
+			))
+
+			tc.By("sending the request to sign the warp message", func() {
+				registerL1ValidatorRequest, err := wrapWarpSignatureRequest(
+					unsignedRegisterL1Validator,
+					nil,
+				)
+				require.NoError(err)
+
+				require.True(genesisPeer.Send(tc.DefaultContext(), registerL1ValidatorRequest))
+			})
+
+			tc.By("getting the signature response")
+			registerL1ValidatorSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
+			require.True(ok)
+
+			tc.By("creating the signed warp message to register the validator")
+			registerL1Validator, err := warp.NewMessage(
+				unsignedRegisterL1Validator,
+				&warp.BitSetSignature{
+					Signers: set.NewBits(0).Bytes(),
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(registerL1ValidatorSignature),
+					),
+				},
+			)
+			require.NoError(err)
+
+			tc.By("issuing a RegisterL1ValidatorTx", func() {
+				tx, err := pWallet.IssueRegisterL1ValidatorTx(
+					registerBalance,
+					registerNodePoP.ProofOfPossession,
+					registerL1Validator.Bytes(),
+				)
+				require.NoError(err)
+				awaitAcceptance(tx.ID())
+			})
+		})
+
+		tc.By("verifying the validator was registered", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+				ids.EmptyNodeID: { // The validator is not active
+					NodeID: ids.EmptyNodeID,
+					Weight: registerWeight,
+				},
+			})
+		})
+
+		var nextNonce uint64
+		setWeight := func(validationID ids.ID, weight uint64) {
+			tc.By("creating the unsigned L1ValidatorWeightMessage")
+			unsignedL1ValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+				networkID,
+				managerChainID,
+				must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+					address,
+					must[*warpmessage.L1ValidatorWeight](tc)(warpmessage.NewL1ValidatorWeight(
+						validationID,
+						nextNonce,
+						weight,
+					)).Bytes(),
+				)).Bytes(),
+			))
+
+			tc.By("sending the request to sign the warp message", func() {
+				setL1ValidatorWeightRequest, err := wrapWarpSignatureRequest(
+					unsignedL1ValidatorWeight,
+					nil,
+				)
+				require.NoError(err)
+
+				require.True(genesisPeer.Send(tc.DefaultContext(), setL1ValidatorWeightRequest))
+			})
+
+			tc.By("getting the signature response")
+			setL1ValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
+			require.True(ok)
+
+			tc.By("creating the signed warp message to set the weight of the validator")
+			setL1ValidatorWeight, err := warp.NewMessage(
+				unsignedL1ValidatorWeight,
+				&warp.BitSetSignature{
+					Signers: set.NewBits(0).Bytes(),
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(setL1ValidatorWeightSignature),
+					),
+				},
+			)
+			require.NoError(err)
+
+			tc.By("issuing a SetL1ValidatorWeightTx", func() {
+				tx, err := pWallet.IssueSetL1ValidatorWeightTx(
+					setL1ValidatorWeight.Bytes(),
+				)
+				require.NoError(err)
+				awaitAcceptance(tx.ID())
+			})
+
+			nextNonce++
+		}
+
+		tc.By("increasing the weight of the validator", func() {
+			setWeight(registerValidationID, updatedWeight)
+		})
+
+		tc.By("issuing an IncreaseL1ValidatorBalanceTx", func() {
+			_, err := pWallet.IssueIncreaseL1ValidatorBalanceTx(
+				registerValidationID,
+				units.Avax,
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the validator was activated with the increased weight", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+				subnetRegisterNode.NodeID: {
+					NodeID:    subnetRegisterNode.NodeID,
+					PublicKey: registerNodePK,
+					Weight:    updatedWeight,
+				},
+			})
+		})
+
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+
+		tc.By("removing the registered validator", func() {
+			setWeight(registerValidationID, 0)
+		})
+
+		tc.By("verifying the validator was removed", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+			})
+		})
+
+		genesisPeerMessages.Close()
+		genesisPeer.StartClose()
+		require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
 
 		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
