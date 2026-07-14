@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -48,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -2145,6 +2147,60 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
 		})
 	}
+}
+
+// TestHeliconBlockValidation tests that blocks with Helicon timestamps cannot
+// be verified, cannot be built, but can be parsed.
+func TestHeliconBlockValidation(t *testing.T) {
+	ctx := t.Context()
+
+	// The chain config's upgrade schedule is derived from the snow context, so
+	// scheduling Helicon only requires updating the context.
+	snowCtx, prefixedDB, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
+
+	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
+	snowCtx.NetworkUpgrades.HeliconTime = heliconTime
+
+	vm := newDefaultTestVM()
+	err := vm.Initialize(
+		ctx,
+		snowCtx,
+		prefixedDB,
+		genesisBytes,
+		nil,
+		nil,
+		nil,
+		&enginetest.Sender{T: t, SendAppGossipF: func(context.Context, commonEng.SendConfig, []byte) error { return nil }},
+	)
+	require.NoErrorf(t, err, "%T.Initialize()", vm)
+	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping))
+	require.NoError(t, vm.SetState(ctx, snow.NormalOp))
+	defer func() {
+		require.NoErrorf(t, vm.Shutdown(ctx), "%T.Shutdown()", vm)
+	}()
+
+	vm.clock.Set(heliconTime)
+	signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
+	blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
+	require.NoError(t, err)
+
+	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	header := ethBlock.Header()
+	heliconTimestamp := uint64(heliconTime.Unix())
+	require.Less(t, header.Time, heliconTimestamp, "block builder shouldn't create Helicon blocks")
+
+	// Make malicious helicon block
+	header.Time = heliconTimestamp
+	customtypes.GetHeaderExtra(header).TimeMilliseconds = utils.PointerTo(heliconTimestamp * 1000)
+	modifiedEthBlock := ethBlock.WithSeal(header)
+	modifiedBytes, err := rlp.EncodeToBytes(modifiedEthBlock)
+	require.NoError(t, err, "rlp.EncodeToBytes(%T)", modifiedEthBlock)
+
+	modifiedBlock, err := vm.ParseBlock(ctx, modifiedBytes)
+	require.NoError(t, err, "Helicon blocks must be parsable")
+
+	err = modifiedBlock.Verify(ctx)
+	require.ErrorIsf(t, err, errIsHeliconBlock, "%T.Verify()", modifiedBlock)
 }
 
 func TestInspectDatabases(t *testing.T) {

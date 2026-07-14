@@ -24,10 +24,10 @@ func (b *backend) SetHead(uint64) {
 // re-execute a block's transactions in an internal loop of bare
 // core.ApplyMessage calls, which diverges from [saexec.Execute]:
 //
-//   - [saexec.Execute] credits each transaction's burnt base fee to an
-//     explicit burn address (see hook.Points.BaseFeeBurnAddress).
+//   - [saexec.Execute] credits each transaction's burnt base fee via
+//     hook.Points.AfterExecutingTransaction; libevm's loops do not.
 //   - hook.Points.BeforeExecutingBlock writes upgrade-boundary state before a
-//     block's first transaction; libevm's loops do not.
+//     block's first transaction while libevm's loops do not.
 //   - A synchronous block replays with the base fee it was executed with,
 //     which the gas clock cannot reproduce.
 //

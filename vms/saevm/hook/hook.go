@@ -81,9 +81,10 @@ type Points interface {
 	// BeforeExecutingBlock is called immediately prior to executing the block
 	// with the given header; parent is the header of that block's parent.
 	BeforeExecutingBlock(statedb *state.StateDB, parent, header *types.Header) error
-	// BaseFeeBurnAddress returns the address credited with each transaction's
-	// base fee (GasUsed * baseFee), or nil to discard it as upstream geth does.
-	BaseFeeBurnAddress() *common.Address
+	// AfterExecutingTransaction is called immediately after executing each
+	// transaction, with the executing block's base fee and the resulting
+	// receipt. Note the caller finalises any state changes made by the hook.
+	AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }

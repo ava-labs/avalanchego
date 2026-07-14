@@ -13,6 +13,7 @@ package_group(
     packages = [
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
+        "//node",
         "//tests/e2e/p",
     ],
 )
@@ -168,6 +169,7 @@ go_test(
         "//vms/components/avax",
         "//vms/components/gas",
         "//vms/evm/acp176",
+        "//vms/evm/acp226",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",

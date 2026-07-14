@@ -22,10 +22,11 @@ func Ops(ops ...vm.OpCode) []byte {
 }
 
 // Push returns bytecode that pushes data onto the stack as a single
-// PUSH<len(data)> instruction, failing tb if data exceeds the EVM's 32-byte
-// push limit.
+// PUSH<len(data)> instruction, failing tb if data is empty or exceeds the
+// EVM's 32-byte push limit. To push a zero, use [Ops] with [vm.PUSH0].
 func Push(tb testing.TB, data []byte) []byte {
 	tb.Helper()
+	require.NotEmpty(tb, data, "Push() data is empty; PUSH0 pushes a 0, not zero-length data")
 	require.LessOrEqualf(tb, len(data), 32, "Push() data length exceeds the EVM's push limit")
 	return append(Ops(vm.PUSH0+vm.OpCode(len(data))), data...)
 }

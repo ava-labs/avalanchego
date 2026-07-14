@@ -195,7 +195,7 @@ func Execute(
 	log logging.Logger,
 	opts ...ExecuteOption,
 ) (*ExecutionResults, error) {
-	log.Debug("Executing block")
+	log.Trace("Executing block")
 
 	var cfg executeConfig
 	for _, o := range opts {
@@ -225,11 +225,13 @@ func Execute(
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
 
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
+
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
-
-	burnAddr := hooks.BaseFeeBurnAddress()
 
 	txs := b.Transactions()
 	txs = txs[:min(len(txs), maxNumTxs)]
@@ -280,13 +282,13 @@ func Execute(
 		}
 		receipts[ti] = receipt
 
-		// libevm's state transition discards the base-fee burn, so credit it to
-		// the hook-provided address before executing the next transaction.
-		if burnAddr != nil {
-			burned := new(uint256.Int).SetUint64(receipt.GasUsed)
-			burned.Mul(burned, baseFee)
-			stateDB.AddBalance(*burnAddr, burned)
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
 		}
+		// Finalise any state changes made by the hook as part of this
+		// transaction, mirroring the finalisation performed by
+		// [core.ApplyTransaction].
+		stateDB.Finalise(config.IsEIP158(b.Number()))
 
 		if cfg.intermediateRoots {
 			intermediateRoots = append(intermediateRoots, stateDB.IntermediateRoot(config.IsEIP158(b.Number())))
@@ -319,7 +321,7 @@ func Execute(
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
-	log.Debug(
+	log.Trace(
 		"Block execution complete",
 		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),
