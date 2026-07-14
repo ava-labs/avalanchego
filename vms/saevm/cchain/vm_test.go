@@ -126,6 +126,14 @@ func withState(state snow.State) sutOption {
 
 // withoutRPCTransport skips the SUT's real HTTP/WebSocket transport. Required
 // under testing/synctest, where real sockets never reach a durable block.
+//
+// The resulting SUT has no RPC surface: [SUT.Client] and [SUT.ethclient] are
+// left nil, so tests using this option must drive the VM directly (e.g. via
+// the txpool and consensus methods) rather than through RPC.
+//
+// TODO: investigate in-process client implementations (e.g. served over
+// net.Pipe or an in-memory listener) that stay durably blocked under
+// synctest, so RPC-driven tests can run in a bubble too.
 func withoutRPCTransport() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.skipRPCTransport = true

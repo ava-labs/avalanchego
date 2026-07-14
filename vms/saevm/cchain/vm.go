@@ -329,22 +329,19 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// Pace block building on the ACP-226 minimum block delay before consulting
 	// the event sources so that the mempools are queried when we are actually
 	// willing to build.
-	if preferred := vm.VM.GetPreference(); preferred != nil {
-		minTime := earliestBuildTime(preferred)
-		timeToWait := minTime.Sub(vm.now())
-		if timeToWait > 0 {
-			select {
-			case <-ctx.Done():
-				return 0, context.Cause(ctx)
-			case <-time.After(timeToWait):
-			}
+	minTime := earliestBuildTime(vm.VM.GetPreference())
+	if timeToWait := minTime.Sub(vm.now()); timeToWait > 0 {
+		select {
+		case <-ctx.Done():
+			return 0, context.Cause(ctx)
+		case <-time.After(timeToWait):
 		}
 	}
 
-    // Race the SAE event source against the cross-chain txpool. The winner's
-    // deferred cancel unblocks the loser, whose pending call returns and delivers
-    // its discarded result to the buffered channel, so neither goroutine leaks.
-    raceCtx, cancel := context.WithCancel(ctx)
+	// Race the SAE event source against the cross-chain txpool. The winner's
+	// deferred cancel unblocks the loser, whose pending call returns and delivers
+	// its discarded result to the buffered channel, so neither goroutine leaks.
+	raceCtx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg snowcommon.Message
 		err error

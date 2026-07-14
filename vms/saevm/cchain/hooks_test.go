@@ -54,22 +54,6 @@ func TestDelayExponent(t *testing.T) {
 	}
 }
 
-// When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
-// The VM always sets TimeMilliseconds, so this legacy decode path is only
-// reachable by exercising the hook directly.
-func TestBlockTime(t *testing.T) {
-	_, sut := newSUT(t)
-	hooks := sut.hooks()
-
-	const (
-		unix            = 1_700_000_000
-		unixMilli int64 = unix * 1000
-	)
-	header := &types.Header{Time: unix}
-	got := hooks.BlockTime(header)
-	require.Equal(t, unixMilli, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
-	// Documented invariant: BlockTime(h).Unix() == h.Time.
-	require.Equal(t, int64(unix), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 func TestBlockTime(t *testing.T) {
 	_, sut := newSUT(t)
 	hooks := sut.hooks()
