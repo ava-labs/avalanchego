@@ -216,10 +216,14 @@ func TestRecoverSimple(t *testing.T) {
 
 			requireConsensusCriticalBlocks(t, src, sut)
 
+			// Firewood nodes have a rolling buffer of available recent states,
+			// so it doesn't need to be managed directly.
+			// Archival nodes store all states.
 			if !tt.archival && tt.scheme != customrawdb.FirewoodScheme {
-				// For non-archival nodes, states outside [lastSettled, lastExecuted]
-				// must not be accessible, except at CommitTrieDBEvery boundaries
-				// where the settled state was written to disk.
+				// For non-archival, HashDB nodes, states outside
+				// [lastSettled, lastExecuted] MUST NOT be accessible, except at
+				// CommitTrieDBEvery boundaries where the settled state was
+				// written to disk. Otherwise, the memory will leak.
 				t.Run("unavailable_outside_window", func(t *testing.T) {
 					lastSettled := sut.rawVM.last.settled.Load().NumberU64()
 					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
