@@ -45,6 +45,10 @@ type Config struct {
 	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
 	Archival         bool   // if true, will store every state on disk
 	CommitInterval   uint64 // MUST be set to a non-zero value
+
+	// only configurable for tests
+	maxCapBytes       uint64
+	targetCommitBytes uint64
 }
 
 func (c Config) Verify() error {
@@ -174,10 +178,21 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 // [triedb.Database.Commit] and, if so, moves the oldest state to disk.
 func (t *Tracker) maybeCap(height uint64) error {
 	const (
-		maxCap                = 512 * mibToBytes
-		targetCommitSize      = 20 * mibToBytes                         // for [triedb.Database.Commit]
-		_                uint = targetCommitSize - ethdb.IdealBatchSize // [targetCommitSize] >= [ethdb.IdealBatchSize]
+		defaultMaxCap           = 512 * mibToBytes
+		defaultTargetCommitSize = 20 * mibToBytes // for [triedb.Database.Commit]
+
+		// defaultTargetCommitSize >= ethdb.IdealBatchSize
+		_ uint = defaultTargetCommitSize - ethdb.IdealBatchSize
 	)
+
+	maxCap := common.StorageSize(defaultMaxCap)
+	if t.config.maxCapBytes > 0 {
+		maxCap = common.StorageSize(t.config.maxCapBytes)
+	}
+	targetCommitSize := common.StorageSize(defaultTargetCommitSize)
+	if t.config.targetCommitBytes > 0 {
+		targetCommitSize = common.StorageSize(t.config.targetCommitBytes)
+	}
 
 	// The cap shrinks linearly as we approach the commit interval
 	commitInterval := t.config.CommitInterval
