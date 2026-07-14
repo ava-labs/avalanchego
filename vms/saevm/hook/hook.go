@@ -82,7 +82,7 @@ type Points interface {
 	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
 	// AfterExecutingTransaction is called immediately after executing each
 	// transaction, with the executing block's base fee and the resulting
-	// receipt.
+	// receipt. Note the caller finalises any state changes made by the hook.
 	AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error

@@ -254,6 +254,10 @@ func Execute(
 		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
 			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
 		}
+		// Finalise any state changes made by the hook as part of this
+		// transaction, mirroring the finalisation performed by
+		// [core.ApplyTransaction].
+		stateDB.Finalise(true)
 	}
 
 	numTxs := len(b.Transactions())
