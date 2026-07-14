@@ -741,7 +741,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) *tx.Tx {
+) (*tx.Tx, *tx.Import) {
 	tb.Helper()
 
 	var (
@@ -783,7 +783,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs))
+	return w.sign(tb, imp, len(inputs)), imp
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -870,7 +870,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -1248,8 +1248,6 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	dbOpt := withDB(memdb.New(), t.TempDir())
 	ctx, node := newSUT(t, alloc, timeOpt, dbOpt)
 	w := newWallet(key, node.ctx, node.Client)
-
-	clock.Advance(2 * time.Second)
 
 	// settled is accepted; it is settled by the (non-genesis) marker settler
 	// carries.
