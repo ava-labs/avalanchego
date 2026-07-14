@@ -318,20 +318,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
-	// Enforce block-building separation against the parent's MinDelayExcess.
-	{
-		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
-		if nowMS < parentTimeMS {
-			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
-		}
-
-		delay := nowMS - parentTimeMS
-		minDelay := de.Delay()
-		if delay < minDelay {
-			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
-		}
-	}
-
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
