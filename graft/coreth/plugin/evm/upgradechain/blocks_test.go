@@ -47,27 +47,27 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 
 	// At least one block per historical upgrade; each note names the behavior
 	// exercised by consuming tests.
-	g.setClock(upgrades.ApricotPhase3Time.Add(10*time.Second))
+	g.setClock(upgrades.ApricotPhase3Time.Add(10 * time.Second))
 	g.buildEthBlock(t, "apricotPhase3", "counter-contract deploy and AVAX transfer under dynamic fees",
 		g.counterDeployTx(t),
 		g.transferTx(t, 1),
 	)
 
-	g.advanceClock(10*time.Second)
+	g.advanceClock(10 * time.Second)
 	g.buildBlock(t, "apricotPhase3", "single atomic import of AVAX (pre-AP5 extData encoding)",
 		[]*corethatomic.Tx{g.importAVAX(t, 10*units.Avax)},
 		[]*types.Transaction{g.counterIncrementTx(t)},
 		nil,
 	)
 
-	g.advanceClock(10*time.Second)
+	g.advanceClock(10 * time.Second)
 	g.buildBlock(t, "apricotPhase3", "atomic import of a non-AVAX asset, funding a multicoin (ANT) balance",
 		[]*corethatomic.Tx{g.importANT(t, 1_000)},
 		[]*types.Transaction{g.transferTx(t, 8)},
 		nil,
 	)
 
-	g.advanceClock(10*time.Second)
+	g.advanceClock(10 * time.Second)
 	g.buildEthBlock(t, "apricotPhase3", "nativeAssetCall moving the imported ANT balance (functional precompile era)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
@@ -122,7 +122,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	)
 	require.Equal(t, SendWarpMessageBlock, g.tip(), "sendWarpMessage block height")
 
-	g.advanceClock(10*time.Second)
+	g.advanceClock(10 * time.Second)
 	g.buildBlock(t, "durango", "getVerifiedWarpMessage with an access-list predicate (results in header extra), plus a transfer whose tracing replays the predicate transaction",
 		nil,
 		[]*types.Transaction{g.verifiedWarpMessageTx(t), g.transferTx(t, 11)},
@@ -144,12 +144,12 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 		g.transferTx(t, 6),
 	)
 
-	g.advanceClock(2*time.Second)
+	g.advanceClock(2 * time.Second)
 	g.buildEthBlock(t, "granite", "second Granite block, subject to the ACP-226 minimum block delay; three transactions so that tracing the last replays the first two",
 		g.transferTx(t, 7), g.transferTx(t, 12), g.transferTx(t, 13),
 	)
 
-	g.advanceClock(2*time.Second)
+	g.advanceClock(2 * time.Second)
 	g.buildEthBlock(t, "granite", "storage set-and-clear in one transaction, accruing an SSTORE refund that coreth discards (refunds disabled since AP1)",
 		g.storageClearTx(t),
 	)
