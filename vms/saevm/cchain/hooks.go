@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -234,10 +235,14 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 	return nil
 }
 
-// BaseFeeBurnAddress returns [constants.BlackholeAddr], to which the C-Chain
-// credits every transaction's base-fee burn.
-func (*hooks) BaseFeeBurnAddress() *common.Address {
-	return &constants.BlackholeAddr
+// AfterExecutingTransaction credits the base-fee burn (GasUsed * baseFee) to
+// [constants.BlackholeAddr], which libevm's state transition otherwise discards.
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
+	burned := new(uint256.Int).SetUint64(r.GasUsed)
+	burned.Mul(burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, burned)
+	db.Finalise(true)
+	return nil
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {

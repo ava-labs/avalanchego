@@ -38,7 +38,6 @@ type Stub struct {
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
 	GasPriceConfig          gastime.GasPriceConfig
-	BaseFeeBurnAddr         *common.Address
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -71,14 +70,6 @@ func WithInvalidOpIDs(invalidOps set.Set[ids.ID]) HookOption {
 func WithOps(ops []Op) HookOption {
 	return options.Func[Stub](func(s *Stub) {
 		s.Ops = ops
-	})
-}
-
-// WithBaseFeeBurnAddress overrides the default base-fee burn address of nil,
-// which discards the burn.
-func WithBaseFeeBurnAddress(addr *common.Address) HookOption {
-	return options.Func[Stub](func(s *Stub) {
-		s.BaseFeeBurnAddr = addr
 	})
 }
 
@@ -255,10 +246,9 @@ func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) er
 	return nil
 }
 
-// BaseFeeBurnAddress returns [Stub.BaseFeeBurnAddr], which is nil unless
-// overridden with [WithBaseFeeBurnAddress].
-func (s *Stub) BaseFeeBurnAddress() *common.Address {
-	return s.BaseFeeBurnAddr
+// AfterExecutingTransaction is a no-op that always returns nil.
+func (*Stub) AfterExecutingTransaction(*state.StateDB, uint256.Int, *types.Receipt) error {
+	return nil
 }
 
 // AfterExecutingBlock is a no-op that always returns nil.

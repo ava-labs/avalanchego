@@ -1054,6 +1054,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		assert.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
+	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that the cchain ParseBlock override accepts

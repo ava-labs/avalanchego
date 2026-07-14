@@ -414,47 +414,6 @@ func TestExecution(t *testing.T) {
 	})
 }
 
-// TestBaseFeeBurn verifies that executing a block credits the address returned
-// by [saehookstest.Stub.BaseFeeBurnAddress] with GasUsed * baseFee for every
-// transaction.
-func TestBaseFeeBurn(t *testing.T) {
-	burnAddr := common.Address{'b', 'u', 'r', 'n'}
-	hooks := saehookstest.NewStub(
-		1e6,
-		saehookstest.WithBaseFeeBurnAddress(&burnAddr),
-		// A base fee of 2 and a gas price of 3 make GasUsed, GasUsed*baseFee,
-		// and GasUsed*gasPrice pairwise distinct.
-		saehookstest.WithGasPriceConfig(gastime.GasPriceConfig{
-			TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
-			MinPrice:              2,
-			StaticPricing:         true,
-		}),
-	)
-	ctx, sut := newSUT(t, withHooks(hooks))
-
-	// An empty block advances past the genesis base fee of 1.
-	require.NoError(t, sut.Enqueue(ctx, sut.chain.NewBlock(t, nil)), "Enqueue() empty block")
-
-	const numTxs = 2
-	txs := make(types.Transactions, numTxs)
-	for i := range txs {
-		txs[i] = sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &common.Address{},
-			GasPrice: big.NewInt(3),
-			Gas:      1e5,
-		})
-	}
-	b := sut.chain.NewBlock(t, txs)
-	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	require.Equalf(t, uint256.NewInt(2), b.ExecutedBaseFee(), "%T.ExecutedBaseFee()", b)
-
-	sdb, err := sut.StateDB(b.PostExecutionStateRoot())
-	require.NoErrorf(t, err, "%T.StateDB(%T.PostExecutionStateRoot())", sut.Executor, b)
-	want := uint256.NewInt(numTxs * params.TxGas * 2) // plain transfers use exactly [params.TxGas]
-	assert.Equal(t, want, sdb.GetBalance(burnAddr), "burn-address balance")
-}
-
 func TestEndOfBlockOps(t *testing.T) {
 	ctx, sut := newSUT(t)
 	wallet := sut.wallet

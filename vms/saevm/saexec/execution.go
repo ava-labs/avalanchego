@@ -199,8 +199,6 @@ func Execute(
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
 
-	burnAddr := hooks.BaseFeeBurnAddress()
-
 	txs := b.Transactions()
 	txs = txs[:min(len(txs), maxNumTxs)]
 	receipts := make(types.Receipts, len(txs))
@@ -249,13 +247,8 @@ func Execute(
 		}
 		receipts[ti] = receipt
 
-		// libevm's state transition discards the base-fee burn, so credit it to
-		// the hook-provided address before executing the next transaction.
-		if burnAddr != nil {
-			burned := new(uint256.Int).SetUint64(receipt.GasUsed)
-			burned.Mul(burned, baseFee)
-			stateDB.AddBalance(*burnAddr, burned)
-			stateDB.Finalise(true)
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
 		}
 	}
 
