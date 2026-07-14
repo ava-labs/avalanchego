@@ -50,7 +50,7 @@ var errGenesisNotTraceable = errors.New("genesis is not traceable")
 // IntermediateRoots returns the state root after each of the block's
 // transactions. The roots exclude end-of-block operations.
 func (t *tracersAPI) IntermediateRoots(ctx context.Context, hash common.Hash, _ *tracers.TraceConfig) ([]common.Hash, error) {
-	target, err := t.b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, false))
+	target, err := t.b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (t *tracersAPI) TraceBlockByNumber(ctx context.Context, number rpc.BlockNum
 // TraceBlockByHash traces each of the block's transactions; see
 // [tracersAPI.traceBlock].
 func (t *tracersAPI) TraceBlockByHash(ctx context.Context, hash common.Hash, config *tracers.TraceConfig) ([]*txTraceResult, error) {
-	return t.traceBlock(ctx, rpc.BlockNumberOrHashWithHash(hash, false), config)
+	return t.traceBlock(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */), config)
 }
 
 // The remaining embedded [tracers.API] endpoints that replay blocks run the

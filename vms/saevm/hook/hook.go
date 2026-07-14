@@ -79,7 +79,7 @@ type Points interface {
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
 	// BeforeExecutingBlock is called immediately prior to executing the block
-	// with the given header.
+	// with the given header; parent is the header of that block's parent.
 	BeforeExecutingBlock(statedb *state.StateDB, parent, header *types.Header) error
 	// BaseFeeBurnAddress returns the address credited with each transaction's
 	// base fee (GasUsed * baseFee), or nil to discard it as upstream geth does.

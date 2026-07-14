@@ -48,8 +48,8 @@ func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.Bloc
 }
 
 // restoreBlock finds any available canonical block by number or hash. All
-// methods unrelated to ancestry are safe to use. Unlike the read*() functions,
-// a missing block is reported as [blocks.ErrNotFound], never as a nil block.
+// methods unrelated to ancestry are safe to use. A missing block is reported as
+// [blocks.ErrNotFound].
 func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, error) {
 	numOrHash.RequireCanonical = true
 	return blocks.FromNumberOrHash(

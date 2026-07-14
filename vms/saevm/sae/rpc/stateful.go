@@ -122,7 +122,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(block.Hash(), false))
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,14 +140,14 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 func (b *backend) replayBlock(ethB *types.Block, maxNumTxs int, opts ...saexec.ExecuteOption) (*saexec.ExecutionResults, error) {
 	// The gas clock cannot reproduce a synchronous block's base fee, so
 	// restorable blocks replay with their originally executed one.
-	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), false)); {
+	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */)); {
 	case err == nil:
 		opts = append(opts, saexec.WithBaseFee(target.ExecutedBaseFee()))
 	case !errors.Is(err, blocks.ErrNotFound):
 		return nil, fmt.Errorf("restoring block: %w", err)
 	}
 
-	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), false))
+	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)
 	}

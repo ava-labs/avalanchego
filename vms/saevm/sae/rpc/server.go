@@ -166,9 +166,21 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		})
 	}
 
+	// TODO(JonathanOppenheimer): support all APIs
 	if !b.config.DisableTracing {
 		apis = append(apis, api{
 			// geth-specific APIs:
+			// - debug_intermediateRoots
+			// - debug_standardTraceBadBlockToFile (not supported by SAE)
+			// - debug_standardTraceBlockToFile    (not supported by SAE)
+			// - debug_traceBadBlock
+			// - debug_traceBlock                  (not supported by SAE)
+			// - debug_traceBlockByHash
+			// - debug_traceBlockByNumber
+			// - debug_traceBlockFromFile          (not supported by SAE)
+			// - debug_traceCall
+			// - debug_traceChain                  (not supported by SAE)
+			// - debug_traceTransaction
 			"debug", newTracersAPI(b),
 		})
 	}
