@@ -204,13 +204,12 @@ func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	}
 }
 
-// BlockTime returns the canonical wall-clock time of the block with header h.
+// BlockTime returns the canonical wall-clock time of a block.
 //
-// It anchors the seconds component to h.Time so that the documented invariant
-// BlockTime(h).Unix() == h.Time holds, taking only the sub-second component
-// from TimeMilliseconds. This guards against malformed headers where
-// TimeMilliseconds disagrees with Time (e.g. from a malicious peer), which
-// would otherwise yield an unexpected block time.
+// The whole-second value is authoritative and the millisecond field only
+// refines it below the second, so the two can never disagree on which second a
+// block belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
 func (*hooks) BlockTime(h *types.Header) time.Time {
 	return blockTime(h)
 }
