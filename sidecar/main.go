@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 	"github.com/ava-labs/avalanchego/sidecar/config"
+	"github.com/ava-labs/avalanchego/sidecar/evmrpc"
 	"github.com/ava-labs/avalanchego/sidecar/solanarpc"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
@@ -25,6 +26,8 @@ func buildVerifier(sourceType string, body json.RawMessage) (oracleVerifier, err
 	switch sourceType {
 	case oracle.SourceTypeSolana:
 		return solanarpc.NewSolanaVerifier(body, nil)
+	case oracle.SourceTypeEVM:
+		return evmrpc.NewEVMVerifier(body, nil)
 	default:
 		return nil, fmt.Errorf("no verifier implementation for source type %q", sourceType)
 	}
