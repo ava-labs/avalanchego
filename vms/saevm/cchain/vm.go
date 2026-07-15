@@ -320,6 +320,12 @@ func earliestBuildTime(b *blocks.Block) time.Time {
 	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
+// minWaitForEventDelay is the minimum spacing between consecutive
+// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
+// reasonable frequency for the engine to poll on whether to build a block or
+// not.
+const minWaitForEventDelay = 100 * time.Millisecond
+
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
 // block has elapsed, then waits for a transaction to be in the txpool or for
 // the SAE VM to produce an event.
@@ -331,31 +337,20 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// we don't need this throttle.
 	{
 		defer func() {
-			vm.lastWaitForEvent.Set(time.Now())
+			vm.lastWaitForEvent.Set(vm.now())
 		}()
 
-		// 100ms isn't special here, it was selected as a reasonable frequency
-		// for the engine to poll on whether to build a block or not.
-		const minimumDelay = 100 * time.Millisecond
-		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
-		timeToWait := minimumDelay - sinceLastCall
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(timeToWait):
+		throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
+		if err := vm.waitUntil(ctx, throttleUntil); err != nil {
+			return 0, err
 		}
 	}
 
 	// Pace block building on the ACP-226 minimum block delay before consulting
 	// the event sources so that the mempools are queried when we are actually
 	// willing to build.
-	minTime := earliestBuildTime(vm.VM.GetPreference())
-	if timeToWait := minTime.Sub(vm.now()); timeToWait > 0 {
-		select {
-		case <-ctx.Done():
-			return 0, context.Cause(ctx)
-		case <-time.After(timeToWait):
-		}
+	if err := vm.waitUntil(ctx, earliestBuildTime(vm.VM.GetPreference())); err != nil {
+		return 0, err
 	}
 
 	// Race the SAE event source against the cross-chain txpool. The winner's
@@ -380,6 +375,21 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 
 	r := <-results
 	return r.msg, r.err
+}
+
+// waitUntil blocks until [VM.now] reaches t, returning early with the
+// cancellation cause if ctx is canceled first.
+func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
+	timeToWait := t.Sub(vm.now())
+	if timeToWait <= 0 {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case <-time.After(timeToWait):
+		return nil
+	}
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

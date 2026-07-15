@@ -167,7 +167,6 @@ go_test(
         "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
-        "//vms/saevm/cchain/txpool",
         "//vms/saevm/cchain/warp",
         "//vms/saevm/cchain/warp/warptest",
         "//vms/saevm/cmputils",

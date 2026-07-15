@@ -59,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -1670,32 +1669,30 @@ func TestWaitForEventThrottle(t *testing.T) {
 		w := newWallet(key, sut.ctx, nil)
 
 		gossipTx := toGossipTx(w.newMinimalTx(t))
-		if err := sut.gossipSet.Add(gossipTx); err != nil {
-			require.ErrorIsf(t, err, txpool.ErrAlreadyKnown, "%T.gossipSet.Add()", sut.VM)
-		}
-		sut.pushGossiper.Add(gossipTx)
+		require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
 
 		// Skip the min-delay pacing so only the throttle can block.
 		clock.Advance(2 * dynamic.InitialDelayExponent.DelayDuration())
 
+		// The throttle clock starts when a call returns, so this first
+		// (immediate) call is what forces the second one to wait.
 		msg, err := sut.WaitForEvent(ctx)
 		require.NoErrorf(t, err, "%T.WaitForEvent() first call", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, msg, "%T.WaitForEvent() first call event", sut.VM)
 
-                start := time.Now()
+		start := time.Now()
 		done := make(chan waitForEventResult, 1)
 		go func() {
 			msg, err := sut.WaitForEvent(ctx)
 			done <- waitForEventResult{msg, err}
 		}()
-		
+
 		// Blocked on the throttle timer until synctest fires it.
 		synctest.Wait()
 		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
 
 		got := <-done
-		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM
-)
+		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM)
 		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
 	})
