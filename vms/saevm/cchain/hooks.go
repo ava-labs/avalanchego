@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -116,6 +117,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
 			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(b.Header()).MinDelayExcess),
 		},
 	}, nil
 }
@@ -140,6 +142,15 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 		return *pe
 	}
 	return dynamic.InitialPriceExponent
+}
+
+// delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
+// [dynamic.InitialDelayExponent] when the header does not carry one.
+func delayExponent(h *types.Header) dynamic.DelayExponent {
+	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
+		return dynamic.DelayExponent(*de)
+	}
+	return dynamic.InitialDelayExponent
 }
 
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
@@ -194,12 +205,17 @@ func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	}
 }
 
+// BlockTime returns the canonical wall-clock time of a block.
+//
+// The whole-second value is authoritative and the millisecond field only
+// refines it below the second, so the two can never disagree on which second a
+// block belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
 func (*hooks) BlockTime(h *types.Header) time.Time {
-	// Anchor the seconds component to h.Time so that the documented invariant
-	// BlockTime(h).Unix() == h.Time holds, taking only the sub-second component
-	// from TimeMilliseconds. This guards against malformed headers where
-	// TimeMilliseconds disagrees with Time (e.g. from a malicious peer), which
-	// would otherwise yield an unexpected block time.
+	return blockTime(h)
+}
+
+func blockTime(h *types.Header) time.Time {
 	ms := customtypes.HeaderTimeMilliseconds(h)
 	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
 	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
@@ -231,6 +247,17 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 	// and this block is the first post-Durango block, we need to activate the
 	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
 	// network, but could happen on a custom network.
+	return nil
+}
+
+// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
+// The C-Chain has historically credited the full fee (base + priority) to the
+// blackhole address, but libevm's state transition only credits the priority
+// fee to the coinbase (the blackhole address) and discards the base fee.
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
+	burned := new(uint256.Int).SetUint64(r.GasUsed)
+	burned.Mul(burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, burned)
 	return nil
 }
 
@@ -271,7 +298,10 @@ type builder struct {
 	desired      desiredParams
 }
 
-var errHeliconUnactivated = errors.New("helicon is not activated")
+var (
+	errHeliconUnactivated = errors.New("helicon is not activated")
+	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+)
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
@@ -281,15 +311,25 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, errHeliconUnactivated
 	}
 
-	// TODO(StephenButtolph): Enforce the minimum block time here.
+	de := delayExponent(parent)
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
+	}
+
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
+	// Move each dynamic parameter toward this node's vote (nil = no move).
+	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -309,8 +349,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess:   new(acp226.DelayExcess),
+			MinDelayExcess:   &minDelayExcess,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},
