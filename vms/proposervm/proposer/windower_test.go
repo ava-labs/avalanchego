@@ -102,7 +102,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 
 	nonValidatorDelay, err := w.Delay(t.Context(), 1, 0, nonValidatorID, MaxVerifyWindows)
 	require.NoError(err)
-	require.Equal(MaxVerifyWindows*DefaultWindowDuration, nonValidatorDelay)
+	require.Equal(MaxVerifyDelay, nonValidatorDelay)
 }
 
 func TestDelayChangeByHeight(t *testing.T) {
@@ -408,28 +408,13 @@ func TestTimeToSlot(t *testing.T) {
 				{timeOffset: 2 * window, expectedSlot: 2},
 				{timeOffset: 10 * window, expectedSlot: 10},
 			}
-			w := New(makeValidatorState(t, nil), subnetID, randomChainID, window, &logging.NoLog{})
 			for _, test := range tests {
 				t.Run(test.timeOffset.String(), func(t *testing.T) {
-					slot := w.TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
+					slot := TimeToSlot(parentTime, parentTime.Add(test.timeOffset), window)
 					require.Equal(t, test.expectedSlot, slot)
 				})
 			}
 		})
-	}
-}
-
-func TestNewWindowDurationFallback(t *testing.T) {
-	require := require.New(t)
-
-	parentTime := time.Now()
-	// The fallback also keeps TimeToSlot's division from panicking on a zero
-	// window.
-	for _, windowDuration := range []time.Duration{0, -time.Second} {
-		w := New(makeValidatorState(t, nil), subnetID, randomChainID, windowDuration, &logging.NoLog{})
-		require.Equal(uint64(0), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration-time.Nanosecond)))
-		require.Equal(uint64(1), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration)))
-		require.Equal(uint64(2), w.TimeToSlot(parentTime, parentTime.Add(2*DefaultWindowDuration)))
 	}
 }
 

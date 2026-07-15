@@ -139,7 +139,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	}
 
 	// set proVM to be able to build unsigned blocks
-	proVM.Set(proVM.Time().Add(proVM.MaxVerifyDelay()))
+	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
 
 	{
 		// child block referring unknown parent does not verify
@@ -443,7 +443,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 
 	{
 		// block can arrive within submission window
-		atSubWindowEnd := proVM.Time().Add(proVM.MaxVerifyDelay())
+		atSubWindowEnd := proVM.Time().Add(proposer.MaxVerifyDelay)
 		proVM.Clock.Set(atSubWindowEnd)
 
 		childSlb, err := block.BuildUnsigned(
@@ -718,7 +718,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	// set VM to be ready to build next block. We set it to generate unsigned blocks
 	// for simplicity.
-	nextTime := parentBlk.Timestamp().Add(proVM.MaxVerifyDelay())
+	nextTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
 	proVM.Set(nextTime)
 
 	parentBlkPChainHeight := postForkOracleBlk.PChainHeight() // option takes proposal blocks' Pchain height

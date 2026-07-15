@@ -72,34 +72,6 @@ func (mr *WindowerMockRecorder) ExpectedProposer(ctx, blockHeight, pChainHeight,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectedProposer", reflect.TypeOf((*Windower)(nil).ExpectedProposer), ctx, blockHeight, pChainHeight, slot)
 }
 
-// MaxBuildDelay mocks base method.
-func (m *Windower) MaxBuildDelay() time.Duration {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MaxBuildDelay")
-	ret0, _ := ret[0].(time.Duration)
-	return ret0
-}
-
-// MaxBuildDelay indicates an expected call of MaxBuildDelay.
-func (mr *WindowerMockRecorder) MaxBuildDelay() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxBuildDelay", reflect.TypeOf((*Windower)(nil).MaxBuildDelay))
-}
-
-// MaxVerifyDelay mocks base method.
-func (m *Windower) MaxVerifyDelay() time.Duration {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MaxVerifyDelay")
-	ret0, _ := ret[0].(time.Duration)
-	return ret0
-}
-
-// MaxVerifyDelay indicates an expected call of MaxVerifyDelay.
-func (mr *WindowerMockRecorder) MaxVerifyDelay() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxVerifyDelay", reflect.TypeOf((*Windower)(nil).MaxVerifyDelay))
-}
-
 // MinDelayForProposer mocks base method.
 func (m *Windower) MinDelayForProposer(ctx context.Context, blockHeight, pChainHeight uint64, nodeID ids.NodeID, startSlot uint64) (time.Duration, error) {
 	m.ctrl.T.Helper()
@@ -128,18 +100,4 @@ func (m *Windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 func (mr *WindowerMockRecorder) Proposers(ctx, blockHeight, pChainHeight, maxWindows any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposers", reflect.TypeOf((*Windower)(nil).Proposers), ctx, blockHeight, pChainHeight, maxWindows)
-}
-
-// TimeToSlot mocks base method.
-func (m *Windower) TimeToSlot(start, now time.Time) uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TimeToSlot", start, now)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// TimeToSlot indicates an expected call of TimeToSlot.
-func (mr *WindowerMockRecorder) TimeToSlot(start, now any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TimeToSlot", reflect.TypeOf((*Windower)(nil).TimeToSlot), start, now)
 }

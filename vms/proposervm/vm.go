@@ -163,7 +163,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.Config.WindowDuration, vm.ctx.Log)
+	if vm.WindowDuration <= 0 {
+		vm.WindowDuration = DefaultWindowDuration
+	}
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.WindowDuration, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -522,10 +525,10 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 			ctx,
 			childBlockHeight,
 			pChainHeight,
-			vm.Windower.TimeToSlot(parentTimestamp, currentTime),
+			proposer.TimeToSlot(parentTimestamp, currentTime, vm.WindowDuration),
 			parentTimestamp,
 		); err == nil {
-			vm.proposerBuildSlotGauge.Set(float64(vm.Windower.TimeToSlot(parentTimestamp, nextStartTime)))
+			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime, vm.WindowDuration)))
 		}
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(

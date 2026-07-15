@@ -23,17 +23,18 @@ import (
 
 // Proposer list constants
 const (
-	// DefaultWindowDuration is the default length of a single proposer slot. See
-	// [New] for the requirement that all validators of a chain agree on it.
+	// DefaultWindowDuration is the proposer slot length for chains that do not
+	// configure one; see subnets.Config.ProposerWindowMilliseconds.
 	DefaultWindowDuration = 5 * time.Second
 
-	// Slot counts, independent of the window duration. The
-	// matching absolute delays depend on the window and are windower methods
-	// (MaxVerifyDelay, MaxBuildDelay).
-	MaxVerifyWindows = 6  // 30s at the default window
-	MaxBuildWindows  = 60 // 5m at the default window
+	MaxVerifyWindows = 6
+	MaxVerifyDelay   = MaxVerifyWindows * DefaultWindowDuration // 30 seconds
 
-	MaxLookAheadSlots = 720 // 1h at the default window
+	MaxBuildWindows = 60
+	MaxBuildDelay   = MaxBuildWindows * DefaultWindowDuration // 5 minutes
+
+	MaxLookAheadSlots  = 720
+	MaxLookAheadWindow = MaxLookAheadSlots * DefaultWindowDuration // 1 hour
 )
 
 var (
@@ -96,19 +97,6 @@ type Windower interface {
 		nodeID ids.NodeID,
 		startSlot uint64,
 	) (time.Duration, error)
-
-	// TimeToSlot returns the slot index that [now] falls in, relative to the
-	// parent block timestamp [start], using this chain's window duration.
-	TimeToSlot(start, now time.Time) uint64
-
-	// MaxVerifyDelay is the maximum age (relative to its parent) a block may
-	// have while still requiring a specific proposer. It equals
-	// [MaxVerifyWindows] times this chain's window duration.
-	MaxVerifyDelay() time.Duration
-
-	// MaxBuildDelay is the delay after which any node may build an unsigned
-	// block. It equals [MaxBuildWindows] times this chain's window duration.
-	MaxBuildDelay() time.Duration
 }
 
 // windower interfaces with P-Chain and it is responsible for calculating the
@@ -121,15 +109,7 @@ type windower struct {
 	logger         logging.Logger
 }
 
-// New returns a Windower whose proposer slots are [windowDuration] apart. A
-// value <= 0 falls back to [DefaultWindowDuration] (5s).
-//
-// Invariant: [windowDuration] must be identical across every validator of the
-// chain; divergent values break proposer selection and chain liveness.
 func New(state validators.State, subnetID, chainID ids.ID, windowDuration time.Duration, logger logging.Logger) Windower {
-	if windowDuration <= 0 {
-		windowDuration = DefaultWindowDuration
-	}
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
 		logger:         logger,
@@ -190,14 +170,6 @@ func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, 
 		delay += w.windowDuration
 	}
 	return delay, nil
-}
-
-func (w *windower) MaxVerifyDelay() time.Duration {
-	return MaxVerifyWindows * w.windowDuration
-}
-
-func (w *windower) MaxBuildDelay() time.Duration {
-	return MaxBuildWindows * w.windowDuration
 }
 
 func (w *windower) ExpectedProposer(
@@ -320,9 +292,9 @@ func (w *windower) expectedProposer(
 	return validators[indices[0]].id, nil
 }
 
-func (w *windower) TimeToSlot(start, now time.Time) uint64 {
+func TimeToSlot(start, now time.Time, windowDuration time.Duration) uint64 {
 	if now.Before(start) {
 		return 0
 	}
-	return uint64(now.Sub(start) / w.windowDuration)
+	return uint64(now.Sub(start) / windowDuration)
 }
