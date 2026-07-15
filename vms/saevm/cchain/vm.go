@@ -330,26 +330,26 @@ const minWaitForEventDelay = 100 * time.Millisecond
 // block has elapsed, then waits for a transaction to be in the txpool or for
 // the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	defer func() {
+		vm.lastWaitForEvent.Set(vm.now())
+	}()
+
 	// Throttle to avoid busy looping: the txpools only clear after block
 	// execution, so pending txs can re-signal while their block is processing.
 	//
 	// TODO(JonathanOppenheimer): The txpool should track preference / reorgs so
 	// we don't need this throttle.
-	{
-		defer func() {
-			vm.lastWaitForEvent.Set(vm.now())
-		}()
+	throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
 
-		throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
-		if err := vm.waitUntil(ctx, throttleUntil); err != nil {
-			return 0, err
-		}
+	// Pace block building on the ACP-226 minimum block delay so that the event
+	// sources are consulted when we are actually willing to build.
+	buildTime := earliestBuildTime(vm.VM.GetPreference())
+
+	until := throttleUntil
+	if buildTime.After(until) {
+		until = buildTime
 	}
-
-	// Pace block building on the ACP-226 minimum block delay before consulting
-	// the event sources so that the mempools are queried when we are actually
-	// willing to build.
-	if err := vm.waitUntil(ctx, earliestBuildTime(vm.VM.GetPreference())); err != nil {
+	if err := vm.waitUntil(ctx, until); err != nil {
 		return 0, err
 	}
 
