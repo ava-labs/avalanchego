@@ -490,9 +490,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-
-	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
-	// state is encoded in other fields.
+	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
+	// entirely during the coreth removal. warpValidityBytes could just be set
+	// directly.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,
