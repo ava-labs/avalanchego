@@ -106,7 +106,7 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 		var addr common.Address
 		binary.BigEndian.PutUint64(addr[:8], height)
 		binary.BigEndian.PutUint64(addr[8:16], i)
-		sdb.SetNonce(addr, height) // MUST be have a non-empty account
+		sdb.SetNonce(addr, height) // MUST have a non-empty account
 		for s := range uint64(slotsPerAccount) {
 			var key, val common.Hash
 			binary.BigEndian.PutUint64(key[:8], s)

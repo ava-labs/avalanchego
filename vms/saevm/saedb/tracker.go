@@ -39,6 +39,15 @@ const (
 	maxCacheMiB = math.MaxInt / mibToBytes
 )
 
+// Used in [Tracker.maybeCap] to determine memory pressure.
+const (
+	defaultMaxCap           = 512 * mibToBytes
+	defaultTargetCommitSize = 20 * mibToBytes
+
+	// defaultTargetCommitSize >= ethdb.IdealBatchSize
+	_ uint = defaultTargetCommitSize - ethdb.IdealBatchSize
+)
+
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
 	TrieCacheMiB     uint64 // size of the TrieDB cache
@@ -80,6 +89,20 @@ func (c Config) snapConfig() *snapshot.Config {
 		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 // checked in [Config.Verify]
 		AsyncBuild: true,
 	}
+}
+
+func (c Config) maxCap() common.StorageSize {
+	if c.maxCapBytes > 0 {
+		return common.StorageSize(c.maxCapBytes)
+	}
+	return common.StorageSize(defaultMaxCap)
+}
+
+func (c Config) targetCommitSize() common.StorageSize {
+	if c.targetCommitBytes > 0 {
+		return common.StorageSize(c.targetCommitBytes)
+	}
+	return common.StorageSize(defaultTargetCommitSize)
 }
 
 var _ StateDBOpener = (*Tracker)(nil)
@@ -177,25 +200,13 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 // maybeCap checks if the in-memory state of a HashDB is too high for an efficient
 // [triedb.Database.Commit] and, if so, moves the oldest state to disk.
 func (t *Tracker) maybeCap(height uint64) error {
-	const (
-		defaultMaxCap           = 512 * mibToBytes
-		defaultTargetCommitSize = 20 * mibToBytes // for [triedb.Database.Commit]
-
-		// defaultTargetCommitSize >= ethdb.IdealBatchSize
-		_ uint = defaultTargetCommitSize - ethdb.IdealBatchSize
+	var (
+		maxCap           = t.config.maxCap()
+		targetCommitSize = t.config.targetCommitSize()
+		commitInterval   = t.config.CommitInterval // for [triedb.Database.Commit]
 	)
 
-	maxCap := common.StorageSize(defaultMaxCap)
-	if t.config.maxCapBytes > 0 {
-		maxCap = common.StorageSize(t.config.maxCapBytes)
-	}
-	targetCommitSize := common.StorageSize(defaultTargetCommitSize)
-	if t.config.targetCommitBytes > 0 {
-		targetCommitSize = common.StorageSize(t.config.targetCommitBytes)
-	}
-
 	// The cap shrinks linearly as we approach the commit interval
-	commitInterval := t.config.CommitInterval
 	distanceFromCommit := commitInterval - height%commitInterval
 	slope := common.StorageSize(maxCap-targetCommitSize) / common.StorageSize(commitInterval)
 	targetCap := common.StorageSize(distanceFromCommit)*slope + targetCommitSize
