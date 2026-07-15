@@ -136,7 +136,7 @@ runs:
       shell: bash
       run: echo "::warning::Monitoring credentials not found. Skipping collector start. Is the PR from a fork branch?"
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v6
+      uses: aws-actions/configure-aws-credentials@f79bc868ee9ca4687c7db10f05fe6a46cdcda892 # v6
       with:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
@@ -182,7 +182,7 @@ runs:
         if-no-files-found: error
     - name: Compare Benchmark Results
       if: inputs.skip-benchmark-comparison != 'true'
-      uses: benchmark-action/github-action-benchmark@v1
+      uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1
       with:
         tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
