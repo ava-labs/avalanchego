@@ -31,6 +31,9 @@ const SafeMaxBytes uint64 = constants.DefaultMaxMessageSize
 //	accept if  y/M <= g/x  <->   y·x <= g·M
 //
 // Equivalently, it must carry at least x/M gas per serialized byte.
+//
+// maxBytes is the gas per byte ratio normalizer, not a block size cap. The
+// builder enforces the actual byte budget separately.
 func Eligible(tx *types.Transaction, blockGasLimit, maxBytes uint64) bool {
 	// Defensive check: if blockGasLimit == 0, all transactions would be
 	// incorrectly eligible
