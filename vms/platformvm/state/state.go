@@ -457,7 +457,7 @@ func New(
 	execCfg *config.Config,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
-	rewards reward.Calculator,
+	rewardConfig reward.Config,
 ) (*State, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
@@ -640,7 +640,7 @@ func New(
 		ctx:        ctx,
 		upgrades:   upgrades,
 		metrics:    metrics,
-		rewards:    rewards,
+		rewards:    reward.NewPrimaryNetworkCalculator(rewardConfig, upgrades),
 		baseDB:     baseDB,
 
 		addedBlockIDs: make(map[uint64]ids.ID),
@@ -1733,6 +1733,7 @@ func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 		}
 
 		potentialReward := s.rewards.Calculate(
+			startTime,
 			stakeDuration,
 			stakeAmount,
 			currentSupply,
