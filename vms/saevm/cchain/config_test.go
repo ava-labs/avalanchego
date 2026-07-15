@@ -70,6 +70,11 @@ func TestParseConfig(t *testing.T) {
 			json: `{"gas-target":1000}`,
 			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
 		},
+		{
+			name: "block_building/min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
+		},
 
 		// State & trie
 		{
@@ -143,11 +148,6 @@ func TestParseConfig(t *testing.T) {
 		},
 
 		// Warp
-		{
-			name: "min_delay_target",
-			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
-		},
 		{
 			name: "warp/off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
