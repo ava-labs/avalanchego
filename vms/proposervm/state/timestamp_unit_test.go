@@ -22,19 +22,15 @@ func TestVerifyTimestampUnit(t *testing.T) {
 	require.NoError(New(vdb, true).VerifyTimestampUnit(true))
 	require.NoError(New(vdb, true).VerifyTimestampUnit(true))
 
-	// A restart without the subnet config flips the unit; it must fail loud
-	// instead of silently misparsing every stored block.
+	// A restart with the unit flipped (e.g. a lost subnet config) must fail
+	// loud instead of silently misparsing every stored block, in both
+	// directions.
 	err := New(vdb, false).VerifyTimestampUnit(false)
 	require.ErrorIs(err, errTimestampUnitMismatch)
-}
 
-func TestVerifyTimestampUnitSecondsThenMillis(t *testing.T) {
-	require := require.New(t)
-
-	vdb := versiondb.New(memdb.New())
+	vdb = versiondb.New(memdb.New())
 	require.NoError(New(vdb, false).VerifyTimestampUnit(false))
-
-	err := New(vdb, true).VerifyTimestampUnit(true)
+	err = New(vdb, true).VerifyTimestampUnit(true)
 	require.ErrorIs(err, errTimestampUnitMismatch)
 }
 

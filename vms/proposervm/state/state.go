@@ -6,7 +6,6 @@ package state
 import (
 	"bytes"
 	"errors"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -71,17 +70,9 @@ func (s *state) VerifyTimestampUnit(millisecondTimestamps bool) error {
 	case err != nil:
 		return err
 	case !bytes.Equal(stored, unit):
-		return fmt.Errorf("%w: database has %s, config requests %s",
-			errTimestampUnitMismatch, timestampUnitName(stored), timestampUnitName(unit))
+		return errTimestampUnitMismatch
 	}
 	return nil
-}
-
-func timestampUnitName(unit []byte) string {
-	if bytes.Equal(unit, []byte{1}) {
-		return "milliseconds"
-	}
-	return "seconds"
 }
 
 func New(db *versiondb.Database, millisecondTimestamps bool) State {

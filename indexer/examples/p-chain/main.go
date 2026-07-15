@@ -34,8 +34,7 @@ func main() {
 		}
 
 		platformvmBlockBytes := container.Bytes
-		// false: the primary network always uses second-granular timestamps. A
-		// Subnet chain must pass its configured proposerMillisecondTimestamps.
+		// false: the primary network always uses second-granular timestamps.
 		proposerVMBlock, err := proposervmblock.Parse(container.Bytes, constants.PlatformChainID, false)
 		if err == nil {
 			platformvmBlockBytes = proposerVMBlock.Block()

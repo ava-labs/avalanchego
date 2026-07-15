@@ -78,9 +78,7 @@ window speeds failover recovery at the cost of more rejected blocks. A value of
 `1000` (1s) is enough to make validator restarts and maintenance largely
 invisible and needs no other settings. Going below 1s only helps if the Subnet
 also sets
-[`proposerMillisecondTimestamps`](#proposermillisecondtimestamps-bool): with the
-default whole-second timestamps the slot clock only ticks once per second, so a
-sub-second window stays quantized to ~1s and gains nothing.
+[`proposerMillisecondTimestamps`](#proposermillisecondtimestamps-bool).
 
 :::caution
 
@@ -104,13 +102,9 @@ block timestamp. With the default whole-second timestamps the clock can only
 advance in whole-second steps, so proposer rotation (and therefore how fast the
 chain recovers when a scheduled proposer is offline) is quantized to ~1s no
 matter how short the proposer window is. Setting this to `true` makes the
-timestamp millisecond-granular so that a sub-second proposer window can actually
+timestamp millisecond-granular so that a sub-second
+[`proposerWindowMilliseconds`](#proposerwindowmilliseconds-uint) can actually
 advance.
-
-Use it together with a sub-second [`proposerWindowMilliseconds`](#proposerwindowmilliseconds-uint):
-neither has much effect without the other. A sub-second window is still quantized
-to ~1s while timestamps are whole-second, and millisecond timestamps do nothing
-while the window stays at its 5s default.
 
 ```json
 { "proposerMillisecondTimestamps": true }

@@ -16,10 +16,8 @@ import (
 const (
 	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
 	// "use the default". The floor is 50ms: roughly the smallest window in which
-	// a proposer can build and propagate a block before its slot closes. A
-	// sub-second window only actually advances the slot clock when the chain also
-	// sets ProposerMillisecondTimestamps; without it, whole-second timestamps
-	// quantize the slot clock to ~1s and a sub-second window gains nothing. The
+	// a proposer can build and propagate a block before its slot closes. Windows
+	// below 1s also require ProposerMillisecondTimestamps to have any effect. The
 	// ceiling is the default window, since a larger window only slows failover.
 	MinProposerWindowMilliseconds = 50
 	MaxProposerWindowMilliseconds = 5_000
@@ -80,10 +78,8 @@ type Config struct {
 
 	// ProposerMillisecondTimestamps interprets the proposerVM wrapper block's
 	// timestamp as unix-milliseconds instead of unix-seconds, so that a
-	// sub-second ProposerWindowMilliseconds can actually advance (with
-	// whole-second timestamps the slot clock only ticks once per second, so a
-	// sub-second window gains nothing). It is opt-in and only meaningful
-	// alongside a sub-second proposer window.
+	// sub-second ProposerWindowMilliseconds can actually advance the slot clock.
+	// Only meaningful alongside a sub-second proposer window.
 	//
 	// Invariant: this is a Subnet-wide consensus parameter, not a per-node knob.
 	// Every validator of the Subnet's chains must use the same value, and it must

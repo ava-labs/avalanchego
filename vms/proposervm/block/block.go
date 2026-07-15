@@ -34,10 +34,8 @@ type Block interface {
 }
 
 // timestampToUnix encodes the block's int64 Timestamp field: historically
-// whole unix-seconds, unix-millis when the chain is configured for millisecond
-// timestamps. A bare int64 cannot describe its own unit, so the caller supplies
-// the chain's fixed-from-genesis setting; see
-// subnets.Config.ProposerMillisecondTimestamps.
+// whole unix-seconds, unix-millis when the chain is configured for
+// millisecond timestamps; see subnets.Config.ProposerMillisecondTimestamps.
 func timestampToUnix(t time.Time, millisecondTimestamps bool) int64 {
 	if millisecondTimestamps {
 		return t.UnixMilli()
