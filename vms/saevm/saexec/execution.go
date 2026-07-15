@@ -187,7 +187,7 @@ func Execute(
 	}
 
 	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
+	if err := hooks.BeforeExecutingBlock(stateDB, parent.Header(), header); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
 
