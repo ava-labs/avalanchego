@@ -304,7 +304,7 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(b.saturatedBaseFee())
+	e.baseFee.SetUint64(b.headerBaseFee())
 	return e, nil
 }
 
@@ -316,15 +316,15 @@ func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
 	return gastime.New(
 		hooks.BlockTime(hdr),
 		target,
-		gas.Price(b.saturatedBaseFee()),
+		gas.Price(b.headerBaseFee()),
 		cfg,
 	)
 }
 
-// saturatedBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee MUST be capped at [math.MaxUint64] to provide the
-// correct type to [gastime.New].
-func (b *Block) saturatedBaseFee() uint64 {
+// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
+// header). The base fee is capped at [math.MaxUint64] but any reasonable
+// implementation has a base fee much less than [math.MaxUint64].
+func (b *Block) headerBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
 		return 0
