@@ -202,8 +202,8 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 func (t *Tracker) maybeCap(height uint64) error {
 	var (
 		maxCap           = t.config.maxCap()
-		targetCommitSize = t.config.targetCommitSize()
-		commitInterval   = t.config.CommitInterval // for [triedb.Database.Commit]
+		targetCommitSize = t.config.targetCommitSize() // for [triedb.Database.Commit]
+		commitInterval   = t.config.CommitInterval
 	)
 
 	// The cap shrinks linearly as we approach the commit interval

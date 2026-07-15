@@ -173,8 +173,8 @@ func TestTrackerMaybeCap(t *testing.T) {
 	// Each run will generate the same state, so this is deterministic
 	require.Greater(t, capsFired, 5, "test did not generate enough state to exercise capping")
 
-	//
 	root := writeBlock(t, tr, prevRoot, commitInterval)
+	prevRoot = root // for cleanup
 	before := inMemorySize()
 	require.NoErrorf(t, tr.MaybeCommit(root, root, commitInterval), "%T.MaybeCommit() at height %d", tr, commitInterval)
 	require.Less(t, inMemorySize(), before, "in-memory size did not drop after commit at the interval")
@@ -192,7 +192,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 		maxCapBytes       = 8 * mibToBytes
 		targetCommitBytes = 512 * 1024
 
-		// MUST be > [ethdb.IdealBatchSize] so that [Tracker.maybeCap] never
+		// MUST be >= [ethdb.IdealBatchSize] so that [Tracker.maybeCap] never
 		// calls Cap with a negative limit.
 		_ uint = targetCommitBytes - ethdb.IdealBatchSize
 	)
