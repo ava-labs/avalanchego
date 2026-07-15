@@ -334,6 +334,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 			vm.lastWaitForEvent.Set(time.Now())
 		}()
 
+		// 100ms isn't special here, it was selected as a reasonable frequency
+		// for the engine to poll on whether to build a block or not.
 		const minimumDelay = 100 * time.Millisecond
 		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
 		timeToWait := minimumDelay - sinceLastCall
