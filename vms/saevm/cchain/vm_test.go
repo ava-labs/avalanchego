@@ -1584,7 +1584,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
-// waitForEventResult carries a [VM.WaitForEvent] return out of a goroutine.
+// waitForEventResult carries a [VM.WaitForEvent] output.
 type waitForEventResult struct {
 	msg snowcommon.Message
 	err error
