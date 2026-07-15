@@ -592,6 +592,20 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"proposer millisecond timestamps": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"proposerMillisecondTimestamps": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ProposerMillisecondTimestamps)
+			},
+			expectedErr: nil,
+		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -762,12 +776,15 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	}
 }
 
-// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
-// proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
-func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
+// TestPrimaryNetworkProposerConfigIsAlwaysDefault guards that the per-Subnet
+// proposerWindowMilliseconds and proposerMillisecondTimestamps settings can
+// never alter the primary network (P/C/X).
+func TestPrimaryNetworkProposerConfigIsAlwaysDefault(t *testing.T) {
 	t.Run("config is built from constants and never reads user input", func(t *testing.T) {
 		defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
-		require.Equal(t, defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+		primaryCfg := getPrimaryNetworkConfig(setupViperFlags())
+		require.Equal(t, defaultWindowMS, primaryCfg.ProposerWindowMilliseconds)
+		require.False(t, primaryCfg.ProposerMillisecondTimestamps)
 	})
 
 	t.Run("tracking the primary network is rejected", func(t *testing.T) {
