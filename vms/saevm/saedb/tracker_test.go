@@ -94,7 +94,7 @@ func TestProtectTrieIndex(t *testing.T) {
 		{
 			name:    "pruning_after_archival",
 			runs:    []Config{{Archival: true}, {}},
-			wantErr: ErrRefuseToCorruptArchiver,
+			wantErr: errRefuseToCorruptArchiver,
 		},
 		{
 			name: "pruning_after_archival_allowed",
@@ -103,7 +103,7 @@ func TestProtectTrieIndex(t *testing.T) {
 		{
 			name:    "archival_history_outlives_allowed_pruning_run",
 			runs:    []Config{{Archival: true}, {AllowMissingTries: true}, {}},
-			wantErr: ErrRefuseToCorruptArchiver,
+			wantErr: errRefuseToCorruptArchiver,
 		},
 	}
 	for _, tt := range tests {

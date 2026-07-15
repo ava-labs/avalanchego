@@ -106,7 +106,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 		return nil, err
 	}
 	if err := protectTrieIndex(db, c); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("checking for missing tries: %w", err)
 	}
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
 	var snaps *snapshot.Tree
@@ -222,7 +222,7 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 	return errors.Join(errs...)
 }
 
-var ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
+var errRefuseToCorruptArchiver = errors.New(`node is switching from non-pruning to pruning; if this is intentional, set "allow-missing-tries" via config, otherwise disable pruning`)
 
 func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
 	if c.Archival {
@@ -230,13 +230,13 @@ func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
 	}
 	pruningDisabled, err := customrawdb.HasPruningDisabled(db)
 	if err != nil {
-		return fmt.Errorf("failed to check if the chain has been run with pruning disabled: %w", err)
+		return err
 	}
 	if !pruningDisabled {
 		return nil
 	}
 	if !c.AllowMissingTries {
-		return fmt.Errorf("%w (set allow-missing-tries=true to proceed)", ErrRefuseToCorruptArchiver)
+		return errRefuseToCorruptArchiver
 	}
 	return nil
 }

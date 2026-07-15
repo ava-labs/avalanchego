@@ -78,9 +78,26 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.Pruning = false }),
 		},
 		{
-			name: "state/commit_interval",
-			json: `{"commit-interval":128}`,
-			want: with(func(c *config) { c.CommitInterval = 128 }),
+			name:      "state/commit_interval",
+			json:      `{"commit-interval":256}`,
+			networkID: constants.UnitTestID,
+			want:      with(func(c *config) { c.CommitInterval = 256 }),
+		},
+		{
+			name:      "state/commit_interval_production_network",
+			json:      `{"commit-interval":256}`,
+			networkID: constants.MainnetID,
+			wantErr:   testerr.Is(errProductionCommitInterval),
+		},
+		{
+			name: "state/trie_clean_cache",
+			json: `{"trie-clean-cache":256}`,
+			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+		},
+		{
+			name: "state/snapshot_cache",
+			json: `{"snapshot-cache":128}`,
+			want: with(func(c *config) { c.SnapshotCache = 128 }),
 		},
 		{
 			name: "state/allow_missing_tries",
@@ -141,44 +158,22 @@ func TestParseConfig(t *testing.T) {
 
 		// All active fields
 		{
-			name:      "commit_interval_production_network",
-			json:      `{"commit-interval":256}`,
-			networkID: constants.MainnetID,
-			wantErr:   testerr.Is(errProductionCommitInterval),
-		},
-		{
-			name:      "commit_interval_non_production_network",
-			json:      `{"commit-interval":256}`,
-			networkID: constants.UnitTestID,
-			want:      with(func(c *config) { c.CommitInterval = 256 }),
-		},
-		{
-			name: "trie_clean_cache",
-			json: `{"trie-clean-cache":256}`,
-			want: with(func(c *config) { c.TrieCleanCache = 256 }),
-		},
-		{
-			name: "snapshot_cache",
-			json: `{"snapshot-cache":128}`,
-			want: with(func(c *config) { c.SnapshotCache = 128 }),
-		},
-		{
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
 				"min-delay-target":3000,
 				"pruning-enabled":false,
+				"commit-interval":256,
+				"trie-clean-cache":256,
+				"snapshot-cache":128,
 				"allow-missing-tries":true,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
-				"warp-off-chain-messages":["0x1234"],
-				"trie-clean-cache":256,
-				"snapshot-cache":128,
-				"commit-interval":256
+				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
@@ -186,6 +181,8 @@ func TestParseConfig(t *testing.T) {
 				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
 				CommitInterval:       256,
+				TrieCleanCache:       256,
+				SnapshotCache:        128,
 				AllowMissingTries:    true,
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
@@ -193,8 +190,6 @@ func TestParseConfig(t *testing.T) {
 				AllowUnprotectedTxs:  true,
 				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
-				TrieCleanCache:       256,
-				SnapshotCache:        128,
 			},
 		},
 	}
