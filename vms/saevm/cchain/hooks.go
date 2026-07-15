@@ -245,9 +245,9 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (h *hooks) BeforeExecutingBlock(statedb *state.StateDB, parent, header *types.Header) error {
+func (h *hooks) BeforeExecutingBlock(statedb *state.StateDB, parent *types.Header, block *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := config.IsDurango(header.Time) && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	if isFirstDurangoBlock := config.IsDurango(block.Time()) && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
