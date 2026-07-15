@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -125,7 +127,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
+	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(num))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -190,4 +193,55 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, err
 	}
 	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
+}
+
+var _ tracers.ExtraExecutor = (*tracerBackend)(nil)
+
+// tracerBackend provides optional hooks for the tracers API to perform state
+// changes provided by the hooks.
+type tracerBackend struct {
+	*backend
+}
+
+// BeforeExecutingBlock mirrors the pre-transaction state changes performed by
+// [saexec.Execute].
+func (b *tracerBackend) BeforeExecutingBlock(sdb *state.StateDB, parent, header *types.Header) error {
+	if err := b.Hooks().BeforeExecutingBlock(sdb, parent, header); err != nil {
+		return fmt.Errorf("before-block hook: %v", err)
+	}
+	core.SetBeaconBlockRoot(sdb, header)
+	return nil
+}
+
+// AfterExecutingTransaction mirrors the post-transaction state changes performed by
+// [saexec.Execute].
+func (b *tracerBackend) AfterExecutingTransaction(sdb *state.StateDB, bf *big.Int, gasUsed uint64) error {
+	bf256, _ := uint256.FromBig(bf)
+	r := &types.Receipt{
+		GasUsed: gasUsed,
+	}
+	return b.Hooks().AfterExecutingTransaction(sdb, *bf256, r)
+}
+
+// BlockByHash is the same as [backend.BlockByHash] but returns a faked header
+// with post-execution results.
+func (b *tracerBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	return b.getBlockModified(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
+}
+
+// BlockByNumber is the same as [backend.BlockByNumber] but returns a faked
+// header with post-execution results.
+func (b *tracerBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
+	return b.getBlockModified(rpc.BlockNumberOrHashWithNumber(n))
+}
+
+func (b *tracerBackend) getBlockModified(nOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
+	bl, err := b.restoreBlock(nOrHash)
+	if err != nil {
+		return nil, err
+	}
+	hdr := bl.Header()
+	hdr.Root = bl.PostExecutionStateRoot()
+	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
+	return bl.EthBlock().WithSeal(hdr), nil
 }
