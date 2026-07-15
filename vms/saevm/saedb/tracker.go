@@ -56,8 +56,8 @@ type Config struct {
 	CommitInterval   uint64 // MUST be set to a non-zero value
 
 	// only configurable for tests
-	maxCapBytes       uint64
-	targetCommitBytes uint64
+	maxCapBytes       common.StorageSize
+	targetCommitBytes common.StorageSize
 }
 
 func (c Config) Verify() error {
@@ -93,16 +93,16 @@ func (c Config) snapConfig() *snapshot.Config {
 
 func (c Config) maxCap() common.StorageSize {
 	if c.maxCapBytes > 0 {
-		return common.StorageSize(c.maxCapBytes)
+		return c.maxCapBytes
 	}
-	return common.StorageSize(defaultMaxCap)
+	return defaultMaxCap
 }
 
 func (c Config) targetCommitSize() common.StorageSize {
 	if c.targetCommitBytes > 0 {
-		return common.StorageSize(c.targetCommitBytes)
+		return c.targetCommitBytes
 	}
-	return common.StorageSize(defaultTargetCommitSize)
+	return defaultTargetCommitSize
 }
 
 var _ StateDBOpener = (*Tracker)(nil)
@@ -208,7 +208,7 @@ func (t *Tracker) maybeCap(height uint64) error {
 
 	// The cap shrinks linearly as we approach the commit interval
 	distanceFromCommit := commitInterval - height%commitInterval
-	slope := common.StorageSize(maxCap-targetCommitSize) / common.StorageSize(commitInterval)
+	slope := (maxCap - targetCommitSize) / common.StorageSize(commitInterval)
 	targetCap := common.StorageSize(distanceFromCommit)*slope + targetCommitSize
 
 	tdb := t.cache.TrieDB()

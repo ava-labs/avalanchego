@@ -99,15 +99,15 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 	require.NoErrorf(tb, err, "%T.StateDB(%#x)", tr, prevRoot)
 
 	const (
-		accountsPerBlock = 64
-		slotsPerAccount  = 16
+		accountsPerBlock uint64 = 64
+		slotsPerAccount  uint64 = 16
 	)
-	for i := uint64(0); i < accountsPerBlock; i++ {
+	for i := range accountsPerBlock {
 		var addr common.Address
 		binary.BigEndian.PutUint64(addr[:8], height)
 		binary.BigEndian.PutUint64(addr[8:16], i)
 		sdb.SetNonce(addr, height) // MUST have a non-empty account
-		for s := range uint64(slotsPerAccount) {
+		for s := range slotsPerAccount {
 			var key, val common.Hash
 			binary.BigEndian.PutUint64(key[:8], s)
 			binary.BigEndian.PutUint64(val[:8], height)
@@ -187,6 +187,9 @@ func TestTrackerMaybeCap(t *testing.T) {
 //   - capped: [Tracker.maybeCap] flushes state throughout the interval.
 //   - uncapped: the cap never fires, so all dirty state accumulates until
 //     the single trie commit at the interval boundary.
+//
+// The goal is to minimize the `max-pause-ms` metric, which is the maximum time
+// spent in a single block.
 func BenchmarkTrackerCommitInterval(b *testing.B) {
 	const (
 		maxCapBytes       = 8 * mibToBytes
@@ -199,7 +202,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 
 	modes := []struct {
 		name        string
-		maxCapBytes uint64
+		maxCapBytes common.StorageSize
 	}{
 		{name: "capped", maxCapBytes: maxCapBytes},
 		// Large enough that the target cap always exceeds the dirty size.
