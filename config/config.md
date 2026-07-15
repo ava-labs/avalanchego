@@ -110,7 +110,7 @@ Configuration for node bootstrapping process.
 | `--bootstrap-max-time-get-ancestors` | `AVAGO_BOOTSTRAP_MAX_TIME_GET_ANCESTORS` | duration | `50ms` | Max Time to spend fetching a container and its ancestors when responding to a GetAncestors message. |
 | `--bootstrap-retry-enabled` | `AVAGO_BOOTSTRAP_RETRY_ENABLED` | bool | `true` | If set to `false`, will not retry bootstrapping if it fails. |
 | `--bootstrap-retry-warn-frequency` | `AVAGO_BOOTSTRAP_RETRY_WARN_FREQUENCY` | uint | `50` | Specifies how many times bootstrap should be retried before warning the operator. |
-| `--p-chain-follow-only` | `AVAGO_P_CHAIN_FOLLOW_ONLY` | bool | `false` | If set to `true`, the P-Chain does not join consensus; it follows the tip read-only, re-syncing from the peers listed in `--bootstrap-ids`. Lets an isolated node track the P-Chain through a single trusted peer/gateway. Only affects the P-Chain. |
+| `--p-chain-follow-only` | `AVAGO_P_CHAIN_FOLLOW_ONLY` | bool | `false` | If set to `true`, the P-chain follows the tip read-only without joining consensus, re-syncing from the peers listed in `--bootstrap-ids`. The node will always report the P-chain as not bootstrapped. |
 
 ### Chain Configuration
 

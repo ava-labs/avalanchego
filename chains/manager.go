@@ -205,6 +205,7 @@ type ManagerConfig struct {
 	NodeID                    ids.NodeID                 // The ID of this node
 	NetworkID                 uint32                     // ID of the network this node is connected to
 	PartialSyncPrimaryNetwork bool
+	PChainFollowOnly          bool
 	Server                    server.Server // Handles HTTP API calls
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
@@ -245,10 +246,6 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
-
-	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
-	// joining consensus.
-	PChainFollowOnly bool
 }
 
 type manager struct {

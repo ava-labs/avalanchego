@@ -72,8 +72,11 @@ type IPConfig struct {
 
 type StakingConfig struct {
 	genesis.StakingConfig
-	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
-	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
+	SybilProtectionEnabled    bool `json:"sybilProtectionEnabled"`
+	PartialSyncPrimaryNetwork bool `json:"partialSyncPrimaryNetwork"`
+	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
+	// joining consensus.
+	PChainFollowOnly              bool            `json:"pChainFollowOnly"`
 	StakingTLSCert                tls.Certificate `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
@@ -176,11 +179,6 @@ type Config struct {
 	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
-
-	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
-	// joining consensus. Used for an isolated node that tracks the P-chain
-	// through a single trusted peer/gateway listed in Bootstrappers.
-	PChainFollowOnly bool `json:"pChainFollowOnly"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block on the P-chain and the X-chain. All other

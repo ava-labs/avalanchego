@@ -776,6 +776,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
 		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		PartialSyncPrimaryNetwork:     v.GetBool(PartialSyncPrimaryNetworkKey),
+		PChainFollowOnly:              v.GetBool(PChainFollowOnlyKey),
 		StakingTLSKeyPath:             getExpandedArg(v, StakingTLSKeyPathKey),
 		StakingTLSCertPath:            getExpandedArg(v, StakingCertPathKey),
 	}
@@ -1398,8 +1399,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
-
-	nodeConfig.PChainFollowOnly = v.GetBool(PChainFollowOnlyKey)
 
 	// HTTP APIs
 	nodeConfig.HTTPConfig, err = getHTTPConfig(v)

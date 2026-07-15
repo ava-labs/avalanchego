@@ -24,7 +24,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 ### Config
 
 - Added:
-  - `--p-chain-follow-only`: makes the P-chain follow the tip read-only without joining consensus, re-syncing from the peers listed in `--bootstrap-ids`. Lets an isolated/air-gapped node track the P-chain through a single trusted peer/gateway. Composes with `--partial-sync-primary-network`.
+  - `--p-chain-follow-only`
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
