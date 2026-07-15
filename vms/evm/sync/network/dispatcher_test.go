@@ -104,17 +104,19 @@ func TestDispatcher_Send(t *testing.T) {
 }
 
 // Cancel mid-flight (parked in SendTo's select) returns context.Canceled
-// and de-scores the peer. Pre-send cancel is a row in TestDispatcher_Send.
+// and de-scores the peer. The handler cancels its own context so the
+// cancellation is guaranteed to land while the request is in flight.
+// Pre-send cancel is a row in TestDispatcher_Send.
 func TestDispatcher_CancelInFlight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
-	reqCtx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
-	entered := make(chan struct{})
 	release := make(chan struct{})
-	defer close(release)
+	defer close(release) // avoid leaking the handler goroutine
 	handler := p2p.TestHandler{
 		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-			close(entered)
+			cancel()
 			<-release
 			return nil, nil
 		},
@@ -126,16 +128,8 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		t, t.Context(), nodeID, handler, tracker,
 	)
 
-	errCh := make(chan error, 1)
-	go func() {
-		_, err := c.SendTo(reqCtx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-		errCh <- err
-	}()
-
-	<-entered
-	cancel()
-
-	require.ErrorIsf(t, <-errCh, context.Canceled, "%T.SendTo()", c)
+	_, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	require.ErrorIsf(t, err, context.Canceled, "%T.SendTo()", c)
 	assert.Equal(t, 0.0, responsivePeers(t, reg), "responsivePeers()")
 }
 
