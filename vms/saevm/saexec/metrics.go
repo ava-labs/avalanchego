@@ -6,7 +6,6 @@ package saexec
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -14,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -141,7 +139,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 
 	// Seed the gauges from the last-executed block so startup and steady state
 	// report the same signals.
-	worstCase, err := m.worstCaseGasTime(lastExecuted.Header())
+	worstCase, err := lastExecuted.WorstCaseGasTime(m.hooks)
 	if err != nil {
 		return nil, fmt.Errorf("deriving worst-case gas time of block %d: %w", lastExecuted.Height(), err)
 	}
@@ -184,7 +182,7 @@ func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.executionQueueGasLimit.Add(gasLimit)
 	m.acceptedGasLimit.Add(gasLimit)
 
-	worstCase, err := m.worstCaseGasTime(block.Header())
+	worstCase, err := block.WorstCaseGasTime(m.hooks)
 	if err != nil {
 		m.log.Warn(
 			"Failed to derive worst-case gas time for metrics",
@@ -196,27 +194,8 @@ func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.setWorstCasePricing(worstCase)
 }
 
-// worstCaseGasTime reconstructs the worst-case gas time that the block with
-// the given header committed to, from its base fee and gas config.
-func (m *metrics) worstCaseGasTime(hdr *types.Header) (*gastime.Time, error) {
-	// The base fee MAY be nil (a pre-SAE header) and must be capped at
-	// [math.MaxUint64] to provide the correct type to [gastime.New].
-	var baseFee uint64
-	switch bf := hdr.BaseFee; {
-	case bf == nil:
-		baseFee = 0
-	case bf.IsUint64():
-		baseFee = bf.Uint64()
-	default:
-		baseFee = math.MaxUint64
-	}
-
-	target, cfg := m.hooks.GasConfigAfter(hdr)
-	return gastime.New(m.hooks.BlockTime(hdr), target, gas.Price(baseFee), cfg)
-}
-
 // setWorstCasePricing records the worst-case pricing admitted by consensus
-// for the most recently enqueued block: base fee, gas excess, and gas target.
+// for the most recently enqueued block.
 func (m *metrics) setWorstCasePricing(worstCase *gastime.Time) {
 	m.worstCaseBaseFee.Set(float64(worstCase.Price()))
 	m.worstCaseGasExcess.Set(float64(worstCase.Excess()))
@@ -224,8 +203,7 @@ func (m *metrics) setWorstCasePricing(worstCase *gastime.Time) {
 }
 
 // markExecuted records that the block has finished executing with the given
-// results. It advances the last-executed height and gas-time gauges, removes
-// the block from the queue gauges, and adds to the cumulative executed totals.
+// results.
 func (m *metrics) markExecuted(b *types.Block, results *ExecutionResults) {
 	gasLimit := float64(b.GasLimit())
 	m.lastExecutedHeight.Set(float64(b.NumberU64()))
