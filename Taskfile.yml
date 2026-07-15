@@ -2,10 +2,7 @@
 # To run on a system without task installed, `./scripts/run_task.sh` will
 # prefer a task binary in the PATH and otherwise run task with `go tool`.
 # If in the nix dev shell, repo tasks use the pinned toolchain.
-
-# - Tasks should be simple entrypoints to functionality exposed by scripts or code.
-# - Avoid the temptation to use task vars to define an API surface. Prefer configuring the
-#   underlying script or code via CLI args and/or env vars.
+# General guidance for maintaining tasks is documented in docs/tasks.md.
 
 version: '3'
 
@@ -473,6 +470,24 @@ tasks:
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
+  test-e2e-ci-schedule-latest:
+    desc: Runs e2e tests [serially with race detection enabled] and schedules latest activation after 4 minutes
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: build-race
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m'
+
+  test-e2e-ci-post-latest:
+    desc: Runs e2e tests [serially with race detection enabled] and posts latest activation immediately
+    env:
+      E2E_SERIAL: 1
+    cmds:
+      - task: build-race
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
+
   test-e2e-existing-ci:
     desc: Runs e2e tests with an existing network [serially with race detection enabled]
     env:
@@ -519,6 +534,20 @@ tasks:
       - task: build
       - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}'
 
+  test-load-ci:
+    desc: Runs load tests with the standard CI timeout
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: build
+      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego --load-timeout=30s'
+
+  test-load-firewood-ci:
+    desc: Runs firewood load tests with the scheduled CI timeout
+    cmds:
+      - task: generate-load-contract-bindings
+      - task: build
+      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego --load-timeout=30m --firewood'
+
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
@@ -535,6 +564,12 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}'
+
+  test-load-kube-kind-ci:
+    desc: Runs load tests against a kind cluster with the standard CI timeout
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.load.kube.kind.sh --load-timeout=30s'
 
   test-robustness:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.

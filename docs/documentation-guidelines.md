@@ -336,6 +336,11 @@ Use the earlier framework for the detailed questions each section may want to
 answer. This is a recommendation, not a rigid template. The important thing is
 to make it easy for a reader to find the right level of detail.
 
+Include a table of contents in every dedicated document. Even when a document is
+still fairly short, a TOC makes the structure visible up front, helps readers
+jump to the part they need, and makes it easier to notice when the document's
+shape has drifted.
+
 A trailing **References** section pointing to the relevant code, tests, and
 related docs is often useful. It makes the links between the document and the
 code explicit, supports the discoverability conventions above, and helps
