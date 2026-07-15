@@ -412,14 +412,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+				RewardConfig: reward.Config{
+					MaxConsumptionRate: .12 * reward.PercentDenominator,
+					MinConsumptionRate: .1 * reward.PercentDenominator,
+					MintingPeriod:      365 * 24 * time.Hour,
+					SupplyCap:          720 * units.MegaAvax,
+				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 			},
-			Rewards: reward.NewCalculator(reward.Config{
-				MaxConsumptionRate: .12 * reward.PercentDenominator,
-				MinConsumptionRate: .1 * reward.PercentDenominator,
-				MintingPeriod:      365 * 24 * time.Hour,
-				SupplyCap:          720 * units.MegaAvax,
-			}),
 		},
 		s,
 		startTime,
@@ -485,28 +485,29 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	rewards := reward.NewCalculator(reward.Config{
+	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .1 * reward.PercentDenominator,
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
-	})
+	}
+	rewards := reward.NewCalculator(rewardConfig)
 
 	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
 	duration := endTime.Sub(startTime)
-	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
-	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
+	wantDelegatorReward := rewards.Calculate(startTime, duration, delegatorWeight, initialSupply)
+	wantValidatorReward := rewards.Calculate(startTime, duration, validatorWeight, initialSupply+wantDelegatorReward)
 
 	_, err = AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				RewardConfig:       rewardConfig,
 				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
 			},
-			Rewards: rewards,
 		},
 		s,
 		startTime,
@@ -526,4 +527,54 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	gotSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
+}
+
+func TestGetRewardsCalculatorTransformedSubnetConfig(t *testing.T) {
+	const heliconRampDuration = 90 * 24 * time.Hour
+	heliconTime := time.Unix(1_000_000, 0)
+	postRampStartTime := heliconTime.Add(heliconRampDuration + time.Second)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+
+	primaryConfig := genesis.MainnetParams.StakingConfig.RewardConfig
+	transformConfig := primaryConfig
+	// Set MinConsumptionRate above the ACP-285 target so primary network
+	// reward upgrades would alter the reward if applied.
+	transformConfig.MinConsumptionRate = 90_000
+
+	transformedSubnet := ids.GenerateTestID()
+	transformedState := statetest.New(t, statetest.Config{})
+	transformedState.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
+		Subnet:             transformedSubnet,
+		MaxConsumptionRate: transformConfig.MaxConsumptionRate,
+		MinConsumptionRate: transformConfig.MinConsumptionRate,
+		MaximumSupply:      transformConfig.SupplyCap,
+	}})
+
+	rewards, err := GetRewardsCalculator(
+		primaryConfig,
+		upgradeConfig,
+		transformedState,
+		transformedSubnet,
+	)
+	require.NoError(t, err)
+
+	const (
+		stakeDuration = 14 * 24 * time.Hour
+		stakedAmount  = units.MegaAvax
+		currentSupply = 5 * units.MegaAvax
+	)
+	want := reward.NewCalculator(transformConfig).Calculate(
+		postRampStartTime,
+		stakeDuration,
+		stakedAmount,
+		currentSupply,
+	)
+
+	got := rewards.Calculate(
+		postRampStartTime,
+		stakeDuration,
+		stakedAmount,
+		currentSupply,
+	)
+	require.Equal(t, want, got)
 }
