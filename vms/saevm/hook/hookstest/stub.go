@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -241,7 +242,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 }
 
 // BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(*state.StateDB, *types.Header, *types.Block) error {
+func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Header, *types.Block) error {
 	return nil
 }
 

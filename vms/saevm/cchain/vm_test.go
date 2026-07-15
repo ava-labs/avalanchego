@@ -192,21 +192,12 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// withHeliconTime schedules the Helicon activation at t rather than at
-// genesis, leaving the rest of the upgrade schedule unchanged.
-func withHeliconTime(t time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrades.HeliconTime = t
-	})
-}
-
-// withDurangoTime schedules the Durango activation at t rather than at
-// genesis. Later upgrades cannot precede Durango, so they are also scheduled
-// at t; the pre-Durango schedule is left initially active.
-func withDurangoTime(t time.Time) sutOption {
+// withUpgradeTime schedules fork and all later upgrades at t. Earlier
+// upgrades remain initially active.
+func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Latest, t)
-		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Durango-1, upgrade.InitiallyActiveTime)
+		upgradetest.SetTimesTo(&c.upgrades, fork-1, upgrade.InitiallyActiveTime)
 	})
 }
 
@@ -1752,7 +1743,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 	timeOpt, clock := withVMTime(preHeliconTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withHeliconTime(heliconTime),
+		withUpgradeTime(upgradetest.Helicon, heliconTime),
 		timeOpt,
 	)
 
@@ -1792,7 +1783,7 @@ func TestWarpPrecompileActivation(t *testing.T) {
 	key := txtest.NewKey(t)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withDurangoTime(upgrade.InitiallyActiveTime.Add(5*time.Second)),
+		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(5*time.Second)),
 	)
 
 	genesisState, err := sut.LastExecutedState()
