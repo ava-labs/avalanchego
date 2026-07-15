@@ -24,25 +24,35 @@ func TestMillisecondTimestampRoundTrip(t *testing.T) {
 		tsMillis = time.UnixMilli(1_700_000_000_123)
 	)
 
-	t.Run("millis preserves sub-second precision", func(t *testing.T) {
-		require := require.New(t)
+	tests := []struct {
+		name   string
+		millis bool
+		want   time.Time
+	}{
+		{
+			name:   "millis preserves sub-second precision",
+			millis: true,
+			want:   tsMillis,
+		},
+		{
+			name:   "seconds truncates sub-second precision",
+			millis: false,
+			want:   tsMillis.Truncate(time.Second),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 
-		blk, err := BuildUnsigned(parentID, tsMillis, 2, Epoch{}, []byte{3}, true)
-		require.NoError(err)
-		require.Equal(tsMillis, blk.Timestamp())
+			blk, err := BuildUnsigned(parentID, tsMillis, 2, Epoch{}, []byte{3}, tt.millis)
+			require.NoError(err)
+			require.Equal(tt.want, blk.Timestamp())
 
-		parsed, err := Parse(blk.Bytes(), chainID, true)
-		require.NoError(err)
-		require.Equal(tsMillis, parsed.(SignedBlock).Timestamp())
-	})
-
-	t.Run("seconds truncates sub-second precision", func(t *testing.T) {
-		require := require.New(t)
-
-		blk, err := BuildUnsigned(parentID, tsMillis, 2, Epoch{}, []byte{3}, false)
-		require.NoError(err)
-		require.Equal(tsMillis.Truncate(time.Second), blk.Timestamp())
-	})
+			parsed, err := Parse(blk.Bytes(), chainID, tt.millis)
+			require.NoError(err)
+			require.Equal(tt.want, parsed.(SignedBlock).Timestamp())
+		})
+	}
 
 	t.Run("seconds encoding is byte-stable", func(t *testing.T) {
 		require := require.New(t)
