@@ -329,17 +329,13 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 	return g.writeState(db, tdb)
 }
 
-// activateWarpPrecompile marks the warp precompile's account as non-empty by
-// setting the nonce and code so it is not pruned as an empty account during
-// state finalization (EIP-161) and so it appears as a contract to EVM code
+// activatePrecompile marks the precompile's account as non-empty by setting
+// the nonce and code so it is not pruned as an empty account during state
+// finalization (EIP-161) and so it appears as a contract to EVM code
 // introspection (e.g. EXTCODESIZE/EXTCODEHASH).
-func activateWarpPrecompile(statedb *state.StateDB) {
-	const (
-		precompileNonce = 1
-		precompileCode  = "\x01"
-	)
-	statedb.SetNonce(warp.ContractAddress, precompileNonce)
-	statedb.SetCode(warp.ContractAddress, []byte(precompileCode))
+func activatePrecompile(statedb *state.StateDB, addr common.Address) {
+	statedb.SetNonce(addr, 1)
+	statedb.SetCode(addr, []byte{0x01})
 }
 
 // writeState commits the genesis allocation to the state database and returns
@@ -367,7 +363,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
-		activateWarpPrecompile(statedb)
+		activatePrecompile(statedb, warp.ContractAddress)
 	}
 
 	const deleteEmptyObjects = true

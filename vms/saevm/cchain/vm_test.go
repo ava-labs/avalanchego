@@ -68,6 +68,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -196,6 +197,16 @@ func withNetworkID(id uint32) sutOption {
 func withHeliconTime(t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.upgrades.HeliconTime = t
+	})
+}
+
+// withDurangoTime schedules the Durango activation at t rather than at
+// genesis. Later upgrades cannot precede Durango, so they are also scheduled
+// at t; the pre-Durango schedule is left initially active.
+func withDurangoTime(t time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Latest, t)
+		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Durango-1, upgrade.InitiallyActiveTime)
 	})
 }
 
@@ -1728,4 +1739,27 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		err = sut.VerifyBlock(ctx, nil, parsed)
 		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
 	})
+}
+
+// TestWarpPrecompileActivation verifies that executing the first post-Durango
+// block marks the warp precompile's account as non-empty when the genesis
+// predates Durango.
+func TestWarpPrecompileActivation(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(key.EthAddress()),
+		withDurangoTime(upgrade.InitiallyActiveTime.Add(5*time.Second)),
+	)
+
+	genesisState, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	sut.issueAndExecute(ctx, t, stx)
+
+	state, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
+	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
 }

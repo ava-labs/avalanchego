@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -246,8 +247,8 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 
 func (h *hooks) BeforeExecutingBlock(statedb *state.StateDB, parent, header *types.Header) error {
 	config := corethparams.GetExtra(h.chainConfig)
-	if config.IsDurango(header.Time) && !config.IsDurango(parent.Time) {
-		activateWarpPrecompile(statedb)
+	if isFirstDurangoBlock := config.IsDurango(header.Time) && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
 }
