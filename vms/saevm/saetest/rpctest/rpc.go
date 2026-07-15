@@ -64,8 +64,8 @@ func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {
 				t.Errorf("CallContext(...) %s", diff)
 				t.FailNow()
 			}
-			cmpOpts := append(opts, tc.ExtraCmpOpts...)
-			if diff := cmp.Diff(tc.Want, got.Elem().Interface(), cmpOpts...); diff != "" {
+			opts := append(opts, tc.ExtraCmpOpts...)
+			if diff := cmp.Diff(tc.Want, got.Elem().Interface(), opts...); diff != "" {
 				t.Errorf("Unmarshalled %T diff (-want +got):\n%s", got.Elem().Interface(), diff)
 			}
 		}
