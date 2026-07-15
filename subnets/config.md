@@ -97,6 +97,10 @@ Interprets the proposerVM wrapper block's timestamp as unix-milliseconds
 instead of unix-seconds. Defaults to `false` (seconds). Existing networks are
 unaffected when this is unset.
 
+Most Subnets do not need this. It only exists to make a sub-second proposer
+window effective, in the same narrow proof-of-authority case described under
+[`proposerWindowMilliseconds`](#proposerwindowmilliseconds-uint).
+
 The proposerVM proposer-slot clock advances at the resolution of the wrapper
 block timestamp. With the default whole-second timestamps the clock can only
 advance in whole-second steps, so proposer rotation (and therefore how fast the
