@@ -16,13 +16,25 @@ go_library(
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_libevm//triedb/hashdb",
         "@org_uber_go_zap//:zap",
     ],
 )
 
 go_test(
     name = "saedb_test",
-    srcs = ["saedb_test.go"],
+    srcs = [
+        "saedb_test.go",
+        "tracker_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":saedb"],
+    deps = [
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
 )

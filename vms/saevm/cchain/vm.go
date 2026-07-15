@@ -91,7 +91,7 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	userConfig, err := parseConfig(configBytes)
+	userConfig, err := parseConfig(configBytes, snowCtx.NetworkID)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
@@ -112,7 +112,7 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
-	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig); err != nil {
+	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig()); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
