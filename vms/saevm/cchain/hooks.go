@@ -106,7 +106,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		txs[i] = ht
 	}
 
-	now := h.BlockTime(b.Header())
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
 	return &builder{
 		h.ctx,
 		h.chainConfig,
@@ -115,9 +117,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		},
 		slices.Values(txs),
 		desiredParams{
-			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
-			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(b.Header()).MinDelayExcess),
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -488,9 +490,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-
-	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
-	// state is encoded in other fields.
+	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
+	// entirely during the coreth removal. warpValidityBytes could just be set
+	// directly.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,
