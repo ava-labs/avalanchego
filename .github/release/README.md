@@ -50,23 +50,28 @@ step) lives in [`release.yml`](../workflows/release.yml).
 ## Conceptual model
 
 ```
-push v*.*.* ── validate-tag ──┬─ build-rpms      ─┐
-  classify stable/prerelease  ├─ build-linux     ─┤   publish
-  duplicate-release guard     ├─ build-macos     ─┼─► body + publish-set gates
-  RELEASES.md notes gate      ├─ build-deb-amd64 ─┤   draft release + post-assert
-                              └─ build-deb-arm64 ─┘
+push v*.*.* ── validate-tag ──┬─ build-linux-packages ─┐  (rpm + deb, jammy/noble S3)
+  classify stable/prerelease  ├─ build-linux           ┤  publish
+  duplicate-release guard     ├─ build-macos           ┼► body + publish-set gates
+  RELEASES.md notes gate      └────────────────────────┘  draft release + post-assert
 ```
 
 One umbrella workflow ([`release.yml`](../workflows/release.yml)) owns the
-`push: tags` trigger and calls the five producer workflows via `workflow_call`;
+`push: tags` trigger and calls its producer workflows via `workflow_call`;
 `needs:` makes `publish` wait for all of them, and artifacts are collected
-in-run with `actions/download-artifact`. All logic lives in single-purpose
-`release-*.sh` helpers under [`.github/workflows/`](../workflows/); the YAML
-only wires them together.
+in-run with `actions/download-artifact`. Linux packages (RPM + DEB) come from
+the unified [`build-linux-packages.yml`](../workflows/build-linux-packages.yml),
+made reusable for this umbrella; it builds one codename-agnostic `.deb` per arch
+and, on the tag push, fans each into the jammy + noble S3 prefixes. All release
+logic lives in single-purpose `release-*.sh` helpers under
+[`.github/workflows/`](../workflows/); the YAML only wires them together.
 
 [`release-expected-manifest.sh`](../workflows/release-expected-manifest.sh) is
-the single source of truth for the asset set (20 basenames: 4 debs, 4 RPMs,
-4 Linux tarballs + 4 `.sig`, 2 macOS zips + 2 `.sig`). The publish job copies
+the single source of truth for the asset set (24 basenames: 8 debs
+[avalanchego + subnet-evm x jammy/noble x amd64/arm64], 4 RPMs, 4 Linux
+tarballs + 4 `.sig`, 2 macOS zips + 2 `.sig`). Each per-arch `.deb` is published
+under both its jammy and noble names, preserving the codename split on the
+release page. The publish job copies
 exactly the manifest entries into the publish set (failing on any missing one),
 asserts set-equality before creating the release, and re-asserts against the
 live release's assets afterwards.
@@ -90,9 +95,11 @@ live release's assets afterwards.
   then `echo`): under `bash -e`, a failing command substitution inside `echo`'s
   arguments is silently swallowed, which would convert helper failures into
   empty outputs.
-- **Deb basenames embed the codename** (`avalanchego-vX.Y.Z-{jammy,noble}-{arch}.deb`)
-  because the deb producers emit identically-named files; the rename happens at
-  publish-set assembly (by artifact-path substring), so S3 layout is unchanged.
+- **Deb basenames embed the codename** (`{avalanchego,subnet-evm}-vX.Y.Z-{jammy,noble}-{arch}.deb`)
+  even though the unified producer builds one codename-agnostic `.deb` per arch
+  (Ubuntu 22.04, `libc6 >= 2.35`, validated on both jammy and noble). The
+  assembler duplicates each per-arch binary into its jammy and noble names, so
+  the codename split is preserved on the release page and mirrors the S3 layout.
 - **The GPG public key is not a release asset.** It is distributed exclusively
   via S3; it rides inside the `rpms-*` artifacts for validation and the
   manifest-driven assembler ignores it.

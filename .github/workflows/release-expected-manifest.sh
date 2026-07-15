@@ -12,12 +12,15 @@
 # assembler ignores any downloaded file that isn't in this manifest, so it
 # never reaches the release page.
 #
-# Deb basenames embed the codename to disambiguate jammy from noble (the deb
-# producers emit identically-named files under codename-distinct artifact
-# bundles). The release workflow's publish-set assembler resolves each
-# codename-suffixed target name by path substring (`*jammy*` or `*noble*`)
-# when copying into publish-assets/, preserving the S3 path convention for
-# downstream consumers.
+# Deb basenames embed the codename (jammy/noble) even though the unified
+# packaging workflow (build-linux-packages.yml) builds ONE codename-agnostic
+# .deb per arch: it is built on Ubuntu 22.04 with a libc6 >= 2.35 floor and
+# that single binary is install-tested on, and serves, both jammy and noble.
+# The producer uploads per-arch bundles (debs-amd64, debs-arm64), each carrying
+# both avalanchego and subnet-evm. The publish-set assembler duplicates each
+# per-arch binary into its jammy and noble release names, preserving the
+# codename split on the release page and mirroring the S3 layout
+# (linux/debs/ubuntu/{jammy,noble}/{arch}/).
 #
 # Detached signatures (.sig companions) are first-class release deliverables
 # and ARE listed in this manifest. PRECONDITION: the linux-binary
@@ -37,6 +40,10 @@ avalanchego-${TAG}-jammy-amd64.deb
 avalanchego-${TAG}-noble-amd64.deb
 avalanchego-${TAG}-jammy-arm64.deb
 avalanchego-${TAG}-noble-arm64.deb
+subnet-evm-${TAG}-jammy-amd64.deb
+subnet-evm-${TAG}-noble-amd64.deb
+subnet-evm-${TAG}-jammy-arm64.deb
+subnet-evm-${TAG}-noble-arm64.deb
 avalanchego-${TAG}-x86_64.rpm
 avalanchego-${TAG}-aarch64.rpm
 subnet-evm-${TAG}-x86_64.rpm

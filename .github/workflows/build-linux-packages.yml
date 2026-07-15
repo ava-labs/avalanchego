@@ -6,14 +6,21 @@ name: build-linux-packages
 # differences are captured by the matrix below.
 
 on:
+  # Called by the release umbrella (.github/workflows/release.yml), which owns
+  # the tag-push trigger and passes the validated tag in. This workflow no
+  # longer listens on `push: tags` directly, so a tag push produces exactly one
+  # orchestrated run instead of racing a standalone packaging run.
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to build packages for (passed by the release umbrella)'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to build packages for'
         required: true
-  push:
-    tags:
-      - "v*"
   pull_request:
     paths:
       - ".github/packaging/**"
@@ -57,7 +64,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          # inputs.tag (workflow_call, from the umbrella) is a semver tag already
+          # validated by the umbrella's validate-tag job; github.event.inputs.tag
+          # covers direct workflow_dispatch; github.ref covers any remaining path.
+          ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
 
       # Defense in depth: workflow_dispatch accepts an arbitrary ref, and non-PR
       # events import the real signing key. The overlay below replaces only
@@ -65,7 +75,9 @@ jobs:
       # run from the checked-out ref. Refuse to proceed unless the dispatched input
       # names an actual tag in origin (not a branch), so the key can never sign
       # arbitrary branch content.
-      # tag-push events are already constrained to refs/tags/v* by the `on:` filter.
+      # Tag builds now arrive via workflow_call from the release umbrella, which
+      # validates the tag (release-classify-tag.sh) before fan-out; this assert
+      # only guards the direct workflow_dispatch path.
       - name: Assert dispatch input is a released tag
         if: github.event.inputs.tag
         env:
@@ -109,7 +121,7 @@ jobs:
         with:
           format: ${{ matrix.format }}
           package-arch: ${{ matrix.package_arch }}
-          tag-input: ${{ github.event.inputs.tag }}
+          tag-input: ${{ inputs.tag || github.event.inputs.tag }}
           gpg-private-key: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PRIVATE_KEY || '' }}
           gpg-passphrase: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PASSPHRASE || '' }}
           release: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}

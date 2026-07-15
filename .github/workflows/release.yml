@@ -88,14 +88,19 @@ jobs:
           TAG: ${{ steps.derive.outputs.tag }}
         run: ./.github/workflows/release-assert-notes-exist.sh "$TAG"
 
-  build-rpms:
+  build-linux-packages:
     needs: validate-tag
-    uses: ./.github/workflows/build-rpm-release.yml
+    # Unified RPM + DEB producer (master's build-linux-packages.yml, made
+    # reusable). Builds all four format x arch packages; on this tag-push its
+    # upload-debs-s3 job fans each deb into the jammy + noble S3 prefixes,
+    # preserving the codename split at the distribution layer.
+    uses: ./.github/workflows/build-linux-packages.yml
     with:
       tag: ${{ needs.validate-tag.outputs.tag }}
     secrets: inherit
     permissions:
       contents: read
+      id-token: write   # upload-debs-s3 (jammy/noble) assumes an AWS role via OIDC
 
   build-linux:
     needs: validate-tag
@@ -117,34 +122,12 @@ jobs:
       contents: read
       id-token: write
 
-  build-deb-amd64:
-    needs: validate-tag
-    uses: ./.github/workflows/build-ubuntu-amd64-release.yml
-    with:
-      tag: ${{ needs.validate-tag.outputs.tag }}
-    secrets: inherit
-    permissions:
-      contents: read
-      id-token: write
-
-  build-deb-arm64:
-    needs: validate-tag
-    uses: ./.github/workflows/build-ubuntu-arm64-release.yml
-    with:
-      tag: ${{ needs.validate-tag.outputs.tag }}
-    secrets: inherit
-    permissions:
-      contents: read
-      id-token: write
-
   publish:
     needs:
       - validate-tag
-      - build-rpms
+      - build-linux-packages
       - build-linux
       - build-macos
-      - build-deb-amd64
-      - build-deb-arm64
     runs-on: ubuntu-22.04
     permissions:
       contents: write

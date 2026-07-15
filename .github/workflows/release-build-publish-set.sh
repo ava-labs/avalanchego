@@ -9,13 +9,12 @@
 # Fails (exit 1) on any missing entry, listing the missing manifest targets
 # and the downloaded inventory.
 #
-# Deb files require codename disambiguation: after the deb producer's
-# artifact-bundle rename (`debs-jammy-amd64`, `debs-noble-amd64`, etc.),
-# the producer outputs arrive under SOURCE_DIR/debs-{codename}-{arch}/
-# carrying identically-named files (`avalanchego-${TAG}-${arch}.deb`).
-# resolve_source() maps each codename-suffixed target name to the source
-# file by path substring, so each deb arrives in DEST_DIR with a unique
-# basename matching the manifest.
+# Deb files need codename handling: the unified producer builds one
+# codename-agnostic .deb per arch and uploads per-arch bundles
+# (SOURCE_DIR/debs-amd64/, SOURCE_DIR/debs-arm64/), each carrying avalanchego
+# and subnet-evm plus the GPG key. resolve_source() maps every codename-embedded
+# manifest target (jammy/noble) back to its single per-arch file; the cp below
+# then renames it, so each per-arch binary is published under both codenames.
 
 set -euo pipefail
 
@@ -29,23 +28,16 @@ mkdir -p "$DEST_DIR"
 
 resolve_source() {
   local target="$1"
-  case "$target" in
-    avalanchego-*-jammy-amd64.deb)
-      find "$SOURCE_DIR" -type f -path '*jammy*' -name "avalanchego-${TAG}-amd64.deb" | sort | head -n1
-      ;;
-    avalanchego-*-noble-amd64.deb)
-      find "$SOURCE_DIR" -type f -path '*noble*' -name "avalanchego-${TAG}-amd64.deb" | sort | head -n1
-      ;;
-    avalanchego-*-jammy-arm64.deb)
-      find "$SOURCE_DIR" -type f -path '*jammy*' -name "avalanchego-${TAG}-arm64.deb" | sort | head -n1
-      ;;
-    avalanchego-*-noble-arm64.deb)
-      find "$SOURCE_DIR" -type f -path '*noble*' -name "avalanchego-${TAG}-arm64.deb" | sort | head -n1
-      ;;
-    *)
-      find "$SOURCE_DIR" -type f -name "$target" | sort | head -n1
-      ;;
-  esac
+  # A codename-embedded deb target (<pkg>-<tag>-<jammy|noble>-<arch>.deb) has no
+  # codename in the built file: strip it and match the single per-arch binary
+  # <pkg>-<tag>-<arch>.deb in its debs-<arch> bundle. Everything else (rpms,
+  # tarballs, macOS zips, .sig) matches the manifest basename verbatim.
+  if [[ "$target" =~ ^(avalanchego|subnet-evm)-.*-(jammy|noble)-(amd64|arm64)\.deb$ ]]; then
+    find "$SOURCE_DIR" -type f \
+      -name "${BASH_REMATCH[1]}-${TAG}-${BASH_REMATCH[3]}.deb" | sort | head -n1
+  else
+    find "$SOURCE_DIR" -type f -name "$target" | sort | head -n1
+  fi
 }
 
 missing=()
