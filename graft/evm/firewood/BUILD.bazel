@@ -17,6 +17,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/firewood",
     visibility = ["//visibility:public"],
     deps = [
+        "//database/pebbledb",
+        "//graft/evm/firewood/statehistory",
+        "//utils/logging",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
@@ -41,10 +44,12 @@ graft_go_test(
     srcs = [
         "hash_test.go",
         "reconstructed_state_test.go",
+        "statehistory_capture_test.go",
         "triedb_test.go",
     ],
     embed = [":firewood"],
     deps = [
+        "//graft/evm/firewood/statehistory",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
