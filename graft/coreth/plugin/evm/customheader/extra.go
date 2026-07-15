@@ -170,14 +170,7 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
 func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
-	offset := ap3.WindowSize
-	if rules.IsFortuna {
-		offset = acp176.StateSize
-	}
-	if rules.IsHelicon {
-		offset = 0
-	}
-
+	offset := predicateBytesOffset(rules)
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
 	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
@@ -191,14 +184,7 @@ func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
 // data. If the extra data is not long enough (i.e., an incomplete header.Extra
 // as built in the miner), it is padded with zeros.
 func SetPredicateBytesInExtra(rules extras.AvalancheRules, extra []byte, predicateBytes []byte) []byte {
-	offset := ap3.WindowSize
-	if rules.IsFortuna {
-		offset = acp176.StateSize
-	}
-	if rules.IsHelicon {
-		offset = 0
-	}
-
+	offset := predicateBytesOffset(rules)
 	if len(extra) < offset {
 		// pad extra with zeros
 		extra = append(extra, make([]byte, offset-len(extra))...)
@@ -208,4 +194,15 @@ func SetPredicateBytesInExtra(rules extras.AvalancheRules, extra []byte, predica
 	}
 	extra = append(extra, predicateBytes...)
 	return extra
+}
+
+func predicateBytesOffset(rules extras.AvalancheRules) int {
+	switch {
+	case rules.IsHelicon:
+		return 0
+	case rules.IsFortuna:
+		return acp176.StateSize
+	default:
+		return ap3.WindowSize
+	}
 }
