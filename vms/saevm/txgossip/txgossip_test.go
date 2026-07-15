@@ -102,7 +102,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		config,
 		db,
 		xdb,
-		saedb.Config{},
+		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
 		hookstest.NewStub(testGasTarget),
 		logger,
 		prometheus.NewRegistry(),
