@@ -117,6 +117,8 @@ func VerifyExtraPrefix(
 func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
+	case rules.IsHelicon:
+		return nil
 	case rules.IsFortuna:
 		if extraLen < acp176.StateSize {
 			return fmt.Errorf(
@@ -172,6 +174,9 @@ func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
 	if rules.IsFortuna {
 		offset = acp176.StateSize
 	}
+	if rules.IsHelicon {
+		offset = 0
+	}
 
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
@@ -189,6 +194,9 @@ func SetPredicateBytesInExtra(rules extras.AvalancheRules, extra []byte, predica
 	offset := ap3.WindowSize
 	if rules.IsFortuna {
 		offset = acp176.StateSize
+	}
+	if rules.IsHelicon {
+		offset = 0
 	}
 
 	if len(extra) < offset {
