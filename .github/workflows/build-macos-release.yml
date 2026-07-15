@@ -39,6 +39,26 @@ jobs:
         with:
           # Build the release tag's source, not the dispatch/caller ref.
           ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
+
+      # A standalone workflow_dispatch can name an arbitrary ref; refuse to build
+      # and upload release-named artifacts unless the dispatched input is a real
+      # tag in origin. Skipped on workflow_call (the umbrella already validated
+      # the tag) and on push (the on: filter constrains it to refs/tags).
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.15.0)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/upload a non-tag ref" >&2
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 

@@ -49,10 +49,10 @@ jobs:
       tag: ${{ steps.derive.outputs.tag }}
       kind: ${{ steps.classify.outputs.kind }}
     steps:
-      # Fail fast, before the 30+ min build fan-out, if the dispatched input is
-      # not an actual tag in origin. Runs before checkout (git ls-remote needs
-      # no local clone) and covers every producer, since they all build this
-      # same tag. Guards against a typo, an un-pushed tag, or a like-named branch.
+      # Fail fast, before checkout, if the dispatched input is not an actual tag
+      # in origin. Runs before checkout (git ls-remote needs no local clone) so
+      # the tag checkout below gets a friendly message instead of a cryptic
+      # failure. The full multi-module tag set is verified after checkout.
       - name: Assert the release tag exists in origin
         env:
           TAG_INPUT: ${{ github.event.inputs.tag }}
@@ -84,6 +84,16 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
         env:
           TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+
+      - name: Verify all release tags exist in origin
+        # The root-tag preflight above only lets the checkout succeed; this
+        # asserts the full multi-module tag set (root + graft/coreth, graft/evm,
+        # graft/subnet-evm, from lib_go_modules.sh) was pushed, so a partial
+        # tags-push cannot yield a release with missing module tags.
+        run: ./scripts/verify_tags_remote.sh "$TAG"
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
         shell: bash
 
       - name: Classify tag (stable vs prerelease)
