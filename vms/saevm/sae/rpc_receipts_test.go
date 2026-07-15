@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
@@ -30,10 +31,10 @@ func TestImmediateReceipts(t *testing.T) {
 	notBlocked := txs[0]
 
 	b := sut.runConsensusLoop(t, txs...)
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_getTransactionReceipt",
-		args:   []any{notBlocked.Hash()},
-		want: &types.Receipt{
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_getTransactionReceipt",
+		Args:   []any{notBlocked.Hash()},
+		Want: &types.Receipt{
 			Status:            types.ReceiptStatusSuccessful,
 			EffectiveGasPrice: big.NewInt(1),
 			GasUsed:           params.TxGas,

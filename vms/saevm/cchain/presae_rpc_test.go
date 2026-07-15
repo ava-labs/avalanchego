@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core"
@@ -29,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgradechain"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	ethereum "github.com/ava-labs/libevm"
 )
@@ -107,6 +110,22 @@ func TestPreSAEChainRPCs(t *testing.T) {
 			"genesis hash matches the fixture chain's genesis (block 1's parent)")
 	})
 
+	t.Run("genesis_not_traceable", func(t *testing.T) {
+		genesisHash := blocks[1].ParentHash()
+		rpctest.Run(ctx, t, sut.ethclient.Client(),
+			rpctest.Case{
+				Method:  "debug_intermediateRoots",
+				Args:    []any{genesisHash},
+				WantErr: testerr.Contains("genesis is not traceable"),
+			},
+			rpctest.Case{
+				Method:  "debug_traceBlockByNumber",
+				Args:    []any{hexutil.Uint64(0), map[string]any{"tracer": "callTracer"}},
+				WantErr: testerr.Contains("genesis is not traceable"),
+			},
+		)
+	})
+
 	for _, fb := range fx.Blocks {
 		t.Run(fmt.Sprintf("block_%02d_%s", fb.Number, fb.Fork), func(t *testing.T) {
 			t.Logf("%s", fb.Note)
@@ -117,7 +136,7 @@ func TestPreSAEChainRPCs(t *testing.T) {
 
 func testBlockRPCs(ctx context.Context, t *testing.T, sut *SUT, fx *upgradechain.Fixture, fb upgradechain.Block, eth *types.Block) {
 	testBlockLookupRPCs(ctx, t, sut, fb, eth)
-	testStateRPCs(ctx, t, sut, fx, fb)
+	testStateRPCs(ctx, t, sut, fx, fb, eth)
 	testReceiptRPCs(ctx, t, sut, fb, eth)
 	testTransactionRPCs(ctx, t, sut, fb, eth)
 	testTraceBlockRPCs(ctx, t, sut, fb, eth)
@@ -141,7 +160,7 @@ func testBlockLookupRPCs(ctx context.Context, t *testing.T, sut *SUT, fb upgrade
 	})
 }
 
-func testStateRPCs(ctx context.Context, t *testing.T, sut *SUT, fx *upgradechain.Fixture, fb upgradechain.Block) {
+func testStateRPCs(ctx context.Context, t *testing.T, sut *SUT, fx *upgradechain.Fixture, fb upgradechain.Block, eth *types.Block) {
 	t.Helper()
 
 	blockNum := new(big.Int).SetUint64(fb.Number)
@@ -176,12 +195,19 @@ func testStateRPCs(ctx context.Context, t *testing.T, sut *SUT, fx *upgradechain
 	})
 
 	t.Run("eth_getProof", func(t *testing.T) {
-		proof, err := gethclient.New(sut.ethclient.Client()).GetProof(ctx, fx.Counter, nil, blockNum)
+		const slot0 = "0x0000000000000000000000000000000000000000000000000000000000000000"
+		proof, err := gethclient.New(sut.ethclient.Client()).GetProof(ctx, fx.Counter, []string{slot0}, blockNum)
 		require.NoError(t, err, "GetProof(counter, %d)", fb.Number)
 
 		want := fb.State[fx.Counter]
 		assert.Zero(t, want.Balance.ToInt().Cmp(proof.Balance), "proof balance")
 		assert.Equal(t, want.Nonce, proof.Nonce, "proof nonce")
+
+		// Verify the account and storage nodes actually hash up to the block's
+		// state root, rather than trusting the server's claimed values.
+		saetest.VerifyProof(t, eth.Root(), proof)
+		require.Len(t, proof.StorageProof, 1, "storage proof for slot 0")
+		assert.Equal(t, fb.Counter, proof.StorageProof[0].Value.Uint64(), "proven counter value")
 	})
 }
 

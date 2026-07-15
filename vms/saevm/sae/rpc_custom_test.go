@@ -25,15 +25,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 func TestGetChainConfig(t *testing.T) {
 	ctx, sut := newSUT(t, 0)
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_getChainConfig",
-		want:   *saetest.ChainConfig(),
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_getChainConfig",
+		Want:   *saetest.ChainConfig(),
 	})
 }
 
@@ -45,15 +46,15 @@ func withGenesisBaseFee(fee uint64) sutOption {
 
 func TestBaseFee(t *testing.T) {
 	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_baseFee",
-		want:   hexBig(params.InitialBaseFee),
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_baseFee",
+		Want:   hexBig(params.InitialBaseFee),
 	})
 
 	b := sut.runConsensusLoop(t)
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_baseFee",
-		want:   (*hexutil.Big)(b.WorstCaseBounds().LatestEndTime.BaseFee().ToBig()),
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_baseFee",
+		Want:   (*hexutil.Big)(b.WorstCaseBounds().LatestEndTime.BaseFee().ToBig()),
 	})
 }
 
@@ -61,9 +62,9 @@ func TestSuggestPriceOptions(t *testing.T) {
 	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
 	// Before any blocks with worst-case bounds, the base fee falls back to the
 	// genesis base fee and the tip defaults to the minimum (no txs yet).
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_suggestPriceOptions",
-		want:   saerpc.NewPriceOptions(big.NewInt(params.Wei), big.NewInt(2*params.InitialBaseFee)),
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_suggestPriceOptions",
+		Want:   saerpc.NewPriceOptions(big.NewInt(params.Wei), big.NewInt(2*params.InitialBaseFee)),
 	})
 
 	b := sut.runConsensusLoop(t)
@@ -74,9 +75,9 @@ func TestSuggestPriceOptions(t *testing.T) {
 	require.NoErrorf(t, err, "SuggestGasTipCap()")
 	doubleBaseFee := b.WorstCaseBounds().LatestEndTime.BaseFee().ToBig()
 	doubleBaseFee.Lsh(doubleBaseFee, 1)
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_suggestPriceOptions",
-		want:   saerpc.NewPriceOptions(tip, doubleBaseFee),
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_suggestPriceOptions",
+		Want:   saerpc.NewPriceOptions(tip, doubleBaseFee),
 	})
 }
 
@@ -153,24 +154,24 @@ func TestCallDetailed(t *testing.T) {
 	// value returned by [ethapi.RevertError.ErrorCode].
 	const revertErrCode = 3
 
-	sut.testRPC(ctx, t, []rpcTest{
+	sut.testRPC(ctx, t, []rpctest.Case{
 		{
-			method: "eth_callDetailed",
-			args: []any{
+			Method: "eth_callDetailed",
+			Args: []any{
 				map[string]any{
 					"to":   escrowAddr,
 					"data": hexutil.Encode(escrow.CallDataForBalance(recipient)),
 				},
 				latest,
 			},
-			want: saerpc.DetailedExecutionResult{
+			Want: saerpc.DetailedExecutionResult{
 				UsedGas:    23675,
 				ReturnData: uint256.NewInt(escrowDepositVal).PaddedBytes(32),
 			},
 		},
 		{
-			method: "eth_callDetailed",
-			args: []any{
+			Method: "eth_callDetailed",
+			Args: []any{
 				map[string]any{
 					"to":   escrowAddr,
 					"from": noBalance,
@@ -178,7 +179,7 @@ func TestCallDetailed(t *testing.T) {
 				},
 				latest,
 			},
-			want: saerpc.DetailedExecutionResult{
+			Want: saerpc.DetailedExecutionResult{
 				UsedGas: 23451,
 				ErrCode: revertErrCode,
 				Err:     vm.ErrExecutionReverted.Error(),
@@ -190,15 +191,15 @@ func TestCallDetailed(t *testing.T) {
 			},
 		},
 		{
-			method: "eth_callDetailed",
-			args: []any{
+			Method: "eth_callDetailed",
+			Args: []any{
 				map[string]any{
 					"to":   echoReverter,
 					"data": hexutil.Bytes{42},
 				},
 				latest,
 			},
-			want: saerpc.DetailedExecutionResult{
+			Want: saerpc.DetailedExecutionResult{
 				UsedGas:    21035,
 				ErrCode:    revertErrCode,
 				Err:        vm.ErrExecutionReverted.Error(),
@@ -206,15 +207,15 @@ func TestCallDetailed(t *testing.T) {
 			},
 		},
 		{
-			method: "eth_callDetailed",
-			args: []any{
+			Method: "eth_callDetailed",
+			Args: []any{
 				map[string]any{
 					"to":   echoReverter,
 					"data": hexutil.Bytes(revertAsPanic),
 				},
 				latest,
 			},
-			want: saerpc.DetailedExecutionResult{
+			Want: saerpc.DetailedExecutionResult{
 				UsedGas:    21241,
 				ErrCode:    revertErrCode,
 				Err:        fmt.Sprintf("%v: unknown panic code: %#x", vm.ErrExecutionReverted, revertWith),
@@ -222,14 +223,14 @@ func TestCallDetailed(t *testing.T) {
 			},
 		},
 		{
-			method: "eth_callDetailed",
-			args: []any{
+			Method: "eth_callDetailed",
+			Args: []any{
 				map[string]any{
 					"to": invalidJumper,
 				},
 				latest,
 			},
-			want: saerpc.DetailedExecutionResult{
+			Want: saerpc.DetailedExecutionResult{
 				UsedGas: gasCap,
 				Err:     vm.ErrInvalidJump.Error(),
 			},

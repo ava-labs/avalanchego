@@ -16,11 +16,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
-	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -32,7 +29,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -45,16 +44,16 @@ func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 	b := unwrap(t, sut.createAndVerifyBlock(t, sut.lastAcceptedBlock(t)))
 
-	sut.testRPC(ctx, t, []rpcTest{
+	sut.testRPC(ctx, t, []rpctest.Case{
 		{
-			method:  "eth_getBalance",
-			args:    []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
-			wantErr: testerr.Contains(blocks.ErrNonCanonicalBlock.Error()),
+			Method:  "eth_getBalance",
+			Args:    []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
+			WantErr: testerr.Contains(blocks.ErrNonCanonicalBlock.Error()),
 		},
 		{
-			method: "eth_getBlockByHash",
-			args:   []any{b.Hash(), false},
-			want:   (*types.Header)(nil),
+			Method: "eth_getBlockByHash",
+			Args:   []any{b.Hash(), false},
+			Want:   (*types.Header)(nil),
 		},
 	}...)
 }
@@ -80,18 +79,18 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 
 	// Running in parallel allows the main test to unblock() after the tests are
 	// started.
-	sut.testRPC(ctx, t, []rpcTest{
+	sut.testRPC(ctx, t, []rpctest.Case{
 		{
-			method:   "eth_getBalance",
-			args:     []any{addr, rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
-			want:     (*hexutil.Big)(want),
-			parallel: true,
+			Method:   "eth_getBalance",
+			Args:     []any{addr, rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
+			Want:     (*hexutil.Big)(want),
+			Parallel: true,
 		},
 		{
-			method:   "eth_getBalance",
-			args:     []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(b.Number().Int64()))},
-			want:     (*hexutil.Big)(want),
-			parallel: true,
+			Method:   "eth_getBalance",
+			Args:     []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(b.Number().Int64()))},
+			Want:     (*hexutil.Big)(want),
+			Parallel: true,
 		},
 	}...)
 }
@@ -150,45 +149,45 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
-	tests := []rpcTest{
+	tests := []rpctest.Case{
 		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(deployBlock.NumberU64())},
-			want:         wantDeploy,
-			extraCmpOpts: ignore,
+			Method:       "debug_traceBlockByNumber",
+			Args:         []any{hexutil.Uint64(deployBlock.NumberU64())},
+			Want:         wantDeploy,
+			ExtraCmpOpts: ignore,
 		},
 		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(depositBlock.NumberU64())},
-			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			Method:       "debug_traceBlockByNumber",
+			Args:         []any{hexutil.Uint64(depositBlock.NumberU64())},
+			Want:         wantDeposit,
+			ExtraCmpOpts: ignore,
 		},
 		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{rpc.LatestBlockNumber},
-			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			Method:       "debug_traceBlockByNumber",
+			Args:         []any{rpc.LatestBlockNumber},
+			Want:         wantDeposit,
+			ExtraCmpOpts: ignore,
 		},
 		{
-			method:       "debug_traceBlockByHash",
-			args:         []any{deployBlock.Hash()},
-			want:         wantDeploy,
-			extraCmpOpts: ignore,
+			Method:       "debug_traceBlockByHash",
+			Args:         []any{deployBlock.Hash()},
+			Want:         wantDeploy,
+			ExtraCmpOpts: ignore,
 		},
 		{
-			method:       "debug_traceBlockByHash",
-			args:         []any{depositBlock.Hash()},
-			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			Method:       "debug_traceBlockByHash",
+			Args:         []any{depositBlock.Hash()},
+			Want:         wantDeposit,
+			ExtraCmpOpts: ignore,
 		},
 		{
-			method:  "debug_traceTransaction",
-			args:    []any{common.Hash{}},
-			wantErr: testerr.Contains("not found"),
+			Method:  "debug_traceTransaction",
+			Args:    []any{common.Hash{}},
+			WantErr: testerr.Contains("not found"),
 		},
 		{
-			method: "debug_traceBlockByNumber",
-			args: []any{
+			Method: "debug_traceBlockByNumber",
+			Args: []any{
 				hexutil.Uint64(depositBlock.NumberU64()),
 				map[string]any{
 					"tracer": `{
@@ -203,16 +202,16 @@ func TestDebugTrace(t *testing.T) {
 					"timeout": "10ms",
 				},
 			},
-			wantErr: testerr.Contains("execution timeout"),
+			WantErr: testerr.Contains("execution timeout"),
 		},
 	}
 
 	for _, tx := range want {
-		tests = append(tests, rpcTest{
-			method:       "debug_traceTransaction",
-			args:         []any{tx.TxHash},
-			want:         *tx.Result,
-			extraCmpOpts: ignore,
+		tests = append(tests, rpctest.Case{
+			Method:       "debug_traceTransaction",
+			Args:         []any{tx.TxHash},
+			Want:         *tx.Result,
+			ExtraCmpOpts: ignore,
 		})
 	}
 
@@ -296,7 +295,7 @@ func TestStatefulRPCs(t *testing.T) {
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
 
-				verifyProof(t, b.PostExecutionStateRoot(), got)
+				saetest.VerifyProof(t, b.PostExecutionStateRoot(), got)
 				assert.Equal(t, escrowAddr, got.Address, "GetProof().Address")
 				assert.Zerof(t, wantStorageValue.Cmp(got.Balance), "GetProof().Balance: want %d, got %s", wantStorageValue, got.Balance)
 				assert.Equal(t, crypto.Keccak256Hash(escrow.ByteCode()), got.CodeHash, "GetProof().CodeHash")
@@ -355,52 +354,4 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		msg.AccessList = *accessList
 		requireCallSucceedsWithGas(t, msg, gas)
 	})
-}
-
-func verifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResult) {
-	tb.Helper()
-
-	account := proveAccount(tb, root, proof.Address, proof.AccountProof)
-	assert.Zerof(tb, account.Balance.ToBig().Cmp(proof.Balance), "proven account balance: proven %d, claimed %s", account.Balance.ToBig(), proof.Balance)
-	assert.Equal(tb, proof.CodeHash[:], account.CodeHash, "proven account code hash")
-	assert.Equal(tb, proof.Nonce, account.Nonce, "proven account nonce")
-	assert.Equal(tb, proof.StorageHash, account.Root, "proven account storage root")
-
-	for _, sp := range proof.StorageProof {
-		value := proveStorageValue(tb, account.Root, common.HexToHash(sp.Key), sp.Proof)
-		assert.Zerof(tb, sp.Value.Cmp(value), "proven storage value: proven %d, claimed %s", value, sp.Value)
-	}
-}
-
-func proveAccount(tb testing.TB, root common.Hash, addr common.Address, nodes []string) types.StateAccount {
-	tb.Helper()
-
-	accountRLP := proveTrieValue(tb, root, crypto.Keccak256(addr.Bytes()), nodes)
-	var account types.StateAccount
-	require.NoError(tb, rlp.DecodeBytes(accountRLP, &account), "decode proven account")
-	return account
-}
-
-func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes []string) *big.Int {
-	tb.Helper()
-
-	storageRLP := proveTrieValue(tb, root, crypto.Keccak256(key.Bytes()), nodes)
-	var value big.Int
-	require.NoError(tb, rlp.DecodeBytes(storageRLP, &value), "decode proven storage value")
-	return &value
-}
-
-func proveTrieValue(tb testing.TB, root common.Hash, key []byte, nodes []string) []byte {
-	tb.Helper()
-
-	proofDB := memorydb.New()
-	for _, nodeStr := range nodes {
-		nodeBytes := common.FromHex(nodeStr)
-		nodeHash := crypto.Keccak256(nodeBytes)
-		require.NoErrorf(tb, proofDB.Put(nodeHash, nodeBytes), "%T.Put(proof node)", proofDB)
-	}
-
-	value, err := trie.VerifyProof(root, key, proofDB)
-	require.NoError(tb, err, "VerifyProof()")
-	return value
 }
