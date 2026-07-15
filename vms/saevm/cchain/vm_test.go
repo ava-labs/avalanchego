@@ -1682,17 +1682,20 @@ func TestWaitForEventThrottle(t *testing.T) {
 		require.NoErrorf(t, err, "%T.WaitForEvent() first call", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, msg, "%T.WaitForEvent() first call event", sut.VM)
 
+                start := time.Now()
 		done := make(chan waitForEventResult, 1)
 		go func() {
 			msg, err := sut.WaitForEvent(ctx)
 			done <- waitForEventResult{msg, err}
 		}()
-
+		
 		// Blocked on the throttle timer until synctest fires it.
 		synctest.Wait()
 		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
 
 		got := <-done
+		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM
+)
 		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
 	})
