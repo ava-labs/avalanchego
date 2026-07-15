@@ -765,20 +765,17 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 // TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
 // proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
 func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
-	require := require.New(t)
+	t.Run("config is built from constants and never reads user input", func(t *testing.T) {
+		defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
+		require.Equal(t, defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+	})
 
-	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
-
-	// The primary network config is built from constants and never reads user
-	// input.
-	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
-
-	// Tracking the primary network is rejected, so a subnet config can never
-	// target it.
-	v := setupViperFlags()
-	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
-	_, err := getTrackedSubnets(v)
-	require.ErrorIs(err, errCannotTrackPrimaryNetwork)
+	t.Run("tracking the primary network is rejected", func(t *testing.T) {
+		v := setupViperFlags()
+		v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
+		_, err := getTrackedSubnets(v)
+		require.ErrorIs(t, err, errCannotTrackPrimaryNetwork)
+	})
 }
 
 func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
