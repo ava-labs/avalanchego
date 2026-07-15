@@ -49,11 +49,31 @@ jobs:
       tag: ${{ steps.derive.outputs.tag }}
       kind: ${{ steps.classify.outputs.kind }}
     steps:
+      # Fail fast, before the 30+ min build fan-out, if the dispatched input is
+      # not an actual tag in origin. Runs before checkout (git ls-remote needs
+      # no local clone) and covers every producer, since they all build this
+      # same tag. Guards against a typo, an un-pushed tag, or a like-named branch.
+      - name: Assert the release tag exists in origin
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.15.0)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code "https://github.com/${REPO}.git" "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in ${REPO}; push the release tags first (task tags-push -- ${TAG_INPUT})." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v5
         with:
-          # Validate the tag's own RELEASES.md and run the tag's release scripts,
-          # not whatever is on the dispatch ref (the default branch).
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          # Fully-qualified tag ref (not a bare name) so a like-named branch can
+          # never shadow the tag. Runs the tag's own RELEASES.md + release
+          # scripts, not whatever is on the dispatch ref (the default branch).
+          ref: refs/tags/${{ github.event.inputs.tag }}
 
       - name: Derive tag
         id: derive
@@ -141,9 +161,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # Render the release body from the tag's RELEASES.md, per the README
-          # contract that the notes section must exist in the tagged commit.
-          ref: ${{ needs.validate-tag.outputs.tag }}
+          # Fully-qualified tag ref: render the release body from the tag's
+          # RELEASES.md, per the README contract that the notes section must
+          # exist in the tagged commit.
+          ref: refs/tags/${{ needs.validate-tag.outputs.tag }}
 
       - name: Find previous tag in RELEASES.md
         id: prev
