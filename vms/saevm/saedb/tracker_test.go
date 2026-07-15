@@ -77,43 +77,27 @@ func TestNewTracker(t *testing.T) {
 	}
 }
 
+// TestProtectTrieIndex simulates every pair of consecutive node runs against
+// the same database. The first run, on a fresh database, always succeeds;
+// only the second may error.
 func TestProtectTrieIndex(t *testing.T) {
-	tests := []struct {
-		name    string
-		runs    []Config // node runs against the same DB; only the last may error
-		wantErr error
-	}{
-		{
-			name: "archival",
-			runs: []Config{{Archival: true}},
-		},
-		{
-			name: "pruning_fresh_db",
-			runs: []Config{{}},
-		},
-		{
-			name:    "pruning_after_archival",
-			runs:    []Config{{Archival: true}, {}},
-			wantErr: errRefuseToCorruptArchiver,
-		},
-		{
-			name: "pruning_after_archival_allowed",
-			runs: []Config{{Archival: true}, {AllowMissingTries: true}},
-		},
-		{
-			name:    "archival_history_outlives_allowed_pruning_run",
-			runs:    []Config{{Archival: true}, {AllowMissingTries: true}, {}},
-			wantErr: errRefuseToCorruptArchiver,
-		},
+	configs := map[string]Config{
+		"archival":        {Archival: true},
+		"pruning":         {},
+		"allowed_pruning": {AllowMissingTries: true},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db := rawdb.NewMemoryDatabase()
-			for _, c := range tt.runs[:len(tt.runs)-1] {
-				require.NoError(t, protectTrieIndex(db, c), "protectTrieIndex(%+v)", c)
-			}
-			last := tt.runs[len(tt.runs)-1]
-			require.ErrorIs(t, protectTrieIndex(db, last), tt.wantErr, "protectTrieIndex(%+v)", last)
-		})
+	wantErrs := map[string]error{
+		"pruning_after_archival": errRefuseToCorruptArchiver,
+	}
+
+	for name1, config1 := range configs {
+		for name2, config2 := range configs {
+			name := name2 + "_after_" + name1
+			t.Run(name, func(t *testing.T) {
+				db := rawdb.NewMemoryDatabase()
+				require.NoError(t, protectTrieIndex(db, config1), "protectTrieIndex(%+v) on fresh DB", config1)
+				require.ErrorIs(t, protectTrieIndex(db, config2), wantErrs[name], "protectTrieIndex(%+v) after first run", config2)
+			})
+		}
 	}
 }

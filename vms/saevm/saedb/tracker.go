@@ -224,15 +224,20 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 
 var errRefuseToCorruptArchiver = errors.New(`node is switching from non-pruning to pruning; if this is intentional, set "allow-missing-tries" via config, otherwise disable pruning`)
 
+// protectTrieIndex prevents a pruning run from deleting tries stored by a
+// previous archival run. Archival runs persistently mark the database, and
+// the marker is never removed. Pruning runs against a marked database return
+// [errRefuseToCorruptArchiver] unless [Config.AllowMissingTries] is set,
+// which bypasses the check without removing the marker.
 func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
 	if c.Archival {
 		return customrawdb.WritePruningDisabled(db)
 	}
-	pruningDisabled, err := customrawdb.HasPruningDisabled(db)
+	prevArchival, err := customrawdb.HasPruningDisabled(db)
 	if err != nil {
 		return err
 	}
-	if !pruningDisabled {
+	if !prevArchival {
 		return nil
 	}
 	if !c.AllowMissingTries {
