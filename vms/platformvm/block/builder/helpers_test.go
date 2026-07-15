@@ -110,13 +110,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = statetest.New(t, statetest.Config{
-		DB:         res.baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: res.config.Validators,
-		Context:    res.ctx,
-		Rewards:    rewardsCalc,
+		DB:           res.baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   res.config.Validators,
+		Upgrades:     res.config.UpgradeConfig,
+		Context:      res.ctx,
+		RewardConfig: res.config.RewardConfig,
 	})
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
@@ -131,7 +131,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		Fx:           res.fx,
 		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()

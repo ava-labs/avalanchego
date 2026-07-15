@@ -11,7 +11,6 @@ import (
 	"math"
 	"math/big"
 	"math/rand/v2"
-	"slices"
 	"sync"
 	"testing"
 
@@ -99,11 +98,17 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
-		hooks: defaultHooks(),
+		hooks:          defaultHooks(),
+		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
 	config := saetest.ChainConfig()
+	saedbConfig := saedb.Config{
+		Archival:         sutCfg.archival,
+		CommitInterval:   sutCfg.commitInterval,
+		SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+	}
+
 	db := rawdb.NewMemoryDatabase()
-	tdbConfig := &triedb.Config{}
 	xdb := saetest.NewExecutionResultsDB()
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
@@ -111,7 +116,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithTrieDBConfig(saedbConfig.TrieDBConfig()),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -123,11 +128,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	saedbConfig := saedb.Config{
-		TrieDBConfig:       tdbConfig,
-		Archival:           sutCfg.archival,
-		TrieCommitInterval: sutCfg.commitInterval,
-	}
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
@@ -662,33 +662,20 @@ func TestGasAccounting(t *testing.T) {
 			To:       nil, // runs call data as a constructor
 			Gas:      100e6,
 			GasPrice: new(big.Int).SetUint64(finalPrice),
-			Data:     asBytes(logTopOfStackAfter(vm.BASEFEE)...),
+			Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE)),
 		})
 
 		b := chain.NewBlock(t, types.Transactions{tx})
 		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), 1, "%T.Receipts()", b)
-		require.Lenf(t, b.Receipts()[0].Logs, 1, "%T.Receipts()[0].Logs", b)
 
-		got := b.Receipts()[0].Logs[0].Topics[0]
+		receipt := b.Receipts()[0]
+		require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
+		got := receipt.Logs[0].Topics[0]
 		want := common.BytesToHash(binary.BigEndian.AppendUint64(nil, finalPrice))
 		assert.Equal(t, want, got)
 	})
-}
-
-// logTopOfStackAfter returns contract bytecode that logs the value on the top
-// of the stack after executing `pre`.
-func logTopOfStackAfter(pre ...vm.OpCode) []vm.OpCode {
-	return slices.Concat(pre, []vm.OpCode{vm.PUSH0, vm.PUSH0, vm.LOG1})
-}
-
-func asBytes(ops ...vm.OpCode) []byte {
-	buf := make([]byte, len(ops))
-	for i, op := range ops {
-		buf[i] = byte(op)
-	}
-	return buf
 }
 
 func FuzzOpCodes(f *testing.F) {
@@ -738,53 +725,53 @@ func TestContextualOpCodes(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		code        []vm.OpCode
+		code        []byte
 		header      func(*types.Header)
 		wantTopic   common.Hash
 		wantTopicFn func() common.Hash // if non-nil, overrides `wantTopic`
 	}{
 		{
 			name:      "BALANCE_of_ADDRESS",
-			code:      logTopOfStackAfter(vm.ADDRESS, vm.BALANCE),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.ADDRESS, vm.BALANCE)),
 			wantTopic: common.Hash{31: txValueSend},
 		},
 		{
 			name:      "CALLVALUE",
-			code:      logTopOfStackAfter(vm.CALLVALUE),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.CALLVALUE)),
 			wantTopic: common.Hash{31: txValueSend},
 		},
 		{
 			name:      "SELFBALANCE",
-			code:      logTopOfStackAfter(vm.SELFBALANCE),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.SELFBALANCE)),
 			wantTopic: common.Hash{31: txValueSend},
 		},
 		{
 			name: "ORIGIN",
-			code: logTopOfStackAfter(vm.ORIGIN),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.ORIGIN)),
 			wantTopic: common.BytesToHash(
 				sut.wallet.Addresses()[0].Bytes(),
 			),
 		},
 		{
 			name: "CALLER",
-			code: logTopOfStackAfter(vm.CALLER),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.CALLER)),
 			wantTopic: common.BytesToHash(
 				sut.wallet.Addresses()[0].Bytes(),
 			),
 		},
 		{
 			name:      "BLOCKHASH_genesis",
-			code:      logTopOfStackAfter(vm.PUSH0, vm.BLOCKHASH),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0, vm.BLOCKHASH)),
 			wantTopic: chain.AllBlocks()[0].Hash(),
 		},
 		{
 			name:      "BLOCKHASH_arbitrary",
-			code:      logTopOfStackAfter(vm.PUSH1, 3, vm.BLOCKHASH),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH1, 3, vm.BLOCKHASH)),
 			wantTopic: chain.AllBlocks()[3].Hash(),
 		},
 		{
 			name:   "NUMBER",
-			code:   logTopOfStackAfter(vm.NUMBER),
+			code:   saetest.LogTopOfStackAfter(saetest.Ops(vm.NUMBER)),
 			header: saveBlockNum.store,
 			wantTopicFn: func() common.Hash {
 				return bigToHash(saveBlockNum.num)
@@ -792,7 +779,7 @@ func TestContextualOpCodes(t *testing.T) {
 		},
 		{
 			name: "COINBASE_arbitrary",
-			code: logTopOfStackAfter(vm.COINBASE),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.COINBASE)),
 			header: func(h *types.Header) {
 				h.Coinbase = common.Address{17: 0xC0, 18: 0xFF, 19: 0xEE}
 			},
@@ -800,11 +787,11 @@ func TestContextualOpCodes(t *testing.T) {
 		},
 		{
 			name: "COINBASE_zero",
-			code: logTopOfStackAfter(vm.COINBASE),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.COINBASE)),
 		},
 		{
 			name: "TIMESTAMP",
-			code: logTopOfStackAfter(vm.TIMESTAMP),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.TIMESTAMP)),
 			header: func(h *types.Header) {
 				h.Time = 0xDECAFBAD
 			},
@@ -812,11 +799,11 @@ func TestContextualOpCodes(t *testing.T) {
 		},
 		{
 			name: "PREVRANDAO",
-			code: logTopOfStackAfter(vm.PREVRANDAO),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.PREVRANDAO)),
 		},
 		{
 			name: "GASLIMIT",
-			code: logTopOfStackAfter(vm.GASLIMIT),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.GASLIMIT)),
 			header: func(h *types.Header) {
 				h.GasLimit = 0xA11CEB0B
 			},
@@ -824,12 +811,12 @@ func TestContextualOpCodes(t *testing.T) {
 		},
 		{
 			name:      "CHAINID",
-			code:      logTopOfStackAfter(vm.CHAINID),
+			code:      saetest.LogTopOfStackAfter(saetest.Ops(vm.CHAINID)),
 			wantTopic: bigToHash(sut.ChainConfig().ChainID),
 		},
 		{
 			name: "BLOBBASEFEE",
-			code: logTopOfStackAfter(vm.BLOBBASEFEE),
+			code: saetest.LogTopOfStackAfter(saetest.Ops(vm.BLOBBASEFEE)),
 			header: func(h *types.Header) {
 				h.ExcessBlobGas = new(uint64)
 			},
@@ -845,7 +832,7 @@ func TestContextualOpCodes(t *testing.T) {
 				To:       nil, // contract creation runs the call data (one sneaky trick blockchain developers don't want you to know)
 				GasPrice: big.NewInt(1),
 				Gas:      100e6,
-				Data:     asBytes(tt.code...),
+				Data:     tt.code,
 				Value:    big.NewInt(txValueSend),
 			})
 
@@ -935,7 +922,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
 	conf := snapshot.Config{
-		CacheSize: saedb.SnapshotCacheSizeMB,
+		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
 		NoBuild:   true, // i.e. MUST be loaded from disk
 	}
 	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
@@ -982,7 +969,7 @@ func TestStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval()):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced

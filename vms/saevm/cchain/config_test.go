@@ -30,10 +30,11 @@ func TestParseConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		json    string
-		want    config
-		wantErr testerr.Want
+		name      string
+		json      string
+		networkID uint32
+		want      config
+		wantErr   testerr.Want
 	}{
 		{
 			name:    "invalid_json",
@@ -53,11 +54,6 @@ func TestParseConfig(t *testing.T) {
 			name: "pruning_disabled",
 			json: `{"pruning-enabled":false}`,
 			want: with(func(c *config) { c.Pruning = false }),
-		},
-		{
-			name: "commit_interval",
-			json: `{"commit-interval":128}`,
-			want: with(func(c *config) { c.CommitInterval = 128 }),
 		},
 		{
 			name: "local_txs_enabled",
@@ -110,6 +106,11 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
+			name: "min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -117,22 +118,48 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 		{
+			name:      "commit_interval_production_network",
+			json:      `{"commit-interval":256}`,
+			networkID: constants.MainnetID,
+			wantErr:   testerr.Is(errProductionCommitInterval),
+		},
+		{
+			name:      "commit_interval_non_production_network",
+			json:      `{"commit-interval":256}`,
+			networkID: constants.UnitTestID,
+			want:      with(func(c *config) { c.CommitInterval = 256 }),
+		},
+		{
+			name: "trie_clean_cache",
+			json: `{"trie-clean-cache":256}`,
+			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+		},
+		{
+			name: "snapshot_cache",
+			json: `{"snapshot-cache":128}`,
+			want: with(func(c *config) { c.SnapshotCache = 128 }),
+		},
+		{
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
+				"min-delay-target":3000,
 				"pruning-enabled":false,
-				"commit-interval":256,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
-				"warp-off-chain-messages":["0x1234"]
+				"warp-off-chain-messages":["0x1234"],
+				"trie-clean-cache":256,
+				"snapshot-cache":128,
+				"commit-interval":256
 			}`,
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
 				GasTarget:            utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
 				CommitInterval:       256,
 				LocalTxsEnabled:      true,
@@ -141,13 +168,15 @@ func TestParseConfig(t *testing.T) {
 				AllowUnprotectedTxs:  true,
 				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
+				TrieCleanCache:       256,
+				SnapshotCache:        128,
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
-			got, err := parseConfig([]byte(test.json))
+			got, err := parseConfig([]byte(test.json), test.networkID)
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
