@@ -4559,6 +4559,150 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorReaddAutoRenewedValidatorTx asserts that re-adding a
+// node that previously validated as an auto-renewed validator produces a
+// staker and staking info derived exclusively from the new tx, with nothing
+// inherited from the exited validator.
+func TestStandardExecutorReaddAutoRenewedValidatorTx(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	nodeID := ids.GenerateTestNodeID()
+
+	oldPop := newProofOfPossession(t)
+
+	// Stage the old validator with non-zero accrued rewards so that any state
+	// leaking into the re-added validator is visible.
+	oldCfg := autoRenewedValidatorConfig{
+		weight:                   2 * env.config.MinValidatorStake,
+		delegateeReward:          2_000,
+		accruedValidationRewards: 3_000,
+		accruedDelegateeRewards:  4_000,
+		delegationRewardShares:   100_000,
+		autoCompoundRewardShares: 300_000,
+		restake:                  false, // graceful stop at cycle end
+	}
+
+	wallet := newWallet(t, env, walletConfig{})
+	oldTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		oldCfg.weight,
+		oldPop,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{},
+		oldCfg.delegationRewardShares,
+		oldCfg.autoCompoundRewardShares,
+		env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+	addAutoRenewedValidator(t, env, oldTx, oldCfg)
+
+	// Gracefully exit the validator at the end of its cycle.
+	oldStaker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+
+	env.state.SetTimestamp(oldStaker.EndTime)
+	rewardTx := newRewardAutoRenewedValidatorTx(t, oldTx.ID(), oldStaker.EndTime)
+
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	require.NoError(t, ProposalTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		rewardTx,
+		onCommitState,
+		onAbortState,
+	))
+	require.NoError(t, onCommitState.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+
+	_, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.ErrorIs(t, err, database.ErrNotFound)
+
+	// Re-add the same node with a different BLS key and different parameters
+	// so every field of the resulting staker is distinguishable from the old
+	// validator's.
+	newSk, err := localsigner.New()
+	require.NoError(t, err)
+
+	newPop, err := signer.NewProofOfPossession(newSk)
+	require.NoError(t, err)
+
+	const (
+		newDelegationShares   = 150_000
+		newAutoCompoundShares = 450_000
+	)
+	newWeight := 3 * env.config.MinValidatorStake
+	newPeriod := 2 * env.config.MinStakeDuration
+
+	wallet = newWallet(t, env, walletConfig{})
+	newTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		newWeight,
+		newPop,
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		newDelegationShares,
+		newAutoCompoundShares,
+		newPeriod,
+	)
+	require.NoError(t, err)
+
+	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	wantPotentialReward := env.backend.Rewards.Calculate(
+		newPeriod,
+		newWeight,
+		currentSupply,
+	)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		newTx,
+		diff,
+	)
+	require.NoError(t, err)
+	require.NoError(t, diff.Apply(env.state))
+
+	// The re-added validator is defined exclusively by the new tx.
+	chainTime := env.state.GetTimestamp()
+	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, &state.Staker{
+		TxID:            newTx.TxID,
+		NodeID:          nodeID,
+		PublicKey:       newSk.PublicKey(),
+		SubnetID:        constants.PrimaryNetworkID,
+		Weight:          newWeight,
+		StartTime:       chainTime,
+		EndTime:         chainTime.Add(newPeriod),
+		PotentialReward: wantPotentialReward,
+		NextTime:        chainTime.Add(newPeriod),
+		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+	}, validator)
+
+	// The staking info starts from a clean slate: none of the old validator's
+	// accrued rewards leak into the re-added one.
+	stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, state.StakingInfo{
+		DelegateeReward:          0,
+		AccruedValidationRewards: 0,
+		AccruedDelegateeRewards:  0,
+		AutoCompoundRewardShares: newAutoCompoundShares,
+		NextPeriod:               uint64(newPeriod / time.Second),
+	}, stakingInfo)
+}
+
 func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 	var (
 		env           = newEnvironment(t, upgradetest.Latest)

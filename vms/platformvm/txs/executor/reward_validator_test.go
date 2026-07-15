@@ -190,7 +190,7 @@ func addAutoRenewedValidator(t testing.TB, env *environment, tx *txs.Tx, cfg aut
 		AutoCompoundRewardShares: cfg.autoCompoundRewardShares,
 	}
 	if cfg.restake {
-		stakingInfo.NextPeriod = env.config.MinValidatorStake
+		stakingInfo.NextPeriod = uint64(env.config.MinStakeDuration / time.Second)
 	}
 
 	nodeID := (tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)).NodeID()
@@ -215,6 +215,9 @@ type wantRewardAutoRenewedValidator struct {
 	// commit* fields below are ignored.
 	commitRestaked                 bool
 	commitWeight                   uint64
+	commitStartTime                time.Time
+	commitEndTime                  time.Time
+	commitPotentialReward          uint64
 	commitAccruedValidationRewards uint64
 	commitAccruedDelegateeRewards  uint64
 
@@ -250,7 +253,9 @@ func assertValidatorRemoved(t testing.TB, chain state.Chain, stakerTx *txs.Tx, r
 	uStakerTx := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 
 	_, err := chain.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
-	require.ErrorIs(t, err, database.ErrNotFound)
+	require.Equal(t, err, database.ErrNotFound)
+	_, err = chain.GetStakingInfo(uStakerTx.SubnetID(), uStakerTx.NodeID())
+	require.Equal(t, database.ErrNotFound, err)
 
 	assertStakeReturned(t, chain, stakerTx.ID(), uStakerTx)
 	assertRewards(t, chain, stakerTx, rewardTxID, rewards)
@@ -298,6 +303,10 @@ func assertRewardAutoRenewedValidator(
 		require.NoError(t, err)
 
 		require.Equal(t, want.commitWeight, validator.Weight)
+		require.Equal(t, want.commitStartTime, validator.StartTime)
+		require.Equal(t, want.commitEndTime, validator.EndTime)
+		require.Equal(t, want.commitPotentialReward, validator.PotentialReward)
+		require.Zero(t, stakingInfo.DelegateeReward)
 		require.Equal(t, want.commitAccruedValidationRewards, stakingInfo.AccruedValidationRewards)
 		require.Equal(t, want.commitAccruedDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
 
@@ -1463,6 +1472,8 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			uStakerTx := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 			staker, err := env.state.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
 			require.NoError(t, err)
+			currentSupply, err := env.state.GetCurrentSupply(uStakerTx.SubnetID())
+			require.NoError(t, err)
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, err)
@@ -1483,6 +1494,20 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				onAbortState,
 			))
 
+			want := tt.want(cfg, staker.PotentialReward)
+			if want.commitRestaked {
+				want.commitStartTime = staker.EndTime
+				want.commitEndTime = staker.EndTime.Add(env.config.MinStakeDuration)
+
+				rewards, err := GetRewardsCalculator(&env.backend, env.state, staker.SubnetID)
+				require.NoError(t, err)
+				want.commitPotentialReward = rewards.Calculate(
+					env.config.MinStakeDuration,
+					want.commitWeight,
+					currentSupply,
+				)
+			}
+
 			assertRewardAutoRenewedValidator(
 				t,
 				env.state,
@@ -1490,7 +1515,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				rewardTx,
 				onCommitState,
 				onAbortState,
-				tt.want(cfg, staker.PotentialReward),
+				want,
 			)
 		})
 	}
