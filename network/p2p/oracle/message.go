@@ -13,13 +13,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-const SourceTypeSolana = "solana"
+const (
+	SourceTypeSolana = "solana"
+	SourceTypeEVM    = "evm"
+)
 
 // KnownSourceTypes is the compile-time set of source types this build supports.
 // The validator config loader and the sidecar main both cross-check configured
 // entries against this set at startup, turning typos into boot failures.
 var KnownSourceTypes = map[string]struct{}{
 	SourceTypeSolana: {},
+	SourceTypeEVM:    {},
 }
 
 func IsKnownSourceType(s string) bool {
