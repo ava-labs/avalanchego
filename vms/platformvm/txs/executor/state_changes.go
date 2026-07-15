@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -172,12 +173,18 @@ func advanceTimeTo(
 				return nil, false, err
 			}
 
-			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			rewards, err := GetRewardsCalculator(
+				backend.Config.RewardConfig,
+				backend.Config.UpgradeConfig,
+				parentState,
+				stakerToRemove.SubnetID,
+			)
 			if err != nil {
 				return nil, false, err
 			}
 
 			potentialReward := rewards.Calculate(
+				stakerToRemove.StartTime,
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
 				supply,
@@ -382,24 +389,28 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
+// GetRewardsCalculator returns the reward calculator for a staker on subnetID.
+// Non-primary network stakers use their subnet's transformation config.
 func GetRewardsCalculator(
-	backend *Backend,
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
 ) (reward.Calculator, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+		return reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig), nil
 	}
 
+	// Non-primary reward-bearing stakers are permissionless stakers. They can
+	// only exist on transformed subnets, so the transform tx must exist.
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
 	}
-
 	return reward.NewCalculator(reward.Config{
 		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
 		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
+		MintingPeriod:      rewardConfig.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}), nil
 }

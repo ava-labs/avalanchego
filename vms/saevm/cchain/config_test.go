@@ -110,6 +110,11 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
+			name: "min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -121,6 +126,7 @@ func TestParseConfig(t *testing.T) {
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
+				"min-delay-target":3000,
 				"pruning-enabled":false,
 				"commit-interval":256,
 				"local-txs-enabled":true,
@@ -133,6 +139,7 @@ func TestParseConfig(t *testing.T) {
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
 				GasTarget:            utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
 				CommitInterval:       256,
 				LocalTxsEnabled:      true,
