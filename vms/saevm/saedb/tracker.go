@@ -233,7 +233,7 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		// Since Firewood doesn't guarantee that the state will be persisted to
 		// disk immediately, it can enter a crash loop missing a settled state.
 		commit = settledRoot
-		because = "settled "
+		because = "settled"
 	case t.config.Archival:
 		commit = executionRoot
 		because = "post-execution archive"
