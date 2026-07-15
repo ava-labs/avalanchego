@@ -19,9 +19,9 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both should be explicitly freed to avoid leaking Rust memory - otherwise we must rely on Go's garbage collector to eventually call `runtime.AddCleanup`.
 
-All proposals tracked by the `TrieDB` are either explicitly freed (via `Drop`) or committed. Proposals are only explicitly dropped in `TrieDB.Close`. All pending and committable proposals are dropped before the database is closed.
+Proposals tracked by the `TrieDB` are freed when committed. Any remaining handles (pending or committable proposals, and revisions held by tries) are force-closed on the Rust side by `TrieDB.Close`, which calls `ffi.Close` with `ffi.WithForceCloseHandles()`.
 
-Revisions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
+Revisions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Outstanding trie references need not be garbage collected before `TrieDB.Close()`, but they are invalid afterward and must not be used. Users must be conscious that holding a `state.Trie` for longer than necessary can easily lead to a memory leak within Firewood.
 
 ## Operation Model
 

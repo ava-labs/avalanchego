@@ -173,7 +173,12 @@ func TestRecoverSimple(t *testing.T) {
 		},
 		{
 			name:      "non_archival_firewood_after_trie_commit",
-			numBlocks: commitInterval, // ensure another settled block
+			numBlocks: commitInterval + 15, // ensure another settled block
+			scheme:    customrawdb.FirewoodScheme,
+		},
+		{
+			name:      "non_archival_firewood_commit_interval_exactly",
+			numBlocks: commitInterval,
 			scheme:    customrawdb.FirewoodScheme,
 		},
 	}
