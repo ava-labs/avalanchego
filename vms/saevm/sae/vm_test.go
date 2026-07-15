@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
@@ -138,6 +139,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		})),
 		vmConfig: Config{
 			MempoolConfig: mempoolConf,
+			DBConfig: saedb.Config{
+				CommitInterval: saedb.DefaultCommitInterval,
+			},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
@@ -266,7 +270,7 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 
 func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.TrieCommitInterval = interval
+		c.vmConfig.DBConfig.CommitInterval = interval
 	})
 }
 

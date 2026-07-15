@@ -87,7 +87,8 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger, prometheus.NewRegistry())
+	dbCfg := saedb.Config{CommitInterval: saedb.DefaultCommitInterval}
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, dbCfg, hookstest.NewStub(1e6), logger, prometheus.NewRegistry())
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
