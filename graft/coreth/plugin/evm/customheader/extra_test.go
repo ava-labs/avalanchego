@@ -785,7 +785,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 			},
 		},
 		{
-			name: "extra_too_long_helicon",
+			name: "extra_truncated_helicon",
 			rules: extras.AvalancheRules{
 				IsHelicon: true,
 			},
@@ -794,7 +794,7 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 			want:      []byte{2},
 		},
 		{
-			name: "extra_too_short_helicon",
+			name: "extra_overwritten_helicon",
 			rules: extras.AvalancheRules{
 				IsHelicon: true,
 			},
