@@ -326,6 +326,9 @@ func earliestBuildTime(b *blocks.Block) time.Time {
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// Throttle to avoid busy looping: the txpools only clear after block
 	// execution, so pending txs can re-signal while their block is processing.
+	//
+	// TODO(JonathanOppenheimer): The txpool should track preference / reorgs so
+	// we don't need this throttle.
 	{
 		defer func() {
 			vm.lastWaitForEvent.Set(time.Now())
