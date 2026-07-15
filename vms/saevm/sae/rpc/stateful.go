@@ -17,13 +17,31 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
+
+// noEndOfBlockOps wraps [hook.Points] to suppress
+// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
+// the tracer to skip end-of-block operations during partial replay.
+//
+// TODO(StephenButtolph): Properly abstract execution to not rely on method
+// suppression. It is fragile and could result in accidentially modifying the
+// block state or even disk state during tracing.
+type noEndOfBlockOps struct {
+	hook.Points
+}
+
+// EndOfBlockOps always returns nil.
+func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
+
+// AfterExecutingBlock always returns nil.
+func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -76,9 +94,6 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := bl.WaitUntilExecuted(ctx); err != nil {
-		return nil, nil, err
-	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
 	// root and the base fee from fields. At the time of writing, the returned
@@ -114,9 +129,6 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := bl.WaitUntilExecuted(ctx); err != nil {
-		return nil, nil, err
-	}
 
 	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 	if err != nil {
@@ -125,79 +137,57 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	return sdb, noopRelease, nil
 }
 
-var errGenesisNotTraceable = errors.New("genesis is not traceable")
-
-// replay begins a re-execution of ethB's transactions from its parent's
-// post-execution state with the given base fee (see [saexec.NewExecution]),
-// suppressing receipt broadcasting. End-of-block operations never run because
-// RPC callers MUST NOT call [saexec.Execution.Finish].
-func (b *backend) replay(ctx context.Context, ethB *types.Block, baseFee *uint256.Int) (*saexec.Execution, error) {
-	if ethB.NumberU64() == 0 {
-		return nil, errGenesisNotTraceable
-	}
-	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
-	if err != nil {
-		return nil, fmt.Errorf("restoring parent block: %w", err)
-	}
-	// [saexec.NewExecution] would otherwise block indefinitely on the parent's
-	// execution artifacts.
-	if err := parent.WaitUntilExecuted(ctx); err != nil {
-		return nil, err
-	}
-	block, err := b.NewBlock(ethB, parent, nil)
-	if err != nil {
-		return nil, fmt.Errorf("constructing SAE block: %v", err)
-	}
-	return saexec.NewExecution(
-		block,
-		b,
-		b.Hooks(),
-		b.ChainConfig(),
-		b.ChainContext(),
-		&saexec.NullReceiptStore{},
-		b.Logger(),
-		baseFee,
-	)
-}
-
 // StateAtTransaction returns the execution environment of a particular
-// transaction within a block, replaying all preceding transactions with
-// [backend.replay].
+// transaction within a block. It replays all preceding transactions to produce
+// the state just before the target transaction, then returns the message and
+// block context needed for tracing.
+//
+// Replay calls [saexec.Execute] - the same pipeline used by
+// [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
+// operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
+	if ethB.NumberU64() == 0 {
+		return nil, bCtx, nil, nil, errors.New("no transactions in genesis")
+	}
 	txs := ethB.Transactions()
 	if txIndex < 0 || txIndex >= len(txs) {
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	// The gas clock cannot reproduce a synchronous block's base fee, so
-	// restorable blocks replay with their originally executed one.
-	var baseFee *uint256.Int
-	switch target, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */)); {
-	case err == nil:
-		if err := target.WaitUntilExecuted(ctx); err != nil {
-			return nil, bCtx, nil, nil, err
-		}
-		baseFee = target.ExecutedBaseFee()
-	case !errors.Is(err, blocks.ErrNotFound):
-		return nil, bCtx, nil, nil, fmt.Errorf("restoring block: %w", err)
+	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
+		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
+	}
+	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
+	if err != nil {
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
+	}
+	block, err := b.NewBlock(ethB, parent, nil)
+	if err != nil {
+		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
 
-	exec, err := b.replay(ctx, ethB, baseFee)
+	// Replay transactions 0..txIndex-1 to produce the state just before the
+	// target transaction.
+	result, err := saexec.Execute(
+		block,
+		b,
+		txIndex,
+		noEndOfBlockOps{b.Hooks()},
+		b.ChainConfig(),
+		b.ChainContext(),
+		&saexec.NullReceiptStore{},
+		b.Logger(),
+	)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	for range txIndex {
-		if _, err := exec.ExecuteNextTransaction(vm.Config{}); err != nil {
-			return nil, bCtx, nil, nil, err
-		}
-	}
 
-	msg, err := core.TransactionToMessage(txs[txIndex], exec.Signer(), exec.BaseFee().ToBig())
+	msg, err := core.TransactionToMessage(txs[txIndex], result.Signer, result.BaseFee.ToBig())
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, exec.BlockContext(), exec.StateDB(), noopRelease, nil
+	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
 }
