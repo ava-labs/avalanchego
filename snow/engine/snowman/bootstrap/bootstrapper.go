@@ -34,9 +34,8 @@ const (
 	bootstrappingDelay = 10 * time.Second
 
 	// followOnlyPollInterval is how long a [FollowOnly] chain waits before
-	// re-checking the beacon frontier for new blocks. Roughly the P-chain block
-	// cadence: short enough to track the tip within a couple seconds, long
-	// enough that an idle follower polls a couple times rather than spinning.
+	// re-checking the beacon frontier for new blocks. Roughly the P-chain
+	// block cadence.
 	followOnlyPollInterval = 2 * time.Second
 
 	// statusUpdateFrequency is how many containers should be processed between
@@ -124,9 +123,8 @@ type Bootstrapper struct {
 	// already closed once the chain has synced), so the delay actually applies
 	// instead of firing instantly and spinning the CPU.
 	followOnlyTimer common.TimeoutRegistrar
-	// followOnlyTipID is the beacon frontier a [FollowOnly] chain has already
-	// synced to. While the polled frontier still equals it there is no new
-	// block, so the re-arm just waits instead of re-fetching the same window.
+	// followOnlyTipID is the last frontier a [FollowOnly] chain synced to, used
+	// to skip re-fetching when the frontier hasn't advanced.
 	followOnlyTipID ids.ID
 
 	tree            *interval.Tree
@@ -174,10 +172,16 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 
 		if err := bs.Timeout(); err != nil {
 			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			if bs.Config.FollowOnly {
+				// Keep polling; otherwise this chain would stop tracking the
+				// tip forever.
+				bs.awaitingTimeout = true
+				bs.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+			}
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
-	// nil preemption signal => never preempted, so the re-arm delay is honored.
+	// A nil preemption signal is never closed, so this timer is never preempted.
 	bs.followOnlyTimer = common.NewTimeoutScheduler(timeout, nil)
 
 	return bs, err
@@ -405,11 +409,9 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
-	// Follow-only idle guard: on a re-arm where the beacon frontier still equals
-	// the block we already synced to, there is nothing new. Skip the re-fetch /
-	// re-accept of the same window (which otherwise churns CPU + leveldb every
-	// poll) and just wait for the next poll. Catch-up (frontier is a new block)
-	// and the initial sync (b.restarted == false) fall through and fetch.
+	// On a [FollowOnly] re-arm, if the beacon frontier hasn't advanced past the
+	// tip we already synced, don't re-fetch and re-execute the same window; just
+	// schedule the next poll.
 	if b.Config.FollowOnly && b.restarted &&
 		len(acceptedBlockIDs) == 1 && acceptedBlockIDs[0] == b.followOnlyTipID {
 		b.awaitingTimeout = true
@@ -764,11 +766,15 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	// Notify the subnet that this chain is synced
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
-	// Follow-only chains never hand off to consensus. After catching up they
-	// re-arm on [followOnlyTimer] (non-preemptable) to keep tracking the tip.
-	// Record the synced tip so the next poll can no-op until a new block appears.
+	// Follow-only chains never hand off to consensus; re-arm to keep tracking
+	// the tip.
 	if b.Config.FollowOnly {
-		b.followOnlyTipID = lastAccepted.ID()
+		// Re-fetch the tip: execute advanced it past [lastAccepted].
+		if tip, err := b.getLastAccepted(ctx); err != nil {
+			b.Ctx.Log.Warn("failed to get last accepted block", zap.Error(err))
+		} else {
+			b.followOnlyTipID = tip.ID()
+		}
 		b.awaitingTimeout = true
 		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
 		return nil

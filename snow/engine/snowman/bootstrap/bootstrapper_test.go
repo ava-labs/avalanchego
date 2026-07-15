@@ -558,9 +558,8 @@ func TestBootstrapperFollowOnlyNeverHandsOff(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	// A follow-only chain must re-arm on its own non-preemptable timer, never
-	// on the shared registrar (which is preempted once the subnet is
-	// bootstrapped and would fire instantly).
+	// A follow-only chain must never use the shared registrar, which is
+	// preempted once the subnet is bootstrapped and would fire instantly.
 	bs.TimeoutRegistrar = &enginetest.Timer{T: t, CantRegisterTimout: true}
 	rearms := 0
 	bs.followOnlyTimer = &enginetest.Timer{
@@ -603,6 +602,15 @@ func TestBootstrapperFollowOnlyNeverHandsOff(t *testing.T) {
 	require.False(onFinishedCalled)
 	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
 	require.Equal(3, rearms)
+
+	// The recorded tip must be the post-execution frontier: the first idle
+	// poll after the catch-up must not touch the VM or the sender at all.
+	vm.GetBlockF = nil
+	vm.LastAcceptedF = nil
+	sender.SendGetAncestorsF = nil
+	require.NoError(bs.Timeout())
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[1:2])))
+	require.Equal(4, rearms)
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
