@@ -106,7 +106,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		txs[i] = ht
 	}
 
-	now := h.BlockTime(b.Header())
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
 	return &builder{
 		h.ctx,
 		h.chainConfig,
@@ -115,9 +117,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		},
 		slices.Values(txs),
 		desiredParams{
-			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
-			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(b.Header()).MinDelayExcess),
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
