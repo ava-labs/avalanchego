@@ -2,11 +2,19 @@
 
 ## Overview
 
-Pushing a `v*.*.*` tag creates a **draft** GitHub release page with release notes
-parsed from [`RELEASES.md`](../../RELEASES.md), a `Previous Tag:` pointer, and all
-build artifacts attached ([#5162](https://github.com/ava-labs/avalanchego/issues/5162)).
+Dispatching the release workflow for a `vX.Y.Z` tag (after the tags are pushed)
+creates a **draft** GitHub release page with release notes parsed from
+[`RELEASES.md`](../../RELEASES.md), a `Previous Tag:` pointer, and all build
+artifacts attached ([#5162](https://github.com/ava-labs/avalanchego/issues/5162)).
 A human reviews the draft and publishes it via the GitHub UI; nothing becomes
 publicly visible without that step.
+
+The release is triggered by `workflow_dispatch`, not a `push: tags` filter. The
+release procedure pushes four tags at once (root + three graft modules), and
+GitHub creates no tag push events when more than three tags are pushed together,
+so a tag-push trigger would silently never fire. Dispatching explicitly also
+keeps a release from waking the repo's wildcard `tags: "*"` workflows (CI, Bazel,
+buf, Docker publish), which the four-tag push otherwise leaves suppressed.
 
 Audience: maintainers cutting releases; CI maintainers changing the release
 pipeline or its artifact set.
@@ -19,9 +27,11 @@ Cutting a release:
    `## Pending (vX.Y.Z)` or `## [vX.Y.Z](url)` — with a non-empty body. The
    section must exist **in the tagged commit**; the workflow fails fast (before
    any build) if it doesn't.
-2. Push the tag. The [`release` workflow](../workflows/release.yml) validates,
-   fans out the five artifact builds, and creates the draft release.
-3. Review the draft on GitHub (title, body, asset set, pre-release flag) and
+2. Push the tags: `task tags-push -- vX.Y.Z`.
+3. Dispatch the release: `task release:trigger -- vX.Y.Z`. The
+   [`release` workflow](../workflows/release.yml) validates, fans out the
+   artifact builds, and creates the draft release.
+4. Review the draft on GitHub (title, body, asset set, pre-release flag) and
    publish it. Decide "set as latest" in the UI — the workflow never sets it.
 
 Tags with a semver suffix (e.g. `v1.15.0-rc1`) are marked `prerelease`.
@@ -44,26 +54,27 @@ Failure recovery:
   everything the manifest requires; the draft is not created.
 
 Ad-hoc rebuilds of a single producer still work via each producer workflow's
-`workflow_dispatch`. A commented-out direct-publish opt-in (skip the draft
-step) lives in [`release.yml`](../workflows/release.yml).
+`workflow_dispatch`.
 
 ## Conceptual model
 
 ```
-push v*.*.* ── validate-tag ──┬─ build-linux-packages ─┐  (rpm + deb, jammy/noble S3)
-  classify stable/prerelease  ├─ build-linux           ┤  publish
-  duplicate-release guard     ├─ build-macos           ┼► body + publish-set gates
-  RELEASES.md notes gate      └────────────────────────┘  draft release + post-assert
+release:trigger(tag) ── validate-tag ──┬─ build-linux-packages ─┐  (rpm + deb, jammy/noble S3)
+  (workflow_dispatch)                   ├─ build-linux           ┤  publish
+  classify stable/prerelease            ├─ build-macos           ┼► body + publish-set gates
+  duplicate-release guard               └────────────────────────┘  draft release + post-assert
+  RELEASES.md notes gate
 ```
 
-One umbrella workflow ([`release.yml`](../workflows/release.yml)) owns the
-`push: tags` trigger and calls its producer workflows via `workflow_call`;
-`needs:` makes `publish` wait for all of them, and artifacts are collected
-in-run with `actions/download-artifact`. Linux packages (RPM + DEB) come from
-the unified [`build-linux-packages.yml`](../workflows/build-linux-packages.yml),
-made reusable for this umbrella; it builds one codename-agnostic `.deb` per arch
-and, on the tag push, fans each into the jammy + noble S3 prefixes. All release
-logic lives in single-purpose `release-*.sh` helpers under
+One umbrella workflow ([`release.yml`](../workflows/release.yml)) is dispatched
+explicitly (`task release:trigger`) and calls its producer workflows via
+`workflow_call`; `needs:` makes `publish` wait for all of them, and artifacts
+are collected in-run with `actions/download-artifact`. Linux packages (RPM +
+DEB) come from the unified
+[`build-linux-packages.yml`](../workflows/build-linux-packages.yml), made
+reusable for this umbrella; it builds one codename-agnostic `.deb` per arch and,
+on a release, fans each into the jammy + noble S3 prefixes. All release logic
+lives in single-purpose `release-*.sh` helpers under
 [`.github/workflows/`](../workflows/); the YAML only wires them together.
 
 [`release-expected-manifest.sh`](../workflows/release-expected-manifest.sh) is

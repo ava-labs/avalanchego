@@ -74,6 +74,14 @@ tasks:
       Usage: GH_REPO=ava-labs/avalanchego task release:assert-published-assets -- v1.14.3
     cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-assert-published-assets.sh {{.CLI_ARGS}}'
 
+  trigger:
+    desc: |
+      Dispatch the release workflow for TAG. The release is dispatch-driven,
+      not tag-push-driven (see README). Run after `task tags-push -- <TAG>`.
+      Requires an authenticated `gh`.
+      Usage: task release:trigger -- v1.15.0
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-trigger.sh {{.CLI_ARGS}}'
+
   # ----- Composites (script-backed; Taskfile stays thin) -----
 
   validate-tag:

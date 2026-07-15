@@ -36,6 +36,9 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v5
+        with:
+          # Build the release tag's source, not the dispatch/caller ref.
+          ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 

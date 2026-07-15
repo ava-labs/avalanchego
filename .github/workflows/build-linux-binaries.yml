@@ -25,6 +25,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Build the release tag's source, not the dispatch/caller ref.
+          # inputs.tag is the tag passed by the release umbrella (workflow_call);
+          # github.event.inputs.tag covers direct dispatch; github.ref covers push.
+          ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -92,6 +97,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Build the release tag's source, not the dispatch/caller ref.
+          # inputs.tag is the tag passed by the release umbrella (workflow_call);
+          # github.event.inputs.tag covers direct dispatch; github.ref covers push.
+          ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
 
       - uses: ./.github/actions/setup-go-for-project
 

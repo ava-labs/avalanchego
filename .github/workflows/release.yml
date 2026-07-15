@@ -1,25 +1,25 @@
 name: release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-  # Hidden direct-publish opt-in. The active default is draft creation —
-  # direct publishing requires uncommenting the block below AND swapping
-  # the `draft:`/`make_latest:` lines in the publish job.
-  # workflow_dispatch:
-  #   inputs:
-  #     tag:
-  #       description: 'Tag to publish (non-draft) a release for'
-  #       required: true
+  # Dispatch-driven, NOT tag-push-driven. The release procedure pushes four
+  # tags at once (root + three graft modules), and GitHub creates no tag push
+  # events when more than three tags are pushed together
+  # (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push),
+  # so a `push: tags` trigger would silently never fire. Dispatching explicitly
+  # (see `task release:trigger -- vX.Y.Z`) also keeps a release from waking the
+  # repo's wildcard `tags: "*"` workflows (CI, Bazel, buf, Docker publish),
+  # which the four-tag push otherwise leaves suppressed. The release still lands
+  # as a DRAFT (see the publish job); a human publishes it from the GitHub UI.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and draft a release for (e.g. v1.15.0)'
+        required: true
 
-# Defense against force-pushed tag re-runs: serialize publishers for the
-# same tag ref. Tags are immutable absent --force, but if someone
-# force-pushes the same tag twice in quick succession, the concurrency
-# group ensures the second run waits and then hits the fail-closed
-# existence check.
+# Serialize publishers for the same tag: re-dispatching a tag while a run is in
+# flight makes the second run wait, then hit the fail-closed existence check.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.inputs.tag }}
   cancel-in-progress: false
 
 # Principle of least privilege. Default workflow scope to read-only. Each
@@ -50,6 +50,10 @@ jobs:
       kind: ${{ steps.classify.outputs.kind }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Validate the tag's own RELEASES.md and run the tag's release scripts,
+          # not whatever is on the dispatch ref (the default branch).
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Derive tag
         id: derive
@@ -136,6 +140,10 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Render the release body from the tag's RELEASES.md, per the README
+          # contract that the notes section must exist in the tagged commit.
+          ref: ${{ needs.validate-tag.outputs.tag }}
 
       - name: Find previous tag in RELEASES.md
         id: prev
