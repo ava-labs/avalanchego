@@ -28,7 +28,7 @@ const SafeMaxBytes uint64 = constants.DefaultMaxMessageSize
 // The transaction's byte share is y/M and its gas share is g/x. The rule rejects
 // the transaction if its byte share exceeds its gas share:
 //
-//	accept if  y/M < g/x  <->   y·x < g·M
+//	accept if  y/M <= g/x  <->   y·x <= g·M
 //
 // Equivalently, it must carry at least x/M gas per serialized byte.
 func Eligible(tx *types.Transaction, blockGasLimit, maxBytes uint64) bool {

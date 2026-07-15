@@ -24,7 +24,7 @@ gates on the gas-to-byte ratio directly.)
 A transaction is eligible only if its **byte share does not exceed its gas
 share**:
 
-$$\text{accept if } \quad \frac{y}{M} < \frac{g}{x} \quad \iff \quad y x < g M$$
+$$\text{accept if } \quad \frac{y}{M} \le \frac{g}{x} \quad \iff \quad y x \le g M$$
 
 where `M` = max message size, `x` = block gas limit, `g` = tx gas limit, `y` =
 tx serialized size — i.e. it must carry at least `x/M ≈ 38.15` gas per byte (at

@@ -199,9 +199,7 @@ func TestSetRejectsLowGasPerByte(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.submit(t.Context(), tt.tx)
 			require.ErrorIs(t, err, tt.wantErr)
-			if tt.wantErr != nil {
-				require.False(t, s.Has(Transaction{tt.tx}.GossipID()), "Has(Transaction.GossipID())")
-			}
+			require.Equalf(t, tt.wantErr == nil, s.Has(Transaction{tt.tx}.GossipID()), "Has(GossipID()) after %s", tt.name)
 		})
 	}
 }
