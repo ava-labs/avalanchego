@@ -15,12 +15,9 @@ import (
 
 const (
 	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
-	// "use the default". The floor is 1000ms because the proposerVM block
-	// timestamp is currently whole-second granular: the slot clock only ticks
-	// once per second, so a sub-second window gains nothing. Sub-second windows
-	// (and a lower floor) arrive in a follow-up PR that adds millisecond-granular
-	// timestamps. The ceiling is the default window, since a larger window only
-	// slows failover.
+	// "use the default". The floor is 1000ms because block timestamps are
+	// second-granular, so a sub-second window cannot advance the slot clock. The
+	// ceiling is the default window, since a larger window only slows failover.
 	MinProposerWindowMilliseconds = 1_000
 	MaxProposerWindowMilliseconds = 5_000
 )

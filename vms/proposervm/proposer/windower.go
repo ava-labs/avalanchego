@@ -23,10 +23,8 @@ import (
 
 // Proposer list constants
 const (
-	// DefaultWindowDuration is the default length of a single proposer slot,
-	// preserved at 5s so networks that do not configure a window behave
-	// identically to prior versions. See [New] for the requirement that all
-	// validators of a chain agree on it.
+	// DefaultWindowDuration is the default length of a single proposer slot. See
+	// [New] for the requirement that all validators of a chain agree on it.
 	DefaultWindowDuration = 5 * time.Second
 
 	// Slot counts, independent of the window duration. The

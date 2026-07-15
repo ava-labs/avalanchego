@@ -592,20 +592,6 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		"unset proposer window inherits the default": {
-			givenJSON: `{
-				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"validatorOnly": true
-				}
-			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-				require.Equal(uint64(proposervm.DefaultWindowDuration/time.Millisecond), config.ProposerWindowMilliseconds)
-			},
-			expectedErr: nil,
-		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -615,6 +601,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.True(ok)
 				// should respect defaults
 				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+				require.Equal(uint64(proposervm.DefaultWindowDuration/time.Millisecond), config.ProposerWindowMilliseconds)
 			},
 			expectedErr: nil,
 		},
@@ -782,12 +769,12 @@ func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
 
 	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
 
-	// Layer 1: the primary network's window is pinned to the default and never
-	// reads user input.
+	// The primary network config is built from constants and never reads user
+	// input.
 	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
 
-	// Layer 2: tracking the primary network (the only way a subnet config could
-	// reach it) is rejected before any config is read.
+	// Tracking the primary network is rejected, so a subnet config can never
+	// target it.
 	v := setupViperFlags()
 	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
 	_, err := getTrackedSubnets(v)
