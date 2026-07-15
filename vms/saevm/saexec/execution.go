@@ -195,6 +195,10 @@ func Execute(
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
 
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
+
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
@@ -246,6 +250,14 @@ func Execute(
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
+
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
+		}
+		// Finalise any state changes made by the hook as part of this
+		// transaction, mirroring the finalisation performed by
+		// [core.ApplyTransaction].
+		stateDB.Finalise(rules.IsEIP158)
 	}
 
 	numTxs := len(b.Transactions())
