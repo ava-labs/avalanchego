@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -39,9 +39,9 @@ type config struct {
 
 	// State & trie
 	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie; 0 uses the default (4096).
-	// TrieCleanCache       int     `json:"trie-clean-cache"`
-	// SnapshotCache        int     `json:"snapshot-cache"`
+	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
+	TrieCleanCache uint64 `json:"trie-clean-cache"`
+	SnapshotCache  uint64 `json:"snapshot-cache"`
 	// AllowMissingTries    bool    `json:"allow-missing-tries"`
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
@@ -81,15 +81,20 @@ type config struct {
 func defaultConfig() config {
 	return config{
 		Pruning:            true,
+		CommitInterval:     saedb.DefaultCommitInterval,
+		TrieCleanCache:     saedb.DefaultTrieCacheSizeMiB,
+		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
 		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
 
+var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values.
-func parseConfig(b []byte) (config, error) {
+func parseConfig(b []byte, networkID uint32) (config, error) {
 	c := defaultConfig()
 	if len(b) == 0 {
 		return c, nil
@@ -98,8 +103,16 @@ func parseConfig(b []byte) (config, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
-	if err := c.saeConfig(nil).RPCConfig.Verify(); err != nil {
+	saeCfg := c.saeConfig(nil)
+	if err := saeCfg.RPCConfig.Verify(); err != nil {
 		return config{}, err
+	}
+	if err := saeCfg.DBConfig.Verify(); err != nil {
+		return config{}, err
+	}
+	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
+		constants.ProductionNetworkIDs.Contains(networkID) {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
 }
@@ -114,9 +127,10 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
-			TrieDBConfig:       triedb.HashDefaults,
-			Archival:           !c.Pruning,
-			TrieCommitInterval: c.CommitInterval,
+			Archival:         !c.Pruning,
+			TrieCacheMiB:     c.TrieCleanCache,
+			CommitInterval:   c.CommitInterval,
+			SnapshotCacheMiB: c.SnapshotCache,
 		},
 		RPCConfig: rpc.Config{
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,

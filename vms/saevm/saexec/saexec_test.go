@@ -98,11 +98,17 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
-		hooks: defaultHooks(),
+		hooks:          defaultHooks(),
+		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
 	config := saetest.ChainConfig()
+	saedbConfig := saedb.Config{
+		Archival:         sutCfg.archival,
+		CommitInterval:   sutCfg.commitInterval,
+		SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+	}
+
 	db := rawdb.NewMemoryDatabase()
-	tdbConfig := &triedb.Config{}
 	xdb := saetest.NewExecutionResultsDB()
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
@@ -110,7 +116,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithTrieDBConfig(saedbConfig.TrieDBConfig()),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -122,11 +128,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	saedbConfig := saedb.Config{
-		TrieDBConfig:       tdbConfig,
-		Archival:           sutCfg.archival,
-		TrieCommitInterval: sutCfg.commitInterval,
-	}
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
@@ -921,7 +922,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
 	conf := snapshot.Config{
-		CacheSize: saedb.SnapshotCacheSizeMB,
+		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
 		NoBuild:   true, // i.e. MUST be loaded from disk
 	}
 	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
@@ -968,7 +969,7 @@ func TestStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval()):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced
