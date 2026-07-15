@@ -68,10 +68,13 @@ between `1000` (1s) and `5000` (5s) inclusive.
 { "proposerWindowMilliseconds": 1000 }
 ```
 
+Most Subnets do not need this. It exists for one narrow case: small
+proof-of-authority L1s where a single offline validator stalls a large share of
+proposer slots and failover time matters more than extra rejected blocks.
+
 Slots are `proposerWindowMilliseconds` apart. When a scheduled proposer is
 offline, the chain stalls until the next live proposer's slot opens, so a smaller
-window speeds failover recovery (useful for CFT/PoA L1s) at the cost of more
-rejected blocks. The floor is 1s because the proposerVM block timestamp is
+window speeds failover recovery at the cost of more rejected blocks. The floor is 1s because the proposerVM block timestamp is
 whole-second granular: the slot clock only ticks once per second, so a sub-second
 window gains nothing without millisecond-granular timestamps.
 
