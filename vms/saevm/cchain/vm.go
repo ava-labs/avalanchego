@@ -330,10 +330,6 @@ const minWaitForEventDelay = 100 * time.Millisecond
 // block has elapsed, then waits for a transaction to be in the txpool or for
 // the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	defer func() {
-		vm.lastWaitForEvent.Set(vm.now())
-	}()
-
 	// Throttle to avoid busy looping: the txpools only clear after block
 	// execution, so pending txs can re-signal while their block is processing.
 	//
@@ -374,6 +370,9 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	}()
 
 	r := <-results
+	if r.err == nil {
+		vm.lastWaitForEvent.Set(vm.now())
+	}
 	return r.msg, r.err
 }
 
