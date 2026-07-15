@@ -4467,7 +4467,15 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
-	wantPotentialReward := env.backend.Rewards.Calculate(
+	rewards, err := GetRewardsCalculator(
+		env.config.RewardConfig,
+		env.config.UpgradeConfig,
+		env.state,
+		constants.PrimaryNetworkID,
+	)
+	require.NoError(t, err)
+	wantPotentialReward := rewards.Calculate(
+		env.state.GetTimestamp(),
 		period,
 		weight,
 		currentSupply,
