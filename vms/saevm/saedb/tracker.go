@@ -137,8 +137,8 @@ func (c Config) snapConfig() *snapshot.Config {
 		return nil
 	}
 	if c.Scheme == customrawdb.FirewoodScheme {
-		// Firewood already has generic node lookups, so the snapshot provides
-		// unnecessary overhead.
+		// Firewood already has efficient value lookups, so the snapshot
+		// provides unnecessary overhead.
 		return nil
 	}
 	return &snapshot.Config{

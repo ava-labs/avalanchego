@@ -37,7 +37,6 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -71,12 +70,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	saedbConfig saedb.Config
-	chain       *blockstest.ChainBuilder
-	wallet      *saetest.Wallet
-	logger      *loggingtest.Logger
-	db          ethdb.Database
-	snowCtx     *snow.Context
+	saedbConfig  saedb.Config
+	chain        *blockstest.ChainBuilder
+	wallet       *saetest.Wallet
+	logger       *loggingtest.Logger
+	db           ethdb.Database
+	chainDataDir string
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -147,14 +146,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:    e,
-		saedbConfig: saedbConfig,
-		chain:       chain,
-		wallet:      wallet,
-		logger:      logger,
-		db:          db,
-		snowCtx:     snowCtx,
-		closeOnce:   closeOnce,
+		Executor:     e,
+		saedbConfig:  saedbConfig,
+		chain:        chain,
+		wallet:       wallet,
+		logger:       logger,
+		db:           db,
+		chainDataDir: snowCtx.ChainDataDir,
+		closeOnce:    closeOnce,
 	}
 }
 
@@ -1047,7 +1046,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   rawdb.HashScheme,
 			archival: true,
 			expectAvailable: func(height uint64) bool {
-				// all executed states MUST be available.
+				// All executed states MUST be available.
 				return height <= numBlocks
 			},
 		},
@@ -1056,9 +1055,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: true,
 			expectAvailable: func(height uint64) bool {
-				// all settled states MUST be available.
-				// the last executed state MUST NOT be available, otherwise
-				// firewood cannot create a new state for the next block.
+				// All settled states MUST be available.
+				// The last executed state MUST NOT be available, since
+				// Firewood guarantees recovery from the last committed proposal.
 				return height < numBlocks
 			},
 		},
@@ -1067,7 +1066,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,
 			expectAvailable: func(height uint64) bool {
-				// only the last settled state should be available.
+				// Only the last settled state should be available.
 				return height == numBlocks-1
 			},
 		},
@@ -1120,8 +1119,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			t.Run("recover", func(t *testing.T) {
 				// Restart the chain to remove the TrieDB cache.
 				src := blocks.Source(chain.GetBlock)
-				snowCtx := sut.snowCtx
-				snowCtx.Log = loggingtest.New(t, logging.Debug) // replace the `*testing.T` used.
+				snowCtx := snowtest.Context(t, ids.GenerateTestID())
+				snowCtx.ChainDataDir = sut.chainDataDir
+				snowCtx.Log = loggingtest.New(t, logging.Debug)
 				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
