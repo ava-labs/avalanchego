@@ -255,6 +255,16 @@ jobs:
           fi
           echo "Tag '${TAG}' still points to the validated commit ${EXPECTED_SHA}."
 
+      # Re-verify the full coordinated tag set immediately before release
+      # creation. validate-tag ran this before the ~30 min build window, so a
+      # module tag (graft/coreth, graft/evm, graft/subnet-evm) could have been
+      # moved or deleted since. verify_tags_remote.sh asserts all release tags
+      # still exist and peel to one commit; the guard above already pinned the
+      # root tag to the validated SHA, so the whole set is at that commit.
+      - name: Re-verify the full release tag set is intact
+        run: ./scripts/verify_tags_remote.sh "$TAG"
+        shell: bash
+
       - name: Create GitHub release (as draft)
         uses: softprops/action-gh-release@v2
         with:
