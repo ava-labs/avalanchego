@@ -184,10 +184,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # Fully-qualified tag ref: render the release body from the tag's
-          # RELEASES.md, per the README contract that the notes section must
-          # exist in the tagged commit.
-          ref: refs/tags/${{ needs.validate-tag.outputs.tag }}
+          # Pin to the exact commit validate-tag resolved, not the mutable tag
+          # name, so the release body and publish-set are rendered from the
+          # validated tree even if the tag is moved mid-run. The tag-move guard
+          # below still confirms origin's tag (which the release points at via
+          # tag_name) has not moved off this commit before publishing.
+          ref: ${{ needs.validate-tag.outputs.sha }}
 
       - name: Find previous tag in RELEASES.md
         id: prev
