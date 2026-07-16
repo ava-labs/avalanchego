@@ -147,6 +147,19 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
+	// callFrame is the JSON encoding of the native callTracer's output.
+	// TODO(JonathanOppenheimer): export from libevm?
+	type callFrame struct {
+		From    common.Address  `json:"from"`
+		Gas     hexutil.Uint64  `json:"gas"`
+		GasUsed hexutil.Uint64  `json:"gasUsed"`
+		To      *common.Address `json:"to"`
+		Input   hexutil.Bytes   `json:"input"`
+		Value   *hexutil.Big    `json:"value"`
+		Type    string          `json:"type"`
+		Error   string          `json:"error"`
+	}
+
 	tests := []rpcTest{
 		{
 			method:       "debug_traceBlockByNumber",
@@ -184,23 +197,25 @@ func TestDebugTrace(t *testing.T) {
 			wantErr: testerr.Contains("not found"),
 		},
 		{
-			method: "debug_traceBlockByNumber",
-			args: []any{
-				hexutil.Uint64(depositBlock.NumberU64()),
-				map[string]any{
-					"tracer": `{
-						step: function() {
-							for (;;) {}
-						},
-						fault: function() {},
-						result: function() {
-							return {};
-						}
-					}`,
-					"timeout": "10ms",
-				},
-			},
+			method: "debug_traceTransaction",
+			args: []any{depositTx.Hash(), map[string]any{
+				"tracer":  `{fault: function() {}, result: function() { for (;;) {} }}`,
+				"timeout": "10ms",
+			}},
 			wantErr: testerr.Contains("execution timeout"),
+		},
+		{
+			method: "debug_traceTransaction",
+			args:   []any{depositTx.Hash(), map[string]any{"tracer": "callTracer"}},
+			want: callFrame{
+				From:    sut.wallet.Addresses()[0],
+				Gas:     hexutil.Uint64(depositTx.Gas()),
+				GasUsed: hexutil.Uint64(depositBlock.Receipts()[0].GasUsed),
+				To:      &escrowAddr,
+				Input:   escrow.CallDataToDeposit(recipient),
+				Value:   (*hexutil.Big)(big.NewInt(escrowDepositVal)),
+				Type:    "CALL",
+			},
 		},
 	}
 
