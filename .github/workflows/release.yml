@@ -144,6 +144,7 @@ jobs:
     uses: ./.github/workflows/build-linux-packages.yml
     with:
       tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
     secrets: inherit
     permissions:
       contents: read
@@ -154,6 +155,7 @@ jobs:
     uses: ./.github/workflows/build-linux-binaries.yml
     with:
       tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
     secrets: inherit
     permissions:
       contents: read
@@ -164,6 +166,7 @@ jobs:
     uses: ./.github/workflows/build-macos-release.yml
     with:
       tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
     secrets: inherit
     permissions:
       contents: read

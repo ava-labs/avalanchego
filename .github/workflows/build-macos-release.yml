@@ -10,6 +10,11 @@ on:
         description: 'Tag to include in artifact name'
         type: string
         required: true
+      sha:
+        description: 'Exact commit to build (release umbrella pins this to the validated tag commit). Empty for standalone dispatch/push, which resolve the tag ref.'
+        type: string
+        required: false
+        default: ''
   workflow_dispatch:
     inputs:
       tag:
@@ -37,10 +42,12 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v5
         with:
-          # Build the release tag's source, not the dispatch/caller ref; a tag
-          # input is fully qualified to refs/tags/ so a like-named branch cannot
-          # shadow it (checkout resolves a bare name to a branch before a tag).
-          ref: ${{ (inputs.tag || github.event.inputs.tag) && format('refs/tags/{0}', inputs.tag || github.event.inputs.tag) || github.ref }}
+          # Build the exact validated commit when the umbrella pins it via
+          # inputs.sha, so a mid-run tag move cannot change what is built. Absent
+          # a SHA (standalone dispatch/push) fall back to the tag, fully qualified
+          # to refs/tags/ so a like-named branch cannot shadow it. The tag name is
+          # still used only for artifact names.
+          ref: ${{ inputs.sha || (inputs.tag || github.event.inputs.tag) && format('refs/tags/{0}', inputs.tag || github.event.inputs.tag) || github.ref }}
 
       # A standalone workflow_dispatch can name an arbitrary ref; refuse to build
       # and upload release-named artifacts unless the dispatched input is a real
