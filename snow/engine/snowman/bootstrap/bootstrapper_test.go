@@ -611,6 +611,23 @@ func TestBootstrapperFollowOnlyNeverHandsOff(t *testing.T) {
 	require.NoError(bs.Timeout())
 	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[1:2])))
 	require.Equal(4, rearms)
+
+	// Beacons with briefly divergent tips return several frontier IDs; when
+	// every returned block is already accepted locally the poll stays idle
+	// instead of running a full re-sync cycle.
+	initializeVMWithBlockchain(vm, blks)
+	require.NoError(bs.Timeout())
+	vm.LastAcceptedF = nil // the idle path must not reach the execute cycle
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[0:2])))
+	require.Equal(5, rearms)
+
+	// After shutdown (handler.Stop halts bootstrapping) a pending poll tick
+	// must not restart the loop or re-arm the timer.
+	bs.Halt()
+	vm.GetBlockF = nil
+	sender.CantSendGetAcceptedFrontier = true
+	require.NoError(bs.Timeout())
+	require.Equal(5, rearms)
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
