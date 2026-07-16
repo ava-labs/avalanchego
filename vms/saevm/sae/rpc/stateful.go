@@ -96,6 +96,9 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := bl.WaitUntilExecuted(ctx); err != nil {
+		return nil, nil, err
+	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
 	// root and the base fee from fields. At the time of writing, the returned
@@ -132,6 +135,9 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := bl.WaitUntilExecuted(ctx); err != nil {
+		return nil, nil, err
+	}
 
 	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 	if err != nil {
@@ -160,12 +166,12 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
-		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
-	}
 	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
+	}
+	if err := parent.WaitUntilExecuted(ctx); err != nil {
+		return nil, bCtx, nil, nil, err
 	}
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
