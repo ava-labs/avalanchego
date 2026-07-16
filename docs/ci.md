@@ -11,6 +11,8 @@ should follow a shared repo rule rather than a one-off local choice.
 - [Usage](#usage)
 - [Conceptual model](#conceptual-model)
   - [Use stable repo entrypoints](#use-stable-repo-entrypoints)
+  - [Jobs using `install-nix` must define shell policy](#jobs-using-install-nix-must-define-shell-policy)
+  - [Composite actions must manage their own Nix shell](#composite-actions-must-manage-their-own-nix-shell)
   - [Pin runner labels](#pin-runner-labels)
   - [Pin third-party actions](#pin-third-party-actions)
   - [Only `actions/*` may use major tags](#only-actionsmay-use-major-tags)
@@ -69,6 +71,80 @@ This helps with review and maintenance. If CI runs behavior defined in this repo
 contributor should usually be able to find how it is launched in the tree and rerun it
 or inspect it directly.
 
+### Jobs using `install-nix` must define shell policy
+
+**Summary:** if a job directly uses `./.github/actions/install-nix`, later `run:`
+steps should default to the nix dev shell so CI uses the same flake-provided tooling
+developers use locally.
+
+Installing Nix is not the same thing as running later steps inside the nix dev
+shell. A step of a nix-requiring job may succeed without a nix dev shell if the runner
+environment provides the expected tools, but the version of those tools isn't
+guaranteed consistent with the tools the nix shell provides. Such a divergence
+increases the possibility that a CI failure won't be locally reproducible,
+complicating diagnosis and resolution.
+
+It's also possible for execution outside of a nix dev shell to increase a
+given job's exposure to transitory CI failures, as shown by the motivating
+failure below.
+
+To encourage nix-requiring jobs to use the nix dev shell, the lint job runs `task
+check-workflow-nix-shell` to ensure that jobs using the `install-nix` custom action
+directly set `defaults.run.shell` to a shell string that starts with `nix develop`
+e.g.:
+
+```yaml
+defaults:
+  run:
+    shell: nix develop --command bash -x {0}
+```
+
+Where required, individual steps can still set a local `shell:` declaration to
+override the default. In particular, `nix develop` and `nix develop --impure` are not
+interchangeable, so use per-step `shell:` declarations when a step intentionally
+depends on job or GitHub Actions environment variables.
+
+#### Motivation
+
+The check for the use of a nix shell was added after a job that should have been using
+a nix shell was observed to fail due to an infra flake:
+
+ - `scripts/run_task.sh` was being run outside of a nix dev shell
+ - `task` (intended to be provided by the nix shell) was not available
+ - The script fell back to running `task` via `go run`
+ - `go` (intended to be provided by the nix shell) was not the expected version
+ - `go` attempted to download the configured version
+ - The golang download failed due to an infra flake
+
+Were the job in question using the nix shell, no download would have been required and
+the infra flake could have been avoided.
+
+#### Alternatives considered
+
+Another way of solving the same problem would be to update `scripts/run_task.sh` to
+automatically enter a nix shell. This would have ensured that `task` would run in a
+nix dev shell, but wouldn't have guaranteed that invocations of commands other than
+`task` would be guaranteed a nix shell.
+
+### Composite actions must manage their own Nix shell
+
+**Summary:** workflow defaults do not define the shell for a composite
+action's internal `run:` steps.
+
+If a composite action depends on flake-provided tools, the action itself should
+enter the dev shell for those steps. It may rely on the caller to install Nix
+first, but it should not rely on the caller's job defaults to establish the
+action's own execution contract.
+
+Examples:
+
+- `./.github/actions/collect-kind-diagnostics` should enter `nix develop ...`
+  for steps that expect flake-provided tools such as `kind` and `kubectl`
+- `./.github/actions/run-monitored-tmpnet-cmd` already enters the dev shell for
+  its monitored command step using `nix develop --impure ...`, so jobs that
+  only rely on that action do not need a separate job-level default solely for
+  that purpose
+
 ### Pin runner labels
 
 GitHub-hosted runner labels should use explicit versions such as `ubuntu-24.04`
@@ -120,8 +196,27 @@ Current automated checks include:
 - workflow task invocations should not change task behavior by passing extra
   option flags after `--`
 - floating GitHub-hosted runner labels are forbidden
+- workflow jobs that directly use `./.github/actions/install-nix` must set
+  `defaults.run.shell` to a value that starts with `nix develop`
+- exact step-level `shell:` values that duplicate `defaults.run.shell` are
+  flagged as redundant
 
-Those checks live in [`scripts/actionlint.sh`](../scripts/actionlint.sh).
+That redundancy rule is intentionally narrow: only exact duplicate shell
+strings should be removed. Non-exact shell values are not automatically
+interchangeable, because a small shell difference can represent a real behavior
+change. In particular, `nix develop ...` and `nix develop --impure ...` should
+not be collapsed together.
+
+The workflow-structure checks live in
+[`scripts/actionlint.sh`](../scripts/actionlint.sh) and
+[`scripts/check_workflow_nix_shell.sh`](../scripts/check_workflow_nix_shell.sh).
+
+The Nix-shell check parses workflow YAML instead of treating it as plain text.
+This repo already depends on Nix for lint tooling, so workflow checks should
+prefer tools that understand YAML over ad hoc text parsing. The current check is
+specifically a structural check over workflow jobs: it looks for direct
+`install-nix` usage, verifies `defaults.run.shell`, and flags exact redundant
+step-level `shell:` duplicates.
 
 The action-pinning rule is checked by repo lint: `actions/*` may use major
 version tags, while other third-party actions should be pinned by full SHA.
@@ -146,6 +241,10 @@ Useful review questions:
   by full SHA?
 - does the workflow use an explicit runner image instead of a floating
   `*-latest` label?
+- if a job installs Nix directly, is it explicit about which later steps run in
+  the dev shell and which intentionally do not?
+- if a composite action needs flake-provided tools, does the action define that
+  shell behavior itself?
 - if a task is involved, is CI calling a stable named task rather than shaping
   the behavior in the workflow?
 
@@ -156,5 +255,6 @@ that it should be documented here and possibly automated.
 
 - [Tasks](./tasks.md)
 - [`scripts/actionlint.sh`](../scripts/actionlint.sh)
+- [`scripts/check_workflow_nix_shell.sh`](../scripts/check_workflow_nix_shell.sh)
 - [GitHub Actions: Reusing workflow configurations](https://docs.github.com/actions/using-workflows/avoiding-duplication)
 - [GitHub Actions security hardening: pin actions to a full-length commit SHA](https://docs.github.com/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions)
