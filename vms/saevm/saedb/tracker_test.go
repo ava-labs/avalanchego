@@ -86,6 +86,42 @@ func TestNewTracker(t *testing.T) {
 	}
 }
 
+// TestProtectTrieIndex simulates every pair of consecutive node runs against
+// the same database. The first run, on a fresh database, always succeeds;
+// only the second may error.
+func TestProtectTrieIndex(t *testing.T) {
+	configs := map[string]Config{
+		"archival":        {Archival: true},
+		"archival_allow":  {Archival: true, AllowMissingTries: true},
+		"pruning":         {},
+		"allowed_pruning": {AllowMissingTries: true},
+	}
+	wantErrs := map[string]error{
+		"archival_then_pruning":       errRefuseToCorruptArchiver,
+		"archival_allow_then_pruning": errRefuseToCorruptArchiver,
+	}
+
+	for name1, config1 := range configs {
+		for name2, config2 := range configs {
+			name := name1 + "_then_" + name2
+			t.Run(name, func(t *testing.T) {
+				db := rawdb.NewMemoryDatabase()
+				require.NoError(t, protectTrieIndex(db, config1), "protectTrieIndex(%+v) on fresh DB", config1)
+				require.ErrorIs(t, protectTrieIndex(db, config2), wantErrs[name], "protectTrieIndex(%+v) after first run", config2)
+			})
+		}
+	}
+
+	// An allowed pruning run bypasses the protection of an earlier archival
+	// run without disabling it, so a later pruning run must still refuse.
+	t.Run("archival_then_allowed_pruning_then_pruning", func(t *testing.T) {
+		db := rawdb.NewMemoryDatabase()
+		require.NoError(t, protectTrieIndex(db, configs["archival"]), "protectTrieIndex() archival run on fresh DB")
+		require.NoError(t, protectTrieIndex(db, configs["allowed_pruning"]), "protectTrieIndex() allowed pruning run after archival")
+		require.ErrorIs(t, protectTrieIndex(db, configs["pruning"]), errRefuseToCorruptArchiver, "protectTrieIndex() pruning run after allowed pruning")
+	})
+}
+
 // writeBlock simulates the execution of a block by opening a [state.StateDB]
 // at `prevRoot`, writing new accounts and storage unique to `height`, and
 // committing the result, returning the post-"execution" root.

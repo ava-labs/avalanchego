@@ -232,9 +232,13 @@ func NewExecution(
 		return nil, err
 	}
 
-	if err := hooks.BeforeExecutingBlock(stateDB, parent.Header(), header); err != nil {
+	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
 
 	if baseFee == nil {
 		baseFee = gasClock.BaseFee()
@@ -325,9 +329,8 @@ func (e *Execution) ExecuteNextTransaction(vmCfg vm.Config) (*types.Receipt, err
 	if err := e.hooks.AfterExecutingTransaction(e.stateDB, *e.baseFee, receipt); err != nil {
 		return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
 	}
-	// Finalise any state changes made by the hook as part of this
-	// transaction, mirroring the finalisation performed by
-	// [core.ApplyTransaction].
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
 	e.stateDB.Finalise(e.isEIP158)
 
 	return receipt, nil

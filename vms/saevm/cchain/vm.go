@@ -20,7 +20,6 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -37,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -58,6 +58,7 @@ type VM struct {
 	ctx          *snow.Context
 	chainConfig  *ethparams.ChainConfig
 	state        *state.State
+	metrics      *metrics
 	txpool       *txpool.Txpool
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
@@ -124,6 +125,15 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "cchain")
+	if err != nil {
+		return fmt.Errorf("making metrics: %w", err)
+	}
+	vm.metrics, err = newMetrics(reg)
+	if err != nil {
+		return fmt.Errorf("registering cchain metrics: %w", err)
+	}
+
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -134,6 +144,7 @@ func (vm *VM) Initialize(
 		warpStorage,
 		vm.now,
 		userConfig.desired(),
+		vm.metrics,
 	)
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
@@ -151,10 +162,6 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
-	if err != nil {
-		return fmt.Errorf("making metrics: %w", err)
-	}
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
