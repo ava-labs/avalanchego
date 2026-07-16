@@ -92,6 +92,7 @@ func TestNewTracker(t *testing.T) {
 func TestProtectTrieIndex(t *testing.T) {
 	configs := map[string]Config{
 		"archival":        {Archival: true},
+		"archival_allow":  {Archival: true, AllowMissingTries: true},
 		"pruning":         {},
 		"allowed_pruning": {AllowMissingTries: true},
 	}
@@ -110,6 +111,7 @@ func TestProtectTrieIndex(t *testing.T) {
 
 	wantErrs := map[string]error{
 		"archival_then_pruning":                      errRefuseToCorruptArchiver,
+		"archival_allow_then_pruning":                errRefuseToCorruptArchiver,
 		"archival_then_allowed_pruning_then_pruning": errRefuseToCorruptArchiver,
 	}
 
