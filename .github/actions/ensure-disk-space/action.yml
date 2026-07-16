@@ -1,6 +1,14 @@
 name: 'Ensure Disk Space'
 description: 'Check runner free disk, conditionally reclaim space on Linux, and re-check after cleanup'
 
+outputs:
+  initial-below-threshold:
+    description: 'Whether the initial disk-space check found the runner below threshold'
+    value: ${{ steps.initial-check.outputs.below_threshold }}
+  final-below-threshold:
+    description: 'Whether the final disk-space check found the runner below threshold'
+    value: ${{ steps.final-check.outputs.below_threshold || 'false' }}
+
 inputs:
   min-gb:
     description: 'Minimum free disk in GB required on / before the runner is considered healthy'

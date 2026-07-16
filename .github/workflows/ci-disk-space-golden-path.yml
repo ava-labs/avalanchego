@@ -1,0 +1,54 @@
+name: CI Disk Space Golden Path
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  prune-and-recheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Exercise disk-space pruning golden path
+        id: disk-space
+        uses: ./.github/actions/ensure-disk-space
+        with:
+          min-gb: '20'
+          force-free-gb: '5'
+          diagnostic-groups: bazel docker
+
+      - name: Assert the low-space path was exercised and recovered
+        shell: bash
+        env:
+          INITIAL_BELOW_THRESHOLD: ${{ steps.disk-space.outputs.initial-below-threshold }}
+          FINAL_BELOW_THRESHOLD: ${{ steps.disk-space.outputs.final-below-threshold }}
+        run: |
+          if [[ "$INITIAL_BELOW_THRESHOLD" != 'true' ]]; then
+            echo "expected initial disk-space check to report below threshold"
+            exit 1
+          fi
+
+          if [[ "$FINAL_BELOW_THRESHOLD" != 'false' ]]; then
+            echo "expected final disk-space check to recover above threshold"
+            exit 1
+          fi
+
+      - name: Summarize disk-space golden path result
+        shell: bash
+        env:
+          INITIAL_BELOW_THRESHOLD: ${{ steps.disk-space.outputs.initial-below-threshold }}
+          FINAL_BELOW_THRESHOLD: ${{ steps.disk-space.outputs.final-below-threshold }}
+        run: |
+          {
+            echo '## CI disk-space golden path'
+            echo
+            echo "- initial-below-threshold: $INITIAL_BELOW_THRESHOLD"
+            echo "- final-below-threshold: $FINAL_BELOW_THRESHOLD"
+            echo '- expected evidence in logs: low-space diagnostics, Linux prune step, healthy final re-check'
+          } >> "$GITHUB_STEP_SUMMARY"
