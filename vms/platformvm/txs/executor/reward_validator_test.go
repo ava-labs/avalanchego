@@ -1490,6 +1490,8 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			require.NoError(t, err)
 			currentSupply, err := env.state.GetCurrentSupply(uStakerTx.SubnetID())
 			require.NoError(t, err)
+			stakingInfo, err := env.state.GetStakingInfo(uStakerTx.SubnetID(), uStakerTx.NodeID())
+			require.NoError(t, err)
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, err)
@@ -1512,8 +1514,10 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 
 			want := tt.want(cfg, staker.PotentialReward)
 			if want.commitRestaked {
+				period := time.Duration(stakingInfo.NextPeriod) * time.Second
+
 				want.commitStartTime = staker.EndTime
-				want.commitEndTime = staker.EndTime.Add(env.config.MinStakeDuration)
+				want.commitEndTime = staker.EndTime.Add(period)
 
 				rewards, err := GetRewardsCalculator(
 					env.backend.Config.RewardConfig,
@@ -1523,8 +1527,8 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				)
 				require.NoError(t, err)
 				want.commitPotentialReward = rewards.Calculate(
-					staker.StartTime,
-					env.config.MinStakeDuration,
+					want.commitStartTime,
+					period,
 					want.commitWeight,
 					currentSupply,
 				)
