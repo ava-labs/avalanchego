@@ -1,0 +1,54 @@
+name: 'Ensure Disk Space'
+description: 'Check runner free disk, conditionally reclaim space on Linux, and re-check after cleanup'
+
+inputs:
+  min-gb:
+    description: 'Minimum free disk in GB required on / before the runner is considered healthy'
+    required: false
+    default: '20'
+  force-free-gb:
+    description: 'Test-only override for the initial free-disk measurement in GB'
+    required: false
+    default: ''
+  force-free-gb-after-cleanup:
+    description: 'Test-only override for the post-cleanup free-disk measurement in GB'
+    required: false
+    default: ''
+  diagnostic-groups:
+    description: 'Space-separated extra disk diagnostic groups to log when the runner starts below threshold (for example: bazel or docker). Generic root-disk diagnostics are always included.'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Check runner disk space
+      id: initial-check
+      shell: bash
+      env:
+        CI_FORCE_FREE_GB: ${{ inputs.force-free-gb }}
+      run: ./scripts/check_ci_disk_space.sh --min-gb "${{ inputs.min-gb }}"
+
+    - name: Log low-space diagnostics
+      if: ${{ steps.initial-check.outputs.below_threshold == 'true' }}
+      shell: bash
+      env:
+        DIAGNOSTIC_GROUPS: ${{ inputs.diagnostic-groups }}
+      run: |
+        args=(--group generic)
+        for group in ${DIAGNOSTIC_GROUPS}; do
+          args+=(--group "$group")
+        done
+        ./scripts/log_ci_disk_state.sh "${args[@]}"
+
+    - name: Reclaim disk space on Linux runners
+      if: ${{ runner.os == 'Linux' && steps.initial-check.outputs.below_threshold == 'true' }}
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+
+    - name: Re-check runner disk space
+      if: ${{ steps.initial-check.outputs.below_threshold == 'true' }}
+      id: final-check
+      shell: bash
+      env:
+        CI_FORCE_FREE_GB: ${{ inputs.force-free-gb-after-cleanup || inputs.force-free-gb }}
+      run: ./scripts/check_ci_disk_space.sh --min-gb "${{ inputs.min-gb }}"

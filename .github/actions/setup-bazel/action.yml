@@ -10,6 +10,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Ensure runner disk space
+      uses: ./.github/actions/ensure-disk-space
+      with:
+        diagnostic-groups: bazel
+
     - id: cache-paths
       shell: bash
       run: |
