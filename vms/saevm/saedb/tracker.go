@@ -56,11 +56,12 @@ const (
 
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
-	Scheme           string // trie database scheme to use; defaults to [rawdb.HashScheme]
-	TrieCacheMiB     uint64 // size of the TrieDB cache
-	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
-	Archival         bool   // if true, will store every state on disk
-	CommitInterval   uint64 // MUST be set to a non-zero value
+	Scheme            string // trie database scheme to use; defaults to [rawdb.HashScheme]
+	TrieCacheMiB      uint64 // size of the TrieDB cache
+	SnapshotCacheMiB  uint64 // size of the snapshot cache - if 0, snapshots are disabled
+	Archival          bool   // if true, will store every state on disk
+	CommitInterval    uint64 // MUST be set to a non-zero value
+	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
 
 	// only configurable for tests
 	maxCapBytes       common.StorageSize
@@ -181,6 +182,10 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 	if err := c.Verify(); err != nil {
 		return nil, err
 	}
+	if err := protectTrieIndex(db, c); err != nil {
+		return nil, fmt.Errorf("preventing missing tries: %w", err)
+	}
+
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig(dataDir, log))
 	var snaps *snapshot.Tree
 	if snapConf := c.snapConfig(); snapConf != nil {
@@ -328,4 +333,25 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+var errRefuseToCorruptArchiver = errors.New(`node is switching from non-pruning to pruning; if this is intentional, set "allow-missing-tries" via config, otherwise disable pruning`)
+
+// protectTrieIndex prevents a pruning run from deleting tries stored by a
+// previous archival run. Archival runs persistently mark the database, and
+// the marker is never removed. Pruning runs against a marked database return
+// [errRefuseToCorruptArchiver] unless [Config.AllowMissingTries] is set,
+// which bypasses the check without removing the marker.
+func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
+	if c.Archival {
+		return customrawdb.WritePruningDisabled(db)
+	}
+	prevArchival, err := customrawdb.HasPruningDisabled(db)
+	if err != nil {
+		return err
+	}
+	if prevArchival && !c.AllowMissingTries {
+		return errRefuseToCorruptArchiver
+	}
+	return nil
 }

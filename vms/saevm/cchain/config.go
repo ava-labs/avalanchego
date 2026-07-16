@@ -38,11 +38,11 @@ type config struct {
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
-	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
-	TrieCleanCache uint64 `json:"trie-clean-cache"`
-	SnapshotCache  uint64 `json:"snapshot-cache"`
-	// AllowMissingTries    bool    `json:"allow-missing-tries"`
+	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
+	CommitInterval    uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
+	TrieCleanCache    uint64 `json:"trie-clean-cache"`
+	SnapshotCache     uint64 `json:"snapshot-cache"`
+	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
 	StateScheme string `json:"state-scheme"`
@@ -127,11 +127,12 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
-			Archival:         !c.Pruning,
-			Scheme:           c.StateScheme,
-			TrieCacheMiB:     c.TrieCleanCache,
-			CommitInterval:   c.CommitInterval,
-			SnapshotCacheMiB: c.SnapshotCache,
+			Archival:          !c.Pruning,
+			Scheme:            c.StateScheme,
+			TrieCacheMiB:      c.TrieCleanCache,
+			CommitInterval:    c.CommitInterval,
+			SnapshotCacheMiB:  c.SnapshotCache,
+			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
