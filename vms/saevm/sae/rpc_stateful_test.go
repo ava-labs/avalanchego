@@ -199,7 +199,12 @@ func TestDebugTrace(t *testing.T) {
 		{
 			method: "debug_traceTransaction",
 			args: []any{depositTx.Hash(), map[string]any{
-				"tracer":  `{fault: function() {}, result: function() { for (;;) {} }}`,
+				"tracer": `{
+					fault: function() {},
+					result: function() {
+						for (;;) {}
+					}
+				}`,
 				"timeout": "10ms",
 			}},
 			wantErr: testerr.Contains("execution timeout"),
