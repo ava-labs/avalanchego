@@ -199,6 +199,7 @@ go_test(
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",
+        "//vms/saevm/saetest/rpctest",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
         "//vms/saevm/worstcase",
