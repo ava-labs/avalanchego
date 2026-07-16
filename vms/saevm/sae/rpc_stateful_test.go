@@ -223,7 +223,6 @@ func TestDebugTrace(t *testing.T) {
 			wantErr: testerr.Contains("not found"),
 		},
 		{
-
 			method: "debug_intermediateRoots",
 			args:   []any{deployBlock.Hash()},
 			want:   []common.Hash{deployBlock.PostExecutionStateRoot()},
@@ -233,6 +232,7 @@ func TestDebugTrace(t *testing.T) {
 			args:   []any{depositBlock.Hash()},
 			want:   []common.Hash{depositBlock.PostExecutionStateRoot()},
 		},
+		{
 			method: "debug_traceTransaction",
 			args: []any{depositTx.Hash(), map[string]any{
 				"tracer": `{
