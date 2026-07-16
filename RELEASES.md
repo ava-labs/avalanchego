@@ -22,6 +22,7 @@
   - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest enqueued block.
   - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
   - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
+- Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`

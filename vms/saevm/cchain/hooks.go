@@ -52,6 +52,7 @@ type hooks struct {
 	builder
 	state       *cchainstate.State
 	warpStorage *warp.Storage
+	metrics     *metrics
 }
 
 func newHooks(
@@ -62,6 +63,7 @@ func newHooks(
 	warpStorage *warp.Storage,
 	now func() time.Time,
 	desired desiredParams,
+	metrics *metrics,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -88,6 +90,7 @@ func newHooks(
 		},
 		state,
 		warpStorage,
+		metrics,
 	}
 }
 
@@ -264,6 +267,8 @@ func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, 
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)

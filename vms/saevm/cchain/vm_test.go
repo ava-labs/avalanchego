@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -358,7 +359,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
 // provided to the sae VM.
-func (s *SUT) hooks() *hooks {
+func (s *SUT) hooks(tb testing.TB) *hooks {
+	tb.Helper()
+
+	m, err := newMetrics(prometheus.NewRegistry())
+	require.NoErrorf(tb, err, "newMetrics()")
 	return newHooks(
 		s.ctx,
 		s.state,
@@ -367,6 +372,7 @@ func (s *SUT) hooks() *hooks {
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
+		m,
 	)
 }
 
