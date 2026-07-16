@@ -47,6 +47,7 @@ jobs:
     runs-on: ubuntu-24.04
     defaults:
       run:
+        shell: nix develop --command bash -x {0}
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v5

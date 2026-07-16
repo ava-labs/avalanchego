@@ -204,11 +204,13 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
-        shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
   tausecondslint:
     runs-on: ubuntu-24.04
@@ -232,12 +234,14 @@ jobs:
   check_generated_protobuf:
     name: Up-to-date protobuf
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
       - uses: ./.github/actions/install-nix
-      - shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh check-generate-protobuf
+      - run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
     name: Up-to-date mocks
     runs-on: ubuntu-24.04
@@ -257,11 +261,13 @@ jobs:
   check_contract_bindings:
     name: Up-to-date contract bindings
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
-      - shell: nix develop --command bash -x {0}
-        run: task check-generate-load-contract-bindings
+      - run: task check-generate-load-contract-bindings
   check_go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-24.04
@@ -301,11 +307,13 @@ jobs:
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Run e2e tests
-        shell: bash
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
       - name: Collect kind diagnostics
         if: failure()
@@ -349,12 +357,14 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   robustness:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
-        shell: bash
         run: ./scripts/run_task.sh test-robustness
       - name: Collect kind diagnostics
         if: failure()
