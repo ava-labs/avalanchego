@@ -229,7 +229,7 @@ func testTraceBlockRPCs(ctx context.Context, t *testing.T, sut *SUT, fb upgradec
 	t.Helper()
 
 	rpcClient := sut.ethclient.Client()
-	t.Run("debug_traceBlock", func(t *testing.T) {
+	t.Run("debug_traceBlockByNumberAndHash", func(t *testing.T) {
 		tracerConfig := map[string]any{"tracer": "callTracer"}
 		var traces []struct {
 			TxHash common.Hash     `json:"txHash"`

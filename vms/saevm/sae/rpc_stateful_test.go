@@ -5,6 +5,8 @@ package sae
 
 import (
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -147,6 +149,11 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
+	blockFile := filepath.Join(t.TempDir(), "block.rlp")
+	blockRLP, err := rlp.EncodeToBytes(depositBlock.EthBlock())
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", depositBlock.EthBlock())
+	require.NoError(t, os.WriteFile(blockFile, blockRLP, 0o600), "os.WriteFile()")
+
 	tests := []rpcTest{
 		{
 			method:       "debug_traceBlockByNumber",
@@ -179,9 +186,49 @@ func TestDebugTrace(t *testing.T) {
 			extraCmpOpts: ignore,
 		},
 		{
+			method:       "debug_traceBlock",
+			args:         []any{hexutil.Bytes(blockRLP)},
+			want:         wantDeposit,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockFromFile",
+			args:         []any{blockFile},
+			want:         wantDeposit,
+			extraCmpOpts: ignore,
+		},
+		{
+			// The returned deposit balance proves that the call ran against the
+			// post-execution state of the latest block.
+			method: "debug_traceCall",
+			args: []any{
+				map[string]any{
+					"to":   escrowAddr,
+					"data": hexutil.Bytes(escrow.CallDataForBalance(recipient)),
+				},
+				rpc.LatestBlockNumber,
+			},
+			want: logger.ExecutionResult{
+				ReturnValue: common.Bytes2Hex(uint256.NewInt(escrowDepositVal).PaddedBytes(32)),
+			},
+			extraCmpOpts: cmp.Options{
+				cmpopts.IgnoreFields(logger.ExecutionResult{}, "Gas", "StructLogs"),
+			},
+		},
+		{
 			method:  "debug_traceTransaction",
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
+		},
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{deployBlock.Hash()},
+			want:   []common.Hash{deployBlock.PostExecutionStateRoot()},
+		},
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{depositBlock.Hash()},
+			want:   []common.Hash{depositBlock.PostExecutionStateRoot()},
 		},
 	}
 
@@ -195,6 +242,21 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	sut.testRPC(ctx, t, tests...)
+
+	// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
+	// can't be used.
+	t.Run("debug_standardTraceBlockToFile", func(t *testing.T) {
+		var files []string
+		require.NoError(t, sut.CallContext(ctx, &files, "debug_standardTraceBlockToFile", depositBlock.Hash()), "CallContext(debug_standardTraceBlockToFile)")
+		require.Len(t, files, 1, "one trace file per transaction")
+		t.Cleanup(func() {
+			assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
+		})
+
+		trace, err := os.ReadFile(files[0])
+		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
+		assert.Contains(t, string(trace), vm.LOG1.String(), "trace of `emit Deposit()`")
+	})
 }
 
 func TestStatefulRPCs(t *testing.T) {

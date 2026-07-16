@@ -92,11 +92,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	// full block body and receipts but this method only needs the header, the
 	// post-execution state root, and the executed base fee. Some sort of
 	// refactor could improve performance (maybe a reader?)
-	bl, err := b.restoreBlock(numOrHash)
+	bl, err := b.restoreExecutedBlock(ctx, numOrHash)
 	if err != nil {
-		return nil, nil, err
-	}
-	if err := bl.WaitUntilExecuted(ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -131,11 +128,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(num))
+	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
 	if err != nil {
-		return nil, nil, err
-	}
-	if err := bl.WaitUntilExecuted(ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -166,12 +160,9 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
+	parent, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
-	}
-	if err := parent.WaitUntilExecuted(ctx); err != nil {
-		return nil, bCtx, nil, nil, err
 	}
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
@@ -238,17 +229,17 @@ func (b *tracerBackend) AfterExecutingTransaction(sdb *state.StateDB, bf *big.In
 // BlockByHash is the same as [backend.BlockByHash] but returns a faked header
 // with post-execution results.
 func (b *tracerBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return b.getBlockModified(rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
+	return b.getBlockModified(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 }
 
 // BlockByNumber is the same as [backend.BlockByNumber] but returns a faked
 // header with post-execution results.
 func (b *tracerBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
-	return b.getBlockModified(rpc.BlockNumberOrHashWithNumber(n))
+	return b.getBlockModified(ctx, rpc.BlockNumberOrHashWithNumber(n))
 }
 
-func (b *tracerBackend) getBlockModified(nOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
-	bl, err := b.restoreBlock(nOrHash)
+func (b *tracerBackend) getBlockModified(ctx context.Context, nOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
+	bl, err := b.restoreExecutedBlock(ctx, nOrHash)
 	if err != nil {
 		return nil, err
 	}
