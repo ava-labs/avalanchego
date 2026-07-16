@@ -206,9 +206,15 @@ type tracerBackend struct {
 // BeforeExecutingBlock mirrors the pre-transaction state changes performed by
 // [saexec.Execute].
 func (b *tracerBackend) BeforeExecutingBlock(sdb *state.StateDB, parent, header *types.Header) error {
-	if err := b.Hooks().BeforeExecutingBlock(sdb, parent, header); err != nil {
+	rules := b.ChainConfig().Rules(header.Number, true /*isMerge*/, header.Time)
+	// The block's transactions are unavailable here so an empty block carries
+	// the header to the hook.
+	if err := b.Hooks().BeforeExecutingBlock(rules, sdb, parent, types.NewBlockWithHeader(header)); err != nil {
 		return fmt.Errorf("before-block hook: %v", err)
 	}
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	sdb.Finalise(rules.IsEIP158)
 	core.SetBeaconBlockRoot(sdb, header)
 	return nil
 }

@@ -23,6 +23,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stephenbuttolph_canoto//:canoto",
     ],

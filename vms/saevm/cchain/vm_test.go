@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -68,6 +69,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -206,11 +208,12 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// withHeliconTime schedules the Helicon activation at t rather than at
-// genesis, leaving the rest of the upgrade schedule unchanged.
-func withHeliconTime(t time.Time) sutOption {
+// withUpgradeTime schedules fork and all later upgrades at t. Earlier
+// upgrades remain initially active.
+func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrades.HeliconTime = t
+		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Latest, t)
+		upgradetest.SetTimesTo(&c.upgrades, fork-1, upgrade.InitiallyActiveTime)
 	})
 }
 
@@ -226,6 +229,13 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 		cfg.now = c.Now
 	})
 	return opt, c
+}
+
+// withoutPruning runs the SUT archival, persisting every state root.
+func withoutPruning() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.Pruning = false
+	})
 }
 
 // withPriceTarget sets [config.PriceTarget] on the SUT.
@@ -373,7 +383,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
 // provided to the sae VM.
-func (s *SUT) hooks() *hooks {
+func (s *SUT) hooks(tb testing.TB) *hooks {
+	tb.Helper()
+
+	m, err := newMetrics(prometheus.NewRegistry())
+	require.NoErrorf(tb, err, "newMetrics()")
 	return newHooks(
 		s.ctx,
 		s.state,
@@ -382,6 +396,7 @@ func (s *SUT) hooks() *hooks {
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
+		m,
 	)
 }
 
@@ -1756,7 +1771,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 	timeOpt, clock := withVMTime(preHeliconTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withHeliconTime(heliconTime),
+		withUpgradeTime(upgradetest.Helicon, heliconTime),
 		timeOpt,
 	)
 
@@ -1787,4 +1802,27 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		err = sut.VerifyBlock(ctx, nil, parsed)
 		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
 	})
+}
+
+// TestWarpPrecompileActivation verifies that executing the first post-Durango
+// block marks the warp precompile's account as non-empty when the genesis
+// predates Durango.
+func TestWarpPrecompileActivation(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(key.EthAddress()),
+		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(5*time.Second)),
+	)
+
+	genesisState, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	sut.issueAndExecute(ctx, t, stx)
+
+	state, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
+	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
 }
