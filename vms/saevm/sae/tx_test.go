@@ -38,13 +38,13 @@ func TestTxTypeSupport(t *testing.T) {
 
 	for _, tx := range txs {
 		t.Run(fmt.Sprintf("%T", tx), func(t *testing.T) {
-			sut.sendTxsAndWaitUntilPending(t, sut.wallet.SetNonceAndSign(t, 0, tx))
+			sut.SendTxsAndWaitUntilPending(t, sut.wallet.SetNonceAndSign(t, 0, tx))
 		})
 		if t.Failed() {
 			t.FailNow()
 		}
 	}
-	b := sut.runConsensusLoop(t)
+	b := sut.RunConsensusLoop(t)
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 
 	sdb := sut.stateAt(t, b.PostExecutionStateRoot())

@@ -190,7 +190,8 @@ func TestWorstCase(t *testing.T) {
 			}))
 		}
 
-		b := sut.runConsensusLoop(t, txs...)
+		sut.SendTxsAndWaitUntilPending(t, txs...)
+		b := sut.RunConsensusLoop(t)
 		require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), len(precompileTests), "%T.Receipts()", b)
 		for i, r := range b.Receipts() {
@@ -206,7 +207,6 @@ func TestWorstCase(t *testing.T) {
 			t.Parallel()
 
 			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-
 			ctx, sut := newSUT(t, flags.numAccounts, sutOpt, timeOpt)
 
 			addrs := sut.wallet.Addresses()
@@ -245,13 +245,13 @@ func TestWorstCase(t *testing.T) {
 						sut.wallet.DecrementNonce(t, from)
 						continue
 					}
-					sut.waitUntilTxsPending(t, tx)
+					sut.WaitUntilTxsPending(t, tx)
 				}
 
 				for accepted := false; !accepted; {
 					vmTime.Advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
 
-					require.NoError(t, sut.SetPreference(ctx, sut.lastAcceptedBlock(t).ID()), "SetPreference()")
+					require.NoError(t, sut.SetPreference(ctx, sut.LastAcceptedBlock(t).ID()), "SetPreference()")
 
 					switch b, err := sut.BuildBlock(ctx); {
 					case errors.Is(err, worstcase.ErrQueueFull):
