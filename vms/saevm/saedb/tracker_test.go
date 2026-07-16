@@ -96,12 +96,12 @@ func TestProtectTrieIndex(t *testing.T) {
 		"allowed_pruning": {AllowMissingTries: true},
 	}
 	wantErrs := map[string]error{
-		"pruning_after_archival": errRefuseToCorruptArchiver,
+		"archival_then_pruning": errRefuseToCorruptArchiver,
 	}
 
 	for name1, config1 := range configs {
 		for name2, config2 := range configs {
-			name := name2 + "_after_" + name1
+			name := name1 + "_then_" + name2
 			t.Run(name, func(t *testing.T) {
 				db := rawdb.NewMemoryDatabase()
 				require.NoError(t, protectTrieIndex(db, config1), "protectTrieIndex(%+v) on fresh DB", config1)

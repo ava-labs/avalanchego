@@ -42,7 +42,7 @@ type config struct {
 	CommitInterval    uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
-	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, warnings preventing an incomplete trie index are suppressed.
+	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
 	// StateScheme          string  `json:"state-scheme"`

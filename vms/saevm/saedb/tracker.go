@@ -133,7 +133,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 		return nil, err
 	}
 	if err := protectTrieIndex(db, c); err != nil {
-		return nil, fmt.Errorf("checking for missing tries: %w", err)
+		return nil, fmt.Errorf("preventing missing tries: %w", err)
 	}
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
 	var snaps *snapshot.Tree
@@ -291,10 +291,7 @@ func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
 	if err != nil {
 		return err
 	}
-	if !prevArchival {
-		return nil
-	}
-	if !c.AllowMissingTries {
+	if prevArchival && !c.AllowMissingTries {
 		return errRefuseToCorruptArchiver
 	}
 	return nil
