@@ -121,26 +121,22 @@ jobs:
   test_build_image:
     name: Image build
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v5
-      - name: Set up QEMU (required for cross-platform builds)
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Check image build
-        run: ./scripts/run_task.sh test-build-image
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          run: ./scripts/run_task.sh test-build-image
+          working_directory: ./graft/subnet-evm
 
   test_build_antithesis_images:
     name: Build Antithesis images
     runs-on: ubuntu-24.04
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: true
-          docker-images: true
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for subnet-evm test setup
-        shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm

@@ -1,0 +1,45 @@
+name: 'Run Docker/image command with disk-space protection'
+description: 'Ensure runner disk space, run a Docker/image-building command, and log Docker disk diagnostics on failure'
+
+inputs:
+  run:
+    description: 'Command to run'
+    required: true
+  working_directory:
+    description: 'Working directory to run the command in'
+    required: false
+    default: '.'
+  setup-qemu:
+    description: 'Whether to set up QEMU before running the command'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/ensure-disk-space
+      with:
+        diagnostic-groups: docker
+
+    - name: Set up QEMU (required for cross-platform builds)
+      if: ${{ inputs.setup-qemu == 'true' }}
+      uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+
+    - name: Run command with Docker failure diagnostics
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        RUN_COMMAND: ${{ inputs.run }}
+      run: |
+        repo_root="$(git rev-parse --show-toplevel)"
+
+        set +e
+        bash -eo pipefail -c "$RUN_COMMAND"
+        status=$?
+        set -e
+
+        if (( status != 0 )); then
+          "$repo_root"/scripts/run_task.sh log-ci-disk-state-docker
+        fi
+
+        exit "$status"

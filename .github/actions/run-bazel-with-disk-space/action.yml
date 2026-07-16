@@ -1,0 +1,35 @@
+name: 'Run Bazel command with disk-space protection'
+description: 'Prepare Bazel, run a Bazel-related command, and log Bazel disk diagnostics on failure'
+
+inputs:
+  run:
+    description: 'Command to run'
+    required: true
+  working_directory:
+    description: 'Working directory to run the command in'
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-bazel
+
+    - name: Run command with Bazel failure diagnostics
+      shell: bash
+      working-directory: ${{ inputs.working_directory }}
+      env:
+        RUN_COMMAND: ${{ inputs.run }}
+      run: |
+        repo_root="$(git rev-parse --show-toplevel)"
+
+        set +e
+        bash -eo pipefail -c "$RUN_COMMAND"
+        status=$?
+        set -e
+
+        if (( status != 0 )); then
+          "$repo_root"/scripts/run_task.sh log-ci-disk-state-bazel
+        fi
+
+        exit "$status"
