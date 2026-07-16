@@ -39,12 +39,25 @@ const (
 	maxCacheMiB = math.MaxInt / mibToBytes
 )
 
+// Used in [Tracker.maybeCap] to determine memory pressure.
+const (
+	defaultMaxCap           = 512 * mibToBytes
+	defaultTargetCommitSize = 20 * mibToBytes
+
+	// defaultTargetCommitSize >= ethdb.IdealBatchSize
+	_ uint = defaultTargetCommitSize - ethdb.IdealBatchSize
+)
+
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
 	TrieCacheMiB     uint64 // size of the TrieDB cache
 	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
 	Archival         bool   // if true, will store every state on disk
 	CommitInterval   uint64 // MUST be set to a non-zero value
+
+	// only configurable for tests
+	maxCapBytes       common.StorageSize
+	targetCommitBytes common.StorageSize
 }
 
 func (c Config) Verify() error {
@@ -76,6 +89,20 @@ func (c Config) snapConfig() *snapshot.Config {
 		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 // checked in [Config.Verify]
 		AsyncBuild: true,
 	}
+}
+
+func (c Config) maxCap() common.StorageSize {
+	if c.maxCapBytes > 0 {
+		return c.maxCapBytes
+	}
+	return defaultMaxCap
+}
+
+func (c Config) targetCommitSize() common.StorageSize {
+	if c.targetCommitBytes > 0 {
+		return c.targetCommitBytes
+	}
+	return defaultTargetCommitSize
 }
 
 var _ StateDBOpener = (*Tracker)(nil)
@@ -140,7 +167,8 @@ func (t *Tracker) Track(root common.Hash) {
 //
 // 1. If [Config.Archival] is true, then `executionRoot` will be committed.
 // 2. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
-// 3. Otherwise, nothing is committed.
+// 3. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
+// 4. Otherwise, nothing is committed.
 //
 // This does NOT change in-memory tracking.
 func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uint64) error {
@@ -156,6 +184,9 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		commit = settledRoot
 		because = "settled"
 	default:
+		if err := t.maybeCap(height); err != nil {
+			return fmt.Errorf("triedb.Database.Cap() at block %d: %v", height, err)
+		}
 		return nil
 	}
 
@@ -164,6 +195,29 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, commit, because, height, err)
 	}
 	return nil
+}
+
+// maybeCap checks if the in-memory state of a HashDB is too high for an efficient
+// [triedb.Database.Commit] and, if so, moves the oldest state to disk.
+func (t *Tracker) maybeCap(height uint64) error {
+	var (
+		maxCap           = t.config.maxCap()
+		targetCommitSize = t.config.targetCommitSize() // for [triedb.Database.Commit]
+		commitInterval   = t.config.CommitInterval
+	)
+
+	// The cap shrinks linearly as we approach the commit interval
+	distanceFromCommit := commitInterval - height%commitInterval
+	slope := (maxCap - targetCommitSize) / common.StorageSize(commitInterval)
+	targetCap := common.StorageSize(distanceFromCommit)*slope + targetCommitSize
+
+	tdb := t.cache.TrieDB()
+	_, inMemory, _ := tdb.Size()
+	if inMemory <= targetCap {
+		return nil
+	}
+
+	return tdb.Cap(targetCap - ethdb.IdealBatchSize) // avoid small DB writes
 }
 
 // Untrack informs the [Tracker] that the state corresponding

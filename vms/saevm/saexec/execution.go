@@ -46,7 +46,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 
 	select {
 	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
-		e.metrics.markEnqueued(block.EthBlock().GasLimit())
+		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
@@ -67,7 +67,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/strevm/issues/28"
+const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
 
 func (e *Executor) processQueue() {
 	defer close(e.done)
