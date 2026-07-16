@@ -201,7 +201,6 @@ func TestDebugTrace(t *testing.T) {
 		{
 			method: "debug_traceTransaction",
 			args:   []any{depositTx.Hash(), map[string]any{"tracer": "callTracer"}},
-			// Type is unasserted as [native.CallFrame.UnmarshalJSON] drops it.
 			want: native.CallFrame{
 				From:    sut.wallet.Addresses()[0],
 				Gas:     depositTx.Gas(),
