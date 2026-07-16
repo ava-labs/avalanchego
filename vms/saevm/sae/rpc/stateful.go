@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
@@ -97,16 +98,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, err
 	}
 
-	// The API implementations expect this to be synchronous, sourcing the state
-	// root and the base fee from fields. At the time of writing, the returned
-	// header's hash is never used so it's safe to modify it.
-	//
-	// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
-	// devise an approach to ensure that it is confirmed on each.
-	hdr := bl.Header()
-	hdr.Root = bl.PostExecutionStateRoot()
-	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
-
+	hdr := executedHeader(bl)
 	sdb, err := b.StateDB(hdr.Root)
 	if err != nil {
 		return nil, nil, err
@@ -243,8 +235,21 @@ func (b *tracerBackend) getBlockModified(ctx context.Context, nOrHash rpc.BlockN
 	if err != nil {
 		return nil, err
 	}
+	return bl.EthBlock().WithSeal(executedHeader(bl)), nil
+}
+
+// executedHeader returns the block's header faked to carry post-execution
+// results (state root and base fee), mimicking a synchronous block.
+//
+// The API implementations expect this to be synchronous, sourcing the state
+// root and the base fee from fields. At the time of writing, the returned
+// header's hash is never used so it's safe to modify it.
+//
+// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
+// devise an approach to ensure that it is confirmed on each.
+func executedHeader(bl *blocks.Block) *types.Header {
 	hdr := bl.Header()
 	hdr.Root = bl.PostExecutionStateRoot()
 	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
-	return bl.EthBlock().WithSeal(hdr), nil
+	return hdr
 }
