@@ -144,7 +144,7 @@ func (vm *VM) Initialize(
 		warpStorage,
 		vm.now,
 		userConfig.desired(),
-		m,
+		vm.metrics,
 	)
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
