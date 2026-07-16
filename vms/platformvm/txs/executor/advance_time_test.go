@@ -506,6 +506,8 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 		tx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
+		addSubnetValTx.EndTime(),
+		addSubnetValTx.Weight(),
 		0,
 	)
 	require.NoError(err)

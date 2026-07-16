@@ -141,7 +141,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	startTime := stakerTx.StartTime().Add(2 * time.Hour)
 	potentialReward := uint64(12345)
 
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(txID, stakerTx, startTime, stakerTx.EndTime(), stakerTx.Weight(), potentialReward)
 	require.NoError(err)
 	publicKey, isNil, err := stakerTx.PublicKey()
 	require.NoError(err)
@@ -164,7 +164,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	signer.EXPECT().Verify().Return(errCustom)
 	stakerTx.Signer = signer
 
-	_, err = NewCurrentStaker(txID, stakerTx, startTime, potentialReward)
+	_, err = NewCurrentStaker(txID, stakerTx, startTime, stakerTx.EndTime(), stakerTx.Weight(), potentialReward)
 	require.ErrorIs(err, errCustom)
 }
 

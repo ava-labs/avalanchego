@@ -1410,7 +1410,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 
 	endTime := stakeStartTime.Add(duration)
 
-	staker, err := state.NewStaker(
+	staker, err := state.NewCurrentStaker(
 		e.tx.ID(),
 		tx,
 		stakeStartTime,
@@ -1533,7 +1533,14 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 			e.state.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
-		staker, err = state.NewCurrentStaker(txID, stakerTx, stakeStartTime, potentialReward)
+		staker, err = state.NewCurrentStaker(
+			txID,
+			stakerTx,
+			stakeStartTime,
+			stakerTx.EndTime(),
+			stakerTx.Weight(),
+			potentialReward,
+		)
 	}
 	if err != nil {
 		return err

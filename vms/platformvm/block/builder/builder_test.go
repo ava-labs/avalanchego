@@ -235,7 +235,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	// Add the tx and staker directly to state
 	env.state.AddTx(addTx, status.Committed)
 
-	staker, err := state.NewStaker(txID, validatorTx, startTime, endTime, validatorTx.Weight(), 0)
+	staker, err := state.NewCurrentStaker(txID, validatorTx, startTime, endTime, validatorTx.Weight(), 0)
 	require.NoError(err)
 
 	require.NoError(env.state.PutCurrentValidator(staker))

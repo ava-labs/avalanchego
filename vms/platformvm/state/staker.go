@@ -94,42 +94,9 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-// NewCurrentStaker returns a current Staker built from a [txs.BoundedStaker]
-// transaction, deriving its EndTime and Weight.
+// NewCurrentStaker returns a current-priority Staker built from [txs.Staker] with
+// the provided start time, end time, weight, and potential reward.
 func NewCurrentStaker(
-	txID ids.ID,
-	staker txs.BoundedStaker,
-	startTime time.Time,
-	potentialReward uint64,
-) (*Staker, error) {
-	return NewStaker(txID, staker, startTime, staker.EndTime(), staker.Weight(), potentialReward)
-}
-
-// NewPendingStaker returns a pending Staker built from a [txs.ScheduledStaker]
-// transaction.
-func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	startTime := staker.StartTime()
-	return &Staker{
-		TxID:      txID,
-		NodeID:    staker.NodeID(),
-		PublicKey: publicKey,
-		SubnetID:  staker.SubnetID(),
-		Weight:    staker.Weight(),
-		StartTime: startTime,
-		EndTime:   staker.EndTime(),
-		NextTime:  startTime,
-		Priority:  staker.PendingPriority(),
-	}, nil
-}
-
-// NewStaker returns a raw Staker built from explicitly provided startTime,
-// endTime, weight, and potentialReward, rather than deriving them from
-// [txs.Staker]. It is mostly used to build auto-renewed validators.
-func NewStaker(
 	txID ids.ID,
 	staker txs.Staker,
 	startTime time.Time,
@@ -152,5 +119,26 @@ func NewStaker(
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
 		Priority:        staker.CurrentPriority(),
+	}, nil
+}
+
+// NewPendingStaker returns a pending Staker built from a [txs.ScheduledStaker]
+// transaction.
+func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
+	publicKey, _, err := staker.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	startTime := staker.StartTime()
+	return &Staker{
+		TxID:      txID,
+		NodeID:    staker.NodeID(),
+		PublicKey: publicKey,
+		SubnetID:  staker.SubnetID(),
+		Weight:    staker.Weight(),
+		StartTime: startTime,
+		EndTime:   staker.EndTime(),
+		NextTime:  startTime,
+		Priority:  staker.PendingPriority(),
 	}, nil
 }

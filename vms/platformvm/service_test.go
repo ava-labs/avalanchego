@@ -546,6 +546,8 @@ func TestGetStake(t *testing.T) {
 		tx.ID(),
 		addDelTx,
 		genesistest.DefaultValidatorStartTime,
+		addDelTx.EndTime(),
+		addDelTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -700,6 +702,8 @@ func TestGetCurrentValidators(t *testing.T) {
 		delTx.ID(),
 		addDelTx,
 		genesistest.DefaultValidatorStartTime,
+		addDelTx.EndTime(),
+		addDelTx.Weight(),
 		0,
 	)
 	require.NoError(err)
