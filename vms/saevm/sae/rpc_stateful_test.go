@@ -27,9 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Register JS tracers for [TestDebugTrace].
-	_ "github.com/ava-labs/libevm/eth/tracers/js"
-
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
