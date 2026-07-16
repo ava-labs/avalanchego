@@ -124,10 +124,23 @@ live release's assets afterwards.
   signing ([#5161](https://github.com/ava-labs/avalanchego/issues/5161)) must
   be merged before a tag can publish — the manifest lists 6 `.sig` companions
   and the pipeline fails closed without them.
-- **Pre-merge testability:** `push: tags` reads workflow files from the tagged
-  commit, so the pipeline can be exercised before merging by tagging a
-  throwaway `v0.0.0-rc*` commit on a scratch branch (with a temporary
-  `RELEASES.md` entry) and deleting the draft + tag afterwards.
+- **Pre-merge testability:** the release is `workflow_dispatch`-driven, so the
+  pipeline can be exercised before merging by pushing a throwaway `v0.0.0-rc*`
+  tag (with a temporary `RELEASES.md` entry) and dispatching this workflow from
+  the feature branch (`gh workflow run release.yml --ref <branch> -f tag=v0.0.0-rc*`),
+  then deleting the draft + tag afterwards.
+- **Deferred hardening (release-time supply chain):** the `publish` job checks
+  out the release tag's commit and runs the `release-*.sh` helpers — including
+  the guards — with `contents: write` and a job-wide `GH_TOKEN`. A tag pointing
+  at a malicious commit could therefore ship modified helper/guard scripts that
+  run with the write token. This needs push access to create a `v*` tag at an
+  arbitrary commit AND dispatch permission (both write-level), so it is an
+  insider / credential-compromise vector, not an external one. A future
+  hardening pass should run the orchestration helpers from a trusted
+  default-branch checkout, check out the tag in a separate data-only path
+  (`persist-credentials: false`) for `RELEASES.md`, scope `GH_TOKEN` to only the
+  `gh`/release-creation steps, and verify tag trust (protected/signed tag or
+  ancestry) before any write-scoped token is exposed.
 
 ## References
 
