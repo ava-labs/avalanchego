@@ -104,7 +104,7 @@ jobs:
         # asserts the full multi-module tag set (root + graft/coreth, graft/evm,
         # graft/subnet-evm, from lib_go_modules.sh) was pushed, so a partial
         # tags-push cannot yield a release with missing module tags.
-        run: ./scripts/verify_tags_remote.sh "$TAG"
+        run: ./scripts/workflow-verify-tag-set.sh "$TAG"
         env:
           TAG: ${{ steps.derive.outputs.tag }}
         shell: bash
@@ -257,7 +257,7 @@ jobs:
       # still exist and peel to one commit; the guard above already pinned the
       # root tag to the validated SHA, so the whole set is at that commit.
       - name: Re-verify the full release tag set is intact
-        run: ./scripts/verify_tags_remote.sh "$TAG"
+        run: ./scripts/workflow-verify-tag-set.sh "$TAG"
         shell: bash
 
       # Existence re-check LAST, immediately before softprops. validate-tag
