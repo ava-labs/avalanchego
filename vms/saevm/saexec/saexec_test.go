@@ -37,6 +37,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -70,12 +71,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	saedbConfig  saedb.Config
-	chain        *blockstest.ChainBuilder
-	wallet       *saetest.Wallet
-	logger       *loggingtest.Logger
-	db           ethdb.Database
-	chainDataDir string
+	saedbConfig saedb.Config
+	chain       *blockstest.ChainBuilder
+	wallet      *saetest.Wallet
+	logger      *loggingtest.Logger
+	db          ethdb.Database
+	snowCtx     *snow.Context
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -116,15 +117,17 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	snowCtx := snowtest.Context(tb, ids.Empty)
+	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
 	snowCtx.Log = logger
+
+	tdbCfg := saedbConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
 	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(saedbConfig.TrieDBConfig(snowCtx)),
+		blockstest.WithTrieDBConfig(tdbCfg),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -144,14 +147,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:     e,
-		saedbConfig:  saedbConfig,
-		chain:        chain,
-		wallet:       wallet,
-		logger:       logger,
-		db:           db,
-		chainDataDir: snowCtx.ChainDataDir,
-		closeOnce:    closeOnce,
+		Executor:    e,
+		saedbConfig: saedbConfig,
+		chain:       chain,
+		wallet:      wallet,
+		logger:      logger,
+		db:          db,
+		snowCtx:     snowCtx,
+		closeOnce:   closeOnce,
 	}
 }
 
@@ -1117,9 +1120,8 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			t.Run("recover", func(t *testing.T) {
 				// Restart the chain to remove the TrieDB cache.
 				src := blocks.Source(chain.GetBlock)
-				snowCtx := snowtest.Context(t, ids.Empty)
-				snowCtx.Log = loggingtest.New(t, logging.Debug)
-				snowCtx.ChainDataDir = sut.chainDataDir
+				snowCtx := sut.snowCtx
+				snowCtx.Log = loggingtest.New(t, logging.Debug) // replace the `*testing.T` used.
 				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {

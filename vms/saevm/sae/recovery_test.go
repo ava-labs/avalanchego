@@ -171,14 +171,15 @@ func TestRecoverSimple(t *testing.T) {
 			numBlocks: 2, // no new blocks settled yet
 			scheme:    customrawdb.FirewoodScheme,
 		},
-		{
-			name:      "non_archival_firewood_after_trie_commit",
-			numBlocks: commitInterval + 15, // ensure another settled block
-			scheme:    customrawdb.FirewoodScheme,
-		},
+
 		{
 			name:      "non_archival_firewood_commit_interval_exactly",
 			numBlocks: commitInterval,
+			scheme:    customrawdb.FirewoodScheme,
+		},
+		{
+			name:      "non_archival_firewood_beyond_revision_window",
+			numBlocks: 3 * commitInterval, // evicts the oldest revisions from the in-memory window
 			scheme:    customrawdb.FirewoodScheme,
 		},
 	}

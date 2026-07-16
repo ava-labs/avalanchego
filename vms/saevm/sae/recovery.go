@@ -48,7 +48,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
-	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx))
+	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
 	defer func() {
 		retErr = errors.Join(retErr, cache.TrieDB().Close())
 	}()

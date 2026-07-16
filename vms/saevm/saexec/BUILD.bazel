@@ -46,6 +46,7 @@ go_test(
     embed = [":saexec"],
     deps = [
         "//ids",
+        "//snow",
         "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",

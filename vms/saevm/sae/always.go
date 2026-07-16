@@ -58,7 +58,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
-	config, err := setupGenesis(db, vm.config.DBConfig.TrieDBConfig(snowCtx), genesisBytes)
+	tdbCfg := vm.config.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	config, err := setupGenesis(db, tdbCfg, genesisBytes)
 	if err != nil {
 		return err
 	}

@@ -19,8 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -73,15 +71,14 @@ func TestNewTracker(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snowCtx := snowtest.Context(t, ids.Empty)
-			snowCtx.Log = loggingtest.New(t, logging.Debug)
 			cfg := defaults
 			if tt.with != nil {
 				tt.with(&cfg)
 			}
 			db := rawdb.NewMemoryDatabase()
+			log := loggingtest.New(t, logging.Debug)
 
-			tr, err := NewTracker(db, cfg, snowCtx, types.EmptyRootHash)
+			tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
 			require.ErrorIs(t, err, tt.wantErr, "NewTracker()")
 			if err != nil {
 				return
@@ -153,10 +150,8 @@ func TestTrackerMaybeCap(t *testing.T) {
 		targetCommitBytes: targetCommitBytes,
 	}
 
-	snowCtx := snowtest.Context(t, ids.Empty)
-	snowCtx.Log = loggingtest.New(t, logging.Debug)
-
-	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, snowCtx, types.EmptyRootHash)
+	log := loggingtest.New(t, logging.Debug)
+	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, t.TempDir(), log)
 	require.NoError(t, err, "NewTracker()")
 
 	prevRoot := types.EmptyRootHash
@@ -261,6 +256,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 					maxCapBytes:       mode.maxCapBytes,
 					targetCommitBytes: targetCommitBytes,
 				}
+				log := loggingtest.New(b, logging.Debug)
 
 				var (
 					maxPause  time.Duration
@@ -269,7 +265,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 				for b.Loop() {
 					b.StopTimer()
 					db := tt.open(b)
-					tr, err := NewTracker(db, cfg, snowtest.Context(b, ids.Empty), types.EmptyRootHash)
+					tr, err := NewTracker(db, cfg, types.EmptyRootHash, b.TempDir(), log)
 					require.NoError(b, err, "NewTracker()")
 					b.StartTimer()
 

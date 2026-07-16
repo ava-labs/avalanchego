@@ -72,7 +72,7 @@ func New(
 	snowCtx *snow.Context,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, snowCtx, lastExecuted.PostExecutionStateRoot())
+	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
 	if err != nil {
 		return nil, err
 	}

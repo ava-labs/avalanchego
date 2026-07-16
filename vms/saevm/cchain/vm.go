@@ -112,7 +112,8 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
-	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig(snowCtx)); err != nil {
+	tdbCfg := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	if err := genesis.setup(ethDB, tdbCfg); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
