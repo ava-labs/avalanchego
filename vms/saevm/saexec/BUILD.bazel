@@ -20,7 +20,6 @@ go_library(
         "//vms/saevm/blocks",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
-        "//vms/saevm/proxytime",
         "//vms/saevm/saedb",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",

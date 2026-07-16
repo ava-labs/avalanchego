@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/eth/filters"
+	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
@@ -181,7 +182,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_traceCall
 			// - debug_traceChain                  (not supported by SAE)
 			// - debug_traceTransaction
-			"debug", newTracersAPI(b),
+			"debug", tracers.NewAPI(&tracerBackend{b}),
 		})
 	}
 
