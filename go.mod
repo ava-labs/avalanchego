@@ -26,7 +26,7 @@ require (
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
-	github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff
+	github.com/ava-labs/libevm v1.13.15-0.20260716180230-f887fa4393ca
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

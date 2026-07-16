@@ -11,6 +11,11 @@ import (
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
+
+	// Force-load tracer engines to trigger registration of the JS and native
+	// (e.g. "callTracer") tracers available to debug_trace* APIs.
+	_ "github.com/ava-labs/libevm/eth/tracers/js"
+	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
 
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
