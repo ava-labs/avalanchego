@@ -65,9 +65,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           # inputs.tag (workflow_call, from the umbrella) is a semver tag already
-          # validated by the umbrella's validate-tag job; github.event.inputs.tag
-          # covers direct workflow_dispatch; github.ref covers any remaining path.
-          ref: ${{ inputs.tag || github.event.inputs.tag || github.ref }}
+          # validated by the umbrella; github.event.inputs.tag covers direct
+          # dispatch; github.ref (PR/other) is already qualified. A tag input is
+          # fully qualified to refs/tags/ so a like-named branch cannot shadow it
+          # (actions/checkout resolves a bare name to a branch before a tag).
+          ref: ${{ (inputs.tag || github.event.inputs.tag) && format('refs/tags/{0}', inputs.tag || github.event.inputs.tag) || github.ref }}
 
       # Defense in depth: workflow_dispatch accepts an arbitrary ref, and non-PR
       # events import the real signing key. The overlay below replaces only
