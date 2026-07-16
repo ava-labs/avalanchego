@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -81,6 +82,11 @@ func TestParseConfig(t *testing.T) {
 			name: "state/pruning_disabled",
 			json: `{"pruning-enabled":false}`,
 			want: with(func(c *config) { c.Pruning = false }),
+		},
+		{
+			name: "state_scheme",
+			json: `{"state-scheme":"firewood"}`,
+			want: with(func(c *config) { c.StateScheme = customrawdb.FirewoodScheme }),
 		},
 		{
 			name:      "state/commit_interval",
@@ -164,6 +170,7 @@ func TestParseConfig(t *testing.T) {
 				"gas-target":1500,
 				"min-delay-target":3000,
 				"pruning-enabled":false,
+				"state-scheme":"firewood",
 				"commit-interval":256,
 				"trie-clean-cache":256,
 				"snapshot-cache":128,
@@ -180,6 +187,7 @@ func TestParseConfig(t *testing.T) {
 				GasTarget:            utils.PointerTo(gas.Gas(1500)),
 				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
+				StateScheme:          customrawdb.FirewoodScheme,
 				CommitInterval:       256,
 				TrieCleanCache:       256,
 				SnapshotCache:        128,

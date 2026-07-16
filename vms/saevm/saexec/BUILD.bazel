@@ -15,6 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
+        "//snow",
         "//utils/logging",
         "//vms/components/gas",
         "//vms/saevm/blocks",
@@ -44,9 +45,12 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
+        "//ids",
+        "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/gas",
+        "//vms/evm/sync/customrawdb",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/cmputils",
