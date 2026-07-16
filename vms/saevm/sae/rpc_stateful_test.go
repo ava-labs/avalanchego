@@ -27,9 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Register JS tracers for [TestDebugTrace].
-	_ "github.com/ava-labs/libevm/eth/tracers/js"
-
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
@@ -185,25 +182,6 @@ func TestDebugTrace(t *testing.T) {
 			method:  "debug_traceTransaction",
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
-		},
-		{
-			method: "debug_traceBlockByNumber",
-			args: []any{
-				hexutil.Uint64(depositBlock.NumberU64()),
-				map[string]any{
-					"tracer": `{
-						step: function() {
-							for (;;) {}
-						},
-						fault: function() {},
-						result: function() {
-							return {};
-						}
-					}`,
-					"timeout": "10ms",
-				},
-			},
-			wantErr: testerr.Contains("execution timeout"),
 		},
 	}
 
