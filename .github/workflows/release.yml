@@ -48,6 +48,9 @@ jobs:
     outputs:
       tag: ${{ steps.derive.outputs.tag }}
       kind: ${{ steps.classify.outputs.kind }}
+      # Peeled commit the tag pointed to at validation time. publish re-checks
+      # the remote tag against this and fails closed if it was moved mid-build.
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
       # Fail fast, before checkout, if the dispatched input is not an actual tag
       # in origin. Runs before checkout (git ls-remote needs no local clone) so
@@ -74,6 +77,16 @@ jobs:
           # never shadow the tag. Runs the tag's own RELEASES.md + release
           # scripts, not whatever is on the dispatch ref (the default branch).
           ref: refs/tags/${{ github.event.inputs.tag }}
+
+      - name: Resolve tag commit SHA
+        id: sha
+        # HEAD is the commit the tag points to (the checkout above resolved the
+        # fully-qualified tag). Assignment-first so a rev-parse failure fails
+        # this step rather than emitting an empty output.
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+        shell: bash
 
       - name: Derive tag
         id: derive
@@ -214,6 +227,33 @@ jobs:
       # rather than overwrite or conflict with an existing release.
       - name: Final pre-publish existence re-check
         run: ./.github/workflows/release-check-exists.sh "$TAG"
+
+      # Fail closed if the tag was force-moved during the build window: the
+      # artifacts and body were built/rendered from the commit validate-tag
+      # resolved, so refuse to publish if origin's tag no longer points there.
+      # Release tags are annotated (git tag -s); peel with ^{} to the commit.
+      - name: Assert the release tag still points to the validated commit
+        env:
+          TAG: ${{ env.TAG }}
+          EXPECTED_SHA: ${{ needs.validate-tag.outputs.sha }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          url="https://github.com/${REPO}.git"
+          peeled="$(git ls-remote "$url" "refs/tags/${TAG}^{}" | awk '{print $1}')"
+          if [[ -z "$peeled" ]]; then
+            # Lightweight tag: the ref itself is the commit.
+            peeled="$(git ls-remote "$url" "refs/tags/${TAG}" | awk '{print $1}')"
+          fi
+          if [[ -z "$peeled" ]]; then
+            echo "ERROR: tag '${TAG}' no longer exists in ${REPO}; refusing to publish." >&2
+            exit 1
+          fi
+          if [[ "$peeled" != "${EXPECTED_SHA}" ]]; then
+            echo "ERROR: tag '${TAG}' moved since validation (validated ${EXPECTED_SHA}, now ${peeled}); refusing to publish." >&2
+            exit 1
+          fi
+          echo "Tag '${TAG}' still points to the validated commit ${EXPECTED_SHA}."
 
       - name: Create GitHub release (as draft)
         uses: softprops/action-gh-release@v2
