@@ -129,11 +129,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	m, err := newMetrics(reg)
+	vm.metrics, err = newMetrics(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
-	vm.metrics = m
 
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
