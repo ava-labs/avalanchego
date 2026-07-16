@@ -1499,9 +1499,15 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				want.commitStartTime = staker.EndTime
 				want.commitEndTime = staker.EndTime.Add(env.config.MinStakeDuration)
 
-				rewards, err := GetRewardsCalculator(&env.backend, env.state, staker.SubnetID)
+				rewards, err := GetRewardsCalculator(
+					env.backend.Config.RewardConfig,
+					env.backend.Config.UpgradeConfig,
+					env.state,
+					staker.SubnetID,
+				)
 				require.NoError(t, err)
 				want.commitPotentialReward = rewards.Calculate(
+					staker.StartTime,
 					env.config.MinStakeDuration,
 					want.commitWeight,
 					currentSupply,

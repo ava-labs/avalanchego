@@ -4655,11 +4655,13 @@ func TestStandardExecutorReaddAutoRenewedValidatorTx(t *testing.T) {
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
-	wantPotentialReward := env.backend.Rewards.Calculate(
-		newPeriod,
-		newWeight,
-		currentSupply,
+	rewards, err := GetRewardsCalculator(
+		env.config.RewardConfig,
+		env.config.UpgradeConfig,
+		env.state,
+		constants.PrimaryNetworkID,
 	)
+	require.NoError(t, err)
 
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(t, err)
@@ -4677,6 +4679,13 @@ func TestStandardExecutorReaddAutoRenewedValidatorTx(t *testing.T) {
 	chainTime := env.state.GetTimestamp()
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
+
+	wantPotentialReward := rewards.Calculate(
+		validator.StartTime,
+		newPeriod,
+		newWeight,
+		currentSupply,
+	)
 	require.Equal(t, &state.Staker{
 		TxID:            newTx.TxID,
 		NodeID:          nodeID,
