@@ -223,16 +223,6 @@ jobs:
       - name: Assert publish-set equals manifest exactly
         run: ./.github/workflows/release-assert-publish-set.sh "$TAG" publish-assets
 
-      # validate-tag ran release-check-exists.sh at the top of the workflow,
-      # but the window between that initial guard and this publish step is
-      # the full duration of the build matrix (often 30+ min). A manual
-      # `gh release create`, a retry from another workflow, or a sibling
-      # pipeline can create the release inside that window. Re-check
-      # immediately before softprops to fail closed if that has happened
-      # rather than overwrite or conflict with an existing release.
-      - name: Final pre-publish existence re-check
-        run: ./.github/workflows/release-check-exists.sh "$TAG"
-
       # Fail closed if the tag was force-moved during the build window: the
       # artifacts and body were built/rendered from the commit validate-tag
       # resolved, so refuse to publish if origin's tag no longer points there.
@@ -269,6 +259,14 @@ jobs:
       - name: Re-verify the full release tag set is intact
         run: ./scripts/verify_tags_remote.sh "$TAG"
         shell: bash
+
+      # Existence re-check LAST, immediately before softprops. validate-tag
+      # checked at the top of the workflow, but a manual `gh release create`, a
+      # retry, or a sibling pipeline can create the release during the 30+ min
+      # build/guard window. Running it after the tag guards makes it the final
+      # gate, so we fail closed rather than conflict with an existing release.
+      - name: Final pre-publish existence re-check
+        run: ./.github/workflows/release-check-exists.sh "$TAG"
 
       - name: Create GitHub release (as draft)
         uses: softprops/action-gh-release@v2
