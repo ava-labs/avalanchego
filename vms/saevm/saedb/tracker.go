@@ -57,7 +57,7 @@ const (
 
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
-	Scheme           string // trie database scheme to use; "" = default (rawdb.HashScheme)
+	Scheme           string // trie database scheme to use; defaults to [rawdb.HashScheme]
 	TrieCacheMiB     uint64 // size of the TrieDB cache
 	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
 	Archival         bool   // if true, will store every state on disk
@@ -96,8 +96,7 @@ func (c Config) Verify() error {
 // TrieDBConfig returns a config that can be used to create a [triedb.Database] based on
 // the [Config] parameters provided.
 //
-// All [triedb.Database] must be closed, unless the TrieDB cache is disabled, as
-// this will result in a memory leak.
+// All [triedb.Database] MUST be closed.
 func (c Config) TrieDBConfig(snowCtx *snow.Context) *triedb.Config {
 	switch c.Scheme {
 	case customrawdb.FirewoodScheme:
@@ -126,7 +125,7 @@ func (c Config) TrieDBConfig(snowCtx *snow.Context) *triedb.Config {
 			},
 		}
 	default:
-		snowCtx.Log.Error("Defaulting to hashdb",
+		snowCtx.Log.Error("defaulting to hashdb",
 			zap.Error(errUnknownScheme),
 			zap.String("scheme", c.Scheme),
 		)
@@ -139,7 +138,8 @@ func (c Config) snapConfig() *snapshot.Config {
 		return nil
 	}
 	if c.Scheme == customrawdb.FirewoodScheme {
-		// Firewood doesn't support snapshots
+		// Firewood already has generic node lookups, so the snapshot provides
+		// unnecessary overhead.
 		return nil
 	}
 	return &snapshot.Config{
@@ -230,8 +230,10 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 	)
 	switch {
 	case t.config.Scheme == customrawdb.FirewoodScheme:
-		// Since Firewood doesn't guarantee that the state will be persisted to
-		// disk immediately, it can enter a crash loop missing a settled state.
+		// Firewood prunes all but the last state on disk after shutdown.
+		// Persisting the execution root would make VM recovery (re-execution
+		// since last settled) impossible, as Firewood can only build off the
+		// most recent state.
 		commit = settledRoot
 		because = "settled"
 	case t.config.Archival:

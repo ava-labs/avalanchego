@@ -58,7 +58,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
-	config, err := createGenesisBlock(db, vm.config.DBConfig.TrieDBConfig(snowCtx), genesisBytes)
+	config, err := setupGenesis(db, vm.config.DBConfig.TrieDBConfig(snowCtx), genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -71,10 +71,10 @@ func (vm *SinceGenesis[_]) Initialize(
 	return nil
 }
 
-func createGenesisBlock(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *params.ChainConfig, err error) {
+func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *params.ChainConfig, retErr error) {
 	tdb := triedb.NewDatabase(db, tdbConfig)
 	defer func() {
-		err = errors.Join(err, tdb.Close())
+		retErr = errors.Join(retErr, tdb.Close())
 	}()
 
 	genesis := new(core.Genesis)
