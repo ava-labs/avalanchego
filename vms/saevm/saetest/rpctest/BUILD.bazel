@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "rpctest",
+    testonly = True,
+    srcs = ["rpc.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/saevm/cmputils",
+        "@com_github_arr4n_shed//testerr",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rpc",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

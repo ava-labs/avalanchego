@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -57,13 +58,13 @@ func TestGasPriceAPIs(t *testing.T) {
 			require.NoError(t, b.WaitUntilExecuted(ctx), "last-accepted %T.WaitUntilExecuted()", b)
 			baseFee := b.ExecutedBaseFee()
 			sut.testRPC(ctx, t,
-				rpcTest{
-					method: "eth_maxPriorityFeePerGas",
-					want:   hexutil.Uint64(tt.wantTip),
+				rpctest.Case{
+					Method: "eth_maxPriorityFeePerGas",
+					Want:   hexutil.Uint64(tt.wantTip),
 				},
-				rpcTest{
-					method: "eth_gasPrice",
-					want:   hexutil.Uint64(tt.wantTip + baseFee.Uint64()),
+				rpctest.Case{
+					Method: "eth_gasPrice",
+					Want:   hexutil.Uint64(tt.wantTip + baseFee.Uint64()),
 				},
 			)
 		})
@@ -95,10 +96,10 @@ func TestFeeHistory(t *testing.T) {
 	numBlocks := hexutil.Uint64(2)   // to fetch
 	rewardPercentile := []float64{0} // only one tip anyway
 
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_feeHistory",
-		args:   []any{numBlocks, rpc.BlockNumber(3), rewardPercentile},
-		want: ethclient.FeeHistoryResult{
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_feeHistory",
+		Args:   []any{numBlocks, rpc.BlockNumber(3), rewardPercentile},
+		Want: ethclient.FeeHistoryResult{
 			OldestBlock: hexBig(2),
 			Reward: [][]*hexutil.Big{
 				{hexBigU(tips[1])},
