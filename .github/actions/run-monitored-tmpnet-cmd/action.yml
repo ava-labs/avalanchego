@@ -11,6 +11,9 @@ inputs:
   runtime:
     description: 'the tmpnet runtime being used'
     default: 'process'
+  setup_bazel:
+    description: 'Whether to run Bazel setup before executing the command'
+    default: 'false'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -55,6 +58,12 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/ensure-disk-space
+      if: ${{ inputs.runtime == 'kube' }}
+      with:
+        diagnostic-groups: docker
+    - uses: ./.github/actions/setup-bazel
+      if: ${{ inputs.setup_bazel == 'true' }}
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
     - name: Notify of metrics availability
@@ -73,6 +82,8 @@ runs:
       shell: bash
       run: echo "::warning::Monitoring credentials not found. Skipping collector start. Is the PR from a fork branch?"
     - name: Run command
+      id: run-command
+      continue-on-error: true
       shell: bash
       # --impure ensures the env vars are accessible to the command
       run: nix develop --impure --command bash -x ${{ inputs.run }}
@@ -98,6 +109,14 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+    - name: Log Bazel disk diagnostics
+      if: ${{ steps.run-command.outcome == 'failure' && inputs.setup_bazel == 'true' }}
+      shell: bash
+      run: ./scripts/run_task.sh log-ci-disk-state-bazel
+    - name: Log Docker disk diagnostics
+      if: ${{ steps.run-command.outcome == 'failure' && inputs.runtime == 'kube' }}
+      shell: bash
+      run: ./scripts/run_task.sh log-ci-disk-state-docker
     - name: Upload tmpnet data
       if: always() && (inputs.runtime == 'process')
       uses: ./.github/actions/upload-tmpnet-artifact
@@ -108,3 +127,7 @@ runs:
       uses: ./.github/actions/collect-kind-diagnostics
       with:
         artifact_name: ${{ inputs.artifact_prefix }}-kind-diagnostics
+    - name: Fail if the command failed
+      if: ${{ steps.run-command.outcome == 'failure' }}
+      shell: bash
+      run: exit 1
