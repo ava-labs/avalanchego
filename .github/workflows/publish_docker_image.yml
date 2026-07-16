@@ -21,26 +21,18 @@ jobs:
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Create multiplatform docker builder
         run: docker buildx create --use
-      - name: Build and publish images to DockerHub
+      - name: Build and publish Docker images
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: |
+            DOCKER_IMAGE="$DOCKER_IMAGE_DEFAULT" scripts/run_task.sh build-image
+            DOCKER_IMAGE=avaplatform/bootstrap-monitor scripts/run_task.sh build-bootstrap-monitor-image
+            IMAGE_NAME=avaplatform/subnet-evm scripts/run_task.sh build-subnet-evm-image
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          DOCKER_IMAGE: ${{ secrets.DOCKER_REPO }}
+          DOCKER_IMAGE_DEFAULT: ${{ secrets.DOCKER_REPO }}
           BUILD_MULTI_ARCH: 1
-        run: scripts/run_task.sh build-image
-      - name: Build and publish bootstrap-monitor image to DockerHub
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          DOCKER_IMAGE: avaplatform/bootstrap-monitor
-          BUILD_MULTI_ARCH: 1
-        run: scripts/run_task.sh build-bootstrap-monitor-image
-      - name: Build and publish subnet-evm image to DockerHub
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          IMAGE_NAME: avaplatform/subnet-evm
           PLATFORMS: "linux/amd64,linux/arm64"
           PUBLISH: 1
           ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' }}
-        run: scripts/run_task.sh build-subnet-evm-image

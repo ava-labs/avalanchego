@@ -22,11 +22,6 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: false
-          docker-images: true
-
       - name: Checkout Repository
         uses: actions/checkout@v5
 
@@ -37,20 +32,13 @@ jobs:
           username: _json_key
           password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
-      - name: Build and push images for avalanchego test setup
-        run: ./scripts/run_task.sh build-antithesis-images-avalanchego
-        env:
-          IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
-
-      - name: Build and push images for xsvm test setup
-        run: ./scripts/run_task.sh build-antithesis-images-xsvm
-        env:
-          IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
-
-      - name: Build and push images for subnet-evm test setup
-        run: ./scripts/run_task.sh build-antithesis-images-subnet-evm
+      - name: Build and push Antithesis images
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: |
+            ./scripts/run_task.sh build-antithesis-images-avalanchego
+            ./scripts/run_task.sh build-antithesis-images-xsvm
+            ./scripts/run_task.sh build-antithesis-images-subnet-evm
         env:
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
