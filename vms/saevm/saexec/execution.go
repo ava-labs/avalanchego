@@ -153,6 +153,22 @@ type (
 	}
 )
 
+// BeforeExecutingBlock applies the state changes required before executing
+// b's transactions, specifically the before-block hook and the EIP-4788 beacon
+// root, mirroring [core.StateProcessor.Process].
+func BeforeExecutingBlock(hooks hook.Points, config *params.ChainConfig, stateDB *state.StateDB, parent *types.Header, b *types.Block) (params.Rules, error) {
+	rules := config.Rules(b.Number(), true /*isMerge*/, b.Time())
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent, b); err != nil {
+		return params.Rules{}, fmt.Errorf("before-block hook: %v", err)
+	}
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
+
+	core.SetBeaconBlockRoot(stateDB, b.Header())
+	return rules, nil
+}
+
 // Execute executes the transactions in the [blocks.Block], beginning from the
 // post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
 // the number of transactions to process, allowing partial execution for
@@ -186,21 +202,14 @@ func Execute(
 		return nil, err
 	}
 
-	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
-		return nil, fmt.Errorf("before-block hook: %v", err)
+	rules, err := BeforeExecutingBlock(hooks, config, stateDB, parent.Header(), b.EthBlock())
+	if err != nil {
+		return nil, err
 	}
-	// Finalise any state changes made by the hook, mirroring the finalisation
-	// performed by [core.ApplyTransaction].
-	stateDB.Finalise(rules.IsEIP158)
 
 	baseFee := gasClock.BaseFee()
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
-
-	// EIP-4788: before processing any transactions, store the parent beacon
-	// block root, mirroring [core.StateProcessor.Process].
-	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out

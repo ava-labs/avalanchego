@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -18,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -84,6 +82,11 @@ func (b *backend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumbe
 // StateAndHeaderByNumberOrHash fakes the returned [types.Header] to contain
 // post-execution results, mimicking a synchronous block. The [state.StateDB] is
 // opened at the post-execution root, as carried by the faked header.
+//
+// TODO(JonathanOppenheimer): eth_call and eth_callDetailed don't see the next
+// block's before-block state changes (e.g. durango warp activation).
+// I think this is impossible to fix as the next block's rules and time are
+// unknown.
 func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
 	if n, ok := numOrHash.Number(); ok && n == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("state not available for pending block")
@@ -106,8 +109,10 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	return sdb, hdr, nil
 }
 
-// StateAtBlock returns the state database after executing the given block. The
-// reexec, base, readOnly, and preferDisk parameters are ignored because SAE
+// StateAtBlock returns the state database after executing the given block,
+// with the canonical child block's before-block state changes already applied.
+//
+// The reexec, base, readOnly, and preferDisk parameters are ignored because SAE
 // does not implement geth's re-execution-from-archive strategy.
 //
 // Like geth, SAE only stores historical state roots, not full historical state.
@@ -129,7 +134,26 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if err := b.applyChildBeforeBlock(sdb, bl.Header(), num+1); err != nil {
+		return nil, nil, err
+	}
 	return sdb, noopRelease, nil
+}
+
+// applyChildBeforeBlock applies the canonical child block's pre-transaction
+// state changes to sdb, the parent's post-execution state. It is a no-op if no
+// block exists at height child.
+func (b *backend) applyChildBeforeBlock(sdb *state.StateDB, parent *types.Header, child rpc.BlockNumber) error {
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(child))
+	if errors.Is(err, blocks.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("restoring child block %d: %w", child, err)
+	}
+	_, err = saexec.BeforeExecutingBlock(b.Hooks(), b.ChainConfig(), sdb, parent, bl.EthBlock())
+	return err
 }
 
 // StateAtTransaction returns the execution environment of a particular
@@ -184,38 +208,24 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
 }
 
-var _ tracers.ExtraExecutor = (*tracerBackend)(nil)
+var _ tracers.BlockHashOverrider = (*tracerBackend)(nil)
 
-// tracerBackend provides optional hooks for the tracers API to perform state
-// changes provided by the hooks.
+// tracerBackend adapts [backend] for the tracers API, faking headers to carry
+// post-execution results and reporting canonical hashes for the faked blocks.
 type tracerBackend struct {
 	*backend
 }
 
-// BeforeExecutingBlock mirrors the pre-transaction state changes performed by
-// [saexec.Execute].
-func (b *tracerBackend) BeforeExecutingBlock(sdb *state.StateDB, parent, header *types.Header) error {
-	rules := b.ChainConfig().Rules(header.Number, true /*isMerge*/, header.Time)
-	// The block's transactions are unavailable here so an empty block carries
-	// the header to the hook.
-	if err := b.Hooks().BeforeExecutingBlock(rules, sdb, parent, types.NewBlockWithHeader(header)); err != nil {
-		return fmt.Errorf("before-block hook: %v", err)
+// BlockHash returns the block's canonical hash, which differs from
+// block.Hash() because the blocks served by this backend carry faked headers.
+func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
+	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(num))
+	if err != nil {
+		// Unreachable: the tracers API only receives blocks this backend restored.
+		return block.Hash()
 	}
-	// Finalise any state changes made by the hook, mirroring the finalisation
-	// performed by [core.ApplyTransaction].
-	sdb.Finalise(rules.IsEIP158)
-	core.SetBeaconBlockRoot(sdb, header)
-	return nil
-}
-
-// AfterExecutingTransaction mirrors the post-transaction state changes performed by
-// [saexec.Execute].
-func (b *tracerBackend) AfterExecutingTransaction(sdb *state.StateDB, bf *big.Int, gasUsed uint64) error {
-	bf256, _ := uint256.FromBig(bf)
-	r := &types.Receipt{
-		GasUsed: gasUsed,
-	}
-	return b.Hooks().AfterExecutingTransaction(sdb, *bf256, r)
+	return bl.EthBlock().Hash()
 }
 
 // BlockByHash is the same as [backend.BlockByHash] but returns a faked header
@@ -242,11 +252,8 @@ func (b *tracerBackend) getBlockModified(ctx context.Context, nOrHash rpc.BlockN
 // results (state root and base fee), mimicking a synchronous block.
 //
 // The API implementations expect this to be synchronous, sourcing the state
-// root and the base fee from fields. At the time of writing, the returned
-// header's hash is never used so it's safe to modify it.
-//
-// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
-// devise an approach to ensure that it is confirmed on each.
+// root and the base fee from fields. The faked header's hash is wrong; the
+// tracers API reports canonical hashes via [tracerBackend.BlockHash].
 func executedHeader(bl *blocks.Block) *types.Header {
 	hdr := bl.Header()
 	hdr.Root = bl.PostExecutionStateRoot()

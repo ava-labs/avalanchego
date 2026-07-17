@@ -69,8 +69,8 @@ func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 // The C-Chain has historically credited the full fee (base + priority) to the
 // blackhole address, but libevm's state transition only credits the priority
 // fee to the coinbase (the blackhole address) and discards the base fee.
-func (r RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, baseFee *big.Int, gasUsed uint64) {
-	if !r.IsHelicon {
+func (RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, baseFee *big.Int, gasUsed uint64) {
+	if baseFee == nil {
 		return
 	}
 	burned := new(uint256.Int).SetUint64(gasUsed)
