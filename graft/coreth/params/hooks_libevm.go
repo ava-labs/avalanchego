@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -61,6 +63,20 @@ func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 		return hook.MinimumGasConsumption(limit)
 	}
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
+}
+
+// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
+// The C-Chain has historically credited the full fee (base + priority) to the
+// blackhole address, but libevm's state transition only credits the priority
+// fee to the coinbase (the blackhole address) and discards the base fee.
+func (r RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, baseFee *big.Int, gasUsed uint64) {
+	if !r.IsHelicon {
+		return
+	}
+	burned := new(uint256.Int).SetUint64(gasUsed)
+	bf := uint256.MustFromBig(baseFee)
+	burned.Mul(burned, bf)
+	sdb.AddBalance(constants.BlackholeAddr, burned)
 }
 
 // AccessListGas computes the intrinsic gas for an access list.
