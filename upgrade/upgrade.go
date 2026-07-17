@@ -62,7 +62,7 @@ var (
 		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               time.Date(2025, time.October, 29, 15, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
-		HeliconTime:               UnscheduledActivationTime,
+		HeliconTime:               time.Date(2026, time.July, 28, 15, 0, 0, 0, time.UTC),
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -82,7 +82,7 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
-		HeliconTime:                  UnscheduledActivationTime,
+		HeliconTime:                  InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
