@@ -156,17 +156,16 @@ type (
 // BeforeExecutingBlock applies the state changes required before executing
 // b's transactions, specifically the before-block hook and the EIP-4788 beacon
 // root, mirroring [core.StateProcessor.Process].
-func BeforeExecutingBlock(hooks hook.Points, config *params.ChainConfig, stateDB *state.StateDB, parent *types.Header, b *types.Block) (params.Rules, error) {
-	rules := config.Rules(b.Number(), true /*isMerge*/, b.Time())
+func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
 	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent, b); err != nil {
-		return params.Rules{}, fmt.Errorf("before-block hook: %v", err)
+		return fmt.Errorf("before-block hook: %v", err)
 	}
 	// Finalise any state changes made by the hook, mirroring the finalisation
 	// performed by [core.ApplyTransaction].
 	stateDB.Finalise(rules.IsEIP158)
 
 	core.SetBeaconBlockRoot(stateDB, b.Header())
-	return rules, nil
+	return nil
 }
 
 // Execute executes the transactions in the [blocks.Block], beginning from the
@@ -202,8 +201,8 @@ func Execute(
 		return nil, err
 	}
 
-	rules, err := BeforeExecutingBlock(hooks, config, stateDB, parent.Header(), b.EthBlock())
-	if err != nil {
+	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
+	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
 

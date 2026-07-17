@@ -152,8 +152,9 @@ func (b *backend) applyChildBeforeBlock(sdb *state.StateDB, parent *types.Header
 	if err != nil {
 		return fmt.Errorf("restoring child block %d: %w", child, err)
 	}
-	_, err = saexec.BeforeExecutingBlock(b.Hooks(), b.ChainConfig(), sdb, parent, bl.EthBlock())
-	return err
+	ethB := bl.EthBlock()
+	rules := b.ChainConfig().Rules(ethB.Number(), true /*isMerge*/, ethB.Time())
+	return saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parent, ethB)
 }
 
 // StateAtTransaction returns the execution environment of a particular
