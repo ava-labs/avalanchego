@@ -24,8 +24,8 @@ require (
 	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
-	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
-	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
+	github.com/ava-labs/avalanchego/graft/coreth v1.15.0-fuji-rc.0
+	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.0-fuji-rc.0
 	github.com/ava-labs/libevm v1.13.15-0.20260716180230-f887fa4393ca
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -93,7 +93,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/avalanchego/graft/evm v1.14.2
+	github.com/ava-labs/avalanchego/graft/evm v1.15.0-fuji-rc.0
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect

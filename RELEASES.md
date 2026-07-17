@@ -1,6 +1,22 @@
 # Release Notes
 
-## Pending (v1.14.3)
+## Pending (v1.15.0)
+
+## [v1.15.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md) C-Chain Async Execution
+- [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
+- [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
+- [ACP-273](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md) Reduce Minimum Validator Staking Duration
+- [ACP-283](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md) Dynamic Minimum C-Chain Gas Price
+- [ACP-285](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md) Reduce Minimum Consumption Rate
+
+The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, July 28th, 2026 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, July 28th 2026.**
 
 ### Metrics
 
