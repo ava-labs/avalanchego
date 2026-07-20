@@ -923,15 +923,27 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			},
 		})
 		require.NoError(err)
+		tc.By("verifying the chain was created", func() {
+			chainIDs, err := pClient.Validates(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+			require.Equal([]ids.ID{subnetID}, chainIDs)
+			validatedBy, err := pClient.ValidatedBy(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+			require.Equal(subnetID, validatedBy)
+		})
 
 		tc.By("verifying the L1 was created", func() {
 			tc.By("verifying the subnet reports as an L1", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
-				require.False(subnet.IsPermissioned)
-				require.Equal(expectedConversionID, subnet.ConversionID)
-				require.Equal(subnetID, subnet.ManagerChainID)
-				require.Equal(address, subnet.ManagerAddress)
+				require.Equal(platformvm.GetSubnetClientResponse{
+					IsPermissioned: false,
+					ControlKeys: []ids.ShortID{},
+					Threshold: 0,
+					ConversionID: expectedConversionID,
+					ManagerChainID: subnetID,
+					ManagerAddress: address,
+				}, subnet,)
 			})
 
 			tc.By("verifying the validator set was initialized", func() {
