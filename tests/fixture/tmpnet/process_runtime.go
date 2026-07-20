@@ -357,16 +357,16 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 		return stacktrace.Wrap(err)
 	}
 
-	promtailLabels := map[string]string{}
-	maps.Copy(promtailLabels, commonLabels)
-	promtailLabels["__path__"] = filepath.Join(p.node.DataDir, "logs", "*.log")
-	promtailConfig := []ConfigMap{
+	alloyLabels := map[string]string{}
+	maps.Copy(alloyLabels, commonLabels)
+	alloyLabels["__path__"] = filepath.Join(p.node.DataDir, "logs", "*.log")
+	alloyConfig := []ConfigMap{
 		{
 			"targets": []string{"localhost"},
-			"labels":  promtailLabels,
+			"labels":  alloyLabels,
 		},
 	}
-	return p.writeMonitoringConfigFile(promtailCmd, promtailConfig)
+	return p.writeMonitoringConfigFile(alloyCmd, alloyConfig)
 }
 
 // Return the path for this node's prometheus configuration.
@@ -382,7 +382,7 @@ func (p *ProcessRuntime) getMonitoringConfigPath(name string) (string, error) {
 
 // Ensure the removal of the monitoring configuration files for this node.
 func (p *ProcessRuntime) removeMonitoringConfig() error {
-	for _, name := range []string{promtailCmd, prometheusCmd} {
+	for _, name := range []string{alloyCmd, prometheusCmd} {
 		configPath, err := p.getMonitoringConfigPath(name)
 		if err != nil {
 			return stacktrace.Wrap(err)
@@ -394,7 +394,7 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 	return nil
 }
 
-// Write the configuration for a type of monitoring (e.g. prometheus, promtail).
+// Write the configuration for a type of monitoring (e.g. prometheus, alloy).
 func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigMap) error {
 	configPath, err := p.getMonitoringConfigPath(name)
 	if err != nil {

@@ -55,7 +55,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # Install nix and ensure promtail and prometheus are available
+    # Install nix and ensure alloy and prometheus are available
     - uses: ./.github/actions/install-nix
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')

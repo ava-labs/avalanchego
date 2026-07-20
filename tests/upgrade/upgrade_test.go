@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			shutdownDelay = tmpnet.NetworkShutdownDelay // Ensure a final metrics scrape
 		}
 		if collectorVars.StartLogsCollector {
-			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
+			require.NoError(tmpnet.StartAlloy(tc.DefaultContext(), tc.Log()))
 		}
 
 		// Since cleanups are run in LIFO order, adding these cleanups before StartNetwork

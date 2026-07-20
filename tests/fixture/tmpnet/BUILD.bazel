@@ -24,8 +24,8 @@ go_library(
         "utils.go",
     ],
     embedsrcs = [
+        "yaml/alloy-daemonset.yaml",
         "yaml/prometheus-agent.yaml",
-        "yaml/promtail-daemonset.yaml",
         "yaml/tmpnet-rbac.yaml",
     ],
     importpath = "github.com/ava-labs/avalanchego/tests/fixture/tmpnet",
