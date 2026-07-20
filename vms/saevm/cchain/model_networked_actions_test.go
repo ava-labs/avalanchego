@@ -30,6 +30,8 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"buildAndDistribute2": nm.buildAndDistribute,
 		"advanceClock":        nm.advanceClock,
 		"settle":              nm.settle,
+		"delayNode":           nm.delayNode,
+		"catchUpNode":         nm.catchUpNode,
 		"":                    nm.check,
 	}
 }
@@ -42,7 +44,24 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 	from := nm.addrs[fromIdx]
 	nodeIdx, pinned := nm.pins[from]
 	if !pinned {
-		nodeIdx = rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
+		// A delayed node has no sync point covering its pool — unlike a
+		// pinned node (whose every prior tx was admitted with a
+		// waitForPendingEthTxs sync, so its pool holds the account's full
+		// contiguous nonce history), a fresh destination's receipt of
+		// earlier gossip is unguaranteed. Since a delayed node also skips
+		// canonical block delivery, an unpinned account's current
+		// (model-consistent) nonce can be gapped there and never promote to
+		// pending, hanging waitForPendingEthTxs forever. Restrict fresh
+		// draws to non-delayed nodes; delayNode's guard keeps at least one
+		// validator (and hence one node) non-delayed, so eligible is never
+		// empty.
+		var eligible []int
+		for i, cand := range nm.nodes {
+			if !cand.delayed {
+				eligible = append(eligible, i)
+			}
+		}
+		nodeIdx = eligible[rapid.IntRange(0, len(eligible)-1).Draw(rt, "node")]
 	}
 	n := nm.nodes[nodeIdx]
 
@@ -147,6 +166,7 @@ func (nm *networkedMachine) applyCanonical(rt *rapid.T, builder *modelNode, blk 
 			delete(nm.pins, addr)
 		}
 	}
+	nm.snapshot()
 }
 
 // buildAndDistribute drives one canonical consensus round: a drawn eligible
@@ -192,6 +212,45 @@ func (nm *networkedMachine) buildAndDistribute(rt *rapid.T) {
 		}
 		nm.deliverBlock(rt, n, ab)
 	}
+}
+
+// anyDelayed reports whether any node is currently lagging.
+func (nm *networkedMachine) anyDelayed() bool {
+	for _, n := range nm.nodes {
+		if n.delayed {
+			return true
+		}
+	}
+	return false
+}
+
+// delayNode marks a drawn node lagging: subsequent canonical blocks are
+// withheld from it until catchUpNode. Refuses to delay the last buildable
+// validator.
+func (nm *networkedMachine) delayNode(rt *rapid.T) {
+	idx := rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
+	n := nm.nodes[idx]
+	if n.delayed {
+		return
+	}
+	if n.isValidator && len(nm.nonDelayedValidators()) == 1 {
+		return // at least one buildable validator must remain
+	}
+	n.delayed = true
+}
+
+// catchUpNode delivers a lagging node's withheld canonical blocks in order
+// and clears its lag.
+func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
+	idx := rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
+	n := nm.nodes[idx]
+	if !n.delayed {
+		return
+	}
+	for n.acceptedCount < len(nm.canonical) {
+		nm.deliverBlock(rt, n, nm.canonical[n.acceptedCount])
+	}
+	n.delayed = false
 }
 
 func (nm *networkedMachine) advanceClock(rt *rapid.T) {

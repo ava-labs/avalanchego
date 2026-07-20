@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -198,6 +199,7 @@ type networkedMachine struct {
 	genesisID ids.ID
 	nodes     []*modelNode
 	canonical []acceptedBlock
+	snapshots []modelSnapshot
 
 	// pins maps an account with in-flight txs to the node all its txs are
 	// issued to until the account drains. Eth-tx gossip reaches validators
@@ -298,6 +300,7 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 	}
 	nm.genesisID = genesisID
 	m.lastAcceptedID = genesisID
+	nm.snapshot()
 
 	// Fully connect the validator clique; non-validators connect only to
 	// validators, mirroring production (and sae's newNetworkedSUTs).
@@ -366,12 +369,64 @@ func (nm *networkedMachine) nonDelayedValidators() []*modelNode {
 
 // check is the rapid invariant action, run around every other action: every
 // non-delayed node agrees exactly with the shared model (and hence with every
-// other converged node). Lagging nodes are checked by Task 4's prefix logic.
+// other converged node). Lagging nodes are checked against the exact prefix
+// they've accepted via checkLagging.
 func (nm *networkedMachine) check(rt *rapid.T) {
 	for _, n := range nm.nodes {
 		if n.delayed {
-			continue // replaced with checkLagging in Task 4
+			nm.checkLagging(rt, n)
+			continue
 		}
 		nm.checkState(rt, n.ctx, n.sut, n.db)
 	}
+}
+
+// modelSnapshot freezes the model's checkable facts at one accepted height,
+// so a lagging node can be compared against the exact chain prefix it has
+// accepted without replaying the model.
+type modelSnapshot struct {
+	id        ids.ID
+	balances  map[common.Address]*uint256.Int
+	nonces    map[common.Address]uint64
+	contracts map[common.Address]*contractState
+}
+
+func (nm *networkedMachine) snapshot() {
+	balances := make(map[common.Address]*uint256.Int, len(nm.m.balances))
+	for a, b := range nm.m.balances {
+		balances[a] = new(uint256.Int).Set(b)
+	}
+	contracts := make(map[common.Address]*contractState, len(nm.m.contracts))
+	for a, cs := range nm.m.contracts {
+		contracts[a] = &contractState{kind: cs.kind, storage: maps.Clone(cs.storage)}
+	}
+	nm.snapshots = append(nm.snapshots, modelSnapshot{
+		id:        nm.m.lastAcceptedID,
+		balances:  balances,
+		nonces:    maps.Clone(nm.m.nonces),
+		contracts: contracts,
+	})
+}
+
+// checkLagging verifies a delayed node sits exactly at the canonical chain
+// prefix it has accepted: last-accepted ID and full model state as of that
+// height.
+func (nm *networkedMachine) checkLagging(rt *rapid.T, n *modelNode) {
+	snap := nm.snapshots[n.acceptedCount]
+	got, err := n.sut.LastAccepted(n.ctx)
+	require.NoErrorf(rt, err, "%T.LastAccepted() on lagging node %d", n.sut.VM, n.idx)
+	require.Equalf(rt, snap.id, got, "lagging node %d last accepted (prefix height %d)", n.idx, n.acceptedCount)
+
+	state, err := n.sut.LastExecutedState()
+	require.NoErrorf(rt, err, "%T.LastExecutedState() on lagging node %d", n.sut.VM, n.idx)
+	for addr, want := range snap.balances {
+		require.Equalf(rt, *want, *state.GetBalance(addr), "lagging node %d balance of %s", n.idx, addr)
+		require.Equalf(rt, snap.nonces[addr], state.GetNonce(addr), "lagging node %d nonce of %s", n.idx, addr)
+	}
+	for contract, cs := range snap.contracts {
+		for key, want := range cs.storage {
+			require.Equalf(rt, want, state.GetState(contract, key), "lagging node %d storage %s[%s]", n.idx, contract, key)
+		}
+	}
+	checkRawdbPointers(rt, n.db)
 }
