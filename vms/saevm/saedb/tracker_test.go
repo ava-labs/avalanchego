@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
@@ -35,6 +36,10 @@ func TestNewTracker(t *testing.T) {
 	}{
 		{
 			name: "defaults",
+		},
+		{
+			name: "firewood",
+			with: func(c *Config) { c.Scheme = customrawdb.FirewoodScheme },
 		},
 		{
 			name:    "zero_commit_interval",
@@ -57,18 +62,23 @@ func TestNewTracker(t *testing.T) {
 			with:    func(c *Config) { c.SnapshotCacheMiB = math.MaxInt },
 			wantErr: errCacheTooLarge,
 		},
+		{
+			name:    "unknown_scheme",
+			with:    func(c *Config) { c.Scheme = rawdb.PathScheme },
+			wantErr: errUnknownScheme,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log := loggingtest.New(t, logging.Debug)
 			cfg := defaults
 			if tt.with != nil {
 				tt.with(&cfg)
 			}
 			db := rawdb.NewMemoryDatabase()
+			log := loggingtest.New(t, logging.Debug)
 
-			tr, err := NewTracker(db, cfg, types.EmptyRootHash, log)
+			tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
 			require.ErrorIs(t, err, tt.wantErr, "NewTracker()")
 			if err != nil {
 				return
@@ -84,6 +94,42 @@ func TestNewTracker(t *testing.T) {
 			require.Equal(t, wantRoot, gotRoot, "rawdb.ReadSnapshotRoot()")
 		})
 	}
+}
+
+// TestProtectTrieIndex simulates every pair of consecutive node runs against
+// the same database. The first run, on a fresh database, always succeeds;
+// only the second may error.
+func TestProtectTrieIndex(t *testing.T) {
+	configs := map[string]Config{
+		"archival":        {Archival: true},
+		"archival_allow":  {Archival: true, AllowMissingTries: true},
+		"pruning":         {},
+		"allowed_pruning": {AllowMissingTries: true},
+	}
+	wantErrs := map[string]error{
+		"archival_then_pruning":       errRefuseToCorruptArchiver,
+		"archival_allow_then_pruning": errRefuseToCorruptArchiver,
+	}
+
+	for name1, config1 := range configs {
+		for name2, config2 := range configs {
+			name := name1 + "_then_" + name2
+			t.Run(name, func(t *testing.T) {
+				db := rawdb.NewMemoryDatabase()
+				require.NoError(t, protectTrieIndex(db, config1), "protectTrieIndex(%+v) on fresh DB", config1)
+				require.ErrorIs(t, protectTrieIndex(db, config2), wantErrs[name], "protectTrieIndex(%+v) after first run", config2)
+			})
+		}
+	}
+
+	// An allowed pruning run bypasses the protection of an earlier archival
+	// run without disabling it, so a later pruning run must still refuse.
+	t.Run("archival_then_allowed_pruning_then_pruning", func(t *testing.T) {
+		db := rawdb.NewMemoryDatabase()
+		require.NoError(t, protectTrieIndex(db, configs["archival"]), "protectTrieIndex() archival run on fresh DB")
+		require.NoError(t, protectTrieIndex(db, configs["allowed_pruning"]), "protectTrieIndex() allowed pruning run after archival")
+		require.ErrorIs(t, protectTrieIndex(db, configs["pruning"]), errRefuseToCorruptArchiver, "protectTrieIndex() pruning run after allowed pruning")
+	})
 }
 
 // writeBlock simulates the execution of a block by opening a [state.StateDB]
@@ -139,9 +185,9 @@ func TestTrackerMaybeCap(t *testing.T) {
 		maxCapBytes:       maxCapBytes,
 		targetCommitBytes: targetCommitBytes,
 	}
-	log := loggingtest.New(t, logging.Debug)
 
-	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, log)
+	log := loggingtest.New(t, logging.Debug)
+	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, t.TempDir(), log)
 	require.NoError(t, err, "NewTracker()")
 
 	prevRoot := types.EmptyRootHash
@@ -246,6 +292,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 					maxCapBytes:       mode.maxCapBytes,
 					targetCommitBytes: targetCommitBytes,
 				}
+				log := loggingtest.New(b, logging.Debug)
 
 				var (
 					maxPause  time.Duration
@@ -254,7 +301,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 				for b.Loop() {
 					b.StopTimer()
 					db := tt.open(b)
-					tr, err := NewTracker(db, cfg, types.EmptyRootHash, logging.NoLog{})
+					tr, err := NewTracker(db, cfg, types.EmptyRootHash, b.TempDir(), log)
 					require.NoError(b, err, "NewTracker()")
 					b.StartTimer()
 

@@ -163,6 +163,7 @@ go_test(
         "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/predicate",
+        "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
