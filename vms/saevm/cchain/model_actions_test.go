@@ -4,7 +4,9 @@
 package cchain
 
 import (
+	"bytes"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
@@ -12,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -33,6 +36,9 @@ func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 		"advanceClock":  mm.advanceClock,
 		"settle":        mm.settle,
 		"issueTransfer": mm.issueTransfer,
+		"issueDeploy":   mm.issueDeploy,
+		"issueStore":    mm.issueStore,
+		"issueRevert":   mm.issueRevert,
 		"":              mm.check,
 	}
 }
@@ -138,6 +144,127 @@ func (mm *modelMachine) issueMinimalTransfer(rt *rapid.T) {
 		to:    richest,
 		value: new(uint256.Int),
 		cost:  uint256.NewInt(ethparams.TxGas * txGasFeeCap),
+	})
+}
+
+// nextNonce is the account's next nonce: executed nonce + in-flight txs.
+func (mm *modelMachine) nextNonce(addr common.Address) uint64 {
+	n := mm.m.nonces[addr]
+	for _, it := range mm.m.pendingEth {
+		if it.from == addr {
+			n++
+		}
+	}
+	return n
+}
+
+func (mm *modelMachine) issueDeploy(rt *rapid.T) {
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	from := mm.addrs[fromIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	deployKind := rapid.SampledFrom([]txKind{kindStore, kindRevert}).Draw(rt, "fixture")
+	runtime := storeRuntime(mm.tb)
+	if deployKind == kindRevert {
+		runtime = reverterRuntime(mm.tb)
+	}
+	predicted := crypto.CreateAddress(from, mm.nextNonce(from))
+	data := &types.DynamicFeeTx{
+		Gas:       1_000_000,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+		Data:      deployCode(mm.tb, runtime),
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(deploy)")
+	mm.trackPending(ethTx, &issuedTx{
+		kind:       kindDeploy,
+		from:       from,
+		deployKind: deployKind,
+		contract:   predicted,
+		value:      new(uint256.Int),
+		cost:       uint256.NewInt(1_000_000 * txGasFeeCap),
+	})
+}
+
+// deployedContracts returns addresses of model contracts of the given kind.
+func (mm *modelMachine) deployedContracts(kind txKind) []common.Address {
+	var out []common.Address
+	for addr, cs := range mm.m.contracts {
+		if cs.kind == kind {
+			out = append(out, addr)
+		}
+	}
+	slices.SortFunc(out, func(a, b common.Address) int { return bytes.Compare(a[:], b[:]) }) // deterministic draw order
+	return out
+}
+
+func (mm *modelMachine) issueStore(rt *rapid.T) {
+	targets := mm.deployedContracts(kindStore)
+	if len(targets) == 0 {
+		mm.issueDeploy(rt)
+		return
+	}
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	from := mm.addrs[fromIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
+	key := common.BigToHash(new(big.Int).SetUint64(rapid.Uint64Range(0, 15).Draw(rt, "slot")))
+	val := common.BigToHash(new(big.Int).SetUint64(rapid.Uint64().Draw(rt, "value")))
+	data := &types.DynamicFeeTx{
+		To:        &contract,
+		Gas:       1_000_000,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+		Data:      slices.Concat(key[:], val[:]),
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(store)")
+	mm.trackPending(ethTx, &issuedTx{
+		kind:     kindStore,
+		from:     from,
+		contract: contract,
+		key:      key,
+		val:      val,
+		value:    new(uint256.Int),
+		cost:     uint256.NewInt(1_000_000 * txGasFeeCap),
+	})
+}
+
+func (mm *modelMachine) issueRevert(rt *rapid.T) {
+	targets := mm.deployedContracts(kindRevert)
+	if len(targets) == 0 {
+		mm.issueDeploy(rt)
+		return
+	}
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	from := mm.addrs[fromIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
+	arg := rapid.Uint64().Draw(rt, "arg")
+	wantStatus := types.ReceiptStatusSuccessful
+	if arg%2 == 1 {
+		wantStatus = types.ReceiptStatusFailed
+	}
+	argHash := common.BigToHash(new(big.Int).SetUint64(arg))
+	data := &types.DynamicFeeTx{
+		To:        &contract,
+		Gas:       1_000_000,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+		Data:      argHash[:],
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(revert probe)")
+	mm.trackPending(ethTx, &issuedTx{
+		kind:       kindRevert,
+		from:       from,
+		contract:   contract,
+		wantStatus: wantStatus,
+		value:      new(uint256.Int),
+		cost:       uint256.NewInt(1_000_000 * txGasFeeCap),
 	})
 }
 
@@ -282,6 +409,18 @@ func (mm *modelMachine) applyTxEffects(rt *rapid.T, it *issuedTx, r *types.Recei
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "transfer receipt status")
 		mm.m.balances[it.from].Sub(mm.m.balances[it.from], it.value)
 		mm.m.balances[it.to].Add(mm.m.balances[it.to], it.value)
+	case kindDeploy:
+		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "deploy receipt status")
+		require.Equalf(rt, it.contract, r.ContractAddress, "CREATE address prediction")
+		mm.m.contracts[it.contract] = &contractState{kind: it.deployKind, storage: make(map[common.Hash]common.Hash)}
+	case kindStore:
+		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "store receipt status")
+		require.Lenf(rt, r.Logs, 1, "store tx log count")
+		require.Equalf(rt, []common.Hash{it.val}, r.Logs[0].Topics, "store log topic")
+		require.Equalf(rt, it.contract, r.Logs[0].Address, "store log address")
+		mm.m.contracts[it.contract].storage[it.key] = it.val
+	case kindRevert:
+		require.Equalf(rt, it.wantStatus, r.Status, "reverter receipt status")
 	}
 }
 
@@ -315,8 +454,13 @@ func (mm *modelMachine) check(rt *rapid.T) {
 		require.Equalf(rt, *want, *state.GetBalance(addr), "balance of %s", addr)
 		require.Equalf(rt, mm.m.nonces[addr], state.GetNonce(addr), "nonce of %s", addr)
 	}
+	for contract, cs := range mm.m.contracts {
+		for key, want := range cs.storage {
+			require.Equalf(rt, want, state.GetState(contract, key), "storage %s[%s]", contract, key)
+		}
+	}
 	mm.checkRawdbPointers(rt)
-	// Later tasks extend: contract storage (6), exported UTXOs (8).
+	// Later tasks extend: exported UTXOs (8).
 }
 
 // checkRawdbPointers spot-checks invariants.md pointer discipline on the

@@ -44,6 +44,9 @@ type txKind int
 
 const (
 	kindTransfer txKind = iota
+	kindDeploy
+	kindStore
+	kindRevert
 )
 
 // issuedTx carries the model's expectations for a tx issued to the pool but
@@ -54,6 +57,17 @@ type issuedTx struct {
 	to    common.Address
 	value *uint256.Int
 	cost  *uint256.Int // worst-case pool cost: value + gasLimit*feeCap
+
+	contract   common.Address // kindDeploy (predicted CREATE address), kindStore/kindRevert (target)
+	key, val   common.Hash    // kindStore
+	deployKind txKind         // kindDeploy: kindStore or kindRevert
+	wantStatus uint64         // kindRevert: expected receipt status
+}
+
+// contractState is the model's expectation for one deployed fixture.
+type contractState struct {
+	kind    txKind // kindStore or kindRevert
+	storage map[common.Hash]common.Hash
 }
 
 // model is the lightweight predicted state of the VM. Gas costs are
@@ -63,6 +77,7 @@ type model struct {
 	nonces      map[common.Address]uint64
 	pendingEth  map[common.Hash]*issuedTx
 	pendingCost map[common.Address]*uint256.Int
+	contracts   map[common.Address]*contractState
 
 	target        dynamic.TargetExponent
 	price         dynamic.PriceExponent
@@ -134,6 +149,7 @@ func newModelMachine(t *testing.T, rt *rapid.T, cfg runConfig) *modelMachine {
 		nonces:      make(map[common.Address]uint64),
 		pendingEth:  make(map[common.Hash]*issuedTx),
 		pendingCost: make(map[common.Address]*uint256.Int),
+		contracts:   make(map[common.Address]*contractState),
 		target:      dynamic.InitialTargetExponent,
 		price:       dynamic.InitialPriceExponent,
 		delay:       dynamic.InitialDelayExponent,
