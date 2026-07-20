@@ -32,6 +32,7 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"settle":              nm.settle,
 		"delayNode":           nm.delayNode,
 		"catchUpNode":         nm.catchUpNode,
+		"competingSiblings":   nm.competingSiblings,
 		"":                    nm.check,
 	}
 }
@@ -272,4 +273,111 @@ func (nm *networkedMachine) settle(_ *rapid.T) {
 	// AdvanceToSettle only reads its gas-time, and the shared clock moves for
 	// every node at once.
 	nm.clock.AdvanceToSettle(nm.tb.Context(), nm.tb, nm.m.lastAccepted)
+}
+
+// competingSiblings has two validators build sibling blocks on the same
+// parent, verifies both on every node, then resolves: a drawn winner is
+// accepted and executed everywhere, the loser rejected everywhere, in a drawn
+// per-node order. Because tx-priority ties break on per-node pool-admission
+// wall time, the siblings may also come out byte-identical; the draw sequence
+// is the same on both paths so replays stay deterministic.
+func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
+	if nm.anyDelayed() {
+		return // siblings resolve atomically network-wide; keep queue semantics simple
+	}
+	jIdx := rapid.IntRange(0, nm.cfg.numValidators-1).Draw(rt, "builderA")
+	kIdx := rapid.IntRange(0, nm.cfg.numValidators-2).Draw(rt, "builderB")
+	if kIdx >= jIdx {
+		kIdx++
+	}
+	j, k := nm.nodes[jIdx], nm.nodes[kIdx]
+
+	if len(nm.m.pendingEth) == 0 {
+		richestIdx := nm.issueMinimalTransfer(rt, j.ctx, j.sut)
+		nm.pins[nm.addrs[richestIdx]] = j.idx
+	}
+	parentID := nm.tipID()
+	blkA := nm.buildOn(rt, j, parentID)
+	blkB := nm.buildOn(rt, k, parentID)
+
+	// Drawn unconditionally so both branches consume the same draw stream.
+	winnerA := rapid.Bool().Draw(rt, "winnerA")
+	order := make([]int, 0, len(nm.nodes))
+	rest := make([]int, len(nm.nodes))
+	for i := range rest {
+		rest[i] = i
+	}
+	for len(rest) > 0 {
+		p := 0
+		if len(rest) > 1 {
+			p = rapid.IntRange(0, len(rest)-1).Draw(rt, "resolveNext")
+		}
+		order = append(order, rest[p])
+		rest = slices.Delete(rest, p, p+1)
+	}
+
+	if blkA.ID() == blkB.ID() {
+		// Degenerate: byte-identical siblings. Resolve as a normal round; the
+		// builders accept their own (already verified) handles.
+		ab := acceptedBlock{id: blkA.ID(), height: blkA.NumberU64(), bytes: blkA.Bytes()}
+		for _, idx := range order {
+			n := nm.nodes[idx]
+			switch idx {
+			case j.idx:
+				require.NoErrorf(rt, n.sut.AcceptBlock(n.ctx, blkA), "%T.AcceptBlock(own identical sibling) on node %d", n.sut.VM, n.idx)
+				require.NoErrorf(rt, blkA.WaitUntilExecuted(n.ctx), "%T.WaitUntilExecuted() on node %d", blkA, n.idx)
+				n.acceptedCount++
+			case k.idx:
+				require.NoErrorf(rt, n.sut.AcceptBlock(n.ctx, blkB), "%T.AcceptBlock(own identical sibling) on node %d", n.sut.VM, n.idx)
+				require.NoErrorf(rt, blkB.WaitUntilExecuted(n.ctx), "%T.WaitUntilExecuted() on node %d", blkB, n.idx)
+				n.acceptedCount++
+			default:
+				nm.deliverBlock(rt, n, ab)
+			}
+		}
+		nm.applyCanonical(rt, j, blkA, ab)
+		return
+	}
+
+	// Cross-verify: every node holds ITS OWN verified handle of BOTH siblings
+	// before any resolution. A blocks.Block instance is bound to the VM that
+	// produced it, so a node can only accept/reject a handle it parsed (or
+	// built) itself. Builders already hold+verified their own sibling from
+	// buildOn and parse+verify only the competitor's.
+	parseVerify := func(n *modelNode, bytes []byte, wantID ids.ID, role string) *blocks.Block {
+		blk, err := n.sut.ParseBlock(n.ctx, bytes)
+		require.NoErrorf(rt, err, "%T.ParseBlock(%s sibling) on node %d", n.sut.VM, role, n.idx)
+		require.Equalf(rt, wantID, blk.ID(), "parsed %s sibling ID on node %d", role, n.idx)
+		require.NoErrorf(rt, n.sut.VerifyBlock(n.ctx, &block.Context{}, blk), "%T.VerifyBlock(%s sibling) on node %d", n.sut.VM, role, n.idx)
+		return blk
+	}
+	handleA := make([]*blocks.Block, len(nm.nodes))
+	handleB := make([]*blocks.Block, len(nm.nodes))
+	handleA[j.idx], handleB[k.idx] = blkA, blkB // verified in buildOn
+	bytesA, bytesB := blkA.Bytes(), blkB.Bytes()
+	for _, n := range nm.nodes {
+		if handleA[n.idx] == nil {
+			handleA[n.idx] = parseVerify(n, bytesA, blkA.ID(), "A")
+		}
+		if handleB[n.idx] == nil {
+			handleB[n.idx] = parseVerify(n, bytesB, blkB.ID(), "B")
+		}
+	}
+
+	wins, loses, winner, wNode := handleA, handleB, blkA, j
+	if !winnerA {
+		wins, loses, winner, wNode = handleB, handleA, blkB, k
+	}
+	wb := acceptedBlock{id: winner.ID(), height: winner.NumberU64(), bytes: winner.Bytes()}
+
+	// Resolve on every node in the drawn order: accept the winner, wait for
+	// execution, reject the loser.
+	for _, idx := range order {
+		n := nm.nodes[idx]
+		require.NoErrorf(rt, n.sut.AcceptBlock(n.ctx, wins[n.idx]), "%T.AcceptBlock(winner sibling) on node %d", n.sut.VM, n.idx)
+		require.NoErrorf(rt, wins[n.idx].WaitUntilExecuted(n.ctx), "%T.WaitUntilExecuted(winner sibling) on node %d", wins[n.idx], n.idx)
+		require.NoErrorf(rt, n.sut.RejectBlock(n.ctx, loses[n.idx]), "%T.RejectBlock(loser sibling) on node %d", n.sut.VM, n.idx)
+		n.acceptedCount++
+	}
+	nm.applyCanonical(rt, wNode, winner, wb)
 }
