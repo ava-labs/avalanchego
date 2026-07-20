@@ -338,8 +338,6 @@ github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310 h1:BUAU3CGlLvorLI26
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a h1:idn718Q4B6AGu/h5Sxe66HYVdqdGu2l9Iebqhi/AEoA=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.0/go.mod h1:71C76bo47zlDX9gWnn3p/0QZQXkTQ/GNqUNI6fchvjs=
-github.com/ava-labs/libevm v1.13.15-0.20260716180230-f887fa4393ca h1:VEjyvhWTn6FR/tr3wzHnAgAMpVIAu4P5kDQKycbWGWQ=
-github.com/ava-labs/libevm v1.13.15-0.20260716180230-f887fa4393ca/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/ava-labs/simplex v0.0.0-20260320130759-afe09323fdd1 h1:Y9UdRQj28/t+GNzVSlP6nvoNLtzNRo3fNXLUc/NscVM=
 github.com/ava-labs/simplex v0.0.0-20260320130759-afe09323fdd1/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aws/aws-sdk-go-v2 v1.21.2 h1:+LXZ0sgo8quN9UOKXXzAWRT3FWd4NxeXWOZom9pE7GA=
@@ -1009,6 +1007,7 @@ golang.org/x/sys v0.37.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/sys v0.39.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/sys v0.40.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/sys v0.41.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+golang.org/x/sys v0.42.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/sys v0.43.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8 h1:LvzTn0GQhWuvKH/kVRS3R3bVAsdQWI7hvfLHGgh9+lU=
 golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8/go.mod h1:Pi4ztBfryZoJEkyFTI5/Ocsu2jXyDr6iSdgJiYE/uwE=
