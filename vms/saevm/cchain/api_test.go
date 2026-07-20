@@ -7,8 +7,10 @@ import (
 	"context"
 	"maps"
 	"reflect"
+	"sync"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
@@ -19,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -88,6 +93,55 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 
 	err := sut.IssueTx(ctx, stx)
 	require.ErrorContainsf(t, err, errIssuingTx.Error(), "%T.IssueTx()", sut.Client)
+}
+
+// TestIssueTxConcurrent issues multiple [tx.Export] transactions through
+// [Client.IssueTx] simultaneously.
+//
+// This is a regression test ensuring that the txpool does not concurrently
+// access a statedb instance.
+func TestIssueTxConcurrent(t *testing.T) {
+	const numConcurrentTxs = 2
+
+	keys := make([]*secp256k1.PrivateKey, numConcurrentTxs)
+	addrs := make([]common.Address, numConcurrentTxs)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+		addrs[i] = keys[i].EthAddress()
+	}
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
+
+	txs := make([]*tx.Tx, numConcurrentTxs)
+	for i, sk := range keys {
+		const (
+			txFee          = 1
+			exportedAmount = 1
+		)
+		// Export transactions are validated against the statedb, so they must
+		// be used rather than Import transactions here.
+		txs[i], _ = newWallet(sk, sut.ctx, sut.Client).newExportTx(
+			t,
+			snowtest.XChainID,
+			txFee,
+			txtest.NewTransferOutput(exportedAmount, sk.Address()),
+		)
+	}
+
+	var (
+		done sync.WaitGroup
+		errs = make([]error, numConcurrentTxs)
+	)
+	for i, stx := range txs {
+		done.Go(func() {
+			errs[i] = sut.IssueTx(ctx, stx)
+		})
+	}
+	done.Wait()
+
+	for i, stx := range txs {
+		require.NoErrorf(t, errs[i], "%T.IssueTx(txs[%d])", sut.Client, i)
+		require.Truef(t, sut.txpool.Has(stx.ID()), "%T.Has(txs[%d])", sut.txpool, i)
+	}
 }
 
 // TestGetTxNotFound asserts that [Client.GetTx] surfaces an error when the
