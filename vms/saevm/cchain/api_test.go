@@ -100,6 +100,8 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 //
 // This is a regression test ensuring that the txpool does not concurrently
 // access a statedb instance.
+//
+// This test is best run with the race detector enabled.
 func TestIssueTxConcurrent(t *testing.T) {
 	const numConcurrentTxs = 2
 
