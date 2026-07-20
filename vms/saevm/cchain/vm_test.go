@@ -805,7 +805,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -852,7 +852,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -939,7 +939,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())

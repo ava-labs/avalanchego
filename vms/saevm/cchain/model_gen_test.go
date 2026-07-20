@@ -44,7 +44,7 @@ type runConfig struct {
 func genRunConfig() *rapid.Generator[runConfig] {
 	return rapid.Custom(func(rt *rapid.T) runConfig {
 		c := runConfig{
-			numAccounts: uint(rapid.IntRange(2, 6).Draw(rt, "numAccounts")),
+			numAccounts: uint(rapid.IntRange(2, 6).Draw(rt, "numAccounts")), //#nosec G115 -- bounded draw, 2..6
 			// Weighted draws: repeats in the sample set set the odds.
 			kv: rapid.SampledFrom([]string{
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
@@ -60,7 +60,8 @@ func genRunConfig() *rapid.Generator[runConfig] {
 		}
 		// Log-scale balances: from "barely funds a few txs" to effectively
 		// unbounded, so funding-edge behaviour is reachable.
-		c.balanceExps = rapid.SliceOfN(rapid.IntRange(9, 30), int(c.numAccounts), int(c.numAccounts)).Draw(rt, "balanceExps")
+		numAccounts := int(c.numAccounts) //#nosec G115 -- bounded draw, 2..6
+		c.balanceExps = rapid.SliceOfN(rapid.IntRange(9, 30), numAccounts, numAccounts).Draw(rt, "balanceExps")
 
 		if rapid.Bool().Draw(rt, "voteGasTarget") {
 			g := gas.Gas(rapid.Uint64Range(1_000_000, 100_000_000).Draw(rt, "gasTarget"))
@@ -98,7 +99,8 @@ func TestGenRunConfig(t *testing.T) {
 		cfg := genRunConfig().Draw(rt, "runConfig")
 		require.GreaterOrEqual(rt, cfg.numAccounts, uint(2), "numAccounts lower bound")
 		require.LessOrEqual(rt, cfg.numAccounts, uint(6), "numAccounts upper bound")
-		require.Len(rt, cfg.balanceExps, int(cfg.numAccounts), "one balance exponent per account")
+		numAccounts := int(cfg.numAccounts) //#nosec G115 -- bounded draw, 2..6
+		require.Len(rt, cfg.balanceExps, numAccounts, "one balance exponent per account")
 		require.Contains(rt, []string{kvMemDB, kvLevelDB}, cfg.kv, "kv store kind")
 		require.Contains(rt, []string{rawdb.HashScheme, customrawdb.FirewoodScheme}, cfg.scheme, "trie scheme")
 		require.NotZero(rt, cfg.commitInterval, "commit interval")

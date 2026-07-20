@@ -455,7 +455,7 @@ func (mm *modelMachine) issueImport(rt *rapid.T) {
 	toIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "to")
 	to := mm.addrs[toIdx]
 
-	signed, _ := mm.atomicWallets[c.ownerIdx].newImportTx(mm.ctx, mm.tb, c.chain, to, fee)
+	signed := mm.atomicWallets[c.ownerIdx].newImportTx(mm.ctx, mm.tb, c.chain, to, fee)
 	require.NoErrorf(rt, mm.sut.IssueTx(mm.ctx, signed), "%T.IssueTx(import)", mm.sut.Client)
 
 	credit := tx.ScaleAVAX(c.total - fee)
