@@ -1191,8 +1191,8 @@ func TestSettledGasTime(t *testing.T) {
 // engine verifies them.
 func TestDuplicateVerify(t *testing.T) {
 	const (
-		original  = 0
-		duplicate = 1
+		originalIndex = iota
+		duplicateIndex
 	)
 	tests := []struct {
 		name        string
@@ -1200,11 +1200,11 @@ func TestDuplicateVerify(t *testing.T) {
 	}{
 		{
 			name:        "original_then_duplicate",
-			verifyOrder: []int{0, 1},
+			verifyOrder: []int{originalIndex, duplicateIndex},
 		},
 		{
 			name:        "duplicate_then_original",
-			verifyOrder: []int{1, 0},
+			verifyOrder: []int{duplicateIndex, originalIndex},
 		},
 	}
 
@@ -1221,7 +1221,10 @@ func TestDuplicateVerify(t *testing.T) {
 			// of the same block, in either order. [VM.consensusCritical] isn't
 			// overridden, so the last instance verified is the one kept in the
 			// map.
-			blks := []snowman.Block{original, duplicate}
+			blks := []snowman.Block{
+				originalIndex:  original,
+				duplicateIndex: duplicate,
+			}
 			for _, i := range test.verifyOrder {
 				b := blks[i]
 				withContext := b.(block.WithVerifyContext)
