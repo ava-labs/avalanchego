@@ -57,6 +57,9 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	// blocks may have grabbed references to the instance in
 	// [VM.consensusCritical], we must ensure that we accept that instance, not
 	// the one passed in.
+	//
+	// TODO(StephenButtolph): Look into simplifying the VM API to avoid footguns
+	// around multiple instances of the same block.
 	b, ok := vm.consensusCritical.Load(b.Hash())
 	if !ok {
 		return errUnverifiedBlock
