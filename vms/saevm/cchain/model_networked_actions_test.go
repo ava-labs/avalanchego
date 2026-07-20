@@ -422,6 +422,32 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 			require.NoErrorf(rt, o.sut.Disconnected(o.ctx, n.nodeID), "%T.Disconnected(%s)", o.sut.VM, n.nodeID)
 		}
 	}
+	// Disconnected only updates VM-side p2p trackers; saetest senders keep
+	// sampling n from their own peer maps, so an in-flight gossip delivery
+	// could race n's Shutdown closing its trie database. Quiesce the
+	// transport, in order: (1) close n's outbound — flushing its in-flight
+	// requests also guarantees peers' response goroutines toward n have been
+	// spawned; (2) drain peers so those responses (and pushes) land while n
+	// is still alive — draining BEFORE RemovePeer avoids the sender's
+	// unknown-peer error; (3) stop peers sampling n; (4) flush deliveries
+	// that sampled n concurrently with (3). openNode gives n a fresh sender
+	// and ConnectTo re-registers it with every peer.
+	n.sut.Sender().Close()
+	for _, o := range nm.nodes {
+		if o.idx != idx {
+			o.sut.Sender().Drain()
+		}
+	}
+	for _, o := range nm.nodes {
+		if o.idx != idx {
+			o.sut.Sender().RemovePeer(n.nodeID)
+		}
+	}
+	for _, o := range nm.nodes {
+		if o.idx != idx {
+			o.sut.Sender().Drain()
+		}
+	}
 	require.NoErrorf(rt, n.sut.Shutdown(n.ctx), "%T.Shutdown() on node %d", n.sut.VM, idx)
 
 	if n.storage.kv == kvLevelDB {
@@ -446,11 +472,17 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	}
 	saetest.ConnectTo(nm.tb, n.sut, peers...)
 
-	// A restarted validator re-learns its pool via pull gossip, so its pins
-	// stay valid. A restarted non-validator never will (gossip reaches
-	// validators only): re-pin its accounts to a live validator, which the
-	// pre-shutdown sync guaranteed holds every pending tx.
-	if !n.isValidator {
+	// A restarted non-delayed validator re-learns its pool via pull gossip,
+	// so its pins stay valid. A restarted non-validator never will (gossip
+	// reaches validators only), and neither will a restarted DELAYED
+	// validator: a pinned account may have nonces already included in
+	// canonical blocks still withheld from it, and those txs exist in no
+	// pool anywhere — pull gossip can only resupply pool contents, so the
+	// node could never promote the account's next nonce and a subsequent
+	// issueTx to the pin would hang forever. Re-pin such accounts to a live
+	// validator, which the pre-shutdown sync guaranteed holds every pending
+	// tx.
+	if !n.isValidator || n.delayed {
 		for _, addr := range nm.addrs {
 			if pin, ok := nm.pins[addr]; ok && pin == idx {
 				v := syncVdrs[0]

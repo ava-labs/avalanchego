@@ -151,8 +151,24 @@ func TestModelNetworked(t *testing.T) {
 		cfg := genNetworkedRunConfig().Draw(rt, "networkedRunConfig")
 		nm := newNetworkedMachine(t, rt, cfg)
 		defer nm.tb.close()
+		defer nm.quiesce() // runs BEFORE nm.tb.close, on pass and on failure
 		rt.Repeat(nm.actions())
 	})
+}
+
+// quiesce permanently silences every live node's sender: after it returns, no
+// goroutine can deliver an App* message to any VM, so the per-node Shutdown
+// cleanups run by nm.tb.close cannot race an in-flight gossip delivery
+// (txpool add reading the trie) against the VM closing its trie database. It
+// MUST run as a defer ahead of nm.tb.close rather than as a Cleanup:
+// restartNode-created SUTs register their Shutdown cleanups after machine
+// construction, so LIFO cleanup ordering alone cannot put every sender close
+// before every VM shutdown. Iterating nm.nodes here picks up each node's
+// CURRENT sender, including those created by restarts.
+func (nm *networkedMachine) quiesce() {
+	for _, n := range nm.nodes {
+		n.sut.Sender().Close()
+	}
 }
 
 // modelNode is one node of the networked machine: a SUT plus the per-node

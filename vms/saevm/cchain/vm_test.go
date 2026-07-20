@@ -654,6 +654,13 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 // during block building.
 func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
+
+	// Bounded well above the worst legitimate gossip heal (the 30s push
+	// regossip period) so a genuinely stranded tx fails loudly, naming the
+	// missing hashes (and, under rapid, the action sequence), instead of
+	// hanging until the package timeout.
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
 }
 
