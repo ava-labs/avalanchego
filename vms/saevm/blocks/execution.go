@@ -289,31 +289,14 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // do not persist their execution results in the [saetypes.ExecutionResults]
 // database, thus they are extracted from the header.
 func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
-	ethB := b.EthBlock()
-
-	// The base fee must be capped at [math.MaxUint64] to provide the correct type to [gastime.New].
-	var baseFee uint64
-	switch bf := ethB.BaseFee(); {
-	case bf == nil:
-		baseFee = 0
-	case bf.IsUint64():
-		baseFee = bf.Uint64()
-	default:
-		baseFee = math.MaxUint64
-	}
-
-	target, cfg := hooks.GasConfigAfter(b.Header())
-	execTime, err := gastime.New(
-		hooks.BlockTime(b.Header()),
-		// Target, excess, and config _after_ are a requirement of
-		// [Block.MarkExecuted].
-		target,
-		gas.Price(baseFee),
-		cfg,
-	)
+	// Target, excess, and config _after_ are a requirement of
+	// [Block.MarkExecuted], as provided by [Block.WorstCaseGasTime].
+	execTime, err := b.WorstCaseGasTime(hooks)
 	if err != nil {
 		return nil, err
 	}
+
+	ethB := b.EthBlock()
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
 		receiptRoot:   ethB.ReceiptHash(),
@@ -321,8 +304,35 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(baseFee)
+	e.baseFee.SetUint64(b.headerBaseFee())
 	return e, nil
+}
+
+// WorstCaseGasTime reconstructs the worst-case gas time that the block
+// committed to, from its base fee and the gas config after the block.
+func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
+	hdr := b.Header()
+	target, cfg := hooks.GasConfigAfter(hdr)
+	return gastime.New(
+		hooks.BlockTime(hdr),
+		target,
+		gas.Price(b.headerBaseFee()),
+		cfg,
+	)
+}
+
+// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
+// header). The base fee is capped at [math.MaxUint64] but any reasonable
+// implementation has a base fee much less than [math.MaxUint64].
+func (b *Block) headerBaseFee() uint64 {
+	switch bf := b.EthBlock().BaseFee(); {
+	case bf == nil:
+		return 0
+	case bf.IsUint64():
+		return bf.Uint64()
+	default:
+		return math.MaxUint64
+	}
 }
 
 func loadExecutionResults(xdb saetypes.ExecutionResults, blockNum uint64) (*executionResults, error) {

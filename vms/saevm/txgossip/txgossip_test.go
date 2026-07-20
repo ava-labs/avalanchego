@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -78,7 +79,10 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
+
+	snowCtx := snowtest.Context(t, ids.Empty)
 	logger := loggingtest.New(t, logging.Warn)
+	snowCtx.Log = logger
 
 	wallet := newWallet(t, numAccounts)
 	config := saetest.ChainConfig()
@@ -104,7 +108,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		xdb,
 		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
 		hookstest.NewStub(testGasTarget),
-		logger,
+		snowCtx,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err, "saexec.New()")

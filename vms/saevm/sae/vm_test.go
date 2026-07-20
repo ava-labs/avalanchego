@@ -93,6 +93,7 @@ type SUT struct {
 	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
+	close  func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -108,6 +109,7 @@ type (
 		precompiles map[common.Address]libevm.PrecompiledContract
 		nodeID      ids.NodeID
 		validators  set.Set[ids.NodeID]
+		dataDir     string
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -158,21 +160,19 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			BaseFee:    big.NewInt(1),
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
-		db:     memdb.New(),
-		nodeID: ids.GenerateTestNodeID(),
+		db:      memdb.New(),
+		dataDir: tb.TempDir(),
+		nodeID:  ids.GenerateTestNodeID(),
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
-	tb.Cleanup(func() {
-		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
-	})
 
 	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
+	snowCtx.ChainDataDir = conf.dataDir
 	snowCtx.NodeID = conf.nodeID
 	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
 
@@ -197,9 +197,13 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		// remove the libevm registration.
 		registerPrecompiles(tb, conf.precompiles)
 	}
-	tb.Cleanup(func() {
+	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+	})
+	tb.Cleanup(func() {
+		closeOnce()
 	})
 
 	// Avalanchego marks the local node as connected so that p2p protocols
@@ -220,6 +224,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		db:     newEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
+		close:  closeOnce,
 
 		sender: sender,
 	}

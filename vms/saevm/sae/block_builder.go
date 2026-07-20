@@ -416,7 +416,7 @@ func lastToSettle(
 		return nil, err
 	}
 	if !ok {
-		log.Warn("Execution lagging when determining last block to settle")
+		log.Debug("Execution lagging when determining last block to settle")
 		return nil, errExecutionLagging
 	}
 	return lastSettled, nil

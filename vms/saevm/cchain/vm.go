@@ -20,13 +20,13 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -57,6 +58,7 @@ type VM struct {
 	ctx          *snow.Context
 	chainConfig  *ethparams.ChainConfig
 	state        *state.State
+	metrics      *metrics
 	txpool       *txpool.Txpool
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
@@ -65,6 +67,8 @@ type VM struct {
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
+
+	lastWaitForEvent utils.Atomic[time.Time]
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -109,7 +113,8 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
-	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig()); err != nil {
+	tdbCfg := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	if err := genesis.setup(ethDB, tdbCfg); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
@@ -121,6 +126,15 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "cchain")
+	if err != nil {
+		return fmt.Errorf("making metrics: %w", err)
+	}
+	vm.metrics, err = newMetrics(reg)
+	if err != nil {
+		return fmt.Errorf("registering cchain metrics: %w", err)
+	}
+
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -131,6 +145,7 @@ func (vm *VM) Initialize(
 		warpStorage,
 		vm.now,
 		userConfig.desired(),
+		vm.metrics,
 	)
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
@@ -148,10 +163,6 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
-	if err != nil {
-		return fmt.Errorf("making metrics: %w", err)
-	}
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
@@ -317,25 +328,33 @@ func earliestBuildTime(b *blocks.Block) time.Time {
 	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
+// minWaitForEventDelay is the minimum spacing between consecutive
+// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
+// reasonable frequency for the engine to poll on whether to build a block or
+// not.
+const minWaitForEventDelay = 100 * time.Millisecond
+
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
 // block has elapsed, then waits for a transaction to be in the txpool or for
 // the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
-	// txpools are cleared after block execution, so we may still have
-	// transactions in the txpool while blocks containing those transactions are
-	// processing.
+	// Throttle to avoid busy looping: the txpools only clear after block
+	// execution, so pending txs can re-signal while their block is processing.
+	//
+	// TODO(JonathanOppenheimer): The txpool should track preference / reorgs so
+	// we don't need this throttle.
+	throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
 
-	// Pace block building on the ACP-226 minimum block delay before consulting
-	// the event sources so that the mempools are queried when we are actually
-	// willing to build.
-	minTime := earliestBuildTime(vm.VM.GetPreference())
-	if timeToWait := minTime.Sub(vm.now()); timeToWait > 0 {
-		select {
-		case <-ctx.Done():
-			return 0, context.Cause(ctx)
-		case <-time.After(timeToWait):
-		}
+	// Pace block building on the ACP-226 minimum block delay so that the event
+	// sources are consulted when we are actually willing to build.
+	buildTime := earliestBuildTime(vm.VM.GetPreference())
+
+	until := throttleUntil
+	if buildTime.After(until) {
+		until = buildTime
+	}
+	if err := vm.waitUntil(ctx, until); err != nil {
+		return 0, err
 	}
 
 	// Race the SAE event source against the cross-chain txpool. The winner's
@@ -359,7 +378,25 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	}()
 
 	r := <-results
+	if r.err == nil {
+		vm.lastWaitForEvent.Set(vm.now())
+	}
 	return r.msg, r.err
+}
+
+// waitUntil blocks until [VM.now] reaches t, returning early with the
+// cancellation cause if ctx is canceled first.
+func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
+	timeToWait := t.Sub(vm.now())
+	if timeToWait <= 0 {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case <-time.After(timeToWait):
+		return nil
+	}
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse
