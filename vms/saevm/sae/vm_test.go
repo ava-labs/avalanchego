@@ -1230,7 +1230,7 @@ func TestDuplicateVerify(t *testing.T) {
 				withContext := b.(block.WithVerifyContext)
 				require.NoErrorf(t,
 					withContext.VerifyWithContext(ctx, &block.Context{
-						PChainHeight: 1,
+						PChainHeight: uint64(i), //#nosec G115 -- Known non-negative
 					}),
 					"%T.VerifyWithContext()",
 					withContext,
