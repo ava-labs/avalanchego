@@ -8,13 +8,17 @@ import (
 	"slices"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -33,6 +37,7 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"delayNode":           nm.delayNode,
 		"catchUpNode":         nm.catchUpNode,
 		"competingSiblings":   nm.competingSiblings,
+		"restartNode":         nm.restartNode,
 		"":                    nm.check,
 	}
 }
@@ -380,4 +385,91 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 		n.acceptedCount++
 	}
 	nm.applyCanonical(rt, wNode, winner, wb)
+}
+
+// restartNode shuts a drawn node down and reopens it on its persisted state.
+// The shared model keeps ALL its predictions: pending txs survive on the
+// other validators (synced below before the pool is dropped), and the
+// restarted node's chain state must come back exactly (continuity, asserted
+// here and by the post-action check).
+func (nm *networkedMachine) restartNode(rt *rapid.T) {
+	idx := rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
+	n := nm.nodes[idx]
+
+	// Another live (non-delayed) validator must exist: it anchors the
+	// pending txs while n's pool is dropped, serves pull-gossip recovery,
+	// and receives any re-pinned accounts. Without one, skip.
+	var syncVdrs []*modelNode
+	for _, v := range nm.nonDelayedValidators() {
+		if v.idx != idx {
+			syncVdrs = append(syncVdrs, v)
+		}
+	}
+	if len(syncVdrs) == 0 {
+		return
+	}
+
+	// Every model-tracked pending tx must exist somewhere other than n
+	// before n's pool is dropped; push/pull gossip delivers to validators.
+	for _, v := range syncVdrs {
+		v.sut.waitForPendingEthTxs(v.ctx, nm.tb, nm.pendingEthTxs...)
+	}
+
+	// Mirror production: peers observe the node disconnect before it goes
+	// down, so gossip stops sampling it while it is unreachable.
+	for _, o := range nm.nodes {
+		if o.idx != idx {
+			require.NoErrorf(rt, o.sut.Disconnected(o.ctx, n.nodeID), "%T.Disconnected(%s)", o.sut.VM, n.nodeID)
+		}
+	}
+	require.NoErrorf(rt, n.sut.Shutdown(n.ctx), "%T.Shutdown() on node %d", n.sut.VM, idx)
+
+	if n.storage.kv == kvLevelDB {
+		// The true production restart: close and reopen the store.
+		require.NoErrorf(rt, n.db.Close(), "leveldb Close() on node %d restart", idx)
+		db, err := leveldb.New(n.dbDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+		require.NoErrorf(rt, err, "leveldb.New(%q) on node %d restart", n.dbDir, idx)
+		n.db = db
+	}
+	nm.openNode(idx)
+
+	// Reconnect with the original topology: a validator links to every other
+	// node; a non-validator only to validators.
+	var peers []*SUT
+	for _, o := range nm.nodes {
+		if o.idx == idx {
+			continue
+		}
+		if n.isValidator || o.isValidator {
+			peers = append(peers, o.sut)
+		}
+	}
+	saetest.ConnectTo(nm.tb, n.sut, peers...)
+
+	// A restarted validator re-learns its pool via pull gossip, so its pins
+	// stay valid. A restarted non-validator never will (gossip reaches
+	// validators only): re-pin its accounts to a live validator, which the
+	// pre-shutdown sync guaranteed holds every pending tx.
+	if !n.isValidator {
+		for _, addr := range nm.addrs {
+			if pin, ok := nm.pins[addr]; ok && pin == idx {
+				v := syncVdrs[0]
+				if len(syncVdrs) > 1 {
+					v = syncVdrs[rapid.IntRange(0, len(syncVdrs)-1).Draw(rt, "repin")]
+				}
+				nm.pins[addr] = v.idx
+			}
+		}
+	}
+
+	// Continuity: the node reports the same last-accepted block it had
+	// before shutdown. (Full state equality is asserted by the post-action
+	// check via checkState/checkLagging.)
+	wantID := nm.genesisID
+	if n.acceptedCount > 0 {
+		wantID = nm.canonical[n.acceptedCount-1].id
+	}
+	got, err := n.sut.LastAccepted(n.ctx)
+	require.NoErrorf(rt, err, "%T.LastAccepted() after restart of node %d", n.sut.VM, idx)
+	require.Equalf(rt, wantID, got, "node %d last accepted across restart", idx)
 }
