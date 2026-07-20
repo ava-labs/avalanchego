@@ -90,6 +90,8 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
+require pgregory.net/rapid v1.3.0
+
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
