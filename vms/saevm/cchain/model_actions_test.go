@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"maps"
 	"math"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -45,14 +47,25 @@ import (
 )
 
 func (mm *modelMachine) actions() map[string]func(*rapid.T) {
+	drawFrom := func(rt *rapid.T) int {
+		return rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	}
 	return map[string]func(*rapid.T){
-		"buildBlock":       mm.buildBlock,
-		"advanceClock":     mm.advanceClock,
-		"settle":           mm.settle,
-		"issueTransfer":    mm.issueTransfer,
-		"issueDeploy":      mm.issueDeploy,
-		"issueStore":       mm.issueStore,
-		"issueRevert":      mm.issueRevert,
+		"buildBlock":   mm.buildBlock,
+		"advanceClock": mm.advanceClock,
+		"settle":       mm.settle,
+		"issueTransfer": func(rt *rapid.T) {
+			mm.modelCore.issueTransfer(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
+		"issueDeploy": func(rt *rapid.T) {
+			mm.modelCore.issueDeploy(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
+		"issueStore": func(rt *rapid.T) {
+			mm.modelCore.issueStore(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
+		"issueRevert": func(rt *rapid.T) {
+			mm.modelCore.issueRevert(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
 		"issueWarpSend":    mm.issueWarpSend,
 		"issueWarpReceive": mm.issueWarpReceive,
 		"provisionUTXO":    mm.provisionUTXO,
@@ -65,9 +78,9 @@ func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 
 const maxPendingPerAccount = 8 // stay well under the pool's 16 account slots
 
-func (mm *modelMachine) pendingCount(addr common.Address) int {
+func (c *modelCore) pendingCount(addr common.Address) int {
 	n := 0
-	for _, it := range mm.m.pendingEth {
+	for _, it := range c.m.pendingEth {
 		if it.from == addr {
 			n++
 		}
@@ -82,22 +95,24 @@ func (mm *modelMachine) pendingCount(addr common.Address) int {
 // a run via high-fraction transfers) would otherwise see the pool correctly
 // reject admission with ErrInsufficientFunds — not a VM bug, just an action
 // that shouldn't have been attempted.
-func (mm *modelMachine) canAfford(addr common.Address, gas uint64) bool {
-	return mm.spendable(addr).CmpUint64(gas*txGasFeeCap) >= 0
+func (c *modelCore) canAfford(addr common.Address, gas uint64) bool {
+	return c.spendable(addr).CmpUint64(gas*txGasFeeCap) >= 0
 }
 
-// issueTransfer sends a randomized value transfer between two model accounts,
-// occasionally (1-in-10) drawing a value guaranteed to exceed the sender's
-// spendable balance to exercise the pool's insufficient-funds rejection path.
-func (mm *modelMachine) issueTransfer(rt *rapid.T) {
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	toIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "to")
-	from, to := mm.addrs[fromIdx], mm.addrs[toIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+// issueTransfer sends a randomized value transfer from account fromIdx to a
+// drawn recipient via sut, occasionally (1-in-10) drawing a value guaranteed
+// to exceed the sender's spendable balance to exercise the pool's
+// insufficient-funds rejection path.
+//
+//nolint:revive // context-as-argument: rt, not ctx, is this file's leading-parameter convention (mirrors *testing.T)
+func (c *modelCore) issueTransfer(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	toIdx := rapid.IntRange(0, len(c.addrs)-1).Draw(rt, "to")
+	from, to := c.addrs[fromIdx], c.addrs[toIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
 
-	spendable := mm.spendable(from)
+	spendable := c.spendable(from)
 	insufficient := rapid.IntRange(0, 9).Draw(rt, "insufficient") == 0
 
 	var value *uint256.Int
@@ -105,7 +120,7 @@ func (mm *modelMachine) issueTransfer(rt *rapid.T) {
 		// 2*balance + 1 ETH guarantees pool-admission rejection regardless of
 		// concurrently pending txs.
 		value = new(uint256.Int).Add(
-			new(uint256.Int).Lsh(mm.m.balances[from], 1),
+			new(uint256.Int).Lsh(c.m.balances[from], 1),
 			uint256.MustFromDecimal("1000000000000000000"),
 		)
 	} else {
@@ -121,18 +136,18 @@ func (mm *modelMachine) issueTransfer(rt *rapid.T) {
 		GasFeeCap: big.NewInt(txGasFeeCap),
 		Value:     value.ToBig(),
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	err := mm.sut.ethclient.SendTransaction(mm.ctx, ethTx)
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	err := sut.ethclient.SendTransaction(ctx, ethTx)
 
 	if insufficient {
 		if diff := testerr.Diff(err, testerr.Contains(core.ErrInsufficientFunds.Error())); diff != "" {
 			rt.Fatalf("SendTransaction(overdrawn transfer) error (-want +got):\n%s", diff)
 		}
-		mm.wallet.DecrementNonce(mm.tb, fromIdx) // reuse the burned nonce
+		c.wallet.DecrementNonce(c.tb, fromIdx) // reuse the burned nonce
 		return
 	}
 	require.NoErrorf(rt, err, "SendTransaction(transfer of %s)", value)
-	mm.trackPending(ethTx, &issuedTx{
+	c.trackPending(ethTx, &issuedTx{
 		kind:  kindTransfer,
 		from:  from,
 		to:    to,
@@ -153,12 +168,16 @@ func (mm *modelMachine) advanceToBuildable() {
 }
 
 // issueMinimalTransfer funds a block when nothing is pending (the VM refuses
-// empty blocks): a zero-value self-transfer from the richest account.
-func (mm *modelMachine) issueMinimalTransfer(rt *rapid.T) {
-	richest := mm.addrs[0]
+// empty blocks): a zero-value self-transfer from the richest account, issued
+// via sut. Returns the chosen account index so the networked machine can pin
+// the account to the issuing node.
+//
+//nolint:revive,unparam // context-as-argument: see issueTransfer; unparam: richestIdx is consumed by the networked machine, not this single-node caller
+func (c *modelCore) issueMinimalTransfer(rt *rapid.T, ctx context.Context, sut *SUT) int {
+	richest := c.addrs[0]
 	richestIdx := 0
-	for i, addr := range mm.addrs {
-		if mm.m.balances[addr].Cmp(mm.m.balances[richest]) > 0 {
+	for i, addr := range c.addrs {
+		if c.m.balances[addr].Cmp(c.m.balances[richest]) > 0 {
 			richest, richestIdx = addr, i
 		}
 	}
@@ -167,21 +186,22 @@ func (mm *modelMachine) issueMinimalTransfer(rt *rapid.T) {
 		Gas:       ethparams.TxGas,
 		GasFeeCap: big.NewInt(txGasFeeCap),
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, richestIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(minimal transfer)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, richestIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(minimal transfer)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:  kindTransfer,
 		from:  richest,
 		to:    richest,
 		value: new(uint256.Int),
 		cost:  uint256.NewInt(ethparams.TxGas * txGasFeeCap),
 	})
+	return richestIdx
 }
 
 // nextNonce is the account's next nonce: executed nonce + in-flight txs.
-func (mm *modelMachine) nextNonce(addr common.Address) uint64 {
-	n := mm.m.nonces[addr]
-	for _, it := range mm.m.pendingEth {
+func (c *modelCore) nextNonce(addr common.Address) uint64 {
+	n := c.m.nonces[addr]
+	for _, it := range c.m.pendingEth {
 		if it.from == addr {
 			n++
 		}
@@ -189,29 +209,29 @@ func (mm *modelMachine) nextNonce(addr common.Address) uint64 {
 	return n
 }
 
-func (mm *modelMachine) issueDeploy(rt *rapid.T) {
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	from := mm.addrs[fromIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueDeploy(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	from := c.addrs[fromIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from, 1_000_000) {
+	if !c.canAfford(from, 1_000_000) {
 		return // can't cover worst-case pool cost; a rejection here would be correct VM behavior
 	}
 	deployKind := rapid.SampledFrom([]txKind{kindStore, kindRevert}).Draw(rt, "fixture")
-	runtime := storeRuntime(mm.tb)
+	runtime := storeRuntime(c.tb)
 	if deployKind == kindRevert {
-		runtime = reverterRuntime(mm.tb)
+		runtime = reverterRuntime(c.tb)
 	}
-	predicted := crypto.CreateAddress(from, mm.nextNonce(from))
+	predicted := crypto.CreateAddress(from, c.nextNonce(from))
 	data := &types.DynamicFeeTx{
 		Gas:       1_000_000,
 		GasFeeCap: big.NewInt(txGasFeeCap),
-		Data:      deployCode(mm.tb, runtime),
+		Data:      deployCode(c.tb, runtime),
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(deploy)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(deploy)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:       kindDeploy,
 		from:       from,
 		deployKind: deployKind,
@@ -222,9 +242,9 @@ func (mm *modelMachine) issueDeploy(rt *rapid.T) {
 }
 
 // deployedContracts returns addresses of model contracts of the given kind.
-func (mm *modelMachine) deployedContracts(kind txKind) []common.Address {
+func (c *modelCore) deployedContracts(kind txKind) []common.Address {
 	var out []common.Address
-	for addr, cs := range mm.m.contracts {
+	for addr, cs := range c.m.contracts {
 		if cs.kind == kind {
 			out = append(out, addr)
 		}
@@ -233,18 +253,18 @@ func (mm *modelMachine) deployedContracts(kind txKind) []common.Address {
 	return out
 }
 
-func (mm *modelMachine) issueStore(rt *rapid.T) {
-	targets := mm.deployedContracts(kindStore)
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueStore(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	targets := c.deployedContracts(kindStore)
 	if len(targets) == 0 {
-		mm.issueDeploy(rt)
+		c.issueDeploy(rt, ctx, sut, fromIdx)
 		return
 	}
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	from := mm.addrs[fromIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+	from := c.addrs[fromIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from, 1_000_000) {
+	if !c.canAfford(from, 1_000_000) {
 		return
 	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
@@ -256,9 +276,9 @@ func (mm *modelMachine) issueStore(rt *rapid.T) {
 		GasFeeCap: big.NewInt(txGasFeeCap),
 		Data:      slices.Concat(key[:], val[:]),
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(store)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(store)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:     kindStore,
 		from:     from,
 		contract: contract,
@@ -269,18 +289,18 @@ func (mm *modelMachine) issueStore(rt *rapid.T) {
 	})
 }
 
-func (mm *modelMachine) issueRevert(rt *rapid.T) {
-	targets := mm.deployedContracts(kindRevert)
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueRevert(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	targets := c.deployedContracts(kindRevert)
 	if len(targets) == 0 {
-		mm.issueDeploy(rt)
+		c.issueDeploy(rt, ctx, sut, fromIdx)
 		return
 	}
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	from := mm.addrs[fromIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+	from := c.addrs[fromIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from, 1_000_000) {
+	if !c.canAfford(from, 1_000_000) {
 		return
 	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
@@ -296,9 +316,9 @@ func (mm *modelMachine) issueRevert(rt *rapid.T) {
 		GasFeeCap: big.NewInt(txGasFeeCap),
 		Data:      argHash[:],
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(revert probe)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(revert probe)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:       kindRevert,
 		from:       from,
 		contract:   contract,
@@ -603,16 +623,16 @@ func (mm *modelMachine) restart(rt *rapid.T) {
 	mm.openSUT() // atomic wallet nonces are restored from the model here
 }
 
-func (mm *modelMachine) trackPending(ethTx *types.Transaction, it *issuedTx) {
-	mm.m.pendingEth[ethTx.Hash()] = it
-	mm.m.pendingCost[it.from].Add(mm.m.pendingCost[it.from], it.cost)
-	mm.pendingEthTxs = append(mm.pendingEthTxs, ethTx)
+func (c *modelCore) trackPending(ethTx *types.Transaction, it *issuedTx) {
+	c.m.pendingEth[ethTx.Hash()] = it
+	c.m.pendingCost[it.from].Add(c.m.pendingCost[it.from], it.cost)
+	c.pendingEthTxs = append(c.pendingEthTxs, ethTx)
 }
 
 // spendable is the model's view of what addr can still commit to new txs.
-func (mm *modelMachine) spendable(addr common.Address) *uint256.Int {
-	s := new(uint256.Int).Set(mm.m.balances[addr])
-	if pc := mm.m.pendingCost[addr]; pc != nil && s.Cmp(pc) >= 0 {
+func (c *modelCore) spendable(addr common.Address) *uint256.Int {
+	s := new(uint256.Int).Set(c.m.balances[addr])
+	if pc := c.m.pendingCost[addr]; pc != nil && s.Cmp(pc) >= 0 {
 		s.Sub(s, pc)
 	} else if pc != nil {
 		s.Clear()
@@ -622,7 +642,7 @@ func (mm *modelMachine) spendable(addr common.Address) *uint256.Int {
 
 func (mm *modelMachine) buildBlock(rt *rapid.T) {
 	if len(mm.m.pendingEth) == 0 && len(mm.m.pendingAtomic) == 0 {
-		mm.issueMinimalTransfer(rt)
+		mm.issueMinimalTransfer(rt, mm.ctx, mm.sut)
 	}
 	blk := mm.buildVerifyAcceptExecute(rt)
 	mm.applyBlock(rt, blk)
@@ -680,10 +700,40 @@ func (mm *modelMachine) buildVerifyAcceptExecute(rt *rapid.T) *blocks.Block {
 	return blk
 }
 
+// applyBlock advances the model by one accepted block: the shared eth-side
+// core, plus this machine's atomic (cross-chain) expectations.
+func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
+	mm.modelCore.applyBlock(rt, mm.ctx, mm.sut, blk)
+
+	// Atomic (cross-chain) tx effects, driven by what the block actually
+	// included.
+	m := mm.m
+	for _, atx := range blockTxs(mm.tb, blk) {
+		exp, ok := m.pendingAtomic[atx.ID()]
+		require.Truef(rt, ok, "block %d contains unexpected atomic tx %s", blk.NumberU64(), atx.ID())
+		delete(m.pendingAtomic, atx.ID())
+		mm.sut.waitForTxPoolStateUpdate(mm.ctx, mm.tb, atx)
+
+		sender := mm.atomicAddrs[exp.senderIdx]
+		if exp.isImport {
+			m.balances[exp.to].Add(m.balances[exp.to], exp.creditWei)
+			consumed := utxosOf(exp.consumed)
+			m.consumedUTXOs[exp.remoteChain] = append(m.consumedUTXOs[exp.remoteChain], consumed...)
+			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, exp.remoteChain, consumed...)
+		} else {
+			m.balances[sender].Sub(m.balances[sender], exp.debitWei)
+			m.nonces[sender]++
+			m.exportedUTXOs[exp.remoteChain] = append(m.exportedUTXOs[exp.remoteChain], exp.exported...)
+		}
+	}
+}
+
 // applyBlock advances the model by one accepted block: dynamic-parameter
 // ramps, height, and per-tx effects reconciled against receipts.
-func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
-	m := mm.m
+//
+//nolint:revive // context-as-argument: see modelCore.issueTransfer
+func (c *modelCore) applyBlock(rt *rapid.T, ctx context.Context, sut *SUT, blk *blocks.Block) {
+	m := c.m
 
 	// Dynamic-parameter ramp: an independent recomputation of Toward.
 	m.target = m.target.Toward(m.desiredTarget)
@@ -732,28 +782,7 @@ func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
 		m.balances[it.from].Sub(m.balances[it.from], fee)
 		m.nonces[it.from]++
 
-		mm.applyTxEffects(rt, it, r)
-	}
-
-	// Atomic (cross-chain) tx effects, driven by what the block actually
-	// included.
-	for _, atx := range blockTxs(mm.tb, blk) {
-		exp, ok := m.pendingAtomic[atx.ID()]
-		require.Truef(rt, ok, "block %d contains unexpected atomic tx %s", blk.NumberU64(), atx.ID())
-		delete(m.pendingAtomic, atx.ID())
-		mm.sut.waitForTxPoolStateUpdate(mm.ctx, mm.tb, atx)
-
-		sender := mm.atomicAddrs[exp.senderIdx]
-		if exp.isImport {
-			m.balances[exp.to].Add(m.balances[exp.to], exp.creditWei)
-			consumed := utxosOf(exp.consumed)
-			m.consumedUTXOs[exp.remoteChain] = append(m.consumedUTXOs[exp.remoteChain], consumed...)
-			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, exp.remoteChain, consumed...)
-		} else {
-			m.balances[sender].Sub(m.balances[sender], exp.debitWei)
-			m.nonces[sender]++
-			m.exportedUTXOs[exp.remoteChain] = append(m.exportedUTXOs[exp.remoteChain], exp.exported...)
-		}
+		c.applyTxEffects(rt, ctx, sut, it, r)
 	}
 
 	// Drop pending txs from the machine's wait-list once included.
@@ -761,39 +790,41 @@ func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
 	for _, ethTx := range blk.Transactions() {
 		included[ethTx.Hash()] = true
 	}
-	kept := mm.pendingEthTxs[:0]
-	for _, ethTx := range mm.pendingEthTxs {
+	kept := c.pendingEthTxs[:0]
+	for _, ethTx := range c.pendingEthTxs {
 		if !included[ethTx.Hash()] {
 			kept = append(kept, ethTx)
 		}
 	}
-	mm.pendingEthTxs = kept
+	c.pendingEthTxs = kept
 }
 
 // applyTxEffects applies kind-specific model updates for an included tx.
-func (mm *modelMachine) applyTxEffects(rt *rapid.T, it *issuedTx, r *types.Receipt) {
+//
+//nolint:revive // context-as-argument: see modelCore.issueTransfer
+func (c *modelCore) applyTxEffects(rt *rapid.T, ctx context.Context, sut *SUT, it *issuedTx, r *types.Receipt) {
 	switch it.kind {
 	case kindTransfer:
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "transfer receipt status")
-		mm.m.balances[it.from].Sub(mm.m.balances[it.from], it.value)
-		mm.m.balances[it.to].Add(mm.m.balances[it.to], it.value)
+		c.m.balances[it.from].Sub(c.m.balances[it.from], it.value)
+		c.m.balances[it.to].Add(c.m.balances[it.to], it.value)
 	case kindDeploy:
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "deploy receipt status")
 		require.Equalf(rt, it.contract, r.ContractAddress, "CREATE address prediction")
-		mm.m.contracts[it.contract] = &contractState{kind: it.deployKind, storage: make(map[common.Hash]common.Hash)}
+		c.m.contracts[it.contract] = &contractState{kind: it.deployKind, storage: make(map[common.Hash]common.Hash)}
 	case kindStore:
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "store receipt status")
 		require.Lenf(rt, r.Logs, 1, "store tx log count")
 		require.Equalf(rt, []common.Hash{it.val}, r.Logs[0].Topics, "store log topic")
 		require.Equalf(rt, it.contract, r.Logs[0].Address, "store log address")
-		mm.m.contracts[it.contract].storage[it.key] = it.val
+		c.m.contracts[it.contract].storage[it.key] = it.val
 	case kindRevert:
 		require.Equalf(rt, it.wantStatus, r.Status, "reverter receipt status")
 	case kindWarpSend:
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "warp send receipt status")
 		// The message must now be signable: the block is accepted and executed.
-		sent := mm.sut.newAddressedCallMessage(mm.tb, it.from.Bytes(), it.payload)
-		mm.sut.signAndVerifyWarpMessage(mm.ctx, mm.tb, sent)
+		sent := sut.newAddressedCallMessage(c.tb, it.from.Bytes(), it.payload)
+		sut.signAndVerifyWarpMessage(ctx, c.tb, sent)
 	case kindWarpReceive:
 		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "warp receive receipt status")
 		require.Lenf(rt, r.Logs, 1, "warp receive log count")
@@ -819,24 +850,31 @@ func (mm *modelMachine) settle(_ *rapid.T) {
 	mm.clock.AdvanceToSettle(mm.ctx, mm.tb, mm.m.lastAccepted)
 }
 
-// check is the rapid invariant action, run around every other action.
-func (mm *modelMachine) check(rt *rapid.T) {
-	got, err := mm.sut.LastAccepted(mm.ctx)
-	require.NoErrorf(rt, err, "%T.LastAccepted()", mm.sut.VM)
-	require.Equalf(rt, mm.m.lastAcceptedID, got, "last accepted ID")
+// checkState compares the model's predicted chain state against one SUT.
+//
+//nolint:revive // context-as-argument: see modelCore.issueTransfer
+func (c *modelCore) checkState(rt *rapid.T, ctx context.Context, sut *SUT, db database.Database) {
+	got, err := sut.LastAccepted(ctx)
+	require.NoErrorf(rt, err, "%T.LastAccepted()", sut.VM)
+	require.Equalf(rt, c.m.lastAcceptedID, got, "last accepted ID")
 
-	state, err := mm.sut.LastExecutedState()
-	require.NoErrorf(rt, err, "%T.LastExecutedState()", mm.sut.VM)
-	for addr, want := range mm.m.balances {
+	state, err := sut.LastExecutedState()
+	require.NoErrorf(rt, err, "%T.LastExecutedState()", sut.VM)
+	for addr, want := range c.m.balances {
 		require.Equalf(rt, *want, *state.GetBalance(addr), "balance of %s", addr)
-		require.Equalf(rt, mm.m.nonces[addr], state.GetNonce(addr), "nonce of %s", addr)
+		require.Equalf(rt, c.m.nonces[addr], state.GetNonce(addr), "nonce of %s", addr)
 	}
-	for contract, cs := range mm.m.contracts {
+	for contract, cs := range c.m.contracts {
 		for key, want := range cs.storage {
 			require.Equalf(rt, want, state.GetState(contract, key), "storage %s[%s]", contract, key)
 		}
 	}
-	mm.checkRawdbPointers(rt)
+	checkRawdbPointers(rt, db)
+}
+
+// check is the rapid invariant action, run around every other action.
+func (mm *modelMachine) check(rt *rapid.T) {
+	mm.checkState(rt, mm.ctx, mm.sut, mm.db)
 
 	// Shared-memory agreement: exported UTXOs are readable by the remote
 	// chain, consumed UTXOs are gone. This also covers restarts, since it
@@ -854,8 +892,8 @@ func (mm *modelMachine) check(rt *rapid.T) {
 // checkRawdbPointers spot-checks invariants.md pointer discipline on the
 // persisted chain: Finalized (settled) ≤ Head (executed) ≤ HeadFast
 // (accepted) along the canonical chain.
-func (mm *modelMachine) checkRawdbPointers(rt *rapid.T) {
-	ethDB := rawdb.NewDatabase(evmdatabase.New(prefixdb.NewNested(ethDBPrefix, prefixdb.New([]byte("chain"), mm.db))))
+func checkRawdbPointers(rt *rapid.T, db database.Database) {
+	ethDB := rawdb.NewDatabase(evmdatabase.New(prefixdb.NewNested(ethDBPrefix, prefixdb.New([]byte("chain"), db))))
 
 	heightOf := func(name string, hash common.Hash) uint64 {
 		if hash == (common.Hash{}) {

@@ -83,7 +83,7 @@ func runScript(t *testing.T, rt *rapid.T, cfg runConfig, script []scriptStep, re
 			doTransfer(s)
 		case "build":
 			if len(mm.m.pendingEth) == 0 {
-				mm.issueMinimalTransfer(rt)
+				mm.issueMinimalTransfer(rt, mm.ctx, mm.sut)
 			}
 			mm.applyBlock(rt, mm.buildVerifyAcceptExecute(rt))
 		case "advance":

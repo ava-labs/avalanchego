@@ -149,17 +149,29 @@ type model struct {
 	lastGasTime        *gastime.Time
 }
 
+// modelCore is the SUT-agnostic heart shared by the single-node and networked
+// machines: the predicted model, the shared wallet, and issuance/apply/check
+// logic parameterized by the target SUT. Methods that touch a VM take the
+// target (ctx, sut) explicitly so the networked machine can aim them at any
+// node.
+type modelCore struct {
+	tb     *scopedTB
+	m      *model
+	wallet *saetest.Wallet
+	addrs  []common.Address
+
+	pendingEthTxs []*types.Transaction
+}
+
 type modelMachine struct {
-	tb  *scopedTB
+	*modelCore
 	cfg runConfig
 
 	ctx   context.Context
 	sut   *SUT
 	clock *saetest.Clock
 
-	wallet *saetest.Wallet
-	addrs  []common.Address
-	vdrs   *warptest.Validators
+	vdrs *warptest.Validators
 
 	atomicKeys    []*secp256k1.PrivateKey
 	atomicWallets []*wallet
@@ -169,9 +181,6 @@ type modelMachine struct {
 	dbDir   string
 	dataDir string
 	timeOpt sutOption
-
-	m             *model
-	pendingEthTxs []*types.Transaction
 }
 
 const txGasFeeCap = 100 // wei; comfortably above the ~1 wei base fee a short run can reach
@@ -184,11 +193,13 @@ func newModelMachine(t *testing.T, rt *rapid.T, cfg runConfig) *modelMachine {
 	timeOpt, clock := withVMTime(testStartTime)
 
 	mm := &modelMachine{
-		tb:      tb,
+		modelCore: &modelCore{
+			tb:     tb,
+			wallet: saetest.NewWalletWithKeyChain(keys, types.LatestSigner(saetest.ChainConfig())),
+			addrs:  keys.Addresses(),
+		},
 		cfg:     cfg,
 		clock:   clock,
-		wallet:  saetest.NewWalletWithKeyChain(keys, types.LatestSigner(saetest.ChainConfig())),
-		addrs:   keys.Addresses(),
 		vdrs:    warptest.NewValidators(tb, cfg.numValidators),
 		dataDir: t.TempDir(),
 		timeOpt: timeOpt,
@@ -244,7 +255,7 @@ func newModelMachine(t *testing.T, rt *rapid.T, cfg runConfig) *modelMachine {
 		d := dynamic.DesiredDelayExponent(*cfg.minDelayMS)
 		m.desiredDelay = &d
 	}
-	mm.m = m
+	mm.modelCore.m = m
 
 	mm.openSUT()
 	return mm
