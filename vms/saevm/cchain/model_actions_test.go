@@ -24,22 +24,27 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmdatabase "github.com/ava-labs/avalanchego/vms/evm/database"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 	return map[string]func(*rapid.T){
-		"buildBlock":    mm.buildBlock,
-		"advanceClock":  mm.advanceClock,
-		"settle":        mm.settle,
-		"issueTransfer": mm.issueTransfer,
-		"issueDeploy":   mm.issueDeploy,
-		"issueStore":    mm.issueStore,
-		"issueRevert":   mm.issueRevert,
-		"":              mm.check,
+		"buildBlock":       mm.buildBlock,
+		"advanceClock":     mm.advanceClock,
+		"settle":           mm.settle,
+		"issueTransfer":    mm.issueTransfer,
+		"issueDeploy":      mm.issueDeploy,
+		"issueStore":       mm.issueStore,
+		"issueRevert":      mm.issueRevert,
+		"issueWarpSend":    mm.issueWarpSend,
+		"issueWarpReceive": mm.issueWarpReceive,
+		"":                 mm.check,
 	}
 }
 
@@ -268,6 +273,92 @@ func (mm *modelMachine) issueRevert(rt *rapid.T) {
 	})
 }
 
+// issueWarpSend calls the warp precompile's sendWarpMessage, which the
+// executed block turns into a signable unsigned warp message (asserted in
+// applyTxEffects).
+func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	from := mm.addrs[fromIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	payload := rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
+	callData, err := corethwarp.PackSendWarpMessage(payload)
+	require.NoErrorf(rt, err, "PackSendWarpMessage(%d bytes)", len(payload))
+	data := &types.DynamicFeeTx{
+		To:        &corethwarp.ContractAddress,
+		Gas:       1_000_000,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+		Data:      callData,
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(warp send)")
+	mm.trackPending(ethTx, &issuedTx{
+		kind:    kindWarpSend,
+		from:    from,
+		payload: payload,
+		value:   new(uint256.Int),
+		cost:    uint256.NewInt(1_000_000 * txGasFeeCap),
+	})
+}
+
+// issueWarpReceive delivers a warp message (1-in-4 mis-signed) to the model's
+// warpLoggerAddr fixture, which forwards to getVerifiedWarpMessage and logs
+// the ABI-encoded output for applyTxEffects to compare.
+func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	from := mm.addrs[fromIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	var (
+		sourceAddress = common.Address(rapid.SliceOfN(rapid.Byte(), 20, 20).Draw(rt, "sourceAddress"))
+		payload       = rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
+		unsigned      = mm.sut.newAddressedCallMessage(mm.tb, sourceAddress[:], payload)
+		valid         = rapid.IntRange(0, 3).Draw(rt, "misSigned") != 0 // 1 in 4 mis-signed
+	)
+	var msg *avalanchewarp.Message
+	if valid {
+		msg = mm.vdrs.Sign(mm.tb, unsigned)
+	} else {
+		msg = warptest.IncorrectlySign(mm.tb, unsigned)
+	}
+
+	callData, err := corethwarp.PackGetVerifiedWarpMessage(0)
+	require.NoErrorf(rt, err, "PackGetVerifiedWarpMessage(0)")
+
+	want := corethwarp.GetVerifiedWarpMessageOutput{Valid: false}
+	if valid {
+		want = corethwarp.GetVerifiedWarpMessageOutput{
+			Message: corethwarp.WarpMessage{
+				SourceChainID:       common.Hash(mm.sut.ctx.ChainID),
+				OriginSenderAddress: sourceAddress,
+				Payload:             payload,
+			},
+			Valid: true,
+		}
+	}
+	wantLogData, err := corethwarp.PackGetVerifiedWarpMessageOutput(want)
+	require.NoErrorf(rt, err, "PackGetVerifiedWarpMessageOutput()")
+
+	data := &types.DynamicFeeTx{
+		To:         &warpLoggerAddr,
+		Gas:        1_000_000,
+		GasFeeCap:  big.NewInt(txGasFeeCap),
+		Data:       callData,
+		AccessList: warpAccessList(msg),
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(warp receive)")
+	mm.trackPending(ethTx, &issuedTx{
+		kind:        kindWarpReceive,
+		from:        from,
+		wantLogData: wantLogData,
+		value:       new(uint256.Int),
+		cost:        uint256.NewInt(1_000_000 * txGasFeeCap),
+	})
+}
+
 func (mm *modelMachine) trackPending(ethTx *types.Transaction, it *issuedTx) {
 	mm.m.pendingEth[ethTx.Hash()] = it
 	mm.m.pendingCost[it.from].Add(mm.m.pendingCost[it.from], it.cost)
@@ -421,6 +512,15 @@ func (mm *modelMachine) applyTxEffects(rt *rapid.T, it *issuedTx, r *types.Recei
 		mm.m.contracts[it.contract].storage[it.key] = it.val
 	case kindRevert:
 		require.Equalf(rt, it.wantStatus, r.Status, "reverter receipt status")
+	case kindWarpSend:
+		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "warp send receipt status")
+		// The message must now be signable: the block is accepted and executed.
+		sent := mm.sut.newAddressedCallMessage(mm.tb, it.from.Bytes(), it.payload)
+		mm.sut.signAndVerifyWarpMessage(mm.ctx, mm.tb, sent)
+	case kindWarpReceive:
+		require.Equalf(rt, types.ReceiptStatusSuccessful, r.Status, "warp receive receipt status")
+		require.Lenf(rt, r.Logs, 1, "warp receive log count")
+		require.Equalf(rt, it.wantLogData, r.Logs[0].Data, "warp precompile output log data")
 	}
 }
 

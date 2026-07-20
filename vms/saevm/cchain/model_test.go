@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
 // TestModel drives randomized action sequences against a real cchain VM and
@@ -47,7 +49,14 @@ const (
 	kindDeploy
 	kindStore
 	kindRevert
+	kindWarpSend
+	kindWarpReceive
 )
+
+// warpLoggerAddr is a genesis account whose code forwards its calldata to the
+// warp precompile and logs the returned data, letting issueWarpReceive
+// observe GetVerifiedWarpMessage(Output) via a receipt log.
+var warpLoggerAddr = common.Address{'m', 'o', 'd', 'e', 'l', '-', 'w', 'a', 'r', 'p'}
 
 // issuedTx carries the model's expectations for a tx issued to the pool but
 // not yet observed in an accepted block.
@@ -62,6 +71,9 @@ type issuedTx struct {
 	key, val   common.Hash    // kindStore
 	deployKind txKind         // kindDeploy: kindStore or kindRevert
 	wantStatus uint64         // kindRevert: expected receipt status
+
+	payload     []byte // kindWarpSend: the message payload to send
+	wantLogData []byte // kindWarpReceive: expected forwardAndLogCode log data
 }
 
 // contractState is the model's expectation for one deployed fixture.
@@ -190,6 +202,9 @@ func (mm *modelMachine) baseOptions() []sutOption {
 	for i, addr := range mm.addrs {
 		opts = append(opts, withAccount(addr, types.Account{Balance: mm.cfg.balance(i)}))
 	}
+	opts = append(opts, withAccount(warpLoggerAddr, types.Account{
+		Code: forwardAndLogCode(mm.tb, corethwarp.ContractAddress),
+	}))
 	if mm.cfg.gasTarget != nil {
 		opts = append(opts, withGasTarget(*mm.cfg.gasTarget))
 	}
