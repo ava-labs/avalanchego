@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -68,24 +69,24 @@ func New(
 	xdb saetypes.ExecutionResults,
 	saedbConfig saedb.Config,
 	hooks hook.Points,
-	log logging.Logger,
+	snowCtx *snow.Context,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
+	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := newMetrics(reg, lastExecuted.Height())
+	m, err := newMetrics(reg, lastExecuted, hooks, snowCtx.Log)
 	if err != nil {
-		return nil, fmt.Errorf("registering saexec metrics: %w", err)
+		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
 		Tracker: t,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
-		log:     log,
+		log:     snowCtx.Log,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
@@ -94,7 +95,7 @@ func New(
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			log,
+			snowCtx.Log,
 		},
 		chainConfig: chainConfig,
 		db:          db,
