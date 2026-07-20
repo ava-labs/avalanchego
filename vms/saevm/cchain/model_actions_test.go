@@ -19,14 +19,17 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -55,6 +58,7 @@ func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 		"provisionUTXO":    mm.provisionUTXO,
 		"issueImport":      mm.issueImport,
 		"issueExport":      mm.issueExport,
+		"restart":          mm.restart,
 		"":                 mm.check,
 	}
 }
@@ -533,6 +537,44 @@ func (mm *modelMachine) issueExport(rt *rapid.T) {
 		remoteChain: chain,
 		exported:    txtest.ExportedUTXOs(signed.ID(), export),
 	}
+}
+
+// restart shuts the VM down and reopens it on the same persisted state, as a
+// node restart would. The model is NOT reset: everything it predicts must
+// still hold. In-memory pool contents are expected to drop, so issued-but-
+// unaccepted txs return to "unissued" (nonces rewound).
+func (mm *modelMachine) restart(rt *rapid.T) {
+	require.NoErrorf(rt, mm.sut.Shutdown(mm.ctx), "%T.Shutdown()", mm.sut.VM)
+
+	if mm.cfg.kv == kvLevelDB {
+		// The true production restart: close and reopen the store.
+		require.NoErrorf(rt, mm.db.Close(), "leveldb Close() on restart")
+		db, err := leveldb.New(mm.dbDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+		require.NoErrorf(rt, err, "leveldb.New(%q) on restart", mm.dbDir)
+		mm.db = db
+	}
+
+	// Pool contents are gone: rewind wallet nonces for dropped eth txs and
+	// forget them; forget dropped atomic txs likewise.
+	for h, it := range mm.m.pendingEth {
+		for i, addr := range mm.addrs {
+			if addr == it.from {
+				mm.wallet.DecrementNonce(mm.tb, i)
+			}
+		}
+		mm.m.pendingCost[it.from].Sub(mm.m.pendingCost[it.from], it.cost)
+		delete(mm.m.pendingEth, h)
+	}
+	for id, exp := range mm.m.pendingAtomic {
+		if exp.isImport {
+			// The reserved UTXOs become available again.
+			mm.m.availableUTXOs[exp.remoteChain] = append(mm.m.availableUTXOs[exp.remoteChain], exp.consumed...)
+		}
+		delete(mm.m.pendingAtomic, id)
+	}
+	mm.pendingEthTxs = nil
+
+	mm.openSUT() // atomic wallet nonces are restored from the model here
 }
 
 func (mm *modelMachine) trackPending(ethTx *types.Transaction, it *issuedTx) {

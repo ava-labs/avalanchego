@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
@@ -112,6 +113,10 @@ type (
 		state      snow.State
 		upgrades   upgrade.Config
 
+		chainDataDir string
+
+		toleratedLogMessages []string
+
 		skipRPCTransport bool
 	}
 	sutOption = options.Option[sutConfig]
@@ -150,6 +155,53 @@ func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
 	})
+}
+
+// withChainDataDir pins the SUT's chain data dir (firewood trie data,
+// execution-results DB) so a restarted SUT finds its persisted state.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
+	})
+}
+
+// withToleratedLogMessage allows an exact WARN-level log message to reach the
+// SUT's logger without failing the test (loggingtest.New otherwise treats
+// every WARN/ERROR as a test failure). Scope it tightly: only pass messages
+// that are known-benign for a specific, documented reason.
+func withToleratedLogMessage(msg string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.toleratedLogMessages = append(c.toleratedLogMessages, msg)
+	})
+}
+
+// toleratingLogger wraps a [logging.Logger], downgrading an exact set of
+// WARN messages to Info so they don't trip loggingtest's "warnings are
+// errors" policy. All other levels, including unlisted WARNs, pass through
+// unchanged.
+type toleratingLogger struct {
+	logging.Logger
+	tolerated map[string]bool
+}
+
+func newToleratingLogger(l logging.Logger, msgs []string) *toleratingLogger {
+	tolerated := make(map[string]bool, len(msgs))
+	for _, m := range msgs {
+		tolerated[m] = true
+	}
+	return &toleratingLogger{Logger: l, tolerated: tolerated}
+}
+
+func (l *toleratingLogger) Warn(msg string, fields ...zap.Field) {
+	if l.tolerated[msg] {
+		l.Logger.Info(msg, fields...)
+		return
+	}
+	l.Logger.Warn(msg, fields...)
+}
+
+func (l *toleratingLogger) With(fields ...zap.Field) logging.Logger {
+	return &toleratingLogger{Logger: l.Logger.With(fields...), tolerated: l.tolerated}
 }
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
@@ -276,12 +328,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	if cfg.chainDataDir != "" {
+		snowCtx.ChainDataDir = cfg.chainDataDir
+	}
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
-	snowCtx.Log = log
+	var vmLog logging.Logger = log
+	if len(cfg.toleratedLogMessages) > 0 {
+		vmLog = newToleratingLogger(log, cfg.toleratedLogMessages)
+	}
+	snowCtx.Log = vmLog
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)

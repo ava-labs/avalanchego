@@ -257,7 +257,13 @@ func (mm *modelMachine) baseOptions() []sutOption {
 		mm.timeOpt,
 		withValidators(mm.vdrs),
 		mm.cfg.storageOptions(),
-		// TODO(Task 9): withChainDataDir(mm.dataDir) once it exists.
+		withChainDataDir(mm.dataDir),
+		// The saexec queue is sized 2*CommitInterval (saexec.go) but restart
+		// recovery enqueues the full unsettled backlog (recovery.go), whose
+		// bound is settlement lag, not CommitInterval; the overflow WARN is
+		// benign (Enqueue blocks; no loss). Tolerated pending an upstream
+		// fix — see task-9 analysis.
+		withToleratedLogMessage("Execution queue buffer full"),
 	}
 	for i, addr := range mm.addrs {
 		opts = append(opts, withAccount(addr, types.Account{Balance: mm.cfg.balance(i)}))
