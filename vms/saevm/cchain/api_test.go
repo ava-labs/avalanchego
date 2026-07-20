@@ -103,6 +103,7 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 func TestIssueTxConcurrent(t *testing.T) {
 	const numConcurrentTxs = 2
 
+	// Each tx uses a different key so that they don't conflict.
 	keys := make([]*secp256k1.PrivateKey, numConcurrentTxs)
 	addrs := make([]common.Address, numConcurrentTxs)
 	for i := range keys {
