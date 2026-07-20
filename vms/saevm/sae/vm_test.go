@@ -1187,41 +1187,68 @@ func TestSettledGasTime(t *testing.T) {
 }
 
 // TestDuplicateVerify verifies that having two in-memory instances of the same
-// block doesn't corrupt the VM.
+// block doesn't corrupt the VM, regardless of the order in which the consensus
+// engine verifies them.
 func TestDuplicateVerify(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	blk := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
-	duplicate, err := sut.ParseBlock(ctx, blk.Bytes())
-	require.NoError(t, err, "ParseBlock(BuildBlock().Bytes())")
-
-	// The consensus engine may call [block.WithVerifyContext.VerifyWithContext]
-	// on multiple instances of the same block.
-	//
-	// This causes [VM.consensusCritical] to be overridden, replacing blk with
-	// duplicate.
-	for _, b := range []snowman.Block{blk, duplicate} {
-		withContext := b.(block.WithVerifyContext)
-		require.NoErrorf(t,
-			withContext.VerifyWithContext(ctx, &block.Context{
-				PChainHeight: 1,
-			}),
-			"%T.VerifyWithContext()",
-			withContext,
-		)
+	const (
+		original  = 0
+		duplicate = 1
+	)
+	tests := []struct {
+		name        string
+		verifyOrder []int
+	}{
+		{
+			name:        "original_then_duplicate",
+			verifyOrder: []int{0, 1},
+		},
+		{
+			name:        "duplicate_then_original",
+			verifyOrder: []int{1, 0},
+		},
 	}
 
-	// When creating child, [VM.VerifyBlock] loads duplicate from
-	// [VM.consensusCritical] and sets it as the parent of the child.
-	child := sut.createAndVerifyBlock(t, unwrap(t, blk))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0)
 
-	// Accepting blk and child adds them to the execution queue.
-	require.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)
-	require.NoErrorf(t, child.Accept(ctx), "%T.Accept()", child)
+			original := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+			duplicate, err := sut.ParseBlock(ctx, original.Bytes())
+			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVM)
 
-	// Inside the executor, execution results are read from the parent of child,
-	// which is duplicate. However, duplicate was never added to the executor,
-	// blk was. So child blocks execution forever.
-	childRaw := unwrap(t, child)
-	require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
+			// The consensus engine may call
+			// [block.WithVerifyContext.VerifyWithContext] on multiple instances
+			// of the same block, in either order. [VM.consensusCritical] isn't
+			// overridden, so the last instance verified is the one kept in the
+			// map.
+			blks := []snowman.Block{original, duplicate}
+			for _, i := range test.verifyOrder {
+				b := blks[i]
+				withContext := b.(block.WithVerifyContext)
+				require.NoErrorf(t,
+					withContext.VerifyWithContext(ctx, &block.Context{
+						PChainHeight: 1,
+					}),
+					"%T.VerifyWithContext()",
+					withContext,
+				)
+			}
+
+			// When creating child, [VM.VerifyBlock] loads the kept instance
+			// from [VM.consensusCritical] and sets it as the parent of the
+			// child.
+			child := sut.createAndVerifyBlock(t, unwrap(t, original))
+
+			// Accepting original and child adds them to the execution queue.
+			require.NoError(t, original.Accept(ctx), "original.Accept()")
+			require.NoError(t, child.Accept(ctx), "child.Accept()")
+
+			// Inside the executor, execution results are read from the parent
+			// of child. When the kept instance differs from the accepted
+			// instance, a naive implementation would block child's execution
+			// forever.
+			childRaw := unwrap(t, child)
+			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
+		})
+	}
 }

@@ -63,23 +63,28 @@ func newSyncMap[K comparable, V any](onStore func(V), onDelete func(V)) *syncMap
 
 func (m *syncMap[K, V]) Load(k K) (V, bool) {
 	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	v, ok := m.m[k]
-	m.mu.RUnlock()
 	return v, ok
 }
 
 func (m *syncMap[K, V]) Store(k K, v V) {
-	m.onStore(v)
 	m.mu.Lock()
-	m.m[k] = v
-	m.mu.Unlock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.m[k]; !ok {
+		m.onStore(v)
+		m.m[k] = v
+	}
 }
 
 func (m *syncMap[K, V]) Delete(k K) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if v, ok := m.m[k]; ok {
 		m.onDelete(v)
+		delete(m.m, k)
 	}
-	delete(m.m, k)
-	m.mu.Unlock()
 }
