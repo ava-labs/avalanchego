@@ -1219,7 +1219,7 @@ func TestDuplicateVerify(t *testing.T) {
 			// The consensus engine may call
 			// [block.WithVerifyContext.VerifyWithContext] on multiple instances
 			// of the same block, in either order. [VM.consensusCritical] isn't
-			// overridden, so the last instance verified is the one kept in the
+			// overridden, so the first instance verified is the one kept in the
 			// map.
 			blks := []snowman.Block{
 				originalIndex:  original,
