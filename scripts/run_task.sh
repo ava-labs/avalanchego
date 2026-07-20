@@ -11,7 +11,7 @@ AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
 # excludes the repo-local wrapper, so aliases like `bin/task` can safely point
 # here without recursion.
 if task_bin="$(which -a task | grep -Fvx "${AVALANCHE_PATH}/bin/task" | head -n1)"; then
-  exec "${task_bin}" "${@+"$@"}"
+  exec "${task_bin}" "${@}"
 fi
 
-exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@+"$@"}"
+exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@}"
