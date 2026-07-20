@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"testing"
 
@@ -19,9 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -58,6 +62,11 @@ const (
 // observe GetVerifiedWarpMessage(Output) via a receipt log.
 var warpLoggerAddr = common.Address{'m', 'o', 'd', 'e', 'l', '-', 'w', 'a', 'r', 'p'}
 
+// atomicKeyGenesisBalanceWei is the genesis eth-side balance (in wei) funded
+// to each atomic account, both in the model (as a *uint256.Int) and in the
+// SUT's genesis alloc (as a *big.Int) via baseOptions.
+const atomicKeyGenesisBalanceWei = "1000000000000000000000" // 1000 ETH-equivalent
+
 // issuedTx carries the model's expectations for a tx issued to the pool but
 // not yet observed in an accepted block.
 type issuedTx struct {
@@ -82,6 +91,37 @@ type contractState struct {
 	storage map[common.Hash]common.Hash
 }
 
+// provisionedUTXO is a shared-memory UTXO the harness wrote as the remote
+// chain, spendable by atomic key ownerIdx via an import.
+type provisionedUTXO struct {
+	utxo     *avax.UTXO
+	ownerIdx int
+	amount   uint64 // nAVAX
+}
+
+// atomicExpectation predicts the effects of an issued cross-chain tx once its
+// block is accepted.
+type atomicExpectation struct {
+	isImport    bool
+	senderIdx   int            // atomic key index
+	to          common.Address // import credit target
+	creditWei   *uint256.Int   // import: ScaleAVAX(imported - fee)
+	debitWei    *uint256.Int   // export: ScaleAVAX(amount + fee)
+	remoteChain ids.ID
+	consumed    []*provisionedUTXO // import: removed from shared memory; restored on restart if dropped
+	exported    []*avax.UTXO       // export: appear in shared memory
+}
+
+// utxosOf projects the raw UTXOs out of provisioned entries, for the
+// shared-memory assertion helpers.
+func utxosOf(ps []*provisionedUTXO) []*avax.UTXO {
+	out := make([]*avax.UTXO, len(ps))
+	for i, p := range ps {
+		out[i] = p.utxo
+	}
+	return out
+}
+
 // model is the lightweight predicted state of the VM. Gas costs are
 // reconciled from receipts (not predicted); everything else is exact.
 type model struct {
@@ -90,6 +130,11 @@ type model struct {
 	pendingEth  map[common.Hash]*issuedTx
 	pendingCost map[common.Address]*uint256.Int
 	contracts   map[common.Address]*contractState
+
+	pendingAtomic  map[ids.ID]*atomicExpectation
+	availableUTXOs map[ids.ID][]*provisionedUTXO
+	exportedUTXOs  map[ids.ID][]*avax.UTXO
+	consumedUTXOs  map[ids.ID][]*avax.UTXO
 
 	target        dynamic.TargetExponent
 	price         dynamic.PriceExponent
@@ -115,6 +160,10 @@ type modelMachine struct {
 	wallet *saetest.Wallet
 	addrs  []common.Address
 	vdrs   *warptest.Validators
+
+	atomicKeys    []*secp256k1.PrivateKey
+	atomicWallets []*wallet
+	atomicAddrs   []common.Address
 
 	db      database.Database
 	dbDir   string
@@ -157,20 +206,31 @@ func newModelMachine(t *testing.T, rt *rapid.T, cfg runConfig) *modelMachine {
 	}
 
 	m := &model{
-		balances:    make(map[common.Address]*uint256.Int),
-		nonces:      make(map[common.Address]uint64),
-		pendingEth:  make(map[common.Hash]*issuedTx),
-		pendingCost: make(map[common.Address]*uint256.Int),
-		contracts:   make(map[common.Address]*contractState),
-		target:      dynamic.InitialTargetExponent,
-		price:       dynamic.InitialPriceExponent,
-		delay:       dynamic.InitialDelayExponent,
+		balances:       make(map[common.Address]*uint256.Int),
+		nonces:         make(map[common.Address]uint64),
+		pendingEth:     make(map[common.Hash]*issuedTx),
+		pendingCost:    make(map[common.Address]*uint256.Int),
+		contracts:      make(map[common.Address]*contractState),
+		pendingAtomic:  make(map[ids.ID]*atomicExpectation),
+		availableUTXOs: make(map[ids.ID][]*provisionedUTXO),
+		exportedUTXOs:  make(map[ids.ID][]*avax.UTXO),
+		consumedUTXOs:  make(map[ids.ID][]*avax.UTXO),
+		target:         dynamic.InitialTargetExponent,
+		price:          dynamic.InitialPriceExponent,
+		delay:          dynamic.InitialDelayExponent,
 	}
 	for i, addr := range mm.addrs {
 		bal, overflow := uint256.FromBig(cfg.balance(i))
 		require.Falsef(tb, overflow, "genesis balance of account %d overflows uint256", i)
 		m.balances[addr] = bal
 		m.pendingCost[addr] = new(uint256.Int)
+	}
+	for range cfg.numAtomicKeys {
+		sk := txtest.NewKey(tb)
+		mm.atomicKeys = append(mm.atomicKeys, sk)
+		mm.atomicAddrs = append(mm.atomicAddrs, sk.EthAddress())
+		m.balances[sk.EthAddress()] = uint256.MustFromDecimal(atomicKeyGenesisBalanceWei)
+		m.pendingCost[sk.EthAddress()] = new(uint256.Int)
 	}
 	if cfg.gasTarget != nil {
 		d := dynamic.DesiredTargetExponent(*cfg.gasTarget)
@@ -202,6 +262,11 @@ func (mm *modelMachine) baseOptions() []sutOption {
 	for i, addr := range mm.addrs {
 		opts = append(opts, withAccount(addr, types.Account{Balance: mm.cfg.balance(i)}))
 	}
+	for _, addr := range mm.atomicAddrs {
+		bal, ok := new(big.Int).SetString(atomicKeyGenesisBalanceWei, 10)
+		require.Truef(mm.tb, ok, "big.Int.SetString(%q, 10)", atomicKeyGenesisBalanceWei)
+		opts = append(opts, withAccount(addr, types.Account{Balance: bal}))
+	}
 	opts = append(opts, withAccount(warpLoggerAddr, types.Account{
 		Code: forwardAndLogCode(mm.tb, corethwarp.ContractAddress),
 	}))
@@ -225,6 +290,16 @@ func (mm *modelMachine) openSUT() {
 		id, err := sut.LastAccepted(ctx)
 		require.NoErrorf(mm.tb, err, "%T.LastAccepted()", sut.VM)
 		mm.m.lastAcceptedID = id
+	}
+
+	// Atomic wallets hold the SUT's Client, so they must be (re)created every
+	// time the SUT is (re)opened; restore each wallet's nonce from the model
+	// so a restart doesn't replay already-applied export nonces.
+	mm.atomicWallets = mm.atomicWallets[:0]
+	for _, sk := range mm.atomicKeys {
+		w := newWallet(sk, mm.sut.ctx, mm.sut.Client)
+		w.nonce = mm.m.nonces[sk.EthAddress()]
+		mm.atomicWallets = append(mm.atomicWallets, w)
 	}
 }
 

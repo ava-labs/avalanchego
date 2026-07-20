@@ -776,6 +776,11 @@ func (w *wallet) newImportTx(
 		})
 	}
 	require.Greaterf(tb, importedAVAX, fee, "imported AVAX insufficient to cover fee")
+	// tx.Import.sanityCheck requires ImportedInputs to be sorted and unique
+	// (by UTXOID); getAllUTXOs makes no such ordering guarantee, and this
+	// only surfaces once an owner has more than one spendable UTXO on the
+	// source chain.
+	utils.Sort(inputs)
 
 	imp := &tx.Import{
 		NetworkID:      w.snowCtx.NetworkID,

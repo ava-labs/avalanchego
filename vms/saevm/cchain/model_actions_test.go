@@ -5,6 +5,8 @@ package cchain
 
 import (
 	"bytes"
+	"maps"
+	"math"
 	"math/big"
 	"slices"
 	"time"
@@ -21,9 +23,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -44,6 +50,9 @@ func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 		"issueRevert":      mm.issueRevert,
 		"issueWarpSend":    mm.issueWarpSend,
 		"issueWarpReceive": mm.issueWarpReceive,
+		"provisionUTXO":    mm.provisionUTXO,
+		"issueImport":      mm.issueImport,
+		"issueExport":      mm.issueExport,
 		"":                 mm.check,
 	}
 }
@@ -359,6 +368,171 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 	})
 }
 
+// remoteChains are the chains the harness simulates the far side of.
+func (mm *modelMachine) remoteChains() []ids.ID {
+	return []ids.ID{mm.sut.ctx.XChainID, constants.PlatformChainID}
+}
+
+// provisionUTXO writes a fresh shared-memory UTXO as the remote chain,
+// spendable by a randomly chosen atomic key via a future import.
+func (mm *modelMachine) provisionUTXO(rt *rapid.T) {
+	ownerIdx := rapid.IntRange(0, len(mm.atomicKeys)-1).Draw(rt, "owner")
+	chain := rapid.SampledFrom(mm.remoteChains()).Draw(rt, "remoteChain")
+	amount := rapid.Uint64Range(2, 1_000_000_000).Draw(rt, "amountNAVAX")
+	utxo := txtest.NewUTXO(amount, mm.sut.ctx.AVAXAssetID, mm.atomicKeys[ownerIdx].Address())
+	mm.sut.addUTXOs(mm.tb, mm.sut.ctx.ChainID, chain, utxo)
+	mm.m.availableUTXOs[chain] = append(mm.m.availableUTXOs[chain], &provisionedUTXO{
+		utxo: utxo, ownerIdx: ownerIdx, amount: amount,
+	})
+}
+
+// hasPendingImport reports whether ownerIdx already has an unconfirmed
+// import in flight against chain. newImportTx consumes whatever the shared
+// memory backend currently reports as spendable for the owner on that
+// chain — a live RPC read with no notion of "reserved by a pending tx" — so
+// issuing a second import for the same (owner, chain) before the first is
+// executed would silently sweep up the first import's UTXOs too, crediting
+// more than either issuance recorded. One in-flight import per (owner,
+// chain) avoids that race; see the report for detail.
+func (m *model) hasPendingImport(ownerIdx int, chain ids.ID) bool {
+	for _, exp := range m.pendingAtomic {
+		if exp.isImport && exp.senderIdx == ownerIdx && exp.remoteChain == chain {
+			return true
+		}
+	}
+	return false
+}
+
+// issueImport picks a (remoteChain, owner) pair with available UTXOs and
+// issues an import consuming ALL of that owner's spendable UTXOs from that
+// chain, crediting a random eth account.
+func (mm *modelMachine) issueImport(rt *rapid.T) {
+	// Pick a (chain, owner) pair with available UTXOs; newImportTx consumes
+	// ALL of the owner's spendable UTXOs from that chain. Skip (owner, chain)
+	// pairs with an import already in flight (see hasPendingImport).
+	type candidate struct {
+		chain    ids.ID
+		ownerIdx int
+		total    uint64
+		utxos    []*provisionedUTXO
+	}
+	var cands []candidate
+	for _, chain := range mm.remoteChains() {
+		perOwner := map[int]*candidate{}
+		for _, p := range mm.m.availableUTXOs[chain] {
+			if mm.m.hasPendingImport(p.ownerIdx, chain) {
+				continue
+			}
+			c, ok := perOwner[p.ownerIdx]
+			if !ok {
+				c = &candidate{chain: chain, ownerIdx: p.ownerIdx}
+				perOwner[p.ownerIdx] = c
+			}
+			c.total += p.amount
+			c.utxos = append(c.utxos, p)
+		}
+		for _, idx := range slices.Sorted(maps.Keys(perOwner)) {
+			cands = append(cands, *perOwner[idx])
+		}
+	}
+	if len(cands) == 0 {
+		mm.provisionUTXO(rt)
+		return
+	}
+	c := cands[rapid.IntRange(0, len(cands)-1).Draw(rt, "candidate")]
+	// fee must be >= 1: the atomic op's worst-case GasFeeCap is derived from
+	// the fee alone (gasPrice(fee, gas)), and the block base fee has a floor
+	// of 1 wei (dynamic.PriceExponent.Price()) that it can never go below, so
+	// a zero fee produces a GasFeeCap of 0 that can never clear the base fee
+	// — the op would sit in the pool forever, wedging the builder.
+	fee := rapid.Uint64Range(1, c.total-1).Draw(rt, "fee")
+	toIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "to")
+	to := mm.addrs[toIdx]
+
+	signed, _ := mm.atomicWallets[c.ownerIdx].newImportTx(mm.ctx, mm.tb, c.chain, to, fee)
+	require.NoErrorf(rt, mm.sut.IssueTx(mm.ctx, signed), "%T.IssueTx(import)", mm.sut.Client)
+
+	credit := tx.ScaleAVAX(c.total - fee)
+	mm.m.pendingAtomic[signed.ID()] = &atomicExpectation{
+		isImport:    true,
+		senderIdx:   c.ownerIdx,
+		to:          to,
+		creditWei:   &credit,
+		remoteChain: c.chain,
+		consumed:    c.utxos,
+	}
+	// Remove the consumed UTXOs from availability immediately: the pool
+	// reserves them.
+	kept := mm.m.availableUTXOs[c.chain][:0]
+	for _, p := range mm.m.availableUTXOs[c.chain] {
+		if p.ownerIdx != c.ownerIdx {
+			kept = append(kept, p)
+		}
+	}
+	mm.m.availableUTXOs[c.chain] = kept
+}
+
+// pendingAtomicCount counts in-flight cross-chain txs for one atomic key.
+func (m *model) pendingAtomicCount(senderIdx int) int {
+	n := 0
+	for _, exp := range m.pendingAtomic {
+		if exp.senderIdx == senderIdx {
+			n++
+		}
+	}
+	return n
+}
+
+// unscaleAVAXTruncateCapped converts an aAVAX amount back into nAVAX,
+// rounding down and clamping to math.MaxUint64. tx.UnscaleAVAXTruncate does
+// not exist, so the scale is computed once via tx.ScaleAVAX(1) and divided
+// out with uint256.Int.Div.
+func unscaleAVAXTruncateCapped(wei *uint256.Int) uint64 {
+	scale := tx.ScaleAVAX(1)
+	q := new(uint256.Int).Div(wei, &scale)
+	if q.IsUint64() {
+		return q.Uint64()
+	}
+	return math.MaxUint64
+}
+
+// issueExport issues an export of at most a quarter of the sender's
+// spendable nAVAX, provided the sender has no other in-flight atomic tx (one
+// in-flight atomic tx per key keeps nonces simple).
+func (mm *modelMachine) issueExport(rt *rapid.T) {
+	senderIdx := rapid.IntRange(0, len(mm.atomicKeys)-1).Draw(rt, "sender")
+	sender := mm.atomicAddrs[senderIdx]
+	if mm.m.pendingAtomicCount(senderIdx) > 0 {
+		return // one in-flight atomic tx per key keeps nonces simple
+	}
+	chain := rapid.SampledFrom(mm.remoteChains()).Draw(rt, "remoteChain")
+
+	// Export at most a quarter of the sender's spendable nAVAX.
+	spendableNAVAX := unscaleAVAXTruncateCapped(mm.spendable(sender))
+	if spendableNAVAX < 8 {
+		return
+	}
+	amount := rapid.Uint64Range(1, spendableNAVAX/4).Draw(rt, "amountNAVAX")
+	// fee must be >= 1, for the same reason as issueImport's fee: a zero fee
+	// yields a worst-case GasFeeCap of 0, which can never clear the block's
+	// 1-wei price floor and would wedge the builder forever.
+	fee := rapid.Uint64Range(1, 1_000).Draw(rt, "fee")
+
+	signed, export := mm.atomicWallets[senderIdx].newExportTx(
+		mm.tb, chain, fee,
+		txtest.NewTransferOutput(amount, mm.atomicKeys[senderIdx].Address()),
+	)
+	require.NoErrorf(rt, mm.sut.IssueTx(mm.ctx, signed), "%T.IssueTx(export)", mm.sut.Client)
+
+	debit := tx.ScaleAVAX(amount + fee)
+	mm.m.pendingAtomic[signed.ID()] = &atomicExpectation{
+		senderIdx:   senderIdx,
+		debitWei:    &debit,
+		remoteChain: chain,
+		exported:    txtest.ExportedUTXOs(signed.ID(), export),
+	}
+}
+
 func (mm *modelMachine) trackPending(ethTx *types.Transaction, it *issuedTx) {
 	mm.m.pendingEth[ethTx.Hash()] = it
 	mm.m.pendingCost[it.from].Add(mm.m.pendingCost[it.from], it.cost)
@@ -377,7 +551,7 @@ func (mm *modelMachine) spendable(addr common.Address) *uint256.Int {
 }
 
 func (mm *modelMachine) buildBlock(rt *rapid.T) {
-	if len(mm.m.pendingEth) == 0 {
+	if len(mm.m.pendingEth) == 0 && len(mm.m.pendingAtomic) == 0 {
 		mm.issueMinimalTransfer(rt)
 	}
 	blk := mm.buildVerifyAcceptExecute(rt)
@@ -477,7 +651,27 @@ func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
 
 		mm.applyTxEffects(rt, it, r)
 	}
-	// Task 8 extends this with atomic (cross-chain) txs from blockTxs(blk).
+
+	// Atomic (cross-chain) tx effects, driven by what the block actually
+	// included.
+	for _, atx := range blockTxs(mm.tb, blk) {
+		exp, ok := m.pendingAtomic[atx.ID()]
+		require.Truef(rt, ok, "block %d contains unexpected atomic tx %s", blk.NumberU64(), atx.ID())
+		delete(m.pendingAtomic, atx.ID())
+		mm.sut.waitForTxPoolStateUpdate(mm.ctx, mm.tb, atx)
+
+		sender := mm.atomicAddrs[exp.senderIdx]
+		if exp.isImport {
+			m.balances[exp.to].Add(m.balances[exp.to], exp.creditWei)
+			consumed := utxosOf(exp.consumed)
+			m.consumedUTXOs[exp.remoteChain] = append(m.consumedUTXOs[exp.remoteChain], consumed...)
+			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, exp.remoteChain, consumed...)
+		} else {
+			m.balances[sender].Sub(m.balances[sender], exp.debitWei)
+			m.nonces[sender]++
+			m.exportedUTXOs[exp.remoteChain] = append(m.exportedUTXOs[exp.remoteChain], exp.exported...)
+		}
+	}
 
 	// Drop pending txs from the machine's wait-list once included.
 	included := make(map[common.Hash]bool, len(blk.Transactions()))
@@ -560,7 +754,18 @@ func (mm *modelMachine) check(rt *rapid.T) {
 		}
 	}
 	mm.checkRawdbPointers(rt)
-	// Later tasks extend: exported UTXOs (8).
+
+	// Shared-memory agreement: exported UTXOs are readable by the remote
+	// chain, consumed UTXOs are gone. This also covers restarts, since it
+	// reads directly from shared memory rather than in-memory bookkeeping.
+	for _, chain := range mm.remoteChains() {
+		if exported := mm.m.exportedUTXOs[chain]; len(exported) > 0 {
+			mm.sut.assertUTXOsExist(mm.tb, chain, mm.sut.ctx.ChainID, exported...)
+		}
+		if consumed := mm.m.consumedUTXOs[chain]; len(consumed) > 0 {
+			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, chain, consumed...)
+		}
+	}
 }
 
 // checkRawdbPointers spot-checks invariants.md pointer discipline on the
