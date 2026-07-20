@@ -7,7 +7,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
@@ -27,11 +29,79 @@ import (
 
 func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 	return map[string]func(*rapid.T){
-		"buildBlock":   mm.buildBlock,
-		"advanceClock": mm.advanceClock,
-		"settle":       mm.settle,
-		"":             mm.check,
+		"buildBlock":    mm.buildBlock,
+		"advanceClock":  mm.advanceClock,
+		"settle":        mm.settle,
+		"issueTransfer": mm.issueTransfer,
+		"":              mm.check,
 	}
+}
+
+const maxPendingPerAccount = 8 // stay well under the pool's 16 account slots
+
+func (mm *modelMachine) pendingCount(addr common.Address) int {
+	n := 0
+	for _, it := range mm.m.pendingEth {
+		if it.from == addr {
+			n++
+		}
+	}
+	return n
+}
+
+// issueTransfer sends a randomized value transfer between two model accounts,
+// occasionally (1-in-10) drawing a value guaranteed to exceed the sender's
+// spendable balance to exercise the pool's insufficient-funds rejection path.
+func (mm *modelMachine) issueTransfer(rt *rapid.T) {
+	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
+	toIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "to")
+	from, to := mm.addrs[fromIdx], mm.addrs[toIdx]
+	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+
+	spendable := mm.spendable(from)
+	insufficient := rapid.IntRange(0, 9).Draw(rt, "insufficient") == 0
+
+	var value *uint256.Int
+	if insufficient {
+		// 2*balance + 1 ETH guarantees pool-admission rejection regardless of
+		// concurrently pending txs.
+		value = new(uint256.Int).Add(
+			new(uint256.Int).Lsh(mm.m.balances[from], 1),
+			uint256.MustFromDecimal("1000000000000000000"),
+		)
+	} else {
+		// A random fraction of at most spendable/4, so several transfers can
+		// stack without draining the account mid-flight.
+		frac := rapid.Uint64().Draw(rt, "valueFrac")
+		value = new(uint256.Int).Rsh(new(uint256.Int).Mul(spendable, uint256.NewInt(frac)), 66)
+	}
+
+	data := &types.DynamicFeeTx{
+		To:        &to,
+		Gas:       ethparams.TxGas,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+		Value:     value.ToBig(),
+	}
+	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
+	err := mm.sut.ethclient.SendTransaction(mm.ctx, ethTx)
+
+	if insufficient {
+		if diff := testerr.Diff(err, testerr.Contains(core.ErrInsufficientFunds.Error())); diff != "" {
+			rt.Fatalf("SendTransaction(overdrawn transfer) error (-want +got):\n%s", diff)
+		}
+		mm.wallet.DecrementNonce(mm.tb, fromIdx) // reuse the burned nonce
+		return
+	}
+	require.NoErrorf(rt, err, "SendTransaction(transfer of %s)", value)
+	mm.trackPending(ethTx, &issuedTx{
+		kind:  kindTransfer,
+		from:  from,
+		to:    to,
+		value: value,
+		cost:  new(uint256.Int).Add(value, uint256.NewInt(ethparams.TxGas*txGasFeeCap)),
+	})
 }
 
 // advanceToBuildable moves the mock clock to the preference's earliest
@@ -109,8 +179,26 @@ func (mm *modelMachine) buildVerifyAcceptExecute(rt *rapid.T) *blocks.Block {
 	mm.sut.waitForPendingEthTxs(mm.ctx, mm.tb, mm.pendingEthTxs...)
 	mm.sut.waitForPendingTxs(mm.ctx, mm.tb)
 
-	blk, err := mm.sut.BuildBlock(mm.ctx, blockCtx)
-	require.NoErrorf(rt, err, "%T.BuildBlock()", mm.sut.VM)
+	const maxBuildAttempts = 5
+	var blk *blocks.Block
+	for attempt := 1; ; attempt++ {
+		var err error
+		blk, err = mm.sut.BuildBlock(mm.ctx, blockCtx)
+		if err == nil {
+			break
+		}
+		// Worst-case block building validates spendability against the
+		// last-SETTLED state (ACP-194), so txs spending executed-but-
+		// unsettled credits are admitted to the pool yet unincludable,
+		// and the hook refuses an empty block. Settling the last accepted
+		// block makes those credits spendable; bounded retries keep a
+		// genuinely wedged builder fatal.
+		require.ErrorIsf(rt, err, errEmptyBlock, "%T.BuildBlock() attempt %d", mm.sut.VM, attempt)
+		require.Lessf(rt, attempt, maxBuildAttempts, "BuildBlock still empty after %d settle-retries", attempt)
+		require.NotNilf(rt, mm.m.lastAccepted, "%T.BuildBlock() returned errEmptyBlock with nothing accepted to settle", mm.sut.VM)
+		mm.settle(rt)
+		mm.advanceToBuildable()
+	}
 	require.NoErrorf(rt, mm.sut.VerifyBlock(mm.ctx, blockCtx, blk), "%T.VerifyBlock()", mm.sut.VM)
 	require.NoErrorf(rt, mm.sut.AcceptBlock(mm.ctx, blk), "%T.AcceptBlock()", mm.sut.VM)
 	require.NoErrorf(rt, blk.WaitUntilExecuted(mm.ctx), "%T.WaitUntilExecuted()", blk)
