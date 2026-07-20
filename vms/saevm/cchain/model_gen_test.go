@@ -45,14 +45,20 @@ func genRunConfig() *rapid.Generator[runConfig] {
 	return rapid.Custom(func(rt *rapid.T) runConfig {
 		c := runConfig{
 			numAccounts: uint(rapid.IntRange(2, 6).Draw(rt, "numAccounts")), //#nosec G115 -- bounded draw, 2..6
-			// Weighted draws: repeats in the sample set set the odds.
+			// Weighted draws: repeats in the sample set set the odds. Weighted
+			// toward memdb/HashScheme (the fast paths) to keep the PR-mode CI
+			// budget in check while still reaching leveldb/Firewood regularly.
 			kv: rapid.SampledFrom([]string{
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvLevelDB,
 			}).Draw(rt, "kv"),
 			scheme: rapid.SampledFrom([]string{
 				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
-				rawdb.HashScheme, customrawdb.FirewoodScheme,
+				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
+				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
+				customrawdb.FirewoodScheme,
 			}).Draw(rt, "scheme"),
 			commitInterval: rapid.SampledFrom([]uint64{1, 4, 16, saedb.DefaultCommitInterval}).Draw(rt, "commitInterval"),
 			numValidators:  rapid.IntRange(1, 3).Draw(rt, "numValidators"),

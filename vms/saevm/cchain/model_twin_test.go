@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"cmp"
 	"maps"
 	"math/big"
 	"slices"
@@ -91,19 +92,34 @@ func runScript(t *testing.T, rt *rapid.T, cfg runConfig, script []scriptStep, re
 			mm.settle(rt)
 		}
 		if i == restartAfter {
-			// Snapshot the pending txs' (from, to, value) triples, restart
-			// (which drops the pool and rewinds nonces), then re-issue them
-			// verbatim so both runs process the same tx set.
+			// Snapshot the pending txs' (from, to, value, nonce) quadruples,
+			// restart (which drops the pool and rewinds nonces), then
+			// re-issue them verbatim so both runs process the same tx set.
+			// The re-issue order must preserve each sender's original
+			// per-account nonce order: SetNonceAndSign assigns nonces
+			// sequentially per account, so reissuing a sender's txs out of
+			// their original relative order would reassign which nonce
+			// carries which value — a balance-equivalent (additive
+			// transfers commute) but byte-different block. Sort by
+			// (fromIdx, nonce) rather than value to keep it deterministic
+			// and faithful to the original issue order; nonce comes off the
+			// already-signed tx rather than out of mm.pendingEth, since
+			// mm.pendingEthTxs/mm.m.pendingEth don't otherwise retain it.
 			type pendingTx struct {
 				fromIdx int
 				to      common.Address
 				value   *uint256.Int
+				nonce   uint64
 			}
 			var pending []pendingTx
-			for _, it := range mm.m.pendingEth {
-				pending = append(pending, pendingTx{slices.Index(mm.addrs, it.from), it.to, it.value})
+			for _, ethTx := range mm.pendingEthTxs {
+				it, ok := mm.m.pendingEth[ethTx.Hash()]
+				require.Truef(rt, ok, "pendingEthTxs entry %s missing from pendingEth", ethTx.Hash())
+				pending = append(pending, pendingTx{slices.Index(mm.addrs, it.from), it.to, it.value, ethTx.Nonce()})
 			}
-			slices.SortFunc(pending, func(a, b pendingTx) int { return a.value.Cmp(b.value) })
+			slices.SortFunc(pending, func(a, b pendingTx) int {
+				return cmp.Or(cmp.Compare(a.fromIdx, b.fromIdx), cmp.Compare(a.nonce, b.nonce))
+			})
 			mm.restart(rt)
 			for _, p := range pending {
 				from := mm.addrs[p.fromIdx]
@@ -122,10 +138,20 @@ func runScript(t *testing.T, rt *rapid.T, cfg runConfig, script []scriptStep, re
 			}
 		}
 	}
-	// Flush anything still pending into one final block, so both runs end at
-	// the same height regardless of where the restart fell.
-	if len(mm.m.pendingEth) > 0 {
+	// Flush anything still pending, so both runs end at the same height
+	// regardless of where the restart fell. A single final block is not
+	// enough: worst-case block building may legally include only a subset
+	// of the pending txs (ApplyTx failures silently exclude txs from a
+	// block; errEmptyBlock only fires when NONE are includable), so under
+	// partial inclusion the two runs could otherwise end at different
+	// heights/balances. Loop until the pool drains, settling between
+	// iterations so unsettled credits from the prior block become
+	// includable.
+	const maxFlushIterations = 10
+	for iter := 0; len(mm.m.pendingEth) > 0; iter++ {
+		require.Lessf(rt, iter, maxFlushIterations, "final flush did not drain pendingEth within %d iterations", maxFlushIterations)
 		mm.applyBlock(rt, mm.buildVerifyAcceptExecute(rt))
+		mm.settle(rt)
 	}
 	mm.check(rt)
 
@@ -139,8 +165,9 @@ func runScript(t *testing.T, rt *rapid.T, cfg runConfig, script []scriptStep, re
 // exactly the state of the same run without one.
 //
 // runScript deliberately does not return lastAccepted block IDs: they are NOT
-// compared. Two independent findings during development made a byte-identical
-// block hash unreachable here, regardless of any restart-specific bug:
+// compared. Three independent findings during development made a
+// byte-identical block hash unreachable here, regardless of any
+// restart-specific bug:
 //
 //  1. Atomic-key accounts are seeded with a fresh secp256k1 key per
 //     newModelMachine call (txtest.NewKey draws from crypto/rand.Reader, not
@@ -150,24 +177,42 @@ func runScript(t *testing.T, rt *rapid.T, cfg runConfig, script []scriptStep, re
 //     and so every downstream block hash - differ between runA and runB
 //     regardless of the restart under test. cfg.numAtomicKeys is forced to 0
 //     below to eliminate this (state roots would differ too, not just IDs).
-//  2. Even with (1) fixed, a rare but genuine flake remains: the
-//     restart-reissue path above sorts pending txs by value before
-//     re-signing them, to get a deterministic re-issue order. If a single
-//     sender has 2+ txs pending at the restart boundary whose values don't
-//     already sort in nonce order, the reissued txs end up with a different
-//     (nonce, value) pairing than runA's — a balance-equivalent (additive
-//     transfers commute) but byte-different block, hence a different ID
-//     despite identical resulting state. Confirmed by running ~800
-//     checks total (mixed -race/no-race, up to -rapid.checks=300) with only
-//     height+root+balances asserted: those never mismatched, while one
-//     lastAccepted-ID mismatch was observed and rapid's shrinker reported it
-//     as "flaky test, can not reproduce a failure" (not deterministically
-//     reproducible from the same seed), consistent with an ordering artifact
-//     rather than a genuine state divergence.
+//  2. The restart-reissue path in runScript re-issues pending txs in each
+//     sender's original nonce order (not by value, which was the original
+//     bug here): SetNonceAndSign assigns nonces sequentially per account, so
+//     reissuing a sender's txs out of their original relative order would
+//     reassign which nonce carries which value — a balance-equivalent
+//     (additive transfers commute) but byte-different block. The snapshot
+//     is taken from mm.pendingEthTxs (issue order) and sorted by (fromIdx,
+//     nonce) — nonce read off the already-signed tx — rather than by value,
+//     so it is faithful to the original issue order and deterministic
+//     across runs. This eliminates the reissue-ordering artifact, but does
+//     NOT make the property hold: see (3).
+//  3. The real, confirmed remaining cause: for transactions from different
+//     senders with equal effective gas tip (all model transfers use the
+//     same fixed txGasFeeCap), TransactionsByPriority
+//     (vms/saevm/txgossip/priority.go:47-61) tie-breaks by `a.Time.Compare
+//     (b.Time)`, where Time is the real wall-clock time the tx pool
+//     admitted the tx — NOT the mocked model clock. runA and runB are two
+//     independent VM instances; identical script replay does not guarantee
+//     identical relative wall-clock arrival order for two different
+//     senders' txs (real RPC/pool-admission latency jitter between the two
+//     instances), so a block containing pending txs from ≥2 senders at
+//     equal tip can legally order them differently between runs — a
+//     different, byte-different block for the same final state. Observed
+//     directly with -race -rapid.checks=300 after fixing (2): the very
+//     FIRST accepted block (height 1) already diverged in per-sender tx
+//     order between runA and runB — before either instance's restart step
+//     had run at all (see task-12-report.md's "Final-review fix wave"
+//     section for the sender/tx_index logs) — which rules out the reissue
+//     path as the cause and confirms this is intrinsic to running two
+//     separate VM instances against the same script, independent of
+//     restart.
 //
 // Height, post-execution state root (which subsumes balances, nonces, and
 // contract storage), and a direct balances comparison are kept as the
-// equivalence property.
+// equivalence property; the lastAccepted ID comparison is intentionally not
+// restored (see (3)).
 func TestModelRestartEquivalence(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		cfg := genRunConfig().Draw(rt, "runConfig")

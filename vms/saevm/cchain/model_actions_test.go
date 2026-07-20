@@ -75,6 +75,17 @@ func (mm *modelMachine) pendingCount(addr common.Address) int {
 	return n
 }
 
+// canAfford reports whether addr's spendable balance still covers a
+// worst-case pool cost of gas*txGasFeeCap. The fixed-cost actions
+// (issueDeploy, issueStore, issueRevert, issueWarpSend, issueWarpReceive) all
+// send at Gas: 1_000_000, so a legitimately drained account (reachable within
+// a run via high-fraction transfers) would otherwise see the pool correctly
+// reject admission with ErrInsufficientFunds — not a VM bug, just an action
+// that shouldn't have been attempted.
+func (mm *modelMachine) canAfford(addr common.Address, gas uint64) bool {
+	return mm.spendable(addr).CmpUint64(gas*txGasFeeCap) >= 0
+}
+
 // issueTransfer sends a randomized value transfer between two model accounts,
 // occasionally (1-in-10) drawing a value guaranteed to exceed the sender's
 // spendable balance to exercise the pool's insufficient-funds rejection path.
@@ -184,6 +195,9 @@ func (mm *modelMachine) issueDeploy(rt *rapid.T) {
 	if mm.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
+	if !mm.canAfford(from, 1_000_000) {
+		return // can't cover worst-case pool cost; a rejection here would be correct VM behavior
+	}
 	deployKind := rapid.SampledFrom([]txKind{kindStore, kindRevert}).Draw(rt, "fixture")
 	runtime := storeRuntime(mm.tb)
 	if deployKind == kindRevert {
@@ -230,6 +244,9 @@ func (mm *modelMachine) issueStore(rt *rapid.T) {
 	if mm.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
+	if !mm.canAfford(from, 1_000_000) {
+		return
+	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
 	key := common.BigToHash(new(big.Int).SetUint64(rapid.Uint64Range(0, 15).Draw(rt, "slot")))
 	val := common.BigToHash(new(big.Int).SetUint64(rapid.Uint64().Draw(rt, "value")))
@@ -261,6 +278,9 @@ func (mm *modelMachine) issueRevert(rt *rapid.T) {
 	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
 	from := mm.addrs[fromIdx]
 	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	if !mm.canAfford(from, 1_000_000) {
 		return
 	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
@@ -297,6 +317,9 @@ func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
 	if mm.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
+	if !mm.canAfford(from, 1_000_000) {
+		return
+	}
 	payload := rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
 	callData, err := corethwarp.PackSendWarpMessage(payload)
 	require.NoErrorf(rt, err, "PackSendWarpMessage(%d bytes)", len(payload))
@@ -324,6 +347,9 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
 	from := mm.addrs[fromIdx]
 	if mm.pendingCount(from) >= maxPendingPerAccount {
+		return
+	}
+	if !mm.canAfford(from, 1_000_000) {
 		return
 	}
 	var (
