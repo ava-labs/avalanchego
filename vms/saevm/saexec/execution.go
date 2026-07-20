@@ -214,6 +214,7 @@ func Execute(
 		stateDB.SetTxContext(tx.Hash(), ti)
 		b.CheckSenderBalanceBound(stateDB, signer, tx)
 
+		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(
 			config,
 			chainCtx,
@@ -253,10 +254,6 @@ func Execute(
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
-
-		// Finalise any state changes made by the hook, mirroring the finalisation
-		// performed by [core.ApplyTransaction].
-		stateDB.Finalise(rules.IsEIP158)
 	}
 
 	numTxs := len(b.Transactions())
