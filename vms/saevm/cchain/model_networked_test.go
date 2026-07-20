@@ -4,16 +4,29 @@
 package cchain
 
 import (
+	"context"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // nodeStorage is one node's independently drawn storage configuration. Nodes
@@ -122,4 +135,243 @@ func TestGenNetworkedRunConfig(t *testing.T) {
 			require.NotZerof(rt, s.commitInterval, "node %d commit interval", i)
 		}
 	})
+}
+
+// TestModelNetworked drives randomized action sequences against a small
+// network of in-process cchain nodes wired via saetest senders. Transactions
+// travel through real push/pull gossip; block distribution is orchestrated by
+// the machine (playing every node's consensus engine), so every scheduling
+// decision is a labeled rapid draw and failures replay deterministically.
+// After every action, all non-delayed nodes must agree exactly with each
+// other and with the shared model. Reproduce failures with -rapid.seed /
+// -rapid.failfile; explore more deeply with -rapid.checks.
+func TestModelNetworked(t *testing.T) {
+	rapid.Check(t, func(rt *rapid.T) {
+		cfg := genNetworkedRunConfig().Draw(rt, "networkedRunConfig")
+		nm := newNetworkedMachine(t, rt, cfg)
+		defer nm.tb.close()
+		rt.Repeat(nm.actions())
+	})
+}
+
+// modelNode is one node of the networked machine: a SUT plus the per-node
+// bookkeeping the machine needs to restart it and to track how far behind
+// the canonical chain it is.
+type modelNode struct {
+	idx         int
+	nodeID      ids.NodeID
+	isValidator bool
+
+	ctx context.Context
+	sut *SUT
+
+	storage nodeStorage
+	db      database.Database
+	dbDir   string
+	dataDir string
+
+	// acceptedCount is the number of post-genesis canonical blocks this node
+	// has accepted. canonical[acceptedCount:] is its (implicit) pending
+	// delivery queue while delayed.
+	acceptedCount int
+	delayed       bool
+}
+
+// acceptedBlock is one canonical block as raw material for delivery to any
+// node: bytes survive node restarts, unlike *blocks.Block handles.
+type acceptedBlock struct {
+	id     ids.ID
+	height uint64
+	bytes  []byte
+}
+
+// networkedMachine drives N connected SUTs against one shared model. The
+// model predicts chain state, which every converged node must match exactly.
+type networkedMachine struct {
+	*modelCore
+	cfg networkedRunConfig
+
+	clock   *saetest.Clock
+	timeOpt sutOption
+	vdrs    *warptest.Validators
+
+	genesisID ids.ID
+	nodes     []*modelNode
+	canonical []acceptedBlock
+
+	// pins maps an account with in-flight txs to the node all its txs are
+	// issued to until the account drains. Eth-tx gossip reaches validators
+	// only (see sae's TestGossip), so spreading one account's txs across
+	// nodes would strand a nonce-gapped tx on a node that can never learn
+	// the missing nonce — never promoted, never gossiped, builder sync hangs.
+	pins map[common.Address]int
+}
+
+func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *networkedMachine {
+	tb := newScopedTB(t)
+	tb.setRapidT(rt)
+
+	keys := saetest.NewUNSAFEKeyChain(tb, cfg.numAccounts)
+	timeOpt, clock := withVMTime(testStartTime)
+
+	vdrIDs := make([]ids.NodeID, cfg.numValidators)
+	for i := range vdrIDs {
+		vdrIDs[i] = ids.GenerateTestNodeID()
+	}
+
+	m := &model{
+		balances:    make(map[common.Address]*uint256.Int),
+		nonces:      make(map[common.Address]uint64),
+		pendingEth:  make(map[common.Hash]*issuedTx),
+		pendingCost: make(map[common.Address]*uint256.Int),
+		contracts:   make(map[common.Address]*contractState),
+		target:      dynamic.InitialTargetExponent,
+		price:       dynamic.InitialPriceExponent,
+		delay:       dynamic.InitialDelayExponent,
+	}
+	nm := &networkedMachine{
+		modelCore: &modelCore{
+			tb:     tb,
+			m:      m,
+			wallet: saetest.NewWalletWithKeyChain(keys, types.LatestSigner(saetest.ChainConfig())),
+			addrs:  keys.Addresses(),
+		},
+		cfg:     cfg,
+		clock:   clock,
+		timeOpt: timeOpt,
+		vdrs:    warptest.NewValidatorsWithNodeIDs(tb, vdrIDs...),
+		pins:    make(map[common.Address]int),
+	}
+	for i, addr := range nm.addrs {
+		bal, overflow := uint256.FromBig(cfg.balance(i))
+		require.Falsef(tb, overflow, "genesis balance of account %d overflows uint256", i)
+		m.balances[addr] = bal
+		m.pendingCost[addr] = new(uint256.Int)
+	}
+	if cfg.gasTarget != nil {
+		d := dynamic.DesiredTargetExponent(*cfg.gasTarget)
+		m.desiredTarget = &d
+	}
+	if cfg.priceTarget != nil {
+		d := dynamic.DesiredPriceExponent(*cfg.priceTarget)
+		m.desiredPrice = &d
+	}
+	if cfg.minDelayMS != nil {
+		d := dynamic.DesiredDelayExponent(*cfg.minDelayMS)
+		m.desiredDelay = &d
+	}
+
+	for i := range cfg.numNodes() {
+		n := &modelNode{
+			idx:         i,
+			isValidator: i < cfg.numValidators,
+			storage:     cfg.perNode[i],
+			dataDir:     t.TempDir(),
+		}
+		if n.isValidator {
+			n.nodeID = vdrIDs[i]
+		} else {
+			n.nodeID = ids.GenerateTestNodeID()
+		}
+		switch n.storage.kv {
+		case kvLevelDB:
+			n.dbDir = t.TempDir()
+			db, err := leveldb.New(n.dbDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+			require.NoErrorf(tb, err, "leveldb.New(%q) for node %d", n.dbDir, i)
+			n.db = db
+			tb.Cleanup(func() { _ = n.db.Close() })
+		default:
+			n.db = memdb.New()
+		}
+		nm.nodes = append(nm.nodes, n)
+		nm.openNode(i)
+	}
+
+	// All nodes must start from the same genesis block, or the network
+	// exhibits very weird behavior.
+	genesisID, err := nm.nodes[0].sut.LastAccepted(nm.nodes[0].ctx)
+	require.NoErrorf(tb, err, "%T.LastAccepted() on node 0", nm.nodes[0].sut.VM)
+	for _, n := range nm.nodes[1:] {
+		got, err := n.sut.LastAccepted(n.ctx)
+		require.NoErrorf(tb, err, "%T.LastAccepted() on node %d", n.sut.VM, n.idx)
+		require.Equalf(tb, genesisID, got, "genesis ID of node %d", n.idx)
+	}
+	nm.genesisID = genesisID
+	m.lastAcceptedID = genesisID
+
+	// Fully connect the validator clique; non-validators connect only to
+	// validators, mirroring production (and sae's newNetworkedSUTs).
+	vdrSUTs := make([]*SUT, cfg.numValidators)
+	for i := range cfg.numValidators {
+		vdrSUTs[i] = nm.nodes[i].sut
+	}
+	saetest.Connect(tb, vdrSUTs...)
+	for _, n := range nm.nodes[cfg.numValidators:] {
+		saetest.ConnectTo(tb, n.sut, vdrSUTs...)
+	}
+	return nm
+}
+
+// openNode (re)creates node i's SUT against its persisted database, deriving
+// every other option identically — the networked analogue of the single-node
+// machine's openSUT.
+func (nm *networkedMachine) openNode(i int) {
+	n := nm.nodes[i]
+	opts := []sutOption{
+		nm.timeOpt,
+		withNodeID(n.nodeID),
+		withValidators(nm.vdrs),
+		n.storage.storageOptions(),
+		withChainDataDir(n.dataDir),
+		withDB(n.db),
+		// Benign on restart recovery; see the single-node machine's
+		// baseOptions for the full analysis.
+		withToleratedLogMessage("Execution queue buffer full"),
+	}
+	for j, addr := range nm.addrs {
+		opts = append(opts, withAccount(addr, types.Account{Balance: nm.cfg.balance(j)}))
+	}
+	if nm.cfg.gasTarget != nil {
+		opts = append(opts, withGasTarget(*nm.cfg.gasTarget))
+	}
+	if nm.cfg.priceTarget != nil {
+		opts = append(opts, withPriceTarget(*nm.cfg.priceTarget))
+	}
+	if nm.cfg.minDelayMS != nil {
+		opts = append(opts, withMinDelayTarget(*nm.cfg.minDelayMS))
+	}
+	ctx, sut := newSUT(nm.tb, opts...)
+	n.ctx = ctx
+	n.sut = sut
+}
+
+// tipID is the canonical chain tip (genesis before the first block).
+func (nm *networkedMachine) tipID() ids.ID {
+	if len(nm.canonical) == 0 {
+		return nm.genesisID
+	}
+	return nm.canonical[len(nm.canonical)-1].id
+}
+
+// nonDelayedValidators returns build-eligible nodes in ascending index order.
+func (nm *networkedMachine) nonDelayedValidators() []*modelNode {
+	var out []*modelNode
+	for _, n := range nm.nodes[:nm.cfg.numValidators] {
+		if !n.delayed {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// check is the rapid invariant action, run around every other action: every
+// non-delayed node agrees exactly with the shared model (and hence with every
+// other converged node). Lagging nodes are checked by Task 4's prefix logic.
+func (nm *networkedMachine) check(rt *rapid.T) {
+	for _, n := range nm.nodes {
+		if n.delayed {
+			continue // replaced with checkLagging in Task 4
+		}
+		nm.checkState(rt, n.ctx, n.sut, n.db)
+	}
 }
