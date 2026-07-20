@@ -138,9 +138,7 @@ type Wallet interface {
 
 	// IssueCreateL1Tx creates, signs, and issues a transaction that atomically
 	// creates a subnet, a chain, and converts the subnet to a Permissionless L1.
-	//
 	// - [vmID] is the ID of the VM the chain runs
-	// - [fxIDs] are the feature extensions the chain runs
 	// - [genesisData] is the genesis data for the chain
 	// - [chainID] specifies which chain the validator manager is deployed on
 	// - [address] specifies the address of the validator manager
