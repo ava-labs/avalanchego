@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"bytes"
+	"errors"
 	"maps"
 	"math"
 	"math/big"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmdatabase "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -560,7 +562,9 @@ func (mm *modelMachine) buildBlock(rt *rapid.T) {
 
 // buildVerifyAcceptExecute drives one full consensus round and waits for
 // execution, so LastExecutedState reflects the new block for the model
-// comparison. Task 10 adds bounded errExecutionLagging recovery here.
+// comparison. BuildBlock retries a bounded number of times, recovering from
+// errEmptyBlock (settle the last accepted block) and sae.ErrExecutionLagging
+// (wait for execution to catch up); any other error is immediately fatal.
 func (mm *modelMachine) buildVerifyAcceptExecute(rt *rapid.T) *blocks.Block {
 	blockCtx := &block.Context{}
 	lastAccepted, err := mm.sut.LastAccepted(mm.ctx)
@@ -579,16 +583,27 @@ func (mm *modelMachine) buildVerifyAcceptExecute(rt *rapid.T) *blocks.Block {
 		if err == nil {
 			break
 		}
-		// Worst-case block building validates spendability against the
-		// last-SETTLED state (ACP-194), so txs spending executed-but-
-		// unsettled credits are admitted to the pool yet unincludable,
-		// and the hook refuses an empty block. Settling the last accepted
-		// block makes those credits spendable; bounded retries keep a
-		// genuinely wedged builder fatal.
-		require.ErrorIsf(rt, err, errEmptyBlock, "%T.BuildBlock() attempt %d", mm.sut.VM, attempt)
-		require.Lessf(rt, attempt, maxBuildAttempts, "BuildBlock still empty after %d settle-retries", attempt)
-		require.NotNilf(rt, mm.m.lastAccepted, "%T.BuildBlock() returned errEmptyBlock with nothing accepted to settle", mm.sut.VM)
-		mm.settle(rt)
+		require.Lessf(rt, attempt, maxBuildAttempts, "BuildBlock never recovered after %d attempts: %v", attempt, err)
+		switch {
+		case errors.Is(err, errEmptyBlock):
+			// Worst-case block building validates spendability against the
+			// last-SETTLED state (ACP-194), so txs spending executed-but-
+			// unsettled credits are admitted to the pool yet unincludable,
+			// and the hook refuses an empty block. Settling the last
+			// accepted block makes those credits spendable; bounded retries
+			// keep a genuinely wedged builder fatal.
+			require.NotNilf(rt, mm.m.lastAccepted, "%T.BuildBlock() returned errEmptyBlock with nothing accepted to settle", mm.sut.VM)
+			mm.settle(rt)
+		case errors.Is(err, sae.ErrExecutionLagging):
+			// A wall-clock jump can leave the executor's gas-time behind the
+			// settlement target implied by the requested block time (the
+			// "GC stall" scenario): let execution catch up.
+			if mm.m.lastAccepted != nil {
+				require.NoErrorf(rt, mm.m.lastAccepted.WaitUntilExecuted(mm.ctx), "%T.WaitUntilExecuted() during lag recovery", mm.m.lastAccepted)
+			}
+		default:
+			require.NoErrorf(rt, err, "%T.BuildBlock() attempt %d: want errors.Is(err, errEmptyBlock) or errors.Is(err, sae.ErrExecutionLagging)", mm.sut.VM, attempt)
+		}
 		mm.advanceToBuildable()
 	}
 	require.NoErrorf(rt, mm.sut.VerifyBlock(mm.ctx, blockCtx, blk), "%T.VerifyBlock()", mm.sut.VM)

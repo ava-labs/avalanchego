@@ -127,7 +127,12 @@ var (
 	errBlockTimeUnderMinimum = errors.New("block time under minimum allowed time")
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
-	errExecutionLagging      = errors.New("execution lagging for settlement")
+
+	// ErrExecutionLagging is returned by block building when the executor has
+	// not yet caught up to the settlement target implied by the requested
+	// block time. Callers (including tests) may retry once execution
+	// advances.
+	ErrExecutionLagging = errors.New("execution lagging for settlement")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
@@ -369,7 +374,7 @@ func lastToSettle(
 	}
 	if !ok {
 		log.Debug("Execution lagging when determining last block to settle")
-		return nil, errExecutionLagging
+		return nil, ErrExecutionLagging
 	}
 	return lastSettled, nil
 }
