@@ -63,6 +63,10 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}
+		// Compare and record the digest-pinned image rather than the mutable
+		// tag so that a restart with an unchanged build resumes the test
+		// instead of wiping it.
+		testConfig.Image = masterImageDetails.Image
 	}
 
 	// A bootstrap is being resumed if a version file exists and the image name it contains matches the container
@@ -96,14 +100,14 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		return fmt.Errorf("failed to remove contents of node directory: %w", err)
 	}
 
-	log.Info("Writing test details to file",
-		zap.Reflect("testDetails", testDetails),
-		zap.String("path", testDetailsPath),
-	)
 	testDetails = bootstrapTestDetails{
 		Image:     testConfig.Image,
 		StartTime: time.Now(),
 	}
+	log.Info("Writing test details to file",
+		zap.Reflect("testDetails", testDetails),
+		zap.String("path", testDetailsPath),
+	)
 	testDetailsBytes, err := json.Marshal(testDetails)
 	if err != nil {
 		return fmt.Errorf("failed to marshal test details: %w", err)
