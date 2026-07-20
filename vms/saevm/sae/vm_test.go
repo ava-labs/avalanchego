@@ -1246,10 +1246,10 @@ func TestDuplicateVerify(t *testing.T) {
 			require.NoError(t, original.Accept(ctx), "original.Accept()")
 			require.NoError(t, child.Accept(ctx), "child.Accept()")
 
-			// Inside the executor, execution results are read from the parent
-			// of child. When the kept instance differs from the accepted
-			// instance, a naive implementation would block child's execution
-			// forever.
+			// Inside the executor, execution results are read from
+			// [blocks.Blocks.ParentBlock]. When the ancestry differs from the
+			// accepted instance, a naive implementation would block child's
+			// execution forever.
 			childRaw := unwrap(t, child)
 			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
 		})
