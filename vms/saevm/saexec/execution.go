@@ -46,7 +46,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 
 	select {
 	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
-		e.metrics.markEnqueued(block.EthBlock().GasLimit())
+		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
@@ -67,7 +67,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/strevm/issues/28"
+const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
 
 func (e *Executor) processQueue() {
 	defer close(e.done)
@@ -172,7 +172,7 @@ func Execute(
 	receiptStore ReceiptStore,
 	log logging.Logger,
 ) (*ExecutionResults, error) {
-	log.Debug("Executing block")
+	log.Trace("Executing block")
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -187,13 +187,20 @@ func Execute(
 	}
 
 	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
 
 	baseFee := gasClock.BaseFee()
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
+
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
@@ -246,6 +253,13 @@ func Execute(
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
+
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
+		}
+		// Finalise any state changes made by the hook, mirroring the finalisation
+		// performed by [core.ApplyTransaction].
+		stateDB.Finalise(rules.IsEIP158)
 	}
 
 	numTxs := len(b.Transactions())
@@ -274,7 +288,7 @@ func Execute(
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
-	log.Debug(
+	log.Trace(
 		"Block execution complete",
 		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),

@@ -160,28 +160,23 @@ func TestSendWarpMessage(t *testing.T) {
 
 // forwardAndLogCode returns runtime bytecode that forwards its calldata to
 // callee and emits the returned data as a log.
-func forwardAndLogCode(callee common.Address) []byte {
+func forwardAndLogCode(tb testing.TB, callee common.Address) []byte {
+	tb.Helper()
 	return slices.Concat(
-		[]byte{
-			// mem[0:cds) = calldata
-			byte(vm.CALLDATASIZE), byte(vm.PUSH0), byte(vm.PUSH0), byte(vm.CALLDATACOPY),
-			// call callee with mem[0:cds) as input
-			byte(vm.PUSH0), byte(vm.PUSH0), // return size + offset; read via RETURNDATACOPY instead
-			byte(vm.CALLDATASIZE), byte(vm.PUSH0), // input size + offset
-			byte(vm.PUSH0), // value
-			byte(vm.PUSH20),
-		},
-		callee[:],
-		[]byte{
-			byte(vm.GAS),
-			byte(vm.CALL),
-			byte(vm.POP), // discard the success flag; a failed call logs empty data
-			// mem[0:rds) = return data
-			byte(vm.RETURNDATASIZE), byte(vm.PUSH0), byte(vm.PUSH0), byte(vm.RETURNDATACOPY),
-			// log0(mem[0:rds))
-			byte(vm.RETURNDATASIZE), byte(vm.PUSH0), byte(vm.LOG0),
-			byte(vm.STOP),
-		},
+		// mem[0:cds) = calldata
+		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY),
+		// call callee with mem[0:cds) as input
+		saetest.Ops(vm.PUSH0, vm.PUSH0),        // return size + offset; read via RETURNDATACOPY instead
+		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0), // input size + offset
+		saetest.Ops(vm.PUSH0),                  // value
+		saetest.Push(tb, callee[:]),
+		saetest.Ops(vm.GAS, vm.CALL),
+		saetest.Ops(vm.POP), // discard the success flag
+		// mem[0:rds) = return data
+		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.PUSH0, vm.RETURNDATACOPY),
+		// log0(mem[0:rds))
+		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.LOG0),
+		saetest.Ops(vm.STOP),
 	)
 }
 
@@ -209,7 +204,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
-		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(corethwarp.ContractAddress)}),
+		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
 		withValidators(vdrs),
 	)
 
@@ -357,9 +352,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 				return
 			}
 
-			logs := receipt.Logs
-			require.Lenf(t, logs, 1, "%T.Logs", receipt)
-			log := logs[0]
+			require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
+			log := receipt.Logs[0]
 			assert.Equalf(t, tt.wantLogData, log.Data, "%T.Data (warp precompile output)", log)
 		})
 	}

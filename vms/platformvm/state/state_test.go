@@ -54,6 +54,25 @@ import (
 var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
 func newTestState(t testing.TB, db database.Database) *State {
+	return newTestStateWithUpgrade(
+		t,
+		db,
+		upgradetest.GetConfig(upgradetest.Latest),
+		reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		},
+	)
+}
+
+func newTestStateWithUpgrade(
+	t testing.TB,
+	db database.Database,
+	upgradeConfig upgrade.Config,
+	rewardConfig reward.Config,
+) *State {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -61,7 +80,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
-		upgradetest.GetConfig(upgradetest.Latest),
+		upgradeConfig,
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
@@ -69,12 +88,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
+		rewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -110,6 +124,37 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) {
+	// One day into the ramp makes the integer reward differ from pre-Helicon.
+	const heliconRampElapsed = 24 * time.Hour
+
+	startTime := genesistest.DefaultValidatorStartTime
+	duration := genesistest.DefaultValidatorDuration
+	heliconTime := startTime.Add(-heliconRampElapsed)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(
+		upgradetest.Helicon,
+		heliconTime,
+	)
+	rewardConfig := reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig, rewardConfig)
+
+	wantReward := reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig).Calculate(
+		startTime,
+		duration,
+		genesistest.DefaultValidatorWeight,
+		genesistest.InitialSupply,
+	)
+
+	staker, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, staker.PotentialReward)
 }
 
 // Whenever we add or remove a staker, a number of on-disk data structures
@@ -2616,10 +2661,9 @@ func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
 			potentialReward,
 		)
 	)
-	state.AddTx(tx, status.Committed)
-
 	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
+	diff.AddTx(tx, status.Committed)
 	require.NoError(diff.PutCurrentValidator(wantValidator))
 	require.NoError(diff.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
 	require.NoError(diff.Apply(state))

@@ -5,6 +5,7 @@ go_library(
     name = "saetest",
     testonly = True,
     srcs = [
+        "bytecode.go",
         "clock.go",
         "db.go",
         "goleak.go",
@@ -38,6 +39,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm/ethtest",

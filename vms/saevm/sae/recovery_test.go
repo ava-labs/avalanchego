@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -61,8 +62,8 @@ func TestRecoverFromDatabase(t *testing.T) {
 
 		if !quick {
 			src.sendTxsAndWaitUntilPending(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       nil,                      // execute `Data` as code for contract "construction"
-				Data:     []byte{byte(vm.INVALID)}, // revert and consume all gas
+				To:       nil,                     // execute `Data` as code for contract "construction"
+				Data:     saetest.Ops(vm.INVALID), // revert and consume all gas
 				Gas:      params.TxGas + params.CreateGas + params.TxDataNonZeroGasFrontier + rng.Uint64N(2e6),
 				GasPrice: big.NewInt(100),
 			}))
@@ -135,8 +136,13 @@ func TestRecoverSimple(t *testing.T) {
 	tests := []struct {
 		name      string
 		numBlocks int
+		scheme    string // defaults to rawdb.HashScheme
 		archival  bool
 	}{
+		{
+			name:      "genesis",
+			numBlocks: 0,
+		},
 		{
 			name:      "archival",
 			numBlocks: 10,
@@ -154,6 +160,28 @@ func TestRecoverSimple(t *testing.T) {
 			name:      "non_archival_commit_interval_exactly",
 			numBlocks: commitInterval,
 		},
+		{
+			name:      "archival_firewood",
+			numBlocks: 10,
+			scheme:    customrawdb.FirewoodScheme,
+			archival:  true,
+		},
+		{
+			name:      "non_archival_firewood_before_first_trie_commit",
+			numBlocks: 2, // no new blocks settled yet
+			scheme:    customrawdb.FirewoodScheme,
+		},
+
+		{
+			name:      "non_archival_firewood_commit_interval_exactly",
+			numBlocks: commitInterval,
+			scheme:    customrawdb.FirewoodScheme,
+		},
+		{
+			name:      "non_archival_firewood_beyond_revision_window",
+			numBlocks: 3 * commitInterval, // evicts the oldest revisions from the in-memory window
+			scheme:    customrawdb.FirewoodScheme,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,12 +189,15 @@ func TestRecoverSimple(t *testing.T) {
 
 			var srcDB database.Database
 			srcHDB := saetest.NewHeightIndexDB()
+			tempDir := t.TempDir()
 
 			sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				srcDB = c.db
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
+				c.vmConfig.DBConfig.Scheme = tt.scheme
+				c.dataDir = tempDir
 			}))
 
 			for range tt.numBlocks {
@@ -178,50 +209,60 @@ func TestRecoverSimple(t *testing.T) {
 				}))
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			}
+			src.close()
 
 			newDB := saetest.CopyDB(t, srcDB)
 			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
+				c.vmConfig.DBConfig.Scheme = tt.scheme
+				c.dataDir = tempDir
 			}))
 
 			requireConsensusCriticalBlocks(t, src, sut)
 
-			if tt.archival {
-				return
+			// Firewood nodes have a rolling buffer of available recent states,
+			// so it doesn't need to be managed directly.
+			// Archival nodes store all states.
+			if !tt.archival && tt.scheme != customrawdb.FirewoodScheme {
+				// For non-archival, HashDB nodes, states outside
+				// [lastSettled, lastExecuted] MUST NOT be accessible, except at
+				// CommitTrieDBEvery boundaries where the settled state was
+				// written to disk. Otherwise, the memory will leak.
+				t.Run("unavailable_outside_window", func(t *testing.T) {
+					lastSettled := sut.rawVM.last.settled.Load().NumberU64()
+					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
+					lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
+					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
+
+					for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
+						ethB, err := canonicalBlock(sut.rawVM.db, i)
+						require.NoErrorf(t, err, "canonicalBlock(%d)", i)
+						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
+						require.NoErrorf(t, err, "RestoreSettledBlock(%d)", i)
+
+						// If these states were available they would eventually
+						// result in an OOM as the triedb leaked memory.
+						root := b.PostExecutionStateRoot()
+						_, err = sut.rawVM.exec.StateDB(root)
+						want := testerr.As(func(got *trie.MissingNodeError) string {
+							if got.NodeHash != root {
+								return fmt.Sprintf("%T for hash %#x", got, root)
+							}
+							return ""
+						})
+						if diff := testerr.Diff(err, want); diff != "" {
+							t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
+						}
+					}
+				})
 			}
 
-			// For non-archival nodes, states outside [lastSettled, lastExecuted]
-			// must not be accessible, except at CommitTrieDBEvery boundaries
-			// where the settled state was written to disk.
-			t.Run("unavailable_outside_window", func(t *testing.T) {
-				lastSettled := sut.rawVM.last.settled.Load().NumberU64()
-				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
-				lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
-				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
-
-				for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
-					ethB, err := canonicalBlock(sut.rawVM.db, i)
-					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-					b, err := blocks.New(ethB, nil, nil, sut.logger)
-					require.NoErrorf(t, err, "blocks.New(): height %d", ethB.NumberU64())
-					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
-
-					// If these states were available they would eventually
-					// result in an OOM as the triedb leaked memory.
-					root := b.PostExecutionStateRoot()
-					_, err = sut.rawVM.exec.StateDB(root)
-					want := testerr.As(func(got *trie.MissingNodeError) string {
-						if got.NodeHash != root {
-							return fmt.Sprintf("%T for hash %#x", got, root)
-						}
-						return ""
-					})
-					if diff := testerr.Diff(err, want); diff != "" {
-						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
-					}
-				}
+			t.Run("settle_after_recovery", func(t *testing.T) {
+				vmTime.AdvanceToSettle(ctx, t, sut.lastAcceptedBlock(t))
+				b := sut.runConsensusLoop(t)
+				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			})
 		})
 	}

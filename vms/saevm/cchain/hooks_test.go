@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -11,31 +12,82 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
-// When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
-// The VM always sets TimeMilliseconds, so this legacy decode path is only
-// reachable by exercising the hook directly.
+func TestDelayExponent(t *testing.T) {
+	tests := []struct {
+		name   string
+		header *types.Header
+		want   dynamic.DelayExponent
+	}{
+		{
+			name: "header_carries_excess",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{},
+				&customtypes.HeaderExtra{MinDelayExcess: utils.PointerTo[acp226.DelayExcess](42)},
+			),
+			want: dynamic.DelayExponent(42),
+		},
+		{
+			name:   "no_field_defaults_to_initial",
+			header: &types.Header{},
+			want:   dynamic.InitialDelayExponent,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, delayExponent(tt.header), "delayExponent()")
+		})
+	}
+}
+
 func TestBlockTime(t *testing.T) {
 	_, sut := newSUT(t)
-	hooks := sut.hooks()
+	hooks := sut.hooks(t)
 
-	const (
-		unix            = 1_700_000_000
-		unixMilli int64 = unix * 1000
-	)
-	header := &types.Header{Time: unix}
-	got := hooks.BlockTime(header)
-	require.Equal(t, unixMilli, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
-	// Documented invariant: BlockTime(h).Unix() == h.Time.
-	require.Equal(t, int64(unix), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
+	tests := []struct {
+		name string
+		// When TimeMilliseconds is unset, BlockTime falls back to Time's
+		// seconds. The VM always sets it, so this decode path is only reachable
+		// by exercising the hook directly.
+		header    *types.Header
+		wantMilli int64
+	}{
+		{
+			name:      "unset_falls_back_to_seconds",
+			header:    &types.Header{Time: 1_700_000_000},
+			wantMilli: 1_700_000_000_000,
+		},
+		{
+			// TimeMilliseconds encodes 105.500s while Time says 100s (e.g. from
+			// a malicious peer). Only the 500ms sub-second remainder is honored.
+			name:      "milliseconds_disagreeing_on_second_ignored",
+			header:    customtypes.WithHeaderExtra(&types.Header{Time: 100}, &customtypes.HeaderExtra{TimeMilliseconds: utils.PointerTo[uint64](105_500)}),
+			wantMilli: 100_500,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hooks.BlockTime(tt.header)
+			require.Equal(t, tt.wantMilli, got.UnixMilli(), "hooks.BlockTime().UnixMilli()")
+			// Documented invariant: BlockTime(h).Unix() == h.Time, i.e. the
+			// second is just the millisecond value floored.
+			require.Equal(t, tt.wantMilli/1000, got.Unix(), "hooks.BlockTime().Unix()")
+		})
+	}
 }
 
 func TestAncestorInputIDs(t *testing.T) {
@@ -107,17 +159,90 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 }
 
+func TestTargetExponent(t *testing.T) {
+	const fortunaTime = 100
+
+	tests := []struct {
+		name    string
+		header  *types.Header
+		want    dynamic.TargetExponent
+		wantErr error
+	}{
+		{
+			name: "header_carries_exponent",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{Number: big.NewInt(1)},
+				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
+			),
+			want: 42,
+		},
+		{
+			name:   "no_field_pre_fortuna",
+			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name:   "no_field_genesis",
+			header: &types.Header{Time: fortunaTime, Number: big.NewInt(0)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name: "no_field_fortuna_legacy_state",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  (&acp176.State{TargetExcess: 5_000}).Bytes(),
+			},
+			want: 5_000,
+		},
+		{
+			name: "no_field_fortuna_invalid_extra",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  []byte{0x01},
+			},
+			wantErr: acp176.ErrStateInsufficientLength,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fortuna := &extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
+				},
+			}
+			got, err := targetExponent(fortuna, tt.header)
+			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
+			assert.Equal(t, tt.want, got, "targetExponent()")
+		})
+	}
+}
+
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
 // writes into the header, and returns the zero marker when the header carries none.
 func TestSettledBy(t *testing.T) {
-	_, sut := newSUT(t)
-	hooks := sut.hooks()
+	key := txtest.NewKey(t)
+	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+	hooks := sut.hooks(t)
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)
+	require.NoError(t, err, "newHookTx()")
 
 	// built returns the header of a block built carrying the given settled marker.
 	built := func(t *testing.T, settled hook.Settled) *types.Header {
 		t.Helper()
 
-		block, err := hooks.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
+		block, err := hooks.BuildBlock(
+			&types.Header{},
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
+			[]*hookTx{htx},
+			settled,
+		)
 		require.NoError(t, err, "builder.BuildBlock()")
 		return block.Header()
 	}

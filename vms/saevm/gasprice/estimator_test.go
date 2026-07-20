@@ -97,9 +97,8 @@ func newSUT(tb testing.TB, c Config) *SUT {
 	tb.Helper()
 
 	db := rawdb.NewMemoryDatabase()
-	xdb := saetest.NewExecutionResultsDB()
 	config := saetest.ChainConfig()
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, types.GenesisAlloc{})
+	genesis := blockstest.NewGenesis(tb, db, config, types.GenesisAlloc{})
 	chain := blockstest.NewChainBuilder(genesis)
 
 	log := loggingtest.New(tb, logging.Debug)

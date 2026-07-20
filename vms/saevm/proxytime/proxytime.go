@@ -12,7 +12,7 @@ import (
 	"math/bits"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE

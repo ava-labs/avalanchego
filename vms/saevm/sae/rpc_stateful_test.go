@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
+	"github.com/ava-labs/libevm/eth/tracers/native"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -182,6 +184,32 @@ func TestDebugTrace(t *testing.T) {
 			method:  "debug_traceTransaction",
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
+		},
+		{
+			method: "debug_traceTransaction",
+			args: []any{depositTx.Hash(), map[string]any{
+				"tracer": `{
+					fault: function() {},
+					result: function() {
+						for (;;) {}
+					}
+				}`,
+				"timeout": "10ms",
+			}},
+			wantErr: testerr.Contains("execution timeout"),
+		},
+		{
+			method: "debug_traceTransaction",
+			args:   []any{depositTx.Hash(), map[string]any{"tracer": "callTracer"}},
+			want: native.CallFrame{
+				From:    sut.wallet.Addresses()[0],
+				Gas:     depositTx.Gas(),
+				GasUsed: depositBlock.Receipts()[0].GasUsed,
+				To:      &escrowAddr,
+				Input:   escrow.CallDataToDeposit(recipient),
+				Value:   big.NewInt(escrowDepositVal),
+			},
+			extraCmpOpts: cmp.Options{cmputils.BigInts()},
 		},
 	}
 

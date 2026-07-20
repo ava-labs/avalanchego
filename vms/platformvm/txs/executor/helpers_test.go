@@ -45,8 +45,9 @@ import (
 const (
 	defaultMinValidatorStake = 5 * units.MilliAvax
 
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
+	defaultMinStakingDuration        = 24 * time.Hour
+	defaultHeliconMinStakingDuration = 12 * time.Hour
+	defaultMaxStakingDuration        = 365 * 24 * time.Hour
 
 	defaultTxFee = 100 * units.NanoAvax
 )
@@ -103,14 +104,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
-	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := statetest.New(t, statetest.Config{
-		DB:         baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: config.Validators,
-		Upgrades:   config.UpgradeConfig,
-		Context:    ctx,
-		Rewards:    rewards,
+		DB:           baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   config.Validators,
+		Upgrades:     config.UpgradeConfig,
+		Context:      ctx,
+		RewardConfig: config.RewardConfig,
 	})
 	lastAcceptedID = baseState.GetLastAccepted()
 
@@ -125,7 +125,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Fx:           fx,
 		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{
@@ -241,15 +240,16 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 	)
 
 	return &config.Internal{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinDelegationFee:       20000,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		Chains:                  chains.TestManager,
+		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
+		Validators:              validators.NewManager(),
+		MinValidatorStake:       5 * units.MilliAvax,
+		MaxValidatorStake:       500 * units.MilliAvax,
+		MinDelegatorStake:       1 * units.MilliAvax,
+		MinDelegationFee:        20000,
+		MinStakeDuration:        defaultMinStakingDuration,
+		HeliconMinStakeDuration: defaultHeliconMinStakingDuration,
+		MaxStakeDuration:        defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,

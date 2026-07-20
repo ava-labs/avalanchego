@@ -41,6 +41,7 @@ go_library(
         "//staking",
         "//tests/fixture/stacktrace",
         "//upgrade",
+        "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/crypto/secp256k1",
