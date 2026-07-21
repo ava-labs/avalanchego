@@ -80,7 +80,7 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 	}
 
 	// Only a digest-pinned image unambiguously identifies a build
-	if !strings.Contains(testConfig.Image, "@sha256:") {
+	if !isDigestPinned(testConfig.Image) {
 		return fmt.Errorf("%w: %q", errImageNotDigestPinned, testConfig.Image)
 	}
 
