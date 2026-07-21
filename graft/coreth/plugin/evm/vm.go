@@ -115,6 +115,7 @@ const (
 	ethMetricsPrefix        = "eth"
 	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
+	syncServerMetricsPrefix = "sync_server"
 )
 
 // Define the API endpoints for the VM
@@ -615,7 +616,15 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodProofHandlerID, syncer.NewGetProofHandler(tdb.Firewood)); err != nil {
+		syncServerMetrics := prometheus.NewRegistry()
+		if err := vm.ctx.Metrics.Register(syncServerMetricsPrefix, syncServerMetrics); err != nil {
+			return fmt.Errorf("registering sync server metrics: %w", err)
+		}
+		proofHandler, err := syncer.NewGetProofHandler(tdb.Firewood, syncServerMetrics)
+		if err != nil {
+			return fmt.Errorf("creating firewood proof handler: %w", err)
+		}
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, proofHandler); err != nil {
 			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
