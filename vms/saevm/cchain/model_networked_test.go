@@ -358,8 +358,12 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 // atomic-tx gossip, which it doesn't exercise at all (issues no atomic txs) —
 // confirmed by matched-seed (-rapid.seed) measurement to have zero effect on
 // wall time. With eth-tx gossip now also driven by this constant, lowering
-// it directly shrinks that dominant wait.
-const networkedGossipInterval = 25 * time.Millisecond
+// it directly shrinks that dominant wait. 25ms left the CI-shaped run
+// (-shuffle=on -race -timeout=120s -coverprofile) short of its 105s-headroom
+// target in 2 of 3 measured runs (109-113s, still under the 120s hard
+// timeout); 10ms buys more margin at negligible further CPU cost (this
+// suite's cost is real-timer-bound, not CPU-bound; see task-7-report.md).
+const networkedGossipInterval = 10 * time.Millisecond
 
 // openNode (re)creates node i's SUT against its persisted database, deriving
 // every other option identically — the networked analogue of the single-node
