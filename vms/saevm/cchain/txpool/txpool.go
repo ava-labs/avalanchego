@@ -54,10 +54,11 @@ type Txpool struct {
 	maxSize int
 	wg      sync.WaitGroup
 
-	// stateLock is ordered before [Pending.lock]. Acquiring stateLock with
-	// [Pending.lock] held will deadlock.
-	stateLock sync.RWMutex
-	state     libevm.StateReader
+	// executionLock is ordered before [Pending.lock] and [Txpool.stateLock].
+	// Acquiring executionLock with either other lock held will deadlock.
+	executionLock sync.RWMutex
+	stateLock     sync.Mutex
+	state         libevm.StateReader
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -139,14 +140,14 @@ func (p *Txpool) updateState(
 				continue
 			}
 
-			p.stateLock.Lock()
+			p.executionLock.Lock()
 			p.lock.Lock()
 
 			p.removeConflicts(inputs)
 			p.state = newState
 
 			p.lock.Unlock()
-			p.stateLock.Unlock()
+			p.executionLock.Unlock()
 
 			log.Debug("updated to new state")
 		case err := <-sub.Err():
@@ -195,13 +196,13 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	//
 	// Verifying against an older state risks admitting a tx that would never
 	// be evicted.
-	p.stateLock.RLock()
-	defer p.stateLock.RUnlock()
+	p.executionLock.RLock()
+	defer p.executionLock.RUnlock()
 
 	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
-	if err := verifyOp(p.state, t.op); err != nil {
+	if err := p.verifyOp(t.op); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyState, err)
 	}
 
@@ -238,6 +239,15 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 func (p *Txpool) Close() {
 	p.sub.Unsubscribe()
 	p.wg.Wait()
+}
+
+func (p *Txpool) verifyOp(op hook.Op) error {
+	// [libevm.StateReader] is not thread-safe, we must lock it even for
+	// read-only operations.
+	p.stateLock.Lock()
+	defer p.stateLock.Unlock()
+
+	return verifyOp(p.state, op)
 }
 
 // inputUTXOs returns the union of all UTXO IDs consumed by transactions in b,
