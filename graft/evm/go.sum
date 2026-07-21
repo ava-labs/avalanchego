@@ -21,8 +21,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0 h1:EDhwnUb6Fy/88cqUCcuj0R5u8isB+Vv++v/r2mawp2g=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
-github.com/ava-labs/libevm v1.13.15-0.20260720163803-90e9e9d2a1f5 h1:1gyMFsVSsCdoBYUwaw5KJmax/2ANuXH200IlayVNAJM=
-github.com/ava-labs/libevm v1.13.15-0.20260720163803-90e9e9d2a1f5/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
+github.com/ava-labs/libevm v1.13.15-0.20260721184559-5557c68d296b h1:a4e+0GJ6Jdj05LM3gtbv+c3ODG5L4ig4yNFpGODiJVs=
+github.com/ava-labs/libevm v1.13.15-0.20260721184559-5557c68d296b/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

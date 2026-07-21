@@ -40,8 +40,24 @@ var (
 	// release, marked as implementable and not activated.
 	//
 	// See: https://github.com/orgs/avalanche-foundation/projects/1
-	CurrentACPs = set.Of[uint32]()
+	CurrentACPs = set.Of[uint32](
+		194, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md
+		224, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/224-dynamic-gas-limit-in-subnet-evm/README.md
+		236, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md
+		247, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/247-delegation-multiplier-increase/README.md
+		267, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md
+		273, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md
+		283, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
+		285, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md
+	)
 
 	// ScheduledACPs are the ACPs included into the next upgrade.
-	ScheduledACPs = set.Of[uint32]()
+	ScheduledACPs = set.Of[uint32](
+		194, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md
+		236, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md
+		267, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md
+		273, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md
+		283, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
+		285, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md
+	)
 )

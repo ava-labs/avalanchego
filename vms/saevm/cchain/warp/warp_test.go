@@ -158,7 +158,7 @@ func newRules(contracts ...common.Address) *extras.Rules {
 
 func TestVerifyBlock(t *testing.T) {
 	var (
-		vdrs = warptest.NewValidators(t, 2)
+		vdrs = warptest.NewValidators(t, warptest.WithCount(2))
 
 		msg, _           = newAddressedCall(t)
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
@@ -334,7 +334,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	const numSigners = 10
 
 	rules := newRules(corethwarp.ContractAddress)
-	vdrs := warptest.NewValidators(b, numSigners)
+	vdrs := warptest.NewValidators(b, warptest.WithCount(numSigners))
 	snowContext := snowtest.Context(b, snowtest.CChainID)
 	warptest.SetValidators(b, snowContext, vdrs)
 	blockContext := &block.Context{}

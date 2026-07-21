@@ -123,7 +123,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	result, err := Execute(b, e, math.MaxInt, nil, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
@@ -153,10 +153,29 @@ type (
 	}
 )
 
+// BeforeExecutingBlock applies the state changes required before executing
+// b's transactions, specifically the before-block hook and the EIP-4788 beacon
+// root, mirroring [core.StateProcessor.Process].
+func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent, b); err != nil {
+		return fmt.Errorf("before-block hook: %v", err)
+	}
+
+	core.SetBeaconBlockRoot(stateDB, b.Header())
+
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
+	return nil
+}
+
 // Execute executes the transactions in the [blocks.Block], beginning from the
 // post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
+//
+// `baseFee`, if non-nil, overrides the gas-clock derivation; replays MUST
+// pass the block's recorded [blocks.Block.ExecutedBaseFee].
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
@@ -166,6 +185,7 @@ func Execute(
 	b *blocks.Block,
 	sdbo saedb.StateDBOpener,
 	maxNumTxs int,
+	baseFee *uint256.Int,
 	hooks hook.Points,
 	config *params.ChainConfig,
 	chainCtx core.ChainContext,
@@ -186,21 +206,16 @@ func Execute(
 		return nil, err
 	}
 
-	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
-		return nil, fmt.Errorf("before-block hook: %v", err)
+	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
+	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+		return nil, err
 	}
-	// Finalise any state changes made by the hook, mirroring the finalisation
-	// performed by [core.ApplyTransaction].
-	stateDB.Finalise(rules.IsEIP158)
 
-	baseFee := gasClock.BaseFee()
-	b.CheckBaseFeeBound(baseFee)
+	if baseFee == nil {
+		baseFee = gasClock.BaseFee()
+		b.CheckBaseFeeBound(baseFee)
+	}
 	header.BaseFee = baseFee.ToBig()
-
-	// EIP-4788: before processing any transactions, store the parent beacon
-	// block root, mirroring [core.StateProcessor.Process].
-	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out

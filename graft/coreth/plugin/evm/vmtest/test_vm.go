@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -31,6 +32,8 @@ var Schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
 type TestVMConfig struct {
 	IsSyncing bool
 	Fork      *upgradetest.Fork
+	// If set, overrides the NetworkUpgrades derived from Fork.
+	Upgrades *upgrade.Config
 	// If genesisJSON is empty, defaults to the genesis corresponding to the
 	// fork.
 	GenesisJSON string
@@ -56,6 +59,9 @@ func SetupTestVM(t *testing.T, vm commoneng.VM, config TestVMConfig) *TestVMSuit
 		fork = *config.Fork
 	}
 	snowtCtx, dbManager, genesisBytes, m := SetupGenesis(t, fork)
+	if config.Upgrades != nil {
+		snowtCtx.NetworkUpgrades = *config.Upgrades
+	}
 	if len(config.GenesisJSON) != 0 {
 		genesisBytes = []byte(config.GenesisJSON)
 	}
