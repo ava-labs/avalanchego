@@ -553,7 +553,9 @@ func awaitTxAccepted(tc tests.TestContext, uri string, txID ids.ID) {
 	})
 }
 
-// newAddressedCallMessage returns an unsigned warp message from [sourceChainID] whose payload is an AddressedCall from sourceAddress containing payloadBytes
+// newAddressedCallMessage returns an unsigned warp message from [sourceChainID] whose payload
+//
+//	is an AddressedCall from sourceAddress containing payloadBytes
 func newAddressedCallMessage(
 	tc tests.TestContext,
 	networkID uint32,
@@ -571,7 +573,8 @@ func newAddressedCallMessage(
 	return msg
 }
 
-// startL1TestPeer connects a test peer to [node] and returns it with a deque that collects every inbound message
+// startL1TestPeer connects a test peer to [node] and returns it with a deque that
+// collects every inbound message
 func startL1TestPeer(
 	tc tests.TestContext,
 	node *tmpnet.Node,
@@ -600,7 +603,7 @@ func startL1TestPeer(
 	return p, messages
 }
 
-// closes [p] and its message deque
+// closeTestPeer closes [p] and its message deque
 func closeTestPeer(
 	tc tests.TestContext,
 	p *peer.Peer,
@@ -613,7 +616,8 @@ func closeTestPeer(
 	require.NoError(p.AwaitClosed(tc.DefaultContext()))
 }
 
-// requestWarpSignature requests that [p] signs [msg], optionally providing s justification, and returns the resulting BLS signature.
+// requestWarpSignature requests that [p] signs [msg], optionally providing a justification,
+// and returns the resulting BLS signature.
 func requestWarpSignature(
 	tc tests.TestContext,
 	p *peer.Peer,
@@ -639,7 +643,8 @@ func requestWarpSignature(
 	return signature
 }
 
-// verifyPChainAttestation verifies that the P-Chain attests to [payload] by requesting a signature over it from [p] and verifying the signature against [signerPK]
+// verifyPChainAttestation verifies that the P-Chain attests to [payload] by requesting
+// a signature over it from [p] and verifying the signature against [signerPK]
 func verifyPChainAttestation(
 	tc tests.TestContext,
 	p *peer.Peer,
@@ -656,7 +661,8 @@ func verifyPChainAttestation(
 	require.True(bls.Verify(signerPK, signature, unsignedMessage.Bytes()))
 }
 
-// verifyValidatorSet checks that the subnet validator set at the current heigt matches [expectedValidators]
+// verifyValidatorSet checks that the subnet validator set at the current height
+// matches [expectedValidators]
 func verifyValidatorSet(
 	tc tests.TestContext,
 	pClient *platformvm.Client,
@@ -747,7 +753,8 @@ type l1Manager struct {
 	acceptanceURI string
 }
 
-// registerValidator signs [message] as the manager and issues the RegisterL1ValidatorTx, funding the validator with [balance] and proving ownership of its BLS key with [pop]
+// registerValidator signs [message] as the manager and issues the RegisterL1ValidatorTx,
+// funding the validator with [balance] and proving ownership of its BLS key with [pop]
 func (m *l1Manager) registerValidator(
 	tc tests.TestContext,
 	message *warpmessage.RegisterL1Validator,
