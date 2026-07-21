@@ -215,6 +215,9 @@ func (g *generator) buildBlock(t *testing.T, fork, note string, atomicTxs []*cor
 	for _, tx := range atomicTxs {
 		require.NoError(t, g.vm.AtomicMempool.AddLocalTx(tx), "AtomicMempool.AddLocalTx()")
 	}
+	// The pool adopts a new head's rules asynchronously; sync so validation
+	// sees the just-accepted upgrade block's rules.
+	require.NoError(t, g.vm.Ethereum().TxPool().Sync(), "TxPool().Sync()")
 	for i, err := range g.vm.Ethereum().TxPool().AddRemotesSync(ethTxs) {
 		require.NoError(t, err, "TxPool().AddRemotesSync() tx %d", i)
 	}
