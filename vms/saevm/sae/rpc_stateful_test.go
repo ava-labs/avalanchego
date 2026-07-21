@@ -100,6 +100,9 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 }
 
 func TestDebugTrace(t *testing.T) {
+	// TODO(JonathanOppenheimer): add a fee-sensitive case. The current
+	// tests only assert fee-insensitive fields, leaving the SAE-era replay
+	// base fee unpinned -- this has led to multiple bugs!
 	ctx, sut := newSUT(t, 2)
 
 	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
@@ -247,9 +250,6 @@ func TestDebugTrace(t *testing.T) {
 			}},
 			wantErr: testerr.Contains("execution timeout"),
 		},
-		// TODO(JonathanOppenheimer): add a fee-sensitive case; these assert
-		// only fee-insensitive fields, leaving the SAE-era replay base fee
-		// unpinned.
 		{
 			method: "debug_traceTransaction",
 			args:   []any{depositTx.Hash(), tracers.TraceConfig{Tracer: utils.PointerTo("callTracer")}},
@@ -276,29 +276,6 @@ func TestDebugTrace(t *testing.T) {
 
 	sut.testRPC(ctx, t, tests...)
 
-	// Mid-block roots are never persisted, so assert properties rather than
-	// exact values.
-	t.Run("debug_intermediateRoots_multiple_txs", func(t *testing.T) {
-		transfers := make([]*types.Transaction, 2)
-		for i := range transfers {
-			transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
-				To:       &common.Address{'x', 'f', 'e', 'r'},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-				Value:    big.NewInt(1),
-			})
-		}
-		block := sut.runConsensusLoop(t, transfers...)
-		require.Lenf(t, block.Transactions(), len(transfers), "%T.Transactions()", block)
-
-		var roots []common.Hash
-		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
-
-		require.Len(t, roots, len(transfers), "one root per transaction")
-		assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
-		assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
-	})
-
 	// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
 	// can't be used.
 	t.Run("debug_standardTraceBlockToFile", func(t *testing.T) {
@@ -316,6 +293,36 @@ func TestDebugTrace(t *testing.T) {
 		// file really does trace the transaction's execution.
 		assert.Contains(t, string(trace), vm.LOG1.String(), "trace of `emit Deposit()`")
 	})
+}
+
+// TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
+// root per transaction. Mid-block roots are never persisted, so it asserts
+// properties rather than exact values.
+func TestDebugIntermediateRoots(t *testing.T) {
+	ctx, sut := newSUT(t, 2)
+
+	transfers := make([]*types.Transaction, 2)
+	for i := range transfers {
+		transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
+			To:       &common.Address{'x', 'f', 'e', 'r'},
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+			Value:    big.NewInt(1),
+		})
+	}
+	block := sut.runConsensusLoop(t, transfers...)
+	require.Lenf(t, block.Transactions(), len(transfers), "%T.Transactions()", block)
+
+	var roots []common.Hash
+	require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
+
+	require.Len(t, roots, len(transfers), "one root per transaction")
+	assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
+	// This holds only because nothing modifies state after the last tx:
+	// hookstest.Stub.AfterExecutingBlock is a no-op and there are no
+	// end-of-block ops. Hooks that mutate post-transaction state (e.g.
+	// the C-Chain's) would break this!!
+	assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
 }
 
 // TestDebugTraceBeforeBlockHook verifies that tracing a block applies the
@@ -338,11 +345,28 @@ func TestDebugTraceBeforeBlockHook(t *testing.T) {
 
 	// b2's post-execution root includes the hook's credit, so re-execution
 	// only reproduces it if the trace's base state includes the credit too.
+	// All block-tracing endpoints source their state from
+	// tracerBackend.StateAtBlock, so debug_intermediateRoots stands in for
+	// the rest.
 	t.Run("block_tracing_applies_hook", func(t *testing.T) {
 		var roots []common.Hash
 		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", b2.Hash()), "CallContext(debug_intermediateRoots)")
 		require.Len(t, roots, 1, "one root per transaction")
 		assert.Equal(t, b2.PostExecutionStateRoot(), roots[0], "trace base state includes the before-block hook's changes")
+	})
+
+	// debug_traceTransaction sources its state from backend.StateAtTransaction
+	// instead. A prestate balance of 2 (one credit per block) proves the
+	// replay applied b2's hook.
+	t.Run("traceTransaction_applies_hook", func(t *testing.T) {
+		var prestate map[common.Address]native.Account
+		err := sut.CallContext(ctx, &prestate, "debug_traceTransaction",
+			b2.Transactions()[0].Hash(),
+			tracers.TraceConfig{Tracer: utils.PointerTo("prestateTracer")},
+		)
+		require.NoError(t, err, "CallContext(debug_traceTransaction, prestateTracer)")
+		require.Contains(t, prestate, marker, "prestate accounts")
+		assert.Equal(t, int64(2), prestate[marker].Balance.Int64(), "marker balance before b2's transaction")
 	})
 
 	// The hook credited marker once per block, so as of b1 its balance is 1;
