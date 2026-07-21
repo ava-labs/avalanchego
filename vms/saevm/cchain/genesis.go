@@ -138,6 +138,11 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 var (
 	mainnetChainID = big.NewInt(43114)
 	fujiChainID    = big.NewInt(43113)
+	// upgradechainChainID identifies the frozen upgradechain fixture test
+	// chain (see upgradechain_fixture_test.go). Like Fuji and Mainnet, its
+	// Berlin and London heights are pinned, letting the fixture chain cross
+	// AP2 and AP3 mid-chain.
+	upgradechainChainID = big.NewInt(43110)
 )
 
 func berlinBlock(chainID *big.Int) int64 {
@@ -146,8 +151,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-	case utils.BigEqual(chainID, corethparams.TestUpgradechainChainID):
-		return int64(corethparams.TestUpgradechainBerlinBlock)
+	case utils.BigEqual(chainID, upgradechainChainID):
+		return 2 // the fixture's AP2 activation block
 	default:
 		return 0
 	}
@@ -159,8 +164,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	case utils.BigEqual(chainID, corethparams.TestUpgradechainChainID):
-		return int64(corethparams.TestUpgradechainLondonBlock)
+	case utils.BigEqual(chainID, upgradechainChainID):
+		return 4 // the fixture's AP3 activation block
 	default:
 		return 0
 	}
