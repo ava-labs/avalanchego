@@ -1187,24 +1187,19 @@ func TestSettledGasTime(t *testing.T) {
 }
 
 // TestDuplicateVerify verifies that having two in-memory instances of the same
-// block doesn't corrupt the VM, regardless of the order in which the consensus
-// engine verifies them.
+// block doesn't corrupt the VM, regardless of which is accepted.
 func TestDuplicateVerify(t *testing.T) {
-	const (
-		originalIndex = iota
-		duplicateIndex
-	)
 	tests := []struct {
 		name        string
-		verifyOrder []int
+		acceptIndex int
 	}{
 		{
-			name:        "original_then_duplicate",
-			verifyOrder: []int{originalIndex, duplicateIndex},
+			name:        "accept_first",
+			acceptIndex: 0,
 		},
 		{
-			name:        "duplicate_then_original",
-			verifyOrder: []int{duplicateIndex, originalIndex},
+			name:        "accept_second",
+			acceptIndex: 1,
 		},
 	}
 
@@ -1212,40 +1207,37 @@ func TestDuplicateVerify(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, sut := newSUT(t, 0)
 
-			original := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
-			duplicate, err := sut.ParseBlock(ctx, original.Bytes())
+			first := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+			second, err := sut.ParseBlock(ctx, first.Bytes())
 			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVM)
+			blks := []snowman.Block{first, second}
 
-			// The consensus engine may call
-			// [block.WithVerifyContext.VerifyWithContext] on multiple instances
-			// of the same block, in either order. [VM.consensusCritical] isn't
-			// overridden, so the first instance verified is the one kept in the
-			// map.
-			blks := []snowman.Block{
-				originalIndex:  original,
-				duplicateIndex: duplicate,
-			}
-			for _, i := range test.verifyOrder {
-				b := blks[i].(block.WithVerifyContext)
+			// Consensus may call [block.WithVerifyContext.VerifyWithContext] on
+			// multiple instances of the same block. [VM.consensusCritical]
+			// isn't overridden, so the first instance verified is the one kept
+			// in the map.
+			for _, blk := range blks {
+				b := blk.(block.WithVerifyContext)
 				require.NoErrorf(t,
 					b.VerifyWithContext(ctx, &block.Context{}),
 					"%T.VerifyWithContext()",
-					b,
+					blk,
 				)
 			}
 
-			require.NoErrorf(t, sut.SetPreference(ctx, original.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
+			parent := blks[test.acceptIndex]
+			require.NoErrorf(t, sut.SetPreference(ctx, parent.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
 			child, err := sut.BuildBlock(ctx)
 			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVM)
 			// Loads the parent from [VM.consensusCritical].
 			require.NoErrorf(t, child.Verify(ctx), "%T.Verify() child of duplicated block", child)
 
-			// Accepting original and child adds them to the execution queue.
-			require.NoError(t, original.Accept(ctx), "original.Accept()")
+			// Accepting parent and child adds them to the execution queue.
+			require.NoError(t, parent.Accept(ctx), "parent.Accept()")
 			require.NoError(t, child.Accept(ctx), "child.Accept()")
 
 			// Inside the executor, execution results are read from
-			// [blocks.Blocks.ParentBlock]. When the ancestry differs from the
+			// [blocks.Block.ParentBlock]. When the ancestry differs from the
 			// accepted instance, a naive implementation would block child's
 			// execution forever.
 			childRaw := unwrap(t, child)
