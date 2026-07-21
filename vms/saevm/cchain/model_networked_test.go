@@ -210,12 +210,22 @@ type modelNode struct {
 	delayed       bool
 }
 
+// warpSend is the model's record of one sendWarpMessage call included in a
+// canonical block: enough to rebuild the unsigned message for per-node
+// signability assertions.
+type warpSend struct {
+	from    common.Address
+	payload []byte
+}
+
 // acceptedBlock is one canonical block as raw material for delivery to any
-// node: bytes survive node restarts, unlike *blocks.Block handles.
+// node: bytes survive node restarts, unlike *blocks.Block handles. warpSends
+// carries the block's warp sends for delivery-time signability assertions.
 type acceptedBlock struct {
-	id     ids.ID
-	height uint64
-	bytes  []byte
+	id        ids.ID
+	height    uint64
+	bytes     []byte
+	warpSends []warpSend
 }
 
 // networkedMachine drives N connected SUTs against one shared model. The
@@ -231,6 +241,7 @@ type networkedMachine struct {
 	nodes     []*modelNode
 	canonical []acceptedBlock
 	snapshots []modelSnapshot
+	warpSent  []warpSend
 
 	// pins maps an account with in-flight txs to the node all its txs are
 	// issued to until the account drains. Eth-tx gossip reaches validators
@@ -466,10 +477,11 @@ func (nm *networkedMachine) check(rt *rapid.T) {
 // so a lagging node can be compared against the exact chain prefix it has
 // accepted without replaying the model.
 type modelSnapshot struct {
-	id        ids.ID
-	balances  map[common.Address]*uint256.Int
-	nonces    map[common.Address]uint64
-	contracts map[common.Address]*contractState
+	id            ids.ID
+	balances      map[common.Address]*uint256.Int
+	nonces        map[common.Address]uint64
+	contracts     map[common.Address]*contractState
+	warpSentCount int
 }
 
 func (nm *networkedMachine) snapshot() {
@@ -482,10 +494,11 @@ func (nm *networkedMachine) snapshot() {
 		contracts[a] = &contractState{kind: cs.kind, storage: maps.Clone(cs.storage)}
 	}
 	nm.snapshots = append(nm.snapshots, modelSnapshot{
-		id:        nm.m.lastAcceptedID,
-		balances:  balances,
-		nonces:    maps.Clone(nm.m.nonces),
-		contracts: contracts,
+		id:            nm.m.lastAcceptedID,
+		balances:      balances,
+		nonces:        maps.Clone(nm.m.nonces),
+		contracts:     contracts,
+		warpSentCount: len(nm.warpSent),
 	})
 }
 

@@ -91,6 +91,7 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 	before := len(nm.m.pendingEth)
 	kind := rapid.SampledFrom([]txKind{
 		kindTransfer, kindTransfer, kindTransfer, kindDeploy, kindStore, kindRevert,
+		kindWarpSend, kindWarpReceive,
 	}).Draw(rt, "kind")
 	switch kind {
 	case kindTransfer:
@@ -101,6 +102,10 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 		nm.modelCore.issueStore(rt, n.ctx, n.sut, fromIdx)
 	case kindRevert:
 		nm.modelCore.issueRevert(rt, n.ctx, n.sut, fromIdx)
+	case kindWarpSend:
+		nm.modelCore.issueWarpSend(rt, n.ctx, n.sut, fromIdx)
+	case kindWarpReceive:
+		nm.modelCore.issueWarpReceive(rt, n.ctx, n.sut, fromIdx)
 	}
 	if len(nm.m.pendingEth) == before {
 		return // rejected negative or capacity no-op: nothing entered the pool
@@ -164,10 +169,9 @@ func (nm *networkedMachine) buildOn(rt *rapid.T, n *modelNode, parentID ids.ID) 
 }
 
 // deliverBlock plays the consensus engine for one node: parse the canonical
-// bytes, verify, accept, and wait for execution. It is a method (rather than a
-// free function) for API symmetry with the machine's other per-node delivery
-// helpers (e.g. buildOn); the receiver is unused and so left unnamed.
-func (*networkedMachine) deliverBlock(rt *rapid.T, n *modelNode, ab acceptedBlock) {
+// bytes, verify, accept, and wait for execution, then assert ab's per-node
+// side effects on n.
+func (nm *networkedMachine) deliverBlock(rt *rapid.T, n *modelNode, ab acceptedBlock) {
 	blk, err := n.sut.ParseBlock(n.ctx, ab.bytes)
 	require.NoErrorf(rt, err, "%T.ParseBlock() on node %d", n.sut.VM, n.idx)
 	require.Equalf(rt, ab.id, blk.ID(), "parsed block ID on node %d", n.idx)
@@ -175,7 +179,33 @@ func (*networkedMachine) deliverBlock(rt *rapid.T, n *modelNode, ab acceptedBloc
 	require.NoErrorf(rt, n.sut.VerifyBlock(n.ctx, &block.Context{}, blk), "%T.VerifyBlock() on node %d", n.sut.VM, n.idx)
 	require.NoErrorf(rt, n.sut.AcceptBlock(n.ctx, blk), "%T.AcceptBlock() on node %d", n.sut.VM, n.idx)
 	require.NoErrorf(rt, blk.WaitUntilExecuted(n.ctx), "%T.WaitUntilExecuted() on node %d", blk, n.idx)
+	nm.assertBlockEffects(n, ab)
 	n.acceptedCount++
+}
+
+// enrichBlock builds the canonical acceptedBlock for blk, capturing the
+// model-tracked side effects (warp sends) the machine must later assert on
+// every node that executes it. MUST run before applyCanonical: it reads the
+// pending maps that reconciliation clears.
+func (nm *networkedMachine) enrichBlock(blk *blocks.Block) acceptedBlock {
+	ab := acceptedBlock{id: blk.ID(), height: blk.NumberU64(), bytes: blk.Bytes()}
+	for _, ethTx := range blk.Transactions() {
+		if it, ok := nm.m.pendingEth[ethTx.Hash()]; ok && it.kind == kindWarpSend {
+			ab.warpSends = append(ab.warpSends, warpSend{from: it.from, payload: it.payload})
+		}
+	}
+	return ab
+}
+
+// assertBlockEffects asserts ab's per-node observable side effects on n,
+// which must already have accepted and executed ab: every warp message the
+// block sent must be signable by n's own warp backend (each node's storage
+// records the message when IT executes the block).
+func (nm *networkedMachine) assertBlockEffects(n *modelNode, ab acceptedBlock) {
+	for _, ws := range ab.warpSends {
+		msg := n.sut.newAddressedCallMessage(nm.tb, ws.from.Bytes(), ws.payload)
+		n.sut.signAndVerifyWarpMessage(n.ctx, nm.tb, msg)
+	}
 }
 
 // applyCanonical records blk (built by builder) as the next canonical block
@@ -186,6 +216,7 @@ func (nm *networkedMachine) applyCanonical(rt *rapid.T, builder *modelNode, blk 
 	require.Emptyf(rt, blockTxs(nm.tb, blk), "networked model issues no atomic txs; block %d must contain none", blk.NumberU64())
 	nm.modelCore.applyBlock(rt, builder.ctx, builder.sut, blk)
 	nm.canonical = append(nm.canonical, ab)
+	nm.warpSent = append(nm.warpSent, ab.warpSends...)
 	// Unpin drained accounts so they may migrate to another node.
 	for _, addr := range nm.addrs {
 		if _, ok := nm.pins[addr]; ok && nm.pendingCount(addr) == 0 {
@@ -217,7 +248,7 @@ func (nm *networkedMachine) buildAndDistribute(rt *rapid.T) {
 	require.NoErrorf(rt, b.sut.AcceptBlock(b.ctx, blk), "%T.AcceptBlock() on builder %d", b.sut.VM, b.idx)
 	require.NoErrorf(rt, blk.WaitUntilExecuted(b.ctx), "%T.WaitUntilExecuted() on builder %d", blk, b.idx)
 	b.acceptedCount++
-	ab := acceptedBlock{id: blk.ID(), height: blk.NumberU64(), bytes: blk.Bytes()}
+	ab := nm.enrichBlock(blk)
 	nm.applyCanonical(rt, b, blk, ab)
 
 	rest := make([]int, 0, len(nm.nodes)-1)
@@ -344,7 +375,7 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 	if blkA.ID() == blkB.ID() {
 		// Degenerate: byte-identical siblings. Resolve as a normal round; the
 		// builders accept their own (already verified) handles.
-		ab := acceptedBlock{id: blkA.ID(), height: blkA.NumberU64(), bytes: blkA.Bytes()}
+		ab := nm.enrichBlock(blkA)
 		for _, idx := range order {
 			n := nm.nodes[idx]
 			switch idx {
@@ -361,6 +392,9 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 			}
 		}
 		nm.applyCanonical(rt, j, blkA, ab)
+		// non-builders went through deliverBlock and j through applyCanonical,
+		// leaving only builder k.
+		nm.assertBlockEffects(k, ab)
 		return
 	}
 
@@ -393,7 +427,7 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 	if !winnerA {
 		wins, loses, winner, wNode = handleB, handleA, blkB, k
 	}
-	wb := acceptedBlock{id: winner.ID(), height: winner.NumberU64(), bytes: winner.Bytes()}
+	wb := nm.enrichBlock(winner)
 
 	// Resolve on every node in the drawn order: accept the winner, wait for
 	// execution, reject the loser.
@@ -405,6 +439,13 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 		n.acceptedCount++
 	}
 	nm.applyCanonical(rt, wNode, winner, wb)
+	// wNode is covered by applyCanonical's applyTxEffects; every other node
+	// accepted its own handle above and must be able to sign the same sends.
+	for _, n := range nm.nodes {
+		if n.idx != wNode.idx {
+			nm.assertBlockEffects(n, wb)
+		}
+	}
 }
 
 // restartNode shuts a drawn node down and reopens it on its persisted state.
@@ -512,6 +553,15 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 				nm.pins[addr] = v.idx
 			}
 		}
+	}
+
+	// Warp storage is DB-backed (cchainwarp.Storage prefixes the VM DB), so
+	// every message sent by a block this node has executed must remain
+	// signable across the restart. A delayed node has executed only its
+	// prefix; the snapshot count scopes the assertion to it.
+	for _, ws := range nm.warpSent[:nm.snapshots[n.acceptedCount].warpSentCount] {
+		msg := n.sut.newAddressedCallMessage(nm.tb, ws.from.Bytes(), ws.payload)
+		n.sut.signAndVerifyWarpMessage(n.ctx, nm.tb, msg)
 	}
 
 	// Continuity: the node reports the same last-accepted block it had
