@@ -271,6 +271,18 @@ func (nm *networkedMachine) assertBlockEffects(n *modelNode, ab acceptedBlock) {
 		for _, atx := range ab.atomic.txs {
 			n.sut.waitForTxPoolStateUpdate(n.ctx, nm.tb, atx)
 		}
+		// The VM applies shared-memory ops when THIS node accepts the block:
+		// consumed UTXOs must be gone from, and exported UTXOs present in,
+		// n's own atomic memory. Iterate remoteChains (not the maps) for
+		// deterministic assertion order.
+		for _, chain := range nm.remoteChains(n.sut) {
+			if us := ab.atomic.consumed[chain]; len(us) > 0 {
+				n.sut.assertUTXOsMissing(nm.tb, n.sut.ctx.ChainID, chain, us...)
+			}
+			if us := ab.atomic.exported[chain]; len(us) > 0 {
+				n.sut.assertUTXOsExist(nm.tb, chain, n.sut.ctx.ChainID, us...)
+			}
+		}
 	}
 	for _, ws := range ab.warpSends {
 		msg := n.sut.newAddressedCallMessage(nm.tb, ws.from.Bytes(), ws.payload)

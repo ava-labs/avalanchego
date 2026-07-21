@@ -498,6 +498,7 @@ func (nm *networkedMachine) check(rt *rapid.T) {
 			continue
 		}
 		nm.checkState(rt, n.ctx, n.sut, n.db)
+		nm.checkSharedMemory(rt, n.sut)
 	}
 }
 
