@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -253,17 +252,6 @@ func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB,
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
-	return nil
-}
-
-// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
-// The C-Chain has historically credited the full fee (base + priority) to the
-// blackhole address, but libevm's state transition only credits the priority
-// fee to the coinbase (the blackhole address) and discards the base fee.
-func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
-	burned := new(uint256.Int).SetUint64(r.GasUsed)
-	burned.Mul(burned, &baseFee)
-	db.AddBalance(constants.BlackholeAddr, burned)
 	return nil
 }
 
