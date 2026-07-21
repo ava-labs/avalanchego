@@ -341,25 +341,22 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 	return nm
 }
 
-// networkedGossipInterval overrides every node's cross-chain atomic-tx
-// gossip period (default 100ms; see withGossipInterval and cchain's own
-// AtomicTxGossipHandlerID system in vm.go). Every node shares the SAME value
-// (never drawn) so gossip timing stays uniform regardless of which node
-// builds, restarts, or catches up.
+// networkedGossipInterval overrides every node's gossip periods, both
+// cchain's own cross-chain atomic-tx gossip and the embedded sae.VM's eth-tx
+// gossip (default 100ms atomic / 100ms-push-1s-pull eth; see
+// withGossipInterval). Every node shares the SAME value (never drawn) so
+// gossip timing stays uniform regardless of which node builds, restarts, or
+// catches up.
 //
-// NOTE: this does NOT control eth-tx gossip. The networked model machine's
-// dominant real-wall-clock cost is waiting for eth txs to reach a builder
-// that didn't receive them directly (see buildOn's waitForPendingEthTxs);
-// eth-tx push/pull gossip is driven entirely by the embedded sae.VM's own
-// hardcoded periods (pushGossipPeriod/pullGossipPeriod local consts in
-// sae/vm.go), which are not exposed as a cchain sutConfig field. Measured:
-// varying this constant between 100ms, 25ms, and 1ms produced no detectable
-// change in TestModelNetworked's wall-clock cost (confirmed via matched-seed
-// per-call timing of buildOn's waitForPendingEthTxs). It is wired here
-// anyway since it is a real, zero-cost-to-others knob for the cross-chain
-// gossip this suite's storage/backend convergence checks incidentally touch,
-// and because a future suite exercising atomic txs over this machine would
-// benefit from it.
+// This is the suite's dominant real-wall-clock cost: buildOn's
+// waitForPendingEthTxs blocks until every model-tracked pending tx reaches
+// the builder via real (unmocked) eth-tx gossip when it wasn't issued
+// directly to the builder. Before sae.Config exposed PushGossipPeriod /
+// PullGossipPeriod (see sae/vm.go), this suite could only speed up cchain's
+// atomic-tx gossip, which it doesn't exercise at all (issues no atomic txs) —
+// confirmed by matched-seed (-rapid.seed) measurement to have zero effect on
+// wall time. With eth-tx gossip now also driven by this constant, lowering
+// it directly shrinks that dominant wait.
 const networkedGossipInterval = 25 * time.Millisecond
 
 // openNode (re)creates node i's SUT against its persisted database, deriving

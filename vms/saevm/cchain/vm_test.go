@@ -119,7 +119,16 @@ type (
 
 		skipRPCTransport bool
 
-		gossipInterval time.Duration
+		// atomicGossipInterval overrides cchain's own cross-chain (atomic-tx)
+		// gossip periods (see [VM.atomicTxPushGossipPeriod] /
+		// [VM.atomicTxPullGossipPeriod]); defaults to 100ms below, matching
+		// every test's behavior before [withGossipInterval] existed.
+		atomicGossipInterval time.Duration
+		// ethGossipInterval overrides the embedded sae.VM's eth-tx gossip
+		// periods (see [sae.Config.PushGossipPeriod] /
+		// [sae.Config.PullGossipPeriod]); zero (the default) leaves the
+		// sae.VM's own defaults in place.
+		ethGossipInterval time.Duration
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -289,18 +298,18 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
-// withGossipInterval overrides the SUT's push AND pull periods for cchain's
-// own cross-chain (atomic-tx) gossip system (registered under
-// p2p.AtomicTxGossipHandlerID in vm.go) — both real, unmocked
-// time.Ticker-driven waits, no mock clock covers gossip timing. Defaults to
-// 100ms, matching every test's behavior before this option existed.
-//
-// This does NOT affect eth-tx gossip: that is driven entirely by the
-// embedded sae.VM's own hardcoded push/pull periods (local consts in
-// sae/vm.go), which are not exposed through this VM's config at all.
+// withGossipInterval overrides every gossip period the SUT drives: cchain's
+// own cross-chain (atomic-tx) push/pull periods (registered under
+// p2p.AtomicTxGossipHandlerID in vm.go) AND the embedded sae.VM's eth-tx
+// push/pull periods (sae.Config.PushGossipPeriod / PullGossipPeriod). All
+// four are real, unmocked time.Ticker-driven waits — no mock clock covers
+// gossip timing. A test issuing many actions that wait on cross-node gossip
+// delivery (e.g. the networked model machine) can lower this to shrink real
+// wall-clock cost without changing what is tested.
 func withGossipInterval(d time.Duration) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.gossipInterval = d
+		c.atomicGossipInterval = d
+		c.ethGossipInterval = d
 	})
 }
 
@@ -324,20 +333,22 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:         ids.GenerateTestNodeID(),
-			networkID:      constants.UnitTestID,
-			validators:     warptest.NewValidators(tb, 0),
-			now:            time.Now,
-			vmConfig:       defaultConfig(),
-			db:             memdb.New(),
-			state:          snow.NormalOp,
-			upgrades:       upgradetest.GetConfig(upgradetest.Latest),
-			gossipInterval: 100 * time.Millisecond,
+			nodeID:               ids.GenerateTestNodeID(),
+			networkID:            constants.UnitTestID,
+			validators:           warptest.NewValidators(tb, 0),
+			now:                  time.Now,
+			vmConfig:             defaultConfig(),
+			db:                   memdb.New(),
+			state:                snow.NormalOp,
+			upgrades:             upgradetest.GetConfig(upgradetest.Latest),
+			atomicGossipInterval: 100 * time.Millisecond,
 		}, opts...)
 		vm = &VM{
-			pullGossipPeriod: cfg.gossipInterval,
-			pushGossipPeriod: cfg.gossipInterval,
-			now:              cfg.now,
+			atomicTxPullGossipPeriod: cfg.atomicGossipInterval,
+			atomicTxPushGossipPeriod: cfg.atomicGossipInterval,
+			ethTxPushGossipPeriod:    cfg.ethGossipInterval,
+			ethTxPullGossipPeriod:    cfg.ethGossipInterval,
+			now:                      cfg.now,
 		}
 		db = cfg.db
 	)

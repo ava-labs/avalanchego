@@ -21,9 +21,9 @@ type Factory struct{}
 func (*Factory) New(log logging.Logger) (interface{}, error) {
 	log.Info("Creating new C-Chain SAE VM")
 	vm := &VM{
-		pullGossipPeriod: time.Second,
-		pushGossipPeriod: 100 * time.Millisecond,
-		now:              time.Now,
+		atomicTxPullGossipPeriod: time.Second,
+		atomicTxPushGossipPeriod: 100 * time.Millisecond,
+		now:                      time.Now,
 	}
 	type fullVM struct {
 		adaptor.ChainVMWithContext

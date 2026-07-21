@@ -93,6 +93,14 @@ func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
 //
+// DefaultPushGossipPeriod and [DefaultPullGossipPeriod] are the periods at
+// which eth-tx gossip is pushed to, and pulled from, peers when a [Config]
+// leaves the corresponding field unset (zero).
+const (
+	DefaultPushGossipPeriod = 100 * time.Millisecond
+	DefaultPullGossipPeriod = time.Second
+)
+
 // TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
 // (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
 // assume its caller validated the config.
@@ -102,6 +110,15 @@ type Config struct {
 	RPCConfig     rpc.Config
 
 	Now func() time.Time // defaults to [time.Now] if nil
+
+	// PushGossipPeriod and PullGossipPeriod control how often eth-tx gossip
+	// is pushed to, and pulled from, peers; zero defaults to
+	// [DefaultPushGossipPeriod] and [DefaultPullGossipPeriod] respectively.
+	// They exist primarily so heavy multi-node test suites can compress the
+	// real (wall-clock) time spent waiting for gossip to converge; production
+	// callers should leave them unset.
+	PushGossipPeriod time.Duration
+	PullGossipPeriod time.Duration
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
@@ -235,7 +252,10 @@ func NewVM[T hook.Transaction](
 			return nil, fmt.Errorf("newNetwork(...): %v", err)
 		}
 
-		const pullGossipPeriod = time.Second
+		pullGossipPeriod := cfg.PullGossipPeriod
+		if pullGossipPeriod == 0 {
+			pullGossipPeriod = DefaultPullGossipPeriod
+		}
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
 			network,
@@ -267,7 +287,10 @@ func NewVM[T hook.Transaction](
 		}()
 		go func() {
 			defer wg.Done()
-			const pushGossipPeriod = 100 * time.Millisecond
+			pushGossipPeriod := cfg.PushGossipPeriod
+			if pushGossipPeriod == 0 {
+				pushGossipPeriod = DefaultPushGossipPeriod
+			}
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
