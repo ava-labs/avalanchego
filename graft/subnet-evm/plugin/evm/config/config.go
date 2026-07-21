@@ -31,6 +31,11 @@ type OracleSidecarConfig struct {
 	// set. Each entry is validated against the compile-time registry in
 	// network/p2p/oracle at startup.
 	AllowedSources []string `json:"allowed-sources"`
+	// Teleporter, when true, also registers the attestor-gateway Teleporter
+	// verifier: the node signs native TeleporterMessageV2 payloads (accepted by
+	// stock TeleporterMessengerV2 + WarpAdapter) at a distinct handler ID, using
+	// the same sidecar as the OracleMessage-format handler. Requires Endpoint.
+	Teleporter bool `json:"teleporter"`
 }
 
 // Config ...
