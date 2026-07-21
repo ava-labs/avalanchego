@@ -5,10 +5,13 @@ package sae
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,6 +33,14 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID, _ *block.Context) er
 	return nil
 }
 
+// GetPreference returns the block the VM would currently build on top of, as
+// set by [NewVM] and [VM.SetPreference]. It never returns nil.
+func (vm *VM) GetPreference() *blocks.Block {
+	return vm.preference.Load()
+}
+
+var errUnverifiedBlock = errors.New("block not verified")
+
 // AcceptBlock marks the block as [accepted], resulting in:
 //   - All blocks settled by this block having their [blocks.Block.MarkSettled]
 //     method called; and
@@ -40,6 +51,19 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	// Recall the terminology and ordering from the invariants document:
 	// - (D)isk then (M)emory then (I)nternal then e(X)ternal.
 	// - B accepted after all of B.Settles() settled
+
+	// If b was verified multiple times, we may be asked to accept a different
+	// instance of b than the one stored in [VM.consensusCritical]. Since other
+	// blocks may have grabbed references to the instance in
+	// [VM.consensusCritical], we must ensure that we accept that instance, not
+	// the one passed in.
+	//
+	// TODO(StephenButtolph): Look into simplifying the VM API to avoid footguns
+	// around multiple instances of the same block.
+	b, ok := vm.consensusCritical.Load(b.Hash())
+	if !ok {
+		return errUnverifiedBlock
+	}
 
 	settles := b.Settles()
 	{
@@ -57,6 +81,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
 		rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
+		rawdb.WriteHeadFastBlockHash(batch, b.Hash())
 
 		if err := batch.Write(); err != nil {
 			return err
@@ -75,6 +100,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
+		vm.metrics.markSettled(s.Height())
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)
@@ -135,4 +161,16 @@ func (vm *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 // emitted after consensus acceptance via [VM.AcceptBlock].
 func (vm *VM) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return vm.acceptedBlocks.Subscribe(ch)
+}
+
+// SubscribeChainHeadEvent returns a new subscription for each
+// [core.ChainHeadEvent] emitted after a block has been executed.
+func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return vm.exec.SubscribeChainHeadEvent(ch)
+}
+
+// LastExecutedState returns a [libevm.StateReader] backed by the post-execution
+// state of the last-executed block.
+func (vm *VM) LastExecutedState() (libevm.StateReader, error) {
+	return vm.exec.StateDB(vm.exec.LastExecuted().PostExecutionStateRoot())
 }

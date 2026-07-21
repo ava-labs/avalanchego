@@ -32,6 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
+
+	ethcore "github.com/ava-labs/libevm/core"
 )
 
 var (
@@ -55,6 +57,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIsHeliconBlock                      = errors.New("helicon blocks are not valid pre-SAE")
 )
 
 var (
@@ -304,7 +307,7 @@ func (b *wrappedBlock) verifyIntrinsicGas() error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	var totalIntrinsicGasCost uint64
 	for _, tx := range b.ethBlock.Transactions() {
-		intrinsicGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
+		intrinsicGas, err := ethcore.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
 		if err != nil {
 			return fmt.Errorf("failed to calculate intrinsic gas: %w for tx %s", err, tx.Hash())
 		}
@@ -337,13 +340,33 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
+
 	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
+	// Ensure TargetExponent is unset. The ACP-176 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyTargetExponent(header); err != nil {
+		return err
+	}
+	// Ensure MinPriceExponent is unset. The ACP-283 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyMinPriceExponent(header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err
+	}
+	// Ensure settled block marker fields are unset. The fields belong to SAE
+	// and must never appear on a coreth block.
+	if err := customheader.VerifySettled(header); err != nil {
+		return err
+	}
+
+	if extraConfig.IsHelicon(header.Time) {
+		return errIsHeliconBlock
 	}
 
 	// If the VM is not marked as bootstrapped the other chains may also be

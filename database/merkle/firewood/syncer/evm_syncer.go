@@ -32,8 +32,7 @@ func NewEVM(
 	db *ffi.Database,
 	codeQueue CodeQueue,
 	targetRoot ids.ID,
-	rangeProofClient *p2p.Client,
-	changeProofClient *p2p.Client,
+	proofClient *p2p.Client,
 ) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
@@ -42,8 +41,7 @@ func NewEVM(
 			codeQueue: codeQueue,
 		},
 		targetRoot,
-		rangeProofClient,
-		changeProofClient,
+		proofClient,
 	)
 }
 

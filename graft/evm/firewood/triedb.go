@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-const firewoodDir = "firewood"
+const Directory = "firewood"
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -145,7 +145,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, firewoodDir)
+	path := filepath.Join(config.DatabaseDir, Directory)
 
 	// The Firewood constructor will check that commitCount is nonzero.
 	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
@@ -170,6 +170,12 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 
 	initialRoot := fw.Root()
+	if initialRoot == ffi.EmptyRoot {
+		log.Debug("empty firewood database opened", "path", path)
+	} else {
+		log.Debug("firewood database opened", "root", initialRoot, "path", path)
+	}
+
 	blockHashes := make(map[common.Hash]struct{})
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
@@ -219,6 +225,15 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
 	t.tree.root = common.Hash(t.Firewood.Root())
+}
+
+// ClearAll resets the database to an empty state, without a genesis block committed.
+func (t *TrieDB) ClearAll() error {
+	if _, err := t.Firewood.Update([]ffi.BatchOp{ffi.PrefixDelete(nil)}); err != nil {
+		return fmt.Errorf("clearing database: %w", err)
+	}
+	t.SetHashAndHeight(common.Hash{}, 0)
+	return nil
 }
 
 // Scheme returns the scheme of the database.

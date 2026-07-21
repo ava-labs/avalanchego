@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -20,10 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
+	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -49,14 +53,43 @@ func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ l
 	return nil
 }
 
-// MinimumGasConsumption is a no-op.
-func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+func (r RulesExtra) ShouldRefundGas() bool {
+	return !r.IsApricotPhase1
 }
 
-// AccessListGas uses the default calculation.
-func (RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	return (ethparams.NOOPHooks{}).AccessListGas(accessList)
+// MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
+func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
+	if extras.Rules(r).IsHelicon {
+		return hook.MinimumGasConsumption(limit)
+	}
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
+}
+
+// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
+// The C-Chain has historically credited the full fee (base + priority) to the
+// blackhole address, but libevm's state transition only credits the priority
+// fee to the coinbase (the blackhole address) and discards the base fee.
+func (RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, baseFee *big.Int, gasUsed uint64) {
+	if baseFee == nil {
+		return
+	}
+	burned := new(uint256.Int).SetUint64(gasUsed)
+	bf := uint256.MustFromBig(baseFee)
+	burned.Mul(burned, bf)
+	sdb.AddBalance(constants.BlackholeAddr, burned)
+}
+
+// AccessListGas computes the intrinsic gas for an access list.
+// When predicaters exist, it calculates gas per-tuple, delegating to predicate
+// contracts for addresses that have them. Otherwise, it returns override=false
+// to use the default calculation.
+func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
+	rules := extras.Rules(r)
+	if !rules.PredicatersExist() {
+		return 0, false, nil
+	}
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(rules.AvalancheRules, rules.Predicaters, accessList)
+	return gas, true, err
 }
 
 var PrecompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{

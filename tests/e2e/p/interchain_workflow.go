@@ -19,8 +19,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -222,21 +224,40 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		tc.By("initializing a new eth client")
 		ethClient := e2e.NewEthClient(tc, nodeURI)
 
-		tc.By("importing AVAX from the P-Chain to the C-Chain", func() {
-			_, err := cWallet.IssueImportTx(
-				constants.PlatformChainID,
-				recipientEthAddress,
-				tc.WithDefaultContext(),
-				e2e.WithSuggestedGasPrice(tc, ethClient),
-				changeOwner,
-			)
-			require.NoError(err)
-		})
+		tc.By("importing AVAX from the P-Chain to the C-Chain")
+		importTx, err := cWallet.IssueImportTx(
+			constants.PlatformChainID,
+			recipientEthAddress,
+			tc.WithDefaultContext(),
+			e2e.WithSuggestedGasPrice(tc, ethClient),
+			changeOwner,
+		)
+		require.NoError(err)
+
+		// Transactions MAY be marked as executed before the block that includes
+		// them is fully executed. It is not safe to assume that the "latest"
+		// block's balance has been updated.
+		tc.By("getting inclusion height of the import transaction")
+		cchainClient := cchain.NewClient(nodeURI.URI)
+		_, height, err := cchainClient.GetTx(tc.DefaultContext(), importTx.ID())
+		require.NoError(err)
 
 		tc.By("checking that the recipient address has received imported funds on the C-Chain")
-		balance, err := ethClient.BalanceAt(tc.DefaultContext(), recipientEthAddress, nil)
+		balance, err := ethClient.BalanceAt(
+			tc.DefaultContext(),
+			recipientEthAddress,
+			new(big.Int).SetUint64(height),
+		)
 		require.NoError(err)
 		require.Positive(balance.Cmp(big.NewInt(0)))
+
+		// Waiting for the ephemeral validator to be settled before stopping its
+		// node avoids polluting later specs: an active validator whose node is
+		// stopped fails its uptime check at end time and burns its (and its
+		// delegator's) potential rewards from the supply mid-spec.
+		tc.By("waiting for the added validator and delegator to be settled", func() {
+			requireValidatorRemoved(tc, platformvm.NewClient(nodeURI.URI), nodeID, "validator should have been settled at its end time")
+		})
 
 		tc.By("stopping validator node to free up resources for a bootstrap check")
 		require.NoError(node.Stop(tc.DefaultContext()))

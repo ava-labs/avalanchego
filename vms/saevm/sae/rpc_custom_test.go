@@ -37,8 +37,14 @@ func TestGetChainConfig(t *testing.T) {
 	})
 }
 
+func withGenesisBaseFee(fee uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.BaseFee = new(big.Int).SetUint64(fee)
+	})
+}
+
 func TestBaseFee(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
+	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_baseFee",
 		want:   hexBig(params.InitialBaseFee),
@@ -52,7 +58,7 @@ func TestBaseFee(t *testing.T) {
 }
 
 func TestSuggestPriceOptions(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
+	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
 	// Before any blocks with worst-case bounds, the base fee falls back to the
 	// genesis base fee and the tip defaults to the minimum (no txs yet).
 	sut.testRPC(ctx, t, rpcTest{
@@ -115,51 +121,24 @@ func TestCallDetailed(t *testing.T) {
 	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.GasCap = gasCap
 
-		const (
-			size   = byte(vm.CALLDATASIZE)
-			cp     = byte(vm.CALLDATACOPY)
-			zero   = byte(vm.PUSH0)
-			revert = byte(vm.REVERT)
-			jump   = byte(vm.JUMP)
-		)
 		c.genesis.Alloc[echoReverter] = types.Account{
-			Code: []byte{
-				size, zero, zero, cp, // https://www.evm.codes/#37
-				size, zero, revert,
-			},
+			Code: saetest.Ops(
+				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY, // https://www.evm.codes/#37
+				vm.CALLDATASIZE, vm.PUSH0, vm.REVERT,
+			),
 			Balance: new(big.Int),
 		}
 		c.genesis.Alloc[invalidJumper] = types.Account{
 			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
-			Code:    []byte{zero, jump},
+			Code:    saetest.Ops(vm.PUSH0, vm.JUMP),
 			Balance: new(big.Int),
 		}
 	}))
 
-	deploy := &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
-	}
-
-	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
-	recv := common.Address{'r', 'e', 'c', 'v'}
-	const depositVal = 42
-	deposit := &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recv),
-		Value:    big.NewInt(depositVal),
-	}
-
-	sign := sut.wallet.SetNonceAndSign
-	b := sut.runConsensusLoop(t, sign(t, 0, deploy), sign(t, 0, deposit))
-	require.Len(t, b.Transactions(), 2, "tx count")
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	for _, r := range b.Receipts() {
-		require.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T.Status", r)
-	}
+	const escrowDepositVal = 42
+	recipient := common.Address{'r', 'e', 'c', 'v'}
+	_, escrowAddr, _ := sut.deployEscrow(t)
+	sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
 	revertAsPanic := slices.Concat(
@@ -180,13 +159,13 @@ func TestCallDetailed(t *testing.T) {
 			args: []any{
 				map[string]any{
 					"to":   escrowAddr,
-					"data": hexutil.Encode(escrow.CallDataForBalance(recv)),
+					"data": hexutil.Encode(escrow.CallDataForBalance(recipient)),
 				},
 				latest,
 			},
 			want: saerpc.DetailedExecutionResult{
 				UsedGas:    23675,
-				ReturnData: uint256.NewInt(depositVal).PaddedBytes(32),
+				ReturnData: uint256.NewInt(escrowDepositVal).PaddedBytes(32),
 			},
 		},
 		{

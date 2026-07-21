@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -127,16 +128,34 @@ func advanceTimeTo(
 
 	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	//
+	// Pending validators are promoted before pending delegators so that when we attempt to promote a current delegator,
+	// the current validator exists to satisfy a defensive check that a current delegator being added must have an
+	// existing current validator.
+	//
+	// Pending stakers are ordered such that ties in Staker.NextTime are broken by Staker.Priority. It is possible for a
+	// tie to result in an Apricot pending delegator being ordered before a pending validator, so we must do two passes
+	// to promote pending validators before pending delegators to respect the expected ordering. Rewards however must be
+	// performed in the original staker iterator ordering to respect the historical ordering.
+	//
 	// Invariant: It is not safe to modify the state while iterating over it,
 	// so we use the parentState's iterator rather than the changes iterator.
 	// ParentState must not be modified before this iterator is released.
+	type promotion struct {
+		pending *state.Staker
+		current *state.Staker
+	}
+
+	var (
+		validatorPromotions []promotion
+		delegatorPromotions []promotion
+	)
+
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return nil, false, err
 	}
 	defer pendingStakerIterator.Release()
 
-	var changed bool
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -147,55 +166,65 @@ func advanceTimeTo(
 		stakerToAdd.NextTime = stakerToRemove.EndTime
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
-		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+		// Only permissionless networks (including the primary network) are eligible for rewards
+		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+			supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
+			if err != nil {
 				return nil, false, err
 			}
-			changes.DeletePendingValidator(stakerToRemove)
-			changed = true
-			continue
-		}
 
-		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
-		if err != nil {
-			return nil, false, err
-		}
-
-		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
-		if err != nil {
-			return nil, false, err
-		}
-
-		potentialReward := rewards.Calculate(
-			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-			stakerToRemove.Weight,
-			supply,
-		)
-		stakerToAdd.PotentialReward = potentialReward
-
-		// Invariant: [rewards.Calculate] can never return a [potentialReward]
-		//            such that [supply + potentialReward > maximumSupply].
-		changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
-
-		switch stakerToRemove.Priority {
-		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+			rewards, err := GetRewardsCalculator(
+				backend.Config.RewardConfig,
+				backend.Config.UpgradeConfig,
+				parentState,
+				stakerToRemove.SubnetID,
+			)
+			if err != nil {
 				return nil, false, err
 			}
-			changes.DeletePendingValidator(stakerToRemove)
 
-		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			if err := changes.PutCurrentDelegator(&stakerToAdd); err != nil {
-				return nil, false, fmt.Errorf("putting current delegator: %w", err)
-			}
-			changes.DeletePendingDelegator(stakerToRemove)
+			potentialReward := rewards.Calculate(
+				stakerToRemove.StartTime,
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				supply,
+			)
+			stakerToAdd.PotentialReward = potentialReward
 
+			// Invariant: reward.Calculator.Calculate can never return a potentialReward
+			//            such that supply + potentialReward > maximumSupply.
+			changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
+		}
+
+		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
+		// expected order of operations.
+		promotion := promotion{pending: stakerToRemove, current: &stakerToAdd}
+
+		switch {
+		case stakerToRemove.Priority.IsPendingValidator():
+			validatorPromotions = append(validatorPromotions, promotion)
+		case stakerToRemove.Priority.IsPendingDelegator():
+			delegatorPromotions = append(delegatorPromotions, promotion)
 		default:
 			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
-
-		changed = true
 	}
+
+	for _, p := range validatorPromotions {
+		if err := changes.PutCurrentValidator(p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current validator: %w", err)
+		}
+		changes.DeletePendingValidator(p.pending)
+	}
+
+	for _, p := range delegatorPromotions {
+		if err := changes.PutCurrentDelegator(p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current delegator: %w", err)
+		}
+		changes.DeletePendingDelegator(p.pending)
+	}
+
+	changed := len(validatorPromotions) > 0 || len(delegatorPromotions) > 0
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
 	//
@@ -217,8 +246,9 @@ func advanceTimeTo(
 		// Invariant: Permissioned stakers are encountered first for a given
 		//            timestamp because their priority is the smallest.
 		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
-			// Permissionless stakers are removed by the RewardValidatorTx, not
-			// an AdvanceTimeTx.
+			// Permissionless stakers are removed by the RewardValidatorTx (or a
+			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
+			// AdvanceTimeTx.
 			break
 		}
 
@@ -359,24 +389,28 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
+// GetRewardsCalculator returns the reward calculator for a staker on subnetID.
+// Non-primary network stakers use their subnet's transformation config.
 func GetRewardsCalculator(
-	backend *Backend,
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
 ) (reward.Calculator, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+		return reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig), nil
 	}
 
+	// Non-primary reward-bearing stakers are permissionless stakers. They can
+	// only exist on transformed subnets, so the transform tx must exist.
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
 	}
-
 	return reward.NewCalculator(reward.Config{
 		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
 		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
+		MintingPeriod:      rewardConfig.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}), nil
 }

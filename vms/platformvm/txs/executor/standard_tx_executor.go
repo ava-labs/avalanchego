@@ -49,6 +49,7 @@ var (
 	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
@@ -1370,8 +1371,115 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	return e.state.PutL1Validator(l1Validator)
 }
 
+func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+	if err := verifyAddAutoRenewedValidatorTx(e.backend, e.feeCalculator, e.state, e.tx, tx); err != nil {
+		return err
+	}
+
+	weight := tx.Weight()
+	stakeStartTime := e.state.GetTimestamp()
+
+	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("getting current supply: %w", err)
+	}
+
+	rewards, err := GetRewardsCalculator(
+		e.backend.Config.RewardConfig,
+		e.backend.Config.UpgradeConfig,
+		e.state,
+		constants.PrimaryNetworkID,
+	)
+	if err != nil {
+		return fmt.Errorf("getting rewards calculator: %w", err)
+	}
+
+	duration := time.Duration(tx.Period) * time.Second
+	potentialReward := rewards.Calculate(
+		stakeStartTime,
+		duration,
+		weight,
+		currentSupply,
+	)
+
+	newCurrentSupply, err := math.Add(currentSupply, potentialReward)
+	if err != nil {
+		return fmt.Errorf("adding current supply: %w", err)
+	}
+	e.state.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+
+	endTime := stakeStartTime.Add(duration)
+
+	staker, err := state.NewStaker(
+		e.tx.ID(),
+		tx,
+		stakeStartTime,
+		endTime,
+		weight,
+		potentialReward,
+	)
+	if err != nil {
+		return fmt.Errorf("creating staker: %w", err)
+	}
+
+	if err := e.state.PutCurrentValidator(staker); err != nil {
+		return fmt.Errorf("putting current validator: %w", err)
+	}
+
+	stakingInfo := state.StakingInfo{
+		AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
+		NextPeriod:               tx.Period,
+	}
+	if err := e.state.SetStakingInfo(staker.SubnetID, staker.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	if e.backend.Config.PartialSyncPrimaryNetwork &&
+		tx.NodeID() == e.backend.Ctx.NodeID {
+		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", e.tx.ID()),
+			zap.String("txType", "addAutoRenewedValidatorTx"),
+			zap.Stringer("nodeID", tx.NodeID()),
+		)
+	}
+
+	return nil
+}
+
+func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+	validator, err := verifySetAutoRenewedValidatorConfigTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return fmt.Errorf("getting staking info: %w", err)
+	}
+
+	stakingInfo.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
+	stakingInfo.NextPeriod = tx.Period
+
+	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
+func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
 		txID      = e.tx.ID()
@@ -1389,6 +1497,10 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 		}
 		staker, err = state.NewPendingStaker(txID, scheduledStakerTx)
 	} else {
+		// Post-Durango, stakers are immediately added to the current staker
+		// set. Their [StartTime] is the current chain time.
+		stakeStartTime := chainTime
+
 		// Only calculate the potentialReward for permissionless stakers.
 		// Recall that we only need to check if this is a permissioned
 		// validator as there are no permissioned delegators
@@ -1400,15 +1512,19 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 				return err
 			}
 
-			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID)
+			rewards, err := GetRewardsCalculator(
+				e.backend.Config.RewardConfig,
+				e.backend.Config.UpgradeConfig,
+				e.state,
+				subnetID,
+			)
 			if err != nil {
 				return err
 			}
 
-			// Post-Durango, stakers are immediately added to the current staker
-			// set. Their [StartTime] is the current chain time.
-			stakeDuration := stakerTx.EndTime().Sub(chainTime)
+			stakeDuration := stakerTx.EndTime().Sub(stakeStartTime)
 			potentialReward = rewards.Calculate(
+				stakeStartTime,
 				stakeDuration,
 				stakerTx.Weight(),
 				currentSupply,
@@ -1417,7 +1533,7 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			e.state.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		staker, err = state.NewCurrentStaker(txID, stakerTx, stakeStartTime, potentialReward)
 	}
 	if err != nil {
 		return err

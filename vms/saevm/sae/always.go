@@ -6,17 +6,23 @@ package sae
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
@@ -48,27 +54,46 @@ func (vm *SinceGenesis[_]) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	fxs []*common.Fx,
-	appSender common.AppSender,
+	fxs []*snowcommon.Fx,
+	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
-	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
-
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
-	}
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	tdbCfg := vm.config.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	config, err := setupGenesis(db, tdbCfg, genesisBytes)
 	if err != nil {
-		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+		return err
 	}
 
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, appSender)
 	if err != nil {
 		return err
 	}
 	vm.VM = inner
 	return nil
+}
+
+func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *params.ChainConfig, retErr error) {
+	tdb := triedb.NewDatabase(db, tdbConfig)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
+	}
+	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	if err != nil {
+		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	// [NewVM] assumes that the genesis block is "finalized", which does not
+	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
+
+	return config, nil
 }
 
 // Shutdown gracefully closes the VM.

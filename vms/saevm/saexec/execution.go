@@ -30,13 +30,23 @@ import (
 
 var errExecutorClosed = errors.New("saexec.Executor closed")
 
+// queuedBlock pairs a queued block with the time it was enqueued so that
+// [Executor.processQueue] can record how long it spent in the queue, from
+// acceptance until its execution completed.
+type queuedBlock struct {
+	block      *blocks.Block
+	enqueuedAt time.Time
+}
+
 // Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
 // before [blocks.Block.Executed] returns true then there is no guarantee that
 // the block will be executed.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
+
 	select {
-	case e.queue <- block:
+	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
+		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
@@ -57,7 +67,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/strevm/issues/28"
+const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
 
 func (e *Executor) processQueue() {
 	defer close(e.done)
@@ -67,7 +77,8 @@ func (e *Executor) processQueue() {
 		case <-e.quit:
 			return
 
-		case block := <-e.queue:
+		case qb := <-e.queue:
+			block := qb.block
 			log := e.log.With(
 				zap.Uint64("block_height", block.Height()),
 				zap.Uint64("block_time", block.BuildTime()),
@@ -93,6 +104,7 @@ func (e *Executor) processQueue() {
 			if err != nil {
 				return
 			}
+			e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 		}
 	}
 }
@@ -107,11 +119,14 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
+	start := time.Now()
+	defer func() {
+		e.metrics.observeExecuteDuration(time.Since(start))
+	}()
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
-
 	return e.afterExecution(b, result)
 }
 
@@ -125,12 +140,13 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee  *uint256.Int
-		StateDB  *state.StateDB
-		Signer   types.Signer
-		BlockCtx vm.BlockContext
-		Receipts types.Receipts
-		FinishBy struct {
+		BaseFee     *uint256.Int
+		StateDB     *state.StateDB
+		Signer      types.Signer
+		BlockCtx    vm.BlockContext
+		Receipts    types.Receipts
+		GasConsumed gas.Gas
+		FinishBy    struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
@@ -156,7 +172,7 @@ func Execute(
 	receiptStore ReceiptStore,
 	log logging.Logger,
 ) (*ExecutionResults, error) {
-	log.Debug("Executing block")
+	log.Trace("Executing block")
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -171,13 +187,20 @@ func Execute(
 	}
 
 	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
+	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
+	// Finalise any state changes made by the hook, mirroring the finalisation
+	// performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
 
 	baseFee := gasClock.BaseFee()
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
+
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
@@ -191,6 +214,7 @@ func Execute(
 		stateDB.SetTxContext(tx.Hash(), ti)
 		b.CheckSenderBalanceBound(stateDB, signer, tx)
 
+		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(
 			config,
 			chainCtx,
@@ -258,7 +282,7 @@ func Execute(
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
-	log.Debug(
+	log.Trace(
 		"Block execution complete",
 		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),
@@ -266,11 +290,12 @@ func Execute(
 	)
 
 	r := &ExecutionResults{
-		BaseFee:  baseFee,
-		StateDB:  stateDB,
-		Signer:   signer,
-		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts: receipts,
+		BaseFee:     baseFee,
+		StateDB:     stateDB,
+		Signer:      signer,
+		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts:    receipts,
+		GasConsumed: blockGasConsumed,
 	}
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime
@@ -301,7 +326,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)
+	e.sendPostExecutionEvents(b.EthBlock(), r) // (3)
 	return nil
 }
 

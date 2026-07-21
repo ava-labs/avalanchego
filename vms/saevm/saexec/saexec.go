@@ -8,6 +8,7 @@
 package saexec
 
 import (
+	"fmt"
 	"io"
 	"sync/atomic"
 
@@ -18,8 +19,10 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -37,7 +40,7 @@ type Executor struct {
 	log        logging.Logger
 	hooks      hook.Points
 
-	queue        chan *blocks.Block
+	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
@@ -49,6 +52,7 @@ type Executor struct {
 	chainConfig  *params.ChainConfig
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
+	metrics      *metrics
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -65,31 +69,38 @@ func New(
 	xdb saetypes.ExecutionResults,
 	saedbConfig saedb.Config,
 	hooks hook.Points,
-	log logging.Logger,
+	snowCtx *snow.Context,
+	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
+	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
 	if err != nil {
 		return nil, err
+	}
+
+	m, err := newMetrics(reg, lastExecuted, hooks, snowCtx.Log)
+	if err != nil {
+		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
 		Tracker: t,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
-		log:     log,
+		log:     snowCtx.Log,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan *blocks.Block, 2*saedbConfig.CommitInterval()),
+		queue: make(chan queuedBlock, 2*saedbConfig.CommitInterval),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			log,
+			snowCtx.Log,
 		},
 		chainConfig: chainConfig,
 		db:          db,
 		xdb:         xdb,
+		metrics:     m,
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)

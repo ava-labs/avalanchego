@@ -11,13 +11,15 @@ import (
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
+
+	// Force-load tracer engines to trigger registration of the JS and native
+	// (e.g. "callTracer") tracers available to debug_trace* APIs.
+	_ "github.com/ava-labs/libevm/eth/tracers/js"
+	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
 
-// Taken as the defaults from geth / libevm's `node.DefaultConfig`.
-const (
-	batchLimit           = 1000
-	batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
-)
+// Taken as the default from geth / libevm's `node.DefaultConfig`.
+const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
 // Server returns the Provider's [rpc.Server], with all configured JSON-RPC
 // namespace handlers registered.
@@ -57,18 +59,27 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		{"eth", ethapi.NewEthereumAPI(b)},
 		// Standard Ethereum node APIs:
 		// - eth_blockNumber
+		// - eth_call
 		// - eth_chainId
+		// - eth_estimateGas
+		// - eth_getBalance
 		// - eth_getBlockByHash
 		// - eth_getBlockByNumber
-		// - eth_getBlockReceipts
+		// - eth_getCode
+		// - eth_getProof
+		// - eth_getStorageAt
 		// - eth_getUncleByBlockHashAndIndex
 		// - eth_getUncleByBlockNumberAndIndex
 		// - eth_getUncleCountByBlockHash
 		// - eth_getUncleCountByBlockNumber
 		//
-		// geth-specific APIs:
+		// Geth-specific APIs:
+		// - eth_createAccessList
 		// - eth_getHeaderByHash
 		// - eth_getHeaderByNumber
+		//
+		// Undocumented APIs:
+		// - eth_getBlockReceipts
 		{"eth", &blockChainAPI{ethapi.NewBlockChainAPI(b), b}},
 		// Standard Ethereum node APIs:
 		// - eth_getBlockTransactionCountByHash
@@ -169,7 +180,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	}
 
 	s := rpc.NewServer()
-	s.SetBatchLimits(batchLimit, batchResponseMaxSize)
+	s.SetBatchLimits(int(b.config.BatchRequestLimit), batchResponseMaxSize) // #nosec G115 -- [Config.Verify], bounds-checks against math.MaxInt
 	for _, api := range apis {
 		if err := s.RegisterName(api.namespace, api.api); err != nil {
 			return nil, fmt.Errorf("%T.RegisterName(%q, %T): %v", s, api.namespace, api.api, err)

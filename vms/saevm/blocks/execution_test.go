@@ -21,9 +21,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -101,7 +103,9 @@ func TestMarkExecuted(t *testing.T) {
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	require.NoError(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "RestoreExecutionArtefacts()")
+	// This block is NOT synchronous, so no hooks are needed.
+	// NOTE: this pattern is only acceptable in tests.
+	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool
@@ -141,7 +145,7 @@ func TestMarkExecuted(t *testing.T) {
 			}
 
 			t.Run("MarkExecuted_again", func(t *testing.T) {
-				rec := saetest.NewLogRecorder(logging.Warn)
+				rec := loggingtest.NewRecorder(logging.Warn)
 				b.log = rec
 				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
 				// The database's head block might have been corrupted so this MUST
@@ -168,14 +172,39 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
+func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
+	// need well-formed receipt hash for invariants check.
+	ethB := types.NewBlockWithHeader(&types.Header{
+		Number:      big.NewInt(1),
+		BaseFee:     big.NewInt(1),
+		Time:        42,
+		ReceiptHash: types.EmptyRootHash,
+	})
+	db := rawdb.NewMemoryDatabase()
+	rawdb.WriteBlock(db, ethB)
+
+	// An empty execution-results DB is what signals the block is synchronous.
+	xdb := saetest.NewExecutionResultsDB()
+	hooks := hookstest.NewStub(1e6)
+	b := newBlock(t, ethB, nil, nil)
+	require.NoErrorf(t, b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
+
+	assert.Truef(t, b.Executed(), "%T.Executed()", b)
+	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
+	// See method comment re user responsibility for settlement.
+	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
+	// A synchronous block is its own last-settled block.
+	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
+}
+
 // selfAsHasher adds a Hash() method to a common.Hash, returning itself.
 type selfAsHasher common.Hash
 
 func (h selfAsHasher) Hash() common.Hash { return common.Hash(h) }
 
-func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig gastime.GasPriceConfig) *gastime.Time {
+func mustNewGasTime(tb testing.TB, at time.Time, target gas.Gas, price gas.Price, gasPriceConfig gastime.GasPriceConfig) *gastime.Time {
 	tb.Helper()
-	tm, err := gastime.New(at, target, excess, gasPriceConfig)
+	tm, err := gastime.New(at, target, price, gasPriceConfig)
 	require.NoError(tb, err, "gastime.New()")
 	return tm
 }

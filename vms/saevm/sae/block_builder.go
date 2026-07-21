@@ -310,13 +310,21 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		receipts = append(receipts, b.Receipts()...)
 	}
 
+	// All fields of [hook.Settled] MUST be populated, otherwise state sync
+	// and recovery will not function correctly.
+	settledGasTime := lastSettled.ExecutedByGasTime()
 	ethB, err := builder.BuildBlock(
 		hdr,
 		bCtx,
 		included,
 		receipts,
 		includedOps,
-		lastSettled.NumberU64(),
+		hook.Settled{
+			Height:       lastSettled.NumberU64(),
+			GasUnix:      settledGasTime.Unix(),
+			GasNumerator: settledGasTime.Fraction().Numerator,
+			Excess:       settledGasTime.Excess(),
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -360,7 +368,7 @@ func lastToSettle(
 		return nil, err
 	}
 	if !ok {
-		log.Warn("Execution lagging when determining last block to settle")
+		log.Debug("Execution lagging when determining last block to settle")
 		return nil, errExecutionLagging
 	}
 	return lastSettled, nil
