@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/eth/filters"
-	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
@@ -124,6 +123,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//  - logs
 		{"eth", filter},
 		// Avalanche-custom eth extensions:
+		// - eth_baseFee
+		// - eth_callDetailed
+		// - eth_getChainConfig
+		// - eth_suggestPriceOptions
+		// - eth_subscribe
+		//  - newAcceptedTransactions
 		{"eth", &customAPI{b}},
 	}
 
@@ -175,7 +180,16 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	if !b.config.DisableTracing {
 		apis = append(apis, api{
 			// geth-specific APIs:
-			"debug", tracers.NewAPI(b),
+			// - debug_intermediateRoots
+			// - debug_standardTraceBlockToFile
+			// - debug_traceBlock
+			// - debug_traceBlockByHash
+			// - debug_traceBlockByNumber
+			// - debug_traceBlockFromFile
+			// - debug_traceCall
+			// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
+			// - debug_traceTransaction
+			"debug", newTracerAPI(b),
 		})
 	}
 

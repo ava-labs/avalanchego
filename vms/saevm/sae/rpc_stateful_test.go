@@ -5,12 +5,15 @@ package sae
 
 import (
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -18,7 +21,9 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/eth/tracers/native"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
+	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -95,7 +100,7 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 }
 
 func TestDebugTrace(t *testing.T) {
-	ctx, sut := newSUT(t, 1)
+	ctx, sut := newSUT(t, 2)
 
 	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
 
@@ -148,6 +153,11 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
+	blockFile := filepath.Join(t.TempDir(), "block.rlp")
+	blockRLP, err := rlp.EncodeToBytes(depositBlock.EthBlock())
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", depositBlock.EthBlock())
+	require.NoError(t, os.WriteFile(blockFile, blockRLP, 0o600), "os.WriteFile()")
+
 	tests := []rpcTest{
 		{
 			method:       "debug_traceBlockByNumber",
@@ -180,9 +190,49 @@ func TestDebugTrace(t *testing.T) {
 			extraCmpOpts: ignore,
 		},
 		{
+			method:       "debug_traceBlock",
+			args:         []any{hexutil.Bytes(blockRLP)},
+			want:         wantDeposit,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockFromFile",
+			args:         []any{blockFile},
+			want:         wantDeposit,
+			extraCmpOpts: ignore,
+		},
+		{
+			// The returned deposit balance proves that the call ran against the
+			// post-execution state of the latest block.
+			method: "debug_traceCall",
+			args: []any{
+				ethapi.TransactionArgs{
+					To:   &escrowAddr,
+					Data: utils.PointerTo(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
+				},
+				rpc.LatestBlockNumber,
+			},
+			want: logger.ExecutionResult{
+				ReturnValue: common.Bytes2Hex(uint256.NewInt(escrowDepositVal).PaddedBytes(32)),
+			},
+			extraCmpOpts: cmp.Options{
+				cmpopts.IgnoreFields(logger.ExecutionResult{}, "Gas", "StructLogs"),
+			},
+		},
+		{
 			method:  "debug_traceTransaction",
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
+		},
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{deployBlock.Hash()},
+			want:   []common.Hash{deployBlock.PostExecutionStateRoot()},
+		},
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{depositBlock.Hash()},
+			want:   []common.Hash{depositBlock.PostExecutionStateRoot()},
 		},
 		{
 			method: "debug_traceTransaction",
@@ -197,6 +247,9 @@ func TestDebugTrace(t *testing.T) {
 			}},
 			wantErr: testerr.Contains("execution timeout"),
 		},
+		// TODO(JonathanOppenheimer): add a fee-sensitive case; these assert
+		// only fee-insensitive fields, leaving the SAE-era replay base fee
+		// unpinned.
 		{
 			method: "debug_traceTransaction",
 			args:   []any{depositTx.Hash(), tracers.TraceConfig{Tracer: utils.PointerTo("callTracer")}},
@@ -222,6 +275,92 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	sut.testRPC(ctx, t, tests...)
+
+	// Mid-block roots are never persisted, so assert properties rather than
+	// exact values.
+	t.Run("debug_intermediateRoots_multiple_txs", func(t *testing.T) {
+		transfers := make([]*types.Transaction, 2)
+		for i := range transfers {
+			transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
+				To:       &common.Address{'x', 'f', 'e', 'r'},
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+				Value:    big.NewInt(1),
+			})
+		}
+		block := sut.runConsensusLoop(t, transfers...)
+		require.Lenf(t, block.Transactions(), len(transfers), "%T.Transactions()", block)
+
+		var roots []common.Hash
+		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
+
+		require.Len(t, roots, len(transfers), "one root per transaction")
+		assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
+		assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
+	})
+
+	// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
+	// can't be used.
+	t.Run("debug_standardTraceBlockToFile", func(t *testing.T) {
+		var files []string
+		require.NoError(t, sut.CallContext(ctx, &files, "debug_standardTraceBlockToFile", depositBlock.Hash()), "CallContext(debug_standardTraceBlockToFile)")
+		require.Len(t, files, 1, "one trace file per transaction")
+		t.Cleanup(func() {
+			assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
+		})
+
+		trace, err := os.ReadFile(files[0])
+		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
+		// The file holds a struct log: one JSON line per EVM opcode executed.
+		// `emit Deposit()` compiles to a LOG1 opcode, so if it shows up the
+		// file really does trace the transaction's execution.
+		assert.Contains(t, string(trace), vm.LOG1.String(), "trace of `emit Deposit()`")
+	})
+}
+
+// TestDebugTraceBeforeBlockHook verifies that tracing a block applies the
+// block's own before-block hook changes, while querying state as of a block
+// does not apply the next block's.
+func TestDebugTraceBeforeBlockHook(t *testing.T) {
+	marker := common.Address{'m', 'a', 'r', 'k'}
+	ctx, sut := newSUT(t, 1)
+	sut.hooks.BeforeExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, _ *types.Header, _ *types.Block) error {
+		sdb.AddBalance(marker, uint256.NewInt(1))
+		return nil
+	}
+
+	b1 := sut.runConsensusLoop(t)
+	b2 := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &marker,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	}))
+
+	// b2's post-execution root includes the hook's credit, so re-execution
+	// only reproduces it if the trace's base state includes the credit too.
+	t.Run("block_tracing_applies_hook", func(t *testing.T) {
+		var roots []common.Hash
+		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", b2.Hash()), "CallContext(debug_intermediateRoots)")
+		require.Len(t, roots, 1, "one root per transaction")
+		assert.Equal(t, b2.PostExecutionStateRoot(), roots[0], "trace base state includes the before-block hook's changes")
+	})
+
+	// The hook credited marker once per block, so as of b1 its balance is 1;
+	// 2 means b2's before-block changes leaked in.
+	t.Run("traceCall_does_not_apply_child_hook", func(t *testing.T) {
+		var prestate map[common.Address]native.Account
+		err := sut.CallContext(ctx, &prestate, "debug_traceCall",
+			ethapi.TransactionArgs{
+				From: utils.PointerTo(sut.wallet.Addresses()[0]),
+				To:   &marker,
+			},
+			rpc.BlockNumber(b1.NumberU64()), // #nosec G115 -- block heights are small
+			tracers.TraceConfig{Tracer: utils.PointerTo("prestateTracer")},
+		)
+		require.NoError(t, err, "CallContext(debug_traceCall, prestateTracer)")
+		require.Contains(t, prestate, marker, "prestate accounts")
+		assert.Equal(t, int64(1), prestate[marker].Balance.Int64(), "marker balance as of b1")
+	})
 }
 
 func TestStatefulRPCs(t *testing.T) {
