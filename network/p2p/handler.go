@@ -31,6 +31,11 @@ const (
 	// signature requests. Distinct from SignatureRequestHandlerID (ACP-118)
 	// which is reserved for native warp.
 	OracleSignatureRequestHandlerID
+	// TeleporterSignatureRequestHandlerID is the handler ID for attestor-gateway
+	// signature requests whose signed payload is a native TeleporterMessageV2
+	// (so stock TeleporterMessengerV2 + WarpAdapter accept it), distinct from the
+	// OracleMessage-format handler above.
+	TeleporterSignatureRequestHandlerID
 )
 
 var (
