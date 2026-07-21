@@ -682,7 +682,6 @@ func verifyValidatorSet(
 	allValidators, err := pClient.GetAllValidatorsAt(tc.DefaultContext(), platformapi.Height(height))
 	require.NoError(err)
 	require.Equal(flattenedExpectedValidators, allValidators[subnetID])
-
 }
 
 // advanceProposerVMPChainHeight ensures that the proposervm's referenced P-Chain height advances past the current height and advancing the epoch by issuing a dummy transaction.
@@ -744,7 +743,7 @@ type l1Manager struct {
 	networkID    uint32
 	chainID      ids.ID
 	address      []byte
-	// acceptanceURI is the API URI polled to confirm issued txs are accpeted.
+	// acceptanceURI is the API URI polled to confirm issued txs are accepted.
 	acceptanceURI string
 }
 
@@ -755,7 +754,6 @@ func (m *l1Manager) registerValidator(
 	balance uint64,
 	pop [bls.SignatureLen]byte,
 ) {
-
 	require := require.New(tc)
 	tc.By("creating the unsigned warp message")
 	unsigned := newAddressedCallMessage(tc, m.networkID, m.chainID, m.address, message.Bytes())
@@ -818,7 +816,6 @@ func (m *l1Manager) setValidatorWeight(
 		require.NoError(err)
 		awaitTxAccepted(tc, m.acceptanceURI, tx.ID())
 	})
-
 }
 
 func wrapWarpSignatureRequest(
