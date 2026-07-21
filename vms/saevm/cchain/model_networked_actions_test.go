@@ -26,19 +26,26 @@ import (
 func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 	return map[string]func(*rapid.T){
 		// Duplicate keys weight the common actions up, mirroring how the
-		// generators weight sample sets.
-		"issueTx":             nm.issueTx,
-		"issueTx2":            nm.issueTx,
-		"issueTx3":            nm.issueTx,
-		"buildAndDistribute":  nm.buildAndDistribute,
-		"buildAndDistribute2": nm.buildAndDistribute,
-		"advanceClock":        nm.advanceClock,
-		"settle":              nm.settle,
-		"delayNode":           nm.delayNode,
-		"catchUpNode":         nm.catchUpNode,
-		"competingSiblings":   nm.competingSiblings,
-		"restartNode":         nm.restartNode,
-		"":                    nm.check,
+		// generators weight sample sets. issueTx keeps all 3 aliases: it never
+		// waits on cross-node gossip (the tx is submitted directly to, and
+		// polled for pending-ness on, the node it targets), so it is cheap
+		// regardless of weight. buildAndDistribute drops one alias: each call
+		// waits for every model-tracked pending tx to reach the builder via
+		// real (unmocked) push/pull gossip (see pushGossipPeriod in
+		// sae/vm.go), so its relative weight is a direct real-wall-clock
+		// budget knob; one alias holds the CI budget while it still runs far
+		// more than the once-only actions below.
+		"issueTx":            nm.issueTx,
+		"issueTx2":           nm.issueTx,
+		"issueTx3":           nm.issueTx,
+		"buildAndDistribute": nm.buildAndDistribute,
+		"advanceClock":       nm.advanceClock,
+		"settle":             nm.settle,
+		"delayNode":          nm.delayNode,
+		"catchUpNode":        nm.catchUpNode,
+		"competingSiblings":  nm.competingSiblings,
+		"restartNode":        nm.restartNode,
+		"":                   nm.check,
 	}
 }
 
@@ -147,11 +154,14 @@ func (nm *networkedMachine) buildOn(rt *rapid.T, n *modelNode, parentID ids.ID) 
 }
 
 // deliverBlock plays the consensus engine for one node: parse the canonical
-// bytes, verify, accept, and wait for execution.
-func (nm *networkedMachine) deliverBlock(rt *rapid.T, n *modelNode, ab acceptedBlock) {
+// bytes, verify, accept, and wait for execution. It is a method (rather than a
+// free function) for API symmetry with the machine's other per-node delivery
+// helpers (e.g. buildOn); the receiver is unused and so left unnamed.
+func (*networkedMachine) deliverBlock(rt *rapid.T, n *modelNode, ab acceptedBlock) {
 	blk, err := n.sut.ParseBlock(n.ctx, ab.bytes)
 	require.NoErrorf(rt, err, "%T.ParseBlock() on node %d", n.sut.VM, n.idx)
 	require.Equalf(rt, ab.id, blk.ID(), "parsed block ID on node %d", n.idx)
+	require.Equalf(rt, ab.height, blk.NumberU64(), "parsed block height on node %d", n.idx)
 	require.NoErrorf(rt, n.sut.VerifyBlock(n.ctx, &block.Context{}, blk), "%T.VerifyBlock() on node %d", n.sut.VM, n.idx)
 	require.NoErrorf(rt, n.sut.AcceptBlock(n.ctx, blk), "%T.AcceptBlock() on node %d", n.sut.VM, n.idx)
 	require.NoErrorf(rt, blk.WaitUntilExecuted(n.ctx), "%T.WaitUntilExecuted() on node %d", blk, n.idx)

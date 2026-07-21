@@ -61,14 +61,23 @@ func genNodeStorage() *rapid.Generator[nodeStorage] {
 		return nodeStorage{
 			// Weighted draws: repeats in the sample set set the odds, matching
 			// genRunConfig. memdb/HashScheme dominate to keep the CI budget in
-			// check while still reaching leveldb/Firewood regularly.
+			// check (real disk I/O on leveldb/Firewood measurably adds to
+			// per-action wall time under the networked machine's real gossip
+			// timers) while still reaching leveldb/Firewood regularly.
 			kv: rapid.SampledFrom([]string{
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
+				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvMemDB,
 				kvMemDB, kvMemDB, kvMemDB, kvMemDB, kvLevelDB,
 			}).Draw(rt, "kv"),
 			scheme: rapid.SampledFrom([]string{
+				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
+				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
+				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
 				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
 				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
 				rawdb.HashScheme, rawdb.HashScheme, rawdb.HashScheme,
@@ -95,7 +104,7 @@ func genNetworkedRunConfig() *rapid.Generator[networkedRunConfig] {
 				numAccounts: uint(rapid.IntRange(2, 6).Draw(rt, "numAccounts")), //#nosec G115 -- bounded draw, 2..6
 				// 2 validators common, 3 rare: per-action cost scales with node
 				// count, and most convergence bugs need only two views.
-				numValidators: rapid.SampledFrom([]int{2, 2, 2, 3}).Draw(rt, "numValidators"),
+				numValidators: rapid.SampledFrom([]int{2, 2, 2, 2, 2, 3}).Draw(rt, "numValidators"),
 			},
 			numNonValidators: rapid.IntRange(0, 1).Draw(rt, "numNonValidators"),
 		}

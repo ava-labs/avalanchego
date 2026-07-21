@@ -89,14 +89,16 @@ func (c *modelCore) pendingCount(addr common.Address) int {
 }
 
 // canAfford reports whether addr's spendable balance still covers a
-// worst-case pool cost of gas*txGasFeeCap. The fixed-cost actions
-// (issueDeploy, issueStore, issueRevert, issueWarpSend, issueWarpReceive) all
-// send at Gas: 1_000_000, so a legitimately drained account (reachable within
-// a run via high-fraction transfers) would otherwise see the pool correctly
-// reject admission with ErrInsufficientFunds — not a VM bug, just an action
-// that shouldn't have been attempted.
-func (c *modelCore) canAfford(addr common.Address, gas uint64) bool {
-	return c.spendable(addr).CmpUint64(gas*txGasFeeCap) >= 0
+// worst-case pool cost of 1_000_000*txGasFeeCap, the fixed Gas every
+// fixed-cost action (issueDeploy, issueStore, issueRevert, issueWarpSend,
+// issueWarpReceive) sends at. Without this guard, a legitimately drained
+// account (reachable within a run via high-fraction transfers) would see the
+// pool correctly reject admission with ErrInsufficientFunds — not a VM bug,
+// just an action that shouldn't have been attempted. Takes no gas parameter:
+// every call site passes the same 1_000_000 (see the actions above), so a
+// parameter would only ever have one value in practice (unparam).
+func (c *modelCore) canAfford(addr common.Address) bool {
+	return c.spendable(addr).CmpUint64(1_000_000*txGasFeeCap) >= 0
 }
 
 // issueTransfer sends a randomized value transfer from account fromIdx to a
@@ -172,7 +174,7 @@ func (mm *modelMachine) advanceToBuildable() {
 // via sut. Returns the chosen account index so the networked machine can pin
 // the account to the issuing node.
 //
-//nolint:revive,unparam // context-as-argument: see issueTransfer; unparam: richestIdx is consumed by the networked machine, not this single-node caller
+//nolint:revive // context-as-argument: see issueTransfer
 func (c *modelCore) issueMinimalTransfer(rt *rapid.T, ctx context.Context, sut *SUT) int {
 	richest := c.addrs[0]
 	richestIdx := 0
@@ -215,7 +217,7 @@ func (c *modelCore) issueDeploy(rt *rapid.T, ctx context.Context, sut *SUT, from
 	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !c.canAfford(from, 1_000_000) {
+	if !c.canAfford(from) {
 		return // can't cover worst-case pool cost; a rejection here would be correct VM behavior
 	}
 	deployKind := rapid.SampledFrom([]txKind{kindStore, kindRevert}).Draw(rt, "fixture")
@@ -264,7 +266,7 @@ func (c *modelCore) issueStore(rt *rapid.T, ctx context.Context, sut *SUT, fromI
 	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !c.canAfford(from, 1_000_000) {
+	if !c.canAfford(from) {
 		return
 	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
@@ -300,7 +302,7 @@ func (c *modelCore) issueRevert(rt *rapid.T, ctx context.Context, sut *SUT, from
 	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !c.canAfford(from, 1_000_000) {
+	if !c.canAfford(from) {
 		return
 	}
 	contract := rapid.SampledFrom(targets).Draw(rt, "contract")
@@ -337,7 +339,7 @@ func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
 	if mm.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from, 1_000_000) {
+	if !mm.canAfford(from) {
 		return
 	}
 	payload := rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
@@ -369,7 +371,7 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 	if mm.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from, 1_000_000) {
+	if !mm.canAfford(from) {
 		return
 	}
 	var (
