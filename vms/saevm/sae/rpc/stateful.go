@@ -164,11 +164,17 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	}
 
 	// ethB was served by [tracerBackend], so its faked header carries the
-	// base fee the block was executed with (see [executedHeader]), which the
-	// gas clock cannot re-derive for pre-SAE blocks.
-	baseFee, overflow := uint256.FromBig(ethB.BaseFee())
-	if overflow {
-		return nil, bCtx, nil, nil, fmt.Errorf("base fee %v of block %d overflows 256 bits", ethB.BaseFee(), ethB.NumberU64())
+	// executed base fee (see [executedHeader]), which the gas clock cannot
+	// re-derive for pre-SAE blocks and the real header only bounds for
+	// asynchronous ones. The faked base fee is never nil, so the guard only
+	// avoids a panic in [uint256.FromBig].
+	baseFee := new(uint256.Int)
+	if bf := ethB.BaseFee(); bf != nil {
+		var overflow bool
+		baseFee, overflow = uint256.FromBig(bf)
+		if overflow {
+			return nil, bCtx, nil, nil, fmt.Errorf("base fee %v of block %d overflows 256 bits", bf, ethB.NumberU64())
+		}
 	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
