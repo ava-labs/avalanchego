@@ -64,8 +64,7 @@ func TestDispatcher_Send(t *testing.T) {
 			wantErr: errUnmarshalResponse,
 		},
 		{
-			// Pre-send cancel returns at SendTo's ctx.Err() guard before
-			// the handler runs.
+			// Pre-send cancel returns at the ctx.Err() guard, before the handler.
 			name:    "context cancelled before send",
 			peers:   []ids.NodeID{nodeID},
 			handler: p2p.NoOpHandler{},
@@ -103,10 +102,8 @@ func TestDispatcher_Send(t *testing.T) {
 	}
 }
 
-// Cancel mid-flight (parked in SendTo's select) returns context.Canceled
-// and de-scores the peer. The handler cancels its own context so the
-// cancellation is guaranteed to land while the request is in flight.
-// Pre-send cancel is a row in TestDispatcher_Send.
+// Mid-flight cancel (parked in SendTo's select) returns context.Canceled
+// and de-scores the peer. The handler cancels its own context to ensure it.
 func TestDispatcher_CancelInFlight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	ctx, cancel := context.WithCancel(t.Context())
@@ -133,8 +130,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 	assert.Equal(t, 0.0, responsivePeers(t, reg), "responsivePeers()")
 }
 
-// Success scores the peer responsive, failure de-scores it (via
-// Outcome.Failure or SendTo's deferred RegisterFailure). De-score rows
+// Success scores the peer responsive, failure de-scores it. De-score rows
 // seed responsive first so the drop to 0 is a real transition.
 func TestDispatcher_PeerScoring(t *testing.T) {
 	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
