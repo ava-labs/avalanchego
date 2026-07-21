@@ -199,7 +199,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	const numTests = 8
 	var (
 		wallet     = saetest.NewUNSAFEWallet(t, numTests, types.LatestSigner(saetest.ChainConfig()))
-		vdrs       = warptest.NewValidators(t, warptest.WithCount(2))
+		vdrs       = warptest.NewValidators(t, warptest.WithMinimum(2))
 		warpLogger = common.Address{'l', 'o', 'g', 'g', 'e', 'r'}
 	)
 	ctx, sut := newSUT(t,
