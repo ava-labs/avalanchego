@@ -1202,7 +1202,6 @@ func TestDuplicateVerify(t *testing.T) {
 			acceptIndex: 1,
 		},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, sut := newSUT(t, 0)
