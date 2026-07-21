@@ -693,6 +693,30 @@ func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*t
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
 }
 
+// waitForAtomicTxs blocks until every tx is present in the SUT's cross-chain
+// tx pool, whether it arrived by direct issuance or via atomic-tx gossip.
+// Bounded like waitForPendingEthTxs so a genuinely stranded tx fails loudly,
+// naming the missing tx, instead of hanging until the package timeout.
+func (s *SUT) waitForAtomicTxs(ctx context.Context, tb testing.TB, txs ...*tx.Tx) {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+
+	for _, t := range txs {
+		for !s.txpool.Has(t.ID()) {
+			select {
+			case <-ctx.Done():
+				require.NoErrorf(tb, ctx.Err(), "waiting for atomic tx %s in pool", t.ID())
+			case <-ticker.C:
+			}
+		}
+	}
+}
+
 type (
 	blockConfig struct {
 		context *block.Context

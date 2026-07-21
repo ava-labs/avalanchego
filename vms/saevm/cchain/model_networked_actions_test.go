@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -34,10 +35,13 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		// real (unmocked) push/pull gossip (see pushGossipPeriod in
 		// sae/vm.go), so its relative weight is a direct real-wall-clock
 		// budget knob; one alias holds the CI budget while it still runs far
-		// more than the once-only actions below.
+		// more than the once-only actions below. issueAtomicTx keeps a single
+		// alias because import/export add a real-gossip sync to every
+		// subsequent buildOn (the same wall-clock knob as buildAndDistribute).
 		"issueTx":            nm.issueTx,
 		"issueTx2":           nm.issueTx,
 		"issueTx3":           nm.issueTx,
+		"issueAtomicTx":      nm.issueAtomicTx,
 		"buildAndDistribute": nm.buildAndDistribute,
 		"advanceClock":       nm.advanceClock,
 		"settle":             nm.settle,
@@ -116,6 +120,43 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 	n.sut.waitForPendingEthTxs(n.ctx, nm.tb, nm.pendingEthTxs[len(nm.pendingEthTxs)-1])
 }
 
+// issueAtomicTx drives the cross-chain surface. provision writes one drawn
+// UTXO into EVERY node's shared memory; import/export issue to a drawn
+// non-delayed node, from which the tx must reach the builder via cchain's
+// real atomic-tx gossip (the buildOn sync point).
+func (nm *networkedMachine) issueAtomicTx(rt *rapid.T) {
+	kind := rapid.SampledFrom([]string{"provision", "import", "export"}).Draw(rt, "atomicKind")
+	if kind == "provision" {
+		nm.modelCore.provisionUTXO(rt, nm.allSUTs()...)
+		return
+	}
+	// Import/export admission validates against the target node's
+	// last-executed state (export balance and nonce), which lags the model
+	// on a delayed node; issue only to non-delayed nodes (mirrors issueTx's
+	// guard). delayNode keeps at least one validator non-delayed, so
+	// eligible is never empty.
+	eligible := nm.nonDelayedNodes()
+	target := eligible[0]
+	if len(eligible) > 1 {
+		target = eligible[rapid.IntRange(0, len(eligible)-1).Draw(rt, "node")]
+	}
+	walletFor := func(ownerIdx int) *wallet {
+		// Wallets hold a node-specific Client, so they are created lazily
+		// per issuance against the target node. The one-in-flight-atomic-tx-
+		// per-key rule (enforced by the shared issuance methods) means the
+		// model's executed nonce is always current here.
+		w := newWallet(nm.atomicKeys[ownerIdx], target.sut.ctx, target.sut.Client)
+		w.nonce = nm.m.nonces[nm.atomicAddrs[ownerIdx]]
+		return w
+	}
+	switch kind {
+	case "import":
+		nm.modelCore.issueImport(rt, target.ctx, target.sut, nm.allSUTs(), walletFor)
+	default:
+		nm.modelCore.issueExport(rt, target.ctx, target.sut, walletFor)
+	}
+}
+
 // advanceToBuildable moves the shared mock clock to n's preference's earliest
 // buildable time. MUST run before anything that reaches WaitForEvent (see the
 // single-node machine's advanceToBuildable).
@@ -137,6 +178,7 @@ func (nm *networkedMachine) buildOn(rt *rapid.T, n *modelNode, parentID ids.ID) 
 
 	nm.advanceToBuildable(n)
 	n.sut.waitForPendingEthTxs(n.ctx, nm.tb, nm.pendingEthTxs...)
+	n.sut.waitForAtomicTxs(n.ctx, nm.tb, nm.pendingAtomicTxs...)
 	n.sut.waitForPendingTxs(n.ctx, nm.tb)
 
 	const maxBuildAttempts = 5
@@ -194,6 +236,26 @@ func (nm *networkedMachine) enrichBlock(blk *blocks.Block) acceptedBlock {
 			ab.warpSends = append(ab.warpSends, warpSend{from: it.from, payload: it.payload})
 		}
 	}
+	atxs := blockTxs(nm.tb, blk)
+	if len(atxs) > 0 {
+		eff := &atomicBlockEffects{
+			txs:      atxs,
+			consumed: make(map[ids.ID][]*avax.UTXO),
+			exported: make(map[ids.ID][]*avax.UTXO),
+		}
+		for _, atx := range atxs {
+			exp, ok := nm.m.pendingAtomic[atx.ID()]
+			if !ok {
+				continue // applyAtomicBlockEffects fails the run on unexpected txs
+			}
+			if exp.isImport {
+				eff.consumed[exp.remoteChain] = append(eff.consumed[exp.remoteChain], utxosOf(exp.consumed)...)
+			} else {
+				eff.exported[exp.remoteChain] = append(eff.exported[exp.remoteChain], exp.exported...)
+			}
+		}
+		ab.atomic = eff
+	}
 	return ab
 }
 
@@ -202,6 +264,14 @@ func (nm *networkedMachine) enrichBlock(blk *blocks.Block) acceptedBlock {
 // block sent must be signable by n's own warp backend (each node's storage
 // records the message when IT executes the block).
 func (nm *networkedMachine) assertBlockEffects(n *modelNode, ab acceptedBlock) {
+	if ab.atomic != nil {
+		// A node's pool evicts an included cross-chain tx when the node
+		// executes its block; wait so a later build on this node can never
+		// race a stale pool entry.
+		for _, atx := range ab.atomic.txs {
+			n.sut.waitForTxPoolStateUpdate(n.ctx, nm.tb, atx)
+		}
+	}
 	for _, ws := range ab.warpSends {
 		msg := n.sut.newAddressedCallMessage(nm.tb, ws.from.Bytes(), ws.payload)
 		n.sut.signAndVerifyWarpMessage(n.ctx, nm.tb, msg)
@@ -209,12 +279,12 @@ func (nm *networkedMachine) assertBlockEffects(n *modelNode, ab acceptedBlock) {
 }
 
 // applyCanonical records blk (built by builder) as the next canonical block
-// and updates the shared model. The networked suite issues no cross-chain
-// txs, so unlike the single-node machine there is no atomic loop — only an
-// assertion that the invariant holds.
+// and updates the shared model, including the shared atomic (cross-chain)
+// reconciliation aimed at the builder — the analogue of the single-node
+// machine's applyBlock pairing.
 func (nm *networkedMachine) applyCanonical(rt *rapid.T, builder *modelNode, blk *blocks.Block, ab acceptedBlock) {
-	require.Emptyf(rt, blockTxs(nm.tb, blk), "networked model issues no atomic txs; block %d must contain none", blk.NumberU64())
 	nm.modelCore.applyBlock(rt, builder.ctx, builder.sut, blk)
+	nm.modelCore.applyAtomicBlockEffects(rt, builder.ctx, builder.sut, blk)
 	nm.canonical = append(nm.canonical, ab)
 	nm.warpSent = append(nm.warpSent, ab.warpSends...)
 	// Unpin drained accounts so they may migrate to another node.
@@ -236,7 +306,7 @@ func (nm *networkedMachine) buildAndDistribute(rt *rapid.T) {
 	if len(builders) > 1 {
 		b = builders[rapid.IntRange(0, len(builders)-1).Draw(rt, "builder")]
 	}
-	if len(nm.m.pendingEth) == 0 {
+	if len(nm.m.pendingEth) == 0 && len(nm.m.pendingAtomic) == 0 {
 		// The VM refuses empty blocks. No pending txs means no pins (pins are
 		// GC'd on drain), so pinning the richest account to the builder is
 		// always consistent.
@@ -348,7 +418,7 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 	}
 	j, k := nm.nodes[jIdx], nm.nodes[kIdx]
 
-	if len(nm.m.pendingEth) == 0 {
+	if len(nm.m.pendingEth) == 0 && len(nm.m.pendingAtomic) == 0 {
 		richestIdx := nm.issueMinimalTransfer(rt, j.ctx, j.sut)
 		nm.pins[nm.addrs[richestIdx]] = j.idx
 	}
@@ -472,8 +542,12 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 
 	// Every model-tracked pending tx must exist somewhere other than n
 	// before n's pool is dropped; push/pull gossip delivers to validators.
+	// Atomic txs are synced the same way as eth txs: n's own atomic-tx pool
+	// entries would otherwise vanish with nothing left to answer a later
+	// buildOn's waitForAtomicTxs on any node.
 	for _, v := range syncVdrs {
 		v.sut.waitForPendingEthTxs(v.ctx, nm.tb, nm.pendingEthTxs...)
+		v.sut.waitForAtomicTxs(v.ctx, nm.tb, nm.pendingAtomicTxs...)
 	}
 
 	// Mirror production: peers observe the node disconnect before it goes

@@ -24,9 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -218,14 +220,25 @@ type warpSend struct {
 	payload []byte
 }
 
+// atomicBlockEffects captures one canonical block's shared-memory
+// consequences, keyed by remote chain, for delivery-time assertions and
+// pool-eviction waits on any node.
+type atomicBlockEffects struct {
+	txs      []*tx.Tx
+	consumed map[ids.ID][]*avax.UTXO // absent from a node's memory once IT accepts the block
+	exported map[ids.ID][]*avax.UTXO // present in a node's memory once IT accepts the block
+}
+
 // acceptedBlock is one canonical block as raw material for delivery to any
 // node: bytes survive node restarts, unlike *blocks.Block handles. warpSends
 // carries the block's warp sends for delivery-time signability assertions.
+// atomic is nil when the block carries no cross-chain txs.
 type acceptedBlock struct {
 	id        ids.ID
 	height    uint64
 	bytes     []byte
 	warpSends []warpSend
+	atomic    *atomicBlockEffects
 }
 
 // networkedMachine drives N connected SUTs against one shared model. The
@@ -264,14 +277,18 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 	}
 
 	m := &model{
-		balances:    make(map[common.Address]*uint256.Int),
-		nonces:      make(map[common.Address]uint64),
-		pendingEth:  make(map[common.Hash]*issuedTx),
-		pendingCost: make(map[common.Address]*uint256.Int),
-		contracts:   make(map[common.Address]*contractState),
-		target:      dynamic.InitialTargetExponent,
-		price:       dynamic.InitialPriceExponent,
-		delay:       dynamic.InitialDelayExponent,
+		balances:       make(map[common.Address]*uint256.Int),
+		nonces:         make(map[common.Address]uint64),
+		pendingEth:     make(map[common.Hash]*issuedTx),
+		pendingCost:    make(map[common.Address]*uint256.Int),
+		contracts:      make(map[common.Address]*contractState),
+		pendingAtomic:  make(map[ids.ID]*atomicExpectation),
+		availableUTXOs: make(map[ids.ID][]*provisionedUTXO),
+		exportedUTXOs:  make(map[ids.ID][]*avax.UTXO),
+		consumedUTXOs:  make(map[ids.ID][]*avax.UTXO),
+		target:         dynamic.InitialTargetExponent,
+		price:          dynamic.InitialPriceExponent,
+		delay:          dynamic.InitialDelayExponent,
 	}
 	nm := &networkedMachine{
 		modelCore: &modelCore{
@@ -455,6 +472,17 @@ func (nm *networkedMachine) nonDelayedNodes() []*modelNode {
 		if !n.delayed {
 			out = append(out, n)
 		}
+	}
+	return out
+}
+
+// allSUTs is every node's SUT in index order, the fan-out set for
+// shared-memory provisioning (delayed nodes included: the remote chain's
+// state is global truth independent of block delivery).
+func (nm *networkedMachine) allSUTs() []*SUT {
+	out := make([]*SUT, len(nm.nodes))
+	for i, n := range nm.nodes {
+		out[i] = n.sut
 	}
 	return out
 }
