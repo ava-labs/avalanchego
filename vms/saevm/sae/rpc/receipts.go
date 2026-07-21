@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -30,11 +31,11 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
 	blk, err := b.restoreBlock(numOrHash)
 	switch {
+	case errors.Is(err, blocks.ErrNotFound):
+		return nil, nil, nil
 	case err != nil:
-		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
-		// this is a "real" error, not just [blocks.ErrNotFound].
 		return nil, nil, err
-	case blk == nil || !blk.Executed():
+	case !blk.Executed():
 		return nil, nil, nil
 	default:
 		return blk.Receipts(), blk.EthBlock(), nil
