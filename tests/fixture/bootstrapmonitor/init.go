@@ -16,12 +16,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	initTimeout = 2 * time.Minute
 
-	// How long to wait to be reaped after updating the statefulset image
+	// How long to wait for the pod to be deleted after prompting its replacement
 	reapTimeout = 5 * time.Minute
 
 	BootstrapStartingMessage = "Starting bootstrap test"
@@ -30,7 +32,7 @@ const (
 
 var (
 	errImageNotDigestPinned = errors.New("image is neither digest-pinned nor tagged \":master\"")
-	errPodNotReaped         = errors.New("pod was not reaped after its statefulset's image was updated")
+	errPodNotTerminated     = errors.New("pod was not terminated after requesting its deletion")
 )
 
 func NodeDataDir(path string) string {
@@ -64,19 +66,22 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		if err != nil {
 			return fmt.Errorf("failed to get master image details: %w", err)
 		}
-		log.Info("Updating owning statefulset with image details",
-			zap.String("image", masterImageDetails.Image),
-			zap.Reflect("versions", masterImageDetails.Versions),
-		)
 		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}
-		// Wait to be reaped by the statefulset controller. The replacement
-		// pod will run the digest-pinned image and make the start/resume
-		// decision.
-		log.Info("Waiting to be reaped by the statefulset controller", zap.Duration("timeout", reapTimeout))
+		// The statefulset controller won't replace a pod that was never ready
+		// (init blocks readiness), so self-delete, and let the digest-pinned
+		// replacement make the start/resume decision.
+		log.Info("Deleting pod to trigger recreation with the digest-pinned image",
+			zap.String("namespace", namespace),
+			zap.String("pod", podName),
+			zap.Duration("terminationTimeout", reapTimeout),
+		)
+		if err := clientset.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{}); err != nil {
+			return fmt.Errorf("deleting pod %s.%s: %w", namespace, podName, err)
+		}
 		time.Sleep(reapTimeout)
-		return errPodNotReaped
+		return errPodNotTerminated
 	}
 
 	// Only a digest-pinned image unambiguously identifies a build
