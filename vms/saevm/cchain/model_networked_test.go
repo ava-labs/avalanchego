@@ -152,10 +152,12 @@ func TestGenNetworkedRunConfig(t *testing.T) {
 // network of in-process cchain nodes wired via saetest senders. Transactions
 // travel through real push/pull gossip; block distribution is orchestrated by
 // the machine (playing every node's consensus engine), so every scheduling
-// decision is a labeled rapid draw and failures replay deterministically.
-// After every action, all non-delayed nodes must agree exactly with each
-// other and with the shared model. Reproduce failures with -rapid.seed /
-// -rapid.failfile; explore more deeply with -rapid.checks.
+// decision is a labeled rapid draw and the draw sequences replay
+// deterministically (block contents can still differ across replays, e.g.
+// wall-clock pool-admission tie-breaks). After every action, all non-delayed
+// nodes must agree exactly with each other and with the shared model.
+// Reproduce failures with -rapid.seed / -rapid.failfile; explore more deeply
+// with -rapid.checks.
 func TestModelNetworked(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		cfg := genNetworkedRunConfig().Draw(rt, "networkedRunConfig")
@@ -405,6 +407,18 @@ func (nm *networkedMachine) tipID() ids.ID {
 func (nm *networkedMachine) nonDelayedValidators() []*modelNode {
 	var out []*modelNode
 	for _, n := range nm.nodes[:nm.cfg.numValidators] {
+		if !n.delayed {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// nonDelayedNodes returns every non-delayed node (validators and
+// non-validators alike) in ascending index order.
+func (nm *networkedMachine) nonDelayedNodes() []*modelNode {
+	var out []*modelNode
+	for _, n := range nm.nodes {
 		if !n.delayed {
 			out = append(out, n)
 		}

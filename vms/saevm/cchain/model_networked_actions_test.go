@@ -68,13 +68,23 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 		// draws to non-delayed nodes; delayNode's guard keeps at least one
 		// validator (and hence one node) non-delayed, so eligible is never
 		// empty.
-		var eligible []int
-		for i, cand := range nm.nodes {
-			if !cand.delayed {
-				eligible = append(eligible, i)
-			}
-		}
-		nodeIdx = eligible[rapid.IntRange(0, len(eligible)-1).Draw(rt, "node")]
+		eligible := nm.nonDelayedNodes()
+		nodeIdx = eligible[rapid.IntRange(0, len(eligible)-1).Draw(rt, "node")].idx
+	}
+	// A pinned account's node can go delayed after the pin was set (delayNode
+	// has no knowledge of pins). Two hazards then apply: (i) nonce — like the
+	// fresh-draw case above, a delayed node has no sync point covering its
+	// pool, so a new tx can never promote to pending there; (ii) balance —
+	// pool admission validates against the node's last-executed state, so
+	// model-visible credits from canonical blocks the node hasn't executed
+	// (because it's delayed) are invisible to it, and the model can size a
+	// value/gas draw from a balance the pinned node's pool cannot yet see,
+	// spuriously rejecting with core.ErrInsufficientFunds. No-op rather than
+	// issue: the condition is pure model state (pins + delayed), so the draw
+	// count stays a function of model state alone, preserving replay
+	// determinism.
+	if pinned && nm.nodes[nodeIdx].delayed {
+		return
 	}
 	n := nm.nodes[nodeIdx]
 

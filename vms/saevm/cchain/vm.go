@@ -124,6 +124,8 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
+	// Unconditional override: safe only because config.saeConfig() never sets
+	// PushGossipPeriod / PullGossipPeriod itself.
 	saeConfig.PushGossipPeriod = vm.ethTxPushGossipPeriod
 	saeConfig.PullGossipPeriod = vm.ethTxPullGossipPeriod
 	tdbCfg := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)

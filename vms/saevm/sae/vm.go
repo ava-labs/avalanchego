@@ -91,16 +91,15 @@ var _ io.Closer = (*closerFunc)(nil)
 
 func (f closerFunc) Close() error { return f() }
 
-// A Config configures construction of a new [VM].
-//
-// DefaultPushGossipPeriod and [DefaultPullGossipPeriod] are the periods at
-// which eth-tx gossip is pushed to, and pulled from, peers when a [Config]
-// leaves the corresponding field unset (zero).
+// Default periods for eth-tx push/pull gossip; used when the corresponding
+// Config fields are zero.
 const (
 	DefaultPushGossipPeriod = 100 * time.Millisecond
 	DefaultPullGossipPeriod = time.Second
 )
 
+// A Config configures construction of a new [VM].
+//
 // TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
 // (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
 // assume its caller validated the config.
