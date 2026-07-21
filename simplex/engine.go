@@ -27,6 +27,9 @@ import (
 var _ common.Engine = (*Engine)(nil)
 
 var (
+	minTickDuration = 50 * time.Millisecond
+
+	errTooFastTicker        = errors.New("ticker set too fast")
 	errUnknownMessageType   = errors.New("unknown message type")
 	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
 )
@@ -165,7 +168,10 @@ func newEngineWithSignerVerifier(ctx context.Context, snowCtx *snow.ConsensusCon
 		return nil, err
 	}
 
-	engine := newEngine(config, snowCtx)
+	engine, err := newEngine(config, snowCtx)
+	if err != nil {
+		return nil, err
+	}
 	engine.epoch = epoch
 	engine.blockDeserializer = blockDeserializer
 	engine.quorumDeserializer = qcDeserializer
@@ -297,7 +303,7 @@ func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (e *Engine) Shutdown(_ context.Context) error {
+func (e *Engine) Shutdown(ctx context.Context) error {
 	// A non-validator never started an epoch instance, so no need
 	// to shut it down
 	if e.nonValidator {
@@ -309,7 +315,8 @@ func (e *Engine) Shutdown(_ context.Context) error {
 		e.logger.Info("Stopped simplex engine")
 		close(e.shutdown)
 	})
-	return nil
+
+	return e.vm.Shutdown(ctx)
 }
 
 var _ common.BootstrapableEngine = (*NoopBootstrapper)(nil)
@@ -341,7 +348,12 @@ func (*NoopBootstrapper) Clear(_ context.Context) error {
 	return nil
 }
 
-func newEngine(config *Config, consensusCtx *snow.ConsensusContext) *Engine {
+func newEngine(config *Config, consensusCtx *snow.ConsensusContext) (*Engine, error) {
+	tickInterval := getTickInterval(config.Params)
+	if tickInterval < minTickDuration {
+		return nil, errTooFastTicker
+	}
+
 	return &Engine{
 		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
@@ -358,13 +370,17 @@ func newEngine(config *Config, consensusCtx *snow.ConsensusContext) *Engine {
 
 		consensusCtx: consensusCtx,
 		logger:       config.Log,
-		tickInterval: getTickInterval(config.Params),
+		tickInterval: tickInterval,
 		shutdown:     make(chan struct{}),
-	}
+	}, nil
 }
 
 func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
-	engine := newEngine(config, consensusCtx)
+	engine, err := newEngine(config, consensusCtx)
+	if err != nil {
+		return nil, err
+	}
+
 	engine.nonValidator = true
 	return engine, nil
 }

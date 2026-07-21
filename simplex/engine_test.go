@@ -109,6 +109,18 @@ func TestSimplexEngineNilParameters(t *testing.T) {
 	require.ErrorIs(t, err, errNilSimplexParameters)
 }
 
+func TestSimplexEngineTooFastTicker(t *testing.T) {
+	configs := newNetworkConfigs(t, 4)
+	ctx := t.Context()
+
+	config := configs[0]
+	config.Params.MaxRebroadcastWait = 1 * time.Millisecond
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+	_, err := NewEngine(ctx, consensusCtx, config)
+	require.ErrorIs(t, err, errTooFastTicker)
+}
+
 func TestSimplexEngineShutdown(t *testing.T) {
 	engine, _ := setupEngine(t)
 	require.NotPanics(t, func() {
