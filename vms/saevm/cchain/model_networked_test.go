@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"maps"
+	"math/big"
 	"testing"
 	"time"
 
@@ -26,9 +27,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
 // nodeStorage is one node's independently drawn storage configuration. Nodes
@@ -42,10 +46,8 @@ type nodeStorage struct {
 
 // networkedRunConfig is the once-per-check configuration of a networked model
 // run. The embedded runConfig contributes the shared axes (accounts, genesis
-// balances, dynamic-parameter votes, numValidators); its single-node storage
-// axes (kv, scheme, commitInterval) and numAtomicKeys remain zero and are
-// ignored — storage is drawn per node in perNode, and this suite issues no
-// cross-chain txs.
+// balances, dynamic-parameter votes, numValidators, numAtomicKeys); its single-node storage
+// axes (kv, scheme, commitInterval) remain zero and are ignored — storage is drawn per node in perNode.
 type networkedRunConfig struct {
 	runConfig
 
@@ -106,6 +108,7 @@ func genNetworkedRunConfig() *rapid.Generator[networkedRunConfig] {
 				// 2 validators common, 3 rare: per-action cost scales with node
 				// count, and most convergence bugs need only two views.
 				numValidators: rapid.SampledFrom([]int{2, 2, 2, 2, 2, 3}).Draw(rt, "numValidators"),
+				numAtomicKeys: rapid.IntRange(1, 2).Draw(rt, "numAtomicKeys"),
 			},
 			numNonValidators: rapid.IntRange(0, 1).Draw(rt, "numNonValidators"),
 		}
@@ -139,7 +142,8 @@ func TestGenNetworkedRunConfig(t *testing.T) {
 		require.LessOrEqualf(rt, cfg.numAccounts, uint(6), "numAccounts upper bound")
 		numAccounts := int(cfg.numAccounts) //#nosec G115 -- bounded draw, 2..6
 		require.Lenf(rt, cfg.balanceExps, numAccounts, "one balance exponent per account")
-		require.Zerof(rt, cfg.numAtomicKeys, "networked suite issues no atomic txs")
+		require.GreaterOrEqualf(rt, cfg.numAtomicKeys, 1, "numAtomicKeys lower bound")
+		require.LessOrEqualf(rt, cfg.numAtomicKeys, 2, "numAtomicKeys upper bound")
 		for i, s := range cfg.perNode {
 			require.Containsf(rt, []string{kvMemDB, kvLevelDB}, s.kv, "node %d kv store kind", i)
 			require.Containsf(rt, []string{rawdb.HashScheme, customrawdb.FirewoodScheme}, s.scheme, "node %d trie scheme", i)
@@ -222,7 +226,6 @@ type networkedMachine struct {
 
 	clock   *saetest.Clock
 	timeOpt sutOption
-	vdrs    *warptest.Validators
 
 	genesisID ids.ID
 	nodes     []*modelNode
@@ -265,11 +268,11 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 			m:      m,
 			wallet: saetest.NewWalletWithKeyChain(keys, types.LatestSigner(saetest.ChainConfig())),
 			addrs:  keys.Addresses(),
+			vdrs:   warptest.NewValidatorsWithNodeIDs(tb, vdrIDs...),
 		},
 		cfg:     cfg,
 		clock:   clock,
 		timeOpt: timeOpt,
-		vdrs:    warptest.NewValidatorsWithNodeIDs(tb, vdrIDs...),
 		pins:    make(map[common.Address]int),
 	}
 	for i, addr := range nm.addrs {
@@ -277,6 +280,13 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 		require.Falsef(tb, overflow, "genesis balance of account %d overflows uint256", i)
 		m.balances[addr] = bal
 		m.pendingCost[addr] = new(uint256.Int)
+	}
+	for range cfg.numAtomicKeys {
+		sk := txtest.NewKey(tb)
+		nm.atomicKeys = append(nm.atomicKeys, sk)
+		nm.atomicAddrs = append(nm.atomicAddrs, sk.EthAddress())
+		m.balances[sk.EthAddress()] = uint256.MustFromDecimal(atomicKeyGenesisBalanceWei)
+		m.pendingCost[sk.EthAddress()] = new(uint256.Int)
 	}
 	if cfg.gasTarget != nil {
 		d := dynamic.DesiredTargetExponent(*cfg.gasTarget)
@@ -385,6 +395,14 @@ func (nm *networkedMachine) openNode(i int) {
 	for j, addr := range nm.addrs {
 		opts = append(opts, withAccount(addr, types.Account{Balance: nm.cfg.balance(j)}))
 	}
+	for _, addr := range nm.atomicAddrs {
+		bal, ok := new(big.Int).SetString(atomicKeyGenesisBalanceWei, 10)
+		require.Truef(nm.tb, ok, "big.Int.SetString(%q, 10)", atomicKeyGenesisBalanceWei)
+		opts = append(opts, withAccount(addr, types.Account{Balance: bal}))
+	}
+	opts = append(opts, withAccount(warpLoggerAddr, types.Account{
+		Code: forwardAndLogCode(nm.tb, corethwarp.ContractAddress),
+	}))
 	if nm.cfg.gasTarget != nil {
 		opts = append(opts, withGasTarget(*nm.cfg.gasTarget))
 	}
