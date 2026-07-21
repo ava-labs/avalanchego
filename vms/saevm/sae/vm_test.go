@@ -1226,21 +1226,19 @@ func TestDuplicateVerify(t *testing.T) {
 				duplicateIndex: duplicate,
 			}
 			for _, i := range test.verifyOrder {
-				b := blks[i]
-				withContext := b.(block.WithVerifyContext)
+				b := blks[i].(block.WithVerifyContext)
 				require.NoErrorf(t,
-					withContext.VerifyWithContext(ctx, &block.Context{
-						PChainHeight: uint64(i), //#nosec G115 -- Known non-negative
-					}),
+					b.VerifyWithContext(ctx, &block.Context{}),
 					"%T.VerifyWithContext()",
-					withContext,
+					b,
 				)
 			}
 
-			// When creating child, [VM.VerifyBlock] loads the kept instance
-			// from [VM.consensusCritical] and sets it as the parent of the
-			// child.
-			child := sut.createAndVerifyBlock(t, unwrap(t, original))
+			require.NoErrorf(t, sut.SetPreference(ctx, original.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
+			child, err := sut.BuildBlock(ctx)
+			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVM)
+			// Loads the parent from [VM.consensusCritical].
+			require.NoErrorf(t, child.Verify(ctx), "%T.Verify() child of duplicated block", child)
 
 			// Accepting original and child adds them to the execution queue.
 			require.NoError(t, original.Accept(ctx), "original.Accept()")
