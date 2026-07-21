@@ -14,14 +14,12 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/eth/tracers/native"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
-	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -31,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -187,20 +186,20 @@ func TestDebugTrace(t *testing.T) {
 		},
 		{
 			method: "debug_traceTransaction",
-			args: []any{depositTx.Hash(), map[string]any{
-				"tracer": `{
+			args: []any{depositTx.Hash(), tracers.TraceConfig{
+				Tracer: utils.PointerTo(`{
 					fault: function() {},
 					result: function() {
 						for (;;) {}
 					}
-				}`,
-				"timeout": "10ms",
+				}`),
+				Timeout: utils.PointerTo("10ms"),
 			}},
 			wantErr: testerr.Contains("execution timeout"),
 		},
 		{
 			method: "debug_traceTransaction",
-			args:   []any{depositTx.Hash(), map[string]any{"tracer": "callTracer"}},
+			args:   []any{depositTx.Hash(), tracers.TraceConfig{Tracer: utils.PointerTo("callTracer")}},
 			want: native.CallFrame{
 				From:    sut.wallet.Addresses()[0],
 				Gas:     depositTx.Gas(),
@@ -302,7 +301,7 @@ func TestStatefulRPCs(t *testing.T) {
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
 
-				verifyProof(t, b.PostExecutionStateRoot(), got)
+				saetest.VerifyProof(t, b.PostExecutionStateRoot(), got)
 				assert.Equal(t, escrowAddr, got.Address, "GetProof().Address")
 				assert.Zerof(t, wantStorageValue.Cmp(got.Balance), "GetProof().Balance: want %d, got %s", wantStorageValue, got.Balance)
 				assert.Equal(t, crypto.Keccak256Hash(escrow.ByteCode()), got.CodeHash, "GetProof().CodeHash")
@@ -361,52 +360,4 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		msg.AccessList = *accessList
 		requireCallSucceedsWithGas(t, msg, gas)
 	})
-}
-
-func verifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResult) {
-	tb.Helper()
-
-	account := proveAccount(tb, root, proof.Address, proof.AccountProof)
-	assert.Zerof(tb, account.Balance.ToBig().Cmp(proof.Balance), "proven account balance: proven %d, claimed %s", account.Balance.ToBig(), proof.Balance)
-	assert.Equal(tb, proof.CodeHash[:], account.CodeHash, "proven account code hash")
-	assert.Equal(tb, proof.Nonce, account.Nonce, "proven account nonce")
-	assert.Equal(tb, proof.StorageHash, account.Root, "proven account storage root")
-
-	for _, sp := range proof.StorageProof {
-		value := proveStorageValue(tb, account.Root, common.HexToHash(sp.Key), sp.Proof)
-		assert.Zerof(tb, sp.Value.Cmp(value), "proven storage value: proven %d, claimed %s", value, sp.Value)
-	}
-}
-
-func proveAccount(tb testing.TB, root common.Hash, addr common.Address, nodes []string) types.StateAccount {
-	tb.Helper()
-
-	accountRLP := proveTrieValue(tb, root, crypto.Keccak256(addr.Bytes()), nodes)
-	var account types.StateAccount
-	require.NoError(tb, rlp.DecodeBytes(accountRLP, &account), "decode proven account")
-	return account
-}
-
-func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes []string) *big.Int {
-	tb.Helper()
-
-	storageRLP := proveTrieValue(tb, root, crypto.Keccak256(key.Bytes()), nodes)
-	var value big.Int
-	require.NoError(tb, rlp.DecodeBytes(storageRLP, &value), "decode proven storage value")
-	return &value
-}
-
-func proveTrieValue(tb testing.TB, root common.Hash, key []byte, nodes []string) []byte {
-	tb.Helper()
-
-	proofDB := memorydb.New()
-	for _, nodeStr := range nodes {
-		nodeBytes := common.FromHex(nodeStr)
-		nodeHash := crypto.Keccak256(nodeBytes)
-		require.NoErrorf(tb, proofDB.Put(nodeHash, nodeBytes), "%T.Put(proof node)", proofDB)
-	}
-
-	value, err := trie.VerifyProof(root, key, proofDB)
-	require.NoError(tb, err, "VerifyProof()")
-	return value
 }

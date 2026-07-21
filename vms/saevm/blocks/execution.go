@@ -321,9 +321,9 @@ func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
 	)
 }
 
-// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee is capped at [math.MaxUint64] but any reasonable
-// implementation has a base fee much less than [math.MaxUint64].
+// headerBaseFee returns the block's header base fee, treating a nil value (a
+// pre-SAE header) as zero. The base fee is capped at [math.MaxUint64] but any
+// reasonable implementation has a base fee much less than [math.MaxUint64].
 func (b *Block) headerBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
