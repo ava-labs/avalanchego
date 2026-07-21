@@ -51,6 +51,11 @@ func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes [
 	tb.Helper()
 
 	storageRLP := proveTrieValue(tb, root, crypto.Keccak256(key.Bytes()), nodes)
+	// A valid proof of absence yields an empty value, which eth_getProof
+	// reports as zero.
+	if len(storageRLP) == 0 {
+		return new(big.Int)
+	}
 	var value big.Int
 	require.NoError(tb, rlp.DecodeBytes(storageRLP, &value), "decode proven storage value")
 	return &value
