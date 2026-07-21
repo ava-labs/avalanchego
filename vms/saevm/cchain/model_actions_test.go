@@ -66,13 +66,23 @@ func (mm *modelMachine) actions() map[string]func(*rapid.T) {
 		"issueRevert": func(rt *rapid.T) {
 			mm.modelCore.issueRevert(rt, mm.ctx, mm.sut, drawFrom(rt))
 		},
-		"issueWarpSend":    mm.issueWarpSend,
-		"issueWarpReceive": mm.issueWarpReceive,
-		"provisionUTXO":    mm.provisionUTXO,
-		"issueImport":      mm.issueImport,
-		"issueExport":      mm.issueExport,
-		"restart":          mm.restart,
-		"":                 mm.check,
+		"issueWarpSend": func(rt *rapid.T) {
+			mm.modelCore.issueWarpSend(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
+		"issueWarpReceive": func(rt *rapid.T) {
+			mm.modelCore.issueWarpReceive(rt, mm.ctx, mm.sut, drawFrom(rt))
+		},
+		"provisionUTXO": func(rt *rapid.T) {
+			mm.modelCore.provisionUTXO(rt, mm.sut)
+		},
+		"issueImport": func(rt *rapid.T) {
+			mm.modelCore.issueImport(rt, mm.ctx, mm.sut, []*SUT{mm.sut}, mm.atomicWallet)
+		},
+		"issueExport": func(rt *rapid.T) {
+			mm.modelCore.issueExport(rt, mm.ctx, mm.sut, mm.atomicWallet)
+		},
+		"restart": mm.restart,
+		"":        mm.check,
 	}
 }
 
@@ -333,13 +343,14 @@ func (c *modelCore) issueRevert(rt *rapid.T, ctx context.Context, sut *SUT, from
 // issueWarpSend calls the warp precompile's sendWarpMessage, which the
 // executed block turns into a signable unsigned warp message (asserted in
 // applyTxEffects).
-func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	from := mm.addrs[fromIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+//
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueWarpSend(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	from := c.addrs[fromIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from) {
+	if !c.canAfford(from) {
 		return
 	}
 	payload := rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
@@ -351,9 +362,9 @@ func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
 		GasFeeCap: big.NewInt(txGasFeeCap),
 		Data:      callData,
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(warp send)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(warp send)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:    kindWarpSend,
 		from:    from,
 		payload: payload,
@@ -365,26 +376,27 @@ func (mm *modelMachine) issueWarpSend(rt *rapid.T) {
 // issueWarpReceive delivers a warp message (1-in-4 mis-signed) to the model's
 // warpLoggerAddr fixture, which forwards to getVerifiedWarpMessage and logs
 // the ABI-encoded output for applyTxEffects to compare.
-func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
-	fromIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "from")
-	from := mm.addrs[fromIdx]
-	if mm.pendingCount(from) >= maxPendingPerAccount {
+//
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueWarpReceive(rt *rapid.T, ctx context.Context, sut *SUT, fromIdx int) {
+	from := c.addrs[fromIdx]
+	if c.pendingCount(from) >= maxPendingPerAccount {
 		return
 	}
-	if !mm.canAfford(from) {
+	if !c.canAfford(from) {
 		return
 	}
 	var (
 		sourceAddress = common.Address(rapid.SliceOfN(rapid.Byte(), 20, 20).Draw(rt, "sourceAddress"))
 		payload       = rapid.SliceOfN(rapid.Byte(), 1, 100).Draw(rt, "payload")
-		unsigned      = mm.sut.newAddressedCallMessage(mm.tb, sourceAddress[:], payload)
+		unsigned      = sut.newAddressedCallMessage(c.tb, sourceAddress[:], payload)
 		valid         = rapid.IntRange(0, 3).Draw(rt, "misSigned") != 0 // 1 in 4 mis-signed
 	)
 	var msg *avalanchewarp.Message
 	if valid {
-		msg = mm.vdrs.Sign(mm.tb, unsigned)
+		msg = c.vdrs.Sign(c.tb, unsigned)
 	} else {
-		msg = warptest.IncorrectlySign(mm.tb, unsigned)
+		msg = warptest.IncorrectlySign(c.tb, unsigned)
 	}
 
 	callData, err := corethwarp.PackGetVerifiedWarpMessage(0)
@@ -394,7 +406,7 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 	if valid {
 		want = corethwarp.GetVerifiedWarpMessageOutput{
 			Message: corethwarp.WarpMessage{
-				SourceChainID:       common.Hash(mm.sut.ctx.ChainID),
+				SourceChainID:       common.Hash(sut.ctx.ChainID),
 				OriginSenderAddress: sourceAddress,
 				Payload:             payload,
 			},
@@ -411,9 +423,9 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 		Data:       callData,
 		AccessList: warpAccessList(msg),
 	}
-	ethTx := mm.wallet.SetNonceAndSign(mm.tb, fromIdx, data)
-	require.NoErrorf(rt, mm.sut.ethclient.SendTransaction(mm.ctx, ethTx), "SendTransaction(warp receive)")
-	mm.trackPending(ethTx, &issuedTx{
+	ethTx := c.wallet.SetNonceAndSign(c.tb, fromIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(warp receive)")
+	c.trackPending(ethTx, &issuedTx{
 		kind:        kindWarpReceive,
 		from:        from,
 		wantLogData: wantLogData,
@@ -422,20 +434,25 @@ func (mm *modelMachine) issueWarpReceive(rt *rapid.T) {
 	})
 }
 
-// remoteChains are the chains the harness simulates the far side of.
-func (mm *modelMachine) remoteChains() []ids.ID {
-	return []ids.ID{mm.sut.ctx.XChainID, constants.PlatformChainID}
+// remoteChains are the chains the harness simulates the far side of. Every
+// SUT in a run shares the same chain IDs, so any node's ctx works.
+func (c *modelCore) remoteChains(sut *SUT) []ids.ID {
+	return []ids.ID{sut.ctx.XChainID, constants.PlatformChainID}
 }
 
-// provisionUTXO writes a fresh shared-memory UTXO as the remote chain,
-// spendable by a randomly chosen atomic key via a future import.
-func (mm *modelMachine) provisionUTXO(rt *rapid.T) {
-	ownerIdx := rapid.IntRange(0, len(mm.atomicKeys)-1).Draw(rt, "owner")
-	chain := rapid.SampledFrom(mm.remoteChains()).Draw(rt, "remoteChain")
+// provisionUTXO writes ONE freshly drawn shared-memory UTXO, as the remote
+// chain, into EVERY given SUT's shared memory — each SUT owns an independent
+// atomic.Memory, and the remote chain's state is a single global truth the
+// harness must mirror into all of them. Recorded once in the shared model.
+func (c *modelCore) provisionUTXO(rt *rapid.T, suts ...*SUT) {
+	ownerIdx := rapid.IntRange(0, len(c.atomicKeys)-1).Draw(rt, "owner")
+	chain := rapid.SampledFrom(c.remoteChains(suts[0])).Draw(rt, "remoteChain")
 	amount := rapid.Uint64Range(2, 1_000_000_000).Draw(rt, "amountNAVAX")
-	utxo := txtest.NewUTXO(amount, mm.sut.ctx.AVAXAssetID, mm.atomicKeys[ownerIdx].Address())
-	mm.sut.addUTXOs(mm.tb, mm.sut.ctx.ChainID, chain, utxo)
-	mm.m.availableUTXOs[chain] = append(mm.m.availableUTXOs[chain], &provisionedUTXO{
+	utxo := txtest.NewUTXO(amount, suts[0].ctx.AVAXAssetID, c.atomicKeys[ownerIdx].Address())
+	for _, s := range suts {
+		s.addUTXOs(c.tb, s.ctx.ChainID, chain, utxo)
+	}
+	c.m.availableUTXOs[chain] = append(c.m.availableUTXOs[chain], &provisionedUTXO{
 		utxo: utxo, ownerIdx: ownerIdx, amount: amount,
 	})
 }
@@ -459,8 +476,12 @@ func (m *model) hasPendingImport(ownerIdx int, chain ids.ID) bool {
 
 // issueImport picks a (remoteChain, owner) pair with available UTXOs and
 // issues an import consuming ALL of that owner's spendable UTXOs from that
-// chain, crediting a random eth account.
-func (mm *modelMachine) issueImport(rt *rapid.T) {
+// chain, crediting a random eth account. all is the provisioning fan-out used
+// when there are no candidates: provisionUTXO writes the fresh UTXO into
+// every SUT in all, not just sut.
+//
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueImport(rt *rapid.T, ctx context.Context, sut *SUT, all []*SUT, walletFor func(int) *wallet) {
 	// Pick a (chain, owner) pair with available UTXOs; newImportTx consumes
 	// ALL of the owner's spendable UTXOs from that chain. Skip (owner, chain)
 	// pairs with an import already in flight (see hasPendingImport).
@@ -471,59 +492,60 @@ func (mm *modelMachine) issueImport(rt *rapid.T) {
 		utxos    []*provisionedUTXO
 	}
 	var cands []candidate
-	for _, chain := range mm.remoteChains() {
+	for _, chain := range c.remoteChains(sut) {
 		perOwner := map[int]*candidate{}
-		for _, p := range mm.m.availableUTXOs[chain] {
-			if mm.m.hasPendingImport(p.ownerIdx, chain) {
+		for _, p := range c.m.availableUTXOs[chain] {
+			if c.m.hasPendingImport(p.ownerIdx, chain) {
 				continue
 			}
-			c, ok := perOwner[p.ownerIdx]
+			c2, ok := perOwner[p.ownerIdx]
 			if !ok {
-				c = &candidate{chain: chain, ownerIdx: p.ownerIdx}
-				perOwner[p.ownerIdx] = c
+				c2 = &candidate{chain: chain, ownerIdx: p.ownerIdx}
+				perOwner[p.ownerIdx] = c2
 			}
-			c.total += p.amount
-			c.utxos = append(c.utxos, p)
+			c2.total += p.amount
+			c2.utxos = append(c2.utxos, p)
 		}
 		for _, idx := range slices.Sorted(maps.Keys(perOwner)) {
 			cands = append(cands, *perOwner[idx])
 		}
 	}
 	if len(cands) == 0 {
-		mm.provisionUTXO(rt)
+		c.provisionUTXO(rt, all...)
 		return
 	}
-	c := cands[rapid.IntRange(0, len(cands)-1).Draw(rt, "candidate")]
+	c2 := cands[rapid.IntRange(0, len(cands)-1).Draw(rt, "candidate")]
 	// fee must be >= 1: the atomic op's worst-case GasFeeCap is derived from
 	// the fee alone (gasPrice(fee, gas)), and the block base fee has a floor
 	// of 1 wei (dynamic.PriceExponent.Price()) that it can never go below, so
 	// a zero fee produces a GasFeeCap of 0 that can never clear the base fee
 	// — the op would sit in the pool forever, wedging the builder.
-	fee := rapid.Uint64Range(1, c.total-1).Draw(rt, "fee")
-	toIdx := rapid.IntRange(0, len(mm.addrs)-1).Draw(rt, "to")
-	to := mm.addrs[toIdx]
+	fee := rapid.Uint64Range(1, c2.total-1).Draw(rt, "fee")
+	toIdx := rapid.IntRange(0, len(c.addrs)-1).Draw(rt, "to")
+	to := c.addrs[toIdx]
 
-	signed := mm.atomicWallets[c.ownerIdx].newImportTx(mm.ctx, mm.tb, c.chain, to, fee)
-	require.NoErrorf(rt, mm.sut.IssueTx(mm.ctx, signed), "%T.IssueTx(import)", mm.sut.Client)
+	signed := walletFor(c2.ownerIdx).newImportTx(ctx, c.tb, c2.chain, to, fee)
+	require.NoErrorf(rt, sut.IssueTx(ctx, signed), "%T.IssueTx(import)", sut.Client)
+	c.pendingAtomicTxs = append(c.pendingAtomicTxs, signed)
 
-	credit := tx.ScaleAVAX(c.total - fee)
-	mm.m.pendingAtomic[signed.ID()] = &atomicExpectation{
+	credit := tx.ScaleAVAX(c2.total - fee)
+	c.m.pendingAtomic[signed.ID()] = &atomicExpectation{
 		isImport:    true,
-		senderIdx:   c.ownerIdx,
+		senderIdx:   c2.ownerIdx,
 		to:          to,
 		creditWei:   &credit,
-		remoteChain: c.chain,
-		consumed:    c.utxos,
+		remoteChain: c2.chain,
+		consumed:    c2.utxos,
 	}
 	// Remove the consumed UTXOs from availability immediately: the pool
 	// reserves them.
-	kept := mm.m.availableUTXOs[c.chain][:0]
-	for _, p := range mm.m.availableUTXOs[c.chain] {
-		if p.ownerIdx != c.ownerIdx {
+	kept := c.m.availableUTXOs[c2.chain][:0]
+	for _, p := range c.m.availableUTXOs[c2.chain] {
+		if p.ownerIdx != c2.ownerIdx {
 			kept = append(kept, p)
 		}
 	}
-	mm.m.availableUTXOs[c.chain] = kept
+	c.m.availableUTXOs[c2.chain] = kept
 }
 
 // pendingAtomicCount counts in-flight cross-chain txs for one atomic key.
@@ -553,16 +575,18 @@ func unscaleAVAXTruncateCapped(wei *uint256.Int) uint64 {
 // issueExport issues an export of at most a quarter of the sender's
 // spendable nAVAX, provided the sender has no other in-flight atomic tx (one
 // in-flight atomic tx per key keeps nonces simple).
-func (mm *modelMachine) issueExport(rt *rapid.T) {
-	senderIdx := rapid.IntRange(0, len(mm.atomicKeys)-1).Draw(rt, "sender")
-	sender := mm.atomicAddrs[senderIdx]
-	if mm.m.pendingAtomicCount(senderIdx) > 0 {
+//
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) issueExport(rt *rapid.T, ctx context.Context, sut *SUT, walletFor func(int) *wallet) {
+	senderIdx := rapid.IntRange(0, len(c.atomicKeys)-1).Draw(rt, "sender")
+	sender := c.atomicAddrs[senderIdx]
+	if c.m.pendingAtomicCount(senderIdx) > 0 {
 		return // one in-flight atomic tx per key keeps nonces simple
 	}
-	chain := rapid.SampledFrom(mm.remoteChains()).Draw(rt, "remoteChain")
+	chain := rapid.SampledFrom(c.remoteChains(sut)).Draw(rt, "remoteChain")
 
 	// Export at most a quarter of the sender's spendable nAVAX.
-	spendableNAVAX := unscaleAVAXTruncateCapped(mm.spendable(sender))
+	spendableNAVAX := unscaleAVAXTruncateCapped(c.spendable(sender))
 	if spendableNAVAX < 8 {
 		return
 	}
@@ -572,14 +596,15 @@ func (mm *modelMachine) issueExport(rt *rapid.T) {
 	// 1-wei price floor and would wedge the builder forever.
 	fee := rapid.Uint64Range(1, 1_000).Draw(rt, "fee")
 
-	signed, export := mm.atomicWallets[senderIdx].newExportTx(
-		mm.tb, chain, fee,
-		txtest.NewTransferOutput(amount, mm.atomicKeys[senderIdx].Address()),
+	signed, export := walletFor(senderIdx).newExportTx(
+		c.tb, chain, fee,
+		txtest.NewTransferOutput(amount, c.atomicKeys[senderIdx].Address()),
 	)
-	require.NoErrorf(rt, mm.sut.IssueTx(mm.ctx, signed), "%T.IssueTx(export)", mm.sut.Client)
+	require.NoErrorf(rt, sut.IssueTx(ctx, signed), "%T.IssueTx(export)", sut.Client)
+	c.pendingAtomicTxs = append(c.pendingAtomicTxs, signed)
 
 	debit := tx.ScaleAVAX(amount + fee)
-	mm.m.pendingAtomic[signed.ID()] = &atomicExpectation{
+	c.m.pendingAtomic[signed.ID()] = &atomicExpectation{
 		senderIdx:   senderIdx,
 		debitWei:    &debit,
 		remoteChain: chain,
@@ -621,6 +646,7 @@ func (mm *modelMachine) restart(rt *rapid.T) {
 		delete(mm.m.pendingAtomic, id)
 	}
 	mm.pendingEthTxs = nil
+	mm.pendingAtomicTxs = nil
 
 	mm.openSUT() // atomic wallet nonces are restored from the model here
 }
@@ -702,32 +728,52 @@ func (mm *modelMachine) buildVerifyAcceptExecute(rt *rapid.T) *blocks.Block {
 	return blk
 }
 
-// applyBlock advances the model by one accepted block: the shared eth-side
-// core, plus this machine's atomic (cross-chain) expectations.
-func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
-	mm.modelCore.applyBlock(rt, mm.ctx, mm.sut, blk)
-
-	// Atomic (cross-chain) tx effects, driven by what the block actually
-	// included.
-	m := mm.m
-	for _, atx := range blockTxs(mm.tb, blk) {
+// applyAtomicBlockEffects advances the model by blk's atomic (cross-chain)
+// txs, waiting for sut's pool to evict each included tx and asserting the
+// import-consumed UTXOs are gone from sut's shared memory.
+//
+//nolint:revive // context-as-argument: see issueTransfer
+func (c *modelCore) applyAtomicBlockEffects(rt *rapid.T, ctx context.Context, sut *SUT, blk *blocks.Block) {
+	m := c.m
+	atxs := blockTxs(c.tb, blk)
+	for _, atx := range atxs {
 		exp, ok := m.pendingAtomic[atx.ID()]
 		require.Truef(rt, ok, "block %d contains unexpected atomic tx %s", blk.NumberU64(), atx.ID())
 		delete(m.pendingAtomic, atx.ID())
-		mm.sut.waitForTxPoolStateUpdate(mm.ctx, mm.tb, atx)
+		sut.waitForTxPoolStateUpdate(ctx, c.tb, atx)
 
-		sender := mm.atomicAddrs[exp.senderIdx]
+		sender := c.atomicAddrs[exp.senderIdx]
 		if exp.isImport {
 			m.balances[exp.to].Add(m.balances[exp.to], exp.creditWei)
 			consumed := utxosOf(exp.consumed)
 			m.consumedUTXOs[exp.remoteChain] = append(m.consumedUTXOs[exp.remoteChain], consumed...)
-			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, exp.remoteChain, consumed...)
+			sut.assertUTXOsMissing(c.tb, sut.ctx.ChainID, exp.remoteChain, consumed...)
 		} else {
 			m.balances[sender].Sub(m.balances[sender], exp.debitWei)
 			m.nonces[sender]++
 			m.exportedUTXOs[exp.remoteChain] = append(m.exportedUTXOs[exp.remoteChain], exp.exported...)
 		}
 	}
+
+	// Drop included txs from the machine's wait-list, mirroring pendingEthTxs.
+	included := make(map[ids.ID]bool, len(atxs))
+	for _, atx := range atxs {
+		included[atx.ID()] = true
+	}
+	kept := c.pendingAtomicTxs[:0]
+	for _, t := range c.pendingAtomicTxs {
+		if !included[t.ID()] {
+			kept = append(kept, t)
+		}
+	}
+	c.pendingAtomicTxs = kept
+}
+
+// applyBlock advances the model by one accepted block: the shared eth-side
+// core, plus the shared atomic (cross-chain) reconciliation.
+func (mm *modelMachine) applyBlock(rt *rapid.T, blk *blocks.Block) {
+	mm.modelCore.applyBlock(rt, mm.ctx, mm.sut, blk)
+	mm.modelCore.applyAtomicBlockEffects(rt, mm.ctx, mm.sut, blk)
 }
 
 // applyBlock advances the model by one accepted block: dynamic-parameter
@@ -874,21 +920,24 @@ func (c *modelCore) checkState(rt *rapid.T, ctx context.Context, sut *SUT, db da
 	checkRawdbPointers(rt, db)
 }
 
+// checkSharedMemory asserts sut's shared memory agrees with the model:
+// exported UTXOs are readable by the remote chain, consumed UTXOs are gone.
+// Reads shared memory directly, so it also covers restarts.
+func (c *modelCore) checkSharedMemory(rt *rapid.T, sut *SUT) {
+	for _, chain := range c.remoteChains(sut) {
+		if exported := c.m.exportedUTXOs[chain]; len(exported) > 0 {
+			sut.assertUTXOsExist(c.tb, chain, sut.ctx.ChainID, exported...)
+		}
+		if consumed := c.m.consumedUTXOs[chain]; len(consumed) > 0 {
+			sut.assertUTXOsMissing(c.tb, sut.ctx.ChainID, chain, consumed...)
+		}
+	}
+}
+
 // check is the rapid invariant action, run around every other action.
 func (mm *modelMachine) check(rt *rapid.T) {
 	mm.checkState(rt, mm.ctx, mm.sut, mm.db)
-
-	// Shared-memory agreement: exported UTXOs are readable by the remote
-	// chain, consumed UTXOs are gone. This also covers restarts, since it
-	// reads directly from shared memory rather than in-memory bookkeeping.
-	for _, chain := range mm.remoteChains() {
-		if exported := mm.m.exportedUTXOs[chain]; len(exported) > 0 {
-			mm.sut.assertUTXOsExist(mm.tb, chain, mm.sut.ctx.ChainID, exported...)
-		}
-		if consumed := mm.m.consumedUTXOs[chain]; len(consumed) > 0 {
-			mm.sut.assertUTXOsMissing(mm.tb, mm.sut.ctx.ChainID, chain, consumed...)
-		}
-	}
+	mm.checkSharedMemory(rt, mm.sut)
 }
 
 // checkRawdbPointers spot-checks invariants.md pointer discipline on the

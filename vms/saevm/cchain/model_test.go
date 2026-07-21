@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -160,7 +161,13 @@ type modelCore struct {
 	wallet *saetest.Wallet
 	addrs  []common.Address
 
-	pendingEthTxs []*types.Transaction
+	vdrs *warptest.Validators
+
+	atomicKeys  []*secp256k1.PrivateKey
+	atomicAddrs []common.Address
+
+	pendingEthTxs    []*types.Transaction
+	pendingAtomicTxs []*tx.Tx
 }
 
 type modelMachine struct {
@@ -171,11 +178,7 @@ type modelMachine struct {
 	sut   *SUT
 	clock *saetest.Clock
 
-	vdrs *warptest.Validators
-
-	atomicKeys    []*secp256k1.PrivateKey
 	atomicWallets []*wallet
-	atomicAddrs   []common.Address
 
 	db      database.Database
 	dbDir   string
@@ -197,10 +200,10 @@ func newModelMachine(t *testing.T, rt *rapid.T, cfg runConfig) *modelMachine {
 			tb:     tb,
 			wallet: saetest.NewWalletWithKeyChain(keys, types.LatestSigner(saetest.ChainConfig())),
 			addrs:  keys.Addresses(),
+			vdrs:   warptest.NewValidators(tb, cfg.numValidators),
 		},
 		cfg:     cfg,
 		clock:   clock,
-		vdrs:    warptest.NewValidators(tb, cfg.numValidators),
 		dataDir: t.TempDir(),
 		timeOpt: timeOpt,
 	}
@@ -319,6 +322,10 @@ func (mm *modelMachine) openSUT() {
 		mm.atomicWallets = append(mm.atomicWallets, w)
 	}
 }
+
+// atomicWallet adapts mm's per-key wallets to the walletFor parameter of the
+// shared modelCore issuance methods.
+func (mm *modelMachine) atomicWallet(i int) *wallet { return mm.atomicWallets[i] }
 
 // scopedTB adapts the outer *testing.T for use inside a rapid property check.
 // It scopes Cleanup callbacks to a single check (run via close) and routes
