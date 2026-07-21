@@ -86,6 +86,7 @@ import (
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	oraclepkg "github.com/ava-labs/avalanchego/network/p2p/oracle"
+	teleporterpkg "github.com/ava-labs/avalanchego/network/p2p/oracle/teleporter"
 	p2poracle "github.com/ava-labs/avalanchego/network/p2p/oracle/validator"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
@@ -514,9 +515,25 @@ func (vm *VM) Initialize(
 		if err != nil {
 			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
 		}
-		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar, allowed)); err != nil {
+		if err := vm.registerOracleHandler(
+			p2poracle.SignatureRequestHandlerID, "oracle_signature_cache",
+			p2poracle.NewOracleVerifier(sidecar, allowed),
+		); err != nil {
 			return fmt.Errorf("failed to register oracle handler: %w", err)
 		}
+
+		// The attestor-gateway Teleporter verifier shares this sidecar but signs
+		// native TeleporterMessageV2 payloads at a distinct handler ID.
+		if vm.config.Oracle.Teleporter {
+			if err := vm.registerOracleHandler(
+				teleporterpkg.SignatureRequestHandlerID, "teleporter_signature_cache",
+				teleporterpkg.NewTeleporterVerifier(sidecar),
+			); err != nil {
+				return fmt.Errorf("failed to register teleporter handler: %w", err)
+			}
+		}
+	} else if vm.config.Oracle.Teleporter {
+		return errors.New("oracle.teleporter is set but oracle.endpoint is empty; the Teleporter verifier needs the sidecar")
 	}
 
 	vm.stateSyncDone = make(chan struct{})
@@ -524,14 +541,14 @@ func (vm *VM) Initialize(
 	return vm.initializeStateSync(lastAcceptedHeight)
 }
 
-func (vm *VM) registerOracleHandler(verifier acp118.Verifier) error {
+func (vm *VM) registerOracleHandler(handlerID uint64, cacheName string, verifier acp118.Verifier) error {
 	cache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
-	meteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, cache)
+	meteredCache, err := metercacher.New(cacheName, vm.sdkMetrics, cache)
 	if err != nil {
-		return fmt.Errorf("failed to create oracle signature cache: %w", err)
+		return fmt.Errorf("failed to create %s: %w", cacheName, err)
 	}
 	handler := acp118.NewCachedHandler(meteredCache, verifier, vm.ctx.WarpSigner)
-	return vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, handler)
+	return vm.P2PNetwork().AddHandler(handlerID, handler)
 }
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
