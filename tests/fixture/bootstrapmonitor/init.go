@@ -21,8 +21,16 @@ import (
 const (
 	initTimeout = 2 * time.Minute
 
+	// How long to wait to be reaped after updating the statefulset image
+	reapTimeout = 5 * time.Minute
+
 	BootstrapStartingMessage = "Starting bootstrap test"
 	BootstrapResumingMessage = "Resuming bootstrap test"
+)
+
+var (
+	errImageNotDigestPinned = errors.New("image is neither digest-pinned nor tagged \":master\"")
+	errPodNotReaped         = errors.New("pod was not reaped after its statefulset's image was updated")
 )
 
 func NodeDataDir(path string) string {
@@ -63,10 +71,17 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}
-		// Compare and record the digest-pinned image rather than the mutable
-		// tag so that a restart with an unchanged build resumes the test
-		// instead of wiping it.
-		testConfig.Image = masterImageDetails.Image
+		// Wait to be reaped by the statefulset controller. The replacement
+		// pod will run the digest-pinned image and make the start/resume
+		// decision.
+		log.Info("Waiting to be reaped by the statefulset controller", zap.Duration("timeout", reapTimeout))
+		time.Sleep(reapTimeout)
+		return errPodNotReaped
+	}
+
+	// Only a digest-pinned image unambiguously identifies a build
+	if !strings.Contains(testConfig.Image, "@sha256:") {
+		return fmt.Errorf("%w: %q", errImageNotDigestPinned, testConfig.Image)
 	}
 
 	// A bootstrap is being resumed if a version file exists and the image name it contains matches the container

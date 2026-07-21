@@ -160,12 +160,10 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return true
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 
-		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the resumption of a bootstrap test", initContainerName))
+		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		// The tag pod records the digest-pinned image before the rollout replaces
-		// it, so the pinned pod resumes the test rather than starting a new one.
-		bootstrapResumingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapResumingMessage, containerImage)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
+		bootstrapStartingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 
 		ginkgo.By("Waiting for the pod to report readiness")
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReady)
@@ -197,6 +195,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return pod.UID != podUID
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
+		bootstrapResumingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapResumingMessage, containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
@@ -223,7 +222,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a new bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapStartingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		bootstrapStartingMessage = bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 	})
 })
