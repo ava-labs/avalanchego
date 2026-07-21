@@ -506,11 +506,13 @@ func (nm *networkedMachine) check(rt *rapid.T) {
 // so a lagging node can be compared against the exact chain prefix it has
 // accepted without replaying the model.
 type modelSnapshot struct {
-	id            ids.ID
-	balances      map[common.Address]*uint256.Int
-	nonces        map[common.Address]uint64
-	contracts     map[common.Address]*contractState
-	warpSentCount int
+	id             ids.ID
+	balances       map[common.Address]*uint256.Int
+	nonces         map[common.Address]uint64
+	contracts      map[common.Address]*contractState
+	consumedCounts map[ids.ID]int // len(m.consumedUTXOs[chain]) at this height
+	exportedCounts map[ids.ID]int // len(m.exportedUTXOs[chain]) at this height
+	warpSentCount  int
 }
 
 func (nm *networkedMachine) snapshot() {
@@ -522,12 +524,22 @@ func (nm *networkedMachine) snapshot() {
 	for a, cs := range nm.m.contracts {
 		contracts[a] = &contractState{kind: cs.kind, storage: maps.Clone(cs.storage)}
 	}
+	consumedCounts := make(map[ids.ID]int, len(nm.m.consumedUTXOs))
+	for chain, us := range nm.m.consumedUTXOs {
+		consumedCounts[chain] = len(us)
+	}
+	exportedCounts := make(map[ids.ID]int, len(nm.m.exportedUTXOs))
+	for chain, us := range nm.m.exportedUTXOs {
+		exportedCounts[chain] = len(us)
+	}
 	nm.snapshots = append(nm.snapshots, modelSnapshot{
-		id:            nm.m.lastAcceptedID,
-		balances:      balances,
-		nonces:        maps.Clone(nm.m.nonces),
-		contracts:     contracts,
-		warpSentCount: len(nm.warpSent),
+		id:             nm.m.lastAcceptedID,
+		balances:       balances,
+		nonces:         maps.Clone(nm.m.nonces),
+		contracts:      contracts,
+		consumedCounts: consumedCounts,
+		exportedCounts: exportedCounts,
+		warpSentCount:  len(nm.warpSent),
 	})
 }
 
@@ -549,6 +561,28 @@ func (nm *networkedMachine) checkLagging(rt *rapid.T, n *modelNode) {
 	for contract, cs := range snap.contracts {
 		for key, want := range cs.storage {
 			require.Equalf(rt, want, state.GetState(contract, key), "lagging node %d storage %s[%s]", n.idx, contract, key)
+		}
+	}
+	// Shared memory lags with the chain: this node has applied atomic ops
+	// only for its accepted prefix. Prefix consumed → gone; suffix consumed
+	// (imports in withheld blocks) → still present. Prefix exported →
+	// present; suffix exported (exports in withheld blocks) → still absent.
+	for _, chain := range nm.remoteChains(n.sut) {
+		consumed := nm.m.consumedUTXOs[chain]
+		cc := snap.consumedCounts[chain]
+		if cc > 0 {
+			n.sut.assertUTXOsMissing(nm.tb, n.sut.ctx.ChainID, chain, consumed[:cc]...)
+		}
+		if suffix := consumed[cc:]; len(suffix) > 0 {
+			n.sut.assertUTXOsExist(nm.tb, n.sut.ctx.ChainID, chain, suffix...)
+		}
+		exported := nm.m.exportedUTXOs[chain]
+		ec := snap.exportedCounts[chain]
+		if ec > 0 {
+			n.sut.assertUTXOsExist(nm.tb, chain, n.sut.ctx.ChainID, exported[:ec]...)
+		}
+		if suffix := exported[ec:]; len(suffix) > 0 {
+			n.sut.assertUTXOsMissing(nm.tb, chain, n.sut.ctx.ChainID, suffix...)
 		}
 	}
 	checkRawdbPointers(rt, n.db)
