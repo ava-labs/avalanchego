@@ -118,6 +118,8 @@ type (
 		toleratedLogMessages []string
 
 		skipRPCTransport bool
+
+		gossipInterval time.Duration
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -287,6 +289,21 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
+// withGossipInterval overrides the SUT's push AND pull periods for cchain's
+// own cross-chain (atomic-tx) gossip system (registered under
+// p2p.AtomicTxGossipHandlerID in vm.go) — both real, unmocked
+// time.Ticker-driven waits, no mock clock covers gossip timing. Defaults to
+// 100ms, matching every test's behavior before this option existed.
+//
+// This does NOT affect eth-tx gossip: that is driven entirely by the
+// embedded sae.VM's own hardcoded push/pull periods (local consts in
+// sae/vm.go), which are not exposed through this VM's config at all.
+func withGossipInterval(d time.Duration) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.gossipInterval = d
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -307,18 +324,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb, 0),
-			now:        time.Now,
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:         ids.GenerateTestNodeID(),
+			networkID:      constants.UnitTestID,
+			validators:     warptest.NewValidators(tb, 0),
+			now:            time.Now,
+			vmConfig:       defaultConfig(),
+			db:             memdb.New(),
+			state:          snow.NormalOp,
+			upgrades:       upgradetest.GetConfig(upgradetest.Latest),
+			gossipInterval: 100 * time.Millisecond,
 		}, opts...)
 		vm = &VM{
-			pullGossipPeriod: 100 * time.Millisecond,
-			pushGossipPeriod: 100 * time.Millisecond,
+			pullGossipPeriod: cfg.gossipInterval,
+			pushGossipPeriod: cfg.gossipInterval,
 			now:              cfg.now,
 		}
 		db = cfg.db
