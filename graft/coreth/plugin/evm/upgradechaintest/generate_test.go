@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -103,14 +102,6 @@ var (
 	transferRecipient = common.Address{0xde, 0xad}
 )
 
-func blsSigner(t *testing.T, scalar byte) *localsigner.LocalSigner {
-	skBytes := make([]byte, 32)
-	skBytes[31] = scalar
-	sk, err := localsigner.FromBytes(skBytes)
-	require.NoError(t, err, "localsigner.FromBytes(scalar=%d)", scalar)
-	return sk
-}
-
 type generator struct {
 	vm  *vm.VM
 	ctx *snow.Context
@@ -144,9 +135,9 @@ func generate(t *testing.T) *Fixture {
 	g := &generator{
 		vm: vm.WrapVM(&evm.VM{}),
 		kc: secp256k1fx.NewKeychain(vmtest.TestKeys...),
-		// Fixed BLS keys so the embedded signed warp message, and hence the
-		// fixture, is deterministic.
-		warpValidators: warptest.NewValidators(t, warptest.WithSigners(blsSigner(t, 1), blsSigner(t, 2))),
+		// [warptest.NewValidators] derives BLS keys deterministically, so the
+		// embedded signed warp message, and hence the fixture, is deterministic.
+		warpValidators: warptest.NewValidators(t, warptest.WithMinimum(2)),
 		fixture: &Fixture{
 			Genesis:    json.RawMessage(genesisJSON),
 			Upgrades:   upgrades,
