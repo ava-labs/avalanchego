@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
@@ -112,7 +113,22 @@ type (
 		state      snow.State
 		upgrades   upgrade.Config
 
+		chainDataDir string
+
+		toleratedLogMessages []string
+
 		skipRPCTransport bool
+
+		// atomicGossipInterval overrides cchain's own cross-chain (atomic-tx)
+		// gossip periods (see [VM.atomicTxPushGossipPeriod] /
+		// [VM.atomicTxPullGossipPeriod]); defaults to 100ms below, matching
+		// every test's behavior before [withGossipInterval] existed.
+		atomicGossipInterval time.Duration
+		// ethGossipInterval overrides the embedded sae.VM's eth-tx gossip
+		// periods (see [sae.Config.PushGossipPeriod] /
+		// [sae.Config.PullGossipPeriod]); zero (the default) leaves the
+		// sae.VM's own defaults in place.
+		ethGossipInterval time.Duration
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -150,6 +166,53 @@ func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
 	})
+}
+
+// withChainDataDir pins the SUT's chain data dir (firewood trie data,
+// execution-results DB) so a restarted SUT finds its persisted state.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
+	})
+}
+
+// withToleratedLogMessage allows an exact WARN-level log message to reach the
+// SUT's logger without failing the test (loggingtest.New otherwise treats
+// every WARN/ERROR as a test failure). Scope it tightly: only pass messages
+// that are known-benign for a specific, documented reason.
+func withToleratedLogMessage(msg string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.toleratedLogMessages = append(c.toleratedLogMessages, msg)
+	})
+}
+
+// toleratingLogger wraps a [logging.Logger], downgrading an exact set of
+// WARN messages to Info so they don't trip loggingtest's "warnings are
+// errors" policy. All other levels, including unlisted WARNs, pass through
+// unchanged.
+type toleratingLogger struct {
+	logging.Logger
+	tolerated map[string]bool
+}
+
+func newToleratingLogger(l logging.Logger, msgs []string) *toleratingLogger {
+	tolerated := make(map[string]bool, len(msgs))
+	for _, m := range msgs {
+		tolerated[m] = true
+	}
+	return &toleratingLogger{Logger: l, tolerated: tolerated}
+}
+
+func (l *toleratingLogger) Warn(msg string, fields ...zap.Field) {
+	if l.tolerated[msg] {
+		l.Logger.Info(msg, fields...)
+		return
+	}
+	l.Logger.Warn(msg, fields...)
+}
+
+func (l *toleratingLogger) With(fields ...zap.Field) logging.Logger {
+	return &toleratingLogger{Logger: l.Logger.With(fields...), tolerated: l.tolerated}
 }
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
@@ -235,6 +298,21 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
+// withGossipInterval overrides every gossip period the SUT drives: cchain's
+// own cross-chain (atomic-tx) push/pull periods (registered under
+// p2p.AtomicTxGossipHandlerID in vm.go) AND the embedded sae.VM's eth-tx
+// push/pull periods (sae.Config.PushGossipPeriod / PullGossipPeriod). All
+// four are real, unmocked time.Ticker-driven waits — no mock clock covers
+// gossip timing. A test issuing many actions that wait on cross-node gossip
+// delivery (e.g. the networked model machine) can lower this to shrink real
+// wall-clock cost without changing what is tested.
+func withGossipInterval(d time.Duration) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.atomicGossipInterval = d
+		c.ethGossipInterval = d
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -255,19 +333,22 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb, 0),
-			now:        time.Now,
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:               ids.GenerateTestNodeID(),
+			networkID:            constants.UnitTestID,
+			validators:           warptest.NewValidators(tb, 0),
+			now:                  time.Now,
+			vmConfig:             defaultConfig(),
+			db:                   memdb.New(),
+			state:                snow.NormalOp,
+			upgrades:             upgradetest.GetConfig(upgradetest.Latest),
+			atomicGossipInterval: 100 * time.Millisecond,
 		}, opts...)
 		vm = &VM{
-			pullGossipPeriod: 100 * time.Millisecond,
-			pushGossipPeriod: 100 * time.Millisecond,
-			now:              cfg.now,
+			atomicTxPullGossipPeriod: cfg.atomicGossipInterval,
+			atomicTxPushGossipPeriod: cfg.atomicGossipInterval,
+			ethTxPushGossipPeriod:    cfg.ethGossipInterval,
+			ethTxPullGossipPeriod:    cfg.ethGossipInterval,
+			now:                      cfg.now,
 		}
 		db = cfg.db
 	)
@@ -276,12 +357,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	if cfg.chainDataDir != "" {
+		snowCtx.ChainDataDir = cfg.chainDataDir
+	}
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
-	snowCtx.Log = log
+	var vmLog logging.Logger = log
+	if len(cfg.toleratedLogMessages) > 0 {
+		vmLog = newToleratingLogger(log, cfg.toleratedLogMessages)
+	}
+	snowCtx.Log = vmLog
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)
@@ -595,7 +683,38 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 // during block building.
 func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
+
+	// Bounded well above the worst legitimate gossip heal (the 30s push
+	// regossip period) so a genuinely stranded tx fails loudly, naming the
+	// missing hashes (and, under rapid, the action sequence), instead of
+	// hanging until the package timeout.
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
+}
+
+// waitForAtomicTxs blocks until every tx is present in the SUT's cross-chain
+// tx pool, whether it arrived by direct issuance or via atomic-tx gossip.
+// Bounded like waitForPendingEthTxs so a genuinely stranded tx fails loudly,
+// naming the missing tx, instead of hanging until the package timeout.
+func (s *SUT) waitForAtomicTxs(ctx context.Context, tb testing.TB, txs ...*tx.Tx) {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+
+	for _, t := range txs {
+		for !s.txpool.Has(t.ID()) {
+			select {
+			case <-ctx.Done():
+				require.NoErrorf(tb, ctx.Err(), "waiting for atomic tx %s in pool", t.ID())
+			case <-ticker.C:
+			}
+		}
+	}
 }
 
 type (
@@ -746,7 +865,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -776,6 +895,11 @@ func (w *wallet) newImportTx(
 		})
 	}
 	require.Greaterf(tb, importedAVAX, fee, "imported AVAX insufficient to cover fee")
+	// tx.Import.sanityCheck requires ImportedInputs to be sorted and unique
+	// (by UTXOID); getAllUTXOs makes no such ordering guarantee, and this
+	// only surfaces once an owner has more than one spendable UTXO on the
+	// source chain.
+	utils.Sort(inputs)
 
 	imp := &tx.Import{
 		NetworkID:      w.snowCtx.NetworkID,
@@ -788,7 +912,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -875,7 +999,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
