@@ -105,6 +105,7 @@ go_library(
         "@com_github_ava_labs_libevm//eth/tracers/js",
         "@com_github_ava_labs_libevm//eth/tracers/native",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//metrics",
