@@ -26,9 +26,13 @@ import (
 
 var _ common.Engine = (*Engine)(nil)
 
-var (
-	minTickDuration = 50 * time.Millisecond
+// minTickDuration is the lowest tick interval the engine allows.
+// [simplexparams.Parameters.Verify] enforces [simplexparams.MinWaitDuration],
+// which guarantees getTickInterval never falls below this; the check in
+// newEngine is an internal backstop.
+const minTickDuration = simplexparams.MinWaitDuration / 10
 
+var (
 	errTooFastTicker        = errors.New("ticker set too fast")
 	errUnknownMessageType   = errors.New("unknown message type")
 	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
@@ -307,7 +311,7 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	// A non-validator never started an epoch instance, so no need
 	// to shut it down
 	if e.nonValidator {
-		return nil
+		return e.vm.Shutdown(ctx)
 	}
 
 	e.shutdownOnce.Do(func() {

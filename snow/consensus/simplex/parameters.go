@@ -13,6 +13,12 @@ import (
 
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
+// MinWaitDuration is the minimum allowed value for both
+// [Parameters.MaxNetworkDelay] and [Parameters.MaxRebroadcastWait]. The engine
+// ticks at a tenth of the smaller of the two values, so this bound keeps the
+// tick interval from being set too fast.
+const MinWaitDuration = 500 * time.Millisecond
+
 type ValidatorInfo struct {
 	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
 
@@ -33,11 +39,11 @@ var DefaultParameters = Parameters{
 }
 
 func (p Parameters) Verify() error {
-	if p.MaxNetworkDelay <= 0 {
-		return fmt.Errorf("%w: maxNetworkDelay must be positive", ErrInvalidParameters)
+	if p.MaxNetworkDelay < MinWaitDuration {
+		return fmt.Errorf("%w: maxNetworkDelay must be at least %s", ErrInvalidParameters, MinWaitDuration)
 	}
-	if p.MaxRebroadcastWait <= 0 {
-		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
+	if p.MaxRebroadcastWait < MinWaitDuration {
+		return fmt.Errorf("%w: maxRebroadcastWait must be at least %s", ErrInvalidParameters, MinWaitDuration)
 	}
 	// TODO: we need to validate InitialValidators contains only unique nodes with valid keys.
 	// See: https://github.com/ava-labs/avalanchego/issues/5023
