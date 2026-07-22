@@ -64,7 +64,7 @@ func newSigner(tb testing.TB, i int) bls.Signer {
 	tb.Helper()
 
 	var skBytes [32]byte
-	binary.BigEndian.PutUint64(skBytes[24:], uint64(i)+1) // scalar 0 is an invalid key
+	binary.BigEndian.PutUint64(skBytes[24:], uint64(i)+1) //#nosec G115 -- Won't overflow; +1 avoids invalid scalar 0
 	sk, err := localsigner.FromBytes(skBytes[:])
 	require.NoError(tb, err, "localsigner.FromBytes(scalar=%d)", i+1)
 	return sk
