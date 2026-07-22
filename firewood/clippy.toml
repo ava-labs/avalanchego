@@ -1,0 +1,49 @@
+# See https://doc.rust-lang.org/clippy/lint_configuration.html
+# for full configuration options.
+
+msrv = "1.94"
+
+doc-valid-idents = [
+  "MerkleDB",
+  # this list must end with ".." so that it does not truncate the default list
+  "..",
+]
+
+disallowed-methods = [
+  { path = "rand::rng", replacement = "firewood_storage::SeededRng::from_env_or_random", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "std::os::unix::fs::FileExt::write_at", replacement = "write_all_at", reason = "use write_all_at instead of write_at to handle short writes ensuring the entire buffer is written", allow-invalid = true },
+  # Out-of-bounds index panics
+  { path = "slice::split_at", reason = "split_at panics on out-of-bounds index; verify the index is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::split_at_mut", reason = "split_at_mut panics on out-of-bounds index; verify the index is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::swap", reason = "swap panics on out-of-bounds index; verify both indices are in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::copy_within", reason = "copy_within panics if src or dest is out of bounds; verify the ranges are in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rotate_left", reason = "rotate_left panics if mid > len; verify mid is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rotate_right", reason = "rotate_right panics if k > len; verify k is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::select_nth_unstable", reason = "select_nth_unstable panics if index >= len; verify the index is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::select_nth_unstable_by", reason = "select_nth_unstable_by panics if index >= len; verify the index is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::select_nth_unstable_by_key", reason = "select_nth_unstable_by_key panics if index >= len; verify the index is in bounds and add #[allow] with a safety comment", allow-invalid = true },
+  # Length mismatch panics
+  { path = "slice::clone_from_slice", reason = "clone_from_slice panics if source and destination lengths differ; verify lengths match and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::copy_from_slice", reason = "copy_from_slice panics if source and destination lengths differ; verify lengths match and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::swap_with_slice", reason = "swap_with_slice panics if source and destination lengths differ; verify lengths match and add #[allow] with a safety comment", allow-invalid = true },
+  # Zero-size argument panics
+  { path = "slice::windows", reason = "windows panics if size is 0; verify size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::chunks", reason = "chunks panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::chunks_mut", reason = "chunks_mut panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::chunks_exact", reason = "chunks_exact panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::chunks_exact_mut", reason = "chunks_exact_mut panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rchunks", reason = "rchunks panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rchunks_mut", reason = "rchunks_mut panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rchunks_exact", reason = "rchunks_exact panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+  { path = "slice::rchunks_exact_mut", reason = "rchunks_exact_mut panics if chunk_size is 0; verify chunk_size is non-zero and add #[allow] with a safety comment", allow-invalid = true },
+]
+
+disallowed-types = [
+  { path = "rand::SeedableRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "rand::rngs::StdRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "std::sync::Mutex", replacement = "parking_lot::Mutex", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::MutexGuard", replacement = "parking_lot::MutexGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLock", replacement = "parking_lot::RwLock", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLockReadGuard", replacement = "parking_lot::RwLockReadGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLockWriteGuard", replacement = "parking_lot::RwLockWriteGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+]
