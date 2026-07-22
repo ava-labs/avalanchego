@@ -1,6 +1,7 @@
 # saevm
 
-`saevm` is the reference implementation of Streaming Asynchronous Execution (SAE) of EVM blocks, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution).
+`saevm` is the reference implementation of Continuous Execution of EVM blocks, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
+Continuous Execution was formerly known as Streaming Asynchronous Execution (SAE), the name still used by the packages and throughout this documentation.
 
 ## Table of contents
 
@@ -101,7 +102,7 @@ See the [C-Chain README](./cchain/README.md), its [configuration reference](./cc
 
 ## References
 
-- [ACP-194: Streaming Asynchronous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution) — the spec this VM implements
+- [ACP-194: Continuous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution) — the spec this VM implements
 - [ACP-176: Dynamic EVM Gas Limit and Price Discovery Updates](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates) — the gas mechanism that `gastime` generalizes
 - [ACP-226: Dynamic Minimum Block Times](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226-dynamic-minimum-block-times)
 - [ACP-283: Dynamic Minimum Gas Price](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md)
