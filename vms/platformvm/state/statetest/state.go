@@ -30,15 +30,15 @@ import (
 var DefaultNodeID = ids.GenerateTestNodeID()
 
 type Config struct {
-	DB         database.Database
-	Genesis    []byte
-	Registerer prometheus.Registerer
-	Validators validators.Manager
-	Upgrades   upgrade.Config
-	Config     config.Config
-	Context    *snow.Context
-	Metrics    metrics.Metrics
-	Rewards    reward.Calculator
+	DB           database.Database
+	Genesis      []byte
+	Registerer   prometheus.Registerer
+	Validators   validators.Manager
+	Upgrades     upgrade.Config
+	Config       config.Config
+	Context      *snow.Context
+	Metrics      metrics.Metrics
+	RewardConfig reward.Config
 }
 
 func New(t testing.TB, c Config) *state.State {
@@ -72,13 +72,13 @@ func New(t testing.TB, c Config) *state.State {
 	if c.Metrics == nil {
 		c.Metrics = metrics.Noop
 	}
-	if c.Rewards == nil {
-		c.Rewards = reward.NewCalculator(reward.Config{
+	if c.RewardConfig == (reward.Config{}) {
+		c.RewardConfig = reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .1 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
-		})
+		}
 	}
 
 	s, err := state.New(
@@ -90,7 +90,7 @@ func New(t testing.TB, c Config) *state.State {
 		&c.Config,
 		c.Context,
 		c.Metrics,
-		c.Rewards,
+		c.RewardConfig,
 	)
 	require.NoError(t, err)
 	return s

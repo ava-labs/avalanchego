@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
@@ -91,6 +92,7 @@ type SUT struct {
 	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
+	close  func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -106,6 +108,7 @@ type (
 		precompiles map[common.Address]libevm.PrecompiledContract
 		nodeID      ids.NodeID
 		validators  set.Set[ids.NodeID]
+		dataDir     string
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -142,6 +145,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		})),
 		vmConfig: Config{
 			MempoolConfig: mempoolConf,
+			DBConfig: saedb.Config{
+				CommitInterval: saedb.DefaultCommitInterval,
+			},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
@@ -151,21 +157,19 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			BaseFee:    big.NewInt(1),
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
-		db:     memdb.New(),
-		nodeID: ids.GenerateTestNodeID(),
+		db:      memdb.New(),
+		dataDir: tb.TempDir(),
+		nodeID:  ids.GenerateTestNodeID(),
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
-	tb.Cleanup(func() {
-		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
-	})
 
 	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
+	snowCtx.ChainDataDir = conf.dataDir
 	snowCtx.NodeID = conf.nodeID
 	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
 
@@ -190,9 +194,13 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		// remove the libevm registration.
 		registerPrecompiles(tb, conf.precompiles)
 	}
-	tb.Cleanup(func() {
+	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+	})
+	tb.Cleanup(func() {
+		closeOnce()
 	})
 
 	// Avalanchego marks the local node as connected so that p2p protocols
@@ -213,6 +221,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		db:     newEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
+		close:  closeOnce,
 
 		sender: sender,
 	}
@@ -277,7 +286,7 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 
 func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.TrieCommitInterval = interval
+		c.vmConfig.DBConfig.CommitInterval = interval
 	})
 }
 
@@ -1174,5 +1183,64 @@ func TestSettledGasTime(t *testing.T) {
 		if diff := cmp.Diff(want, got, gastime.CmpOpt()); diff != "" {
 			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
 		}
+	}
+}
+
+// TestDuplicateVerify verifies that having two in-memory instances of the same
+// block doesn't corrupt the VM, regardless of which is accepted.
+func TestDuplicateVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		acceptIndex int
+	}{
+		{
+			name:        "accept_first",
+			acceptIndex: 0,
+		},
+		{
+			name:        "accept_second",
+			acceptIndex: 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0)
+
+			first := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+			second, err := sut.ParseBlock(ctx, first.Bytes())
+			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVM)
+			blks := []snowman.Block{first, second}
+
+			// Consensus may call [block.WithVerifyContext.VerifyWithContext] on
+			// multiple instances of the same block. [VM.consensusCritical]
+			// isn't overridden, so the first instance verified is the one kept
+			// in the map.
+			for _, blk := range blks {
+				b := blk.(block.WithVerifyContext)
+				require.NoErrorf(t,
+					b.VerifyWithContext(ctx, &block.Context{}),
+					"%T.VerifyWithContext()",
+					blk,
+				)
+			}
+
+			parent := blks[test.acceptIndex]
+			require.NoErrorf(t, sut.SetPreference(ctx, parent.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
+			child, err := sut.BuildBlock(ctx)
+			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVM)
+			// Loads the parent from [VM.consensusCritical].
+			require.NoErrorf(t, child.Verify(ctx), "%T.Verify() child of duplicated block", child)
+
+			// Accepting parent and child adds them to the execution queue.
+			require.NoError(t, parent.Accept(ctx), "parent.Accept()")
+			require.NoError(t, child.Accept(ctx), "child.Accept()")
+
+			// Inside the executor, execution results are read from
+			// [blocks.Block.ParentBlock]. When the ancestry differs from the
+			// accepted instance, a naive implementation would block child's
+			// execution forever.
+			childRaw := unwrap(t, child)
+			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
+		})
 	}
 }

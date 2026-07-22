@@ -152,7 +152,7 @@ func NewVM[T hook.Transaction](
 	vm.toClose = append(vm.toClose, &xdb)
 
 	{ // ==========  Block State  ==========
-		rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg}
+		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
 			return nil, err
@@ -166,7 +166,7 @@ func NewVM[T hook.Transaction](
 			xdb,
 			cfg.DBConfig,
 			hooks,
-			snowCtx.Log,
+			snowCtx,
 			reg,
 		)
 		if err != nil {

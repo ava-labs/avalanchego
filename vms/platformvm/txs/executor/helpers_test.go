@@ -104,14 +104,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
-	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := statetest.New(t, statetest.Config{
-		DB:         baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: config.Validators,
-		Upgrades:   config.UpgradeConfig,
-		Context:    ctx,
-		Rewards:    rewards,
+		DB:           baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   config.Validators,
+		Upgrades:     config.UpgradeConfig,
+		Context:      ctx,
+		RewardConfig: config.RewardConfig,
 	})
 	lastAcceptedID = baseState.GetLastAccepted()
 
@@ -126,7 +125,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Fx:           fx,
 		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{

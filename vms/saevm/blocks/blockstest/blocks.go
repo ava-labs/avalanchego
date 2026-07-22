@@ -133,6 +133,11 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 	}
 
 	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	defer func() {
+		// Close the trie database to prevent memory leak and guarantee all
+		// state changes are flushed to disk.
+		require.NoErrorf(tb, tdb.Close(), "%T.Close()", tdb)
+	}()
 	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
 

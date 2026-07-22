@@ -354,6 +354,14 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return apis, nil
 }
 
+// SetPreferenceWithContext implements [block.SetPreferenceWithContextChainVM].
+//
+// The context is never actually used by this implementation, so the preference
+// is just delegated to the normal SetPreference method.
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
+	return vm.SetPreference(ctx, blkID)
+}
+
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
 func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	if txByteLen := len(tx.SignedBytes()); txByteLen > targetAtomicTxsSize {
