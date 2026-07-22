@@ -4,8 +4,6 @@
 package syncer
 
 import (
-	"errors"
-
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
@@ -13,8 +11,8 @@ import (
 )
 
 var (
-	_ sync.Marshaler[*RangeProof] = rangeProofMarshaler{}
-	_ sync.Marshaler[struct{}]    = changeProofMarshaler{}
+	_ sync.Marshaler[*RangeProof]  = rangeProofMarshaler{}
+	_ sync.Marshaler[*ChangeProof] = changeProofMarshaler{}
 )
 
 type rangeProofMarshaler struct{}
@@ -39,13 +37,24 @@ type RangeProof struct {
 	maxLength int
 }
 
-// TODO: implement an actual ChangeProof marshaler.
 type changeProofMarshaler struct{}
 
-func (changeProofMarshaler) Marshal(struct{}) ([]byte, error) {
-	return nil, errors.New("not implemented")
+func (changeProofMarshaler) Marshal(p *ChangeProof) ([]byte, error) {
+	return p.cp.MarshalBinary()
 }
 
-func (changeProofMarshaler) Unmarshal([]byte) (struct{}, error) {
-	return struct{}{}, errors.New("not implemented")
+func (changeProofMarshaler) Unmarshal(data []byte) (*ChangeProof, error) {
+	proof := new(ffi.ChangeProof)
+	if err := proof.UnmarshalBinary(data); err != nil {
+		return nil, err
+	}
+	return &ChangeProof{cp: proof}, nil
+}
+
+type ChangeProof struct {
+	cp *ffi.ChangeProof
+	// proposal is populated by VerifyChangeProof on the client side and
+	// consumed by CommitChangeProof. It is nil for proofs returned from
+	// GetChangeProof on the server side.
+	proposal *ffi.Proposal
 }

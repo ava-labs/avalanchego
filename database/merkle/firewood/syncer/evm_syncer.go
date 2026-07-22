@@ -5,7 +5,6 @@ package syncer
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
@@ -16,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-var _ sync.DB[*RangeProof, struct{}] = (*evmDB)(nil)
+var _ sync.DB[*RangeProof, *ChangeProof] = (*evmDB)(nil)
 
 type CodeQueue interface {
 	AddCode(context.Context, []common.Hash) error
@@ -33,11 +32,11 @@ func NewEVM(
 	codeQueue CodeQueue,
 	targetRoot ids.ID,
 	proofClient *p2p.Client,
-) (*sync.Syncer[*RangeProof, struct{}], error) {
+) (*sync.Syncer[*RangeProof, *ChangeProof], error) {
 	return newWithDB(
 		config,
 		&evmDB{
-			db:        &database{db},
+			db:        &database{db: db},
 			codeQueue: codeQueue,
 		},
 		targetRoot,
@@ -66,8 +65,23 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 	return nextKey, nil
 }
 
-func (*evmDB) CommitChangeProof(context.Context, maybe.Maybe[[]byte], struct{}) (maybe.Maybe[[]byte], error) {
-	return maybe.Nothing[[]byte](), errors.New("change proof code hashes not implemented")
+func (e *evmDB) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof *ChangeProof) (maybe.Maybe[[]byte], error) {
+	// First enqueue any code hashes found in the proof.
+	// If an error occurs here, we don't want to commit the proof to the database, because the
+	// code hashes will never be requested.
+	// Note: ffi.ChangeProof.CodeHashes() is currently a no-op in firewood; the loop is
+	// kept so we pick up real code hashes automatically once firewood implements it.
+	var codeHashes []common.Hash
+	for h, err := range proof.cp.CodeHashes() {
+		if err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
+		codeHashes = append(codeHashes, common.Hash(h))
+	}
+	if err := e.codeQueue.AddCode(ctx, codeHashes); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+	return e.db.CommitChangeProof(ctx, end, proof)
 }
 
 func (e *evmDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -78,7 +92,7 @@ func (e *evmDB) Clear() error {
 	return e.db.Clear()
 }
 
-func (e *evmDB) GetChangeProof(ctx context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (struct{}, error) {
+func (e *evmDB) GetChangeProof(ctx context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*ChangeProof, error) {
 	return e.db.GetChangeProof(ctx, startRootID, endRootID, start, end, maxLength)
 }
 
@@ -86,7 +100,7 @@ func (e *evmDB) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start ma
 	return e.db.GetRangeProofAtRoot(ctx, rootID, start, end, maxLength)
 }
 
-func (e *evmDB) VerifyChangeProof(ctx context.Context, proof struct{}, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+func (e *evmDB) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
 	return e.db.VerifyChangeProof(ctx, proof, start, end, expectedEndRootID, maxLength)
 }
 
