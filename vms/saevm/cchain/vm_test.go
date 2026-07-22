@@ -95,7 +95,7 @@ type SUT struct {
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
-	clock     *saetest.Clock // MAY be nil
+	clock     *saetest.Clock
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -587,9 +587,6 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
 // [VM.WaitForEvent] will not throttle for ACP-226 delays.
 func (s *SUT) unblockWaitForEvent() {
-	if s.clock == nil {
-		return
-	}
 	if t := earliestBuildTime(s.VM.VM.GetPreference()); s.clock.Now().Before(t) {
 		s.clock.Set(t)
 	}
