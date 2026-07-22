@@ -65,9 +65,9 @@ type Unsigned interface {
 	// inputIDs returns the one-time-use inputs consumed by this transaction.
 	inputIDs() set.Set[ids.ID]
 
-	// burned returns the amount of assetID that is consumed but not produced by
+	// burned returns the amount of AVAX that is consumed but not produced by
 	// this transaction.
-	burned(assetID ids.ID) (uint64, error)
+	burned(avaxAssetID ids.ID) (nAVAX, error)
 
 	// numSigs returns the expected number of signatures required to sign this
 	// transaction.
@@ -202,27 +202,32 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 const _x2cRate = 1_000_000_000
 
 // x2cRate is the conversion rate between the smallest denomination on the
-// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
+// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain, 1 aAVAX.
 var x2cRate = uint256.NewInt(_x2cRate)
 
-// scaleAVAX converts an amount denominated in nAVAX into the C-Chain's aAVAX
+type (
+	nAVAX = uint64
+	aAVAX = uint256.Int
+)
+
+// ScaleAVAX converts an amount denominated in nAVAX into the C-Chain's aAVAX
 // denomination.
-func scaleAVAX(nAVAX uint64) uint256.Int {
-	var aAVAX uint256.Int
-	aAVAX.SetUint64(nAVAX)
-	aAVAX.Mul(&aAVAX, x2cRate)
-	return aAVAX
+func ScaleAVAX(v nAVAX) aAVAX {
+	var r aAVAX
+	r.SetUint64(v)
+	r.Mul(&r, x2cRate)
+	return r
 }
 
 // gasPrice takes in the cost, in nAVAX, and the gas and returns the price per
 // gas in aAVAX/gas. It assumes gas is non-zero.
 //
 // The result is rounded down to the nearest aAVAX/gas.
-func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
+func gasPrice(cost nAVAX, gas gas.Gas) uint256.Int {
 	var u uint256.Int
 	u.SetUint64(uint64(gas))
 
-	p := scaleAVAX(cost)
+	p := ScaleAVAX(cost)
 	p.Div(&p, &u)
 	return p
 }

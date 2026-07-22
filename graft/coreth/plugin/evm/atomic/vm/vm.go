@@ -315,8 +315,20 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.cancel != nil {
 		vm.cancel()
 	}
+	// Persist the atomic trie at the last accepted height before the inner VM
+	// closes the database, so the next startup need not re-index it from the
+	// atomic tx repository.
+	if vm.AtomicBackend != nil {
+		_, lastAcceptedHeight, err := vm.InnerVM.ReadLastAccepted()
+		if err != nil {
+			return err
+		}
+		if err := vm.AtomicBackend.CommitLastAccepted(lastAcceptedHeight); err != nil {
+			return err
+		}
+	}
 	if err := vm.InnerVM.Shutdown(context.Background()); err != nil {
-		log.Error("failed to shutdown inner VM", "err", err)
+		log.Error("shutting down inner VM", "err", err)
 	}
 	vm.shutdownWg.Wait()
 	return nil
@@ -340,6 +352,14 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	log.Info("AVAX API enabled")
 	apis[avaxEndpoint] = avaxAPI
 	return apis, nil
+}
+
+// SetPreferenceWithContext implements [block.SetPreferenceWithContextChainVM].
+//
+// The context is never actually used by this implementation, so the preference
+// is just delegated to the normal SetPreference method.
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
+	return vm.SetPreference(ctx, blkID)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

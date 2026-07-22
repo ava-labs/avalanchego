@@ -5,6 +5,7 @@ package sae
 
 import (
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
@@ -54,4 +55,8 @@ func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*b
 
 func (c chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return c.acceptedBlocks.Subscribe(ch)
+}
+
+func (c chain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return c.Executor.SubscribeChainHeadEvent(ch)
 }

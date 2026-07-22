@@ -167,7 +167,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		signerKey := node.Flags[config.StakingSignerKeyContentKey]
 
 		env := types.Mapping{
-			config.NetworkNameKey:             constants.LocalName,
+			config.NetworkNameKey:             constants.NetworkName(network.GetNetworkID()),
 			config.LogLevelKey:                logging.Debug.String(),
 			config.LogDisplayLevelKey:         logging.Trace.String(),
 			config.LogFormatKey:               logging.JSONString,
@@ -178,9 +178,19 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingSignerKeyContentKey: signerKey,
 			config.ChainConfigContentKey:      chainConfigContent,
 		}
+		if network.Genesis != nil {
+			content, err := network.GetGenesisFileContent()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get genesis file content: %w", err)
+			}
+			env[config.GenesisFileContentKey] = content
+		}
 
 		// Apply configuration appropriate to a test network
 		maps.Copy(env, tmpnet.DefaultTmpnetFlags())
+
+		// Apply the network's default flags (e.g. upgrade configuration)
+		maps.Copy(env, network.DefaultFlags)
 
 		serviceName := getServiceName(i)
 

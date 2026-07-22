@@ -9,37 +9,31 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/log"
 )
 
 var _ state.Database = (*reconstructedStateAccessor)(nil)
 
 // reconstructedStateAccessor wraps a [state.Database] and overrides OpenTrie
 // and OpenStorageTrie to return reconstructed tries backed by an [ffi.Reconstructed].
+//
+// The [ffi.Reconstructed] view is mutated in place by trie operations, so it must
+// not be used concurrently. Instances are constructed by [NewStateAccessor] when
+// the trie database backend is a [reconstructedTrieDB]; see [NewReconstructedTrieDB].
 type reconstructedStateAccessor struct {
 	state.Database
 	recon             *ffi.Reconstructed
 	computeRootOnHash bool
 }
 
-// NewReconstructedStateAccessor creates a [state.Database] that opens tries
-// backed by the given [ffi.Reconstructed] view. The [ffi.Reconstructed] view is
-// mutated in place by trie operations, so the caller must not use it concurrently.
-//
-// If computeRootOnHash is false, reconstructed trie Hash and Commit calls apply
-// pending writes but return the cached root without forcing an expensive
-// reconstructed root computation. This mode is intended for replay paths that
-// only need Hash as a state-flush point and validate the final root separately.
-//
-// The provided db must have been returned by [NewStateAccessor].
-func NewReconstructedStateAccessor(db state.Database, recon *ffi.Reconstructed, computeRootOnHash bool) (state.Database, error) {
-	if _, ok := db.(*stateAccessor); !ok {
-		return nil, fmt.Errorf("expected *stateAccessor, got %T", db)
-	}
+// newReconstructedStateAccessor wraps db so that trie operations are served by
+// the reconstructed view backing fw.
+func newReconstructedStateAccessor(db state.Database, fw *reconstructedTrieDB) state.Database {
 	return &reconstructedStateAccessor{
 		Database:          db,
-		recon:             recon,
-		computeRootOnHash: computeRootOnHash,
-	}, nil
+		recon:             fw.recon,
+		computeRootOnHash: fw.computeRootOnHash,
+	}
 }
 
 // OpenTrie opens an account trie backed by the [ffi.Reconstructed] view.
@@ -73,10 +67,14 @@ func (*reconstructedStateAccessor) OpenStorageTrie(stateRoot common.Hash, addr c
 func (*reconstructedStateAccessor) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *reconstructedAccountTrie:
-		// reconstructedAccountTrie is not concurrent-safe
-		return nil
+		cp, err := t.Copy()
+		if err != nil {
+			log.Error("Failed to copy reconstructed trie", "error", err)
+			return nil
+		}
+		return cp
 	case *storageTrie:
-		return nil
+		return nil // The storage trie just wraps the account trie, so we must re-open it separately.
 	default:
 		panic(fmt.Errorf("unknown trie type %T", t))
 	}

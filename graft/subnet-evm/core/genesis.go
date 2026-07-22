@@ -36,6 +36,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -273,7 +274,7 @@ func (g *Genesis) trieConfig() *triedb.Config {
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
 func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Block, error) {
-	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
+	statedb, err := state.New(types.EmptyRootHash, extstate.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -383,8 +384,12 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
+			initialMinDelayExcess := acp226.InitialDelayExcess
+			if confExtra.InitialMinDelayMS != 0 {
+				initialMinDelayExcess = acp226.DesiredDelayExcess(confExtra.InitialMinDelayMS)
+			}
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
-			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+			*headerExtra.MinDelayExcess = initialMinDelayExcess
 		}
 	}
 
@@ -427,6 +432,8 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
+	rawdb.WriteFinalizedBlockHash(batch, block.Hash())
 	customrawdb.WriteChainConfig(batch, block.Hash(), config, params.GetExtra(config).UpgradeConfig)
 	if err := batch.Write(); err != nil {
 		return nil, fmt.Errorf("failed to write genesis block: %w", err)

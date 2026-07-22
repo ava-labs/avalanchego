@@ -166,3 +166,7 @@ This means that the VM needs to handle uniquification and leads to very specific
 ## Snowman VM APIs
 
 The VM must also implement `CreateHandlers()` which can return a map of extensions mapped to HTTP handlers that will be added to the node's API server. This allows the VM to expose APIs for querying and interacting with the blockchain implemented by the API.
+
+## VM implementations
+
+- [TransitionVM](./transitionvm/README.md) — a wrapper VM that swaps the underlying VM at a configured time. The C-Chain uses it to migrate from Coreth to SAEVM at the Helicon upgrade.

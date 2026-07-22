@@ -578,7 +578,7 @@ func TestEthGetters(t *testing.T) {
 	onDisk := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 
 	settled := sut.runConsensusLoop(t, createTx(t, zeroAddr))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	executed := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
@@ -729,7 +729,7 @@ func TestGetLogs(t *testing.T) {
 	}
 
 	settled := sut.runConsensusLoop(t, txWithLog(t))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	noLogs := sut.runConsensusLoop(t, txWithoutLog(t))
 
@@ -925,7 +925,7 @@ func TestGetReceipts(t *testing.T) {
 
 	onDisk, wantOnDisk := slice(t, 0, 2)
 	settled, wantSettled := slice(t, 2, 4)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
 	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
@@ -1256,6 +1256,43 @@ func TestRPCTxFeeCap(t *testing.T) {
 				Gas:      params.TxGas,
 				GasPrice: tt.gasPrice,
 			})
+			err := sut.Client.SendTransaction(sut.context(t), tx)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("SendTransaction() %s", diff)
+			}
+		})
+	}
+}
+
+func TestUnprotectedTxs(t *testing.T) {
+	tests := []struct {
+		name                string
+		allowUnprotectedTxs bool
+		wantErr             testerr.Want
+	}{
+		{
+			name:                "rejected_when_disallowed",
+			allowUnprotectedTxs: false,
+			wantErr:             testerr.Contains("only replay-protected (EIP-155) transactions allowed over RPC"),
+		},
+		{
+			name:                "accepted_when_allowed",
+			allowUnprotectedTxs: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnprotectedTxs
+			}))
+			// HomesteadSigner produces a pre-EIP-155 (replay-unprotected) tx
+			tx := sut.wallet.SignTx(t, types.HomesteadSigner{}, 0, &types.LegacyTx{
+				To:       &zeroAddr,
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			})
+			require.False(t, tx.Protected(), "tx.Protected()")
+
 			err := sut.Client.SendTransaction(sut.context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("SendTransaction() %s", diff)
@@ -1622,11 +1659,11 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 	ctx, sut := newSUT(t, 0, opt)
 
 	settled := sut.runConsensusLoop(t)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	for range 2 {
 		b := sut.runConsensusLoop(t)
-		vmTime.advanceToSettle(ctx, t, b)
+		vmTime.AdvanceToSettle(ctx, t, b)
 	}
 	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")
