@@ -156,11 +156,6 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
-	if err != nil {
-		return err
-	}
-	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
@@ -188,6 +183,28 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	// The inner VM's capabilities are only known once it has initialized. When
+	// it durably retains every accepted block's bytes (retrievable via
+	// GetBlock), store accepted blocks without their inner bytes and
+	// reconstruct them on read, instead of persisting a second copy of every
+	// inner block.
+	var getInnerBytes func(ids.ID) ([]byte, error)
+	if r, ok := vm.ChainVM.(block.RetainsAcceptedBlocksVM); ok && r.RetainsAcceptedBlocks() {
+		chainCtx.Log.Info("inner VM retains accepted blocks; storing blocks without inner bytes")
+		getInnerBytes = func(innerID ids.ID) ([]byte, error) {
+			innerBlk, err := vm.ChainVM.GetBlock(context.Background(), innerID)
+			if err != nil {
+				return nil, err
+			}
+			return innerBlk.Bytes(), nil
+		}
+	}
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer, getInnerBytes, chainCtx.Log)
+	if err != nil {
+		return err
+	}
+	vm.State = baseState
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
@@ -630,25 +647,38 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted: %w", err)
 	}
-	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("failed to get last accepted block: %w", err)
-	}
-
-	proLastAcceptedHeight := proLastAccepted.Height()
 	innerLastAcceptedHeight := innerLastAccepted.Height()
-	if proLastAcceptedHeight < innerLastAcceptedHeight {
-		return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
-	}
-	if proLastAcceptedHeight == innerLastAcceptedHeight {
-		// There is nothing to repair - as the heights match
-		return nil
-	}
+	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
+	switch {
+	case errors.Is(err, state.ErrInnerBlockUnavailable):
+		// The last accepted block is a deduplicated record whose inner block
+		// the inner VM doesn't have. This happens when the node shut down
+		// uncleanly between the proposervm accepting the block and the inner
+		// VM durably accepting it, which leaves the proposervm's last
+		// accepted above the inner VM's. Roll back to the inner VM's height
+		// without reading the unreconstructable block.
+		vm.ctx.Log.Warn("repairing accepted chain with unreconstructable last accepted block",
+			zap.Stringer("blkID", proLastAcceptedID),
+			zap.Uint64("innerHeight", innerLastAcceptedHeight),
+			zap.Error(err),
+		)
+	case err != nil:
+		return fmt.Errorf("failed to get last accepted block: %w", err)
+	default:
+		proLastAcceptedHeight := proLastAccepted.Height()
+		if proLastAcceptedHeight < innerLastAcceptedHeight {
+			return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
+		}
+		if proLastAcceptedHeight == innerLastAcceptedHeight {
+			// There is nothing to repair - as the heights match
+			return nil
+		}
 
-	vm.ctx.Log.Info("repairing accepted chain by height",
-		zap.Uint64("outerHeight", proLastAcceptedHeight),
-		zap.Uint64("innerHeight", innerLastAcceptedHeight),
-	)
+		vm.ctx.Log.Info("repairing accepted chain by height",
+			zap.Uint64("outerHeight", proLastAcceptedHeight),
+			zap.Uint64("innerHeight", innerLastAcceptedHeight),
+		)
+	}
 
 	// The inner vm must be behind the proposer vm, so we must roll the
 	// proposervm back.
@@ -830,7 +860,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {

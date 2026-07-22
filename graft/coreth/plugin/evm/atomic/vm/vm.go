@@ -58,6 +58,7 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
+	_ block.RetainsAcceptedBlocksVM      = (*VM)(nil)
 
 	errAtomicGasExceedsLimit = errors.New("atomic gas used exceeds atomic gas limit")
 )
@@ -107,6 +108,13 @@ type VM struct {
 
 func WrapVM(vm extension.InnerVM) *VM {
 	return &VM{InnerVM: vm}
+}
+
+// RetainsAcceptedBlocks declares that this VM durably retains the bytes of
+// every accepted block, retrievable via GetBlock, forever: accepted block
+// bodies are never pruned from the chain database.
+func (*VM) RetainsAcceptedBlocks() bool {
+	return true
 }
 
 // Initialize implements the snowman.ChainVM interface
