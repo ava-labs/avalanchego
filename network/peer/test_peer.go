@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -79,6 +78,7 @@ func StartTestPeer(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		return nil, err
@@ -105,12 +105,12 @@ func StartTestPeer(
 		return nil, err
 	}
 
+	stack := NewTestMessageStack(mc)
+
 	peer := Start(
 		&Config{
 			Metrics:              metrics,
-			MessageCreator:       mc,
 			Log:                  logging.NoLog{},
-			InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 			Network:              TestNetwork,
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -132,6 +132,7 @@ func StartTestPeer(
 				blsKey,
 			),
 		},
+		stack,
 		conn,
 		cert,
 		peerID,

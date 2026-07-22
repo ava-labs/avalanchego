@@ -89,6 +89,9 @@ type Network interface {
 	// NodeUptime returns given node's primary network UptimeResults in the view of
 	// this node's peer validators.
 	NodeUptime() (UptimeResult, error)
+
+	// MsgCreator returns the message creator for outbound consensus traffic.
+	MsgCreator() message.Creator
 }
 
 type UptimeResult struct {
@@ -120,7 +123,7 @@ type network struct {
 	peerConfig *peer.Config
 	metrics    *metrics
 
-	outboundMsgThrottler throttling.OutboundMsgThrottler
+	messageStacks *MessageStacks
 
 	// Limits the number of connection attempts based on IP.
 	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
@@ -172,11 +175,14 @@ type network struct {
 	router router.ExternalHandler
 }
 
+func (n *network) MsgCreator() message.Creator {
+	return n.messageStacks.MsgCreator()
+}
+
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
 	minCompatibleTime time.Time,
-	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -209,27 +215,14 @@ func NewNetwork(
 		return nil, errTrackingPrimaryNetwork
 	}
 
-	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
+	messageStacks, err := newMessageStacks(
 		log,
 		metricsRegisterer,
 		config.Validators,
-		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.ResourceTracker,
-		config.CPUTargeter,
-		config.DiskTargeter,
+		config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
-	}
-
-	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
-		log,
-		metricsRegisterer,
-		config.Validators,
-		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
+		return nil, fmt.Errorf("initializing message stacks failed with: %w", err)
 	}
 
 	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
@@ -263,9 +256,7 @@ func NewNetwork(
 		ReadBufferSize:         config.PeerReadBufferSize,
 		WriteBufferSize:        config.PeerWriteBufferSize,
 		Metrics:                peerMetrics,
-		MessageCreator:         msgCreator,
 		Log:                    log,
-		InboundMsgThrottler:    inboundMsgThrottler,
 		Network:                nil, // This is set below.
 		Router:                 router,
 		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
@@ -287,11 +278,11 @@ func NewNetwork(
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
-		startupTime:          time.Now(),
-		config:               config,
-		peerConfig:           peerConfig,
-		metrics:              metrics,
-		outboundMsgThrottler: outboundMsgThrottler,
+		startupTime:   time.Now(),
+		config:        config,
+		peerConfig:    peerConfig,
+		metrics:       metrics,
+		messageStacks: messageStacks,
 
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
@@ -1107,10 +1098,12 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 	)
 
 	// peer.Start requires there is only ever one peer instance running with the
-	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
+	// same [stack.InboundMsgThrottler]. This is guaranteed by the above
 	// de-duplications for [connectingPeers] and [connectedPeers].
+	stack := n.messageStacks.Resolve(nodeID)
 	peer := peer.Start(
 		n.peerConfig,
+		stack,
 		tlsConn,
 		cert,
 		nodeID,
@@ -1118,7 +1111,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 			n.peerConfig.Metrics,
 			nodeID,
 			n.peerConfig.Log,
-			n.outboundMsgThrottler,
+			stack.OutboundThrottler,
 		),
 		isIngress,
 	)

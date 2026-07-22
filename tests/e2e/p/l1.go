@@ -851,6 +851,7 @@ func wrapWarpSignatureRequest(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		p2pTimeout,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		return nil, err
