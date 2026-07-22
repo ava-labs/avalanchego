@@ -142,9 +142,10 @@ func (nm *networkedMachine) issueAtomicTx(rt *rapid.T) {
 	}
 	walletFor := func(ownerIdx int) *wallet {
 		// Wallets hold a node-specific Client, so they are created lazily
-		// per issuance against the target node. The one-in-flight-atomic-tx-
-		// per-key rule (enforced by the shared issuance methods) means the
-		// model's executed nonce is always current here.
+		// per issuance against the target node. Exports are single-flight per
+		// key (issueExport's pendingAtomicCount guard) and imports never
+		// consume an EVM nonce, so the model's executed nonce is always
+		// current here.
 		w := newWallet(nm.atomicKeys[ownerIdx], target.sut.ctx, target.sut.Client)
 		w.nonce = nm.m.nonces[nm.atomicAddrs[ownerIdx]]
 		return w

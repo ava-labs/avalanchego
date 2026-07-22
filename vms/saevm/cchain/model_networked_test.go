@@ -48,8 +48,9 @@ type nodeStorage struct {
 
 // networkedRunConfig is the once-per-check configuration of a networked model
 // run. The embedded runConfig contributes the shared axes (accounts, genesis
-// balances, dynamic-parameter votes, numValidators, numAtomicKeys); its single-node storage
-// axes (kv, scheme, commitInterval) remain zero and are ignored — storage is drawn per node in perNode.
+// balances, dynamic-parameter votes, numValidators, numAtomicKeys); its
+// single-node storage axes (kv, scheme, commitInterval) remain zero and are
+// ignored — storage is drawn per node in perNode.
 type networkedRunConfig struct {
 	runConfig
 
