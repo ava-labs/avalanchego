@@ -47,19 +47,15 @@ protects.
 `50.9` gas/byte sits *above* even the 16 gas/nonzero-byte intrinsic cost, so it
 rejects any calldata-dominated tx with modest execution — raising the worry that
 it blocks legitimate traffic. Analysis of **all C-Chain EVM traffic for May 2026
-(82,577,809 txs)** — measured at the slightly looser `38.1` gas/byte cutoff of an
-earlier version of this rule (`M` = the full 2 MiB message size) — shows it does
-not:
+(82,577,809 txs)** shows it does not:
 
-- **3,724 txs (0.0045%, ~1 in 22,000) would be rejected.** The median tx sits at
-  ~362 gas/byte, **~7× above even today's threshold**, so the rule almost never
-  bites.
-- The rejected set is **legitimate, concentrated infrastructure** (DEX
-  aggregators, batch order-cancels, data-availability payloads with zero-padded
-  calldata), not spam — and rejection is **soft**: raising the tx's gas limit
-  makes it eligible.
+- **25,489 txs (0.0309%, ~1 in 3,240) would be rejected.** The median tx sits at
+  ~362 gas/byte, **~7× above the threshold**, so the rule almost never bites.
+- The rejected set is **calldata-dominated** traffic — byte-heavy relative to the
+  gas it buys, which is exactly what the ratio rule is meant to gate — not spam,
+  and rejection is **soft**: raising the tx's gas limit makes it eligible.
 - The absolute byte ceiling is never the binding constraint: the largest tx
-  all month was ~126 KB (~12× under `M`). The **gas/byte ratio**, not size, is
+  all month was ~123 KiB (~12× under `M`). The **gas/byte ratio**, not size, is
   what does the rejecting.
 
 <p>
@@ -71,8 +67,8 @@ Blocking an absurdly small percentage of legitimate traffic to keep blocks gossi
 ## Why atomic transactions are out of scope
 
 Atomic cross-chain txs (`ImportTx`/`ExportTx`) are byte-heavy and gas-light by
-construction (~36 gas/byte — see the red band in the figure, below the cutoff),
-so this rule would reject ~100% of them. They are gated out and handled
+construction (~36 gas/byte, below the cutoff), so this rule would reject ~100% of
+them. They are gated out and handled
 separately. **Any future use of `eligible` must only be reached by EVM txs.**
 
 ## How it is enforced — three layers
@@ -101,12 +97,11 @@ framing, without itemizing their worst-case sizes.
 - **`x = 80M`** is the Helicon-launch limit (live value from
   `worstcase.SafeMaxBlockSize`). A material change in the gas target shifts the
   threshold `x/M`; re-run the rejection-rate analysis before assuming the rule
-  stays this benign. The same applies to the tightening of the threshold from
-  the measured `38.1` to today's `50.9`.
+  stays this benign.
 - **`M = 1.5 MiB`** is `saeparams.MaxBlockTxBytes`, tracking
   `constants.DefaultMaxMessageSize`; if either the message size or the margins
   change, the threshold `x/M` moves with them.
-- **Traffic composition.** The 0.0045% figure was measured on traffic with no
+- **Traffic composition.** The 0.0309% figure was measured on traffic with no
   access lists. The rule uses the true `types.Transaction.Size()`, so it stays
   *correct* for any composition, but a future access-list- or calldata-heavy
   workload could make it bite more often than history suggests.
