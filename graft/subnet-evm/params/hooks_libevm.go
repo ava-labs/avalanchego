@@ -71,9 +71,10 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// AfterExecutingTransaction is a no-op.
-func (RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, bf *big.Int, gasUsed uint64) {
-	(ethparams.NOOPHooks{}).AfterExecutingTransaction(sdb, bf, gasUsed)
+// ShouldCreditBaseFeeToCoinbase always returns false, so the base fee is
+// burned as on Ethereum mainnet.
+func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }
 
 // AccessListGas computes the intrinsic gas for an access list.
