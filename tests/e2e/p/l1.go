@@ -938,12 +938,12 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				require.NoError(err)
 				require.Equal(platformvm.GetSubnetClientResponse{
 					IsPermissioned: false,
-					ControlKeys: []ids.ShortID{},
-					Threshold: 0,
-					ConversionID: expectedConversionID,
+					ControlKeys:    []ids.ShortID{},
+					Threshold:      0,
+					ConversionID:   expectedConversionID,
 					ManagerChainID: subnetID,
 					ManagerAddress: address,
-				}, subnet,)
+				}, subnet)
 			})
 
 			tc.By("verifying the validator set was initialized", func() {

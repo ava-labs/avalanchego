@@ -1220,6 +1220,56 @@ func TestStateAddL1Chain(t *testing.T) {
 	require := require.New(t)
 
 	s := newTestState(t, memdb.New())
+
+	// Create a CreateL1Tx to get the subnetID.
+	createL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
+		VMID: ids.GenerateTestID(),
+	}, txs.Codec, nil)
+	require.NoError(err)
+	subnetID := createL1Tx.ID()
+
+	// Initially no chains for this subnet.
+	chains, err := s.GetChains(subnetID)
+	require.NoError(err)
+	require.Empty(chains)
+
+	s.AddL1Chain(createL1Tx)
+
+	// Verify the chain appear in insertion.
+	chains, err = s.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{createL1Tx}, chains)
+}
+
+func TestStateAddChain(t *testing.T) {
+	require := require.New(t)
+
+	s := newTestState(t, memdb.New())
+	subnetID := ids.GenerateTestID()
+
+	// Initially no chains for this subnet.
+	chains, err := s.GetChains(subnetID)
+	require.NoError(err)
+	require.Empty(chains)
+
+	// Add a CreateChainTx.
+	createChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	s.AddChain(createChainTx)
+
+	// Verify the chain appear in insertion.
+	chains, err = s.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{createChainTx}, chains)
+}
+
+func TestStateAddL1ChainAndAddChain(t *testing.T) {
+	require := require.New(t)
+
+	s := newTestState(t, memdb.New())
 	subnetID := ids.GenerateTestID()
 
 	// Initially no chains for this subnet.
@@ -1240,18 +1290,18 @@ func TestStateAddL1Chain(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]*txs.Tx{createChainTx}, chains)
 
-	// Add a CreateL1Tx for the same subnet.
-	createL1Tx := &txs.Tx{
-		Unsigned: &txs.CreateL1Tx{
-			VMID: ids.GenerateTestID(),
-		},
-	}
-	s.AddL1Chain(subnetID, createL1Tx)
+	// Create a CreateL1Tx to get the subnetID.
+	createL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
+		VMID: ids.GenerateTestID(),
+	}, txs.Codec, nil)
+	require.NoError(err)
+	subnetID = createL1Tx.ID()
+	s.AddL1Chain(createL1Tx)
 
-	// Verify both appear in insertion order.
+	// Verify it appears.
 	chains, err = s.GetChains(subnetID)
 	require.NoError(err)
-	require.Equal([]*txs.Tx{createChainTx, createL1Tx}, chains)
+	require.Equal([]*txs.Tx{createL1Tx}, chains)
 }
 
 func TestStateSubnetOwner(t *testing.T) {

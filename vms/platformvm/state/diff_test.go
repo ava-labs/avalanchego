@@ -613,17 +613,16 @@ func TestDiffAddL1Chain(t *testing.T) {
 	require := require.New(t)
 
 	state := newTestState(t, memdb.New())
-	subnetID := ids.GenerateTestID()
 
 	// Initialize parent state with one CreateL1Tx chain
-	parentCreateL1Tx := &txs.Tx{
-		Unsigned: &txs.CreateL1Tx{
-			VMID: ids.GenerateTestID(),
-		},
-	}
-	state.AddL1Chain(subnetID, parentCreateL1Tx)
+	parentCreateL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
+		VMID: ids.GenerateTestID(),
+	}, txs.Codec, nil)
+	require.NoError(err)
+	parentSubnetID := parentCreateL1Tx.ID()
+	state.AddL1Chain(parentCreateL1Tx)
 
-	chains, err := state.GetChains(subnetID)
+	chains, err := state.GetChains(parentSubnetID)
 	require.NoError(err)
 	require.Equal([]*txs.Tx{parentCreateL1Tx}, chains)
 
@@ -631,20 +630,24 @@ func TestDiffAddL1Chain(t *testing.T) {
 	require.NoError(err)
 
 	// Add another CreateL1Tx chain via the diff
-	diffCreateL1Tx := &txs.Tx{
-		Unsigned: &txs.CreateL1Tx{
-			VMID: ids.GenerateTestID(),
-		},
-	}
-	diff.AddL1Chain(subnetID, diffCreateL1Tx)
+	diffCreateL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
+		VMID: ids.GenerateTestID(),
+	}, txs.Codec, nil)
+	require.NoError(err)
+	diffSubnetID := diffCreateL1Tx.ID()
+	diff.AddL1Chain(diffCreateL1Tx)
 
 	// Apply diff — exercises the default branch in Diff.Apply that calls AddL1Chain
 	require.NoError(diff.Apply(state))
 
 	// Both chains should now be visible in the parent state
-	chains, err = state.GetChains(subnetID)
+	chains, err = state.GetChains(parentSubnetID)
 	require.NoError(err)
-	require.Equal([]*txs.Tx{parentCreateL1Tx, diffCreateL1Tx}, chains)
+	require.Equal([]*txs.Tx{parentCreateL1Tx}, chains)
+
+	chains, err = state.GetChains(diffSubnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{diffCreateL1Tx}, chains)
 }
 
 func TestDiffTx(t *testing.T) {

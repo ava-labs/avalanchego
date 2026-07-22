@@ -436,7 +436,7 @@ func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Vali
 	)
 }
 
-// ConvertSubnetToL1ValidatorComplexity returns the complexity the validators
+// CreateL1ValidatorComplexity returns the complexity the validators
 // add to a transaction.
 func CreateL1ValidatorComplexity(l1Validators ...*txs.CreateL1Validator) (gas.Dimensions, error) {
 	var complexity gas.Dimensions

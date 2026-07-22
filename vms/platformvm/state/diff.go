@@ -23,6 +23,7 @@ var (
 	_ Versions = stateGetter{}
 
 	ErrMissingParentState = errors.New("missing parent state")
+	errUnknownChainType   = errors.New("unknown chain type")
 )
 
 // Diff is a copy-on-write layer on top of a parent [Chain]. It records
@@ -540,8 +541,8 @@ func (d *Diff) AddChain(createChainTx *txs.Tx) {
 	}
 }
 
-// Added to accommodate for createL1Tx.
-func (d *Diff) AddL1Chain(subnetID ids.ID, tx *txs.Tx) {
+func (d *Diff) AddL1Chain(tx *txs.Tx) {
+	subnetID := tx.ID()
 	if d.addedChains == nil {
 		d.addedChains = map[ids.ID][]*txs.Tx{
 			subnetID: {tx},
@@ -720,13 +721,15 @@ func (d *Diff) Apply(baseState Chain) error {
 	for _, tx := range d.transformedSubnets {
 		baseState.AddSubnetTransformation(tx)
 	}
-	for subnetID, chains := range d.addedChains {
+	for _, chains := range d.addedChains {
 		for _, chain := range chains {
 			switch chain.Unsigned.(type) {
 			case *txs.CreateChainTx:
 				baseState.AddChain(chain)
+			case *txs.CreateL1Tx:
+				baseState.AddL1Chain(chain)
 			default:
-				baseState.AddL1Chain(subnetID, chain)
+				return fmt.Errorf("%w: got %T", errUnknownChainType, chain.Unsigned)
 			}
 		}
 	}

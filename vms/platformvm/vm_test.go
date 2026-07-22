@@ -890,32 +890,43 @@ func TestCreateL1Chain(t *testing.T) {
 func TestCreateSubnetChainTypes(t *testing.T) {
 	tests := []struct {
 		name        string
-		setupChains func(vm *VM, subnetID ids.ID)
+		setupChains func(vm *VM) ids.ID
 		expectedErr error
 	}{
 		{
 			name: "CreateChainTx only",
-			setupChains: func(vm *VM, subnetID ids.ID) {
+			setupChains: func(vm *VM) ids.ID {
+				subnetID := ids.GenerateTestID()
 				vm.state.AddChain(&txs.Tx{Unsigned: &txs.CreateChainTx{SubnetID: subnetID}})
+				return subnetID
 			},
 		},
 		{
 			name: "CreateL1Tx only",
-			setupChains: func(vm *VM, subnetID ids.ID) {
-				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateL1Tx{}})
+			setupChains: func(vm *VM) ids.ID {
+				tx, err := txs.NewSigned(&txs.CreateL1Tx{}, txs.Codec, nil)
+				require.NoError(t, err)
+				vm.state.AddL1Chain(tx)
+				return tx.ID()
 			},
 		},
 		{
 			name: "mixed CreateChainTx and CreateL1Tx",
-			setupChains: func(vm *VM, subnetID ids.ID) {
-				vm.state.AddChain(&txs.Tx{Unsigned: &txs.CreateChainTx{SubnetID: subnetID}})
-				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateL1Tx{}})
+			setupChains: func(vm *VM) ids.ID {
+				tx, err := txs.NewSigned(&txs.CreateL1Tx{}, txs.Codec, nil)
+				require.NoError(t, err)
+				vm.state.AddChain(&txs.Tx{Unsigned: &txs.CreateChainTx{SubnetID: tx.ID()}})
+				vm.state.AddL1Chain(tx)
+				return tx.ID()
 			},
 		},
 		{
 			name: "unknown chain type returns error",
-			setupChains: func(vm *VM, subnetID ids.ID) {
-				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
+			setupChains: func(vm *VM) ids.ID {
+				tx, err := txs.NewSigned(&txs.CreateSubnetTx{Owner: &secp256k1fx.OutputOwners{}}, txs.Codec, nil)
+				require.NoError(t, err)
+				vm.state.AddL1Chain(tx)
+				return tx.ID()
 			},
 			expectedErr: errUnknownChainType,
 		},
@@ -928,8 +939,7 @@ func TestCreateSubnetChainTypes(t *testing.T) {
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 
-			subnetID := ids.GenerateTestID()
-			test.setupChains(vm, subnetID)
+			subnetID := test.setupChains(vm)
 
 			err := vm.createSubnet(subnetID)
 			require.ErrorIs(err, test.expectedErr)

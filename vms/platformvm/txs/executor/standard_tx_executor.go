@@ -1605,7 +1605,7 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	// GetSubnet API can find the subnet in state (will be removed when the service.go is removed. set an owner for now for testing purposes)
 	e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{})
 	// Register the chain under the new subnet
-	e.state.AddL1Chain(subnetID, e.tx)
+	e.state.AddL1Chain(e.tx)
 	// Track the L1 conversion
 
 	e.state.SetSubnetToL1Conversion(
@@ -1617,6 +1617,8 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 		},
 	)
 
+	// If this proposal is committed and this node is a member of the subnet
+	// that validates the blockchain, create the blockchain
 	e.onAccept = func() {
 		e.backend.Config.CreateL1Chain(subnetID, tx)
 	}
