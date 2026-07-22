@@ -219,14 +219,6 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
-// nowFunc returns c.Now, falling back to [time.Now] if c is nil.
-func nowFunc(c *saetest.Clock) func() time.Time {
-	if c == nil {
-		return time.Now
-	}
-	return c.Now
-}
-
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -269,6 +261,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb, 0),
+			clock:      saetest.NewClock(testStartTime, time.Millisecond),
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
@@ -277,7 +270,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
-			now:              nowFunc(cfg.clock),
+			now:              cfg.clock.Now,
 		}
 		db = cfg.db
 	)
@@ -921,8 +914,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i, sk := range keys {
 		addrs[i] = sk.EthAddress()
 	}
-	timeOpt, _ := withVMTime(testStartTime)
-	ctx, sut := newSUT(t, withMaxAllocFor(addrs...), timeOpt)
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
 
 	var (
 		preference = sut.lastAccepted(ctx, t)
@@ -1417,10 +1409,8 @@ func TestDynamicPriceExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, _ := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
-				timeOpt,
 			}
 			if test.desired != nil {
 				opts = append(opts, withPriceTarget(*test.desired))
@@ -1472,10 +1462,8 @@ func TestDynamicTargetExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, _ := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
-				timeOpt,
 			}
 			if test.desired != nil {
 				opts = append(opts, withGasTarget(*test.desired))
@@ -1535,7 +1523,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, _ := withVMTime(testStartTime)
+			timeOpt, clock := withVMTime(testStartTime)
 			opts := []sutOption{withMaxAllocFor(key.EthAddress()), timeOpt}
 			if test.desired != nil {
 				opts = append(opts, withMinDelayTarget(*test.desired))
@@ -1549,6 +1537,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
 				got := dynamic.DelayExponent(*he.MinDelayExcess)
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
+				clock.Advance(got.DelayDuration())
 			}
 		})
 	}
@@ -1599,11 +1588,12 @@ func TestGasRefundsDisabled(t *testing.T) {
 
 func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	key := txtest.NewKey(t)
-	timeOpt, _ := withVMTime(testStartTime)
+	timeOpt, clock := withVMTime(testStartTime)
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
 	w := newWallet(key, sut.ctx, sut.Client)
 
 	parent := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.Set(earliestBuildTime(parent))
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
@@ -1812,15 +1802,20 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 // block marks the warp precompile's account as non-empty when the genesis
 // predates Durango.
 func TestWarpPrecompileActivation(t *testing.T) {
+	const upgradeThreshold = 5 * time.Second
 	key := txtest.NewKey(t)
+	timeOpt, vmTime := withVMTime(upgrade.InitiallyActiveTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(5*time.Second)),
+		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(upgradeThreshold)),
+		timeOpt,
 	)
 
 	genesisState, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
 	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+
+	vmTime.Advance(upgradeThreshold) // activate Durango in next block
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	sut.issueAndExecute(ctx, t, stx)

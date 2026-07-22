@@ -202,12 +202,10 @@ func TestReceiveWarpMessage(t *testing.T) {
 		vdrs       = warptest.NewValidators(t, 2)
 		warpLogger = common.Address{'l', 'o', 'g', 'g', 'e', 'r'}
 	)
-	timeOpt, _ := withVMTime(testStartTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
 		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
 		withValidators(vdrs),
-		timeOpt,
 	)
 
 	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
