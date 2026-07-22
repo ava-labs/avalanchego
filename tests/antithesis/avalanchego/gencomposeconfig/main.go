@@ -75,10 +75,10 @@ func newNetwork() (*tmpnet.Network, time.Time, error) {
 	return network, upgrades.HeliconTime, nil // Must be updated for each network upgrade
 }
 
-// guestScript returns the contents of a bash script that sets the system clock
-// to a random offset in [minActivationOffset, maxActivationOffset] before
-// activationTime so that the latest upgrade activates that random duration
-// after the network starts.
+// guestScript returns a bash script that sets the system clock to a random
+// offset in [minActivationOffset, maxActivationOffset] before activationTime so
+// that the latest upgrade activates that random duration after the network
+// starts.
 func guestScript(activationTime time.Time) string {
 	return fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
