@@ -145,6 +145,12 @@ func (m *txMetrics) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	}).Inc()
 	return nil
 }
+func (m *txMetrics) CreateL1Tx(*txs.CreateL1Tx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "create_l1",
+	}).Inc()
+	return nil
+}
 
 func (m *txMetrics) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{

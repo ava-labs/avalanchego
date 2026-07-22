@@ -871,6 +871,10 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 	)
 	return nil
 }
+func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	// COMING IN A FUTURE PR. This stub is needed.
+	return nil
+}
 
 func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	var (

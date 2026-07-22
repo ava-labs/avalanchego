@@ -111,7 +111,9 @@ func (*atomicTxExecutor) BaseTx(*txs.BaseTx) error {
 func (*atomicTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
-
+func (*atomicTxExecutor) CreateL1Tx(*txs.CreateL1Tx) error {
+	return ErrWrongTxType
+}
 func (*atomicTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }

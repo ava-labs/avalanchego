@@ -30,6 +30,7 @@ var (
 	errNameTooLong             = errors.New("name too long")
 	errGenesisTooLong          = errors.New("genesis too long")
 	errIllegalNameCharacter    = errors.New("illegal name character")
+	errEmptyManagerChainID     = errors.New("empty manager chain ID")
 )
 
 // CreateChainTx is an unsigned createChainTx

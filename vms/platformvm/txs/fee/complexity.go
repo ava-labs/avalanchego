@@ -415,6 +415,16 @@ func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Vali
 		},
 	)
 }
+func CreateL1ValidatorComplexity(l1Validators ...*txs.CreateL1Validator) (gas.Dimensions, error) {
+	// COMING IN FUTURE PR. this is needed
+	var complexity gas.Dimensions
+	return complexity, nil
+}
+func createL1ValidatorComplexity(l1Validator *txs.CreateL1Validator) (gas.Dimensions, error) {
+	// COMING IN FUTURE PR. this is needed
+	var complexity gas.Dimensions
+	return complexity, nil
+}
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
 // It does not include the typeID of the owner.
@@ -757,6 +767,10 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 		},
 	)
 	return err
+}
+func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	// COMING IN FUTURE PR. this is needed.
+	return nil
 }
 
 func (c *complexityVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {

@@ -469,6 +469,10 @@ func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return nil
 }
 
+func (i *inputOutputGetter) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	// COMING IN A FUTURE PR. this is needed.
+	return nil
+}
 // RegisterL1ValidatorTx treats the validator balance like produced AVAX because
 // the fee payer must have enough input AVAX to cover the initial state of the
 // validator

@@ -140,3 +140,10 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
 }
+
+
+// RegisterIglooTypes registers the type information for transactions that
+// were valid during the Igloo series of upgrades.
+func RegisterIglooTypes(targetCodec linearcodec.Codec) error {
+	return targetCodec.RegisterType(&CreateL1Tx{})
+}

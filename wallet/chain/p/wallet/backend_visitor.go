@@ -135,6 +135,10 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	}
 	return b.baseTx(&tx.BaseTx)
 }
+func (b *backendVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	// COMING IN FUTURE PR. this is needed.
+	return b.baseTx(&tx.BaseTx)
+}
 
 func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	warpMessage, err := warp.ParseMessage(tx.Message)
