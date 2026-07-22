@@ -1,5 +1,3 @@
-__Author__: Jad Al Smail
-__Reviewers__: Sam Liokumovich, Yacov Manevich, Joshua Kim
 # Introduction
 The Avalanche network is built around two core elements on the P-Chain: Subnets and Chains
 A __Subnet__ is a set of validators that agrees to validate one (or more) blockchains. Every subnet is identified by a SubnetID, and its validators are responsible for achieving consensus on the chains under it. 
@@ -152,6 +150,6 @@ E2E test:
 "atomically creates an L1 using CreateL1Tx" in tests/e2e/p/l1.go. Runs a full local network, issues the transaction, and verifies the subnet conversion ID (which is required to initialize the validator manager contract), validator set, and L1 validator state via the P-Chain API. 
 “Creates an L1 using CreateL1Tx and updates its validators via the manager” tests the validator lifecycle on the L1. restarts the genesis validator with the new subnet tracked, registers new validatores, increasing its weight, removing it, and verifies the warp message. 
 # Monitoring
-We can use the current Grafana dashboards to monitor this transaction to make sure that it is being executed properly; P-chain transaction and block rejection rates are tracked in the [Terraform-P-Chain](https://avalabs.grafana.net/d/ck8-9nc-wjy/terraform-p-chain) dashboard, though these are aggregate signals and won't isolate subnet creation transaction failures specifically.
-The [P-Chain](https://avalabs.grafana.net/d/maf52g4/p-chain) CI dashboard also tracks rejected blocks per minute.
+We can use the current Grafana dashboards to monitor this transaction to make sure that it is being executed properly; P-chain transaction and block rejection rates are tracked in the Terraform-P-Chain dashboard, though these are aggregate signals and won't isolate subnet creation transaction failures specifically.
+The P-Chain CI dashboard also tracks rejected blocks per minute.
 
