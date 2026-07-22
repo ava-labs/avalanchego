@@ -6,7 +6,12 @@
 // [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
 package params
 
-import "time"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
+)
 
 // Lambda is the denominator for computing the minimum gas consumed per
 // transaction. For a transaction with gas limit `g`, the minimum consumption is
@@ -36,3 +41,11 @@ const MaxFullBlocksInClosedQueue = MaxFullBlocksInOpenQueue + 1
 // the execution queue before execution finishes. This assumes the executor
 // drains the queue at least as fast as the gas capacity rate R.
 const MaxQueueWallTime = MaxFullBlocksInClosedQueue * Tau * Lambda
+
+// MaxBlockTxBytes is the maximum cumulative serialized size of a block's
+// transactions. The block builder enforces it as a byte budget and the mempool
+// uses it as the normalizer of its gas-per-byte admission rule. The somewhat
+// arbitrary 512 KiB margin below [constants.DefaultMaxMessageSize] comfortably
+// covers all non-transaction block and wire bytes, keeping blocks gossipable
+// in a single P2P message.
+const MaxBlockTxBytes = constants.DefaultMaxMessageSize - 512*units.KiB

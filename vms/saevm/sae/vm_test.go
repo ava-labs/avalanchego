@@ -411,6 +411,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	calldata := make([]byte, calldataSize)
 	heavyTxs := make([]*types.Transaction, numTxs)
 	for i := range heavyTxs {
+		// Unique address to prevent legacypool race
 		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
@@ -419,8 +420,8 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 		})
 	}
 
-	txBytes := heavyTxs[0].Size() + maxTxRLPHeaderLen
-	wantTxs := int(maxBlockTxBytes / txBytes) //#nosec G115 -- bounded above by numTxs, checked below
+	txBytes := heavyTxs[0].Size()
+	wantTxs := int(saeparams.MaxBlockTxBytes / txBytes) //#nosec G115 -- bounded above by numTxs, checked below
 	require.Less(t, wantTxs, numTxs, "fixture must supply more transactions than fit in the byte budget")
 
 	// Bypass mempool admission filtering so the builder backstop is exercised.
@@ -435,6 +436,38 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	require.Len(t, builtTxs, wantTxs, "built block included unexpected transaction count")
 	for i, tx := range builtTxs {
 		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
+}
+
+func TestParseBlockSizeLimit(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	tests := []struct {
+		name    string
+		size    int
+		wantErr error
+	}{
+		{
+			name: "at_limit",
+			size: maxBlockBytes,
+		},
+		{
+			name:    "over_limit",
+			size:    maxBlockBytes + 1,
+			wantErr: errBlockTooLarge,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := sut.rawVM.ParseBlock(ctx, make([]byte, tt.size))
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr, "ParseBlock()")
+				return
+			}
+			// will still fail to Parse, but it shouldn't be for size.
+			require.NotErrorIs(t, err, errBlockTooLarge, "ParseBlock()")
+		})
 	}
 }
 

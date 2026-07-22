@@ -6,4 +6,4 @@ It is under active development and there are currently no guarantees about the s
 ## Documentation
 
 - [Invariants](./docs/invariants.md) - in-memory/on-disk state equivalence and timing guarantees
-- [Block size limit](./blocklimit/README.md) - why blocks are bounded to the P2P message size, and the gas-to-byte eligibility rule that enforces it
+- [Block size limit](./txgossip/README.md) - why blocks are bounded to the P2P message size, and the gas-to-byte eligibility rule that enforces it

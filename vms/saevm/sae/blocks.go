@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -38,16 +40,28 @@ const (
 var (
 	errBlockHeightNotUint64 = errors.New("block height not uint64")
 	errBlockTooFarInFuture  = errors.New("block too far in the future")
+	errBlockTooLarge        = errors.New("block size exceeds maximum")
 
 	errTxHashMismatch         = errors.New("transaction hash mismatch")
 	errUncleHashMismatch      = errors.New("uncle hash mismatch")
 	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
 )
 
+// maxBlockBytes is the maximum serialized size of a block. A larger block MAY
+// NOT fit in a single P2P message once wrapped for the wire, making it
+// ungossipable. The somewhat arbitrary 256 KiB margin below the maximum
+// message size comfortably covers the wrapping: the ProposerVM header
+// (certificate, signature, and codec overhead) and message framing.
+const maxBlockBytes = constants.DefaultMaxMessageSize - 256*units.KiB
+
 // ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
 // NOT populate the block ancestry, which is done by [VM.VerifyBlock] i.f.f.
 // verification passes.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
+	if len(buf) > maxBlockBytes {
+		return nil, fmt.Errorf("%w: %d > %d bytes", errBlockTooLarge, len(buf), maxBlockBytes)
+	}
+
 	b := new(types.Block)
 	if err := rlp.DecodeBytes(buf, b); err != nil {
 		return nil, fmt.Errorf("rlp.DecodeBytes(..., %T): %v", b, err)

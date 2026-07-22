@@ -10,6 +10,7 @@ package txgossip
 import (
 	"errors"
 	"fmt"
+	"math/bits"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
@@ -18,13 +19,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // errInsufficientGasPerByte is returned for a transaction that carries fewer
-// than x/M gas per serialized byte. See [blocklimit.Eligible].
+// than x/M gas per serialized byte. See [eligible].
 var errInsufficientGasPerByte = errors.New("insufficient gas per serialized byte")
 
 var _ gossip.Gossipable = Transaction{}
@@ -74,7 +76,7 @@ type Set struct {
 // transactions to the pool, which SHOULD NOT be populated directly.
 //
 // Transactions are vetted against the gas limit of the next block, derived
-// from exec's last-executed block; see [blocklimit.Eligible].
+// from exec's last-executed block; see [eligible].
 func NewSet(
 	exec *saexec.Executor,
 	pool *txpool.TxPool,
@@ -118,18 +120,18 @@ func (s *txSet) Add(tx Transaction) error {
 	return errors.Join(errs...)
 }
 
-// addToPool adds the eligible transactions (see [blocklimit.Eligible]) to the
-// pool. A transaction's entry is the pool's result for it, while a rejected
+// addToPool adds the eligible transactions (see [eligible]) to the pool. A
+// transaction's entry is the pool's result for it, while a rejected
 // transaction's entry is [errInsufficientGasPerByte] and it never reaches the pool
 func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	blockGasLimit := s.blockGasLimit()
 
 	errs := make([]error, len(txs))
-	eligible := make([]*types.Transaction, 0, len(txs))
+	eligibleTxs := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		if blocklimit.Eligible(tx, blockGasLimit, blocklimit.SafeMaxBytes) {
-			eligible = append(eligible, tx)
+		if eligible(tx, blockGasLimit, saeparams.MaxBlockTxBytes) {
+			eligibleTxs = append(eligibleTxs, tx)
 			eligibleIdx = append(eligibleIdx, i)
 			continue
 		}
@@ -137,13 +139,43 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 			errInsufficientGasPerByte, tx.Gas(), tx.Size(), blockGasLimit)
 	}
 
-	if len(eligible) == 0 {
+	if len(eligibleTxs) == 0 {
 		return errs
 	}
-	for j, err := range s.pool.Add(eligible, local, false /*sync*/) {
+	for j, err := range s.pool.Add(eligibleTxs, local, false /*sync*/) {
 		errs[eligibleIdx[j]] = err
 	}
 	return errs
+}
+
+// eligible reports whether tx MAY be included in a block, using the notation:
+//
+//   - M = maxBytes, the block's transaction byte budget (typically
+//     [saeparams.MaxBlockTxBytes])
+//   - x = blockGasLimit, the block's gas limit
+//   - g = tx.Gas(), the transaction's gas limit
+//   - y = tx.Size(), the transaction's serialized size in bytes
+//
+// The transaction's byte share is y/M and its gas share is g/x. The rule rejects
+// the transaction if its byte share exceeds its gas share:
+//
+//	accept if  y/M <= g/x  <->   y·x <= g·M
+//
+// Equivalently, it must carry at least x/M gas per serialized byte, which
+// bounds the cumulative size of a block's worth of transactions by M.
+func eligible(tx *types.Transaction, blockGasLimit, maxBytes uint64) bool {
+	// Defensive check: if blockGasLimit == 0, all transactions would be
+	// incorrectly eligible
+	if blockGasLimit == 0 {
+		return false
+	}
+
+	yxHi, yxLo := bits.Mul64(tx.Size(), blockGasLimit) // y·x
+	gmHi, gmLo := bits.Mul64(tx.Gas(), maxBytes)       // g·M
+	if yxHi != gmHi {
+		return yxHi < gmHi
+	}
+	return yxLo <= gmLo
 }
 
 func (s *txSet) Has(id ids.ID) bool {

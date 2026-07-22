@@ -17,10 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -132,34 +129,6 @@ var (
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
 )
-
-// blockByteOverhead reserves space below the maximum message size M for every
-// non-transaction byte of a gossiped block. Worst-case contributions:
-//
-//   - ProposerVM certificate: [staking.MaxCertificateLen]
-//   - Block header, all fields except Extra: ~660 B ([types.Header]) plus
-//     anything registered via libevm's RegisterExtras. The C-Chain's
-//     customtypes are roughly ~110 B.
-//   - ProposerVM wrapper and codec framing (vms/proposervm/block): 90 B
-//   - ProposerVM block signature (staking permits RSA-4096): <=512 B
-//   - P2P message framing, including worst-case zstd expansion of
-//     incompressible tx bytes (message, network/peer): ~150 B
-//   - RLP list headers: ~10 B
-//
-// The non-certificate contributions total ~1.5 KiB; 6 KiB leaves 4x headroom.
-//
-// Note that hook-injected bytes (header.Extra, extData) are not covered --
-// see the TODOs in buildWithTxs and the C-Chain hook's BuildBlock.
-const blockByteOverhead = staking.MaxCertificateLen + 6*units.KiB
-
-// maxBlockTxBytes caps a block's serialized transaction bytes, reserving
-// [blockByteOverhead] below the maximum message size M.
-const maxBlockTxBytes = blocklimit.SafeMaxBytes - blockByteOverhead
-
-// maxTxRLPHeaderLen bounds the RLP header that wraps each transaction as a byte
-// string in the block body: a string up to the maximum message size M needs at
-// most a 4-byte header.
-const maxTxRLPHeaderLen = 4
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
 // and [blockBuilder.rebuild]. The block context MAY be nil.
@@ -297,14 +266,11 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
-		// Skip transactions that would push the EVM transactions past their
-		// serialized-byte budget, even if mempool admission accepted more bytes
-		// than the gas-per-byte rule intends.
-		//
-		// A transaction's contribution to the block body is its
-		// own size plus the RLP header wrapping it.
-		txBytes := tx.Size() + maxTxRLPHeaderLen
-		if includedTxBytes+txBytes > maxBlockTxBytes {
+		// Skip transactions that would push the block's transactions past
+		// their serialized-byte budget, even if mempool admission accepted
+		// more bytes than the gas-per-byte rule intends.
+		txBytes := tx.Size()
+		if includedTxBytes+txBytes > saeparams.MaxBlockTxBytes {
 			txLog.Debug("Skipping transaction: block byte budget reached",
 				zap.Uint64("tx_bytes", txBytes),
 				zap.Uint64("included_tx_bytes", includedTxBytes),

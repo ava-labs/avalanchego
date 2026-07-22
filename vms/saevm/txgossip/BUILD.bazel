@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p/gossip",
-        "//vms/saevm/blocklimit",
+        "//vms/saevm/params",
         "//vms/saevm/saexec",
         "//vms/saevm/types",
         "//vms/saevm/worstcase",
