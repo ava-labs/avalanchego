@@ -216,6 +216,15 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
+// unblockWaitForEvent advances clock to the earliest time a child of parent
+// may be built, so the next [VM.WaitForEvent] returns without parking on the
+// ACP-226 min-delay pacing timer. It never moves the clock backwards.
+func unblockWaitForEvent(clock *saetest.Clock, parent *blocks.Block) {
+	if t := earliestBuildTime(parent); clock.Now().Before(t) {
+		clock.Set(t)
+	}
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -898,7 +907,8 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i, sk := range keys {
 		addrs[i] = sk.EthAddress()
 	}
-	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
+	timeOpt, clock := withVMTime(testStartTime)
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...), timeOpt)
 
 	var (
 		preference = sut.lastAccepted(ctx, t)
@@ -916,6 +926,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		}
 		blocks[i] = block
 		preference = block.ID()
+		unblockWaitForEvent(clock, block)
 	}
 	for i, block := range blocks {
 		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
@@ -1393,8 +1404,10 @@ func TestDynamicPriceExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
+			timeOpt, clock := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
+				timeOpt,
 			}
 			if test.desired != nil {
 				opts = append(opts, withPriceTarget(*test.desired))
@@ -1413,6 +1426,8 @@ func TestDynamicPriceExponent(t *testing.T) {
 				wantBaseFee := new(big.Int).SetUint64(uint64(wantExponent.Price()))
 				require.NotNilf(t, header.BaseFee, "block %d %T.BaseFee", header.Number, header)
 				require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d %T.BaseFee", header.Number, header)
+
+				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1446,8 +1461,10 @@ func TestDynamicTargetExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
+			timeOpt, clock := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
+				timeOpt,
 			}
 			if test.desired != nil {
 				opts = append(opts, withGasTarget(*test.desired))
@@ -1468,6 +1485,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 				assert.Equalf(t, wantGasLimit, header.GasLimit, "block %d %T.GasLimit", header.Number, header)
 
 				parentExponent = wantExponent
+				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1521,7 +1539,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
 				got := dynamic.DelayExponent(*he.MinDelayExcess)
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
-				clock.Advance(got.DelayDuration())
+				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1577,7 +1595,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	w := newWallet(key, sut.ctx, sut.Client)
 
 	parent := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	clock.Set(earliestBuildTime(parent))
+	unblockWaitForEvent(clock, parent)
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
