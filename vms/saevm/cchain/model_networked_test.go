@@ -56,6 +56,15 @@ type networkedRunConfig struct {
 
 	numNonValidators int
 	perNode          []nodeStorage
+
+	// joiner, when non-nil, is the storage draw for one late-joining node
+	// that does not exist until the lateJoin action fires; it is excluded
+	// from numNodes() and perNode. joinerIsValidator picks its role: a
+	// validator joiner's node ID is registered in the shared validator set
+	// at genesis (an offline validator that comes up late), so the set
+	// itself never changes mid-run.
+	joiner            *nodeStorage
+	joinerIsValidator bool
 }
 
 func (c networkedRunConfig) numNodes() int {
@@ -131,6 +140,18 @@ func genNetworkedRunConfig() *rapid.Generator[networkedRunConfig] {
 		}
 		n := c.numNodes()
 		c.perNode = rapid.SliceOfN(genNodeStorage(), n, n).Draw(rt, "perNode")
+		// Most runs have no joiner (its lasting cost is +1 node in every
+		// subsequent action), and presence is rarer in 3-validator runs,
+		// which are already the expensive tail.
+		joinerOdds := []bool{true, false, false, false}
+		if c.numValidators == 3 {
+			joinerOdds = []bool{true, false, false, false, false, false, false, false}
+		}
+		if rapid.SampledFrom(joinerOdds).Draw(rt, "hasJoiner") {
+			s := genNodeStorage().Draw(rt, "joinerStorage")
+			c.joiner = &s
+			c.joinerIsValidator = rapid.Bool().Draw(rt, "joinerIsValidator")
+		}
 		return c
 	})
 }
@@ -151,6 +172,13 @@ func TestGenNetworkedRunConfig(t *testing.T) {
 			require.Containsf(rt, []string{kvMemDB, kvLevelDB}, s.kv, "node %d kv store kind", i)
 			require.Containsf(rt, []string{rawdb.HashScheme, customrawdb.FirewoodScheme}, s.scheme, "node %d trie scheme", i)
 			require.NotZerof(rt, s.commitInterval, "node %d commit interval", i)
+		}
+		if cfg.joiner != nil {
+			require.Containsf(rt, []string{kvMemDB, kvLevelDB}, cfg.joiner.kv, "joiner kv store kind")
+			require.Containsf(rt, []string{rawdb.HashScheme, customrawdb.FirewoodScheme}, cfg.joiner.scheme, "joiner trie scheme")
+			require.NotZerof(rt, cfg.joiner.commitInterval, "joiner commit interval")
+		} else {
+			require.Falsef(rt, cfg.joinerIsValidator, "joinerIsValidator without a joiner")
 		}
 	})
 }
