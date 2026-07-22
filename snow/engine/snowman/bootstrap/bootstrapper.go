@@ -157,7 +157,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		defer config.Ctx.Lock.Unlock()
 
 		if err := bs.Timeout(); err != nil {
-			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping", zap.Error(err))
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
