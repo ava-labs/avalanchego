@@ -436,7 +436,7 @@ func (c *modelCore) issueWarpReceive(rt *rapid.T, ctx context.Context, sut *SUT,
 
 // remoteChains are the chains the harness simulates the far side of. Every
 // SUT in a run shares the same chain IDs, so any node's ctx works.
-func (c *modelCore) remoteChains(sut *SUT) []ids.ID {
+func (*modelCore) remoteChains(sut *SUT) []ids.ID {
 	return []ids.ID{sut.ctx.XChainID, constants.PlatformChainID}
 }
 
@@ -923,7 +923,7 @@ func (c *modelCore) checkState(rt *rapid.T, ctx context.Context, sut *SUT, db da
 // checkSharedMemory asserts sut's shared memory agrees with the model:
 // exported UTXOs are readable by the remote chain, consumed UTXOs are gone.
 // Reads shared memory directly, so it also covers restarts.
-func (c *modelCore) checkSharedMemory(rt *rapid.T, sut *SUT) {
+func (c *modelCore) checkSharedMemory(sut *SUT) {
 	for _, chain := range c.remoteChains(sut) {
 		if exported := c.m.exportedUTXOs[chain]; len(exported) > 0 {
 			sut.assertUTXOsExist(c.tb, chain, sut.ctx.ChainID, exported...)
@@ -937,7 +937,7 @@ func (c *modelCore) checkSharedMemory(rt *rapid.T, sut *SUT) {
 // check is the rapid invariant action, run around every other action.
 func (mm *modelMachine) check(rt *rapid.T) {
 	mm.checkState(rt, mm.ctx, mm.sut, mm.db)
-	mm.checkSharedMemory(rt, mm.sut)
+	mm.checkSharedMemory(mm.sut)
 }
 
 // checkRawdbPointers spot-checks invariants.md pointer discipline on the
