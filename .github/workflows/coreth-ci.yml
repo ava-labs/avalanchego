@@ -11,12 +11,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  coreth-required:
+  required:
     if: ${{ always() }}
     needs:
-      - lint_test
-      - unit_test
-      - e2e_warp
+      - lint
+      - test-unit-gomod
+      - test-e2e-warp
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -38,26 +38,20 @@ jobs:
             exit 1
           fi
 
-  lint_test:
-    name: Lint
+  lint:
+    name: lint
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: ./graft/coreth
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: ./scripts/run_task.sh lint-all-ci
+        run: ./scripts/run_task.sh coreth:lint-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: ./scripts/run_task.sh check-go-mod-tidy
+        run: ./scripts/run_task.sh coreth:check-go-mod-tidy
 
-  unit_test:
-    name: Unit Tests (${{ matrix.os }})
+  test-unit-gomod:
+    name: test-unit-gomod (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: ./graft/coreth
     strategy:
       fail-fast: false
       matrix:
@@ -65,11 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - run: ./scripts/run_task.sh build-test
-      - run: ./scripts/run_task.sh coverage
+      - run: ./scripts/run_task.sh coreth:test-unit-gomod
+      - run: ./scripts/run_task.sh coreth:coverage
 
-  e2e_warp:
-    name: E2E Warp Tests
+  test-e2e-warp:
+    name: test-e2e-warp
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -79,8 +73,7 @@ jobs:
       - name: Run Warp E2E Tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-warp-ci
-          working_directory: ./graft/coreth
+          run: ./scripts/run_task.sh coreth:test-e2e-warp-ci
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}

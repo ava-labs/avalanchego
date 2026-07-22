@@ -1,0 +1,16 @@
+# https://taskfile.dev
+# Repo tooling tasks.
+
+version: '3'
+
+vars:
+  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
+
+tasks:
+  install-nix:
+    desc: Installs nix with an OS-appropriate installer
+    cmd: '{{.NIX_RUN}} ./scripts/install_nix.sh'
+
+  run-polyrepo:
+    desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task tools:run-polyrepo"
+    cmd: '{{.NIX_RUN}} ./scripts/run_polyrepo.sh {{.CLI_ARGS}}'

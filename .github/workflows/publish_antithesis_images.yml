@@ -38,19 +38,19 @@ jobs:
           password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
 
       - name: Build and push images for avalanchego test setup
-        run: ./scripts/run_task.sh build-antithesis-images-avalanchego
+        run: ./scripts/run_task.sh avalanchego:build-antithesis-images-avalanchego
         env:
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
 
       - name: Build and push images for xsvm test setup
-        run: ./scripts/run_task.sh build-antithesis-images-xsvm
+        run: ./scripts/run_task.sh avalanchego:build-antithesis-images-xsvm
         env:
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
 
       - name: Build and push images for subnet-evm test setup
-        run: ./scripts/run_task.sh build-antithesis-images-subnet-evm
+        run: ./scripts/run_task.sh subnet-evm:build-antithesis-images
         env:
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}

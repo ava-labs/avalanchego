@@ -50,7 +50,7 @@ The packaging pipeline builds two packages per format and architecture:
 Build and validate the full RPM pipeline locally with:
 
 ```bash
-./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
+./scripts/run_task.sh packaging:test-build-rpms
 ```
 
 Build and validate the full DEB pipeline locally with:

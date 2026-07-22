@@ -76,7 +76,7 @@ These changes prepare the merge commit that will be tagged.
 1. Update submodule require directives to reference the future tag:
 
    ```bash
-   ./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
+   ./scripts/run_task.sh git:tags-update-require-directives -- "$VERSION_RC"
    ```
 
 ### 4. Commit and Create PR
@@ -115,8 +115,8 @@ git checkout master
 # Double check the tip of the master branch is the expected commit
 # of the squashed release branch
 git log -1
-./scripts/run_task.sh tags-create -- "$VERSION_RC"
-./scripts/run_task.sh tags-push -- "$VERSION_RC"
+./scripts/run_task.sh git:tags-create -- "$VERSION_RC"
+./scripts/run_task.sh git:tags-push -- "$VERSION_RC"
 ```
 
 Optionally verify from a fresh directory (to avoid local replace directives):
@@ -298,7 +298,7 @@ to the final version, merge, then tag the resulting commit:
 ```bash
 git fetch origin master
 git checkout -b "tags/$VERSION" origin/master
-./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
+./scripts/run_task.sh git:tags-update-require-directives -- "$VERSION"
 git add .
 git commit -S -m "chore: set require directives for $VERSION"
 git push -u origin "tags/$VERSION"
@@ -313,8 +313,8 @@ Tag the merge commit:
 git checkout master
 git pull origin
 git log -1  # Verify expected commit
-./scripts/run_task.sh tags-create -- "$VERSION"
-./scripts/run_task.sh tags-push -- "$VERSION"
+./scripts/run_task.sh git:tags-create -- "$VERSION"
+./scripts/run_task.sh git:tags-push -- "$VERSION"
 ```
 
 ### 8. Create GitHub Release
@@ -450,10 +450,10 @@ go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-ev
 
 To share work-in-progress without merging to master:
 
-1. On your branch, run `./scripts/run_task.sh tags-update-require-directives -- v0.0.0-mybranch`
+1. On your branch, run `./scripts/run_task.sh git:tags-update-require-directives -- v0.0.0-mybranch`
 2. Commit and push to your branch (tags must reference a commit reachable on the remote)
-3. Run `./scripts/run_task.sh tags-create -- --no-sign v0.0.0-mybranch`
-4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
+3. Run `./scripts/run_task.sh git:tags-create -- --no-sign v0.0.0-mybranch`
+4. Run `./scripts/run_task.sh git:tags-push -- v0.0.0-mybranch`
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
 
@@ -499,7 +499,7 @@ To recover, delete the partially created tags and re-run:
 # The error output lists existing tags. Delete them:
 git tag -d v1.14.1 graft/evm/v1.14.1
 # Then re-run:
-./scripts/run_task.sh tags-create -- "$VERSION"
+./scripts/run_task.sh git:tags-create -- "$VERSION"
 ```
 
 ### Tag Push Failure
@@ -512,14 +512,14 @@ To recover, simply re-run the push — git push is idempotent for tags that alre
 exist at the correct commit:
 
 ```bash
-./scripts/run_task.sh tags-push -- "$VERSION"
+./scripts/run_task.sh git:tags-push -- "$VERSION"
 ```
 
 If a tag was pushed pointing to the wrong commit, delete the remote tag and re-push:
 
 ```bash
 git push origin :refs/tags/graft/evm/v1.14.1
-./scripts/run_task.sh tags-push -- "$VERSION"
+./scripts/run_task.sh git:tags-push -- "$VERSION"
 ```
 
 ### Require Directive Update Failure
@@ -528,11 +528,11 @@ If `tags-update-require-directives` fails partway through, some go.mod files may
 been updated while others haven't. The consistency check will catch this:
 
 ```bash
-./scripts/run_task.sh check-require-directives
+./scripts/run_task.sh go:check-require-directives
 ```
 
 To recover, re-run the update — it's idempotent:
 
 ```bash
-./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
+./scripts/run_task.sh git:tags-update-require-directives -- "$VERSION"
 ```

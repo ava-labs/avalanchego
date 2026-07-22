@@ -59,7 +59,7 @@ if [[ ${#mismatches[@]} -gt 0 ]]; then
     echo "  $m" >&2
   done
   echo "" >&2
-  echo "Run './scripts/run_task.sh tags-update-require-directives -- <version>' to fix." >&2
+  echo "Run './scripts/run_task.sh git:tags-update-require-directives -- <version>' to fix." >&2
   exit 1
 fi
 

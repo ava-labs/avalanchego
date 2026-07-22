@@ -21,7 +21,7 @@ To run an EVM load test, execute the following commands:
 nix develop
 
 # Start load test with monitoring
-task test-load -- --start-metrics-collector --start-logs-collector
+task avalanchego:test-load -- --start-metrics-collector --start-logs-collector
 ```
 
 This command will create a temporary Avalanche network and perform any test setup prior
@@ -89,7 +89,7 @@ By default, the nodes of a network created by a load test are local processes. H
 nix develop
 
 # Start load test against Kind cluster
-task test-load-kube-kind
+task avalanchego:test-load-kube-kind
 ```
 
 `nix` handles the installation of any Kubernetes/Kind dependencies, making it trivial to run load tests with a Kind cluster.
