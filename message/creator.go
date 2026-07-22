@@ -27,10 +27,12 @@ func NewCreator(
 	metrics prometheus.Registerer,
 	compressionType compression.Type,
 	maxMessageTimeout time.Duration,
+	maxMessageSize int64,
 ) (Creator, error) {
 	builder, err := newMsgBuilder(
 		metrics,
 		maxMessageTimeout,
+		maxMessageSize,
 	)
 	if err != nil {
 		return nil, err
