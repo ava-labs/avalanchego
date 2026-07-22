@@ -21,6 +21,18 @@ type (
 	}
 )
 
+// OracleSidecarConfig holds operator-supplied settings for the oracle sidecar verifier.
+type OracleSidecarConfig struct {
+	// Endpoint is the gRPC address of the sidecar process, e.g. "127.0.0.1:9900".
+	// If empty, the oracle verifier is not initialized from JSON config.
+	Endpoint string `json:"endpoint"`
+	// SidecarConfigPath is the path to the sidecar's own config file. The
+	// validator reads it to derive the set of source types this node will
+	// sign attestations for. If empty when Endpoint is set, the oracle
+	// handler is not registered.
+	SidecarConfigPath string `json:"sidecar-config-path"`
+}
+
 // Config ...
 type Config struct {
 	// Airdrop
@@ -187,6 +199,9 @@ type Config struct {
 
 	// Database Scheme
 	StateScheme string `json:"state-scheme"`
+
+	// Oracle is the configuration for the oracle sidecar verifier.
+	Oracle OracleSidecarConfig `json:"oracle"`
 }
 
 // GetConfig returns a new config object with the default values set and the
