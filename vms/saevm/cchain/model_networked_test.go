@@ -109,7 +109,7 @@ func genNetworkedRunConfig() *rapid.Generator[networkedRunConfig] {
 				numAccounts: uint(rapid.IntRange(2, 6).Draw(rt, "numAccounts")), //#nosec G115 -- bounded draw, 2..6
 				// 2 validators common, 3 rare: per-action cost scales with node
 				// count, and most convergence bugs need only two views.
-				numValidators: rapid.SampledFrom([]int{2, 2, 2, 2, 2, 3}).Draw(rt, "numValidators"),
+				numValidators: rapid.SampledFrom([]int{2, 2, 2, 2, 2, 2, 2, 3}).Draw(rt, "numValidators"),
 				numAtomicKeys: rapid.IntRange(1, 2).Draw(rt, "numAtomicKeys"),
 			},
 			numNonValidators: rapid.IntRange(0, 1).Draw(rt, "numNonValidators"),
