@@ -65,7 +65,10 @@ go_library(
 
 go_test(
     name = "rpc_test",
-    srcs = ["custom_test.go"],
+    srcs = [
+        "custom_test.go",
+        "stateful_test.go",
+    ],
     embed = [":rpc"],
     deps = [
         "@com_github_ava_labs_libevm//common/hexutil",
