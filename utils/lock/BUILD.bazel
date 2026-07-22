@@ -18,5 +18,8 @@ go_test(
         "progress_test.go",
     ],
     embed = [":lock"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
 )

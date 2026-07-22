@@ -20,6 +20,7 @@ go_library(
         "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/bls/signer/localsigner",
+        "//utils/lock",
         "//utils/logging",
         "//vms/platformvm/warp",
         "@com_github_prometheus_client_golang//prometheus",
