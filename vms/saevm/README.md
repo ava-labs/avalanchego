@@ -13,7 +13,7 @@ Continuous Execution was formerly known as Streaming Asynchronous Execution (SAE
   - Execution: [`saexec`](#saexec), [`gastime`](#gastime), [`proxytime`](#proxytime)
   - State and storage: [`saedb`](#saedb), [`firewood`](#firewood)
   - Chain integration: [`cchain`](#cchain)
-  - Shared utilities: [`types`](#types), [`params`](#params), [`saetest`](#saetest), [`cmputils`](#cmputils)
+  - Shared utilities: [`params`](#params), [`saetest`](#saetest)
 - [References](#references)
 
 ## Background
@@ -42,7 +42,7 @@ See [Invariants](./docs/invariants.md) for the timing guarantees among these pha
 
 ### `hook`
 
-> **TODO:** The points in a block's lifecycle (validation, execution, build/rebuild) where chain-specific behavior gets injected, e.g. `cchain`.
+> **TODO:** Describe both the SAE lifecycle hooks defined here AND the libevm hooks. They're similar and tightly coupled, so make the differences and uses clear.
 
 ### `worstcase`
 
@@ -70,7 +70,7 @@ See [Invariants](./docs/invariants.md) for the timing guarantees among these pha
 
 ### `saedb`
 
-> **TODO:** Storage and access for SAE data — when we commit the trie, opening state at a root, etc. 
+> **TODO:** Storage and access for SAE data — when we commit the trie, opening state at a root, etc.
 
 ### `firewood`
 
@@ -84,10 +84,6 @@ See the [Firewood README](./firewood/README.md).
 
 See the [C-Chain README](./cchain/README.md), its [configuration reference](./cchain/config.md), and the [Warp README](./cchain/warp/README.md).
 
-### `types`
-
-> **TODO:** Shared types -- not sure how much there is to say here
-
 ### `params`
 
 > **TODO:**  `Lambda`, `Tau`, execution-queue limits, etc. This'll be short.
@@ -95,10 +91,6 @@ See the [C-Chain README](./cchain/README.md), its [configuration reference](./cc
 ### `saetest`
 
 > **TODO:** Test helpers for SAE.
-
-### `cmputils`
-
-> **TODO:** `cmp` helpers for equality comparisons in tests.
 
 ## References
 
