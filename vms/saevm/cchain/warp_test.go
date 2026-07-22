@@ -202,7 +202,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		vdrs       = warptest.NewValidators(t, 2)
 		warpLogger = common.Address{'l', 'o', 'g', 'g', 'e', 'r'}
 	)
-	timeOpt, clock := withVMTime(testStartTime)
+	timeOpt, _ := withVMTime(testStartTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
 		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
@@ -346,7 +346,6 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 			sut.waitForPendingEthTxs(ctx, t, tx)
 			built := sut.runConsensusLoop(ctx, t, withBlockContext(&block.Context{}))
-			unblockWaitForEvent(clock, built)
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]

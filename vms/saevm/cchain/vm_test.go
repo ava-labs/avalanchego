@@ -95,6 +95,7 @@ type SUT struct {
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
+	clock     *saetest.Clock // MAY be nil
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -106,7 +107,7 @@ type (
 		nodeID     ids.NodeID
 		networkID  uint32
 		validators *warptest.Validators
-		now        func() time.Time
+		clock      *saetest.Clock
 		vmConfig   config
 		db         database.Database
 		state      snow.State
@@ -207,22 +208,23 @@ func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
 
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
-// the test move the clock forward (e.g. past Tau to settle a block).
+// the test move the clock forward (e.g. past Tau to settle a block). It also
+// makes [SUT.waitForPendingTxs] automatically advance the clock past the
+// ACP-226 min-delay pacing timer; see [SUT.unblockWaitForEvent].
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		cfg.now = c.Now
+		cfg.clock = c
 	})
 	return opt, c
 }
 
-// unblockWaitForEvent advances clock to the earliest time a child of parent
-// may be built, so the next [VM.WaitForEvent] returns without parking on the
-// ACP-226 min-delay pacing timer. It never moves the clock backwards.
-func unblockWaitForEvent(clock *saetest.Clock, parent *blocks.Block) {
-	if t := earliestBuildTime(parent); clock.Now().Before(t) {
-		clock.Set(t)
+// nowFunc returns c.Now, falling back to [time.Now] if c is nil.
+func nowFunc(c *saetest.Clock) func() time.Time {
+	if c == nil {
+		return time.Now
 	}
+	return c.Now
 }
 
 // withPriceTarget sets [config.PriceTarget] on the SUT.
@@ -267,7 +269,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb, 0),
-			now:        time.Now,
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
@@ -276,7 +277,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
-			now:              cfg.now,
+			now:              nowFunc(cfg.clock),
 		}
 		db = cfg.db
 	)
@@ -341,6 +342,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		memory:    memory,
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:     cfg.clock,
 	}
 
 	if !cfg.skipRPCTransport {
@@ -589,9 +591,21 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
+// unblockWaitForEvent advances the [withVMTime] clock to ensure that
+// [VM.WaitForEvent] will not throttle for ACP-226 delays.
+func (s *SUT) unblockWaitForEvent() {
+	if s.clock == nil {
+		return
+	}
+	if t := earliestBuildTime(s.VM.VM.GetPreference()); s.clock.Now().Before(t) {
+		s.clock.Set(t)
+	}
+}
+
 func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	tb.Helper()
 
+	s.unblockWaitForEvent()
 	e, err := s.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
@@ -907,7 +921,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i, sk := range keys {
 		addrs[i] = sk.EthAddress()
 	}
-	timeOpt, clock := withVMTime(testStartTime)
+	timeOpt, _ := withVMTime(testStartTime)
 	ctx, sut := newSUT(t, withMaxAllocFor(addrs...), timeOpt)
 
 	var (
@@ -926,7 +940,6 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		}
 		blocks[i] = block
 		preference = block.ID()
-		unblockWaitForEvent(clock, block)
 	}
 	for i, block := range blocks {
 		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
@@ -1404,7 +1417,7 @@ func TestDynamicPriceExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, clock := withVMTime(testStartTime)
+			timeOpt, _ := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
 				timeOpt,
@@ -1426,8 +1439,6 @@ func TestDynamicPriceExponent(t *testing.T) {
 				wantBaseFee := new(big.Int).SetUint64(uint64(wantExponent.Price()))
 				require.NotNilf(t, header.BaseFee, "block %d %T.BaseFee", header.Number, header)
 				require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d %T.BaseFee", header.Number, header)
-
-				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1461,7 +1472,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, clock := withVMTime(testStartTime)
+			timeOpt, _ := withVMTime(testStartTime)
 			opts := []sutOption{
 				withMaxAllocFor(key.EthAddress()),
 				timeOpt,
@@ -1485,7 +1496,6 @@ func TestDynamicTargetExponent(t *testing.T) {
 				assert.Equalf(t, wantGasLimit, header.GasLimit, "block %d %T.GasLimit", header.Number, header)
 
 				parentExponent = wantExponent
-				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1525,7 +1535,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			key := txtest.NewKey(t)
-			timeOpt, clock := withVMTime(testStartTime)
+			timeOpt, _ := withVMTime(testStartTime)
 			opts := []sutOption{withMaxAllocFor(key.EthAddress()), timeOpt}
 			if test.desired != nil {
 				opts = append(opts, withMinDelayTarget(*test.desired))
@@ -1539,7 +1549,6 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
 				got := dynamic.DelayExponent(*he.MinDelayExcess)
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
-				unblockWaitForEvent(clock, blk)
 			}
 		})
 	}
@@ -1590,12 +1599,11 @@ func TestGasRefundsDisabled(t *testing.T) {
 
 func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	key := txtest.NewKey(t)
-	timeOpt, clock := withVMTime(testStartTime)
+	timeOpt, _ := withVMTime(testStartTime)
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
 	w := newWallet(key, sut.ctx, sut.Client)
 
 	parent := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	unblockWaitForEvent(clock, parent)
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
