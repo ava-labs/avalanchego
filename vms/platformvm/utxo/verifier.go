@@ -469,7 +469,7 @@ func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return nil
 }
 
-func (i *inputOutputGetter) CreateL1Tx(tx *txs.CreateL1Tx) error {
+func (*inputOutputGetter) CreateL1Tx(*txs.CreateL1Tx) error {
 	// CreateL1Tx is implemented in a follow-up PR. Until then, this transaction is rejected.
 	return ErrUnsupportedTxType
 }

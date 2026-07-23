@@ -759,7 +759,8 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	)
 	return err
 }
-func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+
+func (*complexityVisitor) CreateL1Tx(*txs.CreateL1Tx) error {
 	// CreateL1Tx is implemented in a follow-up PR. Until then, this transaction is rejected.
 	return errCreateL1TxNotSupported
 }

@@ -873,7 +873,8 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 	)
 	return nil
 }
-func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+
+func (*standardTxExecutor) CreateL1Tx(*txs.CreateL1Tx) error {
 	// CreateL1Tx is implemented in a future PR. Until then, the transaction is rejected.
 	return errCreateL1TxNotSupported
 }

@@ -38,6 +38,6 @@ type Visitor interface {
 	SetAutoRenewedValidatorConfigTx(*SetAutoRenewedValidatorConfigTx) error
 	RewardAutoRenewedValidatorTx(*RewardAutoRenewedValidatorTx) error
 
-	// Igloo Transactions 
+	// Igloo Transactions
 	CreateL1Tx(*CreateL1Tx) error
 }

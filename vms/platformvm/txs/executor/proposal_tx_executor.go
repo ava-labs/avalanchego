@@ -135,9 +135,11 @@ func (*proposalTxExecutor) BaseTx(*txs.BaseTx) error {
 func (*proposalTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
+
 func (*proposalTxExecutor) CreateL1Tx(*txs.CreateL1Tx) error {
 	return ErrWrongTxType
 }
+
 func (*proposalTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }

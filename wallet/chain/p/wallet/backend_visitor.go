@@ -135,6 +135,7 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	}
 	return b.baseTx(&tx.BaseTx)
 }
+
 func (b *backendVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	// subnetID = txID for CreateL1Tx, so validationIDs are b.txID.Append(uint32(i))
 	for i, vdr := range tx.Validators {

@@ -196,6 +196,7 @@ func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	txSigners = append(txSigners, subnetAuthSigners)
 	return sign(s.tx, txSigners)
 }
+
 func (s *visitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

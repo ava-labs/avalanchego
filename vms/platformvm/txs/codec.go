@@ -49,6 +49,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterIglooTypes(c),
 		)
 	}
 
@@ -140,7 +141,6 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
 }
-
 
 // RegisterIglooTypes registers the type information for transactions that
 // were valid during the Igloo series of upgrades.
