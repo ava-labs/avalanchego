@@ -22,6 +22,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
@@ -157,9 +158,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   escrowAddr,
-					"data": hexutil.Encode(escrow.CallDataForBalance(recipient)),
+				ethapi.TransactionArgs{
+					To:   &escrowAddr,
+					Data: utils.PointerTo(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
 				},
 				latest,
 			},
@@ -171,10 +172,10 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   escrowAddr,
-					"from": noBalance,
-					"data": hexutil.Encode(escrow.CallDataToWithdraw()),
+				ethapi.TransactionArgs{
+					From: &noBalance,
+					To:   &escrowAddr,
+					Data: utils.PointerTo(hexutil.Bytes(escrow.CallDataToWithdraw())),
 				},
 				latest,
 			},
@@ -192,9 +193,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   echoReverter,
-					"data": hexutil.Bytes{42},
+				ethapi.TransactionArgs{
+					To:   &echoReverter,
+					Data: utils.PointerTo(hexutil.Bytes{42}),
 				},
 				latest,
 			},
@@ -208,9 +209,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   echoReverter,
-					"data": hexutil.Bytes(revertAsPanic),
+				ethapi.TransactionArgs{
+					To:   &echoReverter,
+					Data: utils.PointerTo(hexutil.Bytes(revertAsPanic)),
 				},
 				latest,
 			},
@@ -224,8 +225,8 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to": invalidJumper,
+				ethapi.TransactionArgs{
+					To: &invalidJumper,
 				},
 				latest,
 			},

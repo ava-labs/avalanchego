@@ -1123,11 +1123,11 @@ func TestFillTransaction(t *testing.T) {
 		return ethapi.SignTransactionResult{Raw: raw, Tx: tx}
 	}
 
-	args := map[string]any{
-		"from":  sut.wallet.Addresses()[0],
-		"to":    to,
-		"gas":   hexutil.Uint64(gas),
-		"value": hexBig(value),
+	args := ethapi.TransactionArgs{
+		From:  utils.PointerTo(sut.wallet.Addresses()[0]),
+		To:    &to,
+		Gas:   utils.PointerTo(hexutil.Uint64(gas)),
+		Value: hexBig(value),
 	}
 
 	sut.testRPC(ctx, t, rpcTest{
@@ -1170,13 +1170,13 @@ func TestResend(t *testing.T) {
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_resend",
 		args: []any{
-			map[string]any{
-				"from":                 sut.wallet.Addresses()[0],
-				"nonce":                hexutil.Uint64(tx.Nonce()),
-				"to":                   tx.To(),
-				"gas":                  hexutil.Uint64(tx.Gas()),
-				"maxFeePerGas":         (*hexutil.Big)(tx.GasFeeCap()),
-				"maxPriorityFeePerGas": (*hexutil.Big)(tx.GasTipCap()),
+			ethapi.TransactionArgs{
+				From:                 utils.PointerTo(sut.wallet.Addresses()[0]),
+				Nonce:                utils.PointerTo(hexutil.Uint64(tx.Nonce())),
+				To:                   tx.To(),
+				Gas:                  utils.PointerTo(hexutil.Uint64(tx.Gas())),
+				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
+				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
 			},
 			hexBig(2), // arbitrary
 		},
@@ -1190,13 +1190,13 @@ func TestEthSigningAPIs(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	wantErr := testerr.Contains("unknown account")
-	txFields := map[string]any{
-		"from":     zeroAddr,
-		"to":       zeroAddr,
-		"gas":      hexutil.Uint64(params.TxGas),
-		"gasPrice": hexBig(1),
-		"value":    hexBig(100),
-		"nonce":    hexutil.Uint64(0),
+	txFields := ethapi.TransactionArgs{
+		From:     &zeroAddr,
+		To:       &zeroAddr,
+		Gas:      utils.PointerTo(hexutil.Uint64(params.TxGas)),
+		GasPrice: hexBig(1),
+		Value:    hexBig(100),
+		Nonce:    utils.PointerTo(hexutil.Uint64(0)),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
