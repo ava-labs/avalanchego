@@ -26,6 +26,7 @@ func VerifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	tb.Helper()
 
 	accountRLP := proveTrieValue(tb, root, crypto.Keccak256(proof.Address.Bytes()), proof.AccountProof)
+	// valid exclusion proof
 	if len(accountRLP) == 0 {
 		assert.Zero(tb, proof.Balance.Sign(), "balance claimed for proven-absent account")
 		assert.Zero(tb, proof.Nonce, "nonce claimed for proven-absent account")
