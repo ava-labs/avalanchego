@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -52,6 +52,7 @@ type hooks struct {
 	builder
 	state       *cchainstate.State
 	warpStorage *warp.Storage
+	metrics     *metrics
 }
 
 func newHooks(
@@ -62,6 +63,7 @@ func newHooks(
 	warpStorage *warp.Storage,
 	now func() time.Time,
 	desired desiredParams,
+	metrics *metrics,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -88,6 +90,7 @@ func newHooks(
 		},
 		state,
 		warpStorage,
+		metrics,
 	}
 }
 
@@ -106,7 +109,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		txs[i] = ht
 	}
 
-	now := h.BlockTime(b.Header())
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
 	return &builder{
 		h.ctx,
 		h.chainConfig,
@@ -115,9 +120,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		},
 		slices.Values(txs),
 		desiredParams{
-			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
-			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(b.Header()).MinDelayExcess),
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -242,26 +247,17 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
-	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
-	// and this block is the first post-Durango block, we need to activate the
-	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
-	// network, but could happen on a custom network.
-	return nil
-}
-
-// AfterExecutingTransaction credits the base fee to [constants.BlackholeAddr].
-// The C-Chain has historically credited the full fee (base + priority) to the
-// blackhole address, but libevm's state transition only credits the priority
-// fee to the coinbase (the blackhole address) and discards the base fee.
-func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
-	burned := new(uint256.Int).SetUint64(r.GasUsed)
-	burned.Mul(burned, &baseFee)
-	db.AddBalance(constants.BlackholeAddr, burned)
+func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
+	config := corethparams.GetExtra(h.chainConfig)
+	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+		activatePrecompile(statedb, corethwarp.ContractAddress)
+	}
 	return nil
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -488,9 +484,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-
-	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
-	// state is encoded in other fields.
+	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
+	// entirely during the coreth removal. warpValidityBytes could just be set
+	// directly.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,

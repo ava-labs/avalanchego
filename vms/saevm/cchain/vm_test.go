@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -68,6 +69,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -93,6 +95,7 @@ type SUT struct {
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
+	clock     *saetest.Clock
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -104,7 +107,7 @@ type (
 		nodeID     ids.NodeID
 		networkID  uint32
 		validators *warptest.Validators
-		now        func() time.Time
+		clock      *saetest.Clock
 		vmConfig   config
 		db         database.Database
 		state      snow.State
@@ -191,11 +194,12 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// withHeliconTime schedules the Helicon activation at t rather than at
-// genesis, leaving the rest of the upgrade schedule unchanged.
-func withHeliconTime(t time.Time) sutOption {
+// withUpgradeTime schedules fork and all later upgrades at t. Earlier
+// upgrades remain initially active.
+func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrades.HeliconTime = t
+		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Latest, t)
+		upgradetest.SetTimesTo(&c.upgrades, fork-1, upgrade.InitiallyActiveTime)
 	})
 }
 
@@ -204,11 +208,13 @@ func withHeliconTime(t time.Time) sutOption {
 var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
 
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
-// the test move the clock forward (e.g. past Tau to settle a block).
+// the test move the clock forward (e.g. past Tau to settle a block). It also
+// makes [SUT.waitForPendingTxs] automatically advance the clock past the
+// ACP-226 min-delay pacing timer; see [SUT.unblockWaitForEvent].
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		cfg.now = c.Now
+		cfg.clock = c
 	})
 	return opt, c
 }
@@ -255,7 +261,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb, 0),
-			now:        time.Now,
+			clock:      saetest.NewClock(testStartTime, time.Millisecond),
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
@@ -264,7 +270,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
-			now:              cfg.now,
+			now:              cfg.clock.Now,
 		}
 		db = cfg.db
 	)
@@ -329,6 +335,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		memory:    memory,
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:     cfg.clock,
 	}
 
 	if !cfg.skipRPCTransport {
@@ -358,7 +365,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
 // provided to the sae VM.
-func (s *SUT) hooks() *hooks {
+func (s *SUT) hooks(tb testing.TB) *hooks {
+	tb.Helper()
+
+	m, err := newMetrics(prometheus.NewRegistry())
+	require.NoErrorf(tb, err, "newMetrics()")
 	return newHooks(
 		s.ctx,
 		s.state,
@@ -367,6 +378,7 @@ func (s *SUT) hooks() *hooks {
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
+		m,
 	)
 }
 
@@ -572,9 +584,18 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
+// unblockWaitForEvent advances the [withVMTime] clock to ensure that
+// [VM.WaitForEvent] will not throttle for ACP-226 delays.
+func (s *SUT) unblockWaitForEvent() {
+	if t := earliestBuildTime(s.VM.VM.GetPreference()); s.clock.Now().Before(t) {
+		s.clock.Set(t)
+	}
+}
+
 func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	tb.Helper()
 
+	s.unblockWaitForEvent()
 	e, err := s.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
@@ -1583,13 +1604,15 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
+// waitForEventResult carries a [VM.WaitForEvent] output.
+type waitForEventResult struct {
+	msg snowcommon.Message
+	err error
+}
+
 // TestWaitForEventMinDelayPacing exercises WaitForEvent's ACP-226 min-delay
 // pacing.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
-	type result struct {
-		msg snowcommon.Message
-		err error
-	}
 	tests := []struct {
 		name string
 		// cancelDuringDelay releases WaitForEvent by canceling its context while
@@ -1632,10 +1655,10 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				done := make(chan result, 1)
+				done := make(chan waitForEventResult, 1)
 				go func() {
 					msg, err := sut.WaitForEvent(ctx)
-					done <- result{msg, err}
+					done <- waitForEventResult{msg, err}
 				}()
 
 				// Blocked on the pacing timer until we release it.
@@ -1652,6 +1675,48 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestWaitForEventThrottle asserts that consecutive [VM.WaitForEvent] calls
+// are throttled even when a pending tx is available and the preferred block's
+// ACP-226 minimum delay has elapsed.
+func TestWaitForEventThrottle(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// See [TestWaitForEventMinDelayPacing] for why the SUT has no RPC
+		// transport and MUST NOT build blocks.
+		key := txtest.NewKey(t)
+		timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+		ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
+		w := newWallet(key, sut.ctx, nil)
+
+		gossipTx := toGossipTx(w.newMinimalTx(t))
+		require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
+
+		// Skip the min-delay pacing so only the throttle can block.
+		clock.Advance(2 * dynamic.InitialDelayExponent.DelayDuration())
+
+		// The throttle clock starts when a call returns, so this first
+		// (immediate) call is what forces the second one to wait.
+		msg, err := sut.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent() first call", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, msg, "%T.WaitForEvent() first call event", sut.VM)
+
+		start := time.Now()
+		done := make(chan waitForEventResult, 1)
+		go func() {
+			msg, err := sut.WaitForEvent(ctx)
+			done <- waitForEventResult{msg, err}
+		}()
+
+		// Blocked on the throttle timer until synctest fires it.
+		synctest.Wait()
+		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
+
+		got := <-done
+		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM)
+		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
+	})
 }
 
 // TestEmptyBlocksDisallowed asserts that empty blocks are not allowed.
@@ -1697,7 +1762,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 	timeOpt, clock := withVMTime(preHeliconTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withHeliconTime(heliconTime),
+		withUpgradeTime(upgradetest.Helicon, heliconTime),
 		timeOpt,
 	)
 
@@ -1728,4 +1793,32 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		err = sut.VerifyBlock(ctx, nil, parsed)
 		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
 	})
+}
+
+// TestWarpPrecompileActivation verifies that executing the first post-Durango
+// block marks the warp precompile's account as non-empty when the genesis
+// predates Durango.
+func TestWarpPrecompileActivation(t *testing.T) {
+	const upgradeThreshold = 5 * time.Second
+	key := txtest.NewKey(t)
+	timeOpt, vmTime := withVMTime(upgrade.InitiallyActiveTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(key.EthAddress()),
+		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(upgradeThreshold)),
+		timeOpt,
+	)
+
+	genesisState, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+
+	vmTime.Advance(upgradeThreshold) // activate Durango in next block
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	sut.issueAndExecute(ctx, t, stx)
+
+	state, err := sut.LastExecutedState()
+	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
+	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
+	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
 }

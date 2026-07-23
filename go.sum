@@ -333,10 +333,10 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100 h1:j0Pj/Gq5XTbJEyzoSX82l+9LfV2NSl4Klk+9pjaxd3M=
 github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100/go.mod h1:eD5UkxiWTdbkqM7mg2Xf981SAeWQ/Q80js/1rFcKpfg=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0 h1:JzmCHY9uQiZnrdmeXZ4s89g4Su0O4qs0EMmbOaHUDWw=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
-github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff h1:OEBrr1VL5yLS7NPNWmV+tUb8HduRGflAGnWVehDDMO0=
-github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0 h1:EDhwnUb6Fy/88cqUCcuj0R5u8isB+Vv++v/r2mawp2g=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
+github.com/ava-labs/libevm v1.13.15-0.20260720163803-90e9e9d2a1f5 h1:1gyMFsVSsCdoBYUwaw5KJmax/2ANuXH200IlayVNAJM=
+github.com/ava-labs/libevm v1.13.15-0.20260720163803-90e9e9d2a1f5/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad h1:P5IRndHUinfIZ73jdxl3M6jdcnKkQOLYvhGvE3VDiSU=
 github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad/go.mod h1:DADqV3zJ+ij8GqliStJ+aj9l/cPtb5ZUhNy5KxlDEsQ=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

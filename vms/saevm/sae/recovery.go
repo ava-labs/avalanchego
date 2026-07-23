@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -31,7 +31,7 @@ type recovery struct {
 	db          ethdb.Database
 	xdb         types.ExecutionResults
 	chainConfig *params.ChainConfig
-	log         logging.Logger
+	snowCtx     *snow.Context
 	hooks       hook.Points
 	config      Config
 }
@@ -41,14 +41,14 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.log)
+	return blocks.New(ethB, parent, nil, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
-	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig)
+	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
 	defer func() {
 		retErr = errors.Join(retErr, cache.TrieDB().Close())
 	}()
@@ -79,7 +79,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.log, rec.db, rec.xdb, rec.chainConfig)
+		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.snowCtx.Log, rec.db, rec.xdb, rec.chainConfig)
 		if err != nil {
 			return nil, err
 		}

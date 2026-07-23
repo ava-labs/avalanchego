@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -135,6 +136,7 @@ func TestRecoverSimple(t *testing.T) {
 	tests := []struct {
 		name      string
 		numBlocks int
+		scheme    string // defaults to rawdb.HashScheme
 		archival  bool
 	}{
 		{
@@ -158,6 +160,28 @@ func TestRecoverSimple(t *testing.T) {
 			name:      "non_archival_commit_interval_exactly",
 			numBlocks: commitInterval,
 		},
+		{
+			name:      "archival_firewood",
+			numBlocks: 10,
+			scheme:    customrawdb.FirewoodScheme,
+			archival:  true,
+		},
+		{
+			name:      "non_archival_firewood_before_first_trie_commit",
+			numBlocks: 2, // no new blocks settled yet
+			scheme:    customrawdb.FirewoodScheme,
+		},
+
+		{
+			name:      "non_archival_firewood_commit_interval_exactly",
+			numBlocks: commitInterval,
+			scheme:    customrawdb.FirewoodScheme,
+		},
+		{
+			name:      "non_archival_firewood_beyond_revision_window",
+			numBlocks: 3 * commitInterval, // evicts the oldest revisions from the in-memory window
+			scheme:    customrawdb.FirewoodScheme,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,12 +189,15 @@ func TestRecoverSimple(t *testing.T) {
 
 			var srcDB database.Database
 			srcHDB := saetest.NewHeightIndexDB()
+			tempDir := t.TempDir()
 
 			sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				srcDB = c.db
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
+				c.vmConfig.DBConfig.Scheme = tt.scheme
+				c.dataDir = tempDir
 			}))
 
 			for range tt.numBlocks {
@@ -182,20 +209,27 @@ func TestRecoverSimple(t *testing.T) {
 				}))
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			}
+			src.close()
 
 			newDB := saetest.CopyDB(t, srcDB)
 			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
 				c.vmConfig.DBConfig.Archival = tt.archival
+				c.vmConfig.DBConfig.Scheme = tt.scheme
+				c.dataDir = tempDir
 			}))
 
 			requireConsensusCriticalBlocks(t, src, sut)
 
-			if !tt.archival {
-				// For non-archival nodes, states outside [lastSettled, lastExecuted]
-				// must not be accessible, except at CommitTrieDBEvery boundaries
-				// where the settled state was written to disk.
+			// Firewood nodes have a rolling buffer of available recent states,
+			// so it doesn't need to be managed directly.
+			// Archival nodes store all states.
+			if !tt.archival && tt.scheme != customrawdb.FirewoodScheme {
+				// For non-archival, HashDB nodes, states outside
+				// [lastSettled, lastExecuted] MUST NOT be accessible, except at
+				// CommitTrieDBEvery boundaries where the settled state was
+				// written to disk. Otherwise, the memory will leak.
 				t.Run("unavailable_outside_window", func(t *testing.T) {
 					lastSettled := sut.rawVM.last.settled.Load().NumberU64()
 					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)

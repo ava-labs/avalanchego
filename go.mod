@@ -26,7 +26,7 @@ require (
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
-	github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff
+	github.com/ava-labs/libevm v1.13.15-0.20260720163803-90e9e9d2a1f5
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -94,7 +94,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect

@@ -84,7 +84,9 @@ var (
 	errMinValidatorStakeAboveMax              = errors.New("minimum validator stake can't be greater than maximum validator stake")
 	errInvalidDelegationFee                   = errors.New("delegation fee must be in the range [0, 1,000,000]")
 	errInvalidMinStakeDuration                = errors.New("min stake duration must be > 0")
+	errInvalidHeliconMinStakeDuration         = errors.New("helicon min stake duration must be > 0")
 	errMinStakeDurationAboveMax               = errors.New("max stake duration can't be less than min stake duration")
+	errHeliconMinStakeDurationAboveMax        = errors.New("max stake duration can't be less than helicon min stake duration")
 	errStakeMaxConsumptionTooLarge            = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
 	errStakeMaxConsumptionBelowMin            = errors.New("stake max consumption can't be less than min stake consumption")
 	errStakeMintingPeriodBelowMin             = errors.New("stake minting period can't be less than max stake duration")
@@ -822,8 +824,12 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 			return node.StakingConfig{}, errInvalidDelegationFee
 		case config.MinStakeDuration <= 0:
 			return node.StakingConfig{}, errInvalidMinStakeDuration
+		case config.HeliconMinStakeDuration <= 0:
+			return node.StakingConfig{}, errInvalidHeliconMinStakeDuration
 		case config.MaxStakeDuration < config.MinStakeDuration:
 			return node.StakingConfig{}, errMinStakeDurationAboveMax
+		case config.MaxStakeDuration < config.HeliconMinStakeDuration:
+			return node.StakingConfig{}, errHeliconMinStakeDurationAboveMax
 		case config.RewardConfig.MaxConsumptionRate > reward.PercentDenominator:
 			return node.StakingConfig{}, errStakeMaxConsumptionTooLarge
 		case config.RewardConfig.MaxConsumptionRate < config.RewardConfig.MinConsumptionRate:
