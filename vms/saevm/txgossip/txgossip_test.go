@@ -80,6 +80,11 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
 
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see minGasForSize.
+	const gasTarget = 4_000_000
+
 	snowCtx := snowtest.Context(t, ids.Empty)
 	logger := loggingtest.New(t, logging.Warn)
 	snowCtx.Log = logger
@@ -94,7 +99,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		db,
 		config,
 		saetest.MaxAllocFor(wallet.Addresses()...),
-		blockstest.WithGasTarget(saetest.GasTarget),
+		blockstest.WithGasTarget(gasTarget),
 		blockstest.WithBaseFee(params.Wei),
 	)
 	chain := blockstest.NewChainBuilder(genesis)
@@ -107,7 +112,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		db,
 		xdb,
 		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
-		hookstest.NewStub(saetest.GasTarget),
+		hookstest.NewStub(gasTarget),
 		snowCtx,
 		prometheus.NewRegistry(),
 	)

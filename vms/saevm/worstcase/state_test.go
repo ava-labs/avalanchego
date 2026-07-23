@@ -105,7 +105,7 @@ func TestSafeMaxBlockSize(t *testing.T) {
 		},
 		{
 			name:   "liveTarget", // initial live C-Chain target (~4M gas/s)
-			target: saetest.GasTarget,
+			target: 4_000_000,
 			want:   80_000_000,
 		},
 	}
