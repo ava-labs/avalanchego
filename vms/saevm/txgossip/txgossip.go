@@ -130,7 +130,7 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligibleTxs := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		if eligible(tx, blockGasLimit, saeparams.MaxBlockTxBytes) {
+		if eligible(tx, blockGasLimit) {
 			eligibleTxs = append(eligibleTxs, tx)
 			eligibleIdx = append(eligibleIdx, i)
 			continue
@@ -150,8 +150,7 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 
 // eligible reports whether tx MAY be included in a block, using the notation:
 //
-//   - M = maxBytes, the block's transaction byte budget (typically
-//     [saeparams.MaxBlockTxBytes])
+//   - M = [saeparams.TargetBlockBytes], the block's transaction byte budget
 //   - x = blockGasLimit, the block's gas limit
 //   - g = tx.Gas(), the transaction's gas limit
 //   - y = tx.Size(), the transaction's serialized size in bytes
@@ -163,15 +162,15 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 //
 // Equivalently, it must carry at least x/M gas per serialized byte, which
 // bounds the cumulative size of a block's worth of transactions by M.
-func eligible(tx *types.Transaction, blockGasLimit, maxBytes uint64) bool {
+func eligible(tx *types.Transaction, blockGasLimit uint64) bool {
 	// Defensive check: if blockGasLimit == 0, all transactions would be
 	// incorrectly eligible
 	if blockGasLimit == 0 {
 		return false
 	}
 
-	yxHi, yxLo := bits.Mul64(tx.Size(), blockGasLimit) // y·x
-	gmHi, gmLo := bits.Mul64(tx.Gas(), maxBytes)       // g·M
+	yxHi, yxLo := bits.Mul64(tx.Size(), blockGasLimit)             // y·x
+	gmHi, gmLo := bits.Mul64(tx.Gas(), saeparams.TargetBlockBytes) // g·M
 	if yxHi != gmHi {
 		return yxHi < gmHi
 	}

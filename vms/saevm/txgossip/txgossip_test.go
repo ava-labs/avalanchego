@@ -48,6 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 const testGasTarget = 4_000_000
@@ -146,70 +148,60 @@ func newTxPool(t *testing.T, bc BlockChain) *txpool.TxPool {
 
 func TestEligible(t *testing.T) {
 	tx := types.NewTx(&types.LegacyTx{Gas: 21_000})
-	y, g := tx.Size(), tx.Gas()
+	boundary := tx.Gas() * saeparams.TargetBlockBytes / tx.Size()
+	maxGasTx := types.NewTx(&types.LegacyTx{Gas: math.MaxUint64})
 
 	tests := []struct {
-		name                    string
-		blockGasLimit, maxBytes uint64
-		want                    bool
+		name          string
+		tx            *types.Transaction
+		blockGasLimit uint64
+		want          bool
 	}{
 		{
 			name:          "atBoundary",
-			blockGasLimit: g,
-			maxBytes:      y,
+			tx:            tx,
+			blockGasLimit: boundary,
 			want:          true,
 		},
 		{
 			name:          "blockGasLimitOneOver",
-			blockGasLimit: g + 1,
-			maxBytes:      y,
+			tx:            tx,
+			blockGasLimit: boundary + 1,
 		},
 		{
-			name:          "maxBytesOneOver",
-			blockGasLimit: g,
-			maxBytes:      y + 1,
-			want:          true,
-		},
-		{
-			name:          "blockGasLimitDoubled",
-			blockGasLimit: 2 * g,
-			maxBytes:      y,
-		},
-		{
-			name:          "maxBytesDoubled",
-			blockGasLimit: g,
-			maxBytes:      2 * y,
+			name:          "blockGasLimitHalved",
+			tx:            tx,
+			blockGasLimit: boundary / 2,
 			want:          true,
 		},
 		{
 			name:          "overflowingProductRejected",
+			tx:            tx,
 			blockGasLimit: math.MaxUint64,
-			maxBytes:      1,
 		},
 		{
 			name:          "overflowingProductAccepted",
+			tx:            maxGasTx,
 			blockGasLimit: 1,
-			maxBytes:      math.MaxUint64,
 			want:          true,
 		},
 		{
-			name:     "zeroBlockGasLimit",
-			maxBytes: y,
+			name: "zeroBlockGasLimit",
+			tx:   tx,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := eligible(tx, tt.blockGasLimit, tt.maxBytes)
+			got := eligible(tt.tx, tt.blockGasLimit)
 			require.Equal(
 				t,
 				tt.want,
 				got,
-				"eligible(size=%d, gasLimit=%d, blockGasLimit=%d, maxBytes=%d)",
-				y, // size
-				g, // gasLimit
+				"eligible(size=%d, gasLimit=%d, blockGasLimit=%d)",
+				tt.tx.Size(),
+				tt.tx.Gas(),
 				tt.blockGasLimit,
-				tt.maxBytes,
 			)
 		})
 	}

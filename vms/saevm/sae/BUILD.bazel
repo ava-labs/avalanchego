@@ -36,7 +36,6 @@ go_library(
         "//utils",
         "//utils/bloom",
         "//utils/logging",
-        "//utils/units",
         "//version",
         "//vms/components/gas",
         "//vms/evm/database",

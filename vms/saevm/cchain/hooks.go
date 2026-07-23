@@ -496,15 +496,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-
 	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
 	// entirely during the coreth removal. warpValidityBytes could just be set
 	// directly.
-	//
-	// TODO(JonathanOppenheimer): These bytes grow with the number of
-	// warp transactions (up to 61 B each, see vms/evm/predicate) and
-	// consume the headroom that saeparams.MaxBlockTxBytes reserves below
-	// saeparams.MaxBlockBytes for non-transaction block bytes.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,

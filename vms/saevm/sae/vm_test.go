@@ -421,7 +421,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	}
 
 	txBytes := heavyTxs[0].Size()
-	wantTxs := int(saeparams.MaxBlockTxBytes / txBytes) //#nosec G115 -- bounded above by numTxs, checked below
+	wantTxs := int(saeparams.TargetBlockBytes / txBytes) //#nosec G115 -- bounded above by numTxs, checked below
 	require.Less(t, wantTxs, numTxs, "fixture must supply more transactions than fit in the byte budget")
 
 	// Bypass mempool admission filtering so the builder backstop is exercised.
@@ -439,36 +439,22 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	}
 }
 
-func TestParseBlockSizeLimit(t *testing.T) {
+func TestVerifyBlockSizeLimit(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
+	lastAccepted := sut.lastAcceptedBlock(t)
 
-	tests := []struct {
-		name    string
-		size    int
-		wantErr error
-	}{
-		{
-			name: "at_limit",
-			size: maxBlockBytes,
+	ethB := types.NewBlock(
+		&types.Header{
+			ParentHash: common.Hash(lastAccepted.ID()),
+			Number:     new(big.Int).SetUint64(lastAccepted.Height() + 1),
 		},
-		{
-			name:    "over_limit",
-			size:    maxBlockBytes + 1,
-			wantErr: errBlockTooLarge,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := sut.rawVM.ParseBlock(ctx, make([]byte, tt.size))
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr, "ParseBlock()")
-				return
-			}
-			// will still fail to Parse, but it shouldn't be for size.
-			require.NotErrorIs(t, err, errBlockTooLarge, "ParseBlock()")
-		})
-	}
+		types.Transactions{types.NewTx(&types.LegacyTx{Data: make([]byte, saeparams.MaxBlockBytes)})},
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+	)
+	b := blockstest.NewBlock(t, ethB, nil, nil)
+	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
 }
 
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided

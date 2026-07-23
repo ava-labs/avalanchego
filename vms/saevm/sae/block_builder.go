@@ -68,6 +68,7 @@ func (b *blockBuilderG[_]) build(
 		parent,
 		b.mempool.TransactionsByPriority,
 		b.hooks,
+		saeparams.TargetBlockBytes,
 	)
 }
 
@@ -120,6 +121,7 @@ func (b *blockBuilderG[_]) rebuild(
 		parent,
 		func(txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
 		rebuilder,
+		saeparams.MaxBlockBytes,
 	)
 }
 
@@ -132,12 +134,16 @@ var (
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
 // and [blockBuilder.rebuild]. The block context MAY be nil.
+//
+// targetBlockBytes caps the cumulative serialized size of included
+// transactions.
 func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
 	builder hook.BlockBuilder[T],
+	targetBlockBytes uint64,
 ) (*blocks.Block, error) {
 	hdr, err := builder.BuildHeader(parent.Header())
 	if err != nil {
@@ -270,7 +276,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// their serialized-byte budget, even if mempool admission accepted
 		// more bytes than the gas-per-byte rule intends.
 		txBytes := tx.Size()
-		if includedTxBytes+txBytes > saeparams.MaxBlockTxBytes {
+		if includedTxBytes+txBytes > targetBlockBytes {
 			txLog.Debug("Skipping transaction: block byte budget reached",
 				zap.Uint64("tx_bytes", txBytes),
 				zap.Uint64("included_tx_bytes", includedTxBytes),
