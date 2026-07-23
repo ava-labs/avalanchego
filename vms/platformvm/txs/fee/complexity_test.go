@@ -414,6 +414,81 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 		})
 	}
 }
+func TestCreateL1ValidatorComplexity(t *testing.T) {
+	tests := []struct {
+		name     string
+		vdr      txs.CreateL1Validator
+		expected gas.Dimensions
+	}{
+		{
+			name: "any can spend",
+			vdr: txs.CreateL1Validator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 200,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+		{
+			name: "single remaining balance owner",
+			vdr: txs.CreateL1Validator{
+				NodeID: make([]byte, ids.NodeIDLen),
+				Signer: signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+		{
+			name: "single deactivation owner",
+			vdr: txs.CreateL1Validator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			actual, err := CreateL1ValidatorComplexity(&test.vdr)
+			require.NoError(err)
+			require.Equal(test.expected, actual)
+
+			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
+			require.NoError(err)
+
+			numBytesWithoutCodecVersion := uint64(len(vdrBytes) - codec.VersionSize)
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
+		})
+	}
+}
 
 func TestOwnerComplexity(t *testing.T) {
 	tests := []struct {
