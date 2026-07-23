@@ -6,9 +6,11 @@ package sae
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -295,6 +297,9 @@ func TestDebugTrace(t *testing.T) {
 			assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
 		})
 
+		wantPrefix := fmt.Sprintf("block_%#x-%d-%#x-", depositBlock.Hash().Bytes()[:4], 0, depositTx.Hash().Bytes()[:4])
+		assert.Truef(t, strings.HasPrefix(filepath.Base(files[0]), wantPrefix), "file name %q returned by debug_standardTraceBlockToFile MUST have prefix %q", filepath.Base(files[0]), wantPrefix)
+
 		trace, err := os.ReadFile(files[0])
 		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
 		// The file should be a structured log file, each line is a separate
@@ -337,7 +342,6 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	}
 
 	parent := sut.runConsensusLoop(t, newCreateTx())
-	// One second decays the large-excess base fee by ~1%.
 	vmTime.Advance(time.Second)
 	b := sut.runConsensusLoop(t, newCreateTx())
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
@@ -367,16 +371,23 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
-			// Re-derives the base fee by replaying the block's execution.
 			method:       "debug_traceTransaction",
 			args:         []any{txHash},
 			want:         want,
 			extraCmpOpts: ignore,
 		},
 		{
-			// Sources the base fee from the stored execution artefacts.
 			method: "debug_traceBlockByNumber",
 			args:   []any{hexutil.Uint64(b.NumberU64())},
+			want: []txTraceResult{{
+				TxHash: txHash,
+				Result: &want,
+			}},
+			extraCmpOpts: ignore,
+		},
+		{
+			method: "debug_traceBlockByHash",
+			args:   []any{b.Hash()},
 			want: []txTraceResult{{
 				TxHash: txHash,
 				Result: &want,
