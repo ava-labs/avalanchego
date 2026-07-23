@@ -26,9 +26,12 @@ func VerifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	tb.Helper()
 
 	accountRLP := proveTrieValue(tb, root, crypto.Keccak256(proof.Address.Bytes()), proof.AccountProof)
+	// valid exclusion proof
 	if len(accountRLP) == 0 {
 		assert.Zero(tb, proof.Balance.Sign(), "balance claimed for proven-absent account")
+		assert.Zero(tb, proof.CodeHash, "code hash claimed for proven-absent account")
 		assert.Zero(tb, proof.Nonce, "nonce claimed for proven-absent account")
+		assert.Zero(tb, proof.StorageHash, "storage root claimed for proven-absent account")
 		assert.Empty(tb, proof.StorageProof, "storage proofs claimed for proven-absent account")
 		return
 	}
@@ -47,6 +50,10 @@ func VerifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	}
 }
 
+// proveStorageValue proves the value of the storage slot key against the
+// storage root. Unlike [proveTrieValue], it never returns nil as a valid
+// exclusion proof yields zero. (This matches how eth_getProof reports absent
+// storage slots).
 func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes []string) *big.Int {
 	tb.Helper()
 
@@ -61,6 +68,9 @@ func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes [
 	return &value
 }
 
+// proveTrieValue constructs a proof from nodes for key. If the proof is invalid,
+// the test immediately fails. If an inclusion proof, the value associated with the key is returned.
+// Otherwise (for an exclusion proof), nil is returned.
 func proveTrieValue(tb testing.TB, root common.Hash, key []byte, nodes []string) []byte {
 	tb.Helper()
 

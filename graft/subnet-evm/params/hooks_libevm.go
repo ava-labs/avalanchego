@@ -71,8 +71,8 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// ShouldCreditBaseFeeToCoinbase always returns false, so the base fee is
-// burned as on Ethereum mainnet.
+// ShouldCreditBaseFee is unused, as subnet-evm never calls libevm's impelmentation of core
+// for message or transaction execution.
 func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }
