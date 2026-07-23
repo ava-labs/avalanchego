@@ -7,90 +7,58 @@ Continuous Execution was formerly known as Streaming Asynchronous Execution (SAE
 
 - [Background](#background)
 - [Architecture](#architecture)
-- [Packages](#packages)
-  - Core VM: [`sae`](#sae), [`adaptor`](#adaptor), [`blocks`](#blocks), [`hook`](#hook)
-  - Block building: [`worstcase`](#worstcase), [`txgossip`](#txgossip), [`gasprice`](#gasprice)
-  - Execution: [`saexec`](#saexec), [`gastime`](#gastime), [`proxytime`](#proxytime)
-  - State and storage: [`saedb`](#saedb), [`firewood`](#firewood)
-  - Chain integration: [`cchain`](#cchain)
-  - Shared utilities: [`params`](#params), [`saetest`](#saetest)
+  - [The VM](#the-vm)
+  - [Block lifecycle](#block-lifecycle)
+  - [Block building](#block-building)
+  - [Execution](#execution)
+  - [Gas as a clock](#gas-as-a-clock)
+  - [State and storage](#state-and-storage)
+  - [The C-Chain](#the-c-chain)
 - [References](#references)
 
 ## Background
 
-> **TODO:** Quick ACP-194 recap, why execution is decoupled from consensus, what "streaming" and "asynchronous" actually mean here, and the benefits this gives us over chains and the standard synchornous sturcture. We're the best!
+> **TODO:** Quick ACP-194 recap, why execution is decoupled from consensus, what "streaming" and "asynchronous" actually mean here, and the benefits this gives us over chains with the standard synchronous structure. We're the best!
 
 ## Architecture
 
 > **TODO:** Big-picture walkthrough (include diagrams where possible) of how everything fits together. Idea that's probably easiest to trace a single block through build -> verify -> accept -> execute -> settle and call out what does what at each step.
 
-## Packages
+This section is organized by concept rather than by package — detailed package-level documentation lives with the packages themselves.
 
-### `sae`
+### The VM
 
-> **TODO:** The VM itself: block building, consensus glue, P2P, RPC/HTTP APIs, health checks, recovery.
+> **TODO:** The VM itself (`sae`): block building, consensus glue, P2P, RPC/HTTP APIs, health checks, recovery, and how it works w/ consensus (`adaptor`). Cover both the SAE lifecycle hooks (`hook`) AND the libevm hooks — they're similar and tightly coupled, so make the differences and uses clear.
 
-### `adaptor`
-
-> **TODO:** How the VM works w/ consensus.
-
-### `blocks`
+### Block lifecycle
 
 > **TODO:** The phases a block goes through (built -> verified -> accepted -> executed -> settled), what triggers each transition, and what gets recorded along the way (worst-case bounds, interim/final gas time, execution results).
 
 See [Invariants](./docs/invariants.md) for the timing guarantees among these phases and their on-disk artefacts.
 
-### `hook`
+### Block building
 
-> **TODO:** Describe both the SAE lifecycle hooks defined here AND the libevm hooks. They're similar and tightly coupled, so make the differences and uses clear.
+> **TODO:** Build-time worst-case balance/nonce/gas-price tracking (`worstcase`). Why the builder can only include transactions that are guaranteed to still be valid at execution time, and how this  step differs from what actually gets executed. Also the SAE transaction mempool and gas price stats and fee suggestions for transaction inclusion (`gasprice`).
 
-### `worstcase`
+### Execution
 
-> **TODO:** Build-time worst-case balance/nonce/gas-price tracking. Why the builder can only include transactions that are guaranteed to still be valid at execution time, and how this predictive step differs from what `saexec` actually executes.
+> **TODO:** Where blocks actually get executed (`saexec`). Queue of accepted blocks, running transactions off the parent's post-execution state, checking the worst-case bounds recorded at build time, and storing the results.
 
-### `txgossip`
+### Gas as a clock
 
-> **TODO:** The SAE transaction mempool and how it plugs into AvalancheGo's push/pull gossip.
+> **TODO:** Gas as a clock tracking excess consumption above target, and how blocks use interim vs. final gas times (`gastime`, built on the generic proxy-unit clock in `proxytime`).
 
-### `gasprice`
+### State and storage
 
-> **TODO:** Gas price stats and fee suggestions for transaction inclusion.
-
-### `saexec`
-
-> **TODO:** Where blocks actually get executed. Queue of accepted blocks, running transactions off the parent's post-execution state, checking the worst-case bounds recorded at build time, and storing the results.
-
-### `gastime`
-
-> **TODO:** Gas as a clock tracking excess consumption above target, and how blocks use interim vs. final gas times.
-
-### `proxytime`
-
-> **TODO:** The generic proxy-unit clock that `gastime` uses.
-
-### `saedb`
-
-> **TODO:** Storage and access for SAE data — when we commit the trie, opening state at a root, etc.
-
-### `firewood`
-
-> **TODO:** How Firewood is wired in as the state backend.
+> **TODO:** Storage and access for SAE data (`saedb`) — when we commit the trie, opening state at a root, and how Firewood is wired in as the state backend.
 
 See the [Firewood README](./firewood/README.md).
 
-### `cchain`
+### The C-Chain
 
-> **TODO:** The C-Chain VM built on top of `sae.VM` — hooks, cross-chain transactions, Warp messaging, validator-voted parameters.
+> **TODO:** The C-Chain VM built on top of `sae.VM` (`cchain`) — hooks, cross-chain transactions, Warp messaging, validator-voted parameters.
 
 See the [C-Chain README](./cchain/README.md), its [configuration reference](./cchain/config.md), and the [Warp README](./cchain/warp/README.md).
-
-### `params`
-
-> **TODO:**  `Lambda`, `Tau`, execution-queue limits, etc. This'll be short.
-
-### `saetest`
-
-> **TODO:** Test helpers for SAE.
 
 ## References
 
@@ -100,4 +68,3 @@ See the [C-Chain README](./cchain/README.md), its [configuration reference](./cc
 - [ACP-283: Dynamic Minimum Gas Price](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md)
 - [ACP-118: Warp Signature Request](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) — used by Warp messaging in `cchain/warp`
 - [Firewood](https://github.com/ava-labs/firewood) — the database backing the `firewood` package
-
