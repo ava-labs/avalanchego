@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -50,11 +51,56 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 		logging.NoLog{},
 		time.Second,
 		2000,
+		0,
+		nil,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 
 	return bs, vm, sender
+}
+
+func TestNewMaxContainersBytes(t *testing.T) {
+	tests := map[string]struct {
+		maxContainersBytes int
+		want               int
+	}{
+		"uses default when unset": {
+			want: constants.MaxContainersLen,
+		},
+		"uses configured limit": {
+			maxContainersBytes: 4 * constants.MaxContainersLen,
+			want:               4 * constants.MaxContainersLen,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler, err := New(
+				&blocktest.VM{},
+				&enginetest.Sender{T: t},
+				logging.NoLog{},
+				time.Second,
+				2000,
+				test.maxContainersBytes,
+				nil,
+				prometheus.NewRegistry(),
+			)
+			require.NoError(t, err)
+			require.Equal(t, test.want, handler.(*getter).maxContainersBytes)
+		})
+	}
+}
+
+func TestMaxContainersBytesFor(t *testing.T) {
+	allowedPeer := ids.GenerateTestNodeID()
+	handler := &getter{
+		maxContainersBytes: 4 * constants.MaxContainersLen,
+		largeMessagePeers:  set.Of(allowedPeer),
+	}
+
+	require.Equal(t, 4*constants.MaxContainersLen, handler.maxContainersBytesFor(allowedPeer))
+	require.Equal(t, constants.MaxContainersLen, handler.maxContainersBytesFor(ids.EmptyNodeID))
 }
 
 func TestAcceptedFrontier(t *testing.T) {

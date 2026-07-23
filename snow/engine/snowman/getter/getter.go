@@ -28,8 +28,14 @@ func New(
 	log logging.Logger,
 	maxTimeGetAncestors time.Duration,
 	maxContainersGetAncestors int,
+	maxContainersBytes int,
+	largeMessagePeers set.Set[ids.NodeID],
 	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
+	if maxContainersBytes <= 0 {
+		maxContainersBytes = constants.MaxContainersLen
+	}
+
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
 		vm:                        vm,
@@ -38,6 +44,8 @@ func New(
 		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
+		maxContainersBytes:        maxContainersBytes,
+		largeMessagePeers:         largeMessagePeers,
 	}
 
 	var err error
@@ -60,6 +68,12 @@ type getter struct {
 	maxTimeGetAncestors time.Duration
 	// Max number of containers in an ancestors message sent by this node.
 	maxContainersGetAncestors int
+	// Max cumulative byte size of containers in an ancestors message sent by
+	// this node.
+	maxContainersBytes int
+	// Peers configured for frames up to maxContainersBytes. This controls
+	// response size; it does not grant chain access.
+	largeMessagePeers set.Set[ids.NodeID]
 
 	getAncestorsBlks metric.Averager
 }
@@ -189,7 +203,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.vm,
 		blkID,
 		gh.maxContainersGetAncestors,
-		constants.MaxContainersLen,
+		gh.maxContainersBytesFor(nodeID),
 		gh.maxTimeGetAncestors,
 	)
 	if err != nil {
@@ -206,6 +220,13 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil
+}
+
+func (gh *getter) maxContainersBytesFor(nodeID ids.NodeID) int {
+	if gh.largeMessagePeers.Contains(nodeID) {
+		return gh.maxContainersBytes
+	}
+	return constants.MaxContainersLen
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {

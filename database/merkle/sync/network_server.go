@@ -40,6 +40,7 @@ var (
 	_ p2p.Handler = (*ProofHandler[any, any])(nil)
 
 	errMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
+	errMaxMessageSizeTooSmall = fmt.Errorf("max message size must be greater than %d", estimatedMessageOverhead)
 
 	errInvalidBytesLimit    = errors.New("bytes limit must be greater than 0")
 	errInvalidKeyLimit      = errors.New("key limit must be greater than 0")
@@ -64,6 +65,38 @@ func NewProofHandler[R any, C any](
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
+		maxByteSizeLimit:     maxByteSizeLimit,
+		metrics:              metrics,
+	}, nil
+}
+
+// NewProofHandlerWithMaxMessageSize returns a proof handler whose responses fit
+// within maxMessageSize after protocol overhead. Callers using a value above
+// the default must ensure every peer that can reach the handler has a matching
+// P2P frame size.
+func NewProofHandlerWithMaxMessageSize[R any, C any](
+	db DB[R, C],
+	rangeProofMarshaler Marshaler[R],
+	changeProofMarshaler Marshaler[C],
+	registerer prometheus.Registerer,
+	maxMessageSize uint32,
+) (*ProofHandler[R, C], error) {
+	if maxMessageSize == 0 {
+		maxMessageSize = constants.DefaultMaxMessageSize
+	}
+	maxByteSizeLimit, err := proofByteSizeLimit(maxMessageSize)
+	if err != nil {
+		return nil, err
+	}
+	metrics, err := newHandlerMetrics("sync", registerer)
+	if err != nil {
+		return nil, err
+	}
+	return &ProofHandler[R, C]{
+		db:                   db,
+		rangeProofMarshaler:  rangeProofMarshaler,
+		changeProofMarshaler: changeProofMarshaler,
+		maxByteSizeLimit:     maxByteSizeLimit,
 		metrics:              metrics,
 	}, nil
 }
@@ -72,6 +105,7 @@ type ProofHandler[R any, C any] struct {
 	db                   DB[R, C]
 	rangeProofMarshaler  Marshaler[R]
 	changeProofMarshaler Marshaler[C]
+	maxByteSizeLimit     uint32
 	metrics              *handlerMetrics
 }
 
@@ -107,7 +141,10 @@ func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ tim
 	return resp, nil
 }
 
-func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.RangeProofRequest) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleRangeProofRequest(
+	ctx context.Context,
+	req *pb.RangeProofRequest,
+) ([]byte, error) {
 	if err := validateRangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -115,7 +152,7 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 	// override limits if they exceed caps
 	var (
 		keyLimit   = min(int(req.KeyLimit), MaxKeyValuesLimit)
-		bytesLimit = min(req.BytesLimit, maxByteSizeLimit)
+		bytesLimit = min(req.BytesLimit, h.maxByteSizeLimit)
 		startKey   = protoutils.ProtoToMaybe(req.StartKey)
 		endKey     = protoutils.ProtoToMaybe(req.EndKey)
 	)
@@ -168,7 +205,10 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 	return nil, errMinProofSizeIsTooLarge
 }
 
-func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.ChangeProofRequest) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleChangeProofRequest(
+	ctx context.Context,
+	req *pb.ChangeProofRequest,
+) ([]byte, error) {
 	if err := validateChangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -176,7 +216,7 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 	// override limits if they exceed caps
 	var (
 		keyLimit   = min(req.KeyLimit, MaxKeyValuesLimit)
-		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
+		bytesLimit = min(int(req.BytesLimit), int(h.maxByteSizeLimit))
 		start      = protoutils.ProtoToMaybe(req.StartKey)
 		end        = protoutils.ProtoToMaybe(req.EndKey)
 	)
@@ -247,6 +287,13 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 	}
 
 	return nil, errMinProofSizeIsTooLarge
+}
+
+func proofByteSizeLimit(maxMessageSize uint32) (uint32, error) {
+	if maxMessageSize <= estimatedMessageOverhead {
+		return 0, errMaxMessageSizeTooSmall
+	}
+	return maxMessageSize - estimatedMessageOverhead, nil
 }
 
 // Returns nil iff [req] is well-formed.
