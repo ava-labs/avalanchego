@@ -208,22 +208,26 @@ func TestEligible(t *testing.T) {
 }
 
 func TestSetRejectsLowGasPerByte(t *testing.T) {
-	const (
-		numAccounts       = 4
-		zeroCalldataBytes = 10_000
-	)
-	s := newSUT(t, numAccounts)
+	s := newSUT(t, 1)
 
-	transfer := func(account int) *types.Transaction {
-		return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+	// The smallest n bytes of zero calldata making a transaction ineligible:
+	// a transaction is strictly larger than its calldata, so it suffices that
+	//
+	//	n·x > (TxGas + TxDataZeroGas·n)·M
+	const m = saeparams.TargetBlockBytes
+	x := s.set.blockGasLimit()
+	zeroCalldataBytes := params.TxGas*m/(x-params.TxDataZeroGas*m) + 1
+
+	transfer := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas,
 			GasFeeCap: big.NewInt(100),
 			GasTipCap: big.NewInt(1),
 		})
 	}
-	calldataHeavy := func(account int) *types.Transaction {
-		return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+	calldataHeavy := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas + params.TxDataZeroGas*zeroCalldataBytes,
 			GasFeeCap: big.NewInt(100),
@@ -240,23 +244,23 @@ func TestSetRejectsLowGasPerByte(t *testing.T) {
 	}{
 		{
 			name:   "gossip/eligible",
-			tx:     transfer(0),
+			tx:     transfer(),
 			submit: func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
 		},
 		{
 			name:    "gossip/ineligible",
-			tx:      calldataHeavy(1),
+			tx:      calldataHeavy(),
 			submit:  func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
 			wantErr: errInsufficientGasPerByte,
 		},
 		{
 			name:   "rpc/eligible",
-			tx:     transfer(2),
+			tx:     transfer(),
 			submit: s.SendTx,
 		},
 		{
 			name:    "rpc/ineligible",
-			tx:      calldataHeavy(3),
+			tx:      calldataHeavy(),
 			submit:  s.SendTx,
 			wantErr: errInsufficientGasPerByte,
 		},

@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -109,6 +110,9 @@ func compareHashPtrs(a, b *common.Hash) bool {
 func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Block, error) {
 	return vm.blockBuilder.build(ctx, bCtx, vm.preference.Load())
 }
+
+// saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
+const _ = uint(constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1)
 
 var (
 	errUnknownParent     = errors.New("unknown parent")

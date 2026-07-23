@@ -1,4 +1,13 @@
-# Bounding block size to the P2P message limit
+# `txgossip` — bounding block size to the P2P message limit
+
+Package `txgossip` provides SAE's mempool, coupling a `gossip.BloomSet` with a
+`txpool.TxPool` so that transactions can be exchanged over AvalancheGo's p2p
+gossip machinery.
+
+The mempool is also where SAE starts bounding the size of its *blocks*:
+transactions are vetted on their way into the pool so that any block later
+built from it fits in a single P2P message. The rest of this document explains
+that rule.
 
 ## Why this exists
 
@@ -26,7 +35,7 @@ share**:
 
 $$\text{accept if } \quad \frac{y}{M} \le \frac{g}{x} \quad \iff \quad y x \le g M$$
 
-where `M` = the block's transaction byte budget (`saeparams.MaxBlockTxBytes`,
+where `M` = the block's transaction byte budget (`saeparams.TargetBlockBytes`,
 512 KiB below the max message size), `x` = block gas limit, `g` = tx gas limit,
 `y` = tx serialized size — i.e. it must carry at least `x/M ≈ 50.9` gas per byte
 (at the `80M` Helicon-launch limit). [`eligible`](./txgossip.go) evaluates this
@@ -46,8 +55,15 @@ protects.
 
 `50.9` gas/byte sits *above* even the 16 gas/nonzero-byte intrinsic cost, so it
 rejects any calldata-dominated tx with modest execution — raising the worry that
-it blocks legitimate traffic. Analysis of **all C-Chain EVM traffic for May 2026
-(82,577,809 txs)** shows it does not:
+it blocks legitimate traffic.
+
+To assess that worry, **all C-Chain EVM traffic for May 2026 (82,577,809 txs)**
+was replayed against the rule as a what-if: each historical tx's gas limit `g`
+and serialized size `y` was checked against `y·x ≤ g·M` at the Helicon-launch
+parameters above (`x = 80M`, `M = 1.5 MiB`, threshold `x/M ≈ 50.9` gas/byte).
+Note that the C-Chain's own gas rules never enter the picture — the traffic is
+simply a realistic population of transactions to test the rule against. The
+resulting data showed that enforcing such a rule would not be harmful: 
 
 - **25,489 txs (0.0309%, ~1 in 3,240) would be rejected.** The median tx sits at
   ~362 gas/byte, **~7× above the threshold**, so the rule almost never bites.
@@ -78,10 +94,11 @@ separately. **Any future use of `eligible` must only be reached by EVM txs.**
    (`worstcase.SafeMaxBlockSize`). This carries the bulk of the protection.
 2. **Build-time backstop** ([`sae/block_builder.go`](../sae/block_builder.go)) —
    caps a block's cumulative serialized tx bytes at the same
-   `saeparams.MaxBlockTxBytes`.
-3. **Parse-time cap** ([`sae/blocks.go`](../sae/blocks.go)) — rejects any block
-   larger than `maxBlockBytes` (256 KiB below the message size) before it
-   enters consensus.
+   `saeparams.TargetBlockBytes`.
+3. **Verify-time cap** ([`sae/blocks.go`](../sae/blocks.go)) — rejects any block
+   whose serialization exceeds `saeparams.MaxBlockBytes` (256 KiB below the
+   message size) during verification, which covers self-built blocks as well as
+   those received from peers.
 
 The backstop is needed because `x` is **dynamic** (ACP-176). A tx admitted
 under one `x` may be built into a block under a larger `x`, breaking the
@@ -98,11 +115,11 @@ framing, without itemizing their worst-case sizes.
   `worstcase.SafeMaxBlockSize`). A material change in the gas target shifts the
   threshold `x/M`; re-run the rejection-rate analysis before assuming the rule
   stays this benign.
-- **`M = 1.5 MiB`** is `saeparams.MaxBlockTxBytes`, a literal deliberately NOT
+- **`M = 1.5 MiB`** is `saeparams.TargetBlockBytes`, a literal deliberately NOT
   derived from `constants.DefaultMaxMessageSize` (2 MiB), so a change to the
-  message size cannot silently move this consensus-relevant bound. If the
-  message size ever shrinks, both `M` and the parse-time cap MUST be revisited
-  by hand.
+  message size cannot silently move this consensus-relevant bound. A
+  compile-time assertion in [`sae/blocks.go`](../sae/blocks.go) fails the build
+  if the message size ever drops to `saeparams.MaxBlockBytes` or below.
 - **Traffic composition.** The 0.0309% figure was measured on traffic with no
   access lists. The rule uses the true `types.Transaction.Size()`, so it stays
   *correct* for any composition, but a future access-list- or calldata-heavy

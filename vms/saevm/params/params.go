@@ -55,3 +55,6 @@ const MaxBlockBytes = 2*units.MiB - 256*units.KiB
 //
 // Changing this value IS NOT a consensus-breaking change.
 const TargetBlockBytes = MaxBlockBytes - 256*units.KiB
+
+// TargetBlockBytes < MaxBlockBytes
+const _ = uint(MaxBlockBytes - TargetBlockBytes - 1)
