@@ -191,6 +191,7 @@ go_test(
         "//utils/math/intmath",
         "//utils/set",
         "//utils/timer/mockable",
+        "//utils/units",
         "//version",
         "//vms/evm/sync/customrawdb",
         "//vms/saevm/adaptor",
