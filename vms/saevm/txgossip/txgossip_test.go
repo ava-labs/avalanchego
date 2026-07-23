@@ -52,8 +52,6 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
-const testGasTarget = 4_000_000
-
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(
 		m,
@@ -96,7 +94,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		db,
 		config,
 		saetest.MaxAllocFor(wallet.Addresses()...),
-		blockstest.WithGasTarget(testGasTarget),
+		blockstest.WithGasTarget(saetest.GasTarget),
 		blockstest.WithBaseFee(params.Wei),
 	)
 	chain := blockstest.NewChainBuilder(genesis)
@@ -109,7 +107,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		db,
 		xdb,
 		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
-		hookstest.NewStub(testGasTarget),
+		hookstest.NewStub(saetest.GasTarget),
 		snowCtx,
 		prometheus.NewRegistry(),
 	)
@@ -193,11 +191,11 @@ func TestEligible(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := eligible(tt.tx, tt.blockGasLimit)
+			got := tt.tx.Gas() >= minGasForSize(tt.tx.Size(), tt.blockGasLimit)
 			require.Equalf(
 				t, tt.want, got,
-				"eligible(size=%d, gasLimit=%d, blockGasLimit=%d)",
-				tt.tx.Size(), tt.tx.Gas(), tt.blockGasLimit,
+				"tx.Gas()=%d >= minGasForSize(size=%d, blockGasLimit=%d)",
+				tt.tx.Gas(), tt.tx.Size(), tt.blockGasLimit,
 			)
 		})
 	}

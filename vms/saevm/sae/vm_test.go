@@ -134,11 +134,6 @@ var chainID = ids.GenerateTestID()
 func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	// This is approximately the current C-Chain mainnet gas target as of
-	// 7/23/26. A much larger target would force transactions to specify more
-	// gas per byte; see [txgossip.eligible].
-	const gasTarget = 4_000_000
-
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
 
@@ -146,7 +141,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(gasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(saetest.GasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{

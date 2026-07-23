@@ -18,30 +18,29 @@ target and the initial target is 4M. A block filled with zero calldata could
 therefore reach 80M / 4 ≈ 20 MB, roughly ten times the message limit, and
 thus not be gossipable.
 
-A block that cannot be gossiped halts the chain: unlike the P/X-chains, SAE
-does not remove transactions from the mempool while building, so a node that
-builds an oversized block would rebuild the same block from the same pending
-transactions rather than making progress. Every block MUST fit in a p2p message 
-for the chain to remain live, so block size has to be bounded in bytes and not 
-only in gas.
+A block that cannot be gossiped halts the chain. Every block MUST fit in a p2p
+message for the chain to remain live, so block size has to be bounded in bytes
+and not only in gas.
 
-Earlier EVM block builders kept blocks gossipable by skipping over-large
-transactions at build time. SAE can do better: it knows each transaction's gas
-limit up front, so it gates on the gas-to-byte ratio directly.
+Earlier EVM block builders kept blocks gossipable with a cumulative byte
+target, stopping once a block's serialized transactions reached a fixed size
+(coreth's `targetTxsSize`). Because bytes and gas were tracked independently,
+that bound the block but left the gas target gameable. SAE can do better: it
+knows each transaction's gas limit up front, so it gates on the gas-to-byte
+ratio directly.
 
 ### The rule
 
 A transaction is eligible only if its byte share of a block does not exceed
 its gas share:
 
-$$\text{accept if } \quad \frac{y}{M} \le \frac{g}{x} \quad \iff \quad y x \le g M$$
+$$\frac{y}{M} \le \frac{g}{x} \quad \iff \quad y x \le g M$$
 
 where `M` is the block's transaction byte budget (`saeparams.TargetBlockBytes`,
 512 KiB below the max message size), `x` is the block gas limit, `g` is the
 transaction's gas limit, and `y` is its serialized size. Equivalently, a
 transaction must carry at least `x/M` gas per byte, which is ≈ 50.9 at the
-Helicon-launch gas limit. [`eligible`](./txgossip.go) evaluates the rule with
-exact 128-bit integer math.
+Helicon-launch gas limit.
 
 The rule ties a transaction's bytes to its gas so that the block's gas limit
 also acts as a byte limit. The builder already enforces $\sum_i g_i \le x$, so
@@ -72,7 +71,7 @@ population of transactions.
 
 - 25,489 transactions (0.0309%, about 1 in 3,240) would have been rejected.
   The median transaction carries ~362 gas/byte, about 7 times the threshold,
-  so the rule almost never bites.
+  so the rule rarely rejects anything.
 - The rejected set is calldata-dominated traffic, byte-heavy relative to the
   gas it buys, which is exactly what the rule is meant to gate.
 - The gas/byte ratio, not absolute size, does all the rejecting: the largest
@@ -84,13 +83,6 @@ higher gas limit makes it eligible.
 <p>
   <img src="heuristic-scatter.png" width="420" alt="Size vs gas with the y = g·M/x rejection boundary; nearly all txs sit well above the line">
 </p>
-
-### Why atomic transactions are out of scope
-
-Atomic cross-chain transactions (`ImportTx`/`ExportTx`) are byte-heavy and
-gas-light by construction, at roughly 36 gas/byte. The rule would reject
-essentially all of them, so they are gated out and handled separately. Any
-future use of `eligible` MUST only be reached by EVM transactions.
 
 ### Enforcement
 
@@ -123,12 +115,11 @@ sizes.
   `worstcase.SafeMaxBlockSize`. A material change in the gas target shifts the
   threshold `x/M`. Re-run the rejection-rate analysis before assuming the rule
   stays this benign.
-- `M` = 1.5 MiB is `saeparams.TargetBlockBytes`, a literal deliberately not
-  derived from `constants.DefaultMaxMessageSize` (2 MiB), so that a change to
-  the message size cannot silently move this consensus-relevant bound. A
-  compile-time assertion in [`sae/blocks.go`](../sae/blocks.go) fails the
-  build if the message size ever drops to `saeparams.MaxBlockBytes` or below.
-- The 0.0309% figure was measured on traffic with no access lists. The rule
-  uses the true `types.Transaction.Size()`, so it stays correct for any
-  traffic composition, but a future access-list- or calldata-heavy workload
-  could make the rule bite more often than history suggests.
+- `M` = 1.5 MiB is `saeparams.TargetBlockBytes`, deliberately not derived from
+  `constants.DefaultMaxMessageSize` (2 MiB) so a message-size change cannot
+  silently move this consensus-relevant bound. Raising the message size won't
+  change `M`; to use the extra space, bump `M` and re-run the analysis above.
+- The 0.0309% figure reflects one month of historical traffic. The rule uses
+  the true `types.Transaction.Size()`, so it stays correct for any traffic
+  composition, but a future calldata-heavy workload could reject more
+  transactions than history suggests.

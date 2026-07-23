@@ -25,6 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
+// GasTarget is approximately the current C-Chain mainnet gas target as of
+// 7/23/26. A much larger target would force transactions to specify more
+// gas per byte; see txgossip.eligible.
+const GasTarget = 4_000_000
+
 var _ saedb.StateDBOpener = (*stateDBOpener)(nil)
 
 type stateDBOpener struct {

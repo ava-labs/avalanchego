@@ -10,12 +10,13 @@ package txgossip
 import (
 	"errors"
 	"fmt"
-	"math/bits"
+	"math"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -72,7 +73,7 @@ type Set struct {
 // transactions to the pool, which SHOULD NOT be populated directly.
 //
 // Transactions are vetted against the gas limit of the next block, derived
-// from exec's last-executed block; see [eligible].
+// from exec's last-executed block; see [minGasForSize].
 func NewSet(
 	exec *saexec.Executor,
 	pool *txpool.TxPool,
@@ -117,10 +118,10 @@ func (s *txSet) Add(tx Transaction) error {
 }
 
 // errInsufficientGasPerByte is returned for a transaction that carries fewer
-// than x/M gas per serialized byte. See [eligible].
+// than x/M gas per serialized byte. See [minGasForSize].
 var errInsufficientGasPerByte = errors.New("insufficient gas limit for tx size")
 
-// addToPool adds the eligible transactions (see [eligible]) to the pool.
+// addToPool adds the eligible transactions (see [minGasForSize]) to the pool.
 func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	blockGasLimit := s.blockGasLimit()
 
@@ -128,12 +129,12 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligibleTxs := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		if eligible(tx, blockGasLimit) {
+		minGas := minGasForSize(tx.Size(), blockGasLimit)
+		if tx.Gas() >= minGas {
 			eligibleTxs = append(eligibleTxs, tx)
 			eligibleIdx = append(eligibleIdx, i)
 			continue
 		}
-		minGas := (tx.Size()*blockGasLimit + saeparams.TargetBlockBytes - 1) / saeparams.TargetBlockBytes
 		errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
 			errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
 	}
@@ -147,33 +148,35 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	return errs
 }
 
-// eligible reports whether tx MAY be included in a block, using the notation:
+// minGasForSize returns the minimum gas limit a transaction of size bytes must
+// carry to be included in a block, using the notation:
 //
 //   - M = [saeparams.TargetBlockBytes], the block's transaction byte budget
 //   - x = blockGasLimit, the block's gas limit
-//   - g = tx.Gas(), the transaction's gas limit
-//   - y = tx.Size(), the transaction's serialized size in bytes
+//   - y = size, the transaction's serialized size in bytes
+//   - g = the transaction's gas limit, the value this function bounds
 //
-// The transaction's byte share is y/M and its gas share is g/x. The rule rejects
-// the transaction if its byte share exceeds its gas share:
-//
-//	accept if  y/M <= g/x  <->   y·x <= g·M
-//
-// Equivalently, it must carry at least x/M gas per serialized byte, which
-// bounds the cumulative size of a block's worth of transactions by M.
-func eligible(tx *types.Transaction, blockGasLimit uint64) bool {
-	// Defensive check: if blockGasLimit == 0, all transactions would be
-	// incorrectly eligible
+// A transaction's byte share is y/M and its gas share is g/x. It is eligible
+// only if its byte share does not exceed its gas share (y/M <= g/x, i.e.
+// y·x <= g·M), which holds exactly when g >= ceil(y·x / M). Requiring at least
+// x/M gas per byte bounds the cumulative size of a block's worth of
+// transactions by M.
+func minGasForSize(size, blockGasLimit uint64) uint64 {
+	// Defensive check: with a zero gas limit no transaction fits, but the ceil
+	// division below would return 0 and make every transaction eligible.
 	if blockGasLimit == 0 {
-		return false
+		return math.MaxUint64
 	}
 
-	yxHi, yxLo := bits.Mul64(tx.Size(), blockGasLimit)             // y·x
-	gmHi, gmLo := bits.Mul64(tx.Gas(), saeparams.TargetBlockBytes) // g·M
-	if yxHi != gmHi {
-		return yxHi < gmHi
+	// y·x fits in 128 bits, so uint256 removes any overflow concern.
+	minGas := new(uint256.Int).Mul(uint256.NewInt(size), uint256.NewInt(blockGasLimit)) // y·x
+	minGas.AddUint64(minGas, saeparams.TargetBlockBytes-1)                              // round up
+	minGas.Div(minGas, uint256.NewInt(saeparams.TargetBlockBytes))                      // ceil(y·x / M)
+	// No uint64 gas limit can satisfy the rule, so no transaction is eligible.
+	if !minGas.IsUint64() {
+		return math.MaxUint64
 	}
-	return yxLo <= gmLo
+	return minGas.Uint64()
 }
 
 func (s *txSet) Has(id ids.ID) bool {
