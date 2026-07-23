@@ -168,11 +168,17 @@ func minGasForSize(size, blockGasLimit uint64) uint64 {
 		return math.MaxUint64
 	}
 
-	// y·x fits in 128 bits, so uint256 removes any overflow concern.
-	minGas := new(uint256.Int).Mul(uint256.NewInt(size), uint256.NewInt(blockGasLimit)) // y·x
-	minGas.AddUint64(minGas, saeparams.TargetBlockBytes-1)                              // round up
-	minGas.Div(minGas, uint256.NewInt(saeparams.TargetBlockBytes))                      // ceil(y·x / M)
-	// No uint64 gas limit can satisfy the rule, so no transaction is eligible.
+	var (
+		minGas uint256.Int
+		temp   uint256.Int
+	)
+	minGas.SetUint64(size) // y
+	temp.SetUint64(blockGasLimit)
+	minGas.Mul(&minGas, &temp)                              // y·x
+	minGas.AddUint64(&minGas, saeparams.TargetBlockBytes-1) // round up
+	temp.SetUint64(saeparams.TargetBlockBytes)
+	minGas.Div(&minGas, &temp) // ceil(y·x / M)
+	// No uint64 gas limit can satisfy the rule, no transaction is eligible.
 	if !minGas.IsUint64() {
 		return math.MaxUint64
 	}
