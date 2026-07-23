@@ -199,7 +199,7 @@ func TestDebugTrace(t *testing.T) {
 		},
 		{
 			method: "debug_traceTransaction",
-			args:   []any{depositTx.Hash(), tracers.TraceConfig{
+			args: []any{depositTx.Hash(), tracers.TraceConfig{
 				Tracer: utils.PointerTo("callTracer"),
 			}},
 			want: native.CallFrame{
