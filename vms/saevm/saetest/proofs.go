@@ -61,6 +61,9 @@ func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes [
 	return &value
 }
 
+// proveTrieValue constructs a proof from nodes for key. If the proof is invalid,
+// the test immediately fails. If an inclusion proof, the value associated with the key is returned.
+// Otherwise (for an exclusion proof), nil is returned.
 func proveTrieValue(tb testing.TB, root common.Hash, key []byte, nodes []string) []byte {
 	tb.Helper()
 
