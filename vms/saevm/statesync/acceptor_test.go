@@ -62,7 +62,9 @@ func TestStateSyncEnabled(t *testing.T) {
 			opts := []sutOption{
 				withEnabled(tt.enabled),
 			}
-			if !tt.initialized {
+			if tt.initialized {
+				opts = append(opts, withNumBlocks(1))
+			} else {
 				opts = append(opts, withoutInitialization())
 			}
 			sut := newSUT(t, opts...)

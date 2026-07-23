@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -107,20 +109,23 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		BaseFee:    big.NewInt(1),
 		Difficulty: big.NewInt(0), // irrelevant but required
 	}
-	genesisBytes, err := json.Marshal(genesis)
-	require.NoError(t, err, "json.Marshal(genesis)")
 
 	db := memdb.New()
+	ethDB := saetypes.NewEthDB(db)
+	dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil) // get around committing the state
+	_, err := genesis.Commit(ethDB, dummyTrieDB)
+	require.NoErrorf(t, err, "%T.Commit()", genesis) // writes all genesis markers to disk
+
 	reader, err := New(
 		Config{
 			CommitInterval: cfg.commitInterval,
 			Enabled:        cfg.enabled,
 		},
-		snowCtx,
-		saetypes.NewEthDB(db),
-		genesis.ToBlock(),
+		ethDB,
+		logger,
 	)
 	require.NoError(t, err, "New()")
+
 	if !cfg.initializeVM {
 		return &sut{
 			SummaryHandler: reader,
@@ -130,6 +135,9 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 
 	vm := sae.NewSinceGenesis(hooks, saeCfg)
 	ctx := logger.CancelOnError(t.Context())
+
+	genesisBytes, err := json.Marshal(genesis)
+	require.NoError(t, err, "json.Marshal(genesis)")
 	require.NoError(t, vm.Initialize(
 		ctx,
 		snowCtx,

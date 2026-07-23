@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 
-	_ "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	_ "github.com/ava-labs/avalanchego/snow/engine/snowman/block" // for comment resolution
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"

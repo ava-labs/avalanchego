@@ -15,18 +15,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
-
-	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // Config provides all user-configurable information for the [SummaryHandler].
 type Config struct {
 	CommitInterval uint64
-	Enabled        *bool
+	Enabled        *bool // nil means state sync is enabled only if no blocks have been accepted yet
 }
 
 var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
@@ -34,10 +32,9 @@ var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
 // SummaryHandler implements [adaptor.SyncableVM] and provides the consensus-
 // critical block getters for [adaptor.ChainVM].
 type SummaryHandler struct {
-	cfg     Config
-	db      ethdb.Database
-	snowCtx *snow.Context
-	genesis *ethtypes.Block
+	cfg Config
+	db  ethdb.Database
+	log logging.Logger
 
 	stateSyncDone chan struct{}
 }
@@ -47,15 +44,13 @@ type SummaryHandler struct {
 // the summary of the genesis block.
 func New(
 	cfg Config,
-	snowCtx *snow.Context,
 	db ethdb.Database,
-	genesis *ethtypes.Block,
+	log logging.Logger,
 ) (*SummaryHandler, error) {
 	h := &SummaryHandler{
 		cfg:           cfg,
 		db:            db,
-		snowCtx:       snowCtx,
-		genesis:       genesis,
+		log:           log,
 		stateSyncDone: make(chan struct{}),
 	}
 	return h, nil
@@ -107,22 +102,17 @@ func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*S
 // GetBlock returns the block with the given ID. If the block is not found, it
 // returns [database.ErrNotFound].
 func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, error) {
-	var ethB *ethtypes.Block
-	if id == ids.ID(h.genesis.Hash()) {
-		return blocks.New(h.genesis, nil, nil, h.snowCtx.Log)
-	}
-
 	height := rawdb.ReadHeaderNumber(h.db, common.Hash(id))
 	if height == nil {
 		return nil, database.ErrNotFound
 	}
-	ethB = rawdb.ReadBlock(h.db, common.Hash(id), *height)
+	ethB := rawdb.ReadBlock(h.db, common.Hash(id), *height)
 	if ethB == nil {
 		// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
 		return nil, fmt.Errorf("%w: block exists but not on disk %s:%d", database.ErrNotFound, id, *height)
 	}
 
-	return blocks.New(ethB, nil, nil, h.snowCtx.Log)
+	return blocks.New(ethB, nil, nil, h.log)
 }
 
 // LastAccepted returns the ID of the last accepted block. If no blocks have
@@ -130,7 +120,7 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
 	hash, ok := h.lastAcceptedHash()
 	if !ok {
-		hash = h.genesis.Hash()
+		return ids.Empty, database.ErrNotFound
 	}
 	return ids.ID(hash), nil
 }
@@ -138,9 +128,6 @@ func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
 // GetBlockIDAtHeight returns the ID of the block at the given height. If no
 // block exists at that height, it returns [database.ErrNotFound].
 func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
-	if height == 0 {
-		return ids.ID(h.genesis.Hash()), nil
-	}
 	hash := rawdb.ReadCanonicalHash(h.db, height)
 	if hash == (common.Hash{}) {
 		return ids.Empty, database.ErrNotFound
