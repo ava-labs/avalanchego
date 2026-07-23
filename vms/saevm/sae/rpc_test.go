@@ -929,12 +929,6 @@ func TestGetReceipts(t *testing.T) {
 	unsettled, wantUnsettled := slice(t, 4, 6)
 	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
-	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &blockingPrecompile,
-		Gas:      params.TxGas,
-		GasPrice: big.NewInt(1),
-	}))
-
 	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
 		raw := make([]hexutil.Bytes, len(rs))
 		for i, r := range rs {
@@ -999,9 +993,6 @@ func TestGetReceipts(t *testing.T) {
 		})
 	}
 
-	// Acceptance writes blocks to the DB but not receipts, so pending
-	// block receipts error, while pending tx receipts block until they're ready
-	// as long as they have been included in a block.
 	tests = append(tests, []rpcTest{
 		{
 			method: "eth_getTransactionReceipt",
@@ -1028,29 +1019,57 @@ func TestGetReceipts(t *testing.T) {
 			args:   []any{genesis.Hash()},
 			want:   []hexutil.Bytes{},
 		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{pending.Hash()},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{pending.Hash()},
-			want:   []hexutil.Bytes{},
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
-			want:   []hexutil.Bytes{},
-		},
 	}...)
 
 	sut.testRPC(ctx, t, tests...)
+
+	pendingTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &blockingPrecompile,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	})
+	pending := sut.runConsensusLoop(t, pendingTx)
+
+	// Receipts only exist after execution, so receipt queries for the
+	// accepted-but-unexecuted block (and its transaction) wait until it has
+	// been executed.
+	wantPending := []*types.Receipt{{
+		TxHash:            pendingTx.Hash(),
+		Status:            types.ReceiptStatusSuccessful,
+		GasUsed:           params.TxGas,
+		CumulativeGasUsed: params.TxGas,
+		EffectiveGasPrice: big.NewInt(1),
+		Logs:              []*types.Log{},
+		BlockHash:         pending.Hash(),
+		BlockNumber:       pending.Number(),
+	}}
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method:   "eth_getBlockReceipts",
+			args:     []any{pending.Hash()},
+			want:     wantPending,
+			parallel: true,
+		},
+		{
+			method:   "eth_getBlockReceipts",
+			args:     []any{hexutil.Uint64(pending.Height())},
+			want:     wantPending,
+			parallel: true,
+		},
+		{
+			method:   "debug_getRawReceipts",
+			args:     []any{pending.Hash()},
+			want:     marshalReceipts(wantPending),
+			parallel: true,
+		},
+		{
+			method:   "eth_getTransactionReceipt",
+			args:     []any{pendingTx.Hash()},
+			want:     wantPending[0],
+			parallel: true,
+		},
+	}...)
+	unblock()
 }
 
 func TestGetTransactionCount(t *testing.T) {
