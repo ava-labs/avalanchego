@@ -309,6 +309,9 @@ tasks:
       # GOWORK=off is required because tools/external is not part of the workspace
       # and go will otherwise find go.work by walking up the tree
       - cmd: "{{.NIX_RUN}} bash -c 'cd tools/external && GOWORK=off go mod tidy'"
+      # GOWORK=off for the same reason: tools/pgp-bridge is an isolated module
+      # not part of the workspace (see MODULE.bazel tool_go_deps).
+      - cmd: "{{.NIX_RUN}} bash -c 'cd tools/pgp-bridge && GOWORK=off go mod tidy'"
       # GOWORK=off is required for graft modules because lint tooling runs
       # with GOWORK=off (see scripts/run_tool.sh) and dependency resolution
       # differs when the workspace is enabled vs disabled.
