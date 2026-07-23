@@ -27,7 +27,7 @@ import (
 
 // GasTarget is approximately the current C-Chain mainnet gas target as of
 // 7/23/26. A much larger target would force transactions to specify more
-// gas per byte; see txgossip.eligible.
+// gas per byte; see txgossip.minGasForSize.
 const GasTarget = 4_000_000
 
 var _ saedb.StateDBOpener = (*stateDBOpener)(nil)
