@@ -291,6 +291,13 @@ type networkedMachine struct {
 	// nodes would strand a nonce-gapped tx on a node that can never learn
 	// the missing nonce — never promoted, never gossiped, builder sync hangs.
 	pins map[common.Address]int
+
+	// joinerNodeID is pre-generated for a validator joiner so the shared
+	// validator set can include it from genesis; joined flips when lateJoin
+	// fires. Both are config + model state only, preserving replay
+	// determinism.
+	joinerNodeID ids.NodeID
+	joined       bool
 }
 
 func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *networkedMachine {
@@ -303,6 +310,16 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 	vdrIDs := make([]ids.NodeID, cfg.numValidators)
 	for i := range vdrIDs {
 		vdrIDs[i] = ids.GenerateTestNodeID()
+	}
+
+	var joinerNodeID ids.NodeID
+	if cfg.joiner != nil && cfg.joinerIsValidator {
+		// The joiner is an offline validator: in the shared validator set
+		// from genesis, its node created only when lateJoin fires. The set
+		// signs warp messages with every registered key, so the extra
+		// not-yet-live validator never breaks quorum.
+		joinerNodeID = ids.GenerateTestNodeID()
+		vdrIDs = append(vdrIDs, joinerNodeID)
 	}
 
 	m := &model{
@@ -327,10 +344,11 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 			addrs:  keys.Addresses(),
 			vdrs:   warptest.NewValidatorsWithNodeIDs(tb, vdrIDs...),
 		},
-		cfg:     cfg,
-		clock:   clock,
-		timeOpt: timeOpt,
-		pins:    make(map[common.Address]int),
+		cfg:          cfg,
+		clock:        clock,
+		timeOpt:      timeOpt,
+		pins:         make(map[common.Address]int),
+		joinerNodeID: joinerNodeID,
 	}
 	for i, addr := range nm.addrs {
 		bal, overflow := uint256.FromBig(cfg.balance(i))

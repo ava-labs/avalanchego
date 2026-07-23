@@ -13,6 +13,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -49,7 +50,12 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"catchUpNode":        nm.catchUpNode,
 		"competingSiblings":  nm.competingSiblings,
 		"restartNode":        nm.restartNode,
-		"":                   nm.check,
+		// lateJoin is once-only (and a no-op in runs without a joiner), so a
+		// single alias costs nothing; its lasting cost is the +1 node every
+		// subsequent action pays, which the joiner-presence odds in
+		// genNetworkedRunConfig keep rare.
+		"lateJoin": nm.lateJoin,
+		"":         nm.check,
 	}
 }
 
@@ -666,4 +672,71 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	got, err := n.sut.LastAccepted(n.ctx)
 	require.NoErrorf(rt, err, "%T.LastAccepted() after restart of node %d", n.sut.VM, idx)
 	require.Equalf(rt, wantID, got, "node %d last accepted across restart", idx)
+}
+
+// lateJoin brings up the run's pre-drawn joiner, if any: a brand-new node
+// with a fresh database that must replay the entire canonical chain. It
+// arrives delayed at acceptedCount 0 — canonical[0:] is its implicit queue,
+// and checkLagging measures it against the genesis snapshot from the very
+// next check — and it converges via the existing catchUpNode action, whose
+// per-block deliverBlock asserts warp signability and atomic effects along
+// the way. No-op when the run drew no joiner or it already joined (pure
+// config + model state, so draw counts stay deterministic). Makes no draws.
+func (nm *networkedMachine) lateJoin(rt *rapid.T) {
+	if nm.cfg.joiner == nil || nm.joined {
+		return
+	}
+	nm.joined = true
+	n := &modelNode{
+		idx:         len(nm.nodes),
+		isValidator: nm.cfg.joinerIsValidator,
+		storage:     *nm.cfg.joiner,
+		dataDir:     nm.tb.TempDir(),
+		delayed:     true,
+	}
+	if n.isValidator {
+		n.nodeID = nm.joinerNodeID
+	} else {
+		n.nodeID = ids.GenerateTestNodeID()
+	}
+	switch n.storage.kv {
+	case kvLevelDB:
+		n.dbDir = nm.tb.TempDir()
+		db, err := leveldb.New(n.dbDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+		require.NoErrorf(nm.tb, err, "leveldb.New(%q) for late joiner", n.dbDir)
+		n.db = db
+		nm.tb.Cleanup(func() { _ = n.db.Close() })
+	default:
+		n.db = memdb.New()
+	}
+	nm.nodes = append(nm.nodes, n)
+	nm.openNode(n.idx)
+
+	// A brand-new store must open exactly at genesis; anything else means
+	// openNode inherited state (e.g. a reused directory).
+	got, err := n.sut.LastAccepted(n.ctx)
+	require.NoErrorf(rt, err, "%T.LastAccepted() on late joiner (node %d)", n.sut.VM, n.idx)
+	require.Equalf(rt, nm.genesisID, got, "late joiner (node %d) must open at genesis", n.idx)
+
+	// Seed shared memory with every UTXO the harness has ever provisioned —
+	// including ones the model already counts as consumed: replaying the
+	// canonical chain re-applies those imports on this node, and its VM must
+	// find the UTXOs present to remove them. Exported UTXOs are NOT seeded;
+	// replaying the export blocks must recreate them (checkLagging and the
+	// converged checks assert exactly that).
+	for _, chain := range nm.remoteChains(n.sut) {
+		if utxos := nm.provisionedEver[chain]; len(utxos) > 0 {
+			n.sut.addUTXOs(nm.tb, n.sut.ctx.ChainID, chain, utxos...)
+		}
+	}
+
+	// Original topology rule: a validator links to every live node, a
+	// non-validator only to validators.
+	var peers []*SUT
+	for _, o := range nm.nodes[:n.idx] {
+		if n.isValidator || o.isValidator {
+			peers = append(peers, o.sut)
+		}
+	}
+	saetest.ConnectTo(nm.tb, n.sut, peers...)
 }
