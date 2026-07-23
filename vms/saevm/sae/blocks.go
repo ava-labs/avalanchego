@@ -112,7 +112,7 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 }
 
 // saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
-const _ = uint(constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1)
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
 
 var (
 	errUnknownParent     = errors.New("unknown parent")

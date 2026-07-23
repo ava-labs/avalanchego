@@ -25,10 +25,6 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
-// errInsufficientGasPerByte is returned for a transaction that carries fewer
-// than x/M gas per serialized byte. See [eligible].
-var errInsufficientGasPerByte = errors.New("insufficient gas per serialized byte")
-
 var _ gossip.Gossipable = Transaction{}
 
 // A Transaction is a [gossip.Gossipable] wrapper for a [types.Transaction].
@@ -107,7 +103,7 @@ type txSet struct {
 // blockGasLimit returns the worst-case gas limit of the next block, based on
 // the gas clock of the last-executed block.
 func (s *txSet) blockGasLimit() uint64 {
-	return uint64(worstcase.SafeMaxBlockSize(s.exec.LastExecuted().ExecutedByGasTime()))
+	return uint64(worstcase.SafeMaxBlockSize(s.exec.LastExecuted().ExecutedByGasTime().Rate()))
 }
 
 func (s *txSet) Add(tx Transaction) error {
@@ -120,9 +116,11 @@ func (s *txSet) Add(tx Transaction) error {
 	return errors.Join(errs...)
 }
 
-// addToPool adds the eligible transactions (see [eligible]) to the pool. A
-// transaction's entry is the pool's result for it, while a rejected
-// transaction's entry is [errInsufficientGasPerByte] and it never reaches the pool
+// errInsufficientGasPerByte is returned for a transaction that carries fewer
+// than x/M gas per serialized byte. See [eligible].
+var errInsufficientGasPerByte = errors.New("insufficient gas limit for tx size")
+
+// addToPool adds the eligible transactions (see [eligible]) to the pool.
 func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	blockGasLimit := s.blockGasLimit()
 
@@ -135,8 +133,9 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 			eligibleIdx = append(eligibleIdx, i)
 			continue
 		}
-		errs[i] = fmt.Errorf("%w: %d gas over %d serialized bytes for a block gas limit of %d",
-			errInsufficientGasPerByte, tx.Gas(), tx.Size(), blockGasLimit)
+		minGas := (tx.Size()*blockGasLimit + saeparams.TargetBlockBytes - 1) / saeparams.TargetBlockBytes
+		errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
+			errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
 	}
 
 	if len(eligibleTxs) == 0 {

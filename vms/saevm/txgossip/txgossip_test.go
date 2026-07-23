@@ -194,14 +194,10 @@ func TestEligible(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := eligible(tt.tx, tt.blockGasLimit)
-			require.Equal(
-				t,
-				tt.want,
-				got,
+			require.Equalf(
+				t, tt.want, got,
 				"eligible(size=%d, gasLimit=%d, blockGasLimit=%d)",
-				tt.tx.Size(),
-				tt.tx.Gas(),
-				tt.blockGasLimit,
+				tt.tx.Size(), tt.tx.Gas(), tt.blockGasLimit,
 			)
 		})
 	}

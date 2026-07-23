@@ -9,7 +9,6 @@ import (
 	"math"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -113,10 +112,8 @@ func TestSafeMaxBlockSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := gastime.DefaultGasPriceConfig()
-			clock, err := gastime.New(time.Unix(0, 0), tt.target, cfg.MinPrice, cfg)
-			require.NoError(t, err, "gastime.New()")
-			require.Equal(t, tt.want, SafeMaxBlockSize(clock), "SafeMaxBlockSize(clock with target=%d)", tt.target)
+			rate := gastime.SafeRateOfTarget(tt.target)
+			require.Equal(t, tt.want, SafeMaxBlockSize(rate), "SafeMaxBlockSize(rate of target=%d)", tt.target)
 		})
 	}
 }
