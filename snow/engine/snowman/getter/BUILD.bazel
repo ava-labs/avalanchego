@@ -31,6 +31,7 @@ go_test(
         "//snow/engine/enginetest",
         "//snow/engine/snowman/block/blockmock",
         "//snow/engine/snowman/block/blocktest",
+        "//utils/constants",
         "//utils/logging",
         "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",

@@ -83,6 +83,7 @@ go_library(
 go_test(
     name = "node_test",
     srcs = [
+        "ancestors_test.go",
         "beacon_manager_test.go",
         "overridden_manager_test.go",
     ],
@@ -90,8 +91,10 @@ go_test(
     deps = [
         "//ids",
         "//message",
+        "//network",
         "//snow/validators",
         "//utils/constants",
+        "//utils/set",
         "//version",
         "@com_github_stretchr_testify//require",
     ],
