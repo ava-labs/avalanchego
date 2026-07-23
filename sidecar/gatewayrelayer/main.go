@@ -25,15 +25,9 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"net/http"
-	"net/netip"
 	"os"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -42,31 +36,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	p2pmessage "github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
-	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/sidecar/internal/relayer"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	warppayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-const quorumNumerator = 67 // percent of total stake weight required
-
-var warpPrecompileAddr = common.HexToAddress("0x0200000000000000000000000000000000000005")
-
 func main() {
-	avalancheURI := flag.String("avalanche-uri", "http://127.0.0.1:59501", "Avalanche node API URI (P-Chain queries + C-Chain delivery)")
+	avalancheURI := flag.String("avalanche-uri", "", "Avalanche node API URI (required; tmpnet assigns ports per network — see ~/.tmpnet/networks/latest/*/process.json)")
 	subnetIDStr := flag.String("subnet", "", "gateway subnet ID (required)")
 	chainIDStr := flag.String("gateway-chain", "", "gateway (Virtual L1) blockchain ID (required)")
 	attestorList := flag.String("attestors", "", "comma-separated attestor staking addresses, e.g. 127.0.0.1:9661,127.0.0.1:9663 (required)")
@@ -77,6 +60,10 @@ func main() {
 	ethKeyStr := flag.String("eth-key", "", "funded destination-chain key, PrivateKey-... CB58 (required)")
 	tamper := flag.Bool("tamper", false, "corrupt the payload before requesting signatures; attestors must refuse and quorum must fail")
 	flag.Parse()
+
+	if *avalancheURI == "" {
+		log.Fatalf("--avalanche-uri is required")
+	}
 
 	for name, v := range map[string]string{
 		"subnet": *subnetIDStr, "gateway-chain": *chainIDStr, "attestors": *attestorList,
@@ -103,7 +90,7 @@ func main() {
 	defer cancel()
 
 	// ---- 1. Fetch the source event ----
-	height, payload, err := fetchLog(ctx, *besuRPC, *txHashHex, *contract)
+	height, payload, err := relayer.FetchLog(ctx, *besuRPC, *txHashHex, common.HexToAddress(*contract))
 	if err != nil {
 		log.Fatalf("fetch source event: %v", err)
 	}
@@ -148,57 +135,17 @@ func main() {
 		log.Fatalf("flatten validator set: %v", err)
 	}
 	log.Printf("committee: %d validators, total weight %d, quorum >= %d%%",
-		len(warpSet.Validators), warpSet.TotalWeight, quorumNumerator)
+		len(warpSet.Validators), warpSet.TotalWeight, relayer.QuorumNumerator)
 
 	// ---- 4. Request signatures from each attestor over ACP-118 ----
-	sigs := collectSignatures(ctx, networkID, gatewayChainID, unsigned, txHash, strings.Split(*attestorList, ","))
+	sigs := relayer.CollectSignatures(ctx, networkID, gatewayChainID,
+		p2p.ProtocolPrefix(p2p.OracleSignatureRequestHandlerID),
+		unsigned, txHash, strings.Split(*attestorList, ","))
 
 	// ---- 5. Verify each signature and build the quorum aggregate ----
-	signerBits := set.NewBits()
-	var validSigs []*bls.Signature
-	var signedWeight uint64
-	for nodeID, sigBytes := range sigs {
-		sig, err := bls.SignatureFromBytes(sigBytes)
-		if err != nil {
-			log.Printf("attestor %s: invalid signature bytes: %v", nodeID, err)
-			continue
-		}
-		idx := -1
-		for i, vdr := range warpSet.Validators {
-			for _, vdrNodeID := range vdr.NodeIDs {
-				if vdrNodeID == nodeID {
-					idx = i
-					break
-				}
-			}
-			if idx >= 0 {
-				break
-			}
-		}
-		if idx < 0 {
-			log.Printf("attestor %s: not in the registered committee — ignoring", nodeID)
-			continue
-		}
-		if !bls.Verify(warpSet.Validators[idx].PublicKey, sig, unsigned.Bytes()) {
-			log.Printf("attestor %s: signature does not verify — ignoring", nodeID)
-			continue
-		}
-		if signerBits.Contains(idx) {
-			continue
-		}
-		signerBits.Add(idx)
-		validSigs = append(validSigs, sig)
-		signedWeight += warpSet.Validators[idx].Weight
-		log.Printf("attestor %s: signature verified (canonical index %d)", nodeID, idx)
-	}
-
-	if signedWeight*100 < warpSet.TotalWeight*quorumNumerator {
-		log.Fatalf("QUORUM NOT REACHED: signed weight %d of %d (%d%% < %d%%) — message cannot be delivered",
-			signedWeight, warpSet.TotalWeight, signedWeight*100/warpSet.TotalWeight, quorumNumerator)
-	}
-	agg, err := bls.AggregateSignatures(validSigs)
+	signerBits, agg, signedWeight, _, err := relayer.VerifyAndAggregate(warpSet, sigs, unsigned, "attestor")
 	if err != nil {
-		log.Fatalf("aggregate signatures: %v", err)
+		log.Fatalf("%v", err)
 	}
 	bitSig := &avalancheWarp.BitSetSignature{Signers: signerBits.Bytes()}
 	copy(bitSig.Signature[:], bls.SignatureToBytes(agg))
@@ -207,132 +154,16 @@ func main() {
 		log.Fatalf("assemble signed message: %v", err)
 	}
 	log.Printf("quorum reached: %d/%d attestors, weight %d/%d (%d%%)",
-		len(validSigs), len(warpSet.Validators), signedWeight, warpSet.TotalWeight,
+		signerBits.Len(), len(warpSet.Validators), signedWeight, warpSet.TotalWeight,
 		signedWeight*100/warpSet.TotalWeight)
 
 	// ---- 6. Deliver to the destination chain ----
 	if err := deliver(ctx, *avalancheURI, *proverArtifact, *ethKeyStr, signedMsg); err != nil {
 		log.Fatalf("delivery failed: %v", err)
 	}
-	fmt.Printf("\nDELIVERED: event from the external chain, verified by %d independent attestors,\n", len(validSigs))
+	fmt.Printf("\nDELIVERED: event from the external chain, verified by %d independent attestors,\n", signerBits.Len())
 	fmt.Printf("accepted by the destination chain's stock warp verification as a message from\n")
 	fmt.Printf("Virtual L1 %s\n", gatewayChainID)
-}
-
-// collectSignatures connects to each attestor as a network peer, sends an
-// ACP-118 SignatureRequest at the oracle handler ID, and returns the raw
-// signature bytes per responding attestor NodeID. Per-attestor failures are
-// logged and skipped — the caller enforces quorum.
-func collectSignatures(
-	ctx context.Context,
-	networkID uint32,
-	gatewayChainID ids.ID,
-	unsigned *avalancheWarp.UnsignedMessage,
-	justification []byte,
-	attestorAddrs []string,
-) map[ids.NodeID][]byte {
-	requestPayload, err := proto.Marshal(&sdk.SignatureRequest{
-		Message:       unsigned.Bytes(),
-		Justification: justification,
-	})
-	if err != nil {
-		log.Fatalf("marshal SignatureRequest: %v", err)
-	}
-	prefixed := p2p.PrefixMessage(p2p.ProtocolPrefix(p2p.OracleSignatureRequestHandlerID), requestPayload)
-
-	// Request sequentially: each attestor is a separate peer handshake, and a
-	// relayer paces its requests rather than flooding the committee at once.
-	// (Concurrent handshakes proved flaky; a production relayer would use a
-	// small bounded worker pool — sequential is ample for committee-sized fan-out.)
-	out := make(map[ids.NodeID][]byte)
-	for i, addr := range attestorAddrs {
-		addr = strings.TrimSpace(addr)
-		if addr == "" {
-			continue
-		}
-		// Each request uses a fresh peer, so a constant requestID is safe and
-		// avoids an observed quirk where the handler only answered odd IDs.
-		_ = i
-		nodeID, sig, err := requestOne(ctx, networkID, gatewayChainID, prefixed, addr, 1)
-		if err != nil {
-			log.Printf("attestor at %s: %v", addr, err)
-			continue
-		}
-		out[nodeID] = sig
-	}
-	return out
-}
-
-func requestOne(
-	ctx context.Context,
-	networkID uint32,
-	gatewayChainID ids.ID,
-	prefixedRequest []byte,
-	addr string,
-	requestID uint32,
-) (ids.NodeID, []byte, error) {
-	addrPort, err := netip.ParseAddrPort(addr)
-	if err != nil {
-		return ids.EmptyNodeID, nil, fmt.Errorf("bad address: %w", err)
-	}
-
-	type result struct {
-		sig []byte
-		err error
-	}
-	resultCh := make(chan result, 1)
-
-	p, err := peer.StartTestPeer(ctx, addrPort, networkID,
-		router.InboundHandlerFunc(func(_ context.Context, msg *p2pmessage.InboundMessage) {
-			switch msg.Op {
-			case p2pmessage.AppResponseOp:
-				resp, ok := msg.Message.(*p2ppb.AppResponse)
-				if !ok {
-					return
-				}
-				var sigResp sdk.SignatureResponse
-				if err := proto.Unmarshal(resp.AppBytes, &sigResp); err != nil {
-					resultCh <- result{err: fmt.Errorf("bad SignatureResponse: %w", err)}
-					return
-				}
-				resultCh <- result{sig: sigResp.Signature}
-			case p2pmessage.AppErrorOp:
-				appErr, ok := msg.Message.(*p2ppb.AppError)
-				if !ok {
-					return
-				}
-				resultCh <- result{err: fmt.Errorf("attestor refused: %s", appErr.ErrorMessage)}
-			}
-		}),
-	)
-	if err != nil {
-		return ids.EmptyNodeID, nil, fmt.Errorf("peer handshake failed: %w", err)
-	}
-	defer func() {
-		p.StartClose()
-		_ = p.AwaitClosed(context.Background())
-	}()
-
-	messageBuilder, err := p2pmessage.NewCreator(prometheus.NewRegistry(), compression.TypeZstd, time.Hour)
-	if err != nil {
-		return ids.EmptyNodeID, nil, err
-	}
-	appRequest, err := messageBuilder.AppRequest(gatewayChainID, requestID, 30*time.Second, prefixedRequest)
-	if err != nil {
-		return ids.EmptyNodeID, nil, err
-	}
-	if !p.Send(ctx, appRequest) {
-		return ids.EmptyNodeID, nil, fmt.Errorf("send failed")
-	}
-
-	select {
-	case r := <-resultCh:
-		return p.ID(), r.sig, r.err
-	case <-time.After(20 * time.Second):
-		return p.ID(), nil, fmt.Errorf("timed out waiting for signature")
-	case <-ctx.Done():
-		return p.ID(), nil, ctx.Err()
-	}
 }
 
 // deliver deploys the WarpProver on the destination C-Chain and submits the
@@ -383,31 +214,23 @@ func deliver(ctx context.Context, uri, proverArtifactPath, ethKeyStr string, sig
 	if err := client.SendTransaction(ctx, deployTx); err != nil {
 		return fmt.Errorf("deploy prover: %w", err)
 	}
-	deployReceipt, err := waitReceipt(ctx, client, deployTx.Hash())
+	deployReceipt, err := relayer.WaitReceipt(ctx, client, deployTx.Hash())
 	if err != nil || deployReceipt.Status != 1 {
 		return fmt.Errorf("prover deploy failed: %v", err)
 	}
 	prover := deployReceipt.ContractAddress
 
-	predicate := append(signedMsg.Bytes(), 0xff)
-	if rem := len(predicate) % 32; rem != 0 {
-		predicate = append(predicate, make([]byte, 32-rem)...)
-	}
-	storageKeys := make([]common.Hash, 0, len(predicate)/32)
-	for i := 0; i < len(predicate); i += 32 {
-		storageKeys = append(storageKeys, common.BytesToHash(predicate[i:i+32]))
-	}
 	callData := append(crypto.Keccak256([]byte("prove(uint32)"))[:4], make([]byte, 32)...)
 
 	proveTx := types.MustSignNewTx(ethKey, signer, &types.DynamicFeeTx{
 		ChainID: chainID, Nonce: nonce + 1, GasTipCap: gasTip, GasFeeCap: gasFee,
 		Gas: 5_000_000, To: &prover, Data: callData,
-		AccessList: types.AccessList{{Address: warpPrecompileAddr, StorageKeys: storageKeys}},
+		AccessList: relayer.BuildPredicate(signedMsg.Bytes()),
 	})
 	if err := client.SendTransaction(ctx, proveTx); err != nil {
 		return fmt.Errorf("send prove tx: %w", err)
 	}
-	receipt, err := waitReceipt(ctx, client, proveTx.Hash())
+	receipt, err := relayer.WaitReceipt(ctx, client, proveTx.Hash())
 	if err != nil {
 		return err
 	}
@@ -416,69 +239,4 @@ func deliver(ctx context.Context, uri, proverArtifactPath, ethKeyStr string, sig
 	}
 	log.Printf("delivered in destination block %d (tx %s, prover %s)", receipt.BlockNumber, proveTx.Hash(), prover)
 	return nil
-}
-
-func waitReceipt(ctx context.Context, client *ethclient.Client, h common.Hash) (*types.Receipt, error) {
-	for {
-		r, err := client.TransactionReceipt(ctx, h)
-		if err == nil {
-			return r, nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(500 * time.Millisecond):
-		}
-	}
-}
-
-func fetchLog(ctx context.Context, rpcURL, txHash, contract string) (uint64, []byte, error) {
-	body, err := json.Marshal(map[string]any{
-		"jsonrpc": "2.0", "id": 1,
-		"method": "eth_getTransactionReceipt",
-		"params": []any{txHash},
-	})
-	if err != nil {
-		return 0, nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(body))
-	if err != nil {
-		return 0, nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer resp.Body.Close()
-
-	var envelope struct {
-		Result *struct {
-			BlockNumber string `json:"blockNumber"`
-			Logs        []struct {
-				Address string `json:"address"`
-				Data    string `json:"data"`
-			} `json:"logs"`
-		} `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		return 0, nil, err
-	}
-	if envelope.Result == nil {
-		return 0, nil, fmt.Errorf("transaction %s not found", txHash)
-	}
-	height, err := strconv.ParseUint(strings.TrimPrefix(envelope.Result.BlockNumber, "0x"), 16, 64)
-	if err != nil {
-		return 0, nil, err
-	}
-	for _, l := range envelope.Result.Logs {
-		if strings.EqualFold(l.Address, contract) {
-			data, err := hex.DecodeString(strings.TrimPrefix(l.Data, "0x"))
-			if err != nil {
-				return 0, nil, err
-			}
-			return height, data, nil
-		}
-	}
-	return 0, nil, fmt.Errorf("no log from %s in transaction", contract)
 }

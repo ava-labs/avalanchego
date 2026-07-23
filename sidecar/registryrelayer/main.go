@@ -23,11 +23,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/sidecar/internal/relayer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -36,18 +38,22 @@ import (
 )
 
 func main() {
-	avalancheURI := flag.String("avalanche-uri", "http://127.0.0.1:59501", "Avalanche node API URI")
+	avalancheURI := flag.String("avalanche-uri", "", "Avalanche node API URI (required; tmpnet assigns ports per network — see ~/.tmpnet/networks/latest/*/process.json)")
 	besuRPC := flag.String("besu-rpc", "http://127.0.0.1:9545", "external EVM chain JSON-RPC endpoint")
 	txHashHex := flag.String("tx", "", "C-Chain tx hash of the Teleporter send (required)")
 	teleporterStr := flag.String("teleporter", "", "TeleporterMessengerV2 address (same on both chains) (required)")
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
-	validatorList := flag.String("validators", "", "comma-separated primary-network validator staking addresses (required)")
+	validatorList := flag.String("validators", "", "comma-separated primary-network validator staking addresses (default: discovered via the info API on --avalanche-uri)")
 	besuKeyHex := flag.String("besu-key", "", "funded external-chain private key, hex (required)")
 	flag.Parse()
 
+	if *avalancheURI == "" {
+		log.Fatalf("--avalanche-uri is required")
+	}
+
 	for name, v := range map[string]string{
 		"tx": *txHashHex, "teleporter": *teleporterStr, "teleporter-abi": *teleporterArtifact,
-		"validators": *validatorList, "besu-key": *besuKeyHex,
+		"besu-key": *besuKeyHex,
 	} {
 		if v == "" {
 			log.Fatalf("--%s is required", name)
@@ -86,54 +92,32 @@ func main() {
 	log.Printf("primary network: %d validators, total weight %d", len(warpSet.Validators), warpSet.TotalWeight)
 
 	// ---- 3. ACP-118 signature requests to the primary validators ----
+	// Staking addresses come from --validators when given; otherwise they are
+	// discovered from the queried node (itself + its peers, filtered to the
+	// primary validator set) — tmpnet assigns them randomly per network, so a
+	// hardcoded default would never be right.
+	var validatorAddrs []string
+	if *validatorList != "" {
+		validatorAddrs = strings.Split(*validatorList, ",")
+	} else {
+		validatorAddrs, err = discoverPrimaryValidators(ctx, *avalancheURI, warpSet)
+		if err != nil {
+			log.Fatalf("discover primary validators: %v", err)
+		}
+		log.Printf("discovered %d primary validator staking addresses", len(validatorAddrs))
+	}
 	// On-chain warp messages need no justification: each node signs anything
 	// its C-Chain warp backend has stored.
 	prefix := p2p.ProtocolPrefix(acp118.HandlerID)
-	sigs := collectSignatures(ctx, networkID, cChainID, prefix, unsigned, nil, strings.Split(*validatorList, ","))
+	sigs := relayer.CollectSignatures(ctx, networkID, cChainID, prefix, unsigned, nil, validatorAddrs)
 
 	// ---- 4. Verify + aggregate to quorum ----
-	signerBits := set.NewBits()
-	var validSigs []*bls.Signature
-	var signedWeight uint64
-	for nodeID, sigBytes := range sigs {
-		sig, err := bls.SignatureFromBytes(sigBytes)
-		if err != nil {
-			log.Printf("validator %s: bad signature: %v", nodeID, err)
-			continue
-		}
-		idx := -1
-		for i, vdr := range warpSet.Validators {
-			for _, vid := range vdr.NodeIDs {
-				if vid == nodeID {
-					idx = i
-					break
-				}
-			}
-			if idx >= 0 {
-				break
-			}
-		}
-		if idx < 0 || !bls.Verify(warpSet.Validators[idx].PublicKey, sig, unsigned.Bytes()) {
-			log.Printf("validator %s: not in set or signature invalid — ignoring", nodeID)
-			continue
-		}
-		if signerBits.Contains(idx) {
-			continue
-		}
-		signerBits.Add(idx)
-		validSigs = append(validSigs, sig)
-		signedWeight += warpSet.Validators[idx].Weight
-		log.Printf("validator %s: verified (index %d)", nodeID, idx)
-	}
-	if signedWeight*100 < warpSet.TotalWeight*67 {
-		log.Fatalf("QUORUM NOT REACHED: %d/%d weight (%d%%)", signedWeight, warpSet.TotalWeight, signedWeight*100/warpSet.TotalWeight)
-	}
-	agg, err := bls.AggregateSignatures(validSigs)
+	signerBits, agg, _, pct, err := relayer.VerifyAndAggregate(warpSet, sigs, unsigned, "validator")
 	if err != nil {
-		log.Fatalf("aggregate: %v", err)
+		log.Fatalf("%v", err)
 	}
-	log.Printf("quorum reached: %d/%d validators, %d%% weight",
-		len(validSigs), len(warpSet.Validators), signedWeight*100/warpSet.TotalWeight)
+	log.Printf("quorum reached: %d/%d validators, %.0f%% weight",
+		signerBits.Len(), len(warpSet.Validators), pct)
 
 	// Registry attestation format: raw signers bitset || uncompressed (192-byte) BLS signature.
 	attestation := append(signerBits.Bytes(), agg.Serialize()...)
@@ -152,4 +136,52 @@ func main() {
 	fmt.Printf("\nDELIVERED: a C-Chain Teleporter message, signed by the primary-network\n")
 	fmt.Printf("validators, verified ON-CHAIN by the SubsetUpdater registry (EIP-2537 BLS)\n")
 	fmt.Printf("and accepted by the same-address stock TeleporterMessengerV2 on the external chain\n")
+}
+
+// discoverPrimaryValidators returns staking addresses for the primary-network
+// validators reachable from the given node: the node itself plus its peers,
+// filtered to the validator set's node IDs.
+func discoverPrimaryValidators(
+	ctx context.Context,
+	avalancheURI string,
+	warpSet validators.WarpSet,
+) ([]string, error) {
+	primary := set.Set[ids.NodeID]{}
+	for _, v := range warpSet.Validators {
+		for _, id := range v.NodeIDs {
+			primary.Add(id)
+		}
+	}
+
+	infoClient := info.NewClient(avalancheURI)
+	var addrs []string
+	selfID, _, err := infoClient.GetNodeID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("info.getNodeID: %w", err)
+	}
+	if primary.Contains(selfID) {
+		ip, err := infoClient.GetNodeIP(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("info.getNodeIP: %w", err)
+		}
+		addrs = append(addrs, ip.String())
+	}
+	peers, err := infoClient.Peers(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("info.peers: %w", err)
+	}
+	for _, p := range peers {
+		if !primary.Contains(p.ID) {
+			continue
+		}
+		addr := p.PublicIP
+		if !addr.IsValid() {
+			addr = p.IP
+		}
+		addrs = append(addrs, addr.String())
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no primary validators reachable from %s", avalancheURI)
+	}
+	return addrs, nil
 }

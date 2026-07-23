@@ -1,4 +1,7 @@
-package main
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package relayer
 
 import (
 	"math/big"
@@ -8,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDecodeTeleporterMessage confirms the relayer's decoderABI recovers a
+// TestDecodeTeleporterMessage confirms MessageDecoderABI recovers a
 // TeleporterMessageV2 from a bare abi.encode(TeleporterMessageV2) — the outbox
 // log data — so the receiveCrossChainMessage calldata is rebuilt faithfully.
 func TestDecodeTeleporterMessage(t *testing.T) {
-	orig := teleporterMessageV2{
+	orig := TeleporterMessageV2{
 		MessageNonce:            big.NewInt(7),
 		OriginSenderAddress:     common.HexToAddress("0x1111111111111111111111111111111111111111"),
 		OriginTeleporterAddress: common.HexToAddress("0x2222222222222222222222222222222222222222"),
@@ -20,14 +23,14 @@ func TestDecodeTeleporterMessage(t *testing.T) {
 		DestinationAddress:      common.HexToAddress("0x4444444444444444444444444444444444444444"),
 		RequiredGasLimit:        big.NewInt(300_000),
 		AllowedRelayerAddresses: []common.Address{},
-		Receipts:                []teleporterReceipt{},
+		Receipts:                []TeleporterReceipt{},
 		Message:                 []byte("hello teleporter"),
 	}
-	encoded, err := teleporterMessageArgs().Pack(orig)
+	encoded, err := TeleporterMessageArgs().Pack(orig)
 	require.NoError(t, err)
 
-	var wrap struct{ M teleporterMessageV2 }
-	require.NoError(t, decoderABI.UnpackIntoInterface(&wrap, "d", encoded))
+	var wrap struct{ M TeleporterMessageV2 }
+	require.NoError(t, MessageDecoderABI.UnpackIntoInterface(&wrap, "d", encoded))
 	got := wrap.M
 
 	require.Equal(t, orig.MessageNonce, got.MessageNonce)

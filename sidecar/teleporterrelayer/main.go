@@ -23,20 +23,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle/teleporter"
+	"github.com/ava-labs/avalanchego/sidecar/internal/relayer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	warppayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-var warpPrecompileAddr = common.HexToAddress("0x0200000000000000000000000000000000000005")
-
 func main() {
-	avalancheURI := flag.String("avalanche-uri", "http://127.0.0.1:59501", "Avalanche node API URI")
+	avalancheURI := flag.String("avalanche-uri", "", "Avalanche node API URI (required; tmpnet assigns ports per network — see ~/.tmpnet/networks/latest/*/process.json)")
 	subnetIDStr := flag.String("subnet", "", "gateway subnet ID (required)")
 	chainIDStr := flag.String("gateway-chain", "", "gateway (Virtual L1) blockchain ID (required)")
 	attestorList := flag.String("attestors", "", "comma-separated attestor staking addresses (required)")
@@ -48,6 +47,10 @@ func main() {
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
 	ethKeyStr := flag.String("eth-key", "", "funded destination-chain key, PrivateKey-... CB58 (required)")
 	flag.Parse()
+
+	if *avalancheURI == "" {
+		log.Fatalf("--avalanche-uri is required")
+	}
 
 	for name, v := range map[string]string{
 		"subnet": *subnetIDStr, "gateway-chain": *chainIDStr, "attestors": *attestorList, "tx": *txHashHex,
@@ -69,7 +72,7 @@ func main() {
 	defer cancel()
 
 	// ---- 1. Read the outbox event: log data = abi.encode(TeleporterMessageV2) ----
-	height, teleporterBytes, err := fetchOutboxLog(ctx, *besuRPC, *txHashHex, outbox)
+	height, teleporterBytes, err := relayer.FetchLog(ctx, *besuRPC, *txHashHex, outbox)
 	if err != nil {
 		log.Fatalf("read outbox event: %v", err)
 	}
@@ -112,48 +115,14 @@ func main() {
 		Outbox:      outbox,
 		BlockHeight: height,
 	}.Encode()
-	sigs := collectSignatures(ctx, networkID, gatewayChainID, unsigned, justification, strings.Split(*attestorList, ","))
+	sigs := relayer.CollectSignatures(ctx, networkID, gatewayChainID,
+		p2p.ProtocolPrefix(p2p.TeleporterSignatureRequestHandlerID),
+		unsigned, justification, strings.Split(*attestorList, ","))
 
 	// ---- 5. Verify + aggregate to quorum ----
-	signerBits := set.NewBits()
-	var validSigs []*bls.Signature
-	var signedWeight uint64
-	for nodeID, sigBytes := range sigs {
-		sig, err := bls.SignatureFromBytes(sigBytes)
-		if err != nil {
-			log.Printf("attestor %s: bad signature: %v", nodeID, err)
-			continue
-		}
-		idx := -1
-		for i, vdr := range warpSet.Validators {
-			for _, vid := range vdr.NodeIDs {
-				if vid == nodeID {
-					idx = i
-					break
-				}
-			}
-			if idx >= 0 {
-				break
-			}
-		}
-		if idx < 0 || !bls.Verify(warpSet.Validators[idx].PublicKey, sig, unsigned.Bytes()) {
-			log.Printf("attestor %s: not in set or signature invalid — ignoring", nodeID)
-			continue
-		}
-		if signerBits.Contains(idx) {
-			continue
-		}
-		signerBits.Add(idx)
-		validSigs = append(validSigs, sig)
-		signedWeight += warpSet.Validators[idx].Weight
-		log.Printf("attestor %s: verified (index %d)", nodeID, idx)
-	}
-	if signedWeight*100 < warpSet.TotalWeight*67 {
-		log.Fatalf("QUORUM NOT REACHED: %d/%d weight (%d%%)", signedWeight, warpSet.TotalWeight, signedWeight*100/warpSet.TotalWeight)
-	}
-	agg, err := bls.AggregateSignatures(validSigs)
+	signerBits, agg, _, pct, err := relayer.VerifyAndAggregate(warpSet, sigs, unsigned, "attestor")
 	if err != nil {
-		log.Fatalf("aggregate: %v", err)
+		log.Fatalf("%v", err)
 	}
 	bitSig := &avalancheWarp.BitSetSignature{Signers: signerBits.Bytes()}
 	copy(bitSig.Signature[:], bls.SignatureToBytes(agg))
@@ -161,7 +130,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("signed message: %v", err)
 	}
-	log.Printf("quorum reached: %d/%d attestors, %d%% weight", len(validSigs), len(warpSet.Validators), signedWeight*100/warpSet.TotalWeight)
+	log.Printf("quorum reached: %d/%d attestors, %.0f%% weight", signerBits.Len(), len(warpSet.Validators), pct)
 
 	// ---- 6. Deliver via stock receiveCrossChainMessage ----
 	if err := deliver(ctx, *avalancheURI, *teleporterArtifact, *ethKeyStr, teleporterAddr, teleporterBytes, networkID, gatewayChainID, signedMsg); err != nil {
