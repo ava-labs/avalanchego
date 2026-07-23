@@ -265,8 +265,7 @@ func (b *tracerBackend) applyChildBeforeBlock(sdb *state.StateDB, parent *types.
 	rules := b.ChainConfig().Rules(ethB.Number(), true /*isMerge*/, ethB.Time())
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
-	// so we should drop it here. [TestLibevmTracersDoNotApplyBeaconRoot] pins
-	// the current libevm behaviour and will fail when that happens.
+	// so we should drop it here.
 	return saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parent, ethB)
 }
 

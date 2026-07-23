@@ -163,8 +163,9 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 
 	core.SetBeaconBlockRoot(stateDB, b.Header())
 
-	// Finalise any state changes made by the hook, mirroring the finalisation
-	// performed by [core.ApplyTransaction].
+	// SetBeaconRoot only finalizes when it applies the root, so we want to
+	// finalize last. This mirrors the finalization performed by
+	// [core.ApplyTransaction].
 	stateDB.Finalise(rules.IsEIP158)
 	return nil
 }

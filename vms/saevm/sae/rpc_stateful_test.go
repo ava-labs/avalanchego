@@ -4,6 +4,8 @@
 package sae
 
 import (
+	"bytes"
+	"encoding/json"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -102,7 +104,7 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 func TestDebugTrace(t *testing.T) {
 	// TODO(JonathanOppenheimer): add a fee-sensitive case. The current
 	// tests only assert fee-insensitive fields, leaving the SAE-era replay
-	// base fee unpinned -- this has led to multiple bugs!
+	// base fee unpinned. This has missed multiple bugs.
 	ctx, sut := newSUT(t, 2)
 
 	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
@@ -290,10 +292,22 @@ func TestDebugTrace(t *testing.T) {
 
 		trace, err := os.ReadFile(files[0])
 		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
-		// The file holds a struct log: one JSON line per EVM opcode executed.
-		// `emit Deposit()` compiles to a LOG1 opcode, so if it shows up the
-		// file really does trace the transaction's execution.
-		assert.Contains(t, string(trace), vm.LOG1.String(), "trace of `emit Deposit()`")
+		// The file should be a structured log file, each line is a separate
+		// JSON object describing an EVM opcode executed.
+		//
+		// `emit Deposit()` compiles to a LOG1 opcode at [logPC], so if it
+		// shows up there, and only there, the file really does trace the
+		// transaction's execution.
+		var log1PCs []uint64
+		dec := json.NewDecoder(bytes.NewReader(trace))
+		for dec.More() {
+			var step logger.StructLog
+			require.NoError(t, dec.Decode(&step), "decoding trace line")
+			if step.Op == vm.LOG1 {
+				log1PCs = append(log1PCs, step.Pc)
+			}
+		}
+		assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace of `emit Deposit()`", vm.LOG1)
 	})
 }
 
@@ -301,9 +315,10 @@ func TestDebugTrace(t *testing.T) {
 // root per transaction. Mid-block roots are never persisted, so it asserts
 // properties rather than exact values.
 func TestDebugIntermediateRoots(t *testing.T) {
-	ctx, sut := newSUT(t, 2)
+	const numAccounts = 2 // one transfer per account
+	ctx, sut := newSUT(t, numAccounts)
 
-	transfers := make([]*types.Transaction, 2)
+	transfers := make([]*types.Transaction, numAccounts)
 	for i := range transfers {
 		transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
 			To:       &common.Address{'x', 'f', 'e', 'r'},
