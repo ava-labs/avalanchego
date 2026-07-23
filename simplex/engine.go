@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -25,12 +26,26 @@ import (
 
 var _ common.Engine = (*Engine)(nil)
 
+// minTickDuration is the lowest tick interval the engine allows.
+// [simplexparams.Parameters.Verify] enforces [simplexparams.MinWaitDuration],
+// which guarantees getTickInterval never falls below this; the check in
+// newEngine is an internal backstop.
+const minTickDuration = simplexparams.MinWaitDuration / 10
+
 var (
+	errTooFastTicker        = errors.New("ticker set too fast")
 	errUnknownMessageType   = errors.New("unknown message type")
 	errNilSimplexParameters = errors.New("simplex parameters cannot be nil")
 )
 
 type Engine struct {
+	// nonValidator marks that this node is not a validator
+	// this is included, but marked as a todo since the e2e tests currently
+	// try and bootstrap a node that is not a validator(see func `CheckBootstrapIsPossible`).
+	// The bootstrapped node is a non-validator which is currently not supported.
+	// TODO: handle non-validators properly
+	nonValidator bool
+
 	// list of NoOpsHandler for messages dropped by engine
 	common.AllGetsServer
 	common.StateSummaryFrontierHandler
@@ -55,13 +70,22 @@ type Engine struct {
 	tickInterval time.Duration
 	shutdown     chan struct{}
 	shutdownOnce sync.Once
+	consensusCtx *snow.ConsensusContext
 }
 
-// NewEngine creates a new simplex engine. The VM must be initialized before
-// calling this function.
-func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
+// The VM must be initialized before creating the engine
+func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
 	if config.Params == nil {
 		return nil, errNilSimplexParameters
+	}
+
+	if isNonValidator(config) {
+		config.Log.Info("Our node is not a validator for the subnet",
+			zap.Stringer("nodeID", config.Ctx.NodeID),
+			zap.Stringer("chainID", config.Ctx.ChainID),
+			zap.Stringer("subnetID", config.Ctx.SubnetID),
+		)
+		return nonValidatingEngine(snowCtx, config)
 	}
 
 	signer, verifier, err := NewBLSAuth(config)
@@ -69,10 +93,10 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, fmt.Errorf("failed to create BLS auth: %w", err)
 	}
 
-	return newEngineWithSignerVerifier(ctx, config, signer, verifier)
+	return newEngineWithSignerVerifier(ctx, snowCtx, config, signer, verifier)
 }
 
-func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLSSigner, verifier BLSVerifier) (*Engine, error) {
+func newEngineWithSignerVerifier(ctx context.Context, snowCtx *snow.ConsensusContext, config *Config, signer BLSSigner, verifier BLSVerifier) (*Engine, error) {
 	if config.Params == nil {
 		return nil, errNilSimplexParameters
 	}
@@ -148,42 +172,50 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		return nil, err
 	}
 
-	return &Engine{
-		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
-		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
-		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
-		AppHandler:                  config.VM,
-		Connector:                   config.VM,
-		vm:                          config.VM,
+	engine, err := newEngine(config, snowCtx)
+	if err != nil {
+		return nil, err
+	}
+	engine.epoch = epoch
+	engine.blockDeserializer = blockDeserializer
+	engine.quorumDeserializer = qcDeserializer
 
-		epoch:              epoch,
-		blockDeserializer:  blockDeserializer,
-		quorumDeserializer: qcDeserializer,
-		logger:             config.Log,
-
-		tickInterval: getTickInterval(config.Params),
-		shutdown:     make(chan struct{}, 1),
-	}, nil
+	return engine, nil
 }
 
-func (e *Engine) Start(_ context.Context, _ uint32) error {
+func (e *Engine) Start(ctx context.Context, _ uint32) error {
+	if e.nonValidator {
+		e.logger.Info("non-validator cannot start simplex engine")
+		e.consensusCtx.State.Set(snow.EngineState{
+			Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+			State: snow.NormalOp,
+		})
+		return nil
+	}
+
 	e.logger.Info(
 		"Starting simplex engine",
 		zap.Duration("TickInterval", e.tickInterval),
 		zap.Duration("MaxProposalWait", e.epoch.MaxProposalWait),
 		zap.Duration("MaxRebroadcastWait", e.epoch.MaxRebroadcastWait),
 	)
+
+	// Set NormalOp BEFORE starting the epoch so that the VM's block builder
+	// is initialized before the epoch can trigger block building via WaitForEvent.
+	if err := e.vm.SetState(ctx, snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to set VM state to NormalOp: %w", err)
+	}
+
 	if err := e.epoch.Start(); err != nil {
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
 
 	go e.tick()
+
+	e.consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.NormalOp,
+	})
 	return nil
 }
 
@@ -209,6 +241,11 @@ func (e *Engine) tick() {
 }
 
 func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	if e.nonValidator {
+		e.logger.Debug("non-validator received simplex message; dropping")
+		return nil
+	}
+
 	simplexMsg, err := e.p2pToSimplexMessage(ctx, msg)
 	if err != nil {
 		e.logger.Debug("failed to convert p2p message to simplex message", zap.Error(err))
@@ -270,11 +307,93 @@ func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (e *Engine) Shutdown(_ context.Context) error {
+func (e *Engine) Shutdown(ctx context.Context) error {
+	// A non-validator never started an epoch instance, so no need
+	// to shut it down
+	if e.nonValidator {
+		return e.vm.Shutdown(ctx)
+	}
+
 	e.shutdownOnce.Do(func() {
 		e.epoch.Stop()
 		e.logger.Info("Stopped simplex engine")
 		close(e.shutdown)
 	})
+
+	return e.vm.Shutdown(ctx)
+}
+
+var _ common.BootstrapableEngine = (*NoopBootstrapper)(nil)
+
+type NoopBootstrapper struct {
+	*Engine
+	common.BootstrapTracker
+}
+
+func (t *NoopBootstrapper) Start(ctx context.Context, _ uint32) error {
+	t.Engine.logger.Info("Starting simplex no-op bootstrapper")
+
+	t.Engine.consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.Bootstrapping,
+	})
+
+	if err := t.Engine.vm.SetState(ctx, snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to notify VM the bootstrapper is starting: %w", err)
+	}
+
+	// We must notify the tracker we have finished bootstrapping
+	t.BootstrapTracker.Bootstrapped(t.Engine.consensusCtx.ChainID)
+
+	return t.Engine.Start(ctx, 0)
+}
+
+func (*NoopBootstrapper) Clear(_ context.Context) error {
 	return nil
+}
+
+func newEngine(config *Config, consensusCtx *snow.ConsensusContext) (*Engine, error) {
+	tickInterval := getTickInterval(config.Params)
+	if tickInterval < minTickDuration {
+		return nil, errTooFastTicker
+	}
+
+	return &Engine{
+		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AppHandler:                  config.VM,
+		Connector:                   config.VM,
+		vm:                          config.VM,
+
+		consensusCtx: consensusCtx,
+		logger:       config.Log,
+		tickInterval: tickInterval,
+		shutdown:     make(chan struct{}),
+	}, nil
+}
+
+func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
+	engine, err := newEngine(config, consensusCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	engine.nonValidator = true
+	return engine, nil
+}
+
+func isNonValidator(config *Config) bool {
+	for _, node := range config.Params.InitialValidators {
+		if node.NodeID == config.Ctx.NodeID {
+			return false
+		}
+	}
+	return true
 }
