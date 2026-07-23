@@ -260,7 +260,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			},
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb, 0),
+			validators: warptest.NewValidators(tb),
 			clock:      saetest.NewClock(testStartTime, time.Millisecond),
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
