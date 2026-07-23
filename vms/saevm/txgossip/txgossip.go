@@ -4,7 +4,7 @@
 // Package txgossip provides a mempool for [Streaming Asynchronous Execution],
 // which is also compatible with AvalancheGo's [gossip] mechanism.
 //
-// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
+// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution
 package txgossip
 
 import (

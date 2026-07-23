@@ -3,13 +3,12 @@
 
 // Package params declares [Streaming Asynchronous Execution] (SAE) parameters.
 //
-// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
+// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution
 package params
 
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -45,7 +44,7 @@ const MaxQueueWallTime = MaxFullBlocksInClosedQueue * Tau * Lambda
 // MaxBlockTxBytes is the maximum cumulative serialized size of a block's
 // transactions. The block builder enforces it as a byte budget and the mempool
 // uses it as the normalizer of its gas-per-byte admission rule. The somewhat
-// arbitrary 512 KiB margin below [constants.DefaultMaxMessageSize] comfortably
-// covers all non-transaction block and wire bytes, keeping blocks gossipable
-// in a single P2P message.
-const MaxBlockTxBytes = constants.DefaultMaxMessageSize - 512*units.KiB
+// arbitrary 512 KiB margin below the 2 MiB message size (mirroring
+// constants.DefaultMaxMessageSize) comfortably covers all non-transaction
+// block and wire bytes, keeping blocks gossipable in a single message.
+const MaxBlockTxBytes = 2*units.MiB - 512*units.KiB

@@ -98,9 +98,11 @@ framing, without itemizing their worst-case sizes.
   `worstcase.SafeMaxBlockSize`). A material change in the gas target shifts the
   threshold `x/M`; re-run the rejection-rate analysis before assuming the rule
   stays this benign.
-- **`M = 1.5 MiB`** is `saeparams.MaxBlockTxBytes`, tracking
-  `constants.DefaultMaxMessageSize`; if either the message size or the margins
-  change, the threshold `x/M` moves with them.
+- **`M = 1.5 MiB`** is `saeparams.MaxBlockTxBytes`, a literal deliberately NOT
+  derived from `constants.DefaultMaxMessageSize` (2 MiB), so a change to the
+  message size cannot silently move this consensus-relevant bound. If the
+  message size ever shrinks, both `M` and the parse-time cap MUST be revisited
+  by hand.
 - **Traffic composition.** The 0.0309% figure was measured on traffic with no
   access lists. The rule uses the true `types.Transaction.Size()`, so it stays
   *correct* for any composition, but a future access-list- or calldata-heavy
