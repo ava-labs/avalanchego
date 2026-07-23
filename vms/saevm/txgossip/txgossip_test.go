@@ -149,59 +149,50 @@ func newTxPool(t *testing.T, bc BlockChain) *txpool.TxPool {
 	return p
 }
 
-func TestEligible(t *testing.T) {
-	tx := types.NewTx(&types.LegacyTx{Gas: 21_000})
-	boundary := tx.Gas() * saeparams.TargetBlockBytes / tx.Size()
-	maxGasTx := types.NewTx(&types.LegacyTx{Gas: math.MaxUint64})
+func TestMinGasForSize(t *testing.T) {
+	const m = saeparams.TargetBlockBytes
 
 	tests := []struct {
 		name          string
-		tx            *types.Transaction
+		size          uint64
 		blockGasLimit uint64
-		want          bool
+		want          uint64
 	}{
 		{
-			name:          "atBoundary",
-			tx:            tx,
-			blockGasLimit: boundary,
-			want:          true,
+			name:          "exactDivision",
+			size:          m,
+			blockGasLimit: 42,
+			want:          42,
 		},
 		{
-			name:          "blockGasLimitOneOver",
-			tx:            tx,
-			blockGasLimit: boundary + 1,
-		},
-		{
-			name:          "blockGasLimitHalved",
-			tx:            tx,
-			blockGasLimit: boundary / 2,
-			want:          true,
-		},
-		{
-			name:          "overflowingProductRejected",
-			tx:            tx,
-			blockGasLimit: math.MaxUint64,
-		},
-		{
-			name:          "overflowingProductAccepted",
-			tx:            maxGasTx,
+			name:          "roundsUp",
+			size:          1,
 			blockGasLimit: 1,
-			want:          true,
+			want:          1,
+		},
+		{
+			name:          "halfBlockBytes",
+			size:          m / 2,
+			blockGasLimit: 100,
+			want:          50,
+		},
+		{
+			name:          "resultOverflowsUint64",
+			size:          m + 1,
+			blockGasLimit: math.MaxUint64,
+			want:          math.MaxUint64,
 		},
 		{
 			name: "zeroBlockGasLimit",
-			tx:   tx,
+			size: 1,
+			want: math.MaxUint64,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.tx.Gas() >= minGasForSize(tt.tx.Size(), tt.blockGasLimit)
-			require.Equalf(
-				t, tt.want, got,
-				"tx.Gas()=%d >= minGasForSize(size=%d, blockGasLimit=%d)",
-				tt.tx.Gas(), tt.tx.Size(), tt.blockGasLimit,
-			)
+			got := minGasForSize(tt.size, tt.blockGasLimit)
+			require.Equal(t, tt.want, got, "minGasForSize(%d, %d)", tt.size, tt.blockGasLimit)
 		})
 	}
 }
