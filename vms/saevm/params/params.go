@@ -41,10 +41,17 @@ const MaxFullBlocksInClosedQueue = MaxFullBlocksInOpenQueue + 1
 // drains the queue at least as fast as the gas capacity rate R.
 const MaxQueueWallTime = MaxFullBlocksInClosedQueue * Tau * Lambda
 
-// MaxBlockTxBytes is the maximum cumulative serialized size of a block's
-// transactions. The block builder enforces it as a byte budget and the mempool
-// uses it as the normalizer of its gas-per-byte admission rule. The somewhat
-// arbitrary 512 KiB margin below the 2 MiB message size (mirroring
-// constants.DefaultMaxMessageSize) comfortably covers all non-transaction
-// block and wire bytes, keeping blocks gossipable in a single message.
-const MaxBlockTxBytes = 2*units.MiB - 512*units.KiB
+// MaxBlockBytes is the hard maximum block size allowed during verification.
+//
+// The 2 MiB value matches the constants.DefaultMaxMessageSize, while the
+// 256 KiB subtraction is a safety margin to allow things like the proto
+// serialization overhead and the proposervm block header.
+const MaxBlockBytes = 2*units.MiB - 256*units.KiB
+
+// TargetBlockBytes is the target block size used during block building.
+//
+// The 256 KiB subtraction allows for minor inaccuracies while calculating
+// intermediate block sizes while building.
+//
+// Changing this value IS NOT a consensus-breaking change.
+const TargetBlockBytes = MaxBlockBytes - 256*units.KiB
