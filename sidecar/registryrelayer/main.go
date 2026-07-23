@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/sidecar/internal/relayer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -42,6 +43,7 @@ func main() {
 	besuRPC := flag.String("besu-rpc", "http://127.0.0.1:9545", "external EVM chain JSON-RPC endpoint")
 	txHashHex := flag.String("tx", "", "C-Chain tx hash of the Teleporter send (required)")
 	teleporterStr := flag.String("teleporter", "", "TeleporterMessengerV2 address (same on both chains) (required)")
+	registryStr := flag.String("registry", "", "SubsetUpdater registry address on the external chain (required)")
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
 	validatorList := flag.String("validators", "", "comma-separated primary-network validator staking addresses (default: discovered via the info API on --avalanche-uri)")
 	besuKeyHex := flag.String("besu-key", "", "funded external-chain private key, hex (required)")
@@ -52,8 +54,8 @@ func main() {
 	}
 
 	for name, v := range map[string]string{
-		"tx": *txHashHex, "teleporter": *teleporterStr, "teleporter-abi": *teleporterArtifact,
-		"besu-key": *besuKeyHex,
+		"tx": *txHashHex, "teleporter": *teleporterStr, "registry": *registryStr,
+		"teleporter-abi": *teleporterArtifact, "besu-key": *besuKeyHex,
 	} {
 		if v == "" {
 			log.Fatalf("--%s is required", name)
@@ -91,6 +93,57 @@ func main() {
 	}
 	log.Printf("primary network: %d validators, total weight %d", len(warpSet.Validators), warpSet.TotalWeight)
 
+	// ---- 2b. The registry's REGISTERED set — the array the contract applies
+	// the signature bitset to. Indexes, weights, and the quorum denominator
+	// must come from here, not the current P-Chain set: primary-set churn
+	// after registration would otherwise shift every index and fail
+	// verification on the external chain (fail-closed, but bricked).
+	reg, err := fetchRegisteredSet(ctx, *besuRPC, common.HexToAddress(*registryStr), [32]byte(cChainID))
+	if err != nil {
+		log.Fatalf("read registered set: %v", err)
+	}
+	// Attribute signature responses to stored indexes by mapping each stored
+	// key to the node IDs currently serving it. Stored validators no longer
+	// in the current set get no node IDs — they cannot sign, and their weight
+	// is the drift the quorum check surfaces.
+	nodeIDsByKey := make(map[string][]ids.NodeID, len(vdrMap))
+	for nodeID, v := range vdrMap {
+		if v.PublicKey == nil {
+			continue
+		}
+		k := string(bls.PublicKeyToUncompressedBytes(v.PublicKey))
+		nodeIDsByKey[k] = append(nodeIDsByKey[k], nodeID)
+	}
+	regSet := validators.WarpSet{TotalWeight: reg.TotalWeight}
+	live := 0
+	for i, v := range reg.Validators {
+		// The contract stores keys in the EIP-2537 padded G1 encoding (two
+		// 64-byte field elements, each left-padded with 16 zero bytes);
+		// convert back to the 96-byte uncompressed form the BLS library uses.
+		if len(v.BlsPublicKey) != 128 {
+			log.Fatalf("registered key %d: unexpected length %d (want 128, EIP-2537 padded)", i, len(v.BlsPublicKey))
+		}
+		key96 := make([]byte, 0, 96)
+		key96 = append(key96, v.BlsPublicKey[16:64]...)
+		key96 = append(key96, v.BlsPublicKey[80:128]...)
+		pk := bls.PublicKeyFromValidUncompressedBytes(key96)
+		if pk == nil {
+			log.Fatalf("registered key %d does not parse as a BLS public key", i)
+		}
+		nodeIDs := nodeIDsByKey[string(key96)]
+		if len(nodeIDs) > 0 {
+			live++
+		}
+		regSet.Validators = append(regSet.Validators, &validators.Warp{
+			PublicKey:      pk,
+			PublicKeyBytes: key96,
+			Weight:         v.Weight,
+			NodeIDs:        nodeIDs,
+		})
+	}
+	log.Printf("registered set: %d validators @ P-height %d (weight %d), %d still active in the current set",
+		len(reg.Validators), reg.PChainHeight, reg.TotalWeight, live)
+
 	// ---- 3. ACP-118 signature requests to the primary validators ----
 	// Staking addresses come from --validators when given; otherwise they are
 	// discovered from the queried node (itself + its peers, filtered to the
@@ -111,13 +164,13 @@ func main() {
 	prefix := p2p.ProtocolPrefix(acp118.HandlerID)
 	sigs := relayer.CollectSignatures(ctx, networkID, cChainID, prefix, unsigned, nil, validatorAddrs)
 
-	// ---- 4. Verify + aggregate to quorum ----
-	signerBits, agg, _, pct, err := relayer.VerifyAndAggregate(warpSet, sigs, unsigned, "validator")
+	// ---- 4. Verify + aggregate to quorum (against the REGISTERED set) ----
+	signerBits, agg, _, pct, err := relayer.VerifyAndAggregate(regSet, sigs, unsigned, "validator")
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
-	log.Printf("quorum reached: %d/%d validators, %.0f%% weight",
-		signerBits.Len(), len(warpSet.Validators), pct)
+	log.Printf("quorum reached: %d/%d registered validators, %.0f%% weight",
+		signerBits.Len(), len(regSet.Validators), pct)
 
 	// Registry attestation format: raw signers bitset || uncompressed (192-byte) BLS signature.
 	attestation := append(signerBits.Bytes(), agg.Serialize()...)

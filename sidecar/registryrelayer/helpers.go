@@ -5,10 +5,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"os"
 	"strings"
 
+	"github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -81,6 +83,70 @@ func fetchCChainSend(
 		return nil, nil, fmt.Errorf("no SendCrossChainMessage log from teleporter %s in tx", teleporter)
 	}
 	return unsigned, msg, nil
+}
+
+// --- Registered validator set (the registry's stored snapshot) ---
+
+// registeredValidator is one entry of the registry's stored set: a 96-byte
+// uncompressed BLS public key and its stake weight.
+type registeredValidator struct {
+	BlsPublicKey []byte
+	Weight       uint64
+}
+
+type registeredSet struct {
+	AvalancheBlockchainID [32]byte
+	Validators            []registeredValidator
+	TotalWeight           uint64
+	PChainHeight          uint64
+	PChainTimestamp       uint64
+}
+
+// validatorSetDecoderABI decodes SubsetUpdater.getValidatorSet's ValidatorSet
+// return value.
+var validatorSetDecoderABI = func() abi.ABI {
+	const j = `[{"type":"function","name":"d","inputs":[],"outputs":[{"name":"s","type":"tuple","components":[` +
+		`{"name":"avalancheBlockchainID","type":"bytes32"},` +
+		`{"name":"validators","type":"tuple[]","components":[{"name":"blsPublicKey","type":"bytes"},{"name":"weight","type":"uint64"}]},` +
+		`{"name":"totalWeight","type":"uint64"},` +
+		`{"name":"pChainHeight","type":"uint64"},` +
+		`{"name":"pChainTimestamp","type":"uint64"}]}]}]`
+	parsed, err := abi.JSON(strings.NewReader(j))
+	if err != nil {
+		log.Fatalf("build validator set decoder ABI: %v", err)
+	}
+	return parsed
+}()
+
+// fetchRegisteredSet reads the registry's stored validator set for the given
+// source chain. Signature bitset indexes MUST be computed against this array —
+// the contract applies the bitset to its own storage, so deriving indexes from
+// the current P-Chain set diverges as soon as the primary set churns
+// (registration-time snapshot vs now).
+func fetchRegisteredSet(
+	ctx context.Context,
+	besuRPC string,
+	registry common.Address,
+	chainID [32]byte,
+) (*registeredSet, error) {
+	client, err := ethclient.Dial(besuRPC)
+	if err != nil {
+		return nil, fmt.Errorf("dial external chain: %w", err)
+	}
+	selector := crypto.Keccak256([]byte("getValidatorSet(bytes32)"))[:4]
+	data := append(selector, chainID[:]...)
+	out, err := client.CallContract(ctx, ethereum.CallMsg{To: &registry, Data: data}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getValidatorSet: %w", err)
+	}
+	var res struct{ S registeredSet }
+	if err := validatorSetDecoderABI.UnpackIntoInterface(&res, "d", out); err != nil {
+		return nil, fmt.Errorf("decode ValidatorSet: %w", err)
+	}
+	if len(res.S.Validators) == 0 {
+		return nil, fmt.Errorf("registry %s has no registered set for chain %x", registry, chainID)
+	}
+	return &res.S, nil
 }
 
 // --- Delivery to the external chain ---
