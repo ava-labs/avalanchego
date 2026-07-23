@@ -9,6 +9,7 @@
 package evmrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -148,7 +149,7 @@ func (v *EVMVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, jus
 		if err != nil {
 			return fmt.Errorf("failed to decode log data: %w", err)
 		}
-		if bytesEqual(data, msg.Payload) {
+		if bytes.Equal(data, msg.Payload) {
 			return nil
 		}
 	}
@@ -174,16 +175,4 @@ func (v *EVMVerifier) checkFinality(ctx context.Context, blockNumber uint64) err
 
 func hexBytes(s string) ([]byte, error) {
 	return hex.DecodeString(strings.TrimPrefix(s, "0x"))
-}
-
-func bytesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
