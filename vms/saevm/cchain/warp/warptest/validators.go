@@ -7,7 +7,6 @@ package warptest
 
 import (
 	"context"
-	"encoding/binary"
 	"testing"
 
 	"github.com/ava-labs/libevm/libevm/options"
@@ -58,22 +57,10 @@ func WithNodeIDs(nodeIDs ...ids.NodeID) Option {
 	})
 }
 
-// newSigner derives the i'th validator's BLS signer from i so that the set's
-// keys, and any warp messages it signs, are reproducible across runs.
-func newSigner(tb testing.TB, i int) bls.Signer {
-	tb.Helper()
-
-	var skBytes [32]byte
-	binary.BigEndian.PutUint64(skBytes[24:], uint64(i)+1) //#nosec G115 -- Won't overflow; +1 avoids invalid scalar 0
-	sk, err := localsigner.FromBytes(skBytes[:])
-	require.NoError(tb, err, "localsigner.FromBytes(scalar=%d)", i+1)
-	return sk
-}
-
 // NewValidators creates a BLS warp validator set, each validator with weight 1
-// and a BLS key derived deterministically from its index. The number of
-// validators is the larger of the count set by [WithMinimum] and the number of
-// NodeIDs. Any unspecified NodeIDs are freshly generated.
+// and a freshly generated BLS key. The number of validators is the larger of
+// the count set by [WithMinimum] and the number of NodeIDs. Any unspecified
+// NodeIDs are freshly generated.
 func NewValidators(tb testing.TB, opts ...Option) *Validators {
 	tb.Helper()
 
@@ -88,7 +75,9 @@ func NewValidators(tb testing.TB, opts ...Option) *Validators {
 		signers = make(map[string]bls.Signer, n)
 	)
 	for i, nodeID := range c.nodeIDs {
-		signer := newSigner(tb, i)
+		signer, err := localsigner.New()
+		require.NoError(tb, err, "localsigner.New()")
+
 		pk := signer.PublicKey()
 		pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 		vdrs[i] = &validators.Warp{

@@ -95,6 +95,7 @@ type SUT struct {
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
+	clock     *saetest.Clock
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -106,7 +107,7 @@ type (
 		nodeID     ids.NodeID
 		networkID  uint32
 		validators *warptest.Validators
-		now        func() time.Time
+		clock      *saetest.Clock
 		vmConfig   config
 		db         database.Database
 		state      snow.State
@@ -222,11 +223,13 @@ func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
 
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
-// the test move the clock forward (e.g. past Tau to settle a block).
+// the test move the clock forward (e.g. past Tau to settle a block). It also
+// makes [SUT.waitForPendingTxs] automatically advance the clock past the
+// ACP-226 min-delay pacing timer; see [SUT.unblockWaitForEvent].
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		cfg.now = c.Now
+		cfg.clock = c
 	})
 	return opt, c
 }
@@ -284,7 +287,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb),
-			now:        time.Now,
+			clock:      saetest.NewClock(testStartTime, time.Millisecond),
 			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
@@ -293,7 +296,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
-			now:              cfg.now,
+			now:              cfg.clock.Now,
 		}
 		db = cfg.db
 	)
@@ -358,6 +361,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		memory:    memory,
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:     cfg.clock,
 	}
 
 	if !cfg.skipRPCTransport {
@@ -606,9 +610,18 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
+// unblockWaitForEvent advances the [withVMTime] clock to ensure that
+// [VM.WaitForEvent] will not throttle for ACP-226 delays.
+func (s *SUT) unblockWaitForEvent() {
+	if t := earliestBuildTime(s.VM.VM.GetPreference()); s.clock.Now().Before(t) {
+		s.clock.Set(t)
+	}
+}
+
 func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	tb.Helper()
 
+	s.unblockWaitForEvent()
 	e, err := s.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
@@ -1812,15 +1825,20 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 // block marks the warp precompile's account as non-empty when the genesis
 // predates Durango.
 func TestWarpPrecompileActivation(t *testing.T) {
+	const upgradeThreshold = 5 * time.Second
 	key := txtest.NewKey(t)
+	timeOpt, vmTime := withVMTime(upgrade.InitiallyActiveTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(5*time.Second)),
+		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(upgradeThreshold)),
+		timeOpt,
 	)
 
 	genesisState, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
 	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+
+	vmTime.Advance(upgradeThreshold) // activate Durango in next block
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	sut.issueAndExecute(ctx, t, stx)
