@@ -142,8 +142,8 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-// RegisterCreateL1TxTypes registers CreateL1Tx.
-// TODO: update to the correct upgrade name once the target upgrade is finalized.
-func RegisterCreateL1TxTypes(targetCodec linearcodec.Codec) error {
+// RegisterIglooTypes registers the type information for transactions that
+// were valid during the Igloo series of upgrades.
+func RegisterIglooTypes(targetCodec linearcodec.Codec) error {
 	return targetCodec.RegisterType(&CreateL1Tx{})
 }

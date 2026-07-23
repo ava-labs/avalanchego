@@ -37,7 +37,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
-			RegisterCreateL1TxTypes(c),
+			RegisterIglooTypes(c),
 		)
 	}
 
@@ -95,8 +95,8 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
 }
 
-// RegisterCreateL1TxTypes registers CreateL1Tx for block serialization.
-// TODO: update to the correct upgrade name once the target upgrade is finalized.
-func RegisterCreateL1TxTypes(targetCodec linearcodec.Codec) error {
-	return txs.RegisterCreateL1TxTypes(targetCodec)
+// RegisterIglooTypes registers the type information for blocks that were
+// valid during the Igloo series of upgrades.
+func RegisterIglooTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterIglooTypes(targetCodec)
 }
