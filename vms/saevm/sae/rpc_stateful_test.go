@@ -101,10 +101,28 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
+// txTraceResult is [tracers.TxTraceResult] with Result typed rather than
+// `any`, which would JSON-unmarshal into a map.
+type txTraceResult struct {
+	TxHash common.Hash             `json:"txHash"`
+	Result *logger.ExecutionResult `json:"result"`
+	Error  string                  `json:"error"`
+}
+
+// onlyLOG1At returns cmp options comparing only the LOG1 [logger.StructLogRes]
+// at pc, ignoring its Gas and GasCost. It fails tb if code[pc] isn't LOG1.
+func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
+	tb.Helper()
+	require.Equalf(tb, vm.LOG1, vm.OpCode(code[pc]), "Bad test setup; opcode at program counter %d", pc)
+	return cmp.Options{
+		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
+			return r.Pc != pc || r.Op != vm.LOG1.String()
+		}),
+		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
+	}
+}
+
 func TestDebugTrace(t *testing.T) {
-	// TODO(JonathanOppenheimer): add a fee-sensitive case. The current
-	// tests only assert fee-insensitive fields, leaving the SAE-era replay
-	// base fee unpinned. This has missed multiple bugs.
 	ctx, sut := newSUT(t, 2)
 
 	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
@@ -113,25 +131,12 @@ func TestDebugTrace(t *testing.T) {
 	recipient := common.Address{'r', 'e', 'c', 'v'}
 	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
-	// Specifying the entire trace would be excessive and uninformative so we
-	// select a precise location of an event associated with the deposit()
-	// function on the contract.
+	// The full trace would be excessive and uninformative, so pin only the
+	// LOG1 for `emit Deposit()`.
 	const logPC = 185
-	require.Equal(t, vm.LOG1, vm.OpCode(escrow.ByteCode()[logPC]), "Bad test setup; program counter LOG1 for `emit Deposit()`")
-	ignore := cmp.Options{
-		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
-			return r.Pc != logPC || r.Op != vm.LOG1.String()
-		}),
-		// Any precise amount of gas left at the time of OpCode execution would
-		// be copy-pasted from the test output.
-		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
-	}
+	ignore := onlyLOG1At(t, escrow.ByteCode(), logPC)
 
-	want := []struct {
-		TxHash common.Hash             `json:"txHash"`
-		Result *logger.ExecutionResult `json:"result"`
-		Error  string                  `json:"error"`
-	}{
+	want := []txTraceResult{
 		{
 			TxHash: deployTx.Hash(),
 			Result: &logger.ExecutionResult{
@@ -309,6 +314,76 @@ func TestDebugTrace(t *testing.T) {
 		}
 		assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace of `emit Deposit()`", vm.LOG1)
 	})
+}
+
+// TestDebugTraceFeeSensitive pins the base fee used when the debug APIs
+// replay transactions, by tracing a contract that logs BASEFEE. The setup
+// distinguishes the executed base fee from the parent's and the consensus
+// header's, which a buggy replay might source instead.
+func TestDebugTraceFeeSensitive(t *testing.T) {
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
+
+	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
+	logPC := uint64(len(code) - 2)
+	ignore := onlyLOG1At(t, code, logPC)
+
+	newCreateTx := func() *types.Transaction {
+		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			Gas:       1e6, // inflates the next block's worst-case fee bound
+			GasFeeCap: big.NewInt(2 * params.GWei),
+			Data:      code,
+		})
+	}
+
+	parent := sut.runConsensusLoop(t, newCreateTx())
+	// One second decays the large-excess base fee by ~1%.
+	vmTime.Advance(time.Second)
+	b := sut.runConsensusLoop(t, newCreateTx())
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	// If these coincided with the executed fee, a replay sourcing the wrong
+	// one would go undetected.
+	baseFee := b.ExecutedBaseFee()
+	require.NotZerof(t, baseFee.ToBig().Cmp(b.EthBlock().BaseFee()), "%T.ExecutedBaseFee() = consensus header's worst-case base fee (%v); fees MUST differ to be pinned", b, baseFee)
+	require.NotZerof(t, baseFee.Cmp(parent.ExecutedBaseFee()), "%T.ExecutedBaseFee() = parent's executed base fee (%v); fees MUST differ to be pinned", b, baseFee)
+
+	receipts := b.Receipts()
+	require.Lenf(t, receipts, 1, "%T.Receipts()", b)
+	txHash := b.Transactions()[0].Hash()
+
+	want := logger.ExecutionResult{
+		Gas: receipts[0].GasUsed,
+		StructLogs: []logger.StructLogRes{{
+			Pc:    logPC,
+			Op:    vm.LOG1.String(),
+			Depth: 1,
+			Stack: utils.PointerTo([]string{
+				baseFee.Hex(),
+				"0x0", "0x0", // LOG1's size and offset
+			}),
+		}},
+	}
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			// Re-derives the base fee by replaying the block's execution.
+			method:       "debug_traceTransaction",
+			args:         []any{txHash},
+			want:         want,
+			extraCmpOpts: ignore,
+		},
+		{
+			// Sources the base fee from the stored execution artefacts.
+			method: "debug_traceBlockByNumber",
+			args:   []any{hexutil.Uint64(b.NumberU64())},
+			want: []txTraceResult{{
+				TxHash: txHash,
+				Result: &want,
+			}},
+			extraCmpOpts: ignore,
+		},
+	}...)
 }
 
 // TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
