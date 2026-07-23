@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -138,8 +139,9 @@ type Syncer[R any, C any] struct {
 	syncing   bool
 	closeOnce sync.Once
 
-	stateSyncNodeIdx uint32
-	metrics          SyncMetrics
+	stateSyncNodeIdx     uint32
+	requestByteSizeLimit uint32
+	metrics              SyncMetrics
 }
 
 // TODO remove non-config values out of this struct
@@ -152,6 +154,10 @@ type Config[R any, C any] struct {
 	TargetRoot            ids.ID
 	EmptyRoot             ids.ID
 	StateSyncNodes        []ids.NodeID
+	// MaxMessageSize bounds proof responses. A value of zero uses the default
+	// P2P message size. For an elevated value, StateSyncNodes must identify
+	// peers configured for an equally large P2P frame.
+	MaxMessageSize uint32
 }
 
 func NewSyncer[R any, C any](
@@ -174,18 +180,27 @@ func NewSyncer[R any, C any](
 		return nil, ErrZeroWorkLimit
 	}
 
+	if config.MaxMessageSize == 0 {
+		config.MaxMessageSize = constants.DefaultMaxMessageSize
+	}
+	requestByteSizeLimit, err := proofByteSizeLimit(config.MaxMessageSize)
+	if err != nil {
+		return nil, err
+	}
+
 	metrics, err := NewMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
 
 	s := &Syncer[R, C]{
-		db:              db,
-		config:          config,
-		doneChan:        make(chan struct{}),
-		unprocessedWork: newWorkHeap(),
-		processedWork:   newWorkHeap(),
-		metrics:         metrics,
+		db:                   db,
+		config:               config,
+		doneChan:             make(chan struct{}),
+		unprocessedWork:      newWorkHeap(),
+		processedWork:        newWorkHeap(),
+		requestByteSizeLimit: requestByteSizeLimit,
+		metrics:              metrics,
 	}
 	s.unprocessedWorkCond = lock.NewCond(&s.workLock)
 
@@ -405,7 +420,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		StartKey:      protoutils.MaybeToProto(work.start),
 		EndKey:        protoutils.MaybeToProto(work.end),
 		KeyLimit:      DefaultRequestKeyLimit,
-		BytesLimit:    DefaultRequestByteSizeLimit,
+		BytesLimit:    s.requestByteSizeLimit,
 	}
 	request := &pb.ProofRequest{
 		Request: &pb.ProofRequest_ChangeProof{ChangeProof: changeReq},
@@ -460,7 +475,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		StartKey:   protoutils.MaybeToProto(work.start),
 		EndKey:     protoutils.MaybeToProto(work.end),
 		KeyLimit:   DefaultRequestKeyLimit,
-		BytesLimit: DefaultRequestByteSizeLimit,
+		BytesLimit: s.requestByteSizeLimit,
 	}
 	request := &pb.ProofRequest{
 		Request: &pb.ProofRequest_RangeProof{RangeProof: rangeReq},

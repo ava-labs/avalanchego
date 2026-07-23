@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
@@ -38,6 +39,12 @@ type proofDouble struct {
 
 var _ Marshaler[*proofDouble] = marshaler{}
 
+type sizedMarshaler struct {
+	size int
+}
+
+var _ Marshaler[*proofDouble] = sizedMarshaler{}
+
 func (marshaler) Marshal(p *proofDouble) ([]byte, error) {
 	return p.newRoot[:], nil
 }
@@ -48,6 +55,14 @@ func (marshaler) Unmarshal(b []byte) (*proofDouble, error) {
 		return nil, err
 	}
 	return &proofDouble{newRoot: newRoot}, nil
+}
+
+func (m sizedMarshaler) Marshal(*proofDouble) ([]byte, error) {
+	return make([]byte, m.size), nil
+}
+
+func (sizedMarshaler) Unmarshal([]byte) (*proofDouble, error) {
+	return &proofDouble{}, nil
 }
 
 type db struct {
@@ -100,6 +115,90 @@ func (*db) VerifyChangeProof(ctx context.Context, proof *proofDouble, start mayb
 //nolint:revive // unused parameter clarifies method signature
 func (*db) VerifyRangeProof(ctx context.Context, proof *proofDouble, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
 	return nil
+}
+
+func TestNewSyncerMaxMessageSize(t *testing.T) {
+	tests := map[string]struct {
+		maxMessageSize uint32
+		want           uint32
+		wantErr        error
+	}{
+		"default": {
+			want: DefaultRequestByteSizeLimit,
+		},
+		"configured": {
+			maxMessageSize: 2 * constants.DefaultMaxMessageSize,
+			want:           2*constants.DefaultMaxMessageSize - estimatedMessageOverhead,
+		},
+		"too small": {
+			maxMessageSize: estimatedMessageOverhead,
+			wantErr:        errMaxMessageSizeTooSmall,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			syncer, err := NewSyncer(
+				&db{},
+				Config[*proofDouble, *proofDouble]{
+					RangeProofMarshaler:   marshaler{},
+					ChangeProofMarshaler:  marshaler{},
+					ProofClient:           p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, p2p.TestHandler{}),
+					SimultaneousWorkLimit: 1,
+					Log:                   logging.NoLog{},
+					MaxMessageSize:        test.maxMessageSize,
+				},
+				prometheus.NewRegistry(),
+			)
+			if test.wantErr != nil {
+				require.ErrorIs(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.want, syncer.requestByteSizeLimit)
+		})
+	}
+}
+
+func TestNewProofHandlerWithMaxMessageSize(t *testing.T) {
+	const maxMessageSize = 2 * constants.DefaultMaxMessageSize
+
+	handler, err := NewProofHandlerWithMaxMessageSize(
+		&db{},
+		marshaler{},
+		marshaler{},
+		maxMessageSize,
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint32(maxMessageSize-estimatedMessageOverhead), handler.maxByteSizeLimit)
+}
+
+func TestProofHandlerConfiguredMaxMessageSize(t *testing.T) {
+	const maxMessageSize = 2 * constants.DefaultMaxMessageSize
+
+	handler, err := NewProofHandlerWithMaxMessageSize(
+		&db{},
+		sizedMarshaler{size: DefaultRequestByteSizeLimit + 1},
+		marshaler{},
+		maxMessageSize,
+	)
+	require.NoError(t, err)
+
+	root := ids.GenerateTestID()
+	requestBytes, err := proto.Marshal(&pb.ProofRequest{
+		Request: &pb.ProofRequest_RangeProof{
+			RangeProof: &pb.RangeProofRequest{
+				RootHash:   root[:],
+				KeyLimit:   1,
+				BytesLimit: maxMessageSize - estimatedMessageOverhead,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	responseBytes, appErr := handler.AppRequest(t.Context(), ids.EmptyNodeID, time.Time{}, requestBytes)
+	require.Nil(t, appErr)
+	require.Greater(t, len(responseBytes), int(DefaultRequestByteSizeLimit))
 }
 
 func marshalRangeProofResponse(t *testing.T, p *proofDouble) []byte {
