@@ -414,6 +414,7 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 		})
 	}
 }
+
 func TestCreateL1ValidatorComplexity(t *testing.T) {
 	tests := []struct {
 		name     string

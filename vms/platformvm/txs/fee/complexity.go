@@ -266,12 +266,11 @@ var (
 		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
-	errUnsupportedOutput      = errors.New("unsupported output type")
-	errUnsupportedInput       = errors.New("unsupported input type")
-	errUnsupportedOwner       = errors.New("unsupported owner type")
-	errUnsupportedAuth        = errors.New("unsupported auth type")
-	errUnsupportedSigner      = errors.New("unsupported signer type")
-	errCreateL1TxNotSupported = errors.New("CreateL1Tx is not yet supported")
+	errUnsupportedOutput = errors.New("unsupported output type")
+	errUnsupportedInput  = errors.New("unsupported input type")
+	errUnsupportedOwner  = errors.New("unsupported owner type")
+	errUnsupportedAuth   = errors.New("unsupported auth type")
+	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
 func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
