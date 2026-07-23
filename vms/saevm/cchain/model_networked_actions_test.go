@@ -424,12 +424,17 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 	if nm.anyDelayed() {
 		return // siblings resolve atomically network-wide; keep queue semantics simple
 	}
-	jIdx := rapid.IntRange(0, nm.cfg.numValidators-1).Draw(rt, "builderA")
-	kIdx := rapid.IntRange(0, nm.cfg.numValidators-2).Draw(rt, "builderB")
+	// anyDelayed() == false here, so this is every validator — including a
+	// caught-up late joiner, which the nodes[:numValidators] prefix would
+	// miss. Draw ranges match the old numValidators-based ones in runs
+	// without a joiner, so existing failfiles replay identically.
+	vdrs := nm.nonDelayedValidators()
+	jIdx := rapid.IntRange(0, len(vdrs)-1).Draw(rt, "builderA")
+	kIdx := rapid.IntRange(0, len(vdrs)-2).Draw(rt, "builderB")
 	if kIdx >= jIdx {
 		kIdx++
 	}
-	j, k := nm.nodes[jIdx], nm.nodes[kIdx]
+	j, k := vdrs[jIdx], vdrs[kIdx]
 
 	if len(nm.m.pendingEth) == 0 && len(nm.m.pendingAtomic) == 0 {
 		richestIdx := nm.issueMinimalTransfer(rt, j.ctx, j.sut)

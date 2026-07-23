@@ -483,10 +483,12 @@ func (nm *networkedMachine) tipID() ids.ID {
 }
 
 // nonDelayedValidators returns build-eligible nodes in ascending index order.
+// Filtered on isValidator rather than the nodes[:numValidators] prefix: a
+// late-joining validator sits past the initial nodes.
 func (nm *networkedMachine) nonDelayedValidators() []*modelNode {
 	var out []*modelNode
-	for _, n := range nm.nodes[:nm.cfg.numValidators] {
-		if !n.delayed {
+	for _, n := range nm.nodes {
+		if n.isValidator && !n.delayed {
 			out = append(out, n)
 		}
 	}
