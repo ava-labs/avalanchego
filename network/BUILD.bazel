@@ -62,6 +62,7 @@ go_test(
         "example_test.go",
         "handler_test.go",
         "ip_tracker_test.go",
+        "large_message_config_test.go",
         "listener_test.go",
         "message_stacks_test.go",
         "network_test.go",

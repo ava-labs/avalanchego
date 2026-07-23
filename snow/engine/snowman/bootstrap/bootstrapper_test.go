@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -28,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -77,7 +77,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest
 
 	require.NoError(startupTracker.Connected(t.Context(), peer, version.Current))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, constants.MaxContainersLen, nil, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, network.LargeMessageConfig{}, ctx.Registerer)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
@@ -131,7 +131,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	startupTracker := tracker.NewStartup(tracker.NewPeers(), startupAlpha)
 	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, constants.MaxContainersLen, nil, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, network.LargeMessageConfig{}, ctx.Registerer)
 	require.NoError(err)
 
 	peerTracker, err := p2p.NewPeerTracker(
@@ -656,7 +656,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 	require.NoError(startupTracker.Connected(t.Context(), peer, version.Current))
 
-	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, constants.MaxContainersLen, nil, ctx.Registerer)
+	snowGetHandler, err := getter.New(vm, sender, ctx.Log, time.Second, 2000, network.LargeMessageConfig{}, ctx.Registerer)
 	require.NoError(err)
 
 	blk1 := snowmantest.BuildChild(snowmantest.Genesis)

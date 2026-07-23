@@ -1155,8 +1155,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
-			BootstrapMaxContainersBytes:             bootstrapMaxContainersBytes(n.Config.NetworkConfig.LargeMessageConfig),
-			BootstrapLargeMessagePeers:              n.Config.NetworkConfig.LargeMessageConfig.Allowlist,
+			BootstrapLargeMessageConfig:             n.Config.NetworkConfig.LargeMessageConfig,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
@@ -1174,14 +1173,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(n.APIServer)
 	return nil
-}
-
-func bootstrapMaxContainersBytes(config network.LargeMessageConfig) int {
-	maxMessageSize := uint64(constants.DefaultMaxMessageSize)
-	if config.Enabled {
-		maxMessageSize = uint64(config.MaxMessageSize)
-	}
-	return int(4 * maxMessageSize / 5)
 }
 
 // initVMs initializes the VMs Avalanche supports + any additional vms installed as plugins.

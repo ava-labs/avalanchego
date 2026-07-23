@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -31,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -92,8 +92,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *engine
 		config.Ctx.Log,
 		time.Second,
 		2000,
-		constants.MaxContainersLen,
-		nil,
+		network.LargeMessageConfig{},
 		config.Ctx.Registerer,
 	)
 	require.NoError(err)

@@ -8,6 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//network",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//utils/constants",
@@ -25,6 +26,7 @@ go_test(
     embed = [":getter"],
     deps = [
         "//ids",
+        "//network",
         "//snow/consensus/snowman",
         "//snow/consensus/snowman/snowmantest",
         "//snow/engine/common",
