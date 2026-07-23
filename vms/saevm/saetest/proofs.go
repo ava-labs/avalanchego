@@ -29,7 +29,9 @@ func VerifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	// valid exclusion proof
 	if len(accountRLP) == 0 {
 		assert.Zero(tb, proof.Balance.Sign(), "balance claimed for proven-absent account")
+		assert.Zero(tb, proof.CodeHash, "code hash claimed for proven-absent account")
 		assert.Zero(tb, proof.Nonce, "nonce claimed for proven-absent account")
+		assert.Zero(tb, proof.StorageHash, "storage root claimed for proven-absent account")
 		assert.Empty(tb, proof.StorageProof, "storage proofs claimed for proven-absent account")
 		return
 	}
@@ -48,6 +50,10 @@ func VerifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	}
 }
 
+// proveStorageValue proves the value of the storage slot key against the
+// storage root. Unlike [proveTrieValue], it never returns nil as a valid
+// exclusion proof yields zero. (This matches how eth_getProof reports absent
+// storage slots).
 func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes []string) *big.Int {
 	tb.Helper()
 
