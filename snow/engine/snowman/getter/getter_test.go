@@ -51,7 +51,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 		logging.NoLog{},
 		time.Second,
 		2000,
-		0,
+		constants.MaxContainersLen,
 		nil,
 		prometheus.NewRegistry(),
 	)
@@ -63,10 +63,11 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 func TestNewMaxContainersBytes(t *testing.T) {
 	tests := map[string]struct {
 		maxContainersBytes int
+		wantErr            error
 		want               int
 	}{
-		"uses default when unset": {
-			want: constants.MaxContainersLen,
+		"rejects unset limit": {
+			wantErr: errInvalidMaxContainersBytes,
 		},
 		"uses configured limit": {
 			maxContainersBytes: 4 * constants.MaxContainersLen,
@@ -86,6 +87,10 @@ func TestNewMaxContainersBytes(t *testing.T) {
 				nil,
 				prometheus.NewRegistry(),
 			)
+			if test.wantErr != nil {
+				require.ErrorIs(t, err, test.wantErr)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, test.want, handler.(*getter).maxContainersBytes)
 		})
