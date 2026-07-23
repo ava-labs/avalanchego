@@ -37,7 +37,7 @@ func TestMessageStacksResolve(t *testing.T) {
 		cfg,
 	)
 	require.NoError(t, err)
-	require.True(t, stacks.elevatedEnabled)
+	require.True(t, stacks.largeMessageConfig.Enabled)
 
 	defaultStack := stacks.Resolve(other)
 	require.Equal(t, uint32(constants.DefaultMaxMessageSize), defaultStack.MaxFrameSize)
@@ -55,6 +55,37 @@ func TestMessageStacksResolve(t *testing.T) {
 	// elevated peer would inherit the default frame limit.
 	require.NotEqual(t, stacks.Default.MessageCreator, stacks.Elevated.MessageCreator)
 	require.NotEqual(t, stacks.Default.MaxFrameSize, stacks.Elevated.MaxFrameSize)
+}
+
+func TestMessageStacksResolveAll(t *testing.T) {
+	vdrs := validators.NewManager()
+	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
+	require.NoError(t, err)
+	cfg.LargeMessageConfig = LargeMessageConfig{
+		Enabled:        true,
+		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
+		AllowAll:       true,
+		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
+	}
+
+	stacks, err := newMessageStacks(
+		logging.NoLog{},
+		prometheus.NewRegistry(),
+		cfg.Validators,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	for _, nodeID := range []ids.NodeID{
+		ids.GenerateTestNodeID(),
+		ids.GenerateTestNodeID(),
+	} {
+		elevatedStack := stacks.Resolve(nodeID)
+		require.Equal(t, cfg.LargeMessageConfig.MaxMessageSize, elevatedStack.MaxFrameSize)
+		require.Equal(t, stacks.Elevated.MessageCreator, elevatedStack.MessageCreator)
+		require.Equal(t, stacks.Elevated.InboundMsgThrottler, elevatedStack.InboundMsgThrottler)
+		require.Equal(t, stacks.Elevated.OutboundThrottler, elevatedStack.OutboundThrottler)
+	}
 }
 
 // TestMsgCreatorUsesElevatedWhenEnabled verifies the node-wide creator returns
@@ -78,7 +109,7 @@ func TestMsgCreatorUsesElevatedWhenEnabled(t *testing.T) {
 		cfg,
 	)
 	require.NoError(t, err)
-	require.True(t, stacks.elevatedEnabled)
+	require.True(t, stacks.largeMessageConfig.Enabled)
 	require.Equal(t, stacks.Elevated.MessageCreator, stacks.MsgCreator())
 	require.NotEqual(t, stacks.Default.MessageCreator, stacks.MsgCreator())
 }
@@ -97,7 +128,7 @@ func TestMsgCreatorUsesDefaultWhenDisabled(t *testing.T) {
 		cfg,
 	)
 	require.NoError(t, err)
-	require.False(t, stacks.elevatedEnabled)
+	require.False(t, stacks.largeMessageConfig.Enabled)
 	require.Equal(t, stacks.Default.MessageCreator, stacks.MsgCreator())
 }
 
@@ -117,6 +148,6 @@ func TestMessageStacksDisabledWhenAllowlistEmpty(t *testing.T) {
 		cfg,
 	)
 	require.NoError(t, err)
-	require.False(t, stacks.elevatedEnabled)
+	require.False(t, stacks.largeMessageConfig.Enabled)
 	require.Equal(t, stacks.Default, stacks.Resolve(ids.GenerateTestNodeID()))
 }

@@ -102,12 +102,13 @@ var (
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 
-	errLargeMessageFlagsTogether = fmt.Errorf("%q and %q must be set together", NetworkLargeMessageSizeKey, NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeTooLarge  = fmt.Errorf("%s must be <= %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
-	errLargeMessageSizeTooSmall  = fmt.Errorf("%s must be >= %d KiB", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
-	errLargeMessagePeerIDsEmpty  = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeIsDefault = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkLargeMessageSizeKey)
-	errParseLargeMessagePeerID   = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
+	errLargeMessageFlagsTogether        = fmt.Errorf("%q and %q must be set together", NetworkLargeMessageSizeKey, NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeTooLarge         = fmt.Errorf("%s must be <= %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
+	errLargeMessageSizeTooSmall         = fmt.Errorf("%s must be >= %d KiB", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
+	errLargeMessagePeerIDsEmpty         = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
+	errLargeMessagePeerIDsWildcardAlone = fmt.Errorf("%s wildcard must be the only value", NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeIsDefault        = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkLargeMessageSizeKey)
+	errParseLargeMessagePeerID          = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -587,21 +588,32 @@ func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
 	}
 
 	idSlice := v.GetStringSlice(NetworkLargeMessagePeerIDsKey)
-	allowlist := set.NewSet[ids.NodeID](len(idSlice))
-	for _, idStr := range idSlice {
-		idStr = strings.TrimSpace(idStr)
-		if idStr == "" {
-			continue
+	var (
+		allowAll  bool
+		allowlist set.Set[ids.NodeID]
+	)
+	if len(idSlice) > 0 && strings.TrimSpace(idSlice[0]) == "*" {
+		if len(idSlice) != 1 {
+			return network.LargeMessageConfig{}, errLargeMessagePeerIDsWildcardAlone
 		}
-		nodeID, err := ids.NodeIDFromString(idStr)
-		if err != nil {
-			return network.LargeMessageConfig{}, fmt.Errorf("%w %q: %w", errParseLargeMessagePeerID, idStr, err)
+		allowAll = true
+	} else {
+		allowlist = set.NewSet[ids.NodeID](len(idSlice))
+		for _, idStr := range idSlice {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+			nodeID, err := ids.NodeIDFromString(idStr)
+			if err != nil {
+				return network.LargeMessageConfig{}, fmt.Errorf("%w %q: %w", errParseLargeMessagePeerID, idStr, err)
+			}
+			allowlist.Add(nodeID)
 		}
-		allowlist.Add(nodeID)
 	}
 
 	switch {
-	case allowlist.Len() == 0:
+	case !allowAll && allowlist.Len() == 0:
 		return network.LargeMessageConfig{}, errLargeMessagePeerIDsEmpty
 	case maxSizeKiB == defaultMaxMessageSizeKiB:
 		return network.LargeMessageConfig{}, errLargeMessageSizeIsDefault
@@ -615,6 +627,7 @@ func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
 	return network.LargeMessageConfig{
 		Enabled:        true,
 		MaxMessageSize: uint32(maxSize),
+		AllowAll:       allowAll,
 		Allowlist:      allowlist,
 		Throttler:      throttler,
 	}, nil

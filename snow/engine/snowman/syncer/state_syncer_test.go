@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -53,8 +53,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		logging.NoLog{},
 		time.Second,
 		2000,
-		constants.MaxContainersLen,
-		nil,
+		network.LargeMessageConfig{},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -84,8 +83,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		logging.NoLog{},
 		time.Second,
 		2000,
-		constants.MaxContainersLen,
-		nil,
+		network.LargeMessageConfig{},
 		prometheus.NewRegistry())
 	require.NoError(err)
 

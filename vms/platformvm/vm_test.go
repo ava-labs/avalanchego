@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -1276,8 +1277,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		ctx.Log,
 		time.Second,
 		2000,
-		constants.MaxContainersLen,
-		nil,
+		network.LargeMessageConfig{},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

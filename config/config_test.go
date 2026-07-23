@@ -1341,6 +1341,7 @@ func TestGetLargeMessageConfig(t *testing.T) {
 		wantErr          error
 		wantEnabled      bool
 		wantMaxSize      uint32
+		wantAllowAll     bool
 		wantAllowlistLen int
 	}{
 		{
@@ -1366,6 +1367,21 @@ func TestGetLargeMessageConfig(t *testing.T) {
 			wantEnabled:      true,
 			wantMaxSize:      2 * constants.DefaultMaxMessageSize,
 			wantAllowlistLen: 1,
+		},
+		{
+			name:             "wildcard enables all peers",
+			maxSizeKiB:       ptr(2 * defaultKiB),
+			peerIDs:          &[]string{"*"},
+			wantEnabled:      true,
+			wantMaxSize:      2 * constants.DefaultMaxMessageSize,
+			wantAllowAll:     true,
+			wantAllowlistLen: 0,
+		},
+		{
+			name:       "wildcard with peer ids",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{"*", validID.String()},
+			wantErr:    errLargeMessagePeerIDsWildcardAlone,
 		},
 		{
 			name:       "size below default",
@@ -1426,6 +1442,7 @@ func TestGetLargeMessageConfig(t *testing.T) {
 			require.NoError(err)
 			require.Equal(tt.wantEnabled, cfg.Enabled)
 			require.Equal(tt.wantMaxSize, cfg.MaxMessageSize)
+			require.Equal(tt.wantAllowAll, cfg.AllowAll)
 			require.Equal(tt.wantAllowlistLen, cfg.Allowlist.Len())
 		})
 	}

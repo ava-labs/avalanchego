@@ -191,20 +191,39 @@ type Config struct {
 	LargeMessageConfig LargeMessageConfig `json:"largeMessageConfig"`
 }
 
-// LargeMessageConfig configures elevated max P2P message sizes for specific peers.
+// LargeMessageConfig configures elevated max P2P message sizes for selected peers.
 type LargeMessageConfig struct {
 	// Enabled is true when elevated P2P message sizes are configured for
-	// allowlisted peers.
+	// selected peers.
 	Enabled bool `json:"enabled"`
 
-	// MaxMessageSize is the elevated frame and codec size for allowlisted peers.
+	// MaxMessageSize is the elevated frame and codec size for selected peers.
 	MaxMessageSize uint32 `json:"maxMessageSize"`
 
-	// Allowlist is the set of peer node IDs that may use the elevated stack.
+	// AllowAll is true when every peer may use the elevated stack.
+	AllowAll bool `json:"-"`
+
+	// Allowlist is the set of peer node IDs that may use the elevated stack
+	// when AllowAll is false.
 	Allowlist set.Set[ids.NodeID] `json:"-"`
 
-	// Throttler configures elevated-stack throttler limits for allowlisted peers.
+	// Throttler configures elevated-stack throttler limits for selected peers.
 	Throttler LargeMessageThrottlerConfig `json:"throttlerConfig"`
+}
+
+// AppliesTo reports whether [nodeID] may use the elevated large-message stack.
+func (c LargeMessageConfig) AppliesTo(nodeID ids.NodeID) bool {
+	return c.AllowAll || c.Allowlist.Contains(nodeID)
+}
+
+// MaxAncestorsBytes returns the cumulative byte budget for a GetAncestors
+// response when large messages apply to the requesting peer.
+func (c LargeMessageConfig) MaxAncestorsBytes() int {
+	maxMessageSize := uint64(constants.DefaultMaxMessageSize)
+	if c.Enabled {
+		maxMessageSize = uint64(c.MaxMessageSize)
+	}
+	return int(4 * maxMessageSize / 5)
 }
 
 // LargeMessageThrottlerConfig configures the elevated peer stack's message

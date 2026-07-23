@@ -90,6 +90,7 @@ go_test(
         "//database/prefixdb",
         "//ids",
         "//message",
+        "//network",
         "//network/p2p",
         "//network/p2p/gossip",
         "//proto/pb/p2p",

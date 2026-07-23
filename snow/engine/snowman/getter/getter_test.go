@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -26,6 +27,11 @@ import (
 )
 
 var errUnknownBlock = errors.New("unknown block")
+
+var elevatedLargeMessageConfig = network.LargeMessageConfig{
+	Enabled:        true,
+	MaxMessageSize: uint32(4 * constants.DefaultMaxMessageSize),
+}
 
 type StateSyncEnabledMock struct {
 	*blocktest.VM
@@ -51,8 +57,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 		logging.NoLog{},
 		time.Second,
 		2000,
-		constants.MaxContainersLen,
-		nil,
+		network.LargeMessageConfig{},
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
@@ -60,52 +65,57 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 	return bs, vm, sender
 }
 
-func TestNewMaxContainersBytes(t *testing.T) {
+func TestMaxContainersBytesFor(t *testing.T) {
+	allowedPeer := ids.GenerateTestNodeID()
+	otherPeer := ids.GenerateTestNodeID()
+	elevatedAncestorsBytes := elevatedLargeMessageConfig.MaxAncestorsBytes()
+
 	tests := map[string]struct {
-		maxContainersBytes int
-		wantErr            error
+		largeMessageConfig network.LargeMessageConfig
+		nodeID             ids.NodeID
 		want               int
 	}{
-		"rejects unset limit": {
-			wantErr: errInvalidMaxContainersBytes,
+		"allowlisted peer": {
+			largeMessageConfig: network.LargeMessageConfig{
+				Enabled:   true,
+				Allowlist: set.Of(allowedPeer),
+				MaxMessageSize: uint32(
+					4 * constants.DefaultMaxMessageSize,
+				),
+			},
+			nodeID: allowedPeer,
+			want:   elevatedAncestorsBytes,
 		},
-		"uses configured limit": {
-			maxContainersBytes: 4 * constants.MaxContainersLen,
-			want:               4 * constants.MaxContainersLen,
+		"peer outside allowlist": {
+			largeMessageConfig: network.LargeMessageConfig{
+				Enabled:   true,
+				Allowlist: set.Of(allowedPeer),
+				MaxMessageSize: uint32(
+					4 * constants.DefaultMaxMessageSize,
+				),
+			},
+			nodeID: otherPeer,
+			want:   constants.MaxContainersLen,
+		},
+		"all peers": {
+			largeMessageConfig: network.LargeMessageConfig{
+				Enabled:        true,
+				AllowAll:       true,
+				MaxMessageSize: uint32(4 * constants.DefaultMaxMessageSize),
+			},
+			nodeID: otherPeer,
+			want:   elevatedAncestorsBytes,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			handler, err := New(
-				&blocktest.VM{},
-				&enginetest.Sender{T: t},
-				logging.NoLog{},
-				time.Second,
-				2000,
-				test.maxContainersBytes,
-				nil,
-				prometheus.NewRegistry(),
-			)
-			if test.wantErr != nil {
-				require.ErrorIs(t, err, test.wantErr)
-				return
+			handler := &getter{
+				largeMessageConfig: test.largeMessageConfig,
 			}
-			require.NoError(t, err)
-			require.Equal(t, test.want, handler.(*getter).maxContainersBytes)
+			require.Equal(t, test.want, handler.maxContainersBytesFor(test.nodeID))
 		})
 	}
-}
-
-func TestMaxContainersBytesFor(t *testing.T) {
-	allowedPeer := ids.GenerateTestNodeID()
-	handler := &getter{
-		maxContainersBytes: 4 * constants.MaxContainersLen,
-		largeMessagePeers:  set.Of(allowedPeer),
-	}
-
-	require.Equal(t, 4*constants.MaxContainersLen, handler.maxContainersBytesFor(allowedPeer))
-	require.Equal(t, constants.MaxContainersLen, handler.maxContainersBytesFor(ids.EmptyNodeID))
 }
 
 func TestAcceptedFrontier(t *testing.T) {

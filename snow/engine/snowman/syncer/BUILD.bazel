@@ -36,6 +36,7 @@ go_test(
     deps = [
         "//database",
         "//ids",
+        "//network",
         "//snow",
         "//snow/engine/common",
         "//snow/engine/common/tracker",
@@ -45,7 +46,6 @@ go_test(
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",
-        "//utils/constants",
         "//utils/hashing",
         "//utils/logging",
         "//utils/set",

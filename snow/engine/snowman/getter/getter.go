@@ -5,13 +5,13 @@ package getter
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -23,22 +23,15 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
-var errInvalidMaxContainersBytes = errors.New("maxContainersBytes must be > 0")
-
 func New(
 	vm block.ChainVM,
 	sender common.Sender,
 	log logging.Logger,
 	maxTimeGetAncestors time.Duration,
 	maxContainersGetAncestors int,
-	maxContainersBytes int,
-	largeMessagePeers set.Set[ids.NodeID],
+	largeMessageConfig network.LargeMessageConfig,
 	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
-	if maxContainersBytes <= 0 {
-		return nil, errInvalidMaxContainersBytes
-	}
-
 	ssVM, _ := vm.(block.StateSyncableVM)
 	gh := &getter{
 		vm:                        vm,
@@ -47,8 +40,7 @@ func New(
 		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
-		maxContainersBytes:        maxContainersBytes,
-		largeMessagePeers:         largeMessagePeers,
+		largeMessageConfig:        largeMessageConfig,
 	}
 
 	var err error
@@ -71,12 +63,8 @@ type getter struct {
 	maxTimeGetAncestors time.Duration
 	// Max number of containers in an ancestors message sent by this node.
 	maxContainersGetAncestors int
-	// Max cumulative byte size of containers in an ancestors message sent by
-	// this node.
-	maxContainersBytes int
-	// Peers configured for frames up to maxContainersBytes. This controls
-	// response size; it does not grant chain access.
-	largeMessagePeers set.Set[ids.NodeID]
+	// Selects peers that may receive larger GetAncestors responses.
+	largeMessageConfig network.LargeMessageConfig
 
 	getAncestorsBlks metric.Averager
 }
@@ -226,8 +214,8 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) maxContainersBytesFor(nodeID ids.NodeID) int {
-	if gh.largeMessagePeers.Contains(nodeID) {
-		return gh.maxContainersBytes
+	if gh.largeMessageConfig.AppliesTo(nodeID) {
+		return gh.largeMessageConfig.MaxAncestorsBytes()
 	}
 	return constants.MaxContainersLen
 }

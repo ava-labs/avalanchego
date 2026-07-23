@@ -16,27 +16,25 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const largeMessageMetricsPrefix = "large_message_"
 
 // MessageStacks holds default and elevated per-peer P2P resource stacks.
 type MessageStacks struct {
-	allowlist       set.Set[ids.NodeID]
-	elevatedEnabled bool
-	Default         peer.MessageStack
-	Elevated        peer.MessageStack
+	largeMessageConfig LargeMessageConfig
+	Default            peer.MessageStack
+	Elevated           peer.MessageStack
 }
 
 // MsgCreator returns the node-wide message creator for outbound consensus
 // traffic. When the elevated stack is enabled it returns the large creator so
 // the sender can build payloads above the default max size; per-peer frame size
-// enforcement at write time still rejects oversized frames for non-allowlisted
+// enforcement at write time still rejects oversized frames for unselected
 // peers. For payloads within the default size both creators produce identical
 // bytes.
 func (s *MessageStacks) MsgCreator() message.Creator {
-	if !s.elevatedEnabled {
+	if !s.largeMessageConfig.Enabled {
 		return s.Default.MessageCreator
 	}
 	return s.Elevated.MessageCreator
@@ -44,7 +42,7 @@ func (s *MessageStacks) MsgCreator() message.Creator {
 
 // Resolve returns the stack for [nodeID].
 func (s *MessageStacks) Resolve(nodeID ids.NodeID) peer.MessageStack {
-	if s.elevatedEnabled && s.allowlist.Contains(nodeID) {
+	if s.largeMessageConfig.Enabled && s.largeMessageConfig.AppliesTo(nodeID) {
 		return s.Elevated
 	}
 	return s.Default
@@ -90,7 +88,7 @@ func newMessageStacks(
 	}
 
 	stacks := &MessageStacks{
-		allowlist: config.LargeMessageConfig.Allowlist,
+		largeMessageConfig: config.LargeMessageConfig,
 		Default: peer.MessageStack{
 			MaxFrameSize:        constants.DefaultMaxMessageSize,
 			MessageCreator:      defaultCreator,
@@ -103,7 +101,6 @@ func newMessageStacks(
 		return stacks, nil
 	}
 
-	stacks.elevatedEnabled = true
 	largeRegisterer := prometheus.WrapRegistererWithPrefix(largeMessageMetricsPrefix, registerer)
 
 	throttler := config.LargeMessageConfig.Throttler
@@ -112,6 +109,7 @@ func newMessageStacks(
 	log.Warn(
 		"large message config enabled",
 		zap.Uint32("maxMessageSize", config.LargeMessageConfig.MaxMessageSize),
+		zap.Bool("allowAllPeers", config.LargeMessageConfig.AllowAll),
 		zap.Int("allowlistedPeers", config.LargeMessageConfig.Allowlist.Len()),
 		zap.Uint64("inboundNodeMaxAtLargeBytes", largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes),
 		zap.Uint64("inboundValidatorAllocSize", largeInboundConfig.MsgByteThrottlerConfig.VdrAllocSize),
