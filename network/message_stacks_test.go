@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,8 +24,10 @@ func TestMessageStacksResolve(t *testing.T) {
 	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
 	require.NoError(t, err)
 	cfg.LargeMessageConfig = LargeMessageConfig{
+		Enabled:        true,
 		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
 		Allowlist:      set.Of(allowlisted),
+		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
 	}
 
 	stacks, err := newMessageStacks(
@@ -64,8 +65,10 @@ func TestMsgCreatorUsesElevatedWhenEnabled(t *testing.T) {
 	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
 	require.NoError(t, err)
 	cfg.LargeMessageConfig = LargeMessageConfig{
+		Enabled:        true,
 		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
 		Allowlist:      set.Of(ids.GenerateTestNodeID()),
+		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
 	}
 
 	stacks, err := newMessageStacks(
@@ -96,61 +99,6 @@ func TestMsgCreatorUsesDefaultWhenDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, stacks.elevatedEnabled)
 	require.Equal(t, stacks.Default.MessageCreator, stacks.MsgCreator())
-}
-
-func TestElevatedInboundThrottlerConfig(t *testing.T) {
-	const (
-		maxSize      = uint64(4 * constants.DefaultMaxMessageSize)
-		allowlistLen = 3
-	)
-	base := throttling.InboundMsgThrottlerConfig{
-		MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
-			VdrAllocSize:        constants.DefaultInboundThrottlerVdrAllocSize,
-			AtLargeAllocSize:    constants.DefaultInboundThrottlerAtLargeAllocSize,
-			NodeMaxAtLargeBytes: constants.DefaultInboundThrottlerNodeMaxAtLargeBytes,
-		},
-		BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
-			RefillRate:   constants.DefaultInboundThrottlerBandwidthRefillRate,
-			MaxBurstSize: constants.DefaultInboundThrottlerBandwidthMaxBurstSize,
-		},
-		MaxProcessingMsgsPerNode: constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
-	}
-
-	got := elevatedInboundThrottlerConfig(base, maxSize, allowlistLen)
-
-	// Overridden so allowlisted peers may send/receive up to maxSize.
-	require.Equal(t, maxSize, got.MsgByteThrottlerConfig.NodeMaxAtLargeBytes)
-	require.Equal(t, maxSize, got.BandwidthThrottlerConfig.MaxBurstSize)
-	require.Equal(t, maxSize*allowlistLen, got.MsgByteThrottlerConfig.AtLargeAllocSize)
-
-	// Everything else is preserved from the base config.
-	require.Equal(t, base.MsgByteThrottlerConfig.VdrAllocSize, got.MsgByteThrottlerConfig.VdrAllocSize)
-	require.Equal(t, base.BandwidthThrottlerConfig.RefillRate, got.BandwidthThrottlerConfig.RefillRate)
-	require.Equal(t, base.MaxProcessingMsgsPerNode, got.MaxProcessingMsgsPerNode)
-
-	// The base config must not be mutated.
-	require.Equal(t, constants.DefaultInboundThrottlerNodeMaxAtLargeBytes, int(base.MsgByteThrottlerConfig.NodeMaxAtLargeBytes))
-}
-
-func TestElevatedOutboundThrottlerConfig(t *testing.T) {
-	const (
-		maxSize      = uint64(4 * constants.DefaultMaxMessageSize)
-		allowlistLen = 3
-	)
-	base := throttling.MsgByteThrottlerConfig{
-		VdrAllocSize:        constants.DefaultOutboundThrottlerVdrAllocSize,
-		AtLargeAllocSize:    constants.DefaultOutboundThrottlerAtLargeAllocSize,
-		NodeMaxAtLargeBytes: constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes,
-	}
-
-	got := elevatedOutboundThrottlerConfig(base, maxSize, allowlistLen)
-
-	require.Equal(t, maxSize, got.NodeMaxAtLargeBytes)
-	require.Equal(t, maxSize*allowlistLen, got.AtLargeAllocSize)
-	require.Equal(t, base.VdrAllocSize, got.VdrAllocSize)
-
-	// The base config must not be mutated.
-	require.Equal(t, constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes, int(base.NodeMaxAtLargeBytes))
 }
 
 func TestMessageStacksDisabledWhenAllowlistEmpty(t *testing.T) {

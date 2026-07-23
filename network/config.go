@@ -193,14 +193,38 @@ type Config struct {
 
 // LargeMessageConfig configures elevated max P2P message sizes for specific peers.
 type LargeMessageConfig struct {
+	// Enabled is true when elevated P2P message sizes are configured for
+	// allowlisted peers.
+	Enabled bool `json:"enabled"`
+
 	// MaxMessageSize is the elevated frame and codec size for allowlisted peers.
 	MaxMessageSize uint32 `json:"maxMessageSize"`
 
 	// Allowlist is the set of peer node IDs that may use the elevated stack.
 	Allowlist set.Set[ids.NodeID] `json:"-"`
+
+	// Throttler configures elevated-stack throttler limits for allowlisted peers.
+	Throttler LargeMessageThrottlerConfig `json:"throttlerConfig"`
 }
 
-// Enabled returns true when the elevated message stack should be built.
-func (c LargeMessageConfig) Enabled() bool {
-	return c.MaxMessageSize > constants.DefaultMaxMessageSize && c.Allowlist.Len() > 0
+// LargeMessageThrottlerConfig configures throttler limits for the elevated peer
+// stack.
+type LargeMessageThrottlerConfig struct {
+	InboundAtLargeAllocSize      uint64 `json:"inboundAtLargeAllocSize"`
+	InboundNodeMaxAtLargeBytes   uint64 `json:"inboundNodeMaxAtLargeBytes"`
+	InboundBandwidthMaxBurstSize uint64 `json:"inboundBandwidthMaxBurstSize"`
+	OutboundAtLargeAllocSize     uint64 `json:"outboundAtLargeAllocSize"`
+	OutboundNodeMaxAtLargeBytes  uint64 `json:"outboundNodeMaxAtLargeBytes"`
+}
+
+// DefaultLargeMessageThrottlerConfig returns elevated-stack throttler limits
+// derived from [maxMessageSize].
+func DefaultLargeMessageThrottlerConfig(maxMessageSize uint64) LargeMessageThrottlerConfig {
+	return LargeMessageThrottlerConfig{
+		InboundAtLargeAllocSize:      maxMessageSize * constants.LargeMessageInboundAtLargeAllocMultiplier,
+		InboundNodeMaxAtLargeBytes:   maxMessageSize,
+		InboundBandwidthMaxBurstSize: maxMessageSize,
+		OutboundAtLargeAllocSize:     maxMessageSize * constants.LargeMessageOutboundAtLargeAllocMultiplier,
+		OutboundNodeMaxAtLargeBytes:  maxMessageSize,
+	}
 }

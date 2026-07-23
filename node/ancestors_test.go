@@ -24,6 +24,7 @@ func TestBootstrapMaxContainersBytes(t *testing.T) {
 		},
 		"elevated message size": {
 			config: network.LargeMessageConfig{
+				Enabled:        true,
 				MaxMessageSize: 80 * constants.DefaultMaxMessageSize,
 				Allowlist:      set.Of(ids.GenerateTestNodeID()),
 			},

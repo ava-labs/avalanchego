@@ -99,25 +99,30 @@ func newMessageStacks(
 		},
 	}
 
-	if !config.LargeMessageConfig.Enabled() {
+	if !config.LargeMessageConfig.Enabled {
 		return stacks, nil
 	}
 
 	stacks.elevatedEnabled = true
 	largeRegisterer := prometheus.WrapRegistererWithPrefix(largeMessageMetricsPrefix, registerer)
 
-	allowlistLen := config.LargeMessageConfig.Allowlist.Len()
-	maxSize := uint64(config.LargeMessageConfig.MaxMessageSize)
-	atLargeAllocSize := maxSize * uint64(allowlistLen)
+	throttler := config.LargeMessageConfig.Throttler
+	largeInboundConfig := config.ThrottlerConfig.InboundMsgThrottlerConfig
+	largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes = throttler.InboundNodeMaxAtLargeBytes
+	largeInboundConfig.BandwidthThrottlerConfig.MaxBurstSize = throttler.InboundBandwidthMaxBurstSize
+	largeInboundConfig.MsgByteThrottlerConfig.AtLargeAllocSize = throttler.InboundAtLargeAllocSize
+	largeOutboundConfig := config.ThrottlerConfig.OutboundMsgThrottlerConfig
+	largeOutboundConfig.NodeMaxAtLargeBytes = throttler.OutboundNodeMaxAtLargeBytes
+	largeOutboundConfig.AtLargeAllocSize = throttler.OutboundAtLargeAllocSize
 	log.Warn(
-		"large message config enabled; throttler limits for allowlisted peers are derived from network-max-message-size and override throttler-inbound-node-max-at-large-bytes, throttler-inbound-bandwidth-max-burst-size, throttler-inbound-at-large-alloc-size, throttler-outbound-node-max-at-large-bytes, and throttler-outbound-at-large-alloc-size",
+		"large message config enabled",
 		zap.Uint32("maxMessageSize", config.LargeMessageConfig.MaxMessageSize),
-		zap.Int("allowlistedPeers", allowlistLen),
-		zap.Uint64("inboundNodeMaxAtLargeBytes", maxSize),
-		zap.Uint64("inboundBandwidthMaxBurstSize", maxSize),
-		zap.Uint64("inboundAtLargeAllocSize", atLargeAllocSize),
-		zap.Uint64("outboundNodeMaxAtLargeBytes", maxSize),
-		zap.Uint64("outboundAtLargeAllocSize", atLargeAllocSize),
+		zap.Int("allowlistedPeers", config.LargeMessageConfig.Allowlist.Len()),
+		zap.Uint64("inboundNodeMaxAtLargeBytes", largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes),
+		zap.Uint64("inboundBandwidthMaxBurstSize", largeInboundConfig.BandwidthThrottlerConfig.MaxBurstSize),
+		zap.Uint64("inboundAtLargeAllocSize", largeInboundConfig.MsgByteThrottlerConfig.AtLargeAllocSize),
+		zap.Uint64("outboundNodeMaxAtLargeBytes", largeOutboundConfig.NodeMaxAtLargeBytes),
+		zap.Uint64("outboundAtLargeAllocSize", largeOutboundConfig.AtLargeAllocSize),
 	)
 
 	largeCreator, err := message.NewCreator(
@@ -130,11 +135,6 @@ func newMessageStacks(
 		return nil, fmt.Errorf("initializing large message creator: %w", err)
 	}
 
-	largeInboundConfig := elevatedInboundThrottlerConfig(
-		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		maxSize,
-		allowlistLen,
-	)
 	largeInbound, err := throttling.NewInboundMsgThrottler(
 		log,
 		largeRegisterer,
@@ -148,11 +148,6 @@ func newMessageStacks(
 		return nil, fmt.Errorf("initializing large inbound message throttler: %w", err)
 	}
 
-	largeOutboundConfig := elevatedOutboundThrottlerConfig(
-		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
-		maxSize,
-		allowlistLen,
-	)
 	largeOutbound, err := throttling.NewSybilOutboundMsgThrottler(
 		log,
 		largeRegisterer,
@@ -170,27 +165,4 @@ func newMessageStacks(
 		OutboundThrottler:   largeOutbound,
 	}
 	return stacks, nil
-}
-
-func elevatedInboundThrottlerConfig(
-	base throttling.InboundMsgThrottlerConfig,
-	maxSize uint64,
-	allowlistLen int,
-) throttling.InboundMsgThrottlerConfig {
-	cfg := base
-	cfg.MsgByteThrottlerConfig.NodeMaxAtLargeBytes = maxSize
-	cfg.BandwidthThrottlerConfig.MaxBurstSize = maxSize
-	cfg.MsgByteThrottlerConfig.AtLargeAllocSize = maxSize * uint64(allowlistLen)
-	return cfg
-}
-
-func elevatedOutboundThrottlerConfig(
-	base throttling.MsgByteThrottlerConfig,
-	maxSize uint64,
-	allowlistLen int,
-) throttling.MsgByteThrottlerConfig {
-	cfg := base
-	cfg.NodeMaxAtLargeBytes = maxSize
-	cfg.AtLargeAllocSize = maxSize * uint64(allowlistLen)
-	return cfg
 }
