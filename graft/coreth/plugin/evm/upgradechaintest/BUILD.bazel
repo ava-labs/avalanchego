@@ -61,6 +61,7 @@ graft_go_test(
         "//upgrade",
         "//upgrade/upgradetest",
         "//utils/constants",
+        "//utils/crypto/bls/signer/localsigner",
         "//utils/units",
         "//vms/components/avax",
         "//vms/evm/predicate",
