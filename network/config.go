@@ -207,24 +207,40 @@ type LargeMessageConfig struct {
 	Throttler LargeMessageThrottlerConfig `json:"throttlerConfig"`
 }
 
-// LargeMessageThrottlerConfig configures throttler limits for the elevated peer
-// stack.
+// LargeMessageThrottlerConfig configures the elevated peer stack's message
+// throttlers.
 type LargeMessageThrottlerConfig struct {
-	InboundAtLargeAllocSize      uint64 `json:"inboundAtLargeAllocSize"`
-	InboundNodeMaxAtLargeBytes   uint64 `json:"inboundNodeMaxAtLargeBytes"`
-	InboundBandwidthMaxBurstSize uint64 `json:"inboundBandwidthMaxBurstSize"`
-	OutboundAtLargeAllocSize     uint64 `json:"outboundAtLargeAllocSize"`
-	OutboundNodeMaxAtLargeBytes  uint64 `json:"outboundNodeMaxAtLargeBytes"`
+	InboundMsgThrottlerConfig  throttling.InboundMsgThrottlerConfig `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig throttling.MsgByteThrottlerConfig    `json:"outboundMsgThrottlerConfig"`
 }
 
-// DefaultLargeMessageThrottlerConfig returns elevated-stack throttler limits
-// derived from [maxMessageSize].
+// DefaultLargeMessageThrottlerConfig returns a complete elevated-stack
+// throttler configuration. Size-based limits are derived from
+// [maxMessageSize].
 func DefaultLargeMessageThrottlerConfig(maxMessageSize uint64) LargeMessageThrottlerConfig {
 	return LargeMessageThrottlerConfig{
-		InboundAtLargeAllocSize:      maxMessageSize * constants.LargeMessageInboundAtLargeAllocMultiplier,
-		InboundNodeMaxAtLargeBytes:   maxMessageSize,
-		InboundBandwidthMaxBurstSize: maxMessageSize,
-		OutboundAtLargeAllocSize:     maxMessageSize * constants.LargeMessageOutboundAtLargeAllocMultiplier,
-		OutboundNodeMaxAtLargeBytes:  maxMessageSize,
+		InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+			MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+				AtLargeAllocSize:    maxMessageSize * constants.LargeMessageInboundAtLargeAllocMultiplier,
+				VdrAllocSize:        maxMessageSize * constants.LargeMessageValidatorAllocMultiplier,
+				NodeMaxAtLargeBytes: maxMessageSize,
+			},
+			BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
+				RefillRate:   maxMessageSize / constants.LargeMessageInboundBandwidthRefillRateDivisor,
+				MaxBurstSize: maxMessageSize,
+			},
+			MaxProcessingMsgsPerNode: constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
+			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: constants.DefaultInboundThrottlerCPUMaxRecheckDelay,
+			},
+			DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: constants.DefaultInboundThrottlerDiskMaxRecheckDelay,
+			},
+		},
+		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
+			AtLargeAllocSize:    maxMessageSize * constants.LargeMessageOutboundAtLargeAllocMultiplier,
+			VdrAllocSize:        maxMessageSize * constants.LargeMessageValidatorAllocMultiplier,
+			NodeMaxAtLargeBytes: maxMessageSize,
+		},
 	}
 }

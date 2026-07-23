@@ -1432,9 +1432,14 @@ func TestGetLargeMessageConfig(t *testing.T) {
 }
 
 func TestGetLargeMessageThrottlerConfig(t *testing.T) {
-	const defaultKiB = uint(constants.DefaultMaxMessageSize / units.KiB)
+	const (
+		defaultKiB       = uint(constants.DefaultMaxMessageSize / units.KiB)
+		maxSize          = uint64(2 * constants.DefaultMaxMessageSize)
+		maxProcessing    = uint64(10)
+		cpuRecheckDelay  = 2 * time.Second
+		diskRecheckDelay = 3 * time.Second
+	)
 	validID := ids.GenerateTestNodeID()
-	maxSize := uint64(2 * constants.DefaultMaxMessageSize)
 	explicitAtLarge := uint64(10 * units.GiB)
 
 	tests := []struct {
@@ -1451,8 +1456,8 @@ func TestGetLargeMessageThrottlerConfig(t *testing.T) {
 				v.Set(NetworkLargeMessageInboundAtLargeAllocSizeKey, explicitAtLarge)
 			},
 			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
-				require.Equal(t, explicitAtLarge, throttler.InboundAtLargeAllocSize)
-				require.Equal(t, maxSize, throttler.InboundNodeMaxAtLargeBytes)
+				require.Equal(t, explicitAtLarge, throttler.InboundMsgThrottlerConfig.AtLargeAllocSize)
+				require.Equal(t, maxSize, throttler.InboundMsgThrottlerConfig.NodeMaxAtLargeBytes)
 			},
 		},
 		{
@@ -1463,6 +1468,10 @@ func TestGetLargeMessageThrottlerConfig(t *testing.T) {
 			},
 			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
 				require.Equal(t, network.DefaultLargeMessageThrottlerConfig(maxSize), throttler)
+				inbound := throttler.InboundMsgThrottlerConfig
+				require.Equal(t, uint64(constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode), inbound.MaxProcessingMsgsPerNode)
+				require.Equal(t, constants.DefaultInboundThrottlerCPUMaxRecheckDelay, inbound.CPUThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, constants.DefaultInboundThrottlerDiskMaxRecheckDelay, inbound.DiskThrottlerConfig.MaxRecheckDelay)
 			},
 		},
 		{
@@ -1473,6 +1482,64 @@ func TestGetLargeMessageThrottlerConfig(t *testing.T) {
 				v.Set(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxSize-1)
 			},
 			wantErr: fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxSize),
+		},
+		{
+			name: "explicit elevated throttler limits",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundValidatorAllocSizeKey, uint64(units.GiB))
+				v.Set(NetworkLargeMessageInboundMaxProcessingMsgsKey, maxProcessing)
+				v.Set(NetworkLargeMessageInboundBandwidthRefillRateKey, uint64(512*units.MiB))
+				v.Set(NetworkLargeMessageInboundCPUMaxRecheckDelayKey, cpuRecheckDelay)
+				v.Set(NetworkLargeMessageInboundDiskMaxRecheckDelayKey, diskRecheckDelay)
+				v.Set(NetworkLargeMessageOutboundValidatorAllocSizeKey, uint64(2*units.GiB))
+			},
+			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
+				inbound := throttler.InboundMsgThrottlerConfig
+				require.Equal(t, uint64(units.GiB), inbound.VdrAllocSize)
+				require.Equal(t, maxProcessing, inbound.MaxProcessingMsgsPerNode)
+				require.Equal(t, uint64(512*units.MiB), inbound.RefillRate)
+				require.Equal(t, cpuRecheckDelay, inbound.CPUThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, diskRecheckDelay, inbound.DiskThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, uint64(2*units.GiB), throttler.OutboundMsgThrottlerConfig.VdrAllocSize)
+			},
+		},
+		{
+			name: "inbound validator alloc must be positive when set",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundValidatorAllocSizeKey, uint64(0))
+			},
+			wantErr: fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundValidatorAllocSizeKey),
+		},
+		{
+			name: "inbound max processing messages must be positive",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundMaxProcessingMsgsKey, uint64(0))
+			},
+			wantErr: fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundMaxProcessingMsgsKey),
+		},
+		{
+			name: "inbound CPU recheck delay must meet minimum",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay-time.Nanosecond)
+			},
+			wantErr: fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay),
+		},
+		{
+			name: "inbound disk recheck delay must meet minimum",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay-time.Nanosecond)
+			},
+			wantErr: fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay),
 		},
 	}
 

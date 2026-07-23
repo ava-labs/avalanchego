@@ -104,8 +104,15 @@ const (
 	DefaultNetworkInitialReconnectDelay = time.Second
 	DefaultNetworkMaxReconnectDelay     = time.Minute
 
-	// Match default throttler flags: 6 MiB at-large / 2 MiB per-node.
+	// Match default throttler flags: 6 MiB at-large / 32 MiB validator /
+	// 2 MiB per-node / 512 KiB/s refill / 2 MiB burst.
 	LargeMessageInboundAtLargeAllocMultiplier = 3
 	// Match default throttler flags: 32 MiB at-large / 2 MiB per-node.
 	LargeMessageOutboundAtLargeAllocMultiplier = 16
+	// Match default throttler flags: 32 MiB validator allocation for a
+	// 2 MiB maximum message size.
+	LargeMessageValidatorAllocMultiplier = 16
+	// Match default throttler flags: 512 KiB/s refill for a 2 MiB maximum
+	// message size.
+	LargeMessageInboundBandwidthRefillRateDivisor = 4
 )
