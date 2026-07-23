@@ -294,7 +294,7 @@ var (
 				gas.DBWrite:   IntrinsicCreateL1TxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite + intrinsicCreateL1ValidatorDBWrite,
 				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute,
 			},
-			expectedDynamicFee: 195102,
+			expectedDynamicFee: 195_102 * units.NanoAvax,
 		},
 	}
 )
