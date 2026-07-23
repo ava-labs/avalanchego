@@ -102,12 +102,12 @@ var (
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 
-	errLargeMessageFlagsTogether               = fmt.Errorf("%q and %q must be set together", NetworkLargeMessageSizeKey, NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeTooLarge                = fmt.Errorf("%s must be <= %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
-	errLargeMessageSizeTooSmall                = fmt.Errorf("%s must be >= %d KiB", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
-	errLargeMessagePeerIDsEmpty                = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeIsDefault               = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkLargeMessageSizeKey)
-	errParseLargeMessagePeerID                 = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
+	errLargeMessageFlagsTogether = fmt.Errorf("%q and %q must be set together", NetworkLargeMessageSizeKey, NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeTooLarge  = fmt.Errorf("%s must be <= %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
+	errLargeMessageSizeTooSmall  = fmt.Errorf("%s must be >= %d KiB", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
+	errLargeMessagePeerIDsEmpty  = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeIsDefault = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkLargeMessageSizeKey)
+	errParseLargeMessagePeerID   = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -625,20 +625,40 @@ func getLargeMessageThrottlerConfig(
 	maxMessageSize uint64,
 ) (network.LargeMessageThrottlerConfig, error) {
 	throttler := network.DefaultLargeMessageThrottlerConfig(maxMessageSize)
+	inbound := &throttler.InboundMsgThrottlerConfig
+	outbound := &throttler.OutboundMsgThrottlerConfig
 	if v.IsSet(NetworkLargeMessageInboundAtLargeAllocSizeKey) {
-		throttler.InboundAtLargeAllocSize = v.GetUint64(NetworkLargeMessageInboundAtLargeAllocSizeKey)
+		inbound.AtLargeAllocSize = v.GetUint64(NetworkLargeMessageInboundAtLargeAllocSizeKey)
+	}
+	if v.IsSet(NetworkLargeMessageInboundValidatorAllocSizeKey) {
+		inbound.VdrAllocSize = v.GetUint64(NetworkLargeMessageInboundValidatorAllocSizeKey)
 	}
 	if v.IsSet(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey) {
-		throttler.InboundNodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey)
+		inbound.NodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey)
+	}
+	if v.IsSet(NetworkLargeMessageInboundMaxProcessingMsgsKey) {
+		inbound.MaxProcessingMsgsPerNode = v.GetUint64(NetworkLargeMessageInboundMaxProcessingMsgsKey)
+	}
+	if v.IsSet(NetworkLargeMessageInboundBandwidthRefillRateKey) {
+		inbound.RefillRate = v.GetUint64(NetworkLargeMessageInboundBandwidthRefillRateKey)
 	}
 	if v.IsSet(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey) {
-		throttler.InboundBandwidthMaxBurstSize = v.GetUint64(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey)
+		inbound.MaxBurstSize = v.GetUint64(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey)
+	}
+	if v.IsSet(NetworkLargeMessageInboundCPUMaxRecheckDelayKey) {
+		inbound.CPUThrottlerConfig.MaxRecheckDelay = v.GetDuration(NetworkLargeMessageInboundCPUMaxRecheckDelayKey)
+	}
+	if v.IsSet(NetworkLargeMessageInboundDiskMaxRecheckDelayKey) {
+		inbound.DiskThrottlerConfig.MaxRecheckDelay = v.GetDuration(NetworkLargeMessageInboundDiskMaxRecheckDelayKey)
 	}
 	if v.IsSet(NetworkLargeMessageOutboundAtLargeAllocSizeKey) {
-		throttler.OutboundAtLargeAllocSize = v.GetUint64(NetworkLargeMessageOutboundAtLargeAllocSizeKey)
+		outbound.AtLargeAllocSize = v.GetUint64(NetworkLargeMessageOutboundAtLargeAllocSizeKey)
+	}
+	if v.IsSet(NetworkLargeMessageOutboundValidatorAllocSizeKey) {
+		outbound.VdrAllocSize = v.GetUint64(NetworkLargeMessageOutboundValidatorAllocSizeKey)
 	}
 	if v.IsSet(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey) {
-		throttler.OutboundNodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey)
+		outbound.NodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey)
 	}
 
 	if err := validateLargeMessageThrottlerConfig(throttler, maxMessageSize); err != nil {
@@ -651,19 +671,30 @@ func validateLargeMessageThrottlerConfig(
 	throttler network.LargeMessageThrottlerConfig,
 	maxMessageSize uint64,
 ) error {
-	if throttler.InboundAtLargeAllocSize == 0 {
+	inbound := throttler.InboundMsgThrottlerConfig
+	outbound := throttler.OutboundMsgThrottlerConfig
+	switch {
+	case inbound.AtLargeAllocSize == 0:
 		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundAtLargeAllocSizeKey)
-	}
-	if throttler.OutboundAtLargeAllocSize == 0 {
+	case inbound.VdrAllocSize == 0:
+		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundValidatorAllocSizeKey)
+	case inbound.MaxProcessingMsgsPerNode == 0:
+		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundMaxProcessingMsgsKey)
+	case inbound.RefillRate == 0:
+		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundBandwidthRefillRateKey)
+	case inbound.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
+		return fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
+	case inbound.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
+		return fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
+	case outbound.AtLargeAllocSize == 0:
 		return fmt.Errorf("%s must be > 0", NetworkLargeMessageOutboundAtLargeAllocSizeKey)
-	}
-	if throttler.InboundNodeMaxAtLargeBytes < maxMessageSize {
+	case outbound.VdrAllocSize == 0:
+		return fmt.Errorf("%s must be > 0", NetworkLargeMessageOutboundValidatorAllocSizeKey)
+	case inbound.NodeMaxAtLargeBytes < maxMessageSize:
 		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxMessageSize)
-	}
-	if throttler.InboundBandwidthMaxBurstSize < maxMessageSize {
+	case inbound.MaxBurstSize < maxMessageSize:
 		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundBandwidthMaxBurstSizeKey, maxMessageSize)
-	}
-	if throttler.OutboundNodeMaxAtLargeBytes < maxMessageSize {
+	case outbound.NodeMaxAtLargeBytes < maxMessageSize:
 		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey, maxMessageSize)
 	}
 	return nil

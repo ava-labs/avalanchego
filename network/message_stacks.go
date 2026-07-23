@@ -107,21 +107,19 @@ func newMessageStacks(
 	largeRegisterer := prometheus.WrapRegistererWithPrefix(largeMessageMetricsPrefix, registerer)
 
 	throttler := config.LargeMessageConfig.Throttler
-	largeInboundConfig := config.ThrottlerConfig.InboundMsgThrottlerConfig
-	largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes = throttler.InboundNodeMaxAtLargeBytes
-	largeInboundConfig.BandwidthThrottlerConfig.MaxBurstSize = throttler.InboundBandwidthMaxBurstSize
-	largeInboundConfig.MsgByteThrottlerConfig.AtLargeAllocSize = throttler.InboundAtLargeAllocSize
-	largeOutboundConfig := config.ThrottlerConfig.OutboundMsgThrottlerConfig
-	largeOutboundConfig.NodeMaxAtLargeBytes = throttler.OutboundNodeMaxAtLargeBytes
-	largeOutboundConfig.AtLargeAllocSize = throttler.OutboundAtLargeAllocSize
+	largeInboundConfig := throttler.InboundMsgThrottlerConfig
+	largeOutboundConfig := throttler.OutboundMsgThrottlerConfig
 	log.Warn(
 		"large message config enabled",
 		zap.Uint32("maxMessageSize", config.LargeMessageConfig.MaxMessageSize),
 		zap.Int("allowlistedPeers", config.LargeMessageConfig.Allowlist.Len()),
 		zap.Uint64("inboundNodeMaxAtLargeBytes", largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes),
+		zap.Uint64("inboundValidatorAllocSize", largeInboundConfig.MsgByteThrottlerConfig.VdrAllocSize),
+		zap.Uint64("inboundBandwidthRefillRate", largeInboundConfig.BandwidthThrottlerConfig.RefillRate),
 		zap.Uint64("inboundBandwidthMaxBurstSize", largeInboundConfig.BandwidthThrottlerConfig.MaxBurstSize),
 		zap.Uint64("inboundAtLargeAllocSize", largeInboundConfig.MsgByteThrottlerConfig.AtLargeAllocSize),
 		zap.Uint64("outboundNodeMaxAtLargeBytes", largeOutboundConfig.NodeMaxAtLargeBytes),
+		zap.Uint64("outboundValidatorAllocSize", largeOutboundConfig.VdrAllocSize),
 		zap.Uint64("outboundAtLargeAllocSize", largeOutboundConfig.AtLargeAllocSize),
 	)
 
