@@ -47,6 +47,7 @@ go_test(
         "//network/p2p/p2ptest",
         "//proto/pb/sync",
         "//snow/engine/common",
+        "//utils/constants",
         "//utils/logging",
         "//utils/maybe",
         "@com_github_prometheus_client_golang//prometheus",

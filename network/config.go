@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -185,4 +186,80 @@ type Config struct {
 	// If true, connects to all validators regardless of primary network validator
 	// status or of configured tracked subnets.
 	ConnectToAllValidators bool `json:"connectToAllValidators"`
+
+	// LargeMessageConfig configures elevated P2P message sizes for allowlisted peers.
+	LargeMessageConfig LargeMessageConfig `json:"largeMessageConfig"`
+}
+
+// LargeMessageConfig configures elevated max P2P message sizes for selected peers.
+type LargeMessageConfig struct {
+	// Enabled is true when elevated P2P message sizes are configured for
+	// selected peers.
+	Enabled bool `json:"enabled"`
+
+	// MaxMessageSize is the elevated frame and codec size for selected peers.
+	MaxMessageSize uint32 `json:"maxMessageSize"`
+
+	// AllowAll is true when every peer may use the elevated stack.
+	AllowAll bool `json:"-"`
+
+	// Allowlist is the set of peer node IDs that may use the elevated stack
+	// when AllowAll is false.
+	Allowlist set.Set[ids.NodeID] `json:"-"`
+
+	// Throttler configures elevated-stack throttler limits for selected peers.
+	Throttler LargeMessageThrottlerConfig `json:"throttlerConfig"`
+}
+
+// AppliesTo reports whether [nodeID] may use the elevated large-message stack.
+func (c LargeMessageConfig) AppliesTo(nodeID ids.NodeID) bool {
+	return c.AllowAll || c.Allowlist.Contains(nodeID)
+}
+
+// MaxAncestorsBytes returns the cumulative byte budget for a GetAncestors
+// response when large messages apply to the requesting peer.
+func (c LargeMessageConfig) MaxAncestorsBytes() int {
+	maxMessageSize := uint64(constants.DefaultMaxMessageSize)
+	if c.Enabled {
+		maxMessageSize = uint64(c.MaxMessageSize)
+	}
+	return int(4 * maxMessageSize / 5)
+}
+
+// LargeMessageThrottlerConfig configures the elevated peer stack's message
+// throttlers.
+type LargeMessageThrottlerConfig struct {
+	InboundMsgThrottlerConfig  throttling.InboundMsgThrottlerConfig `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig throttling.MsgByteThrottlerConfig    `json:"outboundMsgThrottlerConfig"`
+}
+
+// DefaultLargeMessageThrottlerConfig returns a complete elevated-stack
+// throttler configuration. Size-based limits are derived from
+// [maxMessageSize].
+func DefaultLargeMessageThrottlerConfig(maxMessageSize uint64) LargeMessageThrottlerConfig {
+	return LargeMessageThrottlerConfig{
+		InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+			MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+				AtLargeAllocSize:    maxMessageSize * constants.LargeMessageInboundAtLargeAllocMultiplier,
+				VdrAllocSize:        maxMessageSize * constants.LargeMessageValidatorAllocMultiplier,
+				NodeMaxAtLargeBytes: maxMessageSize,
+			},
+			BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
+				RefillRate:   maxMessageSize / constants.LargeMessageInboundBandwidthRefillRateDivisor,
+				MaxBurstSize: maxMessageSize,
+			},
+			MaxProcessingMsgsPerNode: constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
+			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: constants.DefaultInboundThrottlerCPUMaxRecheckDelay,
+			},
+			DiskThrottlerConfig: throttling.SystemThrottlerConfig{
+				MaxRecheckDelay: constants.DefaultInboundThrottlerDiskMaxRecheckDelay,
+			},
+		},
+		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
+			AtLargeAllocSize:    maxMessageSize * constants.LargeMessageOutboundAtLargeAllocMultiplier,
+			VdrAllocSize:        maxMessageSize * constants.LargeMessageValidatorAllocMultiplier,
+			NodeMaxAtLargeBytes: maxMessageSize,
+		},
+	}
 }

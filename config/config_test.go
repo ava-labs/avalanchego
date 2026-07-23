@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,11 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -1325,6 +1328,261 @@ func TestResolveConsensusMode(t *testing.T) {
 			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
 		})
 	}
+}
+
+func TestGetLargeMessageConfig(t *testing.T) {
+	const defaultKiB = uint(constants.DefaultMaxMessageSize / units.KiB)
+	validID := ids.GenerateTestNodeID()
+
+	tests := []struct {
+		name             string
+		maxSizeKiB       *uint
+		peerIDs          *[]string
+		wantErr          error
+		wantEnabled      bool
+		wantMaxSize      uint32
+		wantAllowAll     bool
+		wantAllowlistLen int
+	}{
+		{
+			name:             "neither set is disabled",
+			wantEnabled:      false,
+			wantMaxSize:      0,
+			wantAllowlistLen: 0,
+		},
+		{
+			name:       "only max size set",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			wantErr:    errLargeMessageFlagsTogether,
+		},
+		{
+			name:    "only peer ids set",
+			peerIDs: &[]string{validID.String()},
+			wantErr: errLargeMessageFlagsTogether,
+		},
+		{
+			name:             "valid elevated config",
+			maxSizeKiB:       ptr(2 * defaultKiB),
+			peerIDs:          &[]string{validID.String()},
+			wantEnabled:      true,
+			wantMaxSize:      2 * constants.DefaultMaxMessageSize,
+			wantAllowlistLen: 1,
+		},
+		{
+			name:             "wildcard enables all peers",
+			maxSizeKiB:       ptr(2 * defaultKiB),
+			peerIDs:          &[]string{"*"},
+			wantEnabled:      true,
+			wantMaxSize:      2 * constants.DefaultMaxMessageSize,
+			wantAllowAll:     true,
+			wantAllowlistLen: 0,
+		},
+		{
+			name:       "wildcard with peer ids",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{"*", validID.String()},
+			wantErr:    errLargeMessagePeerIDsWildcardAlone,
+		},
+		{
+			name:       "size below default",
+			maxSizeKiB: ptr(defaultKiB / 2),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeTooSmall,
+		},
+		{
+			name:       "size equal to default",
+			maxSizeKiB: ptr(defaultKiB),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeIsDefault,
+		},
+		{
+			name:       "size exceeds uint32",
+			maxSizeKiB: ptr(uint(math.MaxUint32/units.KiB) + 1),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeTooLarge,
+		},
+		{
+			name:       "peer ids set but empty",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{},
+			wantErr:    errLargeMessagePeerIDsEmpty,
+		},
+		{
+			name:       "peer ids only whitespace",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{" ", ""},
+			wantErr:    errLargeMessagePeerIDsEmpty,
+		},
+		{
+			name:       "invalid peer id",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{"not-a-node-id"},
+			wantErr:    errParseLargeMessagePeerID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			if tt.maxSizeKiB != nil {
+				v.Set(NetworkLargeMessageSizeKey, *tt.maxSizeKiB)
+			}
+			if tt.peerIDs != nil {
+				v.Set(NetworkLargeMessagePeerIDsKey, *tt.peerIDs)
+			}
+
+			cfg, err := getLargeMessageConfig(v)
+			if tt.wantErr != nil {
+				require.ErrorIs(err, tt.wantErr)
+				return
+			}
+
+			require.NoError(err)
+			require.Equal(tt.wantEnabled, cfg.Enabled)
+			require.Equal(tt.wantMaxSize, cfg.MaxMessageSize)
+			require.Equal(tt.wantAllowAll, cfg.AllowAll)
+			require.Equal(tt.wantAllowlistLen, cfg.Allowlist.Len())
+		})
+	}
+}
+
+func TestGetLargeMessageThrottlerConfig(t *testing.T) {
+	const (
+		defaultKiB       = uint(constants.DefaultMaxMessageSize / units.KiB)
+		maxSize          = uint64(2 * constants.DefaultMaxMessageSize)
+		maxProcessing    = uint64(10)
+		cpuRecheckDelay  = 2 * time.Second
+		diskRecheckDelay = 3 * time.Second
+	)
+	validID := ids.GenerateTestNodeID()
+	explicitAtLarge := uint64(10 * units.GiB)
+
+	tests := []struct {
+		name    string
+		set     func(*viper.Viper)
+		wantErr error
+		check   func(*testing.T, network.LargeMessageThrottlerConfig)
+	}{
+		{
+			name: "explicit elevated throttler values",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundAtLargeAllocSizeKey, explicitAtLarge)
+			},
+			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
+				require.Equal(t, explicitAtLarge, throttler.InboundMsgThrottlerConfig.AtLargeAllocSize)
+				require.Equal(t, maxSize, throttler.InboundMsgThrottlerConfig.NodeMaxAtLargeBytes)
+			},
+		},
+		{
+			name: "defaults derived from max message size",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+			},
+			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
+				require.Equal(t, network.DefaultLargeMessageThrottlerConfig(maxSize), throttler)
+				inbound := throttler.InboundMsgThrottlerConfig
+				require.Equal(t, uint64(constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode), inbound.MaxProcessingMsgsPerNode)
+				require.Equal(t, constants.DefaultInboundThrottlerCPUMaxRecheckDelay, inbound.CPUThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, constants.DefaultInboundThrottlerDiskMaxRecheckDelay, inbound.DiskThrottlerConfig.MaxRecheckDelay)
+			},
+		},
+		{
+			name: "inbound node max below max message size",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxSize-1)
+			},
+			wantErr: fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxSize),
+		},
+		{
+			name: "explicit elevated throttler limits",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundValidatorAllocSizeKey, uint64(units.GiB))
+				v.Set(NetworkLargeMessageInboundMaxProcessingMsgsKey, maxProcessing)
+				v.Set(NetworkLargeMessageInboundBandwidthRefillRateKey, uint64(512*units.MiB))
+				v.Set(NetworkLargeMessageInboundCPUMaxRecheckDelayKey, cpuRecheckDelay)
+				v.Set(NetworkLargeMessageInboundDiskMaxRecheckDelayKey, diskRecheckDelay)
+				v.Set(NetworkLargeMessageOutboundValidatorAllocSizeKey, uint64(2*units.GiB))
+			},
+			check: func(t *testing.T, throttler network.LargeMessageThrottlerConfig) {
+				inbound := throttler.InboundMsgThrottlerConfig
+				require.Equal(t, uint64(units.GiB), inbound.VdrAllocSize)
+				require.Equal(t, maxProcessing, inbound.MaxProcessingMsgsPerNode)
+				require.Equal(t, uint64(512*units.MiB), inbound.RefillRate)
+				require.Equal(t, cpuRecheckDelay, inbound.CPUThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, diskRecheckDelay, inbound.DiskThrottlerConfig.MaxRecheckDelay)
+				require.Equal(t, uint64(2*units.GiB), throttler.OutboundMsgThrottlerConfig.VdrAllocSize)
+			},
+		},
+		{
+			name: "inbound validator alloc must be positive when set",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundValidatorAllocSizeKey, uint64(0))
+			},
+			wantErr: fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundValidatorAllocSizeKey),
+		},
+		{
+			name: "inbound max processing messages must be positive",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundMaxProcessingMsgsKey, uint64(0))
+			},
+			wantErr: fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundMaxProcessingMsgsKey),
+		},
+		{
+			name: "inbound CPU recheck delay must meet minimum",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay-time.Nanosecond)
+			},
+			wantErr: fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay),
+		},
+		{
+			name: "inbound disk recheck delay must meet minimum",
+			set: func(v *viper.Viper) {
+				v.Set(NetworkLargeMessageSizeKey, 2*defaultKiB)
+				v.Set(NetworkLargeMessagePeerIDsKey, []string{validID.String()})
+				v.Set(NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay-time.Nanosecond)
+			},
+			wantErr: fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			tt.set(v)
+
+			cfg, err := getLargeMessageConfig(v)
+			if tt.wantErr != nil {
+				require.EqualError(err, tt.wantErr.Error())
+				return
+			}
+
+			require.NoError(err)
+			if tt.check != nil {
+				tt.check(t, cfg.Throttler)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
 
 func setupViperFlags() *viper.Viper {

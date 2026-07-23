@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -85,6 +86,7 @@ func main() {
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
 		time.Hour,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		log.Fatalf("failed to create message builder: %s\n", err)

@@ -224,15 +224,6 @@ func New(
 		return nil, err
 	}
 
-	n.msgCreator, err = message.NewCreator(
-		networkRegisterer,
-		n.Config.NetworkConfig.CompressionType,
-		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("problem initializing message creator: %w", err)
-	}
-
 	n.vdrs = validators.NewManager()
 	if !n.Config.SybilProtectionEnabled {
 		logger.Warn("sybil control is not enforced")
@@ -246,6 +237,7 @@ func New(
 	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
+	n.msgCreator = n.Net.MsgCreator()
 
 	n.initEventDispatchers()
 
@@ -632,7 +624,6 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.Config.UpgradeConfig.HeliconTime, // Must be updated for each network upgrade
-		n.msgCreator,
 		reg,
 		n.Log,
 		listener,
@@ -1163,6 +1154,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
+			BootstrapLargeMessageConfig:             n.Config.NetworkConfig.LargeMessageConfig,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,

@@ -231,6 +231,9 @@ type ManagerConfig struct {
 	BootstrapMaxTimeGetAncestors time.Duration
 	// Max number of containers in an ancestors message sent by this node.
 	BootstrapAncestorsMaxContainersSent int
+	// BootstrapLargeMessageConfig selects peers that may receive larger
+	// GetAncestors responses.
+	BootstrapLargeMessageConfig network.LargeMessageConfig
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
 	BootstrapAncestorsMaxContainersReceived int
@@ -924,6 +927,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		m.BootstrapLargeMessageConfig,
 		ctx.Registerer,
 	)
 	if err != nil {
@@ -1349,6 +1353,7 @@ func (m *manager) createSnowmanChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		m.BootstrapLargeMessageConfig,
 		ctx.Registerer,
 	)
 	if err != nil {

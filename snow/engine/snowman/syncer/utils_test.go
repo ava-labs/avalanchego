@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -97,6 +98,7 @@ func buildTestsObjects(
 		ctx.Log,
 		time.Second,
 		2000,
+		network.LargeMessageConfig{},
 		ctx.Registerer,
 	)
 	require.NoError(err)

@@ -8,6 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//network",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//utils/constants",
@@ -25,12 +26,14 @@ go_test(
     embed = [":getter"],
     deps = [
         "//ids",
+        "//network",
         "//snow/consensus/snowman",
         "//snow/consensus/snowman/snowmantest",
         "//snow/engine/common",
         "//snow/engine/enginetest",
         "//snow/engine/snowman/block/blockmock",
         "//snow/engine/snowman/block/blocktest",
+        "//utils/constants",
         "//utils/logging",
         "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",
