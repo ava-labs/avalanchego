@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -21,89 +20,86 @@ import (
 // mkConfigWithAllowList creates a new config with the correct type for [module]
 // by marshalling [cfg] to JSON and then unmarshalling it into the config.
 func mkConfigWithAllowList(module modules.Module, cfg *allowlist.AllowListConfig) precompileconfig.Config {
+	return mkConfigWithUpgradeAndAllowList(module, cfg, precompileconfig.Upgrade{})
+}
+
+func mkConfigWithUpgradeAndAllowList(module modules.Module, cfg *allowlist.AllowListConfig, update precompileconfig.Upgrade) precompileconfig.Config {
+	// Apply AllowListConfig fields via JSON round-trip so they land in the
+	// correct concrete Config type for the module.
 	jsonBytes, err := json.Marshal(cfg)
 	if err != nil {
 		panic(err)
 	}
 
 	moduleCfg := module.MakeConfig()
-	err = json.Unmarshal(jsonBytes, moduleCfg)
-	if err != nil {
+	if err := json.Unmarshal(jsonBytes, moduleCfg); err != nil {
 		panic(err)
+	}
+
+	if update != (precompileconfig.Upgrade{}) {
+		jsonUpgradeBytes, err := json.Marshal(update)
+		if err != nil {
+			panic(err)
+		}
+		if err := json.Unmarshal(jsonUpgradeBytes, moduleCfg); err != nil {
+			panic(err)
+		}
 	}
 
 	return moduleCfg
 }
 
-func mkConfigWithUpgradeAndAllowList(module modules.Module, cfg *allowlist.AllowListConfig, update precompileconfig.Upgrade) precompileconfig.Config {
-	jsonUpgradeBytes, err := json.Marshal(update)
-	if err != nil {
-		panic(err)
-	}
-
-	moduleCfg := mkConfigWithAllowList(module, cfg)
-	err = json.Unmarshal(jsonUpgradeBytes, moduleCfg)
-	if err != nil {
-		panic(err)
-	}
-	return moduleCfg
-}
-
-func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]precompiletest.ConfigVerifyTest {
-	return map[string]precompiletest.ConfigVerifyTest{
-		"invalid allow list config with duplicate admins in allowlist": {
+func AllowListConfigVerifyTests(t testing.TB, module modules.Module) []precompiletest.ConfigVerifyTest {
+	return []precompiletest.ConfigVerifyTest{
+		{
+			Name: "invalid allow list config with duplicate admins in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   []common.Address{TestAdminAddr, TestAdminAddr},
-				ManagerAddresses: nil,
-				EnabledAddresses: nil,
+				AdminAddresses: []common.Address{TestAdminAddr, TestAdminAddr},
 			}),
-			ExpectedError: allowlist.ErrDuplicateAdminAddress,
+			ExpectedErr: allowlist.ErrDuplicateAdminAddress,
 		},
-		"invalid allow list config with duplicate enableds in allowlist": {
+		{
+			Name: "invalid allow list config with duplicate enableds in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   nil,
-				ManagerAddresses: nil,
 				EnabledAddresses: []common.Address{TestEnabledAddr, TestEnabledAddr},
 			}),
-			ExpectedError: allowlist.ErrDuplicateEnabledAddress,
+			ExpectedErr: allowlist.ErrDuplicateEnabledAddress,
 		},
-		"invalid allow list config with duplicate managers in allowlist": {
+		{
+			Name: "invalid allow list config with duplicate managers in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   nil,
 				ManagerAddresses: []common.Address{TestManagerAddr, TestManagerAddr},
-				EnabledAddresses: nil,
 			}),
-			ExpectedError: allowlist.ErrDuplicateManagerAddress,
+			ExpectedErr: allowlist.ErrDuplicateManagerAddress,
 		},
-		"invalid allow list config with same admin and enabled in allowlist": {
+		{
+			Name: "invalid allow list config with same admin and enabled in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
-				ManagerAddresses: nil,
 				EnabledAddresses: []common.Address{TestAdminAddr},
 			}),
-			ExpectedError: allowlist.ErrAdminAndEnabledAddress,
+			ExpectedErr: allowlist.ErrAdminAndEnabledAddress,
 		},
-		"invalid allow list config with same admin and manager in allowlist": {
+		{
+			Name: "invalid allow list config with same admin and manager in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestAdminAddr},
-				EnabledAddresses: nil,
 			}),
-			ExpectedError: allowlist.ErrAdminAndManagerAddress,
+			ExpectedErr: allowlist.ErrAdminAndManagerAddress,
 		},
-		"invalid allow list config with same manager and enabled in allowlist": {
+		{
+			Name: "invalid allow list config with same manager and enabled in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   nil,
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: []common.Address{TestManagerAddr},
 			}),
-			ExpectedError: allowlist.ErrEnabledAndManagerAddress,
+			ExpectedErr: allowlist.ErrEnabledAndManagerAddress,
 		},
-		"invalid allow list config with manager role before activation": {
+		{
+			Name: "invalid allow list config with manager role before activation",
 			Config: mkConfigWithUpgradeAndAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   nil,
 				ManagerAddresses: []common.Address{TestManagerAddr},
-				EnabledAddresses: nil,
 			}, precompileconfig.Upgrade{
 				BlockTimestamp: utils.PointerTo[uint64](1),
 			}),
@@ -112,47 +108,44 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				config.EXPECT().IsDurango(gomock.Any()).Return(false)
 				return config
 			}(),
-			ExpectedError: allowlist.ErrCannotAddManagersBeforeDurango,
+			ExpectedErr: allowlist.ErrCannotAddManagersBeforeDurango,
 		},
-		"nil member allow list config in allowlist": {
-			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
-				AdminAddresses:   nil,
-				ManagerAddresses: nil,
-				EnabledAddresses: nil,
-			}),
-			ExpectedError: nil,
+		{
+			Name:   "nil member allow list config in allowlist",
+			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{}),
 		},
-		"empty member allow list config in allowlist": {
+		{
+			Name: "empty member allow list config in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{},
 				ManagerAddresses: []common.Address{},
 				EnabledAddresses: []common.Address{},
 			}),
-			ExpectedError: nil,
 		},
-		"valid allow list config in allowlist": {
+		{
+			Name: "valid allow list config in allowlist",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: []common.Address{TestEnabledAddr},
 			}),
-			ExpectedError: nil,
 		},
 	}
 }
 
-func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]precompiletest.ConfigEqualTest {
-	return map[string]precompiletest.ConfigEqualTest{
-		"allowlist non-nil config and nil other": {
+func AllowListConfigEqualTests(_ testing.TB, module modules.Module) []precompiletest.ConfigEqualTest {
+	return []precompiletest.ConfigEqualTest{
+		{
+			Name: "allowlist non-nil config and nil other",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: []common.Address{TestEnabledAddr},
 			}),
-			Other:    nil,
 			Expected: false,
 		},
-		"allowlist different admin": {
+		{
+			Name: "allowlist different admin",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
@@ -165,7 +158,8 @@ func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]p
 			}),
 			Expected: false,
 		},
-		"allowlist different manager": {
+		{
+			Name: "allowlist different manager",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
@@ -178,7 +172,8 @@ func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]p
 			}),
 			Expected: false,
 		},
-		"allowlist different enabled": {
+		{
+			Name: "allowlist different enabled",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
@@ -191,7 +186,8 @@ func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]p
 			}),
 			Expected: false,
 		},
-		"allowlist same config": {
+		{
+			Name: "allowlist same config",
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{
 				AdminAddresses:   []common.Address{TestAdminAddr},
 				ManagerAddresses: []common.Address{TestManagerAddr},
@@ -207,26 +203,16 @@ func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]p
 	}
 }
 
-func VerifyPrecompileWithAllowListTests(t *testing.T, module modules.Module, verifyTests map[string]precompiletest.ConfigVerifyTest) {
+func VerifyPrecompileWithAllowListTests(t *testing.T, module modules.Module, verifyTests []precompiletest.ConfigVerifyTest) {
 	t.Helper()
 	tests := AllowListConfigVerifyTests(t, module)
-	// Add the contract specific tests to the map of tests to run.
-	for name, test := range verifyTests {
-		require.NotContains(t, tests, name, "duplicate test name: %s", name)
-		tests[name] = test
-	}
-
+	tests = append(tests, verifyTests...)
 	precompiletest.RunVerifyTests(t, tests)
 }
 
-func EqualPrecompileWithAllowListTests(t *testing.T, module modules.Module, equalTests map[string]precompiletest.ConfigEqualTest) {
+func EqualPrecompileWithAllowListTests(t *testing.T, module modules.Module, equalTests []precompiletest.ConfigEqualTest) {
 	t.Helper()
 	tests := AllowListConfigEqualTests(t, module)
-	// Add the contract specific tests to the map of tests to run.
-	for name, test := range equalTests {
-		require.NotContains(t, tests, name, "duplicate test name: %s", name)
-		tests[name] = test
-	}
-
+	tests = append(tests, equalTests...)
 	precompiletest.RunEqualTests(t, tests)
 }

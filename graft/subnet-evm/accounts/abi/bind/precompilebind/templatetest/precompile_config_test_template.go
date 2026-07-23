@@ -33,21 +33,22 @@ func TestVerify(t *testing.T) {
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	{{- end}}
-	tests := map[string]precompiletest.ConfigVerifyTest{
-		"valid config": {
+	tests := []precompiletest.ConfigVerifyTest{
+		{
+			Name: "valid config",
 			Config: NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
 				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			}(),
-			ExpectedError: nil,
 		},
 		// CUSTOM CODE STARTS HERE
 		// Add your own Verify tests here, e.g.:
-		// "your custom test name": {
+		// {
+		// 	Name: "your custom test name",
 		// 	Config: NewConfig(utils.PointerTo[uint64](3), {{- if .Contract.AllowList}} admins, enableds, managers{{- end}}),
-		// 	ExpectedError: ErrYourCustomError,
+		// 	ExpectedErr: ErrYourCustomError,
 		// },
 	}
 	{{- if .Contract.AllowList}}
@@ -70,23 +71,27 @@ func TestEqual(t *testing.T) {
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	{{- end}}
-	tests := map[string]precompiletest.ConfigEqualTest{
-		"non-nil config and nil other": {
+	tests := []precompiletest.ConfigEqualTest{
+		{
+			Name: "non-nil config and nil other",
 			Config:   NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Other:    nil,
 			Expected: false,
 		},
-		"different type": {
+		{
+			Name: "different type",
 			Config:   NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
-		"different timestamp": {
+		{
+			Name: "different timestamp",
 			Config:   NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Other:    NewConfig(utils.PointerTo[uint64](4){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Expected: false,
 		},
-		"same config": {
+		{
+			Name: "same config",
 			Config: NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Other: NewConfig(utils.PointerTo[uint64](3){{- if .Contract.AllowList}}, admins, enableds, managers{{- end}}),
 			Expected: true,
