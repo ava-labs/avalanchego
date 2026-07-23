@@ -11,20 +11,20 @@ import "github.com/ava-labs/avalanchego/vms/components/gas"
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 type TargetExponent uint64
 
-// InitialTargetExponent is the initial target exponent. Its target is the
-// 1,000,000 gas-per-second minimum.
+// InitialTargetExponent is the initial target exponent. Its target is
+// [MinTarget].
 const InitialTargetExponent TargetExponent = 0
+
+// MinTarget is the minimum target gas per second.
+const MinTarget = gas.Gas(1_000_000)
 
 // Target returns the target gas per second.
 //
-// Target = minimum * e^(t / conversionRate)
+// Target = [MinTarget] * e^(t / conversionRate)
 func (t TargetExponent) Target() gas.Gas {
-	const (
-		minimum        = 1_000_000 // gas
-		conversionRate = 1 << 25
-	)
+	const conversionRate = 1 << 25
 	return gas.Gas(gas.CalculatePrice(
-		minimum,
+		gas.Price(MinTarget),
 		gas.Gas(t),
 		conversionRate,
 	))

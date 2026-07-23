@@ -518,6 +518,7 @@ type hookTx struct {
 	id     ids.ID
 	tx     *tx.Tx
 	inputs set.Set[ids.ID]
+	size   int
 	op     hook.Op
 }
 
@@ -526,12 +527,19 @@ func newHookTx(t *tx.Tx, avaxAssetID ids.ID) (*hookTx, error) {
 	if err != nil {
 		return nil, err
 	}
+	bytes, err := t.Bytes()
+	if err != nil {
+		return nil, err
+	}
 	return &hookTx{
 		id:     op.ID,
 		tx:     t,
 		inputs: t.InputIDs(),
+		size:   len(bytes),
 		op:     op,
 	}, nil
 }
 
 func (t *hookTx) AsOp() hook.Op { return t.op }
+
+func (t *hookTx) Size() int { return t.size }

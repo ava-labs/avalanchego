@@ -133,6 +133,7 @@ type BlockBuilder[T Transaction] interface {
 // [Op].
 type Transaction interface {
 	AsOp() Op
+	Size() int
 }
 
 // AccountDebit includes an amount that an account should have debited,

@@ -20,6 +20,7 @@ go_library(
         "//utils/set",
         "//utils/setmap",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//core",

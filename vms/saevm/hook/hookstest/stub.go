@@ -301,6 +301,9 @@ type Op struct {
 	canotoData canotoData_Op
 }
 
+// Size returns the op's serialized size
+func (o Op) Size() int { return len(o.MarshalCanoto()) }
+
 // AsOp converts the op into a representation that SAE can use directly.
 func (o Op) AsOp() hook.Op {
 	hookOp := hook.Op{
