@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/run_bazel_ci_command.sh test //main:...
-# ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...
-# BAZEL_CI_ENFORCE_DEPENDENCY_LIST=1 ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...
+# ./scripts/run_bazel_ci_command.sh test //main:avalanchego
+# ./scripts/run_bazel_ci_command.sh test //:unit_tests
+# BAZEL_CI_ENFORCE_DEPENDENCY_LIST=1 ./scripts/run_bazel_ci_command.sh test //:subnet_evm_unit_tests
 #
 # This is the Bazel CI wrapper for Bazel commands that take target patterns.  In CI it
 # can reject commands whose target patterns are missing from

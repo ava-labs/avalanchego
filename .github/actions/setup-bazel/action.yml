@@ -28,7 +28,7 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh', '.bazel/generated_test_suites.bzl') }}
         restore-keys: |
           bazel-repo-${{ runner.os }}-${{ runner.arch }}-
 
@@ -39,7 +39,7 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh', '.bazel/generated_test_suites.bzl') }}
         restore-keys: |
           bazel-repo-${{ runner.os }}-${{ runner.arch }}-
 
