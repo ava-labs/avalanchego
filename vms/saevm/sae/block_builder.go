@@ -68,6 +68,7 @@ func (b *blockBuilderG[_]) build(
 		parent,
 		b.mempool.TransactionsByPriority,
 		b.hooks,
+		saeparams.TargetBlockBytes,
 	)
 }
 
@@ -120,6 +121,7 @@ func (b *blockBuilderG[_]) rebuild(
 		parent,
 		func(txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
 		rebuilder,
+		saeparams.MaxBlockBytes,
 	)
 }
 
@@ -132,12 +134,16 @@ var (
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
 // and [blockBuilder.rebuild]. The block context MAY be nil.
+//
+// blockByteBudget caps the cumulative serialized size of included
+// transactions.
 func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
 	builder hook.BlockBuilder[T],
+	blockByteBudget uint64,
 ) (*blocks.Block, error) {
 	hdr, err := builder.BuildHeader(parent.Header())
 	if err != nil {
@@ -245,7 +251,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
 		})
-		included []*types.Transaction
+		included        []*types.Transaction
+		includedTxBytes uint64
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -265,6 +272,18 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
+		// Skip transactions that would push the block's transactions past
+		// their serialized-byte budget, even if mempool admission accepted
+		// more bytes than the gas-per-byte rule intends.
+		txBytes := tx.Size()
+		if includedTxBytes+txBytes > blockByteBudget {
+			txLog.Debug("Skipping transaction: block byte budget reached",
+				zap.Uint64("tx_bytes", txBytes),
+				zap.Uint64("included_tx_bytes", includedTxBytes),
+			)
+			continue
+		}
+
 		// The [saexec.Executor] checks the worst-case balance before tx
 		// execution so we MUST record it at the equivalent point, before
 		// ApplyTx().
@@ -274,6 +293,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		txLog.Trace("Including transaction")
 		included = append(included, tx)
+		includedTxBytes += txBytes
 	}
 	var includedOps []T
 	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {
