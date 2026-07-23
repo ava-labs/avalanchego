@@ -1178,7 +1178,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 func bootstrapMaxContainersBytes(config network.LargeMessageConfig) int {
 	maxMessageSize := uint64(constants.DefaultMaxMessageSize)
-	if config.Enabled() {
+	if config.Enabled {
 		maxMessageSize = uint64(config.MaxMessageSize)
 	}
 	return int(4 * maxMessageSize / 5)

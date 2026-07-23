@@ -103,4 +103,9 @@ const (
 	// Delays
 	DefaultNetworkInitialReconnectDelay = time.Second
 	DefaultNetworkMaxReconnectDelay     = time.Minute
+
+	// Match default throttler flags: 6 MiB at-large / 2 MiB per-node.
+	LargeMessageInboundAtLargeAllocMultiplier = 3
+	// Match default throttler flags: 32 MiB at-large / 2 MiB per-node.
+	LargeMessageOutboundAtLargeAllocMultiplier = 16
 )
