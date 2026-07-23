@@ -199,7 +199,9 @@ func TestDebugTrace(t *testing.T) {
 		},
 		{
 			method: "debug_traceTransaction",
-			args:   []any{depositTx.Hash(), tracers.TraceConfig{Tracer: utils.PointerTo("callTracer")}},
+			args:   []any{depositTx.Hash(), tracers.TraceConfig{
+				Tracer: utils.PointerTo("callTracer"),
+			}},
 			want: native.CallFrame{
 				From:    sut.wallet.Addresses()[0],
 				Gas:     depositTx.Gas(),
