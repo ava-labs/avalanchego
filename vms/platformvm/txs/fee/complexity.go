@@ -246,11 +246,12 @@ var (
 		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
-	errUnsupportedOutput = errors.New("unsupported output type")
-	errUnsupportedInput  = errors.New("unsupported input type")
-	errUnsupportedOwner  = errors.New("unsupported owner type")
-	errUnsupportedAuth   = errors.New("unsupported auth type")
-	errUnsupportedSigner = errors.New("unsupported signer type")
+	errUnsupportedOutput      = errors.New("unsupported output type")
+	errUnsupportedInput       = errors.New("unsupported input type")
+	errUnsupportedOwner       = errors.New("unsupported owner type")
+	errUnsupportedAuth        = errors.New("unsupported auth type")
+	errUnsupportedSigner      = errors.New("unsupported signer type")
+	errCreateL1TxNotSupported = errors.New("CreateL1Tx is not yet supported")
 )
 
 func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
@@ -414,16 +415,6 @@ func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Vali
 			gas.Bandwidth: addressBandwidth,
 		},
 	)
-}
-func CreateL1ValidatorComplexity(l1Validators ...*txs.CreateL1Validator) (gas.Dimensions, error) {
-	// COMING IN FUTURE PR. this is needed
-	var complexity gas.Dimensions
-	return complexity, nil
-}
-func createL1ValidatorComplexity(l1Validator *txs.CreateL1Validator) (gas.Dimensions, error) {
-	// COMING IN FUTURE PR. this is needed
-	var complexity gas.Dimensions
-	return complexity, nil
 }
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
@@ -769,8 +760,8 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return err
 }
 func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
-	// COMING IN FUTURE PR. this is needed.
-	return nil
+	// CreateL1Tx is implemented in a follow-up PR. Until then, this transaction is rejected.
+	return errCreateL1TxNotSupported
 }
 
 func (c *complexityVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
