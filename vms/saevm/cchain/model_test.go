@@ -166,6 +166,12 @@ type modelCore struct {
 	atomicKeys  []*secp256k1.PrivateKey
 	atomicAddrs []common.Address
 
+	// provisionedEver records every shared-memory UTXO the harness has ever
+	// written, per remote chain, regardless of the model's current
+	// available/consumed bucket — the seeding source for nodes created
+	// after provisioning happened (the networked machine's lateJoin).
+	provisionedEver map[ids.ID][]*avax.UTXO
+
 	pendingEthTxs    []*types.Transaction
 	pendingAtomicTxs []*tx.Tx
 }

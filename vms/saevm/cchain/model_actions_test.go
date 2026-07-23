@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -455,6 +456,10 @@ func (c *modelCore) provisionUTXO(rt *rapid.T, suts ...*SUT) {
 	c.m.availableUTXOs[chain] = append(c.m.availableUTXOs[chain], &provisionedUTXO{
 		utxo: utxo, ownerIdx: ownerIdx, amount: amount,
 	})
+	if c.provisionedEver == nil {
+		c.provisionedEver = make(map[ids.ID][]*avax.UTXO)
+	}
+	c.provisionedEver[chain] = append(c.provisionedEver[chain], utxo)
 }
 
 // hasPendingImport reports whether ownerIdx already has an unconfirmed
