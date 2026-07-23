@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -185,4 +186,21 @@ type Config struct {
 	// If true, connects to all validators regardless of primary network validator
 	// status or of configured tracked subnets.
 	ConnectToAllValidators bool `json:"connectToAllValidators"`
+
+	// LargeMessageConfig configures elevated P2P message sizes for allowlisted peers.
+	LargeMessageConfig LargeMessageConfig `json:"largeMessageConfig"`
+}
+
+// LargeMessageConfig configures elevated max P2P message sizes for specific peers.
+type LargeMessageConfig struct {
+	// MaxMessageSize is the elevated frame and codec size for allowlisted peers.
+	MaxMessageSize uint32 `json:"maxMessageSize"`
+
+	// Allowlist is the set of peer node IDs that may use the elevated stack.
+	Allowlist set.Set[ids.NodeID] `json:"-"`
+}
+
+// Enabled returns true when the elevated message stack should be built.
+func (c LargeMessageConfig) Enabled() bool {
+	return c.MaxMessageSize > constants.DefaultMaxMessageSize && c.Allowlist.Len() > 0
 }
