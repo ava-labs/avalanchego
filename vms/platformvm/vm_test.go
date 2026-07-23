@@ -1276,7 +1276,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		ctx.Log,
 		time.Second,
 		2000,
-		0,
+		constants.MaxContainersLen,
 		nil,
 		prometheus.NewRegistry(),
 	)

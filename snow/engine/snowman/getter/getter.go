@@ -5,6 +5,7 @@ package getter
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,6 +23,8 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
+var errInvalidMaxContainersBytes = errors.New("maxContainersBytes must be > 0")
+
 func New(
 	vm block.ChainVM,
 	sender common.Sender,
@@ -33,7 +36,7 @@ func New(
 	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	if maxContainersBytes <= 0 {
-		maxContainersBytes = constants.MaxContainersLen
+		return nil, errInvalidMaxContainersBytes
 	}
 
 	ssVM, _ := vm.(block.StateSyncableVM)

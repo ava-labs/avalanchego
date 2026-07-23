@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -97,6 +98,8 @@ func buildTestsObjects(
 		ctx.Log,
 		time.Second,
 		2000,
+		constants.MaxContainersLen,
+		nil,
 		ctx.Registerer,
 	)
 	require.NoError(err)
