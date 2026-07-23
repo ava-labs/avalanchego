@@ -33,7 +33,7 @@ func New(
 	snowCtx *snow.Context,
 	sender common.AppSender,
 ) (*Network, error) {
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "network")
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "p2p")
 	if err != nil {
 		return nil, fmt.Errorf("registering metrics: %w", err)
 	}
@@ -45,7 +45,7 @@ func New(
 		snowCtx.ValidatorState,
 		maxValidatorSetStaleness,
 	)
-	const namespace = "p2p"
+	const namespace = "network"
 	network, err := p2p.NewNetwork(
 		snowCtx.Log,
 		sender,
