@@ -144,6 +144,20 @@ func NodesToIDs(nodes ...*Node) []ids.NodeID {
 	return nodeIDs
 }
 
+// NodesForIDs returns the nodes whose IDs are in nodeIDs.
+func NodesForIDs(nodes []*Node, nodeIDs []ids.NodeID) []*Node {
+	desiredNodes := make([]*Node, 0, len(nodeIDs))
+	for _, node := range nodes {
+		for _, nodeID := range nodeIDs {
+			if node.NodeID == nodeID {
+				desiredNodes = append(desiredNodes, node)
+				break
+			}
+		}
+	}
+	return desiredNodes
+}
+
 func GetEnvWithDefault(envVar, defaultVal string) string {
 	val := os.Getenv(envVar)
 	if len(val) == 0 {
