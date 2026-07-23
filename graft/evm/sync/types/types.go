@@ -6,6 +6,8 @@ package types
 import (
 	"context"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
@@ -39,6 +41,11 @@ type LeafClient interface {
 	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error.
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
+}
+
+type CodeClient interface {
+	// GetCode synchronously retrieves code associated with the given hashes
+	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
 }
 
 // Extender is an interface that allows for extending the state sync process.

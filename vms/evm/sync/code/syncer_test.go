@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -21,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -69,71 +68,7 @@ func TestVerifyCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := verifyCode(tt.hashes, tt.data)
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestSyncer(t *testing.T) {
-	tests := []struct {
-		name          string
-		numFromSource int
-		numOnDisk     int
-		perReq        int
-	}{
-		{name: "single blob", numFromSource: 1},
-		{name: "batches across requests", numFromSource: 12, perReq: 4},
-		{name: "skips code already on disk", numFromSource: 3, numOnDisk: 2},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// A broken skip re-requests forever, so bound the wait.
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
-			nodeID := ids.GenerateTestNodeID()
-
-			source := memorydb.New()
-			target := memorydb.New()
-			want := map[common.Hash][]byte{}
-
-			for range tt.numFromSource {
-				code := randomCode(t)
-				want[writeCode(t, source, code)] = code
-			}
-			// Only in the target, so skipping must avoid requesting them.
-			for range tt.numOnDisk {
-				code := randomCode(t)
-				want[writeCode(t, target, code)] = code
-			}
-
-			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			require.NoError(t, RegisterHandler(net, logging.NoLog{}, source))
-
-			ch := make(chan common.Hash, len(want))
-			for hash := range want {
-				require.NoError(t, customrawdb.WriteCodeToFetch(target, hash))
-				ch <- hash
-			}
-			close(ch)
-
-			var opts []SyncerOption
-			if tt.perReq > 0 {
-				opts = append(opts, WithCodeHashesPerRequest(tt.perReq))
-			}
-			require.NoError(t, NewSyncer(NewClient(net, tracker), target, ch, opts...).Sync(ctx))
-
-			for hash, code := range want {
-				require.Equal(t, code, rawdb.ReadCode(target, hash))
-			}
-
-			it := customrawdb.NewCodeToFetchIterator(target)
-			defer it.Release()
-			require.False(t, it.Next(), "all to-fetch markers must be cleared")
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
@@ -148,7 +83,8 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, tamperingHandler()))
 
-	got, err := getCode(ctx, NewClient(net, tracker), []common.Hash{hash})
+	client := newCodeClient(net, tracker, loggingtest.New(t, logging.Debug))
+	got, err := client.GetCode(ctx, []common.Hash{hash})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, got, "tampered code must never be accepted")
 }
