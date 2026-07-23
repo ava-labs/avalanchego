@@ -1,126 +1,134 @@
-# `txgossip` — bounding block size to the P2P message limit
+# `txgossip`
 
-Package `txgossip` provides SAE's mempool, coupling a `gossip.BloomSet` with a
-`txpool.TxPool` so that transactions can be exchanged over AvalancheGo's p2p
+Package `txgossip` provides SAE's mempool. It couples a `txpool.TxPool` with a
+`gossip.BloomSet` so that transactions can be exchanged over AvalancheGo's p2p
 gossip machinery.
 
-The mempool is also where SAE starts bounding the size of its *blocks*:
-transactions are vetted on their way into the pool so that any block later
-built from it fits in a single P2P message. The rest of this document explains
-that rule.
+TODO: document the rest of the package.
+## Bounding blocks to the p2p message size limit
 
-## Why this exists
+### Why a rule is needed
 
-A SAE block is gossiped as a single P2P message, capped at
-`constants.DefaultMaxMessageSize` (2 MiB). But the block builder bounds blocks
-by **gas**, not **bytes** — and the two diverge: the cheapest byte is a calldata
-zero byte at `TxDataZeroGas = 4` gas/byte, so a block built to the block gas
-limit `x` — `80M` at Helicon launch (ACP-176 sets the per-block limit at target
-× 20, and the initial target is 4M) — could reach `80M / 4 ≈ 20 MB`, ~10× the
-message limit. Such a block can't be gossiped.
+An SAE block is gossiped as a single p2p message, which is capped at
+`constants.DefaultMaxMessageSize` (2 MiB). The block builder, however, bounds
+blocks by gas rather than bytes, and gas is a poor proxy for size. The cheapest
+byte is a zero calldata byte at 4 gas (`TxDataZeroGas`). The block gas limit at
+Helicon launch is 80M, since ACP-176 sets the per-block limit at 20 times the
+target and the initial target is 4M. A block filled with zero calldata could
+therefore reach 80M / 4 ≈ 20 MB, roughly ten times the message limit, and
+thus not be gossipable.
 
-This matters beyond a single wasted block. Unlike the P/X-chains, **SAE does not
-remove transactions from the mempool while building**, so a node that builds an
-oversized block and cannot gossip it would rebuild the *same* block from the
-same pending transactions rather than making progress. Bounding block size by
-bytes — not just gas — is therefore needed for liveness, not only efficiency.
-(Earlier EVM block builders kept blocks gossipable by skipping over-large txs at
-build time; SAE can do better because it knows each tx's gas limit up front and
-gates on the gas-to-byte ratio directly.)
+A block that cannot be gossiped halts the chain: unlike the P/X-chains, SAE
+does not remove transactions from the mempool while building, so a node that
+builds an oversized block would rebuild the same block from the same pending
+transactions rather than making progress. Every block MUST fit in a p2p message 
+for the chain to remain live, so block size has to be bounded in bytes and not 
+only in gas.
 
-## The rule
+Earlier EVM block builders kept blocks gossipable by skipping over-large
+transactions at build time. SAE can do better: it knows each transaction's gas
+limit up front, so it gates on the gas-to-byte ratio directly.
 
-A transaction is eligible only if its **byte share does not exceed its gas
-share**:
+### The rule
+
+A transaction is eligible only if its byte share of a block does not exceed
+its gas share:
 
 $$\text{accept if } \quad \frac{y}{M} \le \frac{g}{x} \quad \iff \quad y x \le g M$$
 
-where `M` = the block's transaction byte budget (`saeparams.TargetBlockBytes`,
-512 KiB below the max message size), `x` = block gas limit, `g` = tx gas limit,
-`y` = tx serialized size — i.e. it must carry at least `x/M ≈ 50.9` gas per byte
-(at the `80M` Helicon-launch limit). [`eligible`](./txgossip.go) evaluates this
-with exact 128-bit integer math.
+where `M` is the block's transaction byte budget (`saeparams.TargetBlockBytes`,
+512 KiB below the max message size), `x` is the block gas limit, `g` is the
+transaction's gas limit, and `y` is its serialized size. Equivalently, a
+transaction must carry at least `x/M` gas per byte, which is ≈ 50.9 at the
+Helicon-launch gas limit. [`eligible`](./txgossip.go) evaluates the rule with
+exact 128-bit integer math.
 
-The *ratio* form (not a flat byte cap) is what composes: if every included tx
-satisfies $y_i/M \le g_i/x$, then
+The rule ties a transaction's bytes to its gas so that the block's gas limit
+also acts as a byte limit. The builder already enforces $\sum_i g_i \le x$, so
+if every included transaction satisfies $y_i/M \le g_i/x$, then
 
 $$\sum_i \frac{y_i}{M} \le \sum_i \frac{g_i}{x} \le 1$$
 
-so a block's transactions fit in `M`, and the 512 KiB margin above `M` covers
-every non-transaction byte on the wire — **provided the `x` in the per-tx check
-matches the `x` bounding the block**, a condition the build-time backstop below
-protects.
+and a full block's worth of transactions fits in `M`, with the margin above
+`M` covering every non-transaction byte on the wire. A flat per-transaction
+byte cap has no such property: gas is the only limit on how many transactions
+a block holds (~3,800 minimum-gas transactions at `x` = 80M), so a flat cap
+small enough to bound the block would be around 400 bytes and reject nearly
+all traffic. This guarantee holds provided the `x` used in each
+per-transaction check matches the `x` bounding the block, a condition the
+build-time backstop below protects.
 
-## Why the threshold is acceptable
+### Impact on real traffic
 
-`50.9` gas/byte sits *above* even the 16 gas/nonzero-byte intrinsic cost, so it
-rejects any calldata-dominated tx with modest execution — raising the worry that
-it blocks legitimate traffic.
+The 50.9 gas/byte threshold exceeds even the 16 gas charged per nonzero
+calldata byte. Reaching it takes execution gas, so the rule rejects
+transactions that carry a lot of calldata but compute little with it.
 
-To assess that worry, **all C-Chain EVM traffic for May 2026 (82,577,809 txs)**
-was replayed against the rule as a what-if: each historical tx's gas limit `g`
-and serialized size `y` was checked against `y·x ≤ g·M` at the Helicon-launch
-parameters above (`x = 80M`, `M = 1.5 MiB`, threshold `x/M ≈ 50.9` gas/byte).
-Note that the C-Chain's own gas rules never enter the picture — the traffic is
-simply a realistic population of transactions to test the rule against. The
-resulting data showed that enforcing such a rule would not be harmful: 
+To measure how many transactions could be rejected, every C-Chain transaction 
+from May 2026 (82,577,809 in total) was checked against the rule at the 
+Helicon-launch parameters (`x` = 80M, `M` = 1.5 MiB). The C-Chain's own gas 
+rules play no part in the check; its history simply provides a realistic
+population of transactions.
 
-- **25,489 txs (0.0309%, ~1 in 3,240) would be rejected.** The median tx sits at
-  ~362 gas/byte, **~7× above the threshold**, so the rule almost never bites.
-- The rejected set is **calldata-dominated** traffic — byte-heavy relative to the
-  gas it buys, which is exactly what the ratio rule is meant to gate — not spam,
-  and rejection is **soft**: raising the tx's gas limit makes it eligible.
-- The absolute byte ceiling is never the binding constraint: the largest tx
-  all month was ~123 KiB (~12× under `M`). The **gas/byte ratio**, not size, is
-  what does the rejecting.
+- 25,489 transactions (0.0309%, about 1 in 3,240) would have been rejected.
+  The median transaction carries ~362 gas/byte, about 7 times the threshold,
+  so the rule almost never bites.
+- The rejected set is calldata-dominated traffic, byte-heavy relative to the
+  gas it buys, which is exactly what the rule is meant to gate.
+- The gas/byte ratio, not absolute size, does all the rejecting: the largest
+  transaction all month was ~123 KiB, about 12 times under `M`.
+
+Rejection is also recoverable: resubmitting the same transaction with a
+higher gas limit makes it eligible.
 
 <p>
   <img src="heuristic-scatter.png" width="420" alt="Size vs gas with the y = g·M/x rejection boundary; nearly all txs sit well above the line">
 </p>
 
-Blocking an absurdly small percentage of legitimate traffic to keep blocks gossipable is worth it. The issuers of said transactions can also simply pay more to continue to issue those transactions.
+### Why atomic transactions are out of scope
 
-## Why atomic transactions are out of scope
+Atomic cross-chain transactions (`ImportTx`/`ExportTx`) are byte-heavy and
+gas-light by construction, at roughly 36 gas/byte. The rule would reject
+essentially all of them, so they are gated out and handled separately. Any
+future use of `eligible` MUST only be reached by EVM transactions.
 
-Atomic cross-chain txs (`ImportTx`/`ExportTx`) are byte-heavy and gas-light by
-construction (~36 gas/byte, below the cutoff), so this rule would reject ~100% of
-them. They are gated out and handled
-separately. **Any future use of `eligible` must only be reached by EVM txs.**
+### Enforcement
 
-## How it is enforced — three layers
+The bound is enforced at three layers:
 
-1. **Mempool admission** ([`txgossip.go`](./txgossip.go)) — rejects ineligible
-   txs on the gossip and RPC paths against the **live** block gas limit
-   (`worstcase.SafeMaxBlockSize`). This carries the bulk of the protection.
-2. **Build-time backstop** ([`sae/block_builder.go`](../sae/block_builder.go)) —
-   caps a block's cumulative serialized tx bytes at the same
-   `saeparams.TargetBlockBytes`.
-3. **Verify-time cap** ([`sae/blocks.go`](../sae/blocks.go)) — rejects any block
-   whose serialization exceeds `saeparams.MaxBlockBytes` (256 KiB below the
-   message size) during verification, which covers self-built blocks as well as
-   those received from peers.
+1. Mempool admission ([`txgossip.go`](./txgossip.go)): ineligible transactions
+   are rejected on both the gossip and RPC paths, against the live block gas
+   limit from `worstcase.SafeMaxBlockSize`. This carries the bulk of the
+   protection.
+2. Build-time backstop ([`sae/block_builder.go`](../sae/block_builder.go)):
+   the builder caps a block's cumulative serialized transaction bytes at the
+   same `saeparams.TargetBlockBytes`.
+3. Verify-time cap ([`sae/blocks.go`](../sae/blocks.go)): verification rejects
+   any block whose serialization exceeds `saeparams.MaxBlockBytes`, 256 KiB
+   below the message size. This covers self-built blocks as well as blocks
+   received from peers.
 
-The backstop is needed because `x` is **dynamic** (ACP-176). A tx admitted
-under one `x` may be built into a block under a larger `x`, breaking the
-admission-time $\sum y \le M$ guarantee — so the absolute byte cap is what
-actually guarantees the produced block is gossipable. The flat, somewhat
-arbitrary margins below the message size (512 KiB for transaction bytes,
-256 KiB for the whole block) reserve headroom for the block header,
-hook-injected payloads, RLP framing, the ProposerVM header, and message
-framing, without itemizing their worst-case sizes.
+The backstop exists because `x` is dynamic under ACP-176. A transaction
+admitted under one `x` may be built into a block under a larger `x`, breaking
+the admission-time $\sum y \le M$ guarantee, so the absolute byte cap is what
+actually guarantees a produced block is gossipable. The flat margins below the
+message size (512 KiB for transaction bytes, 256 KiB for the whole block)
+reserve headroom for the block header, hook-injected payloads, RLP framing,
+the ProposerVM header, and message framing, without itemizing their worst-case
+sizes.
 
-## Assumptions that would justify revisiting
+### Assumptions that would justify revisiting
 
-- **`x = 80M`** is the Helicon-launch limit (live value from
-  `worstcase.SafeMaxBlockSize`). A material change in the gas target shifts the
-  threshold `x/M`; re-run the rejection-rate analysis before assuming the rule
+- `x` = 80M is the Helicon-launch limit; the live value comes from
+  `worstcase.SafeMaxBlockSize`. A material change in the gas target shifts the
+  threshold `x/M`. Re-run the rejection-rate analysis before assuming the rule
   stays this benign.
-- **`M = 1.5 MiB`** is `saeparams.TargetBlockBytes`, a literal deliberately NOT
-  derived from `constants.DefaultMaxMessageSize` (2 MiB), so a change to the
-  message size cannot silently move this consensus-relevant bound. A
-  compile-time assertion in [`sae/blocks.go`](../sae/blocks.go) fails the build
-  if the message size ever drops to `saeparams.MaxBlockBytes` or below.
-- **Traffic composition.** The 0.0309% figure was measured on traffic with no
-  access lists. The rule uses the true `types.Transaction.Size()`, so it stays
-  *correct* for any composition, but a future access-list- or calldata-heavy
-  workload could make it bite more often than history suggests.
+- `M` = 1.5 MiB is `saeparams.TargetBlockBytes`, a literal deliberately not
+  derived from `constants.DefaultMaxMessageSize` (2 MiB), so that a change to
+  the message size cannot silently move this consensus-relevant bound. A
+  compile-time assertion in [`sae/blocks.go`](../sae/blocks.go) fails the
+  build if the message size ever drops to `saeparams.MaxBlockBytes` or below.
+- The 0.0309% figure was measured on traffic with no access lists. The rule
+  uses the true `types.Transaction.Size()`, so it stays correct for any
+  traffic composition, but a future access-list- or calldata-heavy workload
+  could make the rule bite more often than history suggests.
