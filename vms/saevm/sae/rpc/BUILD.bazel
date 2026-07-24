@@ -59,6 +59,7 @@ go_library(
         "@com_github_ava_labs_libevm//libevm/ethapi",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rpc",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
