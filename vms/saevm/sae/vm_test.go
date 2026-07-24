@@ -458,8 +458,8 @@ func TestBuildBlockOpByteBackstop(t *testing.T) {
 	ops := []hookstest.Op{newOp(19_200), newOp(19_200), newOp(19_200), newOp(1)}
 
 	var (
-		big   = uint64(ops[0].Size())
-		small = uint64(ops[3].Size())
+		big   = uint64(ops[0].Size()) //#nosec G115 -- Known non-negative
+		small = uint64(ops[3].Size()) //#nosec G115 -- Known non-negative
 	)
 	require.LessOrEqual(t, 2*big+small, uint64(saeparams.TargetBlockBytes), "fixture: two big ops plus the small op must fit the byte budget")
 	require.Greater(t, 3*big, uint64(saeparams.TargetBlockBytes), "fixture: three big ops must exceed the byte budget")
