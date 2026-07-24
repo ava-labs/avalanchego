@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Configures prometheus and promtail to collect metrics and logs from
+# Configures prometheus and alloy to collect metrics and logs from
 # a local node.
 
 API_PORT="${API_PORT:-9650}"
@@ -31,10 +31,10 @@ cat > "${PROMETHEUS_CONFIG_FILE}" <<EOL
 EOL
 echo "Wrote prometheus configuration to ${PROMETHEUS_CONFIG_FILE}"
 
-PROMTAIL_CONFIG_PATH="${HOME}/.tmpnet/promtail/file_sd_configs"
-PROMTAIL_CONFIG_FILE="${PROMTAIL_CONFIG_PATH}/local.json"
-mkdir -p "${PROMTAIL_CONFIG_PATH}"
-cat > "${PROMTAIL_CONFIG_FILE}" <<EOL
+ALLOY_CONFIG_PATH="${HOME}/.tmpnet/alloy/file_sd_configs"
+ALLOY_CONFIG_FILE="${ALLOY_CONFIG_PATH}/local.json"
+mkdir -p "${ALLOY_CONFIG_PATH}"
+cat > "${ALLOY_CONFIG_FILE}" <<EOL
 [
   {
     "labels": {
@@ -47,10 +47,10 @@ cat > "${PROMTAIL_CONFIG_FILE}" <<EOL
   }
 ]
 EOL
-echo "Wrote promtail configuration to ${PROMTAIL_CONFIG_FILE}"
+echo "Wrote alloy configuration to ${ALLOY_CONFIG_FILE}"
 
 echo "Metrics collection by prometheus can be started with ./bin/tmpnetctl start-metrics-collector"
-echo "Log collection by promtail can be started with ./bin/tmpnetctl start-logs-collector"
+echo "Log collection by alloy can be started with ./bin/tmpnetctl start-logs-collector"
 
 GRAFANA_URI="${GRAFANA_URI:-https://avalabs.grafana.net/d/mabpvtq/avalanche-main-dashboard}"
 GRAFANA_LINK="${GRAFANA_URI}?var-filter=network_uuid%7C%3D%7C${METRICS_UUID}"

@@ -234,8 +234,8 @@ HOME
 └── .tmpnet                                              // Root path for the temporary network fixture
     ├── prometheus                                       // Working directory for a metrics-scraping prometheus instance
     │   └── file_sd_configs                              // Directory containing file-based service discovery config for prometheus
-    ├── promtail                                         // Working directory for a log-collecting promtail instance
-    │   └── file_sd_configs                              // Directory containing file-based service discovery config for promtail
+    ├── alloy                                            // Working directory for a log-collecting alloy instance
+    │   └── file_sd_configs                              // Directory containing file-based service discovery config for alloy
     └── networks                                         // Default parent directory for temporary networks
         └── 20240306-152305.924531                       // The timestamp of creation is the name of a network's directory
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
@@ -351,7 +351,7 @@ shared.
 [Top](#table-of-contents)
 
 ```bash
-# Start a nix shell to ensure the availability of promtail and prometheus.
+# Start a nix shell to ensure the availability of alloy and prometheus.
 nix develop
 
 # Enable collection of logs and metrics
@@ -388,7 +388,7 @@ LOKI_PASSWORD=<password> \
        - `PROMETHEUS_PASSWORD`
      - A `prometheus` binary available in the path
    - Once started, `prometheus` can be stopped by `tmpnetctl stop-metrics-collector`
- - `tmpnetctl start-logs-collector` starts `promtail` configured to collect logs
+ - `tmpnetctl start-logs-collector` starts `alloy` configured to collect logs
    from configured nodes and forward them to
    https://loki-poc.avax-dev.network.
    - Requires:
@@ -397,8 +397,8 @@ LOKI_PASSWORD=<password> \
        - `LOKI_PUSH_URL`
        - `LOKI_USERNAME`
        - `LOKI_PASSWORD`
-     - A `promtail` binary available in the path
-   - Once started, `promtail` can be stopped by `tmpnetctl stop-logs-collector`
+     - An `alloy` binary available in the path
+   - Once started, `alloy` can be stopped by `tmpnetctl stop-logs-collector`
  - Starting a development shell with `nix develop` is one way to
    ensure availability of the necessary binaries and requires the
    installation of nix (e.g. `./scripts/run_task.sh install-nix`).
@@ -415,11 +415,11 @@ from the node is written to
 
 Nodes log are stored at `~/.tmpnet/networks/[network id]/[node
 id]/logs` by default, and can optionally be forwarded to loki with
-promtail.
+alloy.
 
-When a node is started, promtail configuration enabling
+When a node is started, alloy configuration enabling
 collection of logs for the node is written to
-`~/.tmpnet/promtail/file_sd_configs/[network
+`~/.tmpnet/alloy/file_sd_configs/[network
 uuid]-[node id].json`.
 
 ### Labels
@@ -497,7 +497,7 @@ Example usage:
 When a network is started with tmpnet, a link to the [default grafana
 instance](https://avalabs.grafana.net) will be
 emitted. The dashboards will only be populated if prometheus and
-promtail are running locally (as per previous sections) to collect
+alloy are running locally (as per previous sections) to collect
 metrics and logs.
 
 If using a non-default grafana instance, set

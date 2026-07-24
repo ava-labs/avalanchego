@@ -198,7 +198,7 @@ func main() {
 			if err != nil {
 				return stacktrace.Wrap(err)
 			}
-			return tmpnet.StartPromtail(ctx, log)
+			return tmpnet.StartAlloy(ctx, log)
 		},
 	}
 	rootCmd.AddCommand(startLogsCollectorCmd)

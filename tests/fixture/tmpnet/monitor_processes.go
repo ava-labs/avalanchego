@@ -38,10 +38,10 @@ const (
 	prometheusListenAddress  = "127.0.0.1:9090"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
-	// Promtail configuration
-	promtailCmd          = "promtail"
-	promtailHTTPPort     = "3101"
-	promtailReadinessURL = "http://127.0.0.1:" + promtailHTTPPort + "/ready"
+	// Alloy configuration
+	alloyCmd          = "alloy"
+	alloyHTTPPort     = "12345"
+	alloyReadinessURL = "http://127.0.0.1:" + alloyHTTPPort + "/-/ready"
 
 	// Use a delay slightly longer than the scrape interval to ensure a final scrape before shutdown
 	NetworkShutdownDelay = prometheusScrapeInterval + 2*time.Second
@@ -62,23 +62,23 @@ func StartPrometheus(ctx context.Context, log logging.Logger) error {
 	return nil
 }
 
-// StartPromtail ensures promtail is running to collect logs from local nodes.
-func StartPromtail(ctx context.Context, log logging.Logger) error {
+// StartAlloy ensures alloy is running to collect logs from local nodes.
+func StartAlloy(ctx context.Context, log logging.Logger) error {
 	if _, ok := ctx.Deadline(); !ok {
-		return stacktrace.New("unable to start promtail with a context without a deadline")
+		return stacktrace.New("unable to start alloy with a context without a deadline")
 	}
-	if err := startPromtail(ctx, log); err != nil {
+	if err := startAlloy(ctx, log); err != nil {
 		return stacktrace.Wrap(err)
 	}
-	log.Info("skipping promtail readiness check until one or more nodes have written their service discovery configuration")
+	log.Info("skipping alloy readiness check until one or more nodes have written their service discovery configuration")
 	log.Info("To stop: tmpnetctl stop-logs-collector")
 	return nil
 }
 
-// WaitForPromtailReadiness waits until prometheus is ready. It can only succeed after
+// WaitForAlloyReadiness waits until alloy is ready. It can only succeed after
 // one or more nodes have written their service discovery configuration.
-func WaitForPromtailReadiness(ctx context.Context, log logging.Logger) error {
-	return waitForReadiness(ctx, log, promtailCmd, promtailReadinessURL)
+func WaitForAlloyReadiness(ctx context.Context, log logging.Logger) error {
+	return waitForReadiness(ctx, log, alloyCmd, alloyReadinessURL)
 }
 
 // StopMetricsCollector ensures prometheus is not running.
@@ -86,9 +86,9 @@ func StopMetricsCollector(ctx context.Context, log logging.Logger) error {
 	return stopCollector(ctx, log, prometheusCmd)
 }
 
-// StopLogsCollector ensures promtail is not running.
+// StopLogsCollector ensures alloy is not running.
 func StopLogsCollector(ctx context.Context, log logging.Logger) error {
-	return stopCollector(ctx, log, promtailCmd)
+	return stopCollector(ctx, log, alloyCmd)
 }
 
 // stopCollector stops the collector process if it is running.
@@ -161,10 +161,11 @@ func stopCollector(ctx context.Context, log logging.Logger, cmdName string) erro
 // startPrometheus ensures an agent-mode prometheus process is running to collect metrics from local nodes.
 func startPrometheus(ctx context.Context, log logging.Logger) error {
 	cmdName := prometheusCmd
+	confFilename := cmdName + ".yaml"
 
 	args := fmt.Sprintf(
-		"--config.file=%s.yaml --web.listen-address=%s --agent --storage.agent.path=./data --enable-feature=native-histograms",
-		cmdName,
+		"--config.file=%s --web.listen-address=%s --agent --storage.agent.path=./data --enable-feature=native-histograms",
+		confFilename,
 		prometheusListenAddress,
 	)
 
@@ -202,18 +203,17 @@ remote_write:
     send_native_histograms: true
 `, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
-	err = startCollector(ctx, log, cmdName, args, config)
+	err = startCollector(ctx, log, cmdName, confFilename, args, config)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
 	return nil
 }
 
-// startPromtail ensures a promtail process is running to collect logs from local nodes.
-func startPromtail(ctx context.Context, log logging.Logger) error {
-	cmdName := promtailCmd
-
-	args := fmt.Sprintf("-config.file=%s.yaml", cmdName)
+// startAlloy ensures an alloy process is running to collect logs from local nodes.
+func startAlloy(ctx context.Context, log logging.Logger) error {
+	cmdName := alloyCmd
+	confFilename := cmdName + ".alloy"
 
 	collectorConfig, err := getCollectorConfigForPush(cmdName)
 	if err != nil {
@@ -233,28 +233,38 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 		return stacktrace.Errorf("failed to create %s service discovery dir: %w", cmdName, err)
 	}
 
+	args := fmt.Sprintf(
+		"run --server.http.listen-addr=127.0.0.1:%s --storage.path=%s/data %s",
+		alloyHTTPPort,
+		workingDir,
+		confFilename,
+	)
+
+	// discovery.file reads the same Prometheus-style file_sd_config JSON that
+	// tmpnet already writes for each node (see writeMonitoringConfigFile),
+	// so no changes to the service discovery format are required.
 	config := fmt.Sprintf(`
-server:
-  http_listen_port: %s
-  grpc_listen_port: 0
+discovery.file "avalanchego" {
+	files = ["%s/*.json"]
+}
 
-positions:
-  filename: %s/positions.yaml
+loki.source.file "avalanchego" {
+	targets    = discovery.file.avalanchego.targets
+	forward_to = [loki.write.default.receiver]
+}
 
-client:
-  url: "%s"
-  basic_auth:
-    username: "%s"
-    password: "%s"
+loki.write "default" {
+	endpoint {
+		url = "%s"
+		basic_auth {
+			username = "%s"
+			password = "%s"
+		}
+	}
+}
+`, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
-scrape_configs:
-  - job_name: "avalanchego"
-    file_sd_configs:
-      - files:
-          - '%s/*.json'
-`, promtailHTTPPort, workingDir, collectorConfig.url, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
-
-	return startCollector(ctx, log, cmdName, args, config)
+	return startCollector(ctx, log, cmdName, confFilename, args, config)
 }
 
 func getWorkingDir(cmdName string) (string, error) {
@@ -347,6 +357,7 @@ func startCollector(
 	ctx context.Context,
 	log logging.Logger,
 	cmdName string,
+	confFilename string,
 	args string,
 	config string,
 ) error {
@@ -386,7 +397,6 @@ func startCollector(
 	}
 
 	// Write the collector config file
-	confFilename := cmdName + ".yaml"
 	confPath := filepath.Join(workingDir, confFilename)
 	log.Info("writing collector config",
 		zap.String("cmd", cmdName),
@@ -478,7 +488,7 @@ func getCollectorConfig(cmdName string, urlSuffix string) (collectorConfig, erro
 	switch cmdName {
 	case prometheusCmd:
 		baseEnvName = "PROMETHEUS"
-	case promtailCmd:
+	case alloyCmd:
 		baseEnvName = "LOKI"
 	default:
 		return collectorConfig{}, stacktrace.Errorf("unsupported cmd: %s", cmdName)

@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//go:embed yaml/promtail-daemonset.yaml
-var promtailManifest []byte
+//go:embed yaml/alloy-daemonset.yaml
+var alloyManifest []byte
 
 //go:embed yaml/prometheus-agent.yaml
 var prometheusManifest []byte
@@ -76,10 +76,10 @@ func deployKubeCollectors(
 
 	collectorConfigs := []kubeCollectorConfig{
 		{
-			name:         promtailCmd,
+			name:         alloyCmd,
 			target:       "logs",
 			secretPrefix: "loki",
-			manifest:     promtailManifest,
+			manifest:     alloyManifest,
 		},
 		{
 			name:         prometheusCmd,

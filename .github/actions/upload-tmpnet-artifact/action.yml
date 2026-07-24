@@ -16,5 +16,5 @@ runs:
         path: |
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
-          ~/.tmpnet/promtail/promtail.log
+          ~/.tmpnet/alloy/alloy.log
         if-no-files-found: error

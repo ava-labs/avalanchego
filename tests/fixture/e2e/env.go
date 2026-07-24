@@ -91,7 +91,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			require.NoError(tmpnet.StartPrometheus(tc.DefaultContext(), tc.Log()))
 		}
 		if flagVars.StartLogsCollector() {
-			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
+			require.NoError(tmpnet.StartAlloy(tc.DefaultContext(), tc.Log()))
 		}
 
 		// Register cleanups before network start to ensure they run after the network is stopped (LIFO)
@@ -191,7 +191,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		)
 	}
 
-	// Once one or more nodes are running it should be safe to wait for promtail to report readiness
+	// Once one or more nodes are running it should be safe to wait for alloy to report readiness
 	if flagVars.StartLogsCollector() {
 		runtimeConfig, err := flagVars.NodeRuntimeConfig()
 		require.NoError(err)
@@ -200,7 +200,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			// discovery configuration for its own metrics endpoint?
 			tc.Log().Warn("skipping check for logs collection readiness since kube nodes won't create have created the required service discovery config")
 		} else {
-			require.NoError(tmpnet.WaitForPromtailReadiness(tc.DefaultContext(), tc.Log()))
+			require.NoError(tmpnet.WaitForAlloyReadiness(tc.DefaultContext(), tc.Log()))
 		}
 	}
 

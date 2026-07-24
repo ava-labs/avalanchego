@@ -1,0 +1,228 @@
+# A secret called loki-config must be created separately with keys `url`, `username` and `password`
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-monitoring
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy-serviceaccount
+  namespace: ci-monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-clusterrole
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - services
+      - pods
+    verbs:
+      - get
+      - watch
+      - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: alloy-serviceaccount
+    namespace: ci-monitoring
+roleRef:
+  kind: ClusterRole
+  name: alloy-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: ci-monitoring
+data:
+  config.alloy: |
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    discovery.relabel "pods" {
+      targets = discovery.kubernetes.pods.targets
+
+      // TODO(marun) Ensure consistency with prometheus labeling
+      rule {
+        source_labels = ["__meta_kubernetes_pod_annotation_alloy_collect"]
+        action        = "keep"
+        regex         = "true"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_node_name"]
+        target_label  = "__host__"
+      }
+      rule {
+        action        = "replace"
+        replacement   = "$1"
+        separator     = "/"
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        target_label  = "job"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        replacement   = "/var/log/pods/*$1/*.log"
+        separator     = "/"
+        source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+        target_label  = "__path__"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_is_ephemeral_node"]
+        target_label  = "is_ephemeral_node"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_network_owner"]
+        target_label  = "network_owner"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_network_uuid"]
+        target_label  = "network_uuid"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_node_id"]
+        target_label  = "node_id"
+      }
+      // gh_repo is an annotation because labels can't contain `/` and a repo is typically `[org]/[repo]`
+      rule {
+        source_labels = ["__meta_kubernetes_pod_annotation_gh_repo"]
+        target_label  = "gh_repo"
+      }
+      // gh_workflow is an annotation because workflows can contain spaces
+      rule {
+        source_labels = ["__meta_kubernetes_pod_annotation_gh_workflow"]
+        target_label  = "gh_workflow"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_gh_run_id"]
+        target_label  = "gh_run_id"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_gh_run_number"]
+        target_label  = "gh_run_number"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_gh_run_attempt"]
+        target_label  = "gh_run_attempt"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_gh_job_id"]
+        target_label  = "gh_job_id"
+      }
+      // TODO(marun) Add kube cluster identifier as a label
+    }
+
+    local.file_match "pods" {
+      path_targets = discovery.relabel.pods.output
+    }
+
+    loki.source.file "pods" {
+      targets    = local.file_match.pods.targets
+      forward_to = [loki.process.pods.receiver]
+    }
+
+    loki.process "pods" {
+      stage.docker {}
+
+      forward_to = [loki.write.default.receiver]
+    }
+
+    loki.write "default" {
+      endpoint {
+        url = env("LOKI_URL")
+
+        basic_auth {
+          username = env("LOKI_USERNAME")
+          password = env("LOKI_PASSWORD")
+        }
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy-daemonset
+  namespace: ci-monitoring
+spec:
+  selector:
+    matchLabels:
+      name: alloy
+  template:
+    metadata:
+      labels:
+        name: alloy
+    spec:
+      serviceAccount: alloy-serviceaccount
+      containers:
+        - name: alloy-container
+          image: grafana/alloy:v1.17.1 # Pin latest version
+          args:
+            - run
+            - /etc/alloy/config.alloy
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/tmp/alloy
+          env:
+            - name: LOKI_URL
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: url
+            - name: LOKI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: username
+            - name: LOKI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: password
+          volumeMounts:
+            - name: logs
+              mountPath: /var/log
+              readOnly: true
+            - name: alloy-config
+              mountPath: /etc/alloy
+              readOnly: true
+            - mountPath: /var/lib/docker/containers
+              name: varlibdockercontainers
+              readOnly: true
+      volumes:
+        - name: logs
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: alloy-config
+          configMap:
+            name: alloy-config

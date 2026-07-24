@@ -61,7 +61,7 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 // provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
 // a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	config, err := getCollectorConfigForQuery(promtailCmd)
+	config, err := getCollectorConfigForQuery(alloyCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
