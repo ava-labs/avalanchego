@@ -55,6 +55,10 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"catchUpNode":        nm.catchUpNode,
 		"competingSiblings":  nm.competingSiblings,
 		"restartNode":        nm.restartNode,
+		// partitionNetwork/healPartition get single aliases: severance costs
+		// a full-network pre-sync plus four drain sweeps, and a partition's
+		// lasting cost is every stranded tx it forces later builds to skip.
+		"partitionNetwork": nm.partitionNetwork,
 		// lateJoin is once-only (and a no-op in runs without a joiner), so a
 		// single alias costs nothing; its lasting cost is the +1 node every
 		// subsequent action pays, which the joiner-presence odds in
@@ -464,6 +468,116 @@ func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 		nm.deliverBlock(rt, n, nm.canonical[n.acceptedCount])
 	}
 	n.delayed = false
+}
+
+// partitionNetwork splits the network into a majority side, which keeps
+// building and accepting canonical blocks, and a minority side, which
+// receives no blocks and no cross-side gossip until healPartition. One
+// minority flag is drawn per node — unconditionally, so the draw count is a
+// function of node count alone — and the action no-ops when a partition is
+// already active or the draw is illegal (empty minority, or no non-delayed
+// majority validator left to build). Minority nodes become ordinary delayed
+// nodes (canonical[acceptedCount:] is their implicit queue) plus the
+// transport cut performed here; already-delayed nodes may land on either
+// side and just keep their acceptedCount.
+func (nm *networkedMachine) partitionNetwork(rt *rapid.T) {
+	if nm.partitionActive() {
+		return
+	}
+	minority := make(map[int]struct{})
+	for _, n := range nm.nodes {
+		if rapid.Bool().Draw(rt, "minority") {
+			minority[n.idx] = struct{}{}
+		}
+	}
+	// Legality: nonempty minority, and the majority keeps at least one
+	// non-delayed validator to build on. Illegal draws no-op; rapid explores
+	// legal ones.
+	if len(minority) == 0 {
+		return
+	}
+	hasMajorityBuilder := false
+	for _, n := range nm.nodes {
+		if _, min := minority[n.idx]; !min && n.isValidator && !n.delayed {
+			hasMajorityBuilder = true
+			break
+		}
+	}
+	if !hasMajorityBuilder {
+		return
+	}
+
+	// Pre-sync (the restartNode pattern): every model-tracked pending tx
+	// reaches every non-delayed validator BEFORE severance. Tx placement is
+	// then unambiguous — exactly the txs issued to minority nodes after this
+	// action are stranded — and majority builders can include every
+	// pre-partition pending tx, even ones pinned to a node about to go
+	// minority. No partition is active here, so the sync set is the full
+	// pending set.
+	for _, v := range nm.nonDelayedValidators() {
+		v.sut.waitForPendingEthTxs(v.ctx, nm.tb, nm.pendingEthTxs...)
+		v.sut.waitForAtomicTxs(v.ctx, nm.tb, nm.pendingAtomicTxs...)
+	}
+
+	nm.minority = minority
+
+	// Sever every cross-side edge the topology has (validator ↔ everyone,
+	// non-validator ↔ validators only). VM level first: request traffic
+	// (pull gossip) picks targets from the connection-tracked p2p peer set,
+	// so after Disconnected neither side issues new requests across the cut.
+	for _, a := range nm.nodes {
+		if nm.inMinority(a.idx) {
+			continue
+		}
+		for _, b := range nm.nodes {
+			if !nm.inMinority(b.idx) || !(a.isValidator || b.isValidator) {
+				continue
+			}
+			require.NoErrorf(rt, a.sut.Disconnected(a.ctx, b.nodeID), "%T.Disconnected(%s) severing partition", a.sut.VM, b.nodeID)
+			require.NoErrorf(rt, b.sut.Disconnected(b.ctx, a.nodeID), "%T.Disconnected(%s) severing partition", b.sut.VM, a.nodeID)
+		}
+	}
+	// Sender level, in a race-safe order (compare restartNode's analysis):
+	// (1) drain everyone — flushes every in-flight cross-side request, and
+	//     handling a request spawns its response send inline, so
+	// (2) drain everyone again — lands those responses while both peer maps
+	//     still contain each other (avoiding the sender's unknown-peer
+	//     error); Disconnected above guarantees no NEW cross-side requests
+	//     spawn meanwhile.
+	// (3) RemovePeer both ways — push gossip samples the sender's own peer
+	//     map, so this is what actually stops pushes crossing the cut.
+	// (4) drain everyone once more — flushes pushes that sampled a
+	//     cross-side peer concurrently with (3); they carry only
+	//     pre-partition txs, which the pre-sync already delivered
+	//     everywhere.
+	for range 2 {
+		for _, n := range nm.nodes {
+			n.sut.Sender().Drain()
+		}
+	}
+	for _, a := range nm.nodes {
+		if nm.inMinority(a.idx) {
+			continue
+		}
+		for _, b := range nm.nodes {
+			if !nm.inMinority(b.idx) || !(a.isValidator || b.isValidator) {
+				continue
+			}
+			a.sut.Sender().RemovePeer(b.nodeID)
+			b.sut.Sender().RemovePeer(a.nodeID)
+		}
+	}
+	for _, n := range nm.nodes {
+		n.sut.Sender().Drain()
+	}
+
+	// Group lag: from here on every minority node is an ordinary delayed
+	// node plus the transport cut.
+	for _, n := range nm.nodes {
+		if nm.inMinority(n.idx) {
+			n.delayed = true
+		}
+	}
 }
 
 func (nm *networkedMachine) advanceClock(rt *rapid.T) {
