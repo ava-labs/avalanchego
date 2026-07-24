@@ -107,7 +107,7 @@ func NewFullFaker() *DummyEngine {
 }
 
 // verifyCoinbase checks that the coinbase is valid for the given [header] and [parent].
-func (eng *DummyEngine) verifyCoinbase(header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
+func (eng *DummyEngine) verifyCoinbase(header *types.Header, parent *types.Header, chain consensus.ChainReader) error {
 	if eng.consensusMode.ModeSkipCoinbase {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (eng *DummyEngine) verifyCoinbase(header *types.Header, parent *types.Heade
 	return nil
 }
 
-func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
+func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainReader) error {
 	// We verify the current block by checking the parent fee config
 	// this is because the current block cannot set the fee config for itself
 	// Fee config might depend on the state when precompile is activated
@@ -186,15 +186,6 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 		return err
 	}
 
-	// Ensure gas-related header fields are correct
-	if err := verifyHeaderGasFields(config, header, parent, chain); err != nil {
-		return err
-	}
-	// Ensure that coinbase is valid
-	if err := eng.verifyCoinbase(header, parent, chain); err != nil {
-		return err
-	}
-
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
@@ -224,6 +215,24 @@ func (eng *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *
 	return eng.verifyHeader(chain, header, parent, false)
 }
 
+func (eng *DummyEngine) VerifyBlock(chain consensus.ChainReader, block *types.Block) error {
+	if eng.consensusMode.ModeSkipHeader {
+		return nil
+	}
+
+	header := block.Header()
+	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	if parent == nil {
+		return consensus.ErrUnknownAncestor
+	}
+
+	config := params.GetExtra(chain.Config())
+	if err := verifyHeaderGasFields(config, header, parent, chain); err != nil {
+		return err
+	}
+	return eng.verifyCoinbase(header, parent, chain)
+}
+
 func (*DummyEngine) VerifyUncles(_ consensus.ChainReader, block *types.Block) error {
 	if len(block.Uncles()) > 0 {
 		return errUnclesUnsupported
@@ -236,7 +245,7 @@ func (*DummyEngine) Prepare(_ consensus.ChainHeaderReader, header *types.Header)
 	return nil
 }
 
-func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, _ *state.StateDB, receipts []*types.Receipt) error {
+func (eng *DummyEngine) Finalize(chain consensus.ChainReader, block *types.Block, parent *types.Header, _ *state.StateDB, receipts []*types.Receipt) error {
 	config := params.GetExtra(chain.Config())
 	timestamp := block.Time()
 	// we use the parent to determine the fee config
@@ -274,7 +283,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 	return nil
 }
 
-func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt,
 ) (*types.Block, error) {
 	// we use the parent to determine the fee config

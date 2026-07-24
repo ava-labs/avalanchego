@@ -71,6 +71,9 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// Header validity is known at this point. Here we verify that uncle and transactions
 	// given in the block body match the header.
 	header := block.Header()
+	if err := v.engine.VerifyBlock(v.bc, block); err != nil {
+		return err
+	}
 	if err := v.engine.VerifyUncles(v.bc, block); err != nil {
 		return err
 	}

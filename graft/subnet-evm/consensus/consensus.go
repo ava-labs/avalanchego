@@ -55,6 +55,15 @@ type ChainHeaderReader interface {
 
 	// GetHeaderByHash retrieves a block header from the database by its hash.
 	GetHeaderByHash(hash common.Hash) *types.Header
+}
+
+// ChainReader defines the methods needed to access blocks and state-backed
+// configuration during full block verification.
+type ChainReader interface {
+	ChainHeaderReader
+
+	// GetBlock retrieves a block from the database by hash and number.
+	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// GetFeeConfigAt retrieves the fee config and last changed block number at block header.
 	GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error)
@@ -62,15 +71,6 @@ type ChainHeaderReader interface {
 	// GetCoinbaseAt retrieves the configured coinbase address at [parent].
 	// If fee recipients are allowed, returns true in the second return value and a predefined address in the first value.
 	GetCoinbaseAt(parent *types.Header) (common.Address, bool, error)
-}
-
-// ChainReader defines a small collection of methods needed to access the local
-// blockchain during header and/or uncle verification.
-type ChainReader interface {
-	ChainHeaderReader
-
-	// GetBlock retrieves a block from the database by hash and number.
-	GetBlock(hash common.Hash, number uint64) *types.Block
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -88,6 +88,10 @@ type Engine interface {
 	// header).
 	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
 
+	// VerifyBlock checks state-dependent header fields that require the full
+	// block verification context.
+	VerifyBlock(chain ChainReader, block *types.Block) error
+
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
 	// rules of a given engine.
 	VerifyUncles(chain ChainReader, block *types.Block) error
@@ -101,14 +105,14 @@ type Engine interface {
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error
+	Finalize(chain ChainReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error
 
 	// FinalizeAndAssemble runs any post-transaction state modifications (e.g. block
 	// rewards) and assembles the final block.
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
+	FinalizeAndAssemble(chain ChainReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
 		uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error)
 
 	// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
