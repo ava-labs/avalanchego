@@ -71,8 +71,8 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// ShouldCreditBaseFee is unused, as subnet-evm never calls libevm's impelmentation of core
-// for message or transaction execution.
+// ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
+// implementation of core for message or transaction execution.
 func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }

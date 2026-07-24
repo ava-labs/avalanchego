@@ -330,7 +330,7 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
 
 	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
-	logPC := uint64(len(code) - 2)
+	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
 	ignore := onlyLOG1At(t, code, logPC)
 
 	newCreateTx := func() *types.Transaction {
