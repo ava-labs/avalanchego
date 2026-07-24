@@ -251,7 +251,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
 		})
-		included          []*types.Transaction
+		included      []*types.Transaction
 		includedBytes uint64
 	)
 	for _, ltx := range candidates {
@@ -277,10 +277,10 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// bytes than the gas-per-byte rule intends. The budget is shared with
 		// the end-of-block ops appended below.
 		txBytes := tx.Size()
-		if includedBodyBytes+txBytes > blockByteBudget {
+		if includedBytes+txBytes > blockByteBudget {
 			txLog.Debug("Skipping transaction: block byte budget reached",
 				zap.Uint64("tx_bytes", txBytes),
-				zap.Uint64("included_body_bytes", includedBodyBytes),
+				zap.Uint64("included_body_bytes", includedBytes),
 			)
 			continue
 		}
@@ -294,7 +294,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		txLog.Trace("Including transaction")
 		included = append(included, tx)
-		includedBodyBytes += txBytes
+		includedBytes += txBytes
 	}
 	var includedOps []T
 	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {
@@ -311,10 +311,10 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// Ops are serialized into the block's ExtData, so they consume the
 		// same body byte budget as the EVM transactions included above.
 		opBytes := uint64(tx.Size()) //#nosec G115 -- size is a non-negative byte length
-		if includedBodyBytes+opBytes > blockByteBudget {
+		if includedBytes+opBytes > blockByteBudget {
 			opLog.Debug("Skipping op: block byte budget reached",
 				zap.Uint64("op_bytes", opBytes),
-				zap.Uint64("included_body_bytes", includedBodyBytes),
+				zap.Uint64("included_body_bytes", includedBytes),
 			)
 			continue
 		}
@@ -325,7 +325,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		opLog.Trace("Including op")
 		includedOps = append(includedOps, tx)
-		includedBodyBytes += opBytes
+		includedBytes += opBytes
 	}
 	hdr.GasUsed = state.GasUsed()
 
