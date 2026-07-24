@@ -162,8 +162,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapStartingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapStartingMessage, containerImage)
 
 		ginkgo.By("Waiting for the pod to report readiness")
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReady)
@@ -195,8 +194,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return pod.UID != podUID
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapResumingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapResumingMessage, containerImage)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapResumingMessage, containerImage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
 		buildAvalanchegoImage(tc, avalanchegoImage, true /* forceNewHash */)
@@ -222,14 +220,9 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a new bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapStartingMessage = bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapStartingMessage, containerImage)
 	})
 })
-
-func bootstrapMessageForImage(message, image string) string {
-	return message + fmt.Sprintf(`{"image": "%s"}`, image)
-}
 
 func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash bool) {
 	buildImage(tc, imageName, forceNewHash, "build_image.sh")
@@ -448,9 +441,12 @@ func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clients
 	require.NoError(err)
 }
 
-// waitForLogOutput streams the logs from the specified pod container until the desired output is found or the context times out.
-func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput string) {
+// waitForLogOutput streams the logs from the specified pod container until a line containing all of the
+// desired outputs is found or the stream ends. Log lines are JSON-encoded, so a message and its fields
+// (e.g. the image) appear as separate substrings of a single line.
+func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput ...string) {
 	// TODO(marun) Figure out why log output is randomly truncated (not flushed?)
+	// TODO(JonathanOppenheimer): Once this truncation is fixed, fail if the desired output is not found
 
 	tc.Log().Info("log output from container (may not be complete)",
 		zap.String("namespace", namespace),
@@ -471,8 +467,18 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 	for scanner.Scan() {
 		line := scanner.Text()
 		tc.Log().Info(" > " + line)
-		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
+		if len(desiredOutput) > 0 && containsAll(line, desiredOutput) {
 			return
 		}
 	}
+}
+
+// containsAll returns whether the line contains all of the provided substrings
+func containsAll(line string, substrings []string) bool {
+	for _, substring := range substrings {
+		if !strings.Contains(line, substring) {
+			return false
+		}
+	}
+	return true
 }
