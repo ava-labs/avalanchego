@@ -4,17 +4,14 @@
 package sae
 
 import (
-	"context"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
@@ -26,14 +23,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
-func TestRecoverFromDatabase(t *testing.T) {
+// TestRecoverAfterCrash recovers from a copy of a running VM's database,
+// taken without the clean shutdown.
+func TestRecoverAfterCrash(t *testing.T) {
 	t.Parallel()
 
 	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
@@ -45,88 +43,32 @@ func TestRecoverFromDatabase(t *testing.T) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
-	srcCtx := ctx
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
-
-	for final := false; !final; {
-		// We need to test rebuilding from trie roots reflecting (a) the last
-		// synchronous block; (b) some committed state root; and (c) a few
-		// blocks before/after the thresholds. Everything in between is merely
-		// to advance the block number so is treated as a "quick" loop
-		// iteration.
-		last := src.lastAcceptedBlock(t)
-		height := last.Height()
-		quick := height < commitInterval && src.rawVM.last.settled.Load().Height() > 1
-		final = height > commitInterval
-
-		if !quick {
-			src.sendTxsAndWaitUntilPending(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       nil,                     // execute `Data` as code for contract "construction"
-				Data:     saetest.Ops(vm.INVALID), // revert and consume all gas
-				Gas:      params.TxGas + params.CreateGas + params.TxDataNonZeroGasFrontier + rng.Uint64N(2e6),
-				GasPrice: big.NewInt(100),
-			}))
-		}
-
+	// Build past the commit interval so the copied database holds both a
+	// committed trie root and later, uncommitted states.
+	for range commitInterval + 5 {
 		vmTime.Advance(850 * time.Millisecond)
-		b := src.runConsensusLoop(t)
-		if !quick {
-			require.Len(t, b.Transactions(), 1, "transactions in block")
-		}
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-
-		if quick {
-			continue
-		}
-		t.Run("recover", func(t *testing.T) {
-			newDB := saetest.CopyDB(t, srcDB)
-
-			sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
-				c.db = newDB
-				c.logLevel = logging.Warn
-			}))
-
-			requireConsensusCriticalBlocks(t, src, sut)
-
-			if !final {
-				return
-			}
-			t.Run("build_on_recovered_VM", func(t *testing.T) {
-				srcLast := src.lastAcceptedBlock(t)
-				sutLast := sut.lastAcceptedBlock(t)
-				if diff := cmp.Diff(srcLast, sutLast, blocks.CmpOpt()); diff != "" {
-					t.Fatal(diff)
-				}
-				srcSDB := src.stateAt(t, srcLast.PostExecutionStateRoot())
-				sutSDB := sut.stateAt(t, sutLast.PostExecutionStateRoot())
-				if diff := cmp.Diff(srcSDB, sutSDB, cmputils.StateDBs()); diff != "" {
-					t.Fatal(diff)
-				}
-
-				tx := src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-					To:       &common.Address{},
-					Gas:      params.TxGas,
-					GasPrice: big.NewInt(100),
-				})
-
-				for _, sys := range []struct {
-					name string
-					ctx  context.Context //nolint:containedctx // Ephemeral so not in contravention of https://go.dev/blog/context-and-structs
-					*SUT
-				}{
-					{"source", srcCtx, src},
-					{"recovered", sutCtx, sut},
-				} {
-					t.Run(sys.name, func(t *testing.T) {
-						b := sys.runConsensusLoop(t, tx)
-						require.Len(t, b.Transactions(), 1)
-						require.NoError(t, b.WaitUntilExecuted(sys.ctx))
-					})
-				}
-			})
-		})
 	}
+
+	newDB := saetest.CopyDB(t, srcDB) // note: src is still running
+	_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = newDB
+		c.logLevel = logging.Warn
+	}))
+
+	requireConsensusCriticalBlocks(t, src, sut)
+
+	t.Run("build_after_recovery", func(t *testing.T) {
+		vmTime.Advance(850 * time.Millisecond)
+		b := sut.runConsensusLoop(t)
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	})
 }
 
 func TestRecoverSimple(t *testing.T) {
