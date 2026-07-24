@@ -143,9 +143,9 @@ func genNetworkedRunConfig() *rapid.Generator[networkedRunConfig] {
 		// Most runs have no joiner (its lasting cost is +1 node in every
 		// subsequent action), and presence is rarer in 3-validator runs,
 		// which are already the expensive tail.
-		joinerOdds := []bool{true, false, false, false}
+		joinerOdds := []bool{true, false, false, false, false, false}
 		if c.numValidators == 3 {
-			joinerOdds = []bool{true, false, false, false, false, false, false, false}
+			joinerOdds = []bool{true, false, false, false, false, false, false, false, false, false, false, false}
 		}
 		if rapid.SampledFrom(joinerOdds).Draw(rt, "hasJoiner") {
 			s := genNodeStorage().Draw(rt, "joinerStorage")
