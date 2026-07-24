@@ -302,9 +302,9 @@ type Op struct {
 }
 
 // Size returns the op's serialized size
-func (o Op) Size() int {
+func (o Op) Size() uint64 {
 	o.CalculateCanotoCache()
-	return int(o.CachedCanotoSize()) //#nosec G115 -- in-memory size fits in int
+	return o.CachedCanotoSize()
 }
 
 // AsOp converts the op into a representation that SAE can use directly.

@@ -461,8 +461,8 @@ func TestBuildBlockOpByteBackstop(t *testing.T) {
 		big   = ops[0].Size()
 		small = ops[3].Size()
 	)
-	require.LessOrEqual(t, 2*big+small, saeparams.TargetBlockBytes, "two big ops plus the small op must fit the byte budget")
-	require.Greater(t, 3*big, saeparams.TargetBlockBytes, "three big ops must exceed the byte budget")
+	require.LessOrEqual(t, 2*big+small, uint64(saeparams.TargetBlockBytes), "two big ops plus the small op must fit the byte budget")
+	require.Greater(t, 3*big, uint64(saeparams.TargetBlockBytes), "three big ops must exceed the byte budget")
 
 	ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
 		c.hooks.Ops = ops

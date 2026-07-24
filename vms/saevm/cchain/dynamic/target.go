@@ -11,12 +11,14 @@ import "github.com/ava-labs/avalanchego/vms/components/gas"
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 type TargetExponent uint64
 
-// InitialTargetExponent is the initial target exponent. Its target is
-// [MinTarget].
-const InitialTargetExponent TargetExponent = 0
+const (
+	// InitialTargetExponent is the initial target exponent. Its target is
+	// [MinTarget].
+	InitialTargetExponent TargetExponent = 0
 
-// MinTarget is the minimum target gas per second.
-const MinTarget = 1_000_000
+	// MinTarget is the minimum target gas per second.
+	MinTarget = 1_000_000
+)
 
 // Target returns the target gas per second.
 //

@@ -310,7 +310,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 
 		// Ops are carried in the built block, so they consume the same byte
 		// budget as the transactions included above.
-		opBytes := uint64(tx.Size()) //#nosec G115 -- [hook.Transaction.Size] MUST be non-negative
+		opBytes := tx.Size()
 		if includedBytes+opBytes > blockByteBudget {
 			opLog.Debug("Skipping op: block byte budget reached",
 				zap.Uint64("op_bytes", opBytes),
