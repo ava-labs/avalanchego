@@ -1,0 +1,59 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package statesync
+
+import (
+	"context"
+
+	"github.com/ava-labs/libevm/core/rawdb"
+
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+)
+
+// StateSyncEnabled checks whether the node should query for state summaries.
+func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
+	enabled := h.cfg.Enabled
+	if enabled != nil {
+		return *enabled, nil
+	}
+
+	// If any blocks have been accepted, don't state sync.
+	hash, ok := h.lastAcceptedHash()
+	if !ok {
+		return true, nil
+	}
+	height := rawdb.ReadHeaderNumber(h.db, hash)
+	return height == nil || *height == 0, nil
+}
+
+// AcceptSummary performs the entire state sync given the provided summary. If
+// [SummaryHandler.StateSyncEnabled] returns false, this method should not be
+// called. If this method returns [block.StateSyncSkipped], no state changes
+// were made. Once the state sync is complete, [SummaryHandler.WaitForEvent]
+// will return [common.StateSyncDone].
+func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
+	if s.height == 0 {
+		// The genesis block is already accepted, so we don't need to do anything.
+		return block.StateSyncSkipped, nil
+	}
+
+	go func() {
+		// TODO(alarso16): implement state sync
+		close(h.stateSyncDone)
+	}()
+
+	return block.StateSyncStatic, nil
+}
+
+// WaitForEvent blocks until the state sync is complete, or the context is
+// canceled. Once the state sync is done, [common.StateSyncDone] is returned.
+func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, error) {
+	select {
+	case <-h.stateSyncDone:
+		return common.StateSyncDone, nil
+	case <-ctx.Done():
+		return 0, context.Cause(ctx)
+	}
+}
