@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -178,7 +179,7 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 	} else if o.upgradeConfig.IsHeliconActivated(primaryNetworkValidator.StartTime) {
 		// ACP-267 requires 90% uptime for Primary Network validators that start at
 		// or after Helicon activation.
-		expectedUptimePercentage = .9
+		expectedUptimePercentage = genesis.ACP267UptimeRequirement
 	}
 
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(
