@@ -136,6 +136,20 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	// subnetID = txID for CreateL1Tx, so validationIDs are b.txID.Append(uint32(i))
+	for i, vdr := range tx.Validators {
+		b.b.setOwner(
+			b.txID.Append(uint32(i)),
+			&secp256k1fx.OutputOwners{
+				Threshold: vdr.DeactivationOwner.Threshold,
+				Addrs:     vdr.DeactivationOwner.Addresses,
+			},
+		)
+	}
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
