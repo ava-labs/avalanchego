@@ -85,10 +85,12 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 		// canonical block delivery, an unpinned account's current
 		// (model-consistent) nonce can be gapped there and never promote to
 		// pending, hanging waitForPendingEthTxs forever. Restrict fresh
-		// draws to non-delayed nodes; delayNode's guard keeps at least one
-		// validator (and hence one node) non-delayed, so eligible is never
-		// empty.
-		eligible := nm.nonDelayedNodes()
+		// draws to non-delayed nodes — plus, during a partition, minority
+		// validators for which stranding this account is admission-safe
+		// (strandSafe: balance and nonce untouched since the node's accepted
+		// prefix, so neither hazard applies). delayNode's guard keeps at
+		// least one validator non-delayed, so eligible is never empty.
+		eligible := nm.issueTargets(from)
 		nodeIdx = eligible[rapid.IntRange(0, len(eligible)-1).Draw(rt, "node")].idx
 	}
 	// A pinned account's node can go delayed after the pin was set (delayNode
@@ -97,14 +99,18 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 	// pool, so a new tx can never promote to pending there; (ii) balance —
 	// pool admission validates against the node's last-executed state, so
 	// model-visible credits from canonical blocks the node hasn't executed
-	// (because it's delayed) are invisible to it, and the model can size a
-	// value/gas draw from a balance the pinned node's pool cannot yet see,
-	// spuriously rejecting with core.ErrInsufficientFunds. No-op rather than
-	// issue: the condition is pure model state (pins + delayed), so the draw
-	// count stays a function of model state alone, preserving replay
-	// determinism.
-	if pinned && nm.nodes[nodeIdx].delayed {
-		return
+	// are invisible to it, and the model can size a value/gas draw from a
+	// balance the pinned node's pool cannot yet see, spuriously rejecting
+	// with core.ErrInsufficientFunds. One carve-out: a pinned minority
+	// VALIDATOR stays a legal target while stranding remains admission-safe
+	// (strandSafe rules out both hazards). Otherwise no-op rather than
+	// issue: the condition is pure model state (pins + delayed + minority +
+	// snapshots), so the draw count stays a function of model state alone,
+	// preserving replay determinism.
+	if pinned {
+		if n := nm.nodes[nodeIdx]; n.delayed && !(nm.inMinority(nodeIdx) && n.isValidator && nm.strandSafe(from, n)) {
+			return
+		}
 	}
 	n := nm.nodes[nodeIdx]
 
@@ -131,6 +137,12 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 		return // rejected negative or capacity no-op: nothing entered the pool
 	}
 	nm.pins[from] = nodeIdx
+	if nm.inMinority(nodeIdx) {
+		// Issued behind the partition: unreachable by majority builders
+		// until heal, so majority-side sync waits must skip it (syncEthTxs)
+		// and no canonical block may contain it (applyCanonical's invariant).
+		nm.stranded[nm.pendingEthTxs[len(nm.pendingEthTxs)-1].Hash()] = struct{}{}
+	}
 	// Admission sync (subscription-based, not timed): the tx must become
 	// pending on the node it was issued to before the machine moves on.
 	n.sut.waitForPendingEthTxs(n.ctx, nm.tb, nm.pendingEthTxs[len(nm.pendingEthTxs)-1])

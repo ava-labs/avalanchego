@@ -566,6 +566,43 @@ func (nm *networkedMachine) syncEthTxs() []*types.Transaction {
 	return out
 }
 
+// strandSafe reports whether issuing account addr to minority node n keeps
+// pool admission in lockstep with the model: n's pool sees the account
+// exactly as the model does iff the account's balance and executed nonce are
+// unchanged since n's accepted prefix. A canonical credit would let the
+// model size a value the node's lagging pool cannot yet see (spurious
+// ErrInsufficientFunds), and a canonical inclusion of the account's earlier
+// txs would leave stale entries in n's pool whose reserved cost desyncs
+// admission from the model's sizing. Checked on EVERY stranded issuance, not
+// just the first. All inputs are model state (snapshots, balances, nonces),
+// so draw counts stay replay-deterministic.
+func (nm *networkedMachine) strandSafe(addr common.Address, n *modelNode) bool {
+	snap := nm.snapshots[n.acceptedCount]
+	bal, ok := snap.balances[addr]
+	return ok && bal.Eq(nm.m.balances[addr]) && snap.nonces[addr] == nm.m.nonces[addr]
+}
+
+// issueTargets returns the nodes account from may be issued to, in ascending
+// index order: every non-delayed node, plus — during a partition — minority
+// VALIDATORS for which stranding from is admission-safe. Validators only,
+// because a stranded tx's only guaranteed post-heal propagation path is
+// validator↔validator pull gossip (the mechanism restartNode relies on to
+// re-learn pools); a minority non-validator's pool contents might never
+// reach a builder. With no partition active this is exactly
+// nonDelayedNodes.
+func (nm *networkedMachine) issueTargets(from common.Address) []*modelNode {
+	var out []*modelNode
+	for _, n := range nm.nodes {
+		switch {
+		case !n.delayed:
+			out = append(out, n)
+		case nm.inMinority(n.idx) && n.isValidator && nm.strandSafe(from, n):
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 // allSUTs is every node's SUT in index order, the fan-out set for
 // shared-memory provisioning (delayed nodes included: the remote chain's
 // state is global truth independent of block delivery).
