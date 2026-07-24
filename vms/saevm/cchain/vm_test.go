@@ -172,6 +172,21 @@ func withAccount(addr common.Address, acc types.Account) sutOption {
 	})
 }
 
+// withGenesis replaces the SUT's default genesis.
+func withGenesis(g core.Genesis) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis = g
+	})
+}
+
+// withUpgrades overrides the network upgrade schedule, which defaults to
+// every upgrade being active from genesis.
+func withUpgrades(u upgrade.Config) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.upgrades = u
+	})
+}
+
 // withNodeID overrides the SUT's randomly generated NodeID.
 func withNodeID(id ids.NodeID) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -219,6 +234,13 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
+// withArchival disables pruning, persisting every state root.
+func withArchival() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.Pruning = false
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -237,6 +259,10 @@ func withMinDelayTarget(ms uint64) sutOption {
 		c.vmConfig.MinDelayTarget = &ms
 	})
 }
+
+// chainDBPrefix locates the VM's database within the SUT's base database,
+// mirroring the prefix avalanchego's chain manager applies.
+var chainDBPrefix = []byte("chain")
 
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
@@ -287,7 +313,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
-	chainDB := prefixdb.New([]byte("chain"), db)
+	chainDB := prefixdb.New(chainDBPrefix, db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)

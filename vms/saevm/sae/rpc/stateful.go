@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -162,12 +163,27 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
 
+	// ethB was served by [tracerBackend], so its faked header carries the
+	// executed base fee (see [executedHeader]), which the gas clock cannot
+	// re-derive for pre-SAE blocks and the real header only bounds for
+	// asynchronous ones. The faked base fee is never nil, so the guard only
+	// avoids a panic in [uint256.FromBig].
+	baseFee := new(uint256.Int)
+	if bf := ethB.BaseFee(); bf != nil {
+		var overflow bool
+		baseFee, overflow = uint256.FromBig(bf)
+		if overflow {
+			return nil, bCtx, nil, nil, fmt.Errorf("base fee %v of block %d overflows 256 bits", bf, ethB.NumberU64())
+		}
+	}
+
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	result, err := saexec.Execute(
 		block,
 		b,
 		txIndex,
+		baseFee,
 		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),

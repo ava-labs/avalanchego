@@ -123,7 +123,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	result, err := Execute(b, e, math.MaxInt, nil, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
@@ -175,6 +175,9 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
 //
+// `baseFee`, if non-nil, overrides the gas-clock derivation; replays MUST
+// pass the block's recorded [blocks.Block.ExecutedBaseFee].
+//
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
 // accepted block (as against one recovered from the database) MUST NOT be
@@ -183,6 +186,7 @@ func Execute(
 	b *blocks.Block,
 	sdbo saedb.StateDBOpener,
 	maxNumTxs int,
+	baseFee *uint256.Int,
 	hooks hook.Points,
 	config *params.ChainConfig,
 	chainCtx core.ChainContext,
@@ -208,8 +212,10 @@ func Execute(
 		return nil, err
 	}
 
-	baseFee := gasClock.BaseFee()
-	b.CheckBaseFeeBound(baseFee)
+	if baseFee == nil {
+		baseFee = gasClock.BaseFee()
+		b.CheckBaseFeeBound(baseFee)
+	}
 	header.BaseFee = baseFee.ToBig()
 
 	signer := b.Signer(config)
