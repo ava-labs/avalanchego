@@ -831,6 +831,39 @@ func createAutoRenewedValidatorTx(
 	}
 }
 
+func createAutoRenewedStakerAndTx(
+	t testing.TB,
+	nodeID ids.NodeID,
+	startTime time.Time,
+	endTime time.Time,
+	weight uint64,
+	potentialReward uint64,
+	period uint64,
+	autoCompoundRewardShares uint32,
+) (*Staker, *txs.Tx) {
+	unsignedTx := createAutoRenewedValidatorTx(
+		t,
+		nodeID,
+		weight,
+		period,
+		autoCompoundRewardShares,
+	)
+	tx := &txs.Tx{Unsigned: unsignedTx}
+	require.NoError(t, tx.Initialize(txs.Codec))
+
+	staker, err := NewStaker(
+		tx.ID(),
+		unsignedTx,
+		startTime,
+		endTime,
+		weight,
+		potentialReward,
+	)
+	require.NoError(t, err)
+
+	return staker, tx
+}
+
 func TestValidatorWeightDiff(t *testing.T) {
 	type op struct {
 		op     func(*ValidatorWeightDiff, uint64) error
@@ -4097,6 +4130,11 @@ func TestStateAndDiffIntegration_StakingInfo(t *testing.T) {
 	validator1 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 	validator1Replacement := *validator1
 	validator1Replacement.TxID = ids.GenerateTestID()
+	validator1Replacement.StartTime = validator1.StartTime.Add(time.Hour)
+	validator1Replacement.EndTime = validator1.EndTime.Add(2 * time.Hour)
+	validator1Replacement.NextTime = validator1Replacement.EndTime
+	validator1Replacement.Weight++
+	validator1Replacement.PotentialReward++
 	validator2 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
 	stakingInfo := StakingInfo{DelegateeReward: 123}
 
@@ -4292,6 +4330,26 @@ func TestStateAndDiffIntegration_StakingInfo(t *testing.T) {
 			},
 		},
 		{
+			name: "re-add_after_delete_in_prior_commit",
+			diffs: []diff{
+				{
+					ops: []op{
+						put(validator1),
+						setStakingInfo(validator1, stakingInfo),
+					},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+				{
+					ops:   []op{del(validator1)},
+					wants: []want{{staker: validator1, err: database.ErrNotFound}},
+				},
+				{
+					ops:   []op{put(&validator1Replacement)},
+					wants: []want{{staker: &validator1Replacement}},
+				},
+			},
+		},
+		{
 			name: "replace_with_updated_validator_and_set",
 			diffs: []diff{
 				{
@@ -4421,24 +4479,21 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	)
 
 	// Create and add the auto-renewed validator with initial times
-	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
-	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
-	require.NoError(autoRenewedTx.Initialize(txs.Codec))
-
-	autoRenewedStaker, err := NewStaker(
-		autoRenewedTx.ID(),
-		autoRenewedUnsigned,
+	staker, stakerTx := createAutoRenewedStakerAndTx(
+		t,
+		nodeID,
 		startTime,
 		endTime,
 		weight,
 		potentialReward,
+		period,
+		autoCompoundRewardShares,
 	)
-	require.NoError(err)
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	d.AddTx(autoRenewedTx, status.Committed)
-	require.NoError(d.PutCurrentValidator(autoRenewedStaker))
+	d.AddTx(stakerTx, status.Committed)
+	require.NoError(d.PutCurrentValidator(staker))
 	require.NoError(d.Apply(state))
 	require.NoError(state.Commit())
 
@@ -4450,11 +4505,11 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
-	require.NoError(d.DeleteCurrentValidator(autoRenewedStaker))
+	require.NoError(d.DeleteCurrentValidator(staker))
 
 	renewedStaker, err := NewStaker(
-		autoRenewedTx.ID(),
-		autoRenewedUnsigned,
+		stakerTx.ID(),
+		stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx),
 		wantStartTime,
 		wantEndTime,
 		wantWeight,
@@ -4490,4 +4545,110 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	require.Equal(accruedDelRewards, gotStakingInfo.AccruedDelegateeRewards)
 	require.Equal(autoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
 	require.Equal(period, gotStakingInfo.NextPeriod)
+}
+
+func TestAutoRenewedValidatorReaddStateReload(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		subnetID  = constants.PrimaryNetworkID
+		startTime = genesistest.DefaultValidatorStartTime
+	)
+
+	const (
+		weight             = uint64(3000)
+		potentialReward    = uint64(500)
+		period             = uint64(time.Hour / time.Second)
+		autoCompoundShares = uint32(.1 * reward.PercentDenominator)
+	)
+
+	oldStaker, oldStakerTx := createAutoRenewedStakerAndTx(
+		t,
+		nodeID,
+		startTime,
+		startTime.Add(time.Hour),
+		weight,
+		potentialReward,
+		period,
+		autoCompoundShares,
+	)
+
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	diff.AddTx(oldStakerTx, status.Committed)
+	require.NoError(diff.PutCurrentValidator(oldStaker))
+	require.NoError(diff.SetStakingInfo(subnetID, nodeID, StakingInfo{
+		DelegateeReward:          11,
+		AccruedValidationRewards: 12,
+		AccruedDelegateeRewards:  13,
+		AutoCompoundRewardShares: .2 * reward.PercentDenominator,
+		NextPeriod:               period,
+	}))
+	require.NoError(diff.Apply(state))
+	require.NoError(state.Commit())
+
+	// Exit in one commit, then add a new validator transaction for the same
+	// node in a later commit. None of the old transaction's metadata may leak.
+	diff, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	require.NoError(diff.DeleteCurrentValidator(oldStaker))
+	require.NoError(diff.Apply(state))
+	require.NoError(state.Commit())
+
+	const (
+		newWeight                   = uint64(4000)
+		newPotentialReward          = uint64(700)
+		newPeriod                   = uint64(2 * time.Hour / time.Second)
+		newAutoCompoundShares       = uint32(.3 * reward.PercentDenominator)
+		newStakingInfoShares        = uint32(.4 * reward.PercentDenominator)
+		newDelegateeReward          = uint64(21)
+		newAccruedValidationRewards = uint64(22)
+		newAccruedDelegateeRewards  = uint64(23)
+	)
+
+	newStartTime := oldStaker.EndTime.Add(time.Hour)
+	newEndTime := newStartTime.Add(2 * time.Hour)
+	newStaker, newTx := createAutoRenewedStakerAndTx(
+		t,
+		nodeID,
+		newStartTime,
+		newEndTime,
+		newWeight,
+		newPotentialReward,
+		newPeriod,
+		newAutoCompoundShares,
+	)
+
+	diff, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	diff.AddTx(newTx, status.Committed)
+	require.NoError(diff.PutCurrentValidator(newStaker))
+	newStakingInfo := StakingInfo{
+		DelegateeReward:          newDelegateeReward,
+		AccruedValidationRewards: newAccruedValidationRewards,
+		AccruedDelegateeRewards:  newAccruedDelegateeRewards,
+		AutoCompoundRewardShares: newStakingInfoShares,
+		NextPeriod:               newPeriod,
+	}
+	require.NoError(diff.SetStakingInfo(subnetID, nodeID, newStakingInfo))
+	require.NoError(diff.Apply(state))
+	require.NoError(state.Commit())
+
+	reloadedState := newTestState(t, db)
+	gotStaker, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+
+	// On reload, accrued rewards from the staking info are added to the
+	// staker's weight.
+	expectedStaker := *newStaker
+	expectedStaker.Weight += newStakingInfo.AccruedValidationRewards + newStakingInfo.AccruedDelegateeRewards
+	require.True(expectedStaker.Equals(gotStaker))
+
+	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(newStakingInfo, gotStakingInfo)
 }
