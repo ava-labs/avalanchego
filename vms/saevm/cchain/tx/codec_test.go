@@ -273,6 +273,10 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, oldErr := txtest.ParseOlds(data)
+		// The new codec intentionally has no size limit.
+		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
+			t.Skip("input exceeds legacy codec size limit")
+		}
 		oldOk := oldErr == nil
 
 		_, newErr := ParseSlice(data)

@@ -174,6 +174,9 @@ var (
 	errInsufficientFee   = errors.New("insufficient fee")
 )
 
+// Each tx byte must cost at least one gas.
+const _ uint = tx.GasPerByte - 1
+
 // Add validates tx and inserts it into the pool.
 //
 // If tx conflicts with a transaction already in the pool, the lower-fee
@@ -195,6 +198,9 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	// every admitted tx stays includable. An unincludable tx never pays its
 	// fee, so an attacker could pin it with a free, arbitrarily high GasFeeCap
 	// and fill the pool.
+	//
+	// Since each tx byte costs at least one gas, this also caps tx size at
+	// MinTarget bytes, bounding the pool's memory.
 	if t.op.Gas > dynamic.MinTarget {
 		return fmt.Errorf("%w: %d > %d", errExcessGas, t.op.Gas, dynamic.MinTarget)
 	}

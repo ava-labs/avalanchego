@@ -136,7 +136,7 @@ var (
 // and [blockBuilder.rebuild]. The block context MAY be nil.
 //
 // blockByteBudget caps the cumulative serialized size of included
-// transactions.
+// transactions and end-of-block ops.
 func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
@@ -272,15 +272,15 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
-		// Skip transactions that would push the block body past its
-		// serialized-byte budget, even if mempool admission accepted more
-		// bytes than the gas-per-byte rule intends. The budget is shared with
-		// the end-of-block ops appended below.
+		// Skip transactions that would push the block past its serialized-byte
+		// budget, even if mempool admission accepted more bytes than the
+		// gas-per-byte rule intends. The budget is shared with the
+		// end-of-block ops appended below.
 		txBytes := tx.Size()
 		if includedBytes+txBytes > blockByteBudget {
 			txLog.Debug("Skipping transaction: block byte budget reached",
 				zap.Uint64("tx_bytes", txBytes),
-				zap.Uint64("included_body_bytes", includedBytes),
+				zap.Uint64("included_bytes", includedBytes),
 			)
 			continue
 		}
@@ -308,13 +308,13 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			zap.Int("op_index", len(includedOps)),
 		)
 
-		// Ops are carried in the built block, so they consume the same body
-		// byte budget as the transactions included above.
+		// Ops are carried in the built block, so they consume the same byte
+		// budget as the transactions included above.
 		opBytes := uint64(tx.Size()) //#nosec G115 -- [hook.Transaction.Size] MUST be non-negative
 		if includedBytes+opBytes > blockByteBudget {
 			opLog.Debug("Skipping op: block byte budget reached",
 				zap.Uint64("op_bytes", opBytes),
-				zap.Uint64("included_body_bytes", includedBytes),
+				zap.Uint64("included_bytes", includedBytes),
 			)
 			continue
 		}
