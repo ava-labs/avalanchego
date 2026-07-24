@@ -11,32 +11,65 @@ on:
         required: true
   push:
     tags:
-      - "*"
+      # Release tags only. This job signs with the real Apple + GPG keys and
+      # publishes to S3, so it must not fire on arbitrary/non-release tags
+      # (matches build-linux-packages.yml).
+      - "v*"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # The macOS packaging Taskfile greps APPLE_CODESIGN_PKG_VERSION out of this
+  # file (PACKAGING_APPLE_CODESIGN_VERSION in .github/packaging/Taskfile.yml) so
+  # the local validator and CI pin the same rcodesign version. If you rename or
+  # reformat this line, update that awk expression too.
+  APPLE_CODESIGN_PKG_VERSION: "0.28.0"
+  # SHA256 of the pinned rcodesign linux x86_64 release tarball, pinned in this
+  # repo so a retagged or replaced upstream release cannot swap the signing
+  # binary. Verifying against the release's own .sha256 sidecar would only catch
+  # transfer corruption, not upstream compromise. Update this together with
+  # APPLE_CODESIGN_PKG_VERSION (and the per-arch digests in the packaging
+  # builder-image script, build-macos-zip-builder-image.sh).
+  APPLE_CODESIGN_SHA256: "d0f0e4c7915295a1e79fc8b775b354c76d621a52da4c6b841dc9f0585de06cca"
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
+  # Build the macOS binaries on a native macOS runner. Apple notarization and
+  # GPG signing happen in the downstream sign job on Linux.
   build-mac:
-    # Build release artifacts on the oldest macOS version still receiving Apple
-    # security updates to maximize the chance that shipped binaries remain usable
-    # on older supported macOS versions. CI validation can track newer macOS
-    # releases independently.
     runs-on: macos-14
     permissions:
-      id-token: write
       contents: read
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # For workflow_dispatch, build the source tree at the requested tag rather
+      # than the default branch (mirrors build-linux-packages.yml). Tag-push
+      # events already check out the pushed tag by default.
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # Defense in depth: workflow_dispatch accepts an arbitrary ref and the
+      # sign-publish job imports the real Apple + GPG signing keys. Refuse to
+      # proceed unless a dispatched input names an actual tag in origin, so the
+      # keys can never sign arbitrary branch content. Tag-push events are already
+      # constrained to refs/tags/* by the `on:` filter.
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.14.1)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/sign a non-tag ref" >&2
+            exit 1
+          fi
+
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
-      # Runs a single command using the runners shell
       - name: Build the avalanchego binary
         run: ./scripts/run_task.sh build
 
@@ -44,34 +77,238 @@ jobs:
         working-directory: ./graft/subnet-evm
         run: ./scripts/run_task.sh build
 
-      - name: Try to get tag from git
-        if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
+      - name: Upload macOS binaries
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-binaries
+          path: |
+            build/avalanchego
+            build/subnet-evm
+          retention-days: 1
+          if-no-files-found: error
+
+  # Apple-sign + notarize + GPG-sign. Runs on Linux because rcodesign is
+  # cross-platform (no macOS host needed) and Linux runner minutes are ~10x
+  # cheaper than macOS. This job holds the Apple + GPG signing secrets but is
+  # NOT granted id-token: write; S3 publishing is a separate job so the AWS OIDC
+  # token is never present in a job that runs packaging scripts (mirrors
+  # build-linux-packages.yml's upload-debs-s3 split).
+  sign:
+    runs-on: ubuntu-24.04
+    needs: build-mac
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      # Check out the release tag (not the dispatch-selected ref) so the
+      # packaging script that runs below with the signing secrets comes from the
+      # tag, not an arbitrary branch (mirrors build-linux-packages.yml's
+      # secret-bearing job).
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # Refuse a non-tag dispatch input before any signing secret is
+      # materialized. Tag-push events are already constrained to refs/tags/v* by
+      # the `on:` filter.
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.14.1)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/sign a non-tag ref" >&2
+            exit 1
+          fi
+
+      - name: Download macOS binaries
+        uses: actions/download-artifact@v6
+        with:
+          name: macos-binaries
+          path: build
+
+      # actions/upload-artifact + download-artifact do not preserve the Unix
+      # executable bit, so the binaries come back non-executable and must be
+      # re-marked before they can be signed and zipped.
+      - name: Restore executable bits
+        run: chmod +x build/avalanchego build/subnet-evm
+
+      # Resolve the tag from the dispatch input or the pushed ref, and expose it
+      # as a job output so the downstream publish job can name the S3 objects.
+      - name: Resolve tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG}" ]]; then
+            TAG="${INPUT_TAG}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
         shell: bash
 
-      - name: Try to get tag from workflow dispatch
-        if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
+      - name: Install rcodesign and 7zip
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends p7zip-full
+          ARCHIVE="apple-codesign-${APPLE_CODESIGN_PKG_VERSION}-x86_64-unknown-linux-musl"
+          # Release tag uses a slash separator (apple-codesign/0.28.0) which must
+          # be URL-encoded as %2F in the download path.
+          BASE="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_PKG_VERSION}"
+          curl -fsSL -o /tmp/rcodesign.tar.gz "${BASE}/${ARCHIVE}.tar.gz"
+          # Verify against the digest pinned in this repo (APPLE_CODESIGN_SHA256),
+          # not the upstream .sha256 sidecar: a compromised release could replace
+          # the tarball and its sidecar together, so trusting the sidecar only
+          # guards against transfer corruption.
+          echo "${APPLE_CODESIGN_SHA256}  /tmp/rcodesign.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp/
+          sudo install "/tmp/${ARCHIVE}/rcodesign" /usr/local/bin/rcodesign
+          rcodesign --version
         shell: bash
 
-      - name: Create avalanchego zip file
-        run: 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
+      # Apple-sign each Mach-O binary with the already-installed rcodesign (same
+      # tool, flags, and P12 the local validator uses in build-macos-zip.sh).
+      # The P12 is materialized inside this step and removed by the EXIT trap, so
+      # it is never on disk while later steps run checked-out packaging code. The
+      # hardened-runtime flag is required for Apple notarization to accept the
+      # binary later.
+      - name: Apple-sign binaries
         env:
-          TAG: ${{ env.TAG }}
-
-      - name: Create subnet-evm zip file
-        run: 7z a "subnet-evm-macos-${TAG}.zip" build/subnet-evm
-        env:
-          TAG: ${{ env.TAG }}
-
-      - name: Install aws cli
+          APPLE_P12_FILE_B64: ${{ secrets.MACOS_SIGNING_PKCS12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_PASSWORD }}
         run: |
-          curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-          sudo installer -pkg AWSCLIV2.pkg -target /
+          set -euo pipefail
+          p12="$(mktemp --suffix=.p12)"
+          chmod 600 "$p12"
+          trap 'rm -f "$p12"' EXIT
+          printf '%s' "$APPLE_P12_FILE_B64" | base64 -d > "$p12"
+          for bin in avalanchego subnet-evm; do
+            echo "Apple-signing ${bin}..."
+            rcodesign sign \
+              --p12-file "$p12" \
+              --p12-password "$APPLE_P12_PASSWORD" \
+              --code-signature-flags runtime \
+              "build/${bin}"
+          done
+        shell: bash
+
+      # Materialize the GPG key inside this step (removed by the EXIT trap) and
+      # run the production zip + GPG-sign script. Fail fast on an empty key
+      # rather than letting build-zip-pkg.sh's no-op branch produce an unsigned
+      # zip that the S3 upload would then publish without a signature.
+      - name: Build zips and GPG-sign
+        env:
+          TAG: ${{ env.TAG }}
+          RPM_GPG_PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RPM_GPG_PRIVATE_KEY:-}" ]]; then
+            echo "ERROR: RPM_GPG_PRIVATE_KEY secret is required but unset/empty" >&2
+            exit 1
+          fi
+          GPG_KEY_FILE="$(mktemp)"
+          chmod 600 "$GPG_KEY_FILE"
+          trap 'rm -f "$GPG_KEY_FILE"' EXIT
+          printf '%s' "$RPM_GPG_PRIVATE_KEY" > "$GPG_KEY_FILE"
+          if [[ ! -s "$GPG_KEY_FILE" ]]; then
+            echo "ERROR: GPG key file is empty after writing the secret" >&2
+            exit 1
+          fi
+          export GPG_KEY_FILE
+          ./.github/workflows/build-zip-pkg.sh
+        shell: bash
+
+      # Submit each zip to Apple's notary service. The App Store Connect API key
+      # is materialized here (removed by the EXIT trap) rather than up front,
+      # because it is not needed until now; this keeps it off disk while the
+      # packaging script above runs. --wait fails the step if Apple rejects the
+      # asset. Zips are not stapled (the ticket lives server-side for zip
+      # containers), so the zip bytes are unchanged and the GPG signature stays
+      # valid.
+      - name: Notarize zips
+        env:
+          TAG: ${{ env.TAG }}
+          APPLE_API_KEY_B64: ${{ secrets.MACOS_NOTARIZATION_AUTH_KEY }}
+          APPLE_ISSUER:      ${{ secrets.MACOS_NOTARIZATION_ISSUER_ID }}
+          APPLE_KEY_ID:      ${{ secrets.MACOS_NOTARIZATION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          p8="$(mktemp --suffix=.p8)"
+          json="$(mktemp --suffix=.json)"
+          chmod 600 "$p8" "$json"
+          trap 'rm -f "$p8" "$json"' EXIT
+          printf '%s' "$APPLE_API_KEY_B64" | base64 -d > "$p8"
+          rcodesign encode-app-store-connect-api-key \
+            --output-path "$json" \
+            "$APPLE_ISSUER" "$APPLE_KEY_ID" "$p8"
+          rm -f "$p8"
+          for name in avalanchego subnet-evm; do
+            echo "Notarizing ${name}-macos-${TAG}.zip..."
+            rcodesign notary-submit \
+              --api-key-file "$json" \
+              --wait \
+              "${name}-macos-${TAG}.zip"
+          done
+        shell: bash
+
+      - name: Save avalanchego as Github artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: avalanchego-macos
+          path: |
+            avalanchego-macos-${{ env.TAG }}.zip
+            avalanchego-macos-${{ env.TAG }}.zip.sig
+
+      - name: Save subnet-evm as Github artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: subnet-evm-macos
+          path: |
+            subnet-evm-macos-${{ env.TAG }}.zip
+            subnet-evm-macos-${{ env.TAG }}.zip.sig
+
+      # Each signing secret is materialized inside its own step and removed by
+      # that step's EXIT trap (on success or failure), so only the extracted
+      # binaries need cleaning up here.
+      - name: Cleanup
+        if: always()
+        run: rm -rf ./build
+
+  # Publish the signed zips to S3. Isolated from the signing job so that
+  # id-token: write (AWS OIDC) is never present in a job that holds signing
+  # secrets or runs packaging scripts (mirrors build-linux-packages.yml's
+  # upload-debs-s3 split). It only consumes the already-signed artifacts.
+  publish:
+    runs-on: ubuntu-24.04
+    needs: sign
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download signed avalanchego zip
+        uses: actions/download-artifact@v6
+        with:
+          name: avalanchego-macos
+          path: .
+
+      - name: Download signed subnet-evm zip
+        uses: actions/download-artifact@v6
+        with:
+          name: subnet-evm-macos
+          path: .
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -80,28 +317,16 @@ jobs:
           role-session-name: githubrolesession
           aws-region: us-east-1
 
-      - name: Upload avalanchego to S3
-        run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
+      - name: Upload zips to S3
         env:
           BUCKET: ${{ secrets.BUCKET }}
-
-      - name: Upload subnet-evm to S3
-        run: aws s3 cp subnet-evm-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
-        env:
-          BUCKET: ${{ secrets.BUCKET }}
-
-      - name: Save avalanchego as Github artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: avalanchego-macos
-          path: avalanchego-macos-${{ env.TAG }}.zip
-
-      - name: Save subnet-evm as Github artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: subnet-evm-macos
-          path: subnet-evm-macos-${{ env.TAG }}.zip
-
-      - name: Cleanup
+          TAG:    ${{ needs.sign.outputs.tag }}
         run: |
-          rm -rf ./build
+          set -euo pipefail
+          # Upload the detached signature before the zip. A .sig with no .zip is
+          # harmless, but a .zip with no .sig would be a consumable unsigned
+          # artifact, so the zip must land last.
+          for name in avalanchego subnet-evm; do
+            aws s3 cp "${name}-macos-${TAG}.zip.sig" "s3://${BUCKET}/macos/"
+            aws s3 cp "${name}-macos-${TAG}.zip"     "s3://${BUCKET}/macos/"
+          done
