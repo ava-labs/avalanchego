@@ -48,6 +48,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 func TestMain(m *testing.M) {
@@ -78,6 +80,11 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
 
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see minGasForSize.
+	const gasTarget = 4_000_000
+
 	snowCtx := snowtest.Context(t, ids.Empty)
 	logger := loggingtest.New(t, logging.Warn)
 	snowCtx.Log = logger
@@ -87,12 +94,28 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, config, saetest.MaxAllocFor(wallet.Addresses()...))
+	genesis := blockstest.NewGenesis(
+		t,
+		db,
+		config,
+		saetest.MaxAllocFor(wallet.Addresses()...),
+		blockstest.WithGasTarget(gasTarget),
+		blockstest.WithBaseFee(params.Wei),
+	)
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	dbCfg := saedb.Config{CommitInterval: saedb.DefaultCommitInterval}
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, dbCfg, hookstest.NewStub(1e6), snowCtx, prometheus.NewRegistry())
+	exec, err := saexec.New(
+		genesis,
+		src.AsHeaderSource(),
+		config,
+		db,
+		xdb,
+		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
+		hookstest.NewStub(gasTarget),
+		snowCtx,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
@@ -100,7 +123,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(pool, gossip.BloomSetConfig{})
+	set, err := NewSet(exec, pool, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)
@@ -124,6 +147,122 @@ func newTxPool(t *testing.T, bc BlockChain) *txpool.TxPool {
 	p, err := txpool.New(1, bc, subs)
 	require.NoError(t, err, "txpool.New()")
 	return p
+}
+
+func TestMinGasForSize(t *testing.T) {
+	const m = saeparams.TargetBlockBytes
+
+	tests := []struct {
+		name          string
+		size          uint64
+		blockGasLimit uint64
+		want          uint64
+	}{
+		{
+			name:          "exactDivision",
+			size:          m,
+			blockGasLimit: 42,
+			want:          42,
+		},
+		{
+			name:          "roundsUp",
+			size:          1,
+			blockGasLimit: 1,
+			want:          1,
+		},
+		{
+			name:          "halfBlockBytes",
+			size:          m / 2,
+			blockGasLimit: 100,
+			want:          50,
+		},
+		{
+			name:          "resultOverflowsUint64",
+			size:          m + 1,
+			blockGasLimit: math.MaxUint64,
+			want:          math.MaxUint64,
+		},
+		{
+			name: "zeroBlockGasLimit",
+			size: 1,
+			want: math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := minGasForSize(tt.size, tt.blockGasLimit)
+			require.Equal(t, tt.want, got, "minGasForSize(%d, %d)", tt.size, tt.blockGasLimit)
+		})
+	}
+}
+
+func TestSetRejectsLowGasPerByte(t *testing.T) {
+	s := newSUT(t, 1)
+
+	// The smallest n bytes of zero calldata making a transaction ineligible:
+	// a transaction is strictly larger than its calldata, so it suffices that
+	//
+	//	n·x > (TxGas + TxDataZeroGas·n)·M
+	const m = saeparams.TargetBlockBytes
+	x := s.set.blockGasLimit()
+	zeroCalldataBytes := params.TxGas*m/(x-params.TxDataZeroGas*m) + 1
+
+	transfer := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+		})
+	}
+	calldataHeavy := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*zeroCalldataBytes,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+			Data:      make([]byte, zeroCalldataBytes),
+		})
+	}
+
+	tests := []struct {
+		name    string
+		tx      *types.Transaction
+		submit  func(context.Context, *types.Transaction) error
+		wantErr error
+	}{
+		{
+			name:   "gossip/eligible",
+			tx:     transfer(),
+			submit: func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+		},
+		{
+			name:    "gossip/ineligible",
+			tx:      calldataHeavy(),
+			submit:  func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+			wantErr: errInsufficientGasPerByte,
+		},
+		{
+			name:   "rpc/eligible",
+			tx:     transfer(),
+			submit: s.SendTx,
+		},
+		{
+			name:    "rpc/ineligible",
+			tx:      calldataHeavy(),
+			submit:  s.SendTx,
+			wantErr: errInsufficientGasPerByte,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.submit(t.Context(), tt.tx)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equalf(t, tt.wantErr == nil, s.Has(Transaction{tt.tx}.GossipID()), "Has(GossipID()) after %s", tt.name)
+		})
+	}
 }
 
 func TestExecutorIntegration(t *testing.T) {

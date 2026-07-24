@@ -4,9 +4,13 @@
 package sae
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +103,27 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
+// txTraceResult is [tracers.TxTraceResult] with Result typed rather than
+// `any`, which would JSON-unmarshal into a map.
+type txTraceResult struct {
+	TxHash common.Hash             `json:"txHash"`
+	Result *logger.ExecutionResult `json:"result"`
+	Error  string                  `json:"error"`
+}
+
+// onlyLOG1At returns cmp options comparing only the LOG1 [logger.StructLogRes]
+// at pc, ignoring its Gas and GasCost. It fails tb if code[pc] isn't LOG1.
+func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
+	tb.Helper()
+	require.Equalf(tb, vm.LOG1, vm.OpCode(code[pc]), "Bad test setup; opcode at program counter %d", pc)
+	return cmp.Options{
+		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
+			return r.Pc != pc || r.Op != vm.LOG1.String()
+		}),
+		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
+	}
+}
+
 func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 2)
 
@@ -108,25 +133,12 @@ func TestDebugTrace(t *testing.T) {
 	recipient := common.Address{'r', 'e', 'c', 'v'}
 	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
-	// Specifying the entire trace would be excessive and uninformative so we
-	// select a precise location of an event associated with the deposit()
-	// function on the contract.
+	// The full trace would be excessive and uninformative, so pin only the
+	// LOG1 for `emit Deposit()`.
 	const logPC = 185
-	require.Equal(t, vm.LOG1, vm.OpCode(escrow.ByteCode()[logPC]), "Bad test setup; program counter LOG1 for `emit Deposit()`")
-	ignore := cmp.Options{
-		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
-			return r.Pc != logPC || r.Op != vm.LOG1.String()
-		}),
-		// Any precise amount of gas left at the time of OpCode execution would
-		// be copy-pasted from the test output.
-		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
-	}
+	ignore := onlyLOG1At(t, escrow.ByteCode(), logPC)
 
-	want := []struct {
-		TxHash common.Hash             `json:"txHash"`
-		Result *logger.ExecutionResult `json:"result"`
-		Error  string                  `json:"error"`
-	}{
+	want := []txTraceResult{
 		{
 			TxHash: deployTx.Hash(),
 			Result: &logger.ExecutionResult{
@@ -247,12 +259,11 @@ func TestDebugTrace(t *testing.T) {
 			}},
 			wantErr: testerr.Contains("execution timeout"),
 		},
-		// TODO(JonathanOppenheimer): add a fee-sensitive case; these assert
-		// only fee-insensitive fields, leaving the SAE-era replay base fee
-		// unpinned.
 		{
 			method: "debug_traceTransaction",
-			args:   []any{depositTx.Hash(), tracers.TraceConfig{Tracer: utils.PointerTo("callTracer")}},
+			args: []any{depositTx.Hash(), tracers.TraceConfig{
+				Tracer: utils.PointerTo("callTracer"),
+			}},
 			want: native.CallFrame{
 				From:    sut.wallet.Addresses()[0],
 				Gas:     depositTx.Gas(),
@@ -276,29 +287,6 @@ func TestDebugTrace(t *testing.T) {
 
 	sut.testRPC(ctx, t, tests...)
 
-	// Mid-block roots are never persisted, so assert properties rather than
-	// exact values.
-	t.Run("debug_intermediateRoots_multiple_txs", func(t *testing.T) {
-		transfers := make([]*types.Transaction, 2)
-		for i := range transfers {
-			transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
-				To:       &common.Address{'x', 'f', 'e', 'r'},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-				Value:    big.NewInt(1),
-			})
-		}
-		block := sut.runConsensusLoop(t, transfers...)
-		require.Lenf(t, block.Transactions(), len(transfers), "%T.Transactions()", block)
-
-		var roots []common.Hash
-		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
-
-		require.Len(t, roots, len(transfers), "one root per transaction")
-		assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
-		assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
-	})
-
 	// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
 	// can't be used.
 	t.Run("debug_standardTraceBlockToFile", func(t *testing.T) {
@@ -309,13 +297,135 @@ func TestDebugTrace(t *testing.T) {
 			assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
 		})
 
+		wantPrefix := fmt.Sprintf("block_%#x-%d-%#x-", depositBlock.Hash().Bytes()[:4], 0, depositTx.Hash().Bytes()[:4])
+		assert.Truef(t, strings.HasPrefix(filepath.Base(files[0]), wantPrefix), "file name %q returned by debug_standardTraceBlockToFile MUST have prefix %q", filepath.Base(files[0]), wantPrefix)
+
 		trace, err := os.ReadFile(files[0])
 		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
-		// The file holds a struct log: one JSON line per EVM opcode executed.
-		// `emit Deposit()` compiles to a LOG1 opcode, so if it shows up the
-		// file really does trace the transaction's execution.
-		assert.Contains(t, string(trace), vm.LOG1.String(), "trace of `emit Deposit()`")
+		// The file should be a structured log file, each line is a separate
+		// JSON object describing an EVM opcode executed.
+		//
+		// `emit Deposit()` compiles to a LOG1 opcode at [logPC], so if it
+		// shows up there, and only there, the file really does trace the
+		// transaction's execution.
+		var log1PCs []uint64
+		dec := json.NewDecoder(bytes.NewReader(trace))
+		for dec.More() {
+			var step logger.StructLog
+			require.NoError(t, dec.Decode(&step), "decoding trace line")
+			if step.Op == vm.LOG1 {
+				log1PCs = append(log1PCs, step.Pc)
+			}
+		}
+		assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace of `emit Deposit()`", vm.LOG1)
 	})
+}
+
+// TestDebugTraceFeeSensitive pins the base fee used when the debug APIs
+// replay transactions, by tracing a contract that logs BASEFEE. The setup
+// distinguishes the executed base fee from the parent's and the consensus
+// header's, which a buggy replay might source instead.
+func TestDebugTraceFeeSensitive(t *testing.T) {
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
+
+	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
+	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
+	ignore := onlyLOG1At(t, code, logPC)
+
+	newCreateTx := func() *types.Transaction {
+		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			Gas:       1e6, // inflates the next block's worst-case fee bound
+			GasFeeCap: big.NewInt(2 * params.GWei),
+			Data:      code,
+		})
+	}
+
+	parent := sut.runConsensusLoop(t, newCreateTx())
+	vmTime.Advance(time.Second)
+	b := sut.runConsensusLoop(t, newCreateTx())
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	// If these coincided with the executed fee, a replay sourcing the wrong
+	// one would go undetected.
+	baseFee := b.ExecutedBaseFee()
+	require.NotZerof(t, baseFee.ToBig().Cmp(b.EthBlock().BaseFee()), "%T.ExecutedBaseFee() = consensus header's worst-case base fee (%v); fees MUST differ to be pinned", b, baseFee)
+	require.NotZerof(t, baseFee.Cmp(parent.ExecutedBaseFee()), "%T.ExecutedBaseFee() = parent's executed base fee (%v); fees MUST differ to be pinned", b, baseFee)
+
+	receipts := b.Receipts()
+	require.Lenf(t, receipts, 1, "%T.Receipts()", b)
+	txHash := b.Transactions()[0].Hash()
+
+	want := logger.ExecutionResult{
+		Gas: receipts[0].GasUsed,
+		StructLogs: []logger.StructLogRes{{
+			Pc:    logPC,
+			Op:    vm.LOG1.String(),
+			Depth: 1,
+			Stack: utils.PointerTo([]string{
+				baseFee.Hex(),
+				"0x0", "0x0", // LOG1's size and offset
+			}),
+		}},
+	}
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method:       "debug_traceTransaction",
+			args:         []any{txHash},
+			want:         want,
+			extraCmpOpts: ignore,
+		},
+		{
+			method: "debug_traceBlockByNumber",
+			args:   []any{hexutil.Uint64(b.NumberU64())},
+			want: []txTraceResult{{
+				TxHash: txHash,
+				Result: &want,
+			}},
+			extraCmpOpts: ignore,
+		},
+		{
+			method: "debug_traceBlockByHash",
+			args:   []any{b.Hash()},
+			want: []txTraceResult{{
+				TxHash: txHash,
+				Result: &want,
+			}},
+			extraCmpOpts: ignore,
+		},
+	}...)
+}
+
+// TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
+// root per transaction. Mid-block roots are never persisted, so it asserts
+// properties rather than exact values.
+func TestDebugIntermediateRoots(t *testing.T) {
+	const numAccounts = 2 // one transfer per account
+	ctx, sut := newSUT(t, numAccounts)
+
+	transfers := make([]*types.Transaction, numAccounts)
+	for i := range transfers {
+		transfers[i] = sut.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
+			To:       &common.Address{'x', 'f', 'e', 'r'},
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+			Value:    big.NewInt(1),
+		})
+	}
+	block := sut.runConsensusLoop(t, transfers...)
+	require.Lenf(t, block.Transactions(), len(transfers), "%T.Transactions()", block)
+
+	var roots []common.Hash
+	require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
+
+	require.Len(t, roots, len(transfers), "one root per transaction")
+	assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
+	// This holds only because nothing modifies state after the last tx:
+	// hookstest.Stub.AfterExecutingBlock is a no-op and there are no
+	// end-of-block ops. Hooks that mutate post-transaction state (e.g.
+	// the C-Chain's) would break this!!
+	assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
 }
 
 // TestDebugTraceBeforeBlockHook verifies that tracing a block applies the
@@ -338,11 +448,28 @@ func TestDebugTraceBeforeBlockHook(t *testing.T) {
 
 	// b2's post-execution root includes the hook's credit, so re-execution
 	// only reproduces it if the trace's base state includes the credit too.
+	// All block-tracing endpoints source their state from
+	// tracerBackend.StateAtBlock, so debug_intermediateRoots stands in for
+	// the rest.
 	t.Run("block_tracing_applies_hook", func(t *testing.T) {
 		var roots []common.Hash
 		require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", b2.Hash()), "CallContext(debug_intermediateRoots)")
 		require.Len(t, roots, 1, "one root per transaction")
 		assert.Equal(t, b2.PostExecutionStateRoot(), roots[0], "trace base state includes the before-block hook's changes")
+	})
+
+	// debug_traceTransaction sources its state from backend.StateAtTransaction
+	// instead. A prestate balance of 2 (one credit per block) proves the
+	// replay applied b2's hook.
+	t.Run("traceTransaction_applies_hook", func(t *testing.T) {
+		var prestate map[common.Address]native.Account
+		err := sut.CallContext(ctx, &prestate, "debug_traceTransaction",
+			b2.Transactions()[0].Hash(),
+			tracers.TraceConfig{Tracer: utils.PointerTo("prestateTracer")},
+		)
+		require.NoError(t, err, "CallContext(debug_traceTransaction, prestateTracer)")
+		require.Contains(t, prestate, marker, "prestate accounts")
+		assert.Equal(t, int64(2), prestate[marker].Balance.Int64(), "marker balance before b2's transaction")
 	})
 
 	// The hook credited marker once per block, so as of b1 its balance is 1;

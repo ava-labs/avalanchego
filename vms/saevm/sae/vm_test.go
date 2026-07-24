@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -133,6 +134,11 @@ var chainID = ids.GenerateTestID()
 func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see txgossip.minGasForSize.
+	const gasTarget = 4_000_000
+
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
 
@@ -140,7 +146,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(gasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{
@@ -395,6 +401,64 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	b, err := s.ParseBlock(ctx, proposed.Bytes())
 	require.NoError(tb, err, "ParseBlock(BuildBlock().Bytes())")
 	return b
+}
+
+func TestBuildBlockByteBackstop(t *testing.T) {
+	const (
+		numTxs       = 20
+		calldataSize = 120 * units.KiB
+	)
+	ctx, sut := newSUT(t, numTxs)
+
+	heavyTxs := make([]*types.Transaction, numTxs)
+	for i := range heavyTxs {
+		// Unique address to prevent legacypool race
+		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
+			GasFeeCap: big.NewInt(1),
+			Data:      make([]byte, calldataSize),
+		})
+	}
+
+	txBytes := heavyTxs[0].Size()
+	wantTxs := saeparams.TargetBlockBytes / txBytes
+	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
+
+	// Bypass mempool admission filtering so the builder backstop is exercised.
+	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
+	require.NoError(t, errors.Join(errs...), "TxPool.Add()")
+	txgossiptest.WaitUntilPending(t, ctx, sut.rawVM.GethRPCBackends(), heavyTxs...)
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	builtTxs := built.Transactions()
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
+	for i, tx := range builtTxs {
+		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
+}
+
+func TestVerifyBlockSizeLimit(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	lastAccepted := sut.lastAcceptedBlock(t)
+
+	oversizedTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Data: make([]byte, saeparams.MaxBlockBytes),
+	})
+	ethB := types.NewBlock(
+		&types.Header{
+			ParentHash: common.Hash(lastAccepted.ID()),
+			Number:     new(big.Int).SetUint64(lastAccepted.Height() + 1),
+		},
+		types.Transactions{oversizedTx},
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+	)
+	b := blockstest.NewBlock(t, ethB, nil, nil)
+	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
 }
 
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided

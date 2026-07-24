@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
@@ -47,6 +48,7 @@ import (
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
+	*network.Network
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -147,7 +149,11 @@ func (vm *VM) Initialize(
 		userConfig.desired(),
 		vm.metrics,
 	)
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
+	vm.Network, err = network.New(snowCtx, appSender)
+	if err != nil {
+		return fmt.Errorf("creating network: %w", err)
+	}
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -178,8 +184,8 @@ func (vm *VM) Initialize(
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
-		vm.Network,
-		vm.ValidatorPeers,
+		vm.Network.Network,
+		vm.Network.ValidatorPeers,
 		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
@@ -195,7 +201,7 @@ func (vm *VM) Initialize(
 	}
 	vm.pushGossiper = pushGossiper
 
-	if err := vm.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+	if err := vm.Network.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
 		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 
@@ -212,7 +218,7 @@ func (vm *VM) Initialize(
 		gossipWG.Wait()
 		return nil
 	})
-	if err := registerWarpHandler(vm.VM, warpStorage, snowCtx.WarpSigner); err != nil {
+	if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, snowCtx.WarpSigner); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 	return nil
