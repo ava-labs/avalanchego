@@ -1,5 +1,8 @@
 # Linux Packaging for AvalancheGo
 
+> Linux binary tarballs (`.tar.gz` + detached `.tar.gz.sig`) are documented
+> separately in [`linux-tar.md`](./linux-tar.md).
+
 ## Overview
 
 This directory contains the Linux packaging implementation for `avalanchego` and
@@ -414,6 +417,10 @@ The current design should be reconsidered if any of these change:
 - RPM validation script: `/.github/packaging/scripts/validate-rpm.sh`
 - DEB validation script: `/.github/packaging/scripts/validate-deb.sh`
 - Root task include: `/Taskfile.yml`
+
+### Sibling packaging documentation
+
+- Linux tarballs: [`./linux-tar.md`](./linux-tar.md)
 
 ### Maintainer background for revisiting linking choices
 
