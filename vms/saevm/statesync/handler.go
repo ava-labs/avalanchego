@@ -40,20 +40,18 @@ type SummaryHandler struct {
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
-// database. The genesis block must be provided to allow the handler to return
-// the summary of the genesis block.
+// database.
 func New(
 	cfg Config,
 	db ethdb.Database,
 	log logging.Logger,
 ) (*SummaryHandler, error) {
-	h := &SummaryHandler{
+	return &SummaryHandler{
 		cfg:           cfg,
 		db:            db,
 		log:           log,
 		stateSyncDone: make(chan struct{}),
-	}
-	return h, nil
+	}, nil
 }
 
 // Shutdown cancels any ongoing sync.

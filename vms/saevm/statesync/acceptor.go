@@ -31,12 +31,14 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 }
 
 // AcceptSummary performs the entire state sync given the provided summary. If
-// state sync is not enabled, it returns StateSyncSkipped. Once the state sync
-// is complete, [SummaryHandler.WaitForEvent] will return [common.StateSyncDone].
-func (h *SummaryHandler) AcceptSummary(ctx context.Context, _ *Summary) (block.StateSyncMode, error) {
-	enabled, err := h.StateSyncEnabled(ctx)
-	if err != nil || !enabled {
-		return block.StateSyncSkipped, err
+// [SummaryHandler.StateSyncEnabled] returns false, this method should not be
+// called. If this method returns [block.StateSyncSkipped], no state changes
+// were made. Once the state sync is complete, [SummaryHandler.WaitForEvent]
+// will return [common.StateSyncDone].
+func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
+	if s.height == 0 {
+		// The genesis block is already accepted, so we don't need to do anything.
+		return block.StateSyncSkipped, nil
 	}
 
 	go func() {

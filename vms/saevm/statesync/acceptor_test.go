@@ -22,37 +22,37 @@ func TestStateSyncEnabled(t *testing.T) {
 		name        string
 		enabled     *bool
 		initialized bool
-		want        block.StateSyncMode
+		wantEnabled bool
 	}{
 		{
 			name:        "explicitly disabled is skipped",
 			enabled:     &disabled,
 			initialized: false,
-			want:        block.StateSyncSkipped,
+			wantEnabled: false,
 		},
 		{
 			name:        "unset is skipped once a block was processed",
 			enabled:     nil,
 			initialized: true,
-			want:        block.StateSyncSkipped,
+			wantEnabled: false,
 		},
 		{
 			name:        "unset starts sync on a fresh database",
 			enabled:     nil,
 			initialized: false,
-			want:        block.StateSyncStatic,
+			wantEnabled: true,
 		},
 		{
 			name:        "explicitly enabled starts sync",
 			enabled:     &enabled,
 			initialized: false,
-			want:        block.StateSyncStatic,
+			wantEnabled: true,
 		},
 		{
 			name:        "explicitly enabled starts sync even after a block was processed",
 			enabled:     &enabled,
 			initialized: true,
-			want:        block.StateSyncStatic,
+			wantEnabled: true,
 		},
 	}
 	for _, tt := range tests {
@@ -69,11 +69,41 @@ func TestStateSyncEnabled(t *testing.T) {
 			}
 			sut := newSUT(t, opts...)
 
-			enabled, err := sut.StateSyncEnabled(t.Context())
+			gotEnabled, err := sut.StateSyncEnabled(t.Context())
 			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
-			assert.Equalf(t, tt.want != block.StateSyncSkipped, enabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+			assert.Equalf(t, tt.wantEnabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+		})
+	}
+}
 
-			mode, err := sut.AcceptSummary(t.Context(), &Summary{})
+func TestAcceptSummary(t *testing.T) {
+	const numBlocks = 5
+
+	tests := []struct {
+		name          string
+		summaryHeight uint64
+		want          block.StateSyncMode
+	}{
+		{
+			name:          "genesis summary is skipped",
+			summaryHeight: 0,
+			want:          block.StateSyncSkipped,
+		},
+		{
+			name:          "non-genesis summary starts sync",
+			summaryHeight: numBlocks,
+			want:          block.StateSyncStatic,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sut := newSUT(t, withNumBlocks(numBlocks))
+			b := sut.blocks[tt.summaryHeight]
+			s := NewSummary(b.Hash(), b.Height())
+
+			mode, err := sut.AcceptSummary(t.Context(), s)
 			require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
 			require.Equalf(t, tt.want, mode, "%T.AcceptSummary()", sut.SummaryHandler)
 
