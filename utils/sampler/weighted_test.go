@@ -57,7 +57,7 @@ func TestWeightedDistribution(t *testing.T) {
 	require.NoError(s.Initialize([]uint64{1, 1, 2, 3, 4}))
 
 	counts := make([]int, 5)
-	for i := uint64(0); i < 11; i++ {
+	for i := range uint64(11) {
 		index, ok := s.Sample(i)
 		require.True(ok)
 		counts[index]++

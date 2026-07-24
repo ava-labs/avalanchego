@@ -13,13 +13,13 @@ type Haltable interface {
 }
 
 type Halter struct {
-	halted uint32
+	halted atomic.Uint32
 }
 
 func (h *Halter) Halt() {
-	atomic.StoreUint32(&h.halted, 1)
+	h.halted.Store(1)
 }
 
 func (h *Halter) Halted() bool {
-	return atomic.LoadUint32(&h.halted) == 1
+	return h.halted.Load() == 1
 }

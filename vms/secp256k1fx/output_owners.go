@@ -57,7 +57,7 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 
 // Fields returns JSON keys in a map that can be used with marshal JSON
 // to serialize OutputOwners struct
-func (out *OutputOwners) Fields() (map[string]interface{}, error) {
+func (out *OutputOwners) Fields() (map[string]any, error) {
 	addresses := make([]string, len(out.Addrs))
 	for i, addr := range out.Addrs {
 		// for each [addr] in [Addrs] we attempt to format it given
@@ -70,7 +70,7 @@ func (out *OutputOwners) Fields() (map[string]interface{}, error) {
 		}
 		addresses[i] = fAddr
 	}
-	result := map[string]interface{}{
+	result := map[string]any{
 		"locktime":  out.Locktime,
 		"threshold": out.Threshold,
 		"addresses": addresses,

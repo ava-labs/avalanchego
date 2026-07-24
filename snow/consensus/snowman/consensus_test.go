@@ -70,7 +70,7 @@ func runConsensusTests(t *testing.T, factory Factory) {
 	}
 }
 
-func getTestName(i interface{}) string {
+func getTestName(i any) string {
 	return strings.Split(path.Base(runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()), ".")[1]
 }
 
@@ -1328,7 +1328,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 
 	n := NewNetwork(params, numColors, source)
 
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		require.NoError(n.AddNode(t, factory.New()))
 	}
 

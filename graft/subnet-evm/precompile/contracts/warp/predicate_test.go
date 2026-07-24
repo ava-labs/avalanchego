@@ -59,7 +59,7 @@ var (
 
 func init() {
 	testVdrs = make([]*testValidator, 0, numTestVdrs)
-	for i := 0; i < numTestVdrs; i++ {
+	for range numTestVdrs {
 		testVdrs = append(testVdrs, newTestValidator())
 	}
 	utils.Sort(testVdrs)
@@ -152,7 +152,7 @@ func (g GasConfig) PredicateGasCost(chunks int, signers int) uint64 {
 // and the first [numKeys] signatures from [blsSignatures]
 func createWarpMessage(numKeys int) *avalancheWarp.Message {
 	bitSet := set.NewBits()
-	for i := 0; i < numKeys; i++ {
+	for i := range numKeys {
 		bitSet.Add(i)
 	}
 	warpSignature := &avalancheWarp.BitSetSignature{
@@ -287,7 +287,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 		}
 		blsSignatures = make([]*bls.Signature, 0, numKeys)
 	)
-	for i := 0; i < numKeys; i++ {
+	for i := range numKeys {
 		vdr := testVdrs[i]
 		sig, err := vdr.sk.Sign(unsignedMsg.Bytes())
 		require.NoError(err)
@@ -306,7 +306,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
 	require.NoError(err)
 	bitSet := set.NewBits()
-	for i := 0; i < numKeys; i++ {
+	for i := range numKeys {
 		bitSet.Add(i)
 	}
 	warpSignature := &avalancheWarp.BitSetSignature{
@@ -428,7 +428,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	aggregateSignature, err := bls.AggregateSignatures(blsSignatures[0:numKeys])
 	require.NoError(t, err)
 	bitSet := set.NewBits()
-	for i := 0; i < numKeys; i++ {
+	for i := range numKeys {
 		bitSet.Add(i)
 	}
 	warpSignature := &avalancheWarp.BitSetSignature{
@@ -780,7 +780,7 @@ func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precom
 	for _, totalNodes := range []int{100, 1_000, 10_000} {
 		pred := createPredicate(numSigners)
 		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, totalNodes)
-		for i := 0; i < totalNodes; i++ {
+		for i := range totalNodes {
 			validatorSet[testVdrs[i].nodeID] = &validators.GetValidatorOutput{
 				NodeID:    testVdrs[i].nodeID,
 				Weight:    20,

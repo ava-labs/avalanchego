@@ -30,19 +30,19 @@ func TestMessageQueue(t *testing.T) {
 	numToSend := 10
 
 	// Assert that the messages are popped in the same order they were pushed
-	for i := 0; i < numToSend; i++ {
+	for i := range numToSend {
 		m, err := mc.Ping(uint32(i))
 		require.NoError(err)
 		msgs = append(msgs, m)
 	}
 
 	go func() {
-		for i := 0; i < numToSend; i++ {
+		for i := range numToSend {
 			q.Push(t.Context(), msgs[i])
 		}
 	}()
 
-	for i := 0; i < numToSend; i++ {
+	for i := range numToSend {
 		msg, ok := q.Pop()
 		require.True(ok)
 		require.Equal(msgs[i], msg)

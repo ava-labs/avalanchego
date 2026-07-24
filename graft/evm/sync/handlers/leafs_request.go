@@ -114,10 +114,7 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		return nil, nil
 	}
 	// override limit if it is greater than the configured maxLeavesLimit
-	limit := leafsRequest.KeyLimit()
-	if limit > maxLeavesLimit {
-		limit = maxLeavesLimit
-	}
+	limit := min(leafsRequest.KeyLimit(), maxLeavesLimit)
 
 	var leafsResponse message.LeafsResponse
 	leafsResponse.Keys = make([][]byte, 0, limit)

@@ -20,7 +20,7 @@ var (
 type Fx interface {
 	// Initialize this feature extension to be running under this VM. Should
 	// return an error if the VM is incompatible.
-	Initialize(vm interface{}) error
+	Initialize(vm any) error
 
 	// Notify this Fx that the VM is in bootstrapping
 	Bootstrapping() error
@@ -32,15 +32,15 @@ type Fx interface {
 	// provided utxo with no restrictions on the destination. If the transaction
 	// can't spend the output based on the input and credential, a non-nil error
 	// should be returned.
-	VerifyTransfer(tx, in, cred, utxo interface{}) error
+	VerifyTransfer(tx, in, cred, utxo any) error
 
 	// VerifyPermission returns nil iff [cred] proves that [controlGroup]
 	// assents to [tx]
-	VerifyPermission(tx, in, cred, controlGroup interface{}) error
+	VerifyPermission(tx, in, cred, controlGroup any) error
 
 	// CreateOutput creates a new output with the provided control group worth
 	// the specified amount
-	CreateOutput(amount uint64, controlGroup interface{}) (interface{}, error)
+	CreateOutput(amount uint64, controlGroup any) (any, error)
 }
 
 type Owner interface {
@@ -51,5 +51,5 @@ type Owner interface {
 }
 
 type Owned interface {
-	Owners() interface{}
+	Owners() any
 }

@@ -208,7 +208,7 @@ func TestBaseTxSerialization(t *testing.T) {
 func TestBaseTxNotState(t *testing.T) {
 	require := require.New(t)
 
-	intf := interface{}(&BaseTx{})
+	intf := any(&BaseTx{})
 	_, ok := intf.(verify.State)
 	require.False(ok, "should not be marked as state")
 }

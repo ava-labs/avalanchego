@@ -57,7 +57,7 @@ func TestExtensive(t *testing.T) {
 	require := require.New(t)
 
 	hash := hashing.ComputeHash256([]byte{1, 2, 3})
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		key, err := NewPrivateKey()
 		require.NoError(err)
 
@@ -69,7 +69,7 @@ func TestExtensive(t *testing.T) {
 func TestGenRecreate(t *testing.T) {
 	require := require.New(t)
 
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		sk, err := NewPrivateKey()
 		require.NoError(err)
 

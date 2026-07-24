@@ -45,7 +45,7 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 				statedb.Finalise(true)
 				continue
 			}
-			var printIntf interface{}
+			var printIntf any
 			marshalled, err := json.Marshal(activatingConfig)
 			if err == nil {
 				printIntf = string(marshalled)

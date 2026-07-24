@@ -66,7 +66,7 @@ func makeViewForHashChangedNodes(t require.TestingT, numKeys uint64, parallelism
 	require.NoError(t, err)
 
 	ops := make([]database.BatchOp, 0, numKeys)
-	for i := uint64(0); i < numKeys; i++ {
+	for i := range numKeys {
 		k := binary.AppendUvarint(nil, i)
 		ops = append(ops, database.BatchOp{
 			Key:   k,

@@ -28,7 +28,7 @@ func TestSetsAndGets(t *testing.T) {
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
-				InitializeF: func(vmIntf interface{}) error {
+				InitializeF: func(vmIntf any) error {
 					vm := vmIntf.(secp256k1fx.VM)
 					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
@@ -88,7 +88,7 @@ func TestFundingNoAddresses(t *testing.T) {
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
-				InitializeF: func(vmIntf interface{}) error {
+				InitializeF: func(vmIntf any) error {
 					vm := vmIntf.(secp256k1fx.VM)
 					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
@@ -118,7 +118,7 @@ func TestFundingAddresses(t *testing.T) {
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
-				InitializeF: func(vmIntf interface{}) error {
+				InitializeF: func(vmIntf any) error {
 					vm := vmIntf.(secp256k1fx.VM)
 					return vm.CodecRegistry().RegisterType(&avax.TestAddressable{})
 				},

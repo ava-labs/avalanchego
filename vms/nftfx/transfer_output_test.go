@@ -41,7 +41,7 @@ func TestTransferOutputInvalidSecp256k1Output(t *testing.T) {
 }
 
 func TestTransferOutputState(t *testing.T) {
-	intf := interface{}(&TransferOutput{})
+	intf := any(&TransferOutput{})
 	_, ok := intf.(verify.State)
 	require.True(t, ok)
 }

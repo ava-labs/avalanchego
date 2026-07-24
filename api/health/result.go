@@ -18,14 +18,14 @@ func init() {
 
 type Result struct {
 	// Details of the HealthCheck.
-	Details interface{} `json:"message,omitempty"`
+	Details any `json:"message,omitempty"`
 
 	// Error is the string representation of the error returned by the failing
 	// HealthCheck. The value is nil if the check passed.
 	Error *string `json:"error,omitempty"`
 
 	// Timestamp of the last HealthCheck.
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
 
 	// Duration is the amount of time this HealthCheck last took to evaluate.
 	Duration time.Duration `json:"duration"`

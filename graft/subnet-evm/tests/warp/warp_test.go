@@ -713,7 +713,7 @@ func (w *warpTest) warpLoad() {
 
 	log.Info("Generating tx sequence to send warp messages...")
 	warpSendSequences, err := txs.GenerateTxSequences(ctx, func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error) {
-		data, err := warp.PackSendWarpMessage([]byte(fmt.Sprintf("Jets %d-%d Dolphins", key.X.Int64(), nonce)))
+		data, err := warp.PackSendWarpMessage(fmt.Appendf(nil, "Jets %d-%d Dolphins", key.X.Int64(), nonce))
 		if err != nil {
 			return nil, err
 		}

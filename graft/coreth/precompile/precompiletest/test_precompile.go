@@ -123,10 +123,7 @@ func (test PrecompileTest) Bench(b *testing.B, module modules.Module) {
 	}
 	b.StopTimer()
 
-	elapsed := uint64(time.Since(start))
-	if elapsed < 1 {
-		elapsed = 1
-	}
+	elapsed := max(uint64(time.Since(start)), 1)
 	gasUsed := runParams.SuppliedGas * uint64(b.N)
 	b.ReportMetric(float64(runParams.SuppliedGas), "gas/op")
 	// Keep it as uint64, multiply 100 to get two digit float later

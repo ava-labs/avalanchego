@@ -43,7 +43,7 @@ func SetupBenchmark(b *testing.B, count int, keySize, valueSize int) ([][]byte, 
 
 	keys := make([][]byte, count)
 	values := make([][]byte, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		keyBytes := make([]byte, keySize)
 		valueBytes := make([]byte, valueSize)
 		_, err := rand.Read(keyBytes) // #nosec G404

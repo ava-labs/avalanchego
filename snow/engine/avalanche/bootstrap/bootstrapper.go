@@ -389,12 +389,12 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	return b.startSyncing(ctx, nil)
 }
 
-func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+func (b *Bootstrapper) HealthCheck(ctx context.Context) (any, error) {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"consensus": struct{}{},
 		"vm":        vmIntf,
 	}

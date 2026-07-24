@@ -162,7 +162,7 @@ func NewTestTx() *atomic.Tx {
 
 func NewTestTxs(numTxs int) []*atomic.Tx {
 	txs := make([]*atomic.Tx, 0, numTxs)
-	for i := 0; i < numTxs; i++ {
+	for range numTxs {
 		txs = append(txs, NewTestTx())
 	}
 

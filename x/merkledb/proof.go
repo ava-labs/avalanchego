@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 
@@ -541,7 +542,7 @@ func (c *ChangeProof) Empty() bool {
 func verifySortedKeyChanges(keyChanges []KeyChange, start maybe.Maybe[Key], end maybe.Maybe[Key]) error {
 	hasLowerBound := start.HasValue()
 	hasUpperBound := end.HasValue()
-	for i := 0; i < len(keyChanges); i++ {
+	for i := range keyChanges {
 		if i < len(keyChanges)-1 && bytes.Compare(keyChanges[i].Key, keyChanges[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
@@ -678,8 +679,7 @@ func addPathInfo(
 		shouldInsertRightChildren = insertChildrenGreaterThan.HasValue()
 	)
 
-	for i := len(proofPath) - 1; i >= 0; i-- {
-		proofNode := proofPath[i]
+	for _, proofNode := range slices.Backward(proofPath) {
 		key := proofNode.Key
 
 		if key.hasPartialByte() && !proofNode.ValueOrHash.IsNothing() {

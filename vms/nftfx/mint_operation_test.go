@@ -44,7 +44,7 @@ func TestMintOperationOuts(t *testing.T) {
 }
 
 func TestMintOperationState(t *testing.T) {
-	intf := interface{}(&MintOperation{})
+	intf := any(&MintOperation{})
 	_, ok := intf.(verify.State)
 	require.False(t, ok)
 }

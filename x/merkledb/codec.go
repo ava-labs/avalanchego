@@ -183,7 +183,7 @@ func decodeDBNode(b []byte, n *dbNode) error {
 
 	n.children = make(map[byte]*child, numChildren)
 	var previousChild uint64
-	for i := uint64(0); i < numChildren; i++ {
+	for i := range numChildren {
 		index, err := r.Uvarint()
 		if err != nil {
 			return err

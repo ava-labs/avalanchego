@@ -2590,7 +2590,7 @@ func TestLocalParse(t *testing.T) {
 		name           string
 		f              block.ParseFunc
 		block          []byte
-		resultingBlock interface{}
+		resultingBlock any
 	}{
 		{
 			name:           "local parse as post-fork",

@@ -293,17 +293,13 @@ func (vm *VM) onNormalOperationsStarted() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.AtomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
+	})
 
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.pullGossiper, vm.InnerVM.Config().PullGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
+	})
 
 	return nil
 }

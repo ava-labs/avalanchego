@@ -1467,7 +1467,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
 
-	diskSpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+	diskSpaceCheck := health.CheckerFunc(func(context.Context) (any, error) {
 		// confirm that the node has enough disk space to continue operating
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
 
@@ -1488,7 +1488,7 @@ func (n *Node) initHealthAPI() error {
 			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below warning threshold available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningAvailableDiskSpacePercentage)
 		}
 
-		return map[string]interface{}{
+		return map[string]any{
 			"availableDiskBytes":      availableDiskBytes,
 			"availableDiskPercentage": availableDiskPercentage,
 		}, err
@@ -1499,7 +1499,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
 
-	wrongBLSKeyCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+	wrongBLSKeyCheck := health.CheckerFunc(func(context.Context) (any, error) {
 		vdr, ok := n.vdrs.GetValidator(constants.PrimaryNetworkID, n.ID)
 		if !ok {
 			return "node is not a validator", nil
@@ -1551,7 +1551,7 @@ func (n *Node) initHealthAPI() error {
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
 	)
-	futureUpgradeCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+	futureUpgradeCheck := health.CheckerFunc(func(context.Context) (any, error) {
 		var (
 			currentValidators = n.vdrs.GetMap(constants.PrimaryNetworkID)
 			totalWeight       uint64
@@ -1582,7 +1582,7 @@ func (n *Node) initHealthAPI() error {
 		}
 
 		modeUpgradeWeightPortion := float64(modeUpgradeWeight) / float64(totalWeight)
-		result := map[string]interface{}{
+		result := map[string]any{
 			"localUpgradeTime":            localUpgradeTime,
 			"modeUpgradeTime":             time.Unix(int64(modeUpgradeTimeUnix), 0).UTC(),
 			"modeUpgradeWeightPercentage": 100 * modeUpgradeWeightPortion,
@@ -1853,8 +1853,8 @@ func (n *Node) shutdown() {
 
 	if n.health != nil {
 		// Passes if the node is not shutting down
-		shuttingDownCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
-			return map[string]interface{}{
+		shuttingDownCheck := health.CheckerFunc(func(context.Context) (any, error) {
+			return map[string]any{
 				"isShuttingDown": true,
 			}, errShuttingDown
 		})

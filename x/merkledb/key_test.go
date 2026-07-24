@@ -241,14 +241,14 @@ func Test_Key_Token(t *testing.T) {
 				0b1110_1111,
 			},
 			assertTokens: func(require *require.Assertions, key Key) {
-				for i := 0; i < 16; i++ {
+				for i := range 16 {
 					require.Equal(byte(i), key.Token(i*4, 4))
 				}
 			},
 		},
 	}
 
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		tests = append(tests, test{
 			name:       fmt.Sprintf("branch factor 256, byte %d", i),
 			inputBytes: []byte{byte(i)},

@@ -29,7 +29,7 @@ func TestMempoolAddTx(t *testing.T) {
 	require.NoError(err)
 
 	txs := make([]*atomic.Tx, 0)
-	for i := 0; i < 3_000; i++ {
+	for range 3_000 {
 		tx := atomictest.GenerateTestImportTxWithGas(1, 1)
 		txs = append(txs, tx)
 		require.NoError(m.Add(tx))
