@@ -35,8 +35,6 @@ func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHa
 		return nil, nil, nil
 	case err != nil:
 		return nil, nil, err
-	case !blk.Executed():
-		return nil, nil, nil
 	default:
 		return blk.Receipts(), blk.EthBlock(), nil
 	}

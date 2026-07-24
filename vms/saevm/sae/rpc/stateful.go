@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -90,10 +91,10 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	// TODO(JonathanOppenheimer): [backend.restoreBlock] reads and decodes the
-	// full block body and receipts but this method only needs the header, the
-	// post-execution state root, and the executed base fee. Some sort of
-	// refactor could improve performance.
+	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
+	// decodes the full block body and receipts but this method only needs the
+	// header, the post-execution state root, and the executed base fee. Some
+	// sort of refactor could improve performance.
 	bl, err := b.restoreExecutedBlock(ctx, numOrHash)
 	if err != nil {
 		return nil, nil, err
@@ -258,7 +259,7 @@ func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 		return nil, nil, err
 	}
 
-	if err := b.applyChildBeforeBlock(sdb, block.Header()); err != nil {
+	if err := b.applyChildBeforeBlock(ctx, sdb, block.Header()); err != nil {
 		release()
 		return nil, nil, err
 	}
@@ -268,16 +269,15 @@ func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 // applyChildBeforeBlock applies the canonical child block's pre-transaction
 // state changes to sdb, the parent's post-execution state. It is a no-op if
 // the parent has no canonical child.
-func (b *tracerBackend) applyChildBeforeBlock(sdb *state.StateDB, parent *types.Header) error {
+func (b *tracerBackend) applyChildBeforeBlock(ctx context.Context, sdb *state.StateDB, parent *types.Header) error {
 	child := rpc.BlockNumber(parent.Number.Uint64() + 1) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(child))
-	if errors.Is(err, blocks.ErrNotFound) {
+	ethB, err := b.backend.BlockByNumber(ctx, child)
+	if err != nil {
+		return fmt.Errorf("reading child block %d: %w", child, err)
+	}
+	if ethB == nil {
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("restoring child block %d: %w", child, err)
-	}
-	ethB := bl.EthBlock()
 	rules := b.ChainConfig().Rules(ethB.Number(), true /*isMerge*/, ethB.Time())
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
@@ -288,16 +288,14 @@ func (b *tracerBackend) applyChildBeforeBlock(sdb *state.StateDB, parent *types.
 // BlockHash returns the block's canonical hash, which differs from
 // block.Hash() because the blocks served by this backend carry faked headers.
 func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
-	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithNumber(num))
-	if err != nil {
-		b.Logger().Error("Restoring already-served block for its canonical hash",
+	hash := rawdb.ReadCanonicalHash(b.DB(), block.NumberU64())
+	if hash == (common.Hash{}) {
+		b.Logger().Error("No canonical hash for already-served block",
 			zap.Uint64("block_height", block.NumberU64()),
-			zap.Error(err),
 		)
 		return block.Hash()
 	}
-	return bl.Hash()
+	return hash
 }
 
 // BlockByHash is the same as [backend.BlockByHash] but returns a faked header
