@@ -2,7 +2,7 @@
 
 The C-Chain benchmarks support re-executing a range of mainnet C-Chain blocks against a provided snapshot of the current state as of some initial state.
 
-Benchmarks can be invoked by running `./scripts/run_task.sh test-cchain-reexecution` or `./scripts/benchmark_cchain_range.sh`.
+Benchmarks can be invoked by running `./scripts/run_task.sh avalanchego:test-cchain-reexecution` or `./scripts/benchmark_cchain_range.sh`.
 
 ## Prerequisites
 
@@ -277,7 +277,7 @@ FIREWOOD_REF=abc123def ./scripts/run_polyrepo.sh
 LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh
 
 # Then run the benchmark
-./scripts/run_task.sh test-cchain-reexecution -- firewood-101-250k
+./scripts/run_task.sh avalanchego:test-cchain-reexecution -- firewood-101-250k
 ```
 
 ### CI Usage

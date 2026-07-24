@@ -1,0 +1,33 @@
+# https://taskfile.dev
+# Git/tag lifecycle tasks.
+
+version: '3'
+
+vars:
+  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
+
+tasks:
+  check-clean-branch:
+    desc: Checks that the git working tree is clean
+    cmd: '{{.NIX_RUN}} .github/workflows/check-clean-branch.sh'
+
+  tags-create:
+    desc: Creates tags for avalanchego and submodules
+    cmd: '{{.NIX_RUN}} ./scripts/create_tags.sh {{.CLI_ARGS}}'
+
+  tags-push:
+    desc: Pushes tags for avalanchego and submodules and verifies delivery
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/push_tags.sh {{.CLI_ARGS}}'
+      - cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'
+
+  tags-update-require-directives:
+    desc: Updates require directives for avalanchego modules
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/update_require_directives.sh {{.CLI_ARGS}}'
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh go:mod-tidy'
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh go:check-require-directives'
+
+  tags-verify-remote:
+    desc: Verifies tags for avalanchego and submodules exist on the remote
+    cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'

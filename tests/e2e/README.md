@@ -6,8 +6,8 @@
 ## Running tests
 
 ```bash
-./scripts/build.sh        # Builds avalanchego for use in deploying a test network
-./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
+./scripts/run_task.sh avalanchego:build-gomod  # Builds avalanchego for use in deploying a test network
+./scripts/run_task.sh avalanchego:build-xsvm   # Builds xsvm for use in deploying a test network with a subnet
 ./bin/ginkgo -v ./tests/e2e -- --avalanchego-path=$PWD/build/avalanchego # Note that the path given for --avalanchego-path must be an absolute and not a relative path.
 ```
 
@@ -131,7 +131,7 @@ Both methods require:
  - The availability in the path of binaries for promtail and prometheus
    - Starting a development shell with `nix develop` is one way to
      ensure this and requires the installation of nix
-     (e.g. `./scripts/run_task.sh install-nix`).
+     (e.g. `./scripts/run_task.sh tools:install-nix`).
 
 Once started, the collectors will continue to run in the background
 until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.

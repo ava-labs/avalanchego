@@ -6,7 +6,7 @@ set -euo pipefail
 # ./scripts/cache_bazel_ci_build_dependencies.sh
 # ./scripts/nix_run.sh ./scripts/cache_bazel_ci_build_dependencies.sh
 #
-# Used by `task bazel-cache-ci-build-dependencies` in the Bazel CI setup job,
+# Used by `task bazel:cache-ci-build-dependencies` in the Bazel CI setup job,
 # after the metadata check. This fetches only the dependencies needed by the
 # checked-in Bazel CI target patterns instead of trying to cache every possible
 # Bazel dependency.

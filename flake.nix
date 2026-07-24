@@ -1,6 +1,6 @@
 {
   # To use:
-  #  - install nix: `./scripts/run_task.sh install-nix`
+  #  - install nix: `./scripts/run_task.sh tools:install-nix`
   #    - see CONTRIBUTING.md#nix for setup details
   #  - run `nix develop` or use direnv
   #    - see CONTRIBUTING.md#direnv for how direnv enables flake usage

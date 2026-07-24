@@ -401,7 +401,7 @@ LOKI_PASSWORD=<password> \
    - Once started, `promtail` can be stopped by `tmpnetctl stop-logs-collector`
  - Starting a development shell with `nix develop` is one way to
    ensure availability of the necessary binaries and requires the
-   installation of nix (e.g. `./scripts/run_task.sh install-nix`).
+   installation of nix (e.g. `./scripts/run_task.sh tools:install-nix`).
 
 ### Metric collection configuration
 [Top](#table-of-contents)
@@ -471,7 +471,7 @@ Example usage:
   with:
     # This should be a task invocation, not a script. The task should internalize arguments and env
     # vars to ensure that the job can be reproduced locally with minimal expertise.
-    run: ./scripts/run_task.sh test-e2e-ci
+    run: ./scripts/run_task.sh avalanchego:test-e2e-gomod-ci
 
     # Sets the prefix of the artifact containing the tmpnet network dir for this job.
     # Only required if a workflow uses this action more than once so that each artifact

@@ -52,7 +52,7 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
     echo "" >&2
     echo "Error: ${#missing[@]} tag(s) missing on $REMOTE." >&2
-    echo "Re-run: ./scripts/run_task.sh tags-push -- $VERSION" >&2
+    echo "Re-run: ./scripts/run_task.sh git:tags-push -- $VERSION" >&2
     exit 1
 fi
 

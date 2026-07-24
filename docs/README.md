@@ -13,6 +13,7 @@ that span multiple areas of the tree.
   what belongs in repository documentation, where it should live, and how it
   should be maintained
 - [Bazel](./bazel.md) - Bazel-related repository guidance
+- [Project-first naming](./project-first-naming.md) - cross-cutting naming and ownership rules for tasks, CI jobs, and Bazel target groups
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs
 

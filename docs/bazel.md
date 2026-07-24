@@ -12,7 +12,7 @@ nix dev shell when needed and avoids nesting `nix develop` when already inside i
 In the nix dev shell (`nix develop`), `bazel` and `bazelisk` are both on PATH directly.
 For Nix installation and repo dev shell setup, see [CONTRIBUTING.md](../CONTRIBUTING.md#nix).
 
-Some tasks (e.g. `task bazel-check-metadata`) only require tooling that is installed
+Some tasks (e.g. `task bazel:check-metadata`) only require tooling that is installed
 by default on GitHub Action runners (e.g. `bash`, `git`, `go`, `bazelisk`).  These
 tasks can be executed without a nix shell which in CI avoids the cost of nix installation.
 
@@ -20,19 +20,19 @@ tasks can be executed without a nix shell which in CI avoids the cost of nix ins
 
 ```bash
 # Build the main binary
-task bazel-build
+task avalanchego:build-bazel
 
 # Build with optimizations
-task bazel-build-opt
+task avalanchego:build-opt-bazel
 
 # Run unit tests
-task bazel-test
+task go:test-unit
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
-task bazel-generate-metadata
+task bazel:generate-metadata
 
 # Clean build cache
-task bazel-clean
+task bazel:clean
 ```
 
 ## Why Bazel?
@@ -193,18 +193,18 @@ generates BUILD.bazel files from Go source code.
 
 Gazelle is declared as a `bazel_dep` in `MODULE.bazel`. It is **not**
 provided by Nix. The recommended entrypoint is `task
-bazel-generate-metadata`, which regenerates Bazel metadata for the repo.
+bazel:generate-metadata`, which regenerates Bazel metadata for the repo.
 
 ### When to Run Gazelle
 
-Run `task bazel-generate-metadata` after:
+Run `task bazel:generate-metadata` after:
 - Adding new `.go` files
 - Changing import statements
 - Adding new packages/directories
 - Modifying `go.mod` dependencies
 - Modifying `MODULE.bazel`
 
-`task bazel-generate-metadata` also refreshes `MODULE.bazel.lock` into the
+`task bazel:generate-metadata` also refreshes `MODULE.bazel.lock` into the
 same state later Bazel module commands expect. `bazel mod tidy` alone does not
 always fully refresh `MODULE.bazel.lock`, so a later Bazel command may rewrite
 it. Running the lockfile refresh as part of metadata generation makes that
@@ -385,10 +385,10 @@ generation.
 
 ```bash
 # Build main binary
-task bazel-build                    # or: bazel build //main:avalanchego
+task avalanchego:build-bazel                    # or: bazel build //main:avalanchego
 
 # Build with optimizations
-task bazel-build-opt               # or: bazel build --compilation_mode=opt //main:avalanchego
+task avalanchego:build-opt-bazel               # or: bazel build --compilation_mode=opt //main:avalanchego
 
 # Build everything
 bazel build //...
@@ -407,7 +407,11 @@ with a few exceptions:
 
 ```bash
 # Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+task go:test-unit                    # or: bazel test //...
+
+# Run one project's current Bazel unit-test surface
+bazel test //... -- -//graft/...
+bazel test //graft/coreth/...
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -416,13 +420,13 @@ bazel test //utils/...
 bazel test //utils:set_test --test_filter=TestSet_Add
 
 # Fast local iteration (no race, no shuffle)
-task bazel-test-fast               # or: bazel test --config=fast //...
+task go:test-unit-fast               # or: bazel test --config=fast //...
 
 # Collect coverage
 bazel coverage //...
 
 # Run E2E tests (requires built binary)
-task bazel-test-e2e
+task avalanchego:test-e2e-bazel
 ```
 
 #### Test Options
@@ -502,25 +506,25 @@ go_test(
 
 ```bash
 # Regenerate Bazel metadata
-task bazel-generate-metadata
+task bazel:generate-metadata
 
 # Update MODULE.bazel use_repo calls
-task bazel-mod-tidy               # or: bazel mod tidy
+task bazel:mod-tidy               # or: bazel mod tidy
 
 # Refresh Bazel module metadata files
-task bazel-sync-module-metadata
+task bazel:sync-module-metadata
 
 # Clean build outputs
-task bazel-clean                  # or: bazel clean
+task bazel:clean                  # or: bazel clean
 
 # Full cache clean
-task bazel-clean-all              # or: bazel clean --expunge
+task bazel:clean-all              # or: bazel clean --expunge
 
 # CI/local: verify Bazel metadata is current
-task bazel-check-metadata
+task bazel:check-metadata
 ```
 
-As part of `bazel-check-metadata`, package-local `BUILD.bazel` files are
+As part of `bazel:check-metadata`, package-local `BUILD.bazel` files are
 expected to define at most one `go_library` rule. Multiple
 `go_library` rules in one directory are usually stale metadata left
 behind by a package rename or move, where Gazelle added the new rule
@@ -532,7 +536,7 @@ is narrower and safer: it fails on the specific suspicious state we want
 to prevent, without relying on a maintained list of which BUILD files
 are safe to destroy and recreate from scratch.
 
-In CI, the Bazel workflow runs `bazel-check-metadata` before Bazel build
+In CI, the Bazel workflow runs `bazel:check-metadata` before Bazel build
 and test jobs. This makes stale metadata fail with a single actionable
 error instead of surfacing later as multiple downstream Bazel failures.
 This is especially useful for pull requests tested against a moving base
@@ -620,7 +624,7 @@ configures Bazel to use it, and fetches the Bazel-owned
 `//tools/external:task` bootstrap target before the workflow's first
 `./scripts/run_task.sh ...` invocation. In the per-platform `setup` job it is
 run with `initial-setup: true`; in that mode it also checks Bazel metadata and
-runs `./scripts/run_task.sh bazel-cache-ci-build-dependencies`, which
+runs `./scripts/run_task.sh bazel:cache-ci-build-dependencies`, which
 delegates to `./scripts/cache_bazel_ci_build_dependencies.sh` and uses the
 checked-in list in `./scripts/bazel_ci_dependency_list.sh`.
 
@@ -674,8 +678,8 @@ Validate changes proportionally:
   Bazel bootstrap path so the launcher policy and working-directory behavior are
   still covered
 - run the affected Bazel tasks through their normal entrypoints (for example
-  `task bazel-check-metadata`, `task bazel-cache-ci-build-dependencies`, and
-  the relevant `task bazel-test-*` targets) so the checked-in dependency list,
+  `task bazel:check-metadata`, `task bazel:cache-ci-build-dependencies`, and
+  the relevant `task go:test-unit-*` targets) so the checked-in dependency list,
   bootstrap target, and cache-preparation flow still agree
 - if you change which Bazel CI commands or target patterns the workflow runs,
   update `scripts/bazel_ci_dependency_list.sh` in the same change rather than
@@ -685,13 +689,13 @@ Validate changes proportionally:
   external repos without traversing unintended local workspace state
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
-`bazel-required`, that depends on the other jobs in the workflow via
-`needs`.  Branch protection can require that one workflow-level job
-instead of tracking each underlying Bazel job separately. This reduces
+`required`, that depends on the other jobs in the workflow via `needs`.
+Branch protection can require that one workflow-level job instead of
+tracking each underlying Bazel job separately. This reduces
 required-check maintenance to the workflow level.
 
 If the `setup` job fails its metadata check in CI, rebase or merge the target
-branch, run `task bazel-generate-metadata`, commit the resulting changes, and
+branch, run `task bazel:generate-metadata`, commit the resulting changes, and
 rerun CI.
 
 ### Apple CommandLineTools
@@ -705,7 +709,7 @@ For most usage, these defaults should be sufficient. If a machine uses
 Xcode or a non-default Apple developer toolchain location, the
 defaults can be overridden via `.bazelrc.local` which is optionally
 imported by `.bazelrc`. `.bazelrc.local` is intended to be generated
-via `task bazel-configure-local`, which runs
+via `task bazel:configure-local`, which runs
 `./scripts/generate_bazelrc_local.sh` under the repo's standard task
 entrypoint. The script uses `xcode-select -p` and `xcrun --sdk macosx
 --show-sdk-path` to determine the host's active Apple developer
@@ -735,7 +739,7 @@ When adding a new Go module under `graft/`:
 
 3. **Generate Bazel metadata**:
    ```bash
-   task bazel-generate-metadata
+   task bazel:generate-metadata
    ```
 
 Dependencies are resolved automatically via `go.work`.
@@ -746,13 +750,14 @@ Dependencies are resolved automatically via `go.work`.
 
 Regenerate Bazel metadata:
 ```bash
-task bazel-generate-metadata
+task bazel:generate-metadata
 ```
 
 ### Missing external dependency
 
 1. Check if it's in `go.mod` - if not, add it
-2. Run `task go-mod-tidy` (this runs `go mod tidy` in all modules,
+2. Run `task go:check-mod-tidy` (this validates `go mod tidy` state across all modules;
+   use `task go:mod-tidy` to rewrite it when needed,
    syncs the workspace, and runs `bazel mod tidy`)
 
 ### CGO compilation errors
@@ -776,19 +781,19 @@ If you see errors like:
 This indicates the gnark-crypto assembly patch isn't being applied. Check:
 1. The patch file exists: `.bazel/patches/com_github_consensys_gnark_crypto_asm_includes.patch`
 2. `MODULE.bazel` has the `module_override` applying the patch
-3. Try `task bazel-clean-all` to clear cached BUILD files
+3. Try `task bazel:clean-all` to clear cached BUILD files
 
 ### Build cache issues
 
 Try a full cache clean:
 ```bash
-task bazel-clean-all
+task bazel:clean-all
 ```
 
 If builds still fail after cleaning, check if `MODULE.bazel.lock` needs regenerating:
 ```bash
 rm MODULE.bazel.lock
-task bazel-mod-tidy
+task bazel:mod-tidy
 ```
 
 ### "duplicate target" errors
@@ -833,9 +838,9 @@ bazel build --config=release //main:avalanchego   # Release build (stamped)
    `go.work`, `go.mod` files, and `nix/go/default.nix`. Bazel reads
    the version from `go.mod` via `go_sdk.from_file()`, so
    `MODULE.bazel` doesn't need separate updating. Use
-   `task update-go-version -- <version>` to update all files except
+   `task go:update-version -- <version>` to update all files except
    nix (which requires SHA changes). CI enforces consistency via
-   `task check-go-version`.
+   `task go:check-version`.
 
 ## Future Improvements
 
@@ -870,7 +875,7 @@ internal patch parser is strict about (unlike `git apply`).
 **To modify a patch:**
 
 1. Edit the BUILD file in `.bazel/patches/build_files/<module>/`
-2. Run `task bazel-generate-patches` to regenerate `.patch` files
+2. Run `task bazel:generate-patches` to regenerate `.patch` files
 3. Verify: `./scripts/nix_run.sh bazelisk build @<module>//<target>`
    (or plain `bazelisk build @<module>//<target>` when the host already has the
    required tools available)

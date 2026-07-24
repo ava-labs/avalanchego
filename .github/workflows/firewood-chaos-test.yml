@@ -97,7 +97,7 @@ jobs:
           role-duration-seconds: '43200'
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
+        run: ./scripts/run_task.sh avalanchego:test-cchain-reexecution -- "${{ matrix.test || '' }}"
         env:
           CHAOS_MODE: '1'
           START_BLOCK: ${{ matrix.start-block }}

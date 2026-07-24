@@ -5,7 +5,7 @@
 # to build both targets, and the stale one often references files that no longer
 # exist. This check keeps the policy simple: package-local BUILD.bazel files should
 # define at most one go_library rule, so stale rename content fails early under
-# bazel-check-metadata instead of surfacing later as a compile error.
+# bazel:check-metadata instead of surfacing later as a compile error.
 
 set -euo pipefail
 
@@ -46,7 +46,7 @@ if (( failed )); then
 Each BUILD.bazel file must define at most one go_library rule.
 Multiple go_library rules in one directory are usually stale metadata from a package rename or move.
 Remove the duplicate rule and rerun:
-  task bazel-check-metadata
+  task bazel:check-metadata
 EOF
   exit 1
 fi

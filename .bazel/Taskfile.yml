@@ -1,0 +1,84 @@
+# https://taskfile.dev
+# Bazel-owned maintenance and metadata tasks.
+
+version: '3'
+
+vars:
+  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
+
+tasks:
+  cache-ci-build-dependencies:
+    desc: Cache the build dependencies expected by the Bazel CI jobs
+    cmd: '{{.NIX_RUN}} ./scripts/cache_bazel_ci_build_dependencies.sh'
+
+  check-fmt:
+    desc: Check that BUILD.bazel files are formatted with buildifier
+    cmds:
+      - task: fmt
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh git:check-clean-branch'
+
+  check-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
+  check-generate-patches:
+    desc: Checks that generated patches are up-to-date (requires a clean working tree)
+    cmds:
+      - task: generate-patches
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh git:check-clean-branch'
+
+  check-metadata:
+    desc: Checks Bazel metadata is current (requires clean git tree)
+    cmd: '{{.NIX_RUN}} ./scripts/check_bazel_metadata.sh'
+
+  check-module-metadata:
+    desc: Checks that Bazel module metadata is up-to-date (requires a clean working tree)
+    cmds:
+      - task: sync-module-metadata
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh git:check-clean-branch'
+
+  check-multiple-go-libraries:
+    desc: Check that each BUILD.bazel defines at most one go_library
+    cmd: '{{.NIX_RUN}} ./scripts/check_bazel_multiple_go_libraries.sh'
+
+  clean:
+    desc: Clean Bazel cache
+    cmd: '{{.NIX_RUN}} bazelisk clean'
+
+  clean-all:
+    desc: Clean Bazel cache (full expunge)
+    cmd: '{{.NIX_RUN}} bazelisk clean --expunge'
+
+  configure-local:
+    desc: Generate .bazelrc.local, if necessary, with appropriate values for the local host
+    cmd: '{{.NIX_RUN}} ./scripts/generate_bazelrc_local.sh'
+
+  fmt:
+    desc: Format BUILD.bazel files with buildifier
+    cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
+
+  gazelle-generate:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
+
+  generate-metadata:
+    desc: Regenerate Bazel metadata for this source tree
+    cmds:
+      - task: gazelle-generate
+      - task: fmt
+      - task: generate-patches
+      - task: sync-module-metadata
+
+  generate-patches:
+    desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
+    cmd: '{{.NIX_RUN}} ./scripts/generate_bazel_patches.sh'
+
+  mod-tidy:
+    desc: Update use_repo() in MODULE.bazel from go.mod
+    cmd: '{{.NIX_RUN}} bazelisk mod tidy'
+
+  sync-module-metadata:
+    desc: Refresh Bazel module metadata files (MODULE.bazel and MODULE.bazel.lock)
+    cmds:
+      - task: mod-tidy
+      - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'

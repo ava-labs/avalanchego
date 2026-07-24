@@ -11,30 +11,30 @@ print_help() {
   cat >&2 <<'EOF'
 Bazel metadata is not current with this source tree.
 If your branch is behind its base, rebase or merge first, then run:
-  task bazel-generate-metadata
+  task bazel:generate-metadata
 Commit the resulting changes and rerun:
-  task bazel-check-metadata
+  task bazel:check-metadata
 EOF
 }
 
-if ! ./scripts/run_task.sh check-bazel-fmt; then
+if ! ./scripts/run_task.sh bazel:check-fmt; then
   print_help
   exit 1
 fi
 
-if ! ./scripts/run_task.sh check-bazel-gazelle-generate; then
+if ! ./scripts/run_task.sh bazel:check-gazelle-generate; then
   print_help
   exit 1
 fi
 
-if ! ./scripts/run_task.sh check-bazel-multiple-go-libraries; then
+if ! ./scripts/run_task.sh bazel:check-multiple-go-libraries; then
   exit 1
 fi
 
 # Must run after fmt and gazelle since either could modify source BUILD
 # files in .bazel/patches/build_files/. In practice gazelle skips them
 # (they have `# gazelle:ignore`) but buildifier will reformat them.
-if ! ./scripts/run_task.sh check-bazel-generate-patches; then
+if ! ./scripts/run_task.sh bazel:check-generate-patches; then
   print_help
   exit 1
 fi
@@ -42,7 +42,7 @@ fi
 # Refresh Bazel module metadata here because `bazel mod tidy` alone may not
 # fully update MODULE.bazel.lock. This keeps later Bazel commands from
 # rewriting the lockfile unexpectedly.
-if ! ./scripts/run_task.sh check-bazel-module-metadata; then
+if ! ./scripts/run_task.sh bazel:check-module-metadata; then
   print_help
   exit 1
 fi

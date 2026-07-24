@@ -69,9 +69,9 @@ runs:
     - name: Check Bazel metadata
       if: ${{ inputs.initial-setup == 'true' }}
       shell: bash
-      run: ./scripts/run_task.sh bazel-check-metadata
+      run: ./scripts/run_task.sh bazel:check-metadata
 
     - name: Cache Bazel CI build dependencies
       if: ${{ inputs.initial-setup == 'true' }}
       shell: bash
-      run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
+      run: ./scripts/run_task.sh bazel:cache-ci-build-dependencies

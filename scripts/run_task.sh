@@ -4,11 +4,13 @@ set -euo pipefail
 
 AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
 CALLER_PATH="$(pwd)"
+TASKFILE_PATH="${AVALANCHE_PATH}/Taskfile.yml"
+export USER_WORKING_DIR="${USER_WORKING_DIR:-${CALLER_PATH}}"
 
 # e.g.,
 # ./scripts/run_task.sh --list
-# ./scripts/run_task.sh bazel-check-metadata
-# RUN_TASK_PREFER_BAZEL=1 ./scripts/run_task.sh bazel-test-main   # CI path that gets task from Bazel
+# ./scripts/run_task.sh bazel:check-metadata
+# RUN_TASK_PREFER_BAZEL=1 ./scripts/run_task.sh avalanchego:test-unit-bazel   # CI path that gets task from Bazel
 #
 # Launcher policy:
 # 1. Use a real `task` from PATH when available.
@@ -18,7 +20,7 @@ CALLER_PATH="$(pwd)"
 # excludes the repo-local wrapper, so aliases like `bin/task` can safely point
 # here without recursion.
 if task_bin="$(which -a task 2>/dev/null | grep -Fvx "${AVALANCHE_PATH}/bin/task" | head -n1)"; then
-  exec "${task_bin}" "${@}"
+  exec "${task_bin}" --taskfile "${TASKFILE_PATH}" --dir "${AVALANCHE_PATH}" "${@}"
 fi
 
 if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>&1; then
@@ -29,11 +31,11 @@ if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>
     task_bin="${AVALANCHE_PATH}/${task_bin}"
   fi
   cd "${CALLER_PATH}"
-  exec "${task_bin}" "${@}"
+  exec "${task_bin}" --taskfile "${TASKFILE_PATH}" --dir "${AVALANCHE_PATH}" "${@}"
 fi
 
 if command -v go >/dev/null 2>&1; then
-  exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@}"
+  exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task --taskfile "${TASKFILE_PATH}" --dir "${AVALANCHE_PATH}" "${@}"
 fi
 
 cat >&2 <<'EOF'

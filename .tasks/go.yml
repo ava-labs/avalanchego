@@ -1,0 +1,59 @@
+# https://taskfile.dev
+# Aggregate Go-family tasks that intentionally span multiple projects.
+
+version: '3'
+
+vars:
+  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
+
+tasks:
+  check-mod-tidy:
+    desc: Checks that go module configuration is consistent across all Go modules (requires a clean git working tree)
+    cmds:
+      - task: mod-tidy
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh git:check-clean-branch'
+
+  check-require-directives:
+    desc: Checks that internal module require directives reference the same version
+    cmd: '{{.NIX_RUN}} ./scripts/check_require_directives.sh'
+
+  check-require-directives-round-trip:
+    desc: Validates that update_require_directives.sh is idempotent (requires a clean git working tree)
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/check_require_directives_round_trip.sh'
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh git:check-clean-branch'
+
+  check-version:
+    desc: Checks that go version directives are consistent across all modules
+    cmd: '{{.NIX_RUN}} ./scripts/check_go_version.sh'
+
+  mod-tidy:
+    desc: Ensures that go module configuration is consistent across all Go modules
+    cmds:
+      - cmd: '{{.NIX_RUN}} env GOWORK=off go mod tidy'
+      - cmd: "{{.NIX_RUN}} bash -c 'cd tools/external && GOWORK=off go mod tidy'"
+      - cmd: "{{.NIX_RUN}} bash -c 'cd graft/evm && GOWORK=off go mod tidy'"
+      - cmd: "{{.NIX_RUN}} bash -c 'cd graft/coreth && GOWORK=off go mod tidy'"
+      - cmd: "{{.NIX_RUN}} bash -c 'cd graft/subnet-evm && GOWORK=off go mod tidy'"
+      - task: sync-work
+      - cmd: '{{.NIX_RUN}} ./scripts/run_task.sh bazel:mod-tidy'
+
+  sync-work:
+    desc: Downloads module dependencies and syncs go.work.sum
+    cmds:
+      - cmd: '{{.NIX_RUN}} go mod download'
+      - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  test-unit:
+    desc: Run all Go unit tests across projects with Bazel
+    cmd: '{{.NIX_RUN}} bazelisk test //...'
+
+  test-unit-fast:
+    desc: Run all Go unit tests across projects with Bazel without race detection or shuffle
+    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
+
+  update-version:
+    desc: "Updates go version directives across all modules. Usage: task go:update-version -- <version> (e.g. 1.25.7)"
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/set_go_version.sh {{.CLI_ARGS}}'
+      - task: mod-tidy

@@ -138,7 +138,7 @@ chmod +x "${stub_dir}/bazelisk"
 
 # A real task binary on PATH should win immediately.
 run_case "${stub_dir}" hello world
-assert_called task "hello world"
+assert_called task "--taskfile ${repo_root}/Taskfile.yml --dir ${repo_root} hello world"
 assert_pwd "${repo_root}"
 
 # Without task on PATH, the launcher should fall back to go.
@@ -146,12 +146,12 @@ rm "${stub_dir}/task"
 caller_dir="${workdir}/caller"
 mkdir -p "${caller_dir}"
 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called go "tool -modfile=${repo_root}/tools/external/go.mod task hello world"
+assert_called go "tool -modfile=${repo_root}/tools/external/go.mod task --taskfile ${repo_root}/Taskfile.yml --dir ${repo_root} hello world"
 assert_pwd "${caller_dir}"
 
 # Bazel should only be used when CI explicitly asks for it.
 RUN_TASK_PREFER_BAZEL=1 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called fake-task "hello world"
+assert_called fake-task "--taskfile ${repo_root}/Taskfile.yml --dir ${repo_root} hello world"
 assert_pwd "${caller_dir}"
 
 # If go is unavailable and Bazel was not requested, the launcher should fail

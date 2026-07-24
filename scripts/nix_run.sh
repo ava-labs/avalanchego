@@ -32,10 +32,10 @@ fi
 
 if [[ "$1" == "bazelisk" ]]; then
   echo "Error: bazelisk not found on PATH and nix is not installed." >&2
-  echo "Install nix with './scripts/run_task.sh install-nix' or install bazelisk directly; see docs/bazel.md." >&2
+  echo "Install nix with './scripts/run_task.sh tools:install-nix' or install bazelisk directly; see docs/bazel.md." >&2
   exit 1
 fi
 
 echo "Error: $1 not found on PATH and nix is not installed." >&2
-echo "Install nix with './scripts/run_task.sh install-nix' or install $1 directly." >&2
+echo "Install nix with './scripts/run_task.sh tools:install-nix' or install $1 directly." >&2
 exit 1

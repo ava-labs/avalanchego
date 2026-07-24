@@ -38,11 +38,10 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build the avalanchego binary
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh avalanchego:build-gomod
 
       - name: Build subnet-evm plugin
-        working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build
+        run: ./scripts/run_task.sh subnet-evm:build
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
@@ -103,5 +102,5 @@ jobs:
           path: subnet-evm-macos-${{ env.TAG }}.zip
 
       - name: Cleanup
-        run: |
+        run: |-
           rm -rf ./build

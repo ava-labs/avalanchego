@@ -60,7 +60,7 @@ if [[ ${#existing[@]} -gt 0 ]]; then
     if [[ ${#existing[@]} -eq ${#TAGS[@]} && "$all_at_head" == true ]]; then
         echo "All tags for $VERSION already exist at HEAD ($HEAD_SHORT)."
         echo ""
-        echo "Push with: ./scripts/run_task.sh tags-push -- $VERSION"
+        echo "Push with: ./scripts/run_task.sh git:tags-push -- $VERSION"
         exit 0
     fi
 
@@ -82,4 +82,4 @@ for tag in "${TAGS[@]}"; do
 done
 
 echo ""
-echo "Push with: ./scripts/run_task.sh tags-push -- $VERSION"
+echo "Push with: ./scripts/run_task.sh git:tags-push -- $VERSION"

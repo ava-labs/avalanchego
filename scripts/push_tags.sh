@@ -38,7 +38,7 @@ done
 for tag in "${TAGS[@]}"; do
     if ! git rev-parse "$tag" >/dev/null 2>&1; then
         echo "Error: Tag '$tag' does not exist locally." >&2
-        echo "Run './scripts/run_task.sh tags-create -- $VERSION' first." >&2
+        echo "Run './scripts/run_task.sh git:tags-create -- $VERSION' first." >&2
         exit 1
     fi
 done
