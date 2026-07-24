@@ -433,7 +433,7 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 	// anyDelayed() == false here, so this is every validator — including a
 	// caught-up late joiner, which the nodes[:numValidators] prefix would
 	// miss. Draw ranges match the old numValidators-based ones in runs
-	// without a joiner, so existing failfiles replay identically.
+	// without a joiner.
 	vdrs := nm.nonDelayedValidators()
 	jIdx := rapid.IntRange(0, len(vdrs)-1).Draw(rt, "builderA")
 	kIdx := rapid.IntRange(0, len(vdrs)-2).Draw(rt, "builderB")
