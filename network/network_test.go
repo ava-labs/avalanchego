@@ -109,6 +109,7 @@ var (
 		DialerConfig: defaultDialerConfig,
 
 		NetworkID:          49463,
+		UpgradeConfig:      upgrade.Default,
 		MaxClockDifference: time.Minute,
 		PingFrequency:      constants.DefaultPingFrequency,
 		AllowPrivateIPs:    true,
@@ -207,9 +208,17 @@ func newMessageCreator(t *testing.T) message.Creator {
 }
 
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
+	return newFullyConnectedTestNetworkWithConfig(t, handlers, defaultConfig)
+}
+
+func newFullyConnectedTestNetworkWithConfig(
+	t *testing.T,
+	handlers []router.InboundHandler,
+	baseConfig Config,
+) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers), defaultConfig)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers), baseConfig)
 
 	var (
 		networks = make([]*network, len(configs))
@@ -305,6 +314,67 @@ func TestNewNetwork(t *testing.T) {
 		net.StartClose()
 	}
 	require.NoError(eg.Wait())
+}
+
+func TestNodeUptimeACP267Requirement(t *testing.T) {
+	tests := []struct {
+		name           string
+		heliconTime    time.Time
+		peerUptime     float64
+		wantPeerUptime uint32
+		want           float64
+	}{
+		{
+			name:           "before_helicon",
+			heliconTime:    upgrade.UnscheduledActivationTime,
+			peerUptime:     .85,
+			wantPeerUptime: 85,
+			want:           100,
+		},
+		{
+			name:           "after_helicon_below_requirement",
+			heliconTime:    upgrade.InitiallyActiveTime,
+			peerUptime:     .85,
+			wantPeerUptime: 85,
+			want:           50, // only the local validator's half of total stake qualifies
+		},
+		{
+			name:           "after_helicon_at_requirement",
+			heliconTime:    upgrade.InitiallyActiveTime,
+			peerUptime:     .9,
+			wantPeerUptime: 90,
+			want:           100,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := defaultConfig
+			config.PingFrequency = 10 * time.Millisecond
+			config.UptimeCalculator = uptime.TestCalculator{Percent: tt.peerUptime}
+			config.UpgradeConfig.HeliconTime = tt.heliconTime
+
+			_, networks, eg := newFullyConnectedTestNetworkWithConfig(
+				t,
+				[]router.InboundHandler{nil, nil},
+				config,
+			)
+			t.Cleanup(func() {
+				for _, network := range networks {
+					network.StartClose()
+				}
+				require.NoError(t, eg.Wait())
+			})
+
+			require.Eventually(t, func() bool {
+				peers := networks[0].PeerInfo(nil)
+				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == tt.wantPeerUptime
+			}, 10*time.Second, 10*time.Millisecond)
+
+			uptime, err := networks[0].NodeUptime()
+			require.NoError(t, err)
+			require.Equal(t, tt.want, uptime.RewardingStakePercentage)
+		})
+	}
 }
 
 func TestIngressConnCount(t *testing.T) {

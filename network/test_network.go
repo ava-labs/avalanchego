@@ -166,6 +166,7 @@ func NewTestNetworkConfig(
 			1,
 		)),
 		NetworkID:                    networkID,
+		UpgradeConfig:                upgrade.GetConfig(networkID),
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
