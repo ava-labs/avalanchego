@@ -19,9 +19,9 @@ const codecVersion uint16 = 0
 var c codec.Manager
 
 func init() {
-	// No codec size limit: it would bound the whole slice in
-	// [MarshalSlice] and [ParseSlice], not individual transactions.
-	// Block size limits bound the total instead.
+	// The codec marshals both individual transactions and transaction slices,
+	// so size is enforced by the p2p layer, mempool, and block builder rather
+	// than by the codec itself.
 	c = codec.NewManager(math.MaxInt)
 
 	// Registration order impacts the typeID included in the canonical format.

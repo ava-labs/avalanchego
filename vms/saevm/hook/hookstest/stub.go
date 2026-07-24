@@ -302,8 +302,10 @@ type Op struct {
 }
 
 // Size returns the op's serialized size
-func (o Op) Size() int { return len(o.MarshalCanoto()) }
-
+func (o Op) Size() int {
+	o.CalculateCanotoCache()
+	return int(o.CachedCanotoSize())
+}
 // AsOp converts the op into a representation that SAE can use directly.
 func (o Op) AsOp() hook.Op {
 	hookOp := hook.Op{

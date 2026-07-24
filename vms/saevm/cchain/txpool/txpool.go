@@ -191,16 +191,16 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 		return err
 	}
 
-	// Cap gas at the minimum gas target so that an admitted tx remains
-	// includable no matter where the dynamic target sits; anything larger
-	// risks squatting in the pool until evicted by fee competition.
+	// Cap admitted-tx gas at MinTarget, the floor of the dynamic target, so
+	// every admitted tx stays includable. An unincludable tx never pays its
+	// fee, so an attacker could pin it with a free, arbitrarily high GasFeeCap
+	// and fill the pool.
 	if t.op.Gas > dynamic.MinTarget {
 		return fmt.Errorf("%w: %d > %d", errExcessGas, t.op.Gas, dynamic.MinTarget)
 	}
 
-	// TODO(JonathanOppenheimer): We should consider raising an atomic tx's
-	// gas to some minimum based on its serialized size, so that byte-heavy
-	// txs pay their "fair" share.
+	// TODO(JonathanOppenheimer): Consider raising the gas per byte of
+	// cross-chain txs so that byte-heavy txs pay their fair share.
 
 	// We must verify the tx against a state that is at least as high as the
 	// last block processed by the pool subscription.

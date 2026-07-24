@@ -252,7 +252,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			BaseFee: state.BaseFee(),
 		})
 		included          []*types.Transaction
-		includedBodyBytes uint64
+		includedBytes uint64
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
