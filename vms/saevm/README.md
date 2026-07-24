@@ -14,7 +14,6 @@ Continuous Execution was formerly known as Streaming Asynchronous Execution (SAE
   - [Gas as a clock](#gas-as-a-clock)
   - [State and storage](#state-and-storage)
   - [The C-Chain](#the-c-chain)
-- [References](#references)
 
 ## Background
 
@@ -59,12 +58,3 @@ See the [Firewood README](./firewood/README.md).
 > **TODO:** The C-Chain VM built on top of `sae.VM` (`cchain`) — hooks, cross-chain transactions, Warp messaging, validator-voted parameters.
 
 See the [C-Chain README](./cchain/README.md), its [configuration reference](./cchain/config.md), and the [Warp README](./cchain/warp/README.md).
-
-## References
-
-- [ACP-194: Continuous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution) — the spec this VM implements
-- [ACP-176: Dynamic EVM Gas Limit and Price Discovery Updates](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates) — the gas mechanism that `gastime` generalizes
-- [ACP-226: Dynamic Minimum Block Times](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226-dynamic-minimum-block-times)
-- [ACP-283: Dynamic Minimum Gas Price](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md)
-- [ACP-118: Warp Signature Request](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) — used by Warp messaging in `cchain/warp`
-- [Firewood](https://github.com/ava-labs/firewood) — the database backing the `firewood` package
