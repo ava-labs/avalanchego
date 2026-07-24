@@ -11,11 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -414,6 +416,221 @@ func TestDiffStakersDelegator(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestDiffDelegatorCancelOut(t *testing.T) {
+	setupState := func(t *testing.T) (*State, *Staker) {
+		t.Helper()
+		state := newTestState(t, memdb.New())
+		subnetID := ids.GenerateTestID()
+		nodeID := ids.GenerateTestNodeID()
+		require.NoError(t, state.PutCurrentValidator(newTestStaker(subnetID, nodeID)))
+		return state, newTestStaker(subnetID, nodeID)
+	}
+
+	t.Run("delete_then_put_identical_delegator", func(t *testing.T) {
+		state, delegator := setupState(t)
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.Apply(state))
+
+		require.Equal(t, []*Staker{delegator}, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("delete_then_put_updated_weight", func(t *testing.T) {
+		state, delegator := setupState(t)
+		delegator.Weight = 2
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+
+		updated := *delegator
+		updated.Weight = delegator.Weight - 1
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.PutCurrentDelegator(&updated))
+		require.NoError(t, diff.Apply(state))
+
+		require.Equal(t, []*Staker{&updated}, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("put_then_delete_identical", func(t *testing.T) {
+		state, delegator := setupState(t)
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.Apply(state))
+
+		require.Empty(t, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("put_then_delete_mismatched_weight", func(t *testing.T) {
+		state, delegator := setupState(t)
+		delegator.Weight = 2
+
+		mismatched := *delegator
+		mismatched.Weight = delegator.Weight - 1
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.DeleteCurrentDelegator(&mismatched))
+		require.NoError(t, diff.Apply(state))
+
+		require.Empty(t, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("pending_delete_then_put_identical", func(t *testing.T) {
+		state, delegator := setupState(t)
+		state.PutPendingDelegator(delegator)
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		diff.DeletePendingDelegator(delegator)
+		diff.PutPendingDelegator(delegator)
+		require.NoError(t, diff.Apply(state))
+
+		require.Equal(t, []*Staker{delegator}, pendingDelegators(t, state, delegator))
+	})
+}
+
+// TestStateDelegatorCancelOutCommitAndLoad verifies that deleting and re-adding
+// a delegator within a single commit cycle persists correctly across a reload from disk.
+func TestStateDelegatorCancelOutCommitAndLoad(t *testing.T) {
+	newStateAndDelegator := func(t *testing.T, pending bool) (state *State, db database.Database, delegator *Staker) {
+		t.Helper()
+		db = memdb.New()
+		state = newTestState(t, db)
+
+		startTime := time.Now().Truncate(time.Second)
+		endTime := startTime.Add(genesistest.DefaultValidatorDuration)
+
+		unsignedDelegator := createPermissionlessDelegatorTx(constants.PrimaryNetworkID, txs.Validator{
+			NodeID: defaultValidatorNodeID,
+			End:    uint64(endTime.Unix()),
+			Wght:   6789,
+		})
+		delegatorTx := &txs.Tx{Unsigned: unsignedDelegator}
+		require.NoError(t, delegatorTx.Initialize(txs.Codec))
+		state.AddTx(delegatorTx, status.Committed)
+
+		var err error
+		if pending {
+			delegator, err = NewPendingStaker(delegatorTx.ID(), unsignedDelegator)
+		} else {
+			// non-zero reward so the reload assertions validate reward persistence
+			delegator, err = NewCurrentStaker(delegatorTx.ID(), unsignedDelegator, startTime, 100)
+		}
+		require.NoError(t, err)
+		return state, db, delegator
+	}
+
+	t.Run("delete_then_put_identical", func(t *testing.T) {
+		state, db, delegator := newStateAndDelegator(t, false)
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+		state.SetHeight(1)
+		require.NoError(t, state.Commit())
+
+		// Delete then re-add the identical delegator in one commit cycle.
+		require.NoError(t, state.DeleteCurrentDelegator(delegator))
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+		state.SetHeight(2)
+		require.NoError(t, state.Commit())
+
+		state = newTestState(t, db)
+		require.Equal(t, []*Staker{delegator}, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("put_then_delete_identical", func(t *testing.T) {
+		state, db, delegator := newStateAndDelegator(t, false)
+
+		// Put then delete the identical delegator in one commit cycle.
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+		require.NoError(t, state.DeleteCurrentDelegator(delegator))
+		state.SetHeight(1)
+		require.NoError(t, state.Commit())
+
+		state = newTestState(t, db)
+		require.Empty(t, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("delete_then_put_updated_reward", func(t *testing.T) {
+		state, db, delegator := newStateAndDelegator(t, false)
+		require.NoError(t, state.PutCurrentDelegator(delegator))
+		state.SetHeight(1)
+		require.NoError(t, state.Commit())
+
+		updated := *delegator
+		updated.PotentialReward = delegator.PotentialReward + 1
+
+		require.NoError(t, state.DeleteCurrentDelegator(delegator))
+		require.NoError(t, state.PutCurrentDelegator(&updated))
+		state.SetHeight(2)
+		require.NoError(t, state.Commit())
+
+		state = newTestState(t, db)
+		require.Equal(t, []*Staker{&updated}, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("pending_delete_then_put_identical", func(t *testing.T) {
+		state, db, delegator := newStateAndDelegator(t, true)
+		state.PutPendingDelegator(delegator)
+		state.SetHeight(1)
+		require.NoError(t, state.Commit())
+
+		// Delete then re-add the identical delegator in one commit cycle.
+		state.DeletePendingDelegator(delegator)
+		state.PutPendingDelegator(delegator)
+		state.SetHeight(2)
+		require.NoError(t, state.Commit())
+
+		state = newTestState(t, db)
+		require.Equal(t, []*Staker{delegator}, pendingDelegators(t, state, delegator))
+	})
+
+	t.Run("pending_delete_then_put_mismatched", func(t *testing.T) {
+		state, db, delegator := newStateAndDelegator(t, true)
+		state.PutPendingDelegator(delegator)
+		state.SetHeight(1)
+		require.NoError(t, state.Commit())
+
+		// Differing weight prevents the cancel-out, so the diff holds both a
+		// delete and an add for the same txID.
+		mismatched := *delegator
+		mismatched.Weight++
+		state.DeletePendingDelegator(delegator)
+		state.PutPendingDelegator(&mismatched)
+		state.SetHeight(2)
+		require.NoError(t, state.Commit())
+
+		// We expect the original delegator, not mismatched: pending delegators
+		// persist only the txID, so on reload the staker
+		// is rebuilt entirely from the unchanged tx.
+		state = newTestState(t, db)
+		require.Equal(t, []*Staker{delegator}, pendingDelegators(t, state, delegator))
+	})
+}
+
+func currentDelegators(t *testing.T, state *State, staker *Staker) []*Staker {
+	t.Helper()
+	it, err := state.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
+	require.NoError(t, err)
+	defer it.Release()
+	return iterator.ToSlice(it)
+}
+
+func pendingDelegators(t *testing.T, state *State, staker *Staker) []*Staker {
+	t.Helper()
+	it, err := state.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
+	require.NoError(t, err)
+	defer it.Release()
+	return iterator.ToSlice(it)
 }
 
 func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {
