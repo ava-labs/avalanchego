@@ -542,4 +542,6 @@ func newHookTx(t *tx.Tx, avaxAssetID ids.ID) (*hookTx, error) {
 
 func (t *hookTx) AsOp() hook.Op { return t.op }
 
+// Size returns the transaction's serialized size, which is what it
+// contributes to the block's ExtData.
 func (t *hookTx) Size() int { return t.size }

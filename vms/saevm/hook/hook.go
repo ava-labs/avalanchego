@@ -133,6 +133,8 @@ type BlockBuilder[T Transaction] interface {
 // [Op].
 type Transaction interface {
 	AsOp() Op
+	// Size returns the transaction's serialized size. It MUST be
+	// non-negative.
 	Size() int
 }
 

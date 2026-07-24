@@ -306,6 +306,7 @@ func (o Op) Size() int {
 	o.CalculateCanotoCache()
 	return int(o.CachedCanotoSize())
 }
+
 // AsOp converts the op into a representation that SAE can use directly.
 func (o Op) AsOp() hook.Op {
 	hookOp := hook.Op{

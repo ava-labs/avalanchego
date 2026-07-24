@@ -308,9 +308,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			zap.Int("op_index", len(includedOps)),
 		)
 
-		// Ops are serialized into the block's ExtData, so they consume the
-		// same body byte budget as the EVM transactions included above.
-		opBytes := uint64(tx.Size()) //#nosec G115 -- size is a non-negative byte length
+		// Ops are carried in the built block, so they consume the same body
+		// byte budget as the transactions included above.
+		opBytes := uint64(tx.Size()) //#nosec G115 -- [hook.Transaction.Size] MUST be non-negative
 		if includedBytes+opBytes > blockByteBudget {
 			opLog.Debug("Skipping op: block byte budget reached",
 				zap.Uint64("op_bytes", opBytes),
