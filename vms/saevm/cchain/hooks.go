@@ -518,6 +518,7 @@ type hookTx struct {
 	id     ids.ID
 	tx     *tx.Tx
 	inputs set.Set[ids.ID]
+	size   uint64
 	op     hook.Op
 }
 
@@ -526,12 +527,21 @@ func newHookTx(t *tx.Tx, avaxAssetID ids.ID) (*hookTx, error) {
 	if err != nil {
 		return nil, err
 	}
+	bytes, err := t.Bytes()
+	if err != nil {
+		return nil, err
+	}
 	return &hookTx{
 		id:     op.ID,
 		tx:     t,
 		inputs: t.InputIDs(),
+		size:   uint64(len(bytes)),
 		op:     op,
 	}, nil
 }
 
 func (t *hookTx) AsOp() hook.Op { return t.op }
+
+// Size returns the transaction's serialized size, which is what it
+// contributes to the block's ExtData.
+func (t *hookTx) Size() uint64 { return t.size }
