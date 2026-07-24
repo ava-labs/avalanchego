@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -89,11 +90,12 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
+	ethclient  *ethclient.Client
+	clientOnce func()
 
 	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
-	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
 }
@@ -122,6 +124,8 @@ type (
 // initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
 // model a node that is still catching up and has not yet entered normal
 // operation (e.g. verifying blocks received from peers during bootstrap).
+// Use [snow.StateSyncing] to test state-sync specific behavior.
+// Note that any RPCs will not be available until the node is bootstrapping.
 func withState(state snow.State) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
@@ -316,6 +320,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
 
+	// This is called immediately after initialization by avalanchego, so we
+	// should test this behavior specifically.
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+
+	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+
 	// The engine sets the preference to the last accepted block when entering
 	// normal operation.
 	if cfg.state == snow.NormalOp {
@@ -323,7 +334,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
 		require.NoErrorf(tb, vm.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", vm)
 	}
-	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
@@ -338,9 +348,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		clock:     cfg.clock,
 	}
 
-	if !cfg.skipRPCTransport {
-		handlers, err := vm.CreateHandlers(ctx)
-		require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+	// Called from [SUT.SetState].
+	sut.clientOnce = sync.OnceFunc(func() {
+		if cfg.skipRPCTransport {
+			return
+		}
 
 		mux := http.NewServeMux()
 		for path, h := range handlers {
@@ -357,10 +369,21 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 		sut.Client = NewClient(server.URL)
 		sut.ethclient = ethclient.NewClient(ethRPCClient)
-	}
+	})
+
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
 	return ctx, sut
+}
+
+func (s *SUT) SetState(ctx context.Context, state snow.State) error {
+	if err := s.VM.SetState(ctx, state); err != nil {
+		return err
+	}
+	if state >= snow.Bootstrapping {
+		s.clientOnce()
+	}
+	return nil
 }
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
