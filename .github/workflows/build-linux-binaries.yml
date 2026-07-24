@@ -1,14 +1,22 @@
 name: build-linux-release
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to include in artifact name'
+        type: string
+        required: true
+      sha:
+        description: 'Exact commit to build (release umbrella pins this to the validated tag commit). Empty for standalone dispatch/push, which resolve the tag ref.'
+        type: string
+        required: false
+        default: ''
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to include in artifact name'
         required: true
-  push:
-    tags:
-      - "*"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,6 +30,33 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Build the exact validated commit when the umbrella pins it via
+          # inputs.sha, so a mid-run tag move cannot change what is built. Absent
+          # a SHA (standalone dispatch/push) fall back to the tag, fully qualified
+          # to refs/tags/ so a like-named branch cannot shadow it (checkout
+          # resolves a bare name to a branch before a tag); github.ref (push) is
+          # already qualified. The tag name is still used only for artifact names.
+          ref: ${{ inputs.sha || (inputs.tag || github.event.inputs.tag) && format('refs/tags/{0}', inputs.tag || github.event.inputs.tag) || github.ref }}
+
+      # A standalone workflow_dispatch can name an arbitrary ref; refuse to build
+      # and upload release-named artifacts unless the dispatched input is a real
+      # tag in origin. Skipped on workflow_call (the umbrella already validated
+      # the tag) and on push (the on: filter constrains it to refs/tags).
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.15.0)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/upload a non-tag ref" >&2
+            exit 1
+          fi
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -44,18 +79,15 @@ jobs:
           role-session-name: githubrolesession
           aws-region: us-east-1
 
-      - name: Try to get tag from git
-        if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
+      - name: Resolve tag
+        # Assignment-first, NOT `echo "TAG=$(script)" >> …`: under bash -e a
+        # failing command substitution inside echo's arguments is swallowed,
+        # whereas a failing substitution in a plain assignment fails the step.
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
-        shell: bash
-
-      - name: Try to get tag from workflow dispatch
-        if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
-        run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          tag="$(./.github/workflows/release-resolve-tag.sh)"
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
         shell: bash
 
       - name: Create tgz package structure and upload to S3
@@ -92,6 +124,33 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Build the exact validated commit when the umbrella pins it via
+          # inputs.sha, so a mid-run tag move cannot change what is built. Absent
+          # a SHA (standalone dispatch/push) fall back to the tag, fully qualified
+          # to refs/tags/ so a like-named branch cannot shadow it (checkout
+          # resolves a bare name to a branch before a tag); github.ref (push) is
+          # already qualified. The tag name is still used only for artifact names.
+          ref: ${{ inputs.sha || (inputs.tag || github.event.inputs.tag) && format('refs/tags/{0}', inputs.tag || github.event.inputs.tag) || github.ref }}
+
+      # A standalone workflow_dispatch can name an arbitrary ref; refuse to build
+      # and upload release-named artifacts unless the dispatched input is a real
+      # tag in origin. Skipped on workflow_call (the umbrella already validated
+      # the tag) and on push (the on: filter constrains it to refs/tags).
+      - name: Assert dispatch input is a released tag
+        if: github.event.inputs.tag
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag input '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.15.0)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in origin; refusing to build/upload a non-tag ref" >&2
+            exit 1
+          fi
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -114,18 +173,15 @@ jobs:
           role-session-name: githubrolesession
           aws-region: us-east-1
 
-      - name: Try to get tag from git
-        if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
+      - name: Resolve tag
+        # Assignment-first, NOT `echo "TAG=$(script)" >> …`: under bash -e a
+        # failing command substitution inside echo's arguments is swallowed,
+        # whereas a failing substitution in a plain assignment fails the step.
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
-        shell: bash
-
-      - name: Try to get tag from workflow dispatch
-        if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
-        run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          tag="$(./.github/workflows/release-resolve-tag.sh)"
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
         shell: bash
 
       - name: Create tgz package structure and upload to S3
