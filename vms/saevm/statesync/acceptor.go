@@ -19,9 +19,7 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 		return *enabled, nil
 	}
 
-	// If any blocks have been accepted, don't state sync. Acceptance, not
-	// execution, is the signal here: the head header only advances on
-	// execution, which lags acceptance.
+	// If any blocks have been accepted, don't state sync.
 	hash, ok := h.lastAcceptedHash()
 	if !ok {
 		return true, nil

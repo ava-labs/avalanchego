@@ -84,6 +84,10 @@ func (*SummaryHandler) GetOngoingSyncStateSummary(context.Context) (*Summary, er
 	return nil, database.ErrNotFound
 }
 
+// GetStateSummary returns the summary of the block at the given height, if it
+// is available to be served. Otherwise, [database.ErrNotFound] is returned.
+//
+// TODO(alarso16): don't serve summaries for synchronous blocks.
 func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
 	if height%h.cfg.CommitInterval != 0 {
 		// can't serve committed state at this height
