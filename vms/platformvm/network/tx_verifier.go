@@ -6,14 +6,14 @@ package network
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 var _ TxVerifier = (*LockedTxVerifier)(nil)
 
 type TxVerifier interface {
 	// VerifyTx verifies that the transaction should be issued into the mempool.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *platform.Tx) error
 }
 
 type LockedTxVerifier struct {
@@ -21,7 +21,7 @@ type LockedTxVerifier struct {
 	txVerifier TxVerifier
 }
 
-func (l *LockedTxVerifier) VerifyTx(tx *txs.Tx) error {
+func (l *LockedTxVerifier) VerifyTx(tx *platform.Tx) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 

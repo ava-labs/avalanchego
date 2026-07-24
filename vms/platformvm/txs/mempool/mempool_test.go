@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -49,7 +49,7 @@ func newAVAXOutput(amount uint64) *avax.TransferableOutput {
 	}
 }
 
-func newTx(txID ids.ID) *txs.Tx {
+func newTx(txID ids.ID) *platform.Tx {
 	return newTxWithUTXOs(
 		txID,
 		[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 2)},
@@ -61,7 +61,7 @@ func newTxWithUTXOs(
 	txID ids.ID,
 	inputs []*avax.TransferableInput,
 	outputAmount uint64,
-) *txs.Tx {
+) *platform.Tx {
 	tx := avax.BaseTx{
 		Ins: inputs,
 	}
@@ -72,8 +72,8 @@ func newTxWithUTXOs(
 		}
 	}
 
-	return &txs.Tx{
-		Unsigned: &txs.BaseTx{
+	return &platform.Tx{
+		Unsigned: &platform.BaseTx{
 			BaseTx: tx,
 		},
 		TxID: txID,
@@ -124,8 +124,8 @@ func TestMempoolAdd(t *testing.T) {
 		name           string
 		weights        gas.Dimensions
 		maxGasCapacity gas.Gas
-		prevTxs        []*txs.Tx
-		tx             *txs.Tx
+		prevTxs        []*platform.Tx
+		tx             *platform.Tx
 		wantErr        error
 		wantTxIDs      []ids.ID
 	}{
@@ -137,15 +137,15 @@ func TestMempoolAdd(t *testing.T) {
 		},
 		{
 			name: "dropped - AdvanceTimeTx",
-			tx: &txs.Tx{
-				Unsigned: &txs.AdvanceTimeTx{},
+			tx: &platform.Tx{
+				Unsigned: &platform.AdvanceTimeTx{},
 			},
 			wantErr: utxo.ErrUnsupportedTxType,
 		},
 		{
 			name: "dropped - RewardValidatorTx",
-			tx: &txs.Tx{
-				Unsigned: &txs.RewardValidatorTx{},
+			tx: &platform.Tx{
+				Unsigned: &platform.RewardValidatorTx{},
 			},
 			wantErr: utxo.ErrUnsupportedTxType,
 		},
@@ -153,7 +153,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "not enough gas - lower paying tx is not added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 2)},
@@ -174,7 +174,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "not enough gas - equal paying tx is not added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 2)},
@@ -195,7 +195,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "evict - higher paying tx is added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
@@ -215,7 +215,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "evict - higher paying tx without conflicts is added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 5)},
@@ -235,7 +235,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "evict - higher paying tx conflicts with multiple txs",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 500,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
@@ -265,7 +265,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "evict - higher paying tx evicts multiple txs",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 400,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
@@ -294,7 +294,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "cannot evict - not enough gas capacity",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 400,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
@@ -326,7 +326,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "conflict - higher paying tx is dropped",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
@@ -347,7 +347,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "conflict - equal paying tx is dropped",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
@@ -368,7 +368,7 @@ func TestMempoolAdd(t *testing.T) {
 			name:           "conflict - lower paying tx is dropped",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
-			prevTxs: []*txs.Tx{
+			prevTxs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
@@ -444,7 +444,7 @@ func TestMempoolAdd(t *testing.T) {
 func TestMempool_Remove(t *testing.T) {
 	tests := []struct {
 		name         string
-		txs          []*txs.Tx
+		txs          []*platform.Tx
 		txIDToRemove ids.ID
 		wantRemove   bool
 	}{
@@ -454,9 +454,9 @@ func TestMempool_Remove(t *testing.T) {
 		},
 		{
 			name: "remove tx not in mempool - populated",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -480,9 +480,9 @@ func TestMempool_Remove(t *testing.T) {
 		},
 		{
 			name: "remove tx in mempool",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -534,7 +534,7 @@ func TestMempool_Remove(t *testing.T) {
 func TestMempool_RemoveConflicts(t *testing.T) {
 	tests := []struct {
 		name              string
-		txs               []*txs.Tx
+		txs               []*platform.Tx
 		conflictsToRemove []avax.UTXOID
 		wantTxs           []ids.ID
 	}{
@@ -544,9 +544,9 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 		},
 		{
 			name: "remove conflicts in mempool",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -566,7 +566,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{1},
 				},
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -591,9 +591,9 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 		},
 		{
 			name: "remove multiple conflicts in mempool",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -613,7 +613,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{1},
 				},
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -640,9 +640,9 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 		},
 		{
 			name: "remove conflicts not in mempool",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -662,7 +662,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{1},
 				},
 				{
-					Unsigned: &txs.BaseTx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -813,7 +813,7 @@ func TestMempool_WaitForEvent(t *testing.T) {
 func TestMempool_Iterate(t *testing.T) {
 	tests := []struct {
 		name    string
-		txs     []*txs.Tx
+		txs     []*platform.Tx
 		wantTxs []ids.ID
 	}{
 		{
@@ -821,7 +821,7 @@ func TestMempool_Iterate(t *testing.T) {
 		},
 		{
 			name: "one tx",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				newTx(ids.ID{1}),
 			},
 			wantTxs: []ids.ID{
@@ -831,7 +831,7 @@ func TestMempool_Iterate(t *testing.T) {
 		{
 			// txs should be ordered in descending gas price
 			name: "multiple txs",
-			txs: []*txs.Tx{
+			txs: []*platform.Tx{
 				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 10)},
@@ -874,7 +874,7 @@ func TestMempool_Iterate(t *testing.T) {
 			}
 
 			var gotTxs []ids.ID
-			m.Iterate(func(tx *txs.Tx) bool {
+			m.Iterate(func(tx *platform.Tx) bool {
 				gotTxs = append(gotTxs, tx.ID())
 				return true
 			})
