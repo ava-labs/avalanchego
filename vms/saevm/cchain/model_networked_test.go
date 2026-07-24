@@ -292,6 +292,18 @@ type networkedMachine struct {
 	// the missing nonce — never promoted, never gossiped, builder sync hangs.
 	pins map[common.Address]int
 
+	// minority, when non-empty, is the index set of nodes behind the active
+	// transport partition (at most one partition at a time). Minority nodes
+	// are also delayed: the partition adds a transport cut on top of the
+	// existing group-lag semantics, so block withholding, prefix checks, and
+	// build-eligibility all ride the delayed machinery unchanged.
+	minority map[int]struct{}
+	// stranded is the set of model-pending eth txs issued to minority nodes
+	// since the partition started. Majority builders cannot receive them
+	// until healPartition reconnects the topology, so every majority-side
+	// sync wait uses syncEthTxs, which excludes them.
+	stranded map[common.Hash]struct{}
+
 	// joinerNodeID is pre-generated for a validator joiner so the shared
 	// validator set can include it from genesis; joined flips when lateJoin
 	// fires. Both are config + model state only, preserving replay
@@ -348,6 +360,7 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 		clock:        clock,
 		timeOpt:      timeOpt,
 		pins:         make(map[common.Address]int),
+		stranded:     make(map[common.Hash]struct{}),
 		joinerNodeID: joinerNodeID,
 	}
 	for i, addr := range nm.addrs {
@@ -520,6 +533,34 @@ func (nm *networkedMachine) nonDelayedNodes() []*modelNode {
 	for _, n := range nm.nodes {
 		if !n.delayed {
 			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// partitionActive reports whether a transport partition is currently up.
+func (nm *networkedMachine) partitionActive() bool {
+	return len(nm.minority) > 0
+}
+
+// inMinority reports whether node idx is behind the active partition.
+func (nm *networkedMachine) inMinority(idx int) bool {
+	_, ok := nm.minority[idx]
+	return ok
+}
+
+// syncEthTxs is the sync set: the model-pending eth txs a majority-side node
+// can be held to — every pending tx except those stranded behind the
+// partition. With no partition active it is exactly pendingEthTxs, so the
+// pre-partition behavior is the degenerate case, not a parallel path.
+func (nm *networkedMachine) syncEthTxs() []*types.Transaction {
+	if len(nm.stranded) == 0 {
+		return nm.pendingEthTxs
+	}
+	out := make([]*types.Transaction, 0, len(nm.pendingEthTxs))
+	for _, ethTx := range nm.pendingEthTxs {
+		if _, ok := nm.stranded[ethTx.Hash()]; !ok {
+			out = append(out, ethTx)
 		}
 	}
 	return out

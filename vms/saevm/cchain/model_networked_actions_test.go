@@ -4,10 +4,14 @@
 package cchain
 
 import (
+	"context"
 	"errors"
+	"math/big"
 	"slices"
 	"time"
 
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/holiman/uint256"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -23,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
@@ -184,7 +189,9 @@ func (nm *networkedMachine) buildOn(rt *rapid.T, n *modelNode, parentID ids.ID) 
 	require.NoErrorf(rt, n.sut.SetPreference(n.ctx, parentID, blockCtx), "%T.SetPreference() on builder %d", n.sut.VM, n.idx)
 
 	nm.advanceToBuildable(n)
-	n.sut.waitForPendingEthTxs(n.ctx, nm.tb, nm.pendingEthTxs...)
+	// Builders are always majority-side; stranded txs cannot reach them
+	// until heal, so the wait covers the sync set only.
+	n.sut.waitForPendingEthTxs(n.ctx, nm.tb, nm.syncEthTxs()...)
 	n.sut.waitForAtomicTxs(n.ctx, nm.tb, nm.pendingAtomicTxs...)
 	n.sut.waitForPendingTxs(n.ctx, nm.tb)
 
@@ -215,6 +222,50 @@ func (nm *networkedMachine) buildOn(rt *rapid.T, n *modelNode, parentID ids.ID) 
 	}
 	require.NoErrorf(rt, n.sut.VerifyBlock(n.ctx, blockCtx, blk), "%T.VerifyBlock() on builder %d", n.sut.VM, n.idx)
 	return blk
+}
+
+// issueMinimalTransferUnpinned is the networked analogue of the shared
+// issueMinimalTransfer: it funds a block when the builder-reachable pool is
+// empty, drawing the richest account with no in-flight txs (equivalently,
+// unpinned — pins are GC'd on drain). A pinned account is never a safe
+// funder here: with an empty sync set its pending txs are stranded behind
+// the partition, so its next nonce could never promote in the builder's
+// pool. Returns the chosen account index for pinning, or -1 when every
+// account is pinned (only possible while a partition strands them all).
+// With no partition active, all pins imply sync-set entries, so this is
+// only ever called with every account unpinned — identical behavior to
+// issueMinimalTransfer.
+//
+//nolint:revive // context-as-argument: rt, not ctx, is this file's leading-parameter convention (mirrors *testing.T)
+func (nm *networkedMachine) issueMinimalTransferUnpinned(rt *rapid.T, ctx context.Context, sut *SUT) int {
+	richestIdx := -1
+	for i, addr := range nm.addrs {
+		if _, pinned := nm.pins[addr]; pinned {
+			continue
+		}
+		if richestIdx == -1 || nm.m.balances[addr].Cmp(nm.m.balances[nm.addrs[richestIdx]]) > 0 {
+			richestIdx = i
+		}
+	}
+	if richestIdx == -1 {
+		return -1
+	}
+	richest := nm.addrs[richestIdx]
+	data := &types.DynamicFeeTx{
+		To:        &richest,
+		Gas:       ethparams.TxGas,
+		GasFeeCap: big.NewInt(txGasFeeCap),
+	}
+	ethTx := nm.wallet.SetNonceAndSign(nm.tb, richestIdx, data)
+	require.NoErrorf(rt, sut.ethclient.SendTransaction(ctx, ethTx), "SendTransaction(minimal transfer)")
+	nm.trackPending(ethTx, &issuedTx{
+		kind:  kindTransfer,
+		from:  richest,
+		to:    richest,
+		value: new(uint256.Int),
+		cost:  uint256.NewInt(ethparams.TxGas * txGasFeeCap),
+	})
+	return richestIdx
 }
 
 // deliverBlock plays the consensus engine for one node: parse the canonical
@@ -302,6 +353,14 @@ func (nm *networkedMachine) assertBlockEffects(n *modelNode, ab acceptedBlock) {
 // reconciliation aimed at the builder — the analogue of the single-node
 // machine's applyBlock pairing.
 func (nm *networkedMachine) applyCanonical(rt *rapid.T, builder *modelNode, blk *blocks.Block, ab acceptedBlock) {
+	// Invariant: no gossip crosses a severed link. A stranded tx inside a
+	// canonical block means eth-tx gossip leaked across the partition (e.g.
+	// a cross-side edge survived severance). Checked before applyBlock's
+	// reconciliation, which would otherwise silently absorb the tx.
+	for _, ethTx := range blk.Transactions() {
+		_, isStranded := nm.stranded[ethTx.Hash()]
+		require.Falsef(rt, isStranded, "canonical block %s contains stranded tx %s: gossip crossed the severed partition", blk.ID(), ethTx.Hash())
+	}
 	nm.modelCore.applyBlock(rt, builder.ctx, builder.sut, blk)
 	nm.modelCore.applyAtomicBlockEffects(rt, builder.ctx, builder.sut, blk)
 	nm.canonical = append(nm.canonical, ab)
@@ -325,11 +384,16 @@ func (nm *networkedMachine) buildAndDistribute(rt *rapid.T) {
 	if len(builders) > 1 {
 		b = builders[rapid.IntRange(0, len(builders)-1).Draw(rt, "builder")]
 	}
-	if len(nm.m.pendingEth) == 0 && len(nm.m.pendingAtomic) == 0 {
-		// The VM refuses empty blocks. No pending txs means no pins (pins are
-		// GC'd on drain), so pinning the richest account to the builder is
-		// always consistent.
-		richestIdx := nm.issueMinimalTransfer(rt, b.ctx, b.sut)
+	if len(nm.syncEthTxs()) == 0 && len(nm.m.pendingAtomic) == 0 {
+		// The VM refuses empty blocks, and only sync-set txs can reach the
+		// builder — with every pending tx stranded behind a partition the
+		// builder's pool is effectively empty. Fund the block from an
+		// unpinned account; if every account is stranded, nothing can fund a
+		// block, so the round no-ops (pure model state, draw-count safe).
+		richestIdx := nm.issueMinimalTransferUnpinned(rt, b.ctx, b.sut)
+		if richestIdx < 0 {
+			return
+		}
 		nm.pins[nm.addrs[richestIdx]] = b.idx
 	}
 
@@ -390,7 +454,10 @@ func (nm *networkedMachine) delayNode(rt *rapid.T) {
 func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 	idx := rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
 	n := nm.nodes[idx]
-	if !n.delayed {
+	// A minority node's lag is the partition's doing: delivering its queue
+	// would carry blocks across the severed cut. It becomes catchable the
+	// moment healPartition dissolves the overlay.
+	if !n.delayed || nm.inMinority(idx) {
 		return
 	}
 	for n.acceptedCount < len(nm.canonical) {
@@ -550,6 +617,12 @@ func (nm *networkedMachine) competingSiblings(rt *rapid.T) {
 func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	idx := rapid.IntRange(0, len(nm.nodes)-1).Draw(rt, "node")
 	n := nm.nodes[idx]
+	// Conservative v1: a minority node is unreachable from the majority, so
+	// nothing could re-anchor its pool contents before the drop. Skip it
+	// until the partition heals.
+	if nm.inMinority(idx) {
+		return
+	}
 
 	// Another live (non-delayed) validator must exist: it anchors the
 	// pending txs while n's pool is dropped, serves pull-gossip recovery,
@@ -570,14 +643,21 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	// entries would otherwise vanish with nothing left to answer a later
 	// buildOn's waitForAtomicTxs on any node.
 	for _, v := range syncVdrs {
-		v.sut.waitForPendingEthTxs(v.ctx, nm.tb, nm.pendingEthTxs...)
+		// syncVdrs are majority-side; stranded txs cannot reach them, and a
+		// restarting majority node never held them anyway. Atomic txs are
+		// never stranded (issueAtomicTx targets non-delayed nodes only).
+		v.sut.waitForPendingEthTxs(v.ctx, nm.tb, nm.syncEthTxs()...)
 		v.sut.waitForAtomicTxs(v.ctx, nm.tb, nm.pendingAtomicTxs...)
 	}
 
 	// Mirror production: peers observe the node disconnect before it goes
-	// down, so gossip stops sampling it while it is unreachable.
+	// down, so gossip stops sampling it while it is unreachable. During a
+	// partition all loops below are same-side (majority) only: cross-side
+	// edges are already severed — n is majority (minority restarts no-op
+	// above) and minority peers neither hold n in their peer maps nor may be
+	// reconnected to it.
 	for _, o := range nm.nodes {
-		if o.idx != idx {
+		if o.idx != idx && !nm.inMinority(o.idx) {
 			require.NoErrorf(rt, o.sut.Disconnected(o.ctx, n.nodeID), "%T.Disconnected(%s)", o.sut.VM, n.nodeID)
 		}
 	}
@@ -593,17 +673,17 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	// and ConnectTo re-registers it with every peer.
 	n.sut.Sender().Close()
 	for _, o := range nm.nodes {
-		if o.idx != idx {
+		if o.idx != idx && !nm.inMinority(o.idx) {
 			o.sut.Sender().Drain()
 		}
 	}
 	for _, o := range nm.nodes {
-		if o.idx != idx {
+		if o.idx != idx && !nm.inMinority(o.idx) {
 			o.sut.Sender().RemovePeer(n.nodeID)
 		}
 	}
 	for _, o := range nm.nodes {
-		if o.idx != idx {
+		if o.idx != idx && !nm.inMinority(o.idx) {
 			o.sut.Sender().Drain()
 		}
 	}
@@ -622,7 +702,7 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	// node; a non-validator only to validators.
 	var peers []*SUT
 	for _, o := range nm.nodes {
-		if o.idx == idx {
+		if o.idx == idx || nm.inMinority(o.idx) {
 			continue
 		}
 		if n.isValidator || o.isValidator {
@@ -683,7 +763,10 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 // the way. No-op when the run drew no joiner or it already joined (pure
 // config + model state, so draw counts stay deterministic). Makes no draws.
 func (nm *networkedMachine) lateJoin(rt *rapid.T) {
-	if nm.cfg.joiner == nil || nm.joined {
+	// Deferred while a partition is up (conservative v1): the joiner would
+	// need side-aware wiring. The no-op leaves nm.joined false, so the
+	// action can still fire after healPartition.
+	if nm.cfg.joiner == nil || nm.joined || nm.partitionActive() {
 		return
 	}
 	nm.joined = true
