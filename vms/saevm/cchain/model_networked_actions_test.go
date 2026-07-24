@@ -59,6 +59,7 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		// a full-network pre-sync plus four drain sweeps, and a partition's
 		// lasting cost is every stranded tx it forces later builds to skip.
 		"partitionNetwork": nm.partitionNetwork,
+		"healPartition":    nm.healPartition,
 		// lateJoin is once-only (and a no-op in runs without a joiner), so a
 		// single alias costs nothing; its lasting cost is the +1 node every
 		// subsequent action pays, which the joiner-presence odds in
@@ -578,6 +579,39 @@ func (nm *networkedMachine) partitionNetwork(rt *rapid.T) {
 			n.delayed = true
 		}
 	}
+}
+
+// healPartition reconnects every severed cross-side edge and dissolves the
+// partition. Ex-minority nodes stay delayed with their acceptedCount intact
+// — catchUpNode converges them as usual, with checkLagging asserting their
+// prefix at every check in between — and stranded txs rejoin the sync set,
+// so the next buildOn cannot complete until real push/pull gossip has
+// carried them across the healed links to the builder (an existing sync
+// point, never a timer). Makes no draws; no-op without an active partition
+// (pure model state, draw-count safe).
+func (nm *networkedMachine) healPartition(_ *rapid.T) {
+	if !nm.partitionActive() {
+		return
+	}
+	// Reconnect per the original topology rule: validator ↔ everyone,
+	// non-validator ↔ validators only. ConnectTo re-registers both senders
+	// and delivers Connected notifications both ways. Intra-side edges were
+	// never severed.
+	for _, n := range nm.nodes {
+		if !nm.inMinority(n.idx) {
+			continue
+		}
+		var peers []*SUT
+		for _, o := range nm.nodes {
+			if nm.inMinority(o.idx) || !(n.isValidator || o.isValidator) {
+				continue
+			}
+			peers = append(peers, o.sut)
+		}
+		saetest.ConnectTo(nm.tb, n.sut, peers...)
+	}
+	clear(nm.stranded)
+	nm.minority = nil
 }
 
 func (nm *networkedMachine) advanceClock(rt *rapid.T) {
