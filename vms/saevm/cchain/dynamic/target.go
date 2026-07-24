@@ -16,7 +16,7 @@ type TargetExponent uint64
 const InitialTargetExponent TargetExponent = 0
 
 // MinTarget is the minimum target gas per second.
-const MinTarget = gas.Gas(1_000_000)
+const MinTarget = 1_000_000
 
 // Target returns the target gas per second.
 //
@@ -24,7 +24,7 @@ const MinTarget = gas.Gas(1_000_000)
 func (t TargetExponent) Target() gas.Gas {
 	const conversionRate = 1 << 25
 	return gas.Gas(gas.CalculatePrice(
-		gas.Price(MinTarget),
+		MinTarget,
 		gas.Gas(t),
 		conversionRate,
 	))
