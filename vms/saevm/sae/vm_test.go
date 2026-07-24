@@ -11,6 +11,7 @@ import (
 	"math/rand/v2"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -438,6 +439,44 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	for i, tx := range builtTxs {
 		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
 	}
+}
+
+func TestBuildBlockOpByteBackstop(t *testing.T) {
+	newOp := func(mints int) hookstest.Op {
+		return hookstest.Op{
+			ID:        ids.GenerateTestID(),
+			Gas:       1_000,
+			GasFeeCap: *uint256.NewInt(params.Wei),
+			Mint: slices.Repeat([]hookstest.AccountCredit{{
+				Address: common.Address{1},
+				Amount:  *uint256.NewInt(1),
+			}}, mints),
+		}
+	}
+	// Three big ops of which only two fit the byte budget, followed by a
+	// small op that fits in the space left after the third is skipped.
+	ops := []hookstest.Op{newOp(19_200), newOp(19_200), newOp(19_200), newOp(1)}
+
+	var (
+		big   = ops[0].Size()
+		small = ops[3].Size()
+	)
+	require.LessOrEqual(t, 2*big+small, uint64(saeparams.TargetBlockBytes), "two big ops plus the small op must fit the byte budget")
+	require.Greater(t, 3*big, uint64(saeparams.TargetBlockBytes), "three big ops must exceed the byte budget")
+
+	ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Ops = ops
+	}))
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	// The third op is too big and gets skipped, but one skip shouldn't stop
+	// inclusion. The smaller op after it still fits, so it's included.
+	want := []hook.Op{ops[0].AsOp(), ops[1].AsOp(), ops[3].AsOp()}
+	got, err := sut.hooks.EndOfBlockOps(built.EthBlock())
+	require.NoErrorf(t, err, "%T.EndOfBlockOps()", sut.hooks)
+	require.Equal(t, want, got, "ops included in block")
 }
 
 func TestVerifyBlockSizeLimit(t *testing.T) {
