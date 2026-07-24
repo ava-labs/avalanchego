@@ -27,6 +27,27 @@ if [[ -n "${SCRIPT_USAGE}" ]]; then
   exit 1
 fi
 
+echo "Checking for workflow task invocations configured with passthrough flags..."
+# CI should invoke stable named tasks rather than redefining task behavior at
+# the workflow callsite. As a practical guardrail, reject task invocations that
+# pass extra option flags after `--`.
+TASK_CONFIGURATION=
+for file in "${AVALANCHE_PATH}"/.github/workflows/*.{yml,yaml}; do
+  [[ -f "$file" ]] || continue
+
+  MATCHES=$(grep -H -n -P '^\s*run:\s*(?:(?:\./)?scripts/run_task\.sh|task)\s+[^#\n]*\s--\s+--' "$file" || true)
+  if [[ -n "${MATCHES}" ]]; then
+    echo "${MATCHES}"
+    TASK_CONFIGURATION=1
+  fi
+done
+
+if [[ -n "${TASK_CONFIGURATION}" ]]; then
+  echo "Error: workflow task invocations must not pass option flags after '--'."
+  echo "Define a stable named task instead of configuring task behavior at the CI callsite."
+  exit 1
+fi
+
 echo "Checking for floating GitHub runner labels..."
 # Floating runner labels (e.g. ubuntu-latest, macos-latest) can change out
 # from under the default branch and break CI without any corresponding change
