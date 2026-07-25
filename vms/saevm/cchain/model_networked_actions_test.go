@@ -56,7 +56,7 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		"competingSiblings":  nm.competingSiblings,
 		"restartNode":        nm.restartNode,
 		// partitionNetwork/healPartition get single aliases: severance costs
-		// a full-network pre-sync plus four drain sweeps, and a partition's
+		// a full-network pre-sync plus three drain sweeps, and a partition's
 		// lasting cost is every stranded tx it forces later builds to skip.
 		"partitionNetwork": nm.partitionNetwork,
 		"healPartition":    nm.healPartition,
@@ -374,6 +374,9 @@ func (nm *networkedMachine) applyCanonical(rt *rapid.T, builder *modelNode, blk 
 	// canonical block means eth-tx gossip leaked across the partition (e.g.
 	// a cross-side edge survived severance). Checked before applyBlock's
 	// reconciliation, which would otherwise silently absorb the tx.
+	// Detection window: healPartition clears stranded, so a leak first built
+	// into a block post-heal is indistinguishable from legitimate post-heal
+	// inclusion; this invariant covers leaks built while the partition is up.
 	for _, ethTx := range blk.Transactions() {
 		_, isStranded := nm.stranded[ethTx.Hash()]
 		require.Falsef(rt, isStranded, "canonical block %s contains stranded tx %s: gossip crossed the severed partition", blk.ID(), ethTx.Hash())
