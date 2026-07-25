@@ -108,7 +108,7 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 	// snapshots), so the draw count stays a function of model state alone,
 	// preserving replay determinism.
 	if pinned {
-		if n := nm.nodes[nodeIdx]; n.delayed && !(nm.inMinority(nodeIdx) && n.isValidator && nm.strandSafe(from, n)) {
+		if n := nm.nodes[nodeIdx]; n.delayed && (!nm.inMinority(nodeIdx) || !n.isValidator || !nm.strandSafe(from, n)) {
 			return
 		}
 	}
@@ -511,7 +511,7 @@ func (nm *networkedMachine) partitionNetwork(rt *rapid.T) {
 	}
 	hasMajorityBuilder := false
 	for _, n := range nm.nodes {
-		if _, min := minority[n.idx]; !min && n.isValidator && !n.delayed {
+		if _, inMin := minority[n.idx]; !inMin && n.isValidator && !n.delayed {
 			hasMajorityBuilder = true
 			break
 		}
@@ -543,7 +543,7 @@ func (nm *networkedMachine) partitionNetwork(rt *rapid.T) {
 			continue
 		}
 		for _, b := range nm.nodes {
-			if !nm.inMinority(b.idx) || !(a.isValidator || b.isValidator) {
+			if !nm.inMinority(b.idx) || (!a.isValidator && !b.isValidator) {
 				continue
 			}
 			require.NoErrorf(rt, a.sut.Disconnected(a.ctx, b.nodeID), "%T.Disconnected(%s) severing partition", a.sut.VM, b.nodeID)
@@ -573,7 +573,7 @@ func (nm *networkedMachine) partitionNetwork(rt *rapid.T) {
 			continue
 		}
 		for _, b := range nm.nodes {
-			if !nm.inMinority(b.idx) || !(a.isValidator || b.isValidator) {
+			if !nm.inMinority(b.idx) || (!a.isValidator && !b.isValidator) {
 				continue
 			}
 			a.sut.Sender().RemovePeer(b.nodeID)
@@ -615,7 +615,7 @@ func (nm *networkedMachine) healPartition(_ *rapid.T) {
 		}
 		var peers []*SUT
 		for _, o := range nm.nodes {
-			if nm.inMinority(o.idx) || !(n.isValidator || o.isValidator) {
+			if nm.inMinority(o.idx) || (!n.isValidator && !o.isValidator) {
 				continue
 			}
 			peers = append(peers, o.sut)
