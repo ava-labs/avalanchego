@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -239,6 +240,41 @@ type modelNode struct {
 	// delivery queue while delayed.
 	acceptedCount int
 	delayed       bool
+
+	// fork is this node's chain of verified-but-doomed blocks built while it
+	// sat behind a partition (minorityBuild), rooted on its accepted prefix.
+	// A nonempty fork implies delayed (invariant 11): it is resolved —
+	// rejected root-first — by catchUpNode after the canonical sibling of
+	// fork[0] is accepted, or discarded wholesale by restartNode
+	// (crash-realistic: processing blocks are memory-only).
+	fork []doomedBlock
+}
+
+// doomedBlock is one verified-but-unaccepted block of a minority validator's
+// fork. Snowman finality dooms it — the sub-quorum minority can never accept
+// it — so it is destined for RejectBlock. The handle is bound to the VM
+// instance that built it, valid until the node restarts (which drops the
+// fork). txs is the block's tx-hash set, feeding minorityBuild's freshness
+// guard.
+type doomedBlock struct {
+	blk    *blocks.Block
+	id     ids.ID
+	height uint64
+	txs    map[common.Hash]struct{}
+}
+
+// newDoomedBlock records blk as one link of a minority fork.
+func newDoomedBlock(blk *blocks.Block) doomedBlock {
+	d := doomedBlock{
+		blk:    blk,
+		id:     blk.ID(),
+		height: blk.NumberU64(),
+		txs:    make(map[common.Hash]struct{}, len(blk.Transactions())),
+	}
+	for _, ethTx := range blk.Transactions() {
+		d.txs[ethTx.Hash()] = struct{}{}
+	}
+	return d
 }
 
 // warpSend is the model's record of one sendWarpMessage call included in a
@@ -298,11 +334,14 @@ type networkedMachine struct {
 	// existing group-lag semantics, so block withholding, prefix checks, and
 	// build-eligibility all ride the delayed machinery unchanged.
 	minority map[int]struct{}
-	// stranded is the set of model-pending eth txs issued to minority nodes
-	// since the partition started. Majority builders cannot receive them
-	// until healPartition reconnects the topology, so every majority-side
-	// sync wait uses syncEthTxs, which excludes them.
-	stranded map[common.Hash]struct{}
+	// stranded maps each model-pending eth tx issued to a minority node since
+	// the partition started to the node index it was issued to. Majority
+	// builders cannot receive these txs until healPartition reconnects the
+	// topology, so every majority-side sync wait uses syncEthTxs, which
+	// excludes them; the issued-to index feeds minorityBuild's freshness
+	// guard (only issued-to txs are guaranteed pending on a minority
+	// builder).
+	stranded map[common.Hash]int
 
 	// joinerNodeID is pre-generated for a validator joiner so the shared
 	// validator set can include it from genesis; joined flips when lateJoin
@@ -360,7 +399,7 @@ func newNetworkedMachine(t *testing.T, rt *rapid.T, cfg networkedRunConfig) *net
 		clock:        clock,
 		timeOpt:      timeOpt,
 		pins:         make(map[common.Address]int),
-		stranded:     make(map[common.Hash]struct{}),
+		stranded:     make(map[common.Hash]int),
 		joinerNodeID: joinerNodeID,
 	}
 	for i, addr := range nm.addrs {
@@ -620,6 +659,12 @@ func (nm *networkedMachine) allSUTs() []*SUT {
 // they've accepted via checkLagging.
 func (nm *networkedMachine) check(rt *rapid.T) {
 	for _, n := range nm.nodes {
+		// Invariant 11: a doomed fork only ever exists on a delayed node —
+		// resolution (catchUpNode) or discard (restartNode) must precede
+		// anything that clears the lag.
+		if len(n.fork) > 0 {
+			require.Truef(rt, n.delayed, "node %d holds a %d-block doomed fork but is not delayed", n.idx, len(n.fork))
+		}
 		if n.delayed {
 			nm.checkLagging(rt, n)
 			continue

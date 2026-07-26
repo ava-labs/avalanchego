@@ -141,7 +141,7 @@ func (nm *networkedMachine) issueTx(rt *rapid.T) {
 		// Issued behind the partition: unreachable by majority builders
 		// until heal, so majority-side sync waits must skip it (syncEthTxs)
 		// and no canonical block may contain it (applyCanonical's invariant).
-		nm.stranded[nm.pendingEthTxs[len(nm.pendingEthTxs)-1].Hash()] = struct{}{}
+		nm.stranded[nm.pendingEthTxs[len(nm.pendingEthTxs)-1].Hash()] = nodeIdx
 	}
 	// Admission sync (subscription-based, not timed): the tx must become
 	// pending on the node it was issued to before the machine moves on.
@@ -482,6 +482,20 @@ func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 	}
 	for n.acceptedCount < len(nm.canonical) {
 		nm.deliverBlock(rt, n, nm.canonical[n.acceptedCount])
+		// Fork resolution: the canonical block just accepted (deliverBlock
+		// bumped acceptedCount) is the doomed root's sibling — the engine's
+		// cue to reject the competing chain, root-first (rejection cascades
+		// from a decided competitor down through its processing
+		// descendants). Because the fork roots on the node's prefix as
+		// frozen at partition time and nothing was delivered since, this
+		// fires on the loop's first iteration. Handles are valid: restartNode
+		// drops any fork before destroying the VM instance they are bound to.
+		if len(n.fork) > 0 && n.fork[0].height == nm.canonical[n.acceptedCount-1].height {
+			for _, db := range n.fork {
+				require.NoErrorf(rt, n.sut.RejectBlock(n.ctx, db.blk), "%T.RejectBlock(doomed block at height %d) on node %d", n.sut.VM, db.height, n.idx)
+			}
+			n.fork = nil
+		}
 	}
 	n.delayed = false
 }
@@ -786,6 +800,14 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 	if nm.inMinority(idx) {
 		return
 	}
+
+	// A processing (verified-but-unaccepted) doomed fork is memory-only: a
+	// real node loses it on restart and it simply never gets rejected. Drop
+	// the records — the handles are bound to the VM instance Shutdown below
+	// destroys — and let the existing machinery converge the node; the
+	// fork's txs live on in pools regardless (pool eviction happens only at
+	// execution), like any other pending txs.
+	n.fork = nil
 
 	// Another live (non-delayed) validator must exist: it anchors the
 	// pending txs while n's pool is dropped, serves pull-gossip recovery,
