@@ -254,27 +254,20 @@ type modelNode struct {
 // fork. Snowman finality dooms it — the sub-quorum minority can never accept
 // it — so it is destined for RejectBlock. The handle is bound to the VM
 // instance that built it, valid until the node restarts (which drops the
-// fork). txs is the block's tx-hash set, feeding minorityBuild's freshness
-// guard.
+// fork).
 type doomedBlock struct {
 	blk    *blocks.Block
 	id     ids.ID
 	height uint64
-	txs    map[common.Hash]struct{}
 }
 
 // newDoomedBlock records blk as one link of a minority fork.
 func newDoomedBlock(blk *blocks.Block) doomedBlock {
-	d := doomedBlock{
+	return doomedBlock{
 		blk:    blk,
 		id:     blk.ID(),
 		height: blk.NumberU64(),
-		txs:    make(map[common.Hash]struct{}, len(blk.Transactions())),
 	}
-	for _, ethTx := range blk.Transactions() {
-		d.txs[ethTx.Hash()] = struct{}{}
-	}
-	return d
 }
 
 // warpSend is the model's record of one sendWarpMessage call included in a
@@ -640,6 +633,30 @@ func (nm *networkedMachine) issueTargets(from common.Address) []*modelNode {
 		}
 	}
 	return out
+}
+
+// freshStrandedFor reports whether minority validator n has had more
+// stranded txs issued to it than it has made doomed builds, i.e. at least
+// one issued-to-n tx no doomed build has yet consumed — under the
+// assumption that each doomed build consumes at least one (the freshness
+// guard ensured one was pending at that build's time). Only issued-to-n txs
+// are guaranteed pending in n's pool (issueTx's admission sync ran at
+// issuance, and a delayed node never executes, so nothing evicts); a
+// stranded tx gossiped over from another minority validator has no
+// admission guarantee. A model-count proxy rather than inspecting built
+// block contents (which are not a pure function of model state — gossiped
+// extras, pool leftovers, wall-clock tie-breaks — and would make the
+// "doomedBuilder" draw's very occurrence depend on non-model state,
+// breaking rapid replay/shrink). Pure model state, so draw counts
+// downstream stay replay-deterministic.
+func (nm *networkedMachine) freshStrandedFor(n *modelNode) bool {
+	var issuedToN int
+	for _, idx := range nm.stranded {
+		if idx == n.idx {
+			issuedToN++
+		}
+	}
+	return issuedToN > len(n.fork)
 }
 
 // allSUTs is every node's SUT in index order, the fan-out set for

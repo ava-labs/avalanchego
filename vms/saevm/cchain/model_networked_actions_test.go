@@ -60,6 +60,11 @@ func (nm *networkedMachine) actions() map[string]func(*rapid.T) {
 		// lasting cost is every stranded tx it forces later builds to skip.
 		"partitionNetwork": nm.partitionNetwork,
 		"healPartition":    nm.healPartition,
+		// minorityBuild gets a single alias: one build+verify on one node
+		// with no cross-node sync waits — cheap next to buildAndDistribute —
+		// and it only fires inside a partition holding fresh stranded txs,
+		// already a rare state.
+		"minorityBuild": nm.minorityBuild,
 		// lateJoin is once-only (and a no-op in runs without a joiner), so a
 		// single alias costs nothing; its lasting cost is the +1 node every
 		// subsequent action pays, which the joiner-presence odds in
@@ -641,6 +646,92 @@ func (nm *networkedMachine) healPartition(_ *rapid.T) {
 	}
 	clear(nm.stranded)
 	nm.minority = nil
+}
+
+// minorityBuild has a drawn minority validator build and verify one block on
+// its own fork tip — its previous doomed block, else its accepted-prefix tip
+// — creating a verified block Snowman finality dooms: the sub-quorum
+// minority can never accept it, and catchUpNode rejects it after heal when
+// the canonical sibling at the fork root's height is accepted. The block
+// deliberately never touches the model: RejectBlock is a near no-op in SAE
+// and pool eviction happens only at execution, so its txs stay
+// pending/stranded and the model's accounting is unchanged. Doomed CHAINS
+// emerge from repeated firings interleaved with stranded issueTx. Eligibility
+// (partition up, minority validator, fresh stranded tx per freshStrandedFor)
+// is pure machine/model state, so draw counts stay replay-deterministic.
+func (nm *networkedMachine) minorityBuild(rt *rapid.T) {
+	if !nm.partitionActive() {
+		return
+	}
+	var builders []*modelNode
+	for _, n := range nm.nodes {
+		if nm.inMinority(n.idx) && n.isValidator && nm.freshStrandedFor(n) {
+			builders = append(builders, n)
+		}
+	}
+	if len(builders) == 0 {
+		return
+	}
+	b := builders[0]
+	if len(builders) > 1 {
+		b = builders[rapid.IntRange(0, len(builders)-1).Draw(rt, "doomedBuilder")]
+	}
+
+	// Fork tip: extend the doomed chain if one exists, else root a new fork
+	// on the accepted prefix (possibly genesis). SetPreference to a
+	// processing (unaccepted) block is production Snowman's normal case.
+	parentID := nm.snapshots[b.acceptedCount].id
+	if len(b.fork) > 0 {
+		parentID = b.fork[len(b.fork)-1].id
+	}
+	blockCtx := &block.Context{}
+	require.NoErrorf(rt, b.sut.SetPreference(b.ctx, parentID, blockCtx), "%T.SetPreference(fork tip) on minority builder %d", b.sut.VM, b.idx)
+	nm.advanceToBuildable(b)
+
+	// No pre-build sync waits: block contents never feed the model, so
+	// unguaranteed extras (gossiped stranded txs from other minority
+	// validators, pre-partition pool leftovers — including txs the majority
+	// has since included canonically, the classic same-tx-on-both-sides fork
+	// shape) are harmless coverage. The freshness guard's tx is already
+	// pending here (issueTx's admission sync ran at issuance).
+	const maxBuildAttempts = 5
+	var blk *blocks.Block
+	for attempt := 1; ; attempt++ {
+		var err error
+		blk, err = b.sut.BuildBlock(b.ctx, blockCtx)
+		if err == nil {
+			break
+		}
+		if errors.Is(err, sae.ErrExecutionLagging) {
+			// Terminal, not recoverable: lastToSettle (sae/block_builder.go)
+			// computes settleAt = blockTime − Tau and walks parent links
+			// looking for an execution record. A doomed ancestor is never
+			// accepted, so never enqueued to the executor and never gets
+			// one — settlement can never catch up onto it, no matter how
+			// many times we nm.settle(rt) the accepted prefix. This matches
+			// production: a minority validator genuinely cannot extend its
+			// fork past its own settlement window. Leave the fork as-is
+			// (nothing appended) and report the action as a no-op.
+			return
+		}
+		require.Lessf(rt, attempt, maxBuildAttempts, "BuildBlock (doomed) on node %d never recovered after %d attempts: %v", b.idx, attempt, err)
+		// Only worst-case spendability may legally fail here: it validates
+		// against the last-SETTLED state (ACP-194), and settle's shared
+		// clock advance settles this node's own accepted prefix too.
+		require.ErrorIsf(rt, err, errEmptyBlock, "%T.BuildBlock() (doomed) attempt %d on node %d", b.sut.VM, attempt, b.idx)
+		require.NotNilf(rt, nm.m.lastAccepted, "%T.BuildBlock() (doomed) returned errEmptyBlock with nothing accepted to settle", b.sut.VM)
+		nm.settle(rt)
+		nm.advanceToBuildable(b)
+	}
+	require.NoErrorf(rt, b.sut.VerifyBlock(b.ctx, blockCtx, blk), "%T.VerifyBlock(doomed) on minority builder %d", b.sut.VM, b.idx)
+
+	// Record only. No acceptedCount bump, no model/pins/snapshots update —
+	// the very next check's checkLagging asserts exactly that (invariant 10:
+	// doomed building is state-inert). The builder's VM preference is
+	// deliberately left pointed at the doomed tip: harmless, since every
+	// later preference consumer (buildOn, another minorityBuild, ...)
+	// re-runs SetPreference before building.
+	b.fork = append(b.fork, newDoomedBlock(blk))
 }
 
 func (nm *networkedMachine) advanceClock(rt *rapid.T) {
