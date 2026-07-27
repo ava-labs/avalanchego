@@ -278,7 +278,7 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 // TraceBlockFromFile shadows [tracers.API.TraceBlockFromFile], which would
 // otherwise dispatch to the embedded API's TraceBlock instead of the shadow.
 func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
-	blob, err := os.ReadFile(file)
+	blob, err := os.ReadFile(file) //#nosec G304 -- Reading a caller-supplied file is the whole point.
 	if err != nil {
 		return nil, fmt.Errorf("reading file: %v", err)
 	}
