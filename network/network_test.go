@@ -317,30 +317,32 @@ func TestNewNetwork(t *testing.T) {
 }
 
 func TestNodeUptimeACP267Requirement(t *testing.T) {
+	heliconTime := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+
 	tests := []struct {
 		name           string
-		heliconTime    time.Time
+		startTime      time.Time
 		peerUptime     float64
 		wantPeerUptime uint32
 		want           float64
 	}{
 		{
-			name:           "before_helicon",
-			heliconTime:    upgrade.UnscheduledActivationTime,
+			name:           "started_before_helicon",
+			startTime:      heliconTime.Add(-time.Second),
 			peerUptime:     .85,
 			wantPeerUptime: 85,
 			want:           100,
 		},
 		{
-			name:           "after_helicon_below_requirement",
-			heliconTime:    upgrade.InitiallyActiveTime,
+			name:           "started_at_helicon_below_requirement",
+			startTime:      heliconTime,
 			peerUptime:     .85,
 			wantPeerUptime: 85,
 			want:           50, // only the local validator's half of total stake qualifies
 		},
 		{
-			name:           "after_helicon_at_requirement",
-			heliconTime:    upgrade.InitiallyActiveTime,
+			name:           "started_at_helicon_at_requirement",
+			startTime:      heliconTime,
 			peerUptime:     .9,
 			wantPeerUptime: 90,
 			want:           100,
@@ -350,8 +352,11 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := defaultConfig
 			config.PingFrequency = 10 * time.Millisecond
-			config.UptimeCalculator = uptime.TestCalculator{Percent: tt.peerUptime}
-			config.UpgradeConfig.HeliconTime = tt.heliconTime
+			config.UptimeCalculator = uptime.TestCalculator{
+				StartTime: tt.startTime,
+				Percent:   tt.peerUptime,
+			}
+			config.UpgradeConfig.HeliconTime = heliconTime
 
 			_, networks, eg := newFullyConnectedTestNetworkWithConfig(
 				t,

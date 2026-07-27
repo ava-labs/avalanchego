@@ -1187,7 +1187,12 @@ func (n *network) NodeUptime() (UptimeResult, error) {
 		rewardingStake       = float64(myStake)
 		uptimeRequirement    = n.config.UptimeRequirement
 	)
-	if n.config.UpgradeConfig.IsHeliconActivated(n.peerConfig.Clock.Time()) {
+
+	startTime, err := n.config.UptimeCalculator.GetStartTime(n.config.MyNodeID)
+	if err != nil {
+		return UptimeResult{}, fmt.Errorf("error while fetching local validator start time %w", err)
+	}
+	if n.config.UpgradeConfig.IsHeliconActivated(startTime) {
 		uptimeRequirement = genesis.ACP267UptimeRequirement
 	}
 
