@@ -4,14 +4,22 @@
 package evm
 
 import (
+	"context"
+	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/event"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
@@ -138,6 +146,78 @@ func TestCalculateBlockBuildingDelay(t *testing.T) {
 			require.Equal(t, tt.expectedTimeToWait, timeToWait)
 		})
 	}
+}
+
+// fakeTxPool implements builderTxPool with a controllable pending size.
+type fakeTxPool struct {
+	pendingSize atomic.Int64
+}
+
+func (p *fakeTxPool) PendingSize(txpool.PendingFilter) int {
+	return int(p.pendingSize.Load())
+}
+
+func (*fakeTxPool) GasTip() *big.Int {
+	return big.NewInt(1)
+}
+
+func (*fakeTxPool) SubscribeTransactions(chan<- core.NewTxsEvent, bool) event.Subscription {
+	return nil
+}
+
+func (*fakeTxPool) SubscribeNewReorgEvent(chan<- core.NewTxPoolReorgEvent) event.Subscription {
+	return nil
+}
+
+// TestWaitForNeedToBuildWakesWithoutSignal verifies that the block builder
+// notices needToBuild flipping to true even when no Broadcast accompanies the
+// change. This happens in production when the tx pool's periodically refreshed
+// base fee estimate changes which pending transactions pass the min tip
+// filter: the pool state changes with no tx event and no head event.
+func TestWaitForNeedToBuildWakesWithoutSignal(t *testing.T) {
+	require := require.New(t)
+
+	pool := &fakeTxPool{}
+	b := &blockBuilder{txPool: pool}
+	b.pendingSignal = lock.NewCond(&b.buildBlockLock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := b.waitForNeedToBuild(ctx)
+		done <- err
+	}()
+
+	// Let the builder enter its wait with nothing to build.
+	time.Sleep(RetryDelay / 2)
+	require.Empty(done)
+
+	// Flip the predicate with no signal of any kind.
+	pool.pendingSize.Store(1)
+
+	require.NoError(utilstest.WaitErrWithTimeout(t, done, 10*RetryDelay))
+}
+
+// TestWaitForNeedToBuildContextCancellation verifies that cancelling the
+// parent context unblocks the wait and is reported as an error.
+func TestWaitForNeedToBuildContextCancellation(t *testing.T) {
+	require := require.New(t)
+
+	b := &blockBuilder{txPool: &fakeTxPool{}}
+	b.pendingSignal = lock.NewCond(&b.buildBlockLock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := b.waitForNeedToBuild(ctx)
+		done <- err
+	}()
+
+	cancel()
+
+	require.ErrorIs(utilstest.WaitErrWithTimeout(t, done, 10*RetryDelay), context.Canceled)
 }
 
 func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, minDelayExcess acp226.DelayExcess) *types.Header {
