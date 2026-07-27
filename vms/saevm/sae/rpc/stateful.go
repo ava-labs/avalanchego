@@ -236,26 +236,31 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	if err := rlp.DecodeBytes(blob, block); err != nil {
 		return nil, fmt.Errorf("decoding block: %v", err)
 	}
-	api := a.API
-	// Genesis falls through untouched for [tracers.TraceBlock] to reject.
-	if block.NumberU64() > 0 {
-		parent, err := a.b.restoreExecutedParent(ctx, block)
-		if err != nil {
-			return nil, fmt.Errorf("restoring parent block: %w", err)
-		}
-		supplied := block.Hash()
-		hdr := block.Header()
-		hdr.BaseFee = saexec.BlockGasClock(parent, a.b.Hooks(), hdr).BaseFee().ToBig()
-		block = block.WithSeal(hdr)
-
-		// The re-seal changed the block's hash, so trace via a backend that
-		// reports the hash of the block as supplied.
-		api = tracers.NewAPI(&suppliedHashBackend{
-			tracerBackend: a.b,
-			resealed:      block.Hash(),
-			supplied:      supplied,
-		})
+	if block.NumberU64() == 0 {
+		// Copied from [tracers.TraceBlock] for want of a sentinel error.
+		return nil, errors.New("genesis is not traceable")
 	}
+
+	parent, err := a.b.restoreExecutedParent(ctx, block)
+	if err != nil {
+		return nil, fmt.Errorf("restoring parent block: %w", err)
+	}
+	supplied := block.Hash()
+	hdr := block.Header()
+	// The parent's gas clock, advanced to the start of the block, determines
+	// the executed base fee.
+	gasClock := parent.ExecutedByGasTime()
+	gasClock.BeforeBlock(a.b.Hooks().BlockTime(hdr))
+	hdr.BaseFee = gasClock.BaseFee().ToBig()
+	block = block.WithSeal(hdr)
+
+	// The re-seal changed the block's hash, so trace via a backend that
+	// reports the hash of the block as supplied.
+	api := tracers.NewAPI(&suppliedHashBackend{
+		tracerBackend: a.b,
+		resealed:      block.Hash(),
+		supplied:      supplied,
+	})
 	return tracers.TraceBlock(ctx, api, block, config)
 }
 
