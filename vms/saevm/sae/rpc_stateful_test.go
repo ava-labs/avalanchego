@@ -155,7 +155,7 @@ func TestDebugTrace(t *testing.T) {
 	// The full trace would be excessive and uninformative, so pin only the
 	// LOG1 for `emit Deposit()`.
 	const logPC = 185
-	ignore := onlyLOG1At(t, escrow.ByteCode(), logPC)
+	onlyLOG1 := onlyLOG1At(t, escrow.ByteCode(), logPC)
 
 	want := []txTraceResult{
 		{
@@ -191,43 +191,43 @@ func TestDebugTrace(t *testing.T) {
 			method:       "debug_traceBlockByNumber",
 			args:         []any{hexutil.Uint64(deployBlock.NumberU64())},
 			want:         wantDeploy,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByNumber",
 			args:         []any{hexutil.Uint64(depositBlock.NumberU64())},
 			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByNumber",
 			args:         []any{rpc.LatestBlockNumber},
 			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByHash",
 			args:         []any{deployBlock.Hash()},
 			want:         wantDeploy,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByHash",
 			args:         []any{depositBlock.Hash()},
 			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlock",
 			args:         []any{blockRLP},
 			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockFromFile",
 			args:         []any{blockFile},
 			want:         wantDeposit,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			// The returned deposit balance proves that the call ran against the
@@ -297,7 +297,7 @@ func TestDebugTrace(t *testing.T) {
 			method:       "debug_traceTransaction",
 			args:         []any{tx.TxHash},
 			want:         *tx.Result,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		})
 	}
 
@@ -347,7 +347,7 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 
 	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
 	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
-	ignore := onlyLOG1At(t, code, logPC)
+	onlyLOG1 := onlyLOG1At(t, code, logPC)
 
 	newCreateTx := func() *types.Transaction {
 		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
@@ -406,37 +406,37 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			method:       "debug_traceTransaction",
 			args:         []any{txHash},
 			want:         want,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByNumber",
 			args:         []any{hexutil.Uint64(b.NumberU64())},
 			want:         wantBlockTrace,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockByHash",
 			args:         []any{b.Hash()},
 			want:         wantBlockTrace,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlock",
 			args:         []any{canonicalRLP},
 			want:         wantBlockTrace,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlock",
 			args:         []any{nonCanonicalRLP},
 			want:         wantBlockTrace,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 		{
 			method:       "debug_traceBlockFromFile",
 			args:         []any{blockFile},
 			want:         wantBlockTrace,
-			extraCmpOpts: ignore,
+			extraCmpOpts: onlyLOG1,
 		},
 	}...)
 }

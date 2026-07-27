@@ -124,6 +124,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	// The tracers API passes back blocks carrying faked [executedHeader]s,
+	// whose hashes match no stored block, so look up by number instead.
 	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
 	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
 	if err != nil {
@@ -198,6 +200,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 // debug_traceCall is special, because it doesn't expect the parent's state.
 // Therefore, the state is returned without any before-block changes being
 // applied by using a special backend.
+//
+// Every debug_trace* endpoint MUST source its state from one of three places:
+//   - [tracerBackend.StateAtBlock] re-executes the child: all but those below.
+//   - [traceCallBackend.StateAtBlock] gives state as of the block:
+//     debug_traceCall.
+//   - [backend.StateAtTransaction] replays within the block:
+//     debug_traceTransaction, and debug_traceCall with a transaction index.
 type tracerAPI struct {
 	*tracers.API
 	b         *backend
@@ -297,6 +306,11 @@ func (b *tracerBackend) applyChildBeforeBlock(ctx context.Context, sdb *state.St
 		return fmt.Errorf("reading child block %d: %w", child, err)
 	}
 	if ethB == nil {
+		// Normal when the parent is the last accepted block, e.g. when tracing
+		// a caller-supplied block built on the tip.
+		b.Logger().Debug("No canonical child, tracing without before-block changes",
+			zap.Uint64("parent_height", parent.Number.Uint64()),
+		)
 		return nil
 	}
 	rules := b.ChainConfig().Rules(ethB.Number(), true /*isMerge*/, ethB.Time())
