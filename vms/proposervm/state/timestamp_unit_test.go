@@ -23,12 +23,12 @@ func TestVerifyTimestampUnit(t *testing.T) {
 
 			// A fresh chain adopts the configured unit and holds it across
 			// restarts.
-			require.NoError(New(vdb, millis).VerifyTimestampUnit(millis))
-			require.NoError(New(vdb, millis).VerifyTimestampUnit(millis))
+			require.NoError(New(vdb, nil, millis, nil).VerifyTimestampUnit(millis))
+			require.NoError(New(vdb, nil, millis, nil).VerifyTimestampUnit(millis))
 
 			// A restart with the unit flipped (e.g. a lost subnet config) must
 			// fail loud instead of silently misparsing every stored block.
-			err := New(vdb, !millis).VerifyTimestampUnit(!millis)
+			err := New(vdb, nil, !millis, nil).VerifyTimestampUnit(!millis)
 			require.ErrorIs(err, errTimestampUnitMismatch)
 		})
 	}
@@ -40,7 +40,7 @@ func TestVerifyTimestampUnitExistingChain(t *testing.T) {
 	// A database from before unit tracking (an upgraded node) with existing
 	// blocks: enabling millisecond timestamps is rejected, seconds is adopted.
 	vdb := versiondb.New(memdb.New())
-	s := New(vdb, false)
+	s := New(vdb, nil, false, nil)
 	require.NoError(s.SetLastAccepted(ids.GenerateTestID()))
 
 	err := s.VerifyTimestampUnit(true)

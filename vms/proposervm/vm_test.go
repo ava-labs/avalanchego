@@ -1463,6 +1463,7 @@ func TestInnerVMRollbackWithDedup(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
+		false,
 	)
 	require.NoError(err)
 

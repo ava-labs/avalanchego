@@ -28,7 +28,7 @@ func requireStripRestore(require *require.Assertions, b Block, innerBytes []byte
 	require.NoError(err)
 	require.Equal(full, restored)
 
-	parsed, err := ParseWithoutVerification(restored)
+	parsed, err := ParseWithoutVerification(restored, false)
 	require.NoError(err)
 	require.Equal(b.ID(), parsed.ID())
 	require.Equal(innerBytes, parsed.Block())
@@ -53,6 +53,7 @@ func TestStripRestoreSignedBlock(t *testing.T) {
 		innerBytes,
 		ids.ID{4},
 		key,
+		false,
 	)
 	require.NoError(err)
 
@@ -78,6 +79,7 @@ func TestStripRestoreGraniteBlock(t *testing.T) {
 		innerBytes,
 		ids.ID{4},
 		key,
+		false,
 	)
 	require.NoError(err)
 
@@ -88,7 +90,7 @@ func TestStripRestoreUnsignedBlock(t *testing.T) {
 	require := require.New(t)
 
 	innerBytes := []byte{9, 9, 9, 9}
-	b, err := BuildUnsigned(ids.ID{1}, time.Unix(123, 0), uint64(2), Epoch{}, innerBytes)
+	b, err := BuildUnsigned(ids.ID{1}, time.Unix(123, 0), uint64(2), Epoch{}, innerBytes, false)
 	require.NoError(err)
 
 	requireStripRestore(require, b, innerBytes)
