@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -35,8 +35,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		name        string
 		backendF    func(*gomock.Controller) *Backend
 		chain       state.Chain
-		sTxF        func() *txs.Tx
-		txF         func() *txs.AddPermissionlessValidatorTx
+		sTxF        func() *platform.Tx
+		txF         func() *platform.AddPermissionlessValidatorTx
 		expectedErr error
 	}
 
@@ -49,7 +49,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 		subnetID            = ids.GenerateTestID()
 		customAssetID       = ids.GenerateTestID()
-		unsignedTransformTx = &txs.TransformSubnetTx{
+		unsignedTransformTx = &platform.TransformSubnetTx{
 			AssetID:           customAssetID,
 			MinValidatorStake: 1,
 			MaxValidatorStake: 2,
@@ -58,15 +58,15 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			MinDelegationFee:  5,
 			Subnet:            subnetID,
 		}
-		transformTx = txs.Tx{
+		transformTx = platform.Tx{
 			Unsigned: unsignedTransformTx,
 			Creds:    []verify.Verifiable{},
 		}
 		// This tx already passed syntactic verification.
 		startTime  = now.Add(time.Second)
 		endTime    = startTime.Add(time.Second * time.Duration(unsignedTransformTx.MinStakeDuration))
-		verifiedTx = txs.AddPermissionlessValidatorTx{
-			BaseTx: txs.BaseTx{
+		verifiedTx = platform.AddPermissionlessValidatorTx{
+			BaseTx: platform.BaseTx{
 				SyntacticallyVerified: true,
 				BaseTx: avax.BaseTx{
 					NetworkID:    ctx.NetworkID,
@@ -75,7 +75,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					Ins:          []*avax.TransferableInput{},
 				},
 			},
-			Validator: txs.Validator{
+			Validator: platform.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				// Note: [Start] is not set here as it will be ignored
 				// Post-Durango in favor of the current chain time
@@ -100,7 +100,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			DelegationShares: 20_000,
 		}
-		verifiedSignedTx = txs.Tx{
+		verifiedSignedTx = platform.Tx{
 			Unsigned: &verifiedTx,
 			Creds:    []verify.Verifiable{},
 		}
@@ -124,13 +124,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.SetTimestamp(now)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return nil
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return nil
 			},
-			expectedErr: txs.ErrNilSignedTx,
+			expectedErr: platform.ErrNilSignedTx,
 		},
 		{
 			name: "not bootstrapped",
@@ -148,11 +148,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.SetTimestamp(now)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
-				return &txs.AddPermissionlessValidatorTx{}
+			txF: func() *platform.AddPermissionlessValidatorTx {
+				return &platform.AddPermissionlessValidatorTx{}
 			},
 			expectedErr: nil,
 		},
@@ -174,10 +174,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.SetTimestamp(verifiedTx.StartTime())
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
 			expectedErr: ErrTimestampNotBeforeStartTime,
@@ -201,10 +201,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MinValidatorStake - 1
 				return &tx
@@ -230,10 +230,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake + 1
 				return &tx
@@ -259,10 +259,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee - 1
@@ -289,10 +289,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
@@ -322,10 +322,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
 				tx.DelegationShares = unsignedTransformTx.MinDelegationFee
@@ -355,10 +355,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.AddSubnetTransformation(&transformTx)
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.StakeOuts = []*avax.TransferableOutput{
 					{
@@ -397,10 +397,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				require.NoError(t, s.PutCurrentValidator(staker))
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
 			expectedErr: ErrDuplicateValidator,
@@ -432,10 +432,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
 			expectedErr: ErrPeriodMismatch,
@@ -478,10 +478,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
 			expectedErr: ErrFlowCheckFailed,
@@ -523,10 +523,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				return s
 			}(),
-			sTxF: func() *txs.Tx {
+			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
-			txF: func() *txs.AddPermissionlessValidatorTx {
+			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
 			expectedErr: nil,
@@ -637,8 +637,8 @@ func TestGetValidatorRules(t *testing.T) {
 			subnetID: subnetID,
 			backend:  nil,
 			setup: func(s *state.State) {
-				tx := &txs.Tx{
-					Unsigned: &txs.TransformSubnetTx{
+				tx := &platform.Tx{
+					Unsigned: &platform.TransformSubnetTx{
 						AssetID:           customAssetID,
 						InitialSupply:     10,
 						MaximumSupply:     100,
@@ -767,8 +767,8 @@ func TestGetDelegatorRules(t *testing.T) {
 			subnetID: subnetID,
 			backend:  nil,
 			setup: func(s *state.State) {
-				tx := &txs.Tx{
-					Unsigned: &txs.TransformSubnetTx{
+				tx := &platform.Tx{
+					Unsigned: &platform.TransformSubnetTx{
 						AssetID:                  customAssetID,
 						InitialSupply:            10,
 						MaximumSupply:            100,

@@ -14,15 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
-	_ gossip.Marshaller[*txs.Tx] = (*txMarshaller)(nil)
-	_ gossip.Gossipable          = (*txs.Tx)(nil)
+	_ gossip.Marshaller[*platform.Tx] = (*txMarshaller)(nil)
+	_ gossip.Gossipable               = (*platform.Tx)(nil)
 )
 
 // bloomChurnMultiplier is the number used to multiply the size of the mempool
@@ -31,12 +31,12 @@ const bloomChurnMultiplier = 3
 
 type txMarshaller struct{}
 
-func (txMarshaller) MarshalGossip(tx *txs.Tx) ([]byte, error) {
+func (txMarshaller) MarshalGossip(tx *platform.Tx) ([]byte, error) {
 	return tx.Bytes(), nil
 }
 
-func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
-	return txs.Parse(txs.Codec, bytes)
+func (txMarshaller) UnmarshalGossip(bytes []byte) (*platform.Tx, error) {
+	return platform.ParseTx(platform.Codec, bytes)
 }
 
 func newGossipMempool(
@@ -66,7 +66,7 @@ type gossipMempool struct {
 	bloom *gossip.BloomFilter
 }
 
-func (g *gossipMempool) Add(tx *txs.Tx) error {
+func (g *gossipMempool) Add(tx *platform.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
 		return fmt.Errorf("tx %s dropped: %w", txID, txmempool.ErrDuplicateTx)
@@ -109,7 +109,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	if reset {
 		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
+		g.Mempool.Iterate(func(tx *platform.Tx) bool {
 			g.bloom.Add(tx)
 			return true
 		})
