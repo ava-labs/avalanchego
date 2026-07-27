@@ -315,39 +315,52 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	sut.testRPC(ctx, t, tests...)
+}
 
-	// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
-	// can't be used.
-	t.Run("debug_standardTraceBlockToFile", func(t *testing.T) {
-		var files []string
-		require.NoError(t, sut.CallContext(ctx, &files, "debug_standardTraceBlockToFile", depositBlock.Hash()), "CallContext(debug_standardTraceBlockToFile)")
-		require.Len(t, files, 1, "one trace file per transaction")
-		t.Cleanup(func() {
-			assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
-		})
+// TestDebugStandardTraceBlockToFile verifies the per-transaction
+// structured-log files, named with the canonical block hash.
+//
+// Trace-file names contain random suffixes so [SUT.testRPC]'s comparison
+// can't be used.
+func TestDebugStandardTraceBlockToFile(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
 
-		wantPrefix := fmt.Sprintf("block_%#x-%d-%#x-", depositBlock.Hash().Bytes()[:4], 0, depositTx.Hash().Bytes()[:4])
-		assert.Truef(t, strings.HasPrefix(filepath.Base(files[0]), wantPrefix), "file name %q returned by debug_standardTraceBlockToFile MUST have prefix %q", filepath.Base(files[0]), wantPrefix)
+	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.NUMBER))
+	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
 
-		trace, err := os.ReadFile(files[0])
-		require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
-		// The file should be a structured log file, each line is a separate
-		// JSON object describing an EVM opcode executed.
-		//
-		// `emit Deposit()` compiles to a LOG1 opcode at [logPC], so if it
-		// shows up there, and only there, the file really does trace the
-		// transaction's execution.
-		var log1PCs []uint64
-		dec := json.NewDecoder(bytes.NewReader(trace))
-		for dec.More() {
-			var step logger.StructLog
-			require.NoError(t, dec.Decode(&step), "decoding trace line")
-			if step.Op == vm.LOG1 {
-				log1PCs = append(log1PCs, step.Pc)
-			}
-		}
-		assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace of `emit Deposit()`", vm.LOG1)
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(params.GWei),
+		Data:      code,
 	})
+	b := sut.runConsensusLoop(t, tx)
+
+	var files []string
+	require.NoError(t, sut.CallContext(ctx, &files, "debug_standardTraceBlockToFile", b.Hash()), "CallContext(debug_standardTraceBlockToFile)")
+	require.Len(t, files, 1, "one trace file per transaction")
+	t.Cleanup(func() {
+		assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
+	})
+
+	wantPrefix := fmt.Sprintf("block_%#x-%d-%#x-", b.Hash().Bytes()[:4], 0, tx.Hash().Bytes()[:4])
+	assert.Truef(t, strings.HasPrefix(filepath.Base(files[0]), wantPrefix), "file name %q returned by debug_standardTraceBlockToFile MUST have prefix %q", filepath.Base(files[0]), wantPrefix)
+
+	trace, err := os.ReadFile(files[0])
+	require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
+	// The file should be a structured log file, each line is a separate JSON
+	// object describing an EVM opcode executed. The contract LOG1s at
+	// [logPC], so if that shows up there, and only there, the file really
+	// does trace the transaction's execution.
+	var log1PCs []uint64
+	dec := json.NewDecoder(bytes.NewReader(trace))
+	for dec.More() {
+		var step logger.StructLog
+		require.NoError(t, dec.Decode(&step), "decoding trace line")
+		if step.Op == vm.LOG1 {
+			log1PCs = append(log1PCs, step.Pc)
+		}
+	}
+	assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace", vm.LOG1)
 }
 
 // TestDebugTraceFeeSensitive pins the base fee used when the debug APIs
@@ -463,11 +476,9 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	}...)
 }
 
-// TestDebugTraceUnacceptedBlock builds and parses a block without verifying or
-// accepting it, then traces it, sequentially and concurrently. debug_traceBlock
-// only requires the block's parent to be canonical, so tracing MUST work even
-// though the block itself is unknown to the node, and MUST report the supplied
-// block's own hash to tracers.
+// TestDebugTraceUnacceptedBlock traces a block that was built but never
+// verified or accepted, sequentially and in parallel. Only the parent MUST be
+// canonical. The trace MUST succeed and report the supplied block's hash.
 func TestDebugTraceUnacceptedBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
