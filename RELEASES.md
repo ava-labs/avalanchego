@@ -77,6 +77,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 - `helicon-min-stake-duration` (only on local networks)
 - `min-price-target` for C-Chain
 - `proposerWindowMilliseconds` in subnet configs
+- `proposerMillisecondTimestamps` in subnet configs
 
 ### Deprecated in C-Chain
 

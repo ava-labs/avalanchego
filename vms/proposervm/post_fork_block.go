@@ -50,7 +50,7 @@ const (
 
 func (b *postForkBlock) updateLastAcceptedTimestampMetric(blockTypeLabel string, t time.Time) {
 	g := b.vm.lastAcceptedTimestampGaugeVec.WithLabelValues(blockTypeLabel)
-	g.Set(float64(t.Unix()))
+	g.Set(float64(t.UnixMilli()) / 1000)
 }
 
 func (b *postForkBlock) acceptOuterBlk() error {

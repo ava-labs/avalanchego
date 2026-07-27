@@ -38,6 +38,7 @@ go_test(
         "block_state_test.go",
         "chain_state_test.go",
         "state_test.go",
+        "timestamp_unit_test.go",
     ],
     embed = [":state"],
     deps = [
