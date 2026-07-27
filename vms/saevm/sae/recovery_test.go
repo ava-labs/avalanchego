@@ -30,15 +30,21 @@ import (
 )
 
 // TestRecoverAfterCrash recovers from a copy of a running VM's database,
-// taken without the clean shutdown.
+// taken without a clean shutdown.
 func TestRecoverAfterCrash(t *testing.T) {
 	t.Parallel()
+
+	const (
+		// blockTime is randomly selected to ensure multiple blocks are settled,
+		// but allows gaps between settlement to check ancestry edge cases.
+		blockTime      = 850 * time.Millisecond
+		commitInterval = 16
+	)
 
 	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	const commitInterval = 16
 	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
@@ -47,7 +53,7 @@ func TestRecoverAfterCrash(t *testing.T) {
 	// Build past the commit interval so the copied database holds both a
 	// committed trie root and later, uncommitted states.
 	for range commitInterval + 5 {
-		vmTime.Advance(850 * time.Millisecond)
+		vmTime.Advance(blockTime)
 		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas,
@@ -56,8 +62,8 @@ func TestRecoverAfterCrash(t *testing.T) {
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 	}
 
-	newDB := saetest.CopyDB(t, srcDB) // note: src is still running
-	_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	newDB := saetest.CopyDB(t, srcDB) // note: src is still running, but concurrent safe
+	sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = newDB
 		c.logLevel = logging.Warn
 	}))
@@ -65,9 +71,9 @@ func TestRecoverAfterCrash(t *testing.T) {
 	requireConsensusCriticalBlocks(t, src, sut)
 
 	t.Run("build_after_recovery", func(t *testing.T) {
-		vmTime.Advance(850 * time.Millisecond)
+		vmTime.Advance(blockTime)
 		b := sut.runConsensusLoop(t)
-		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		require.NoErrorf(t, b.WaitUntilExecuted(sutCtx), "%T.WaitUntilExecuted()", b)
 	})
 }
 
