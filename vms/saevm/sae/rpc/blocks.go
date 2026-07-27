@@ -47,6 +47,12 @@ func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.Bloc
 	return readByNumberAndHash(b, hash, number, (*blocks.Block).Body, rawdb.ReadBody)
 }
 
+// restoreExecutedParent is [backend.restoreExecutedBlock] for the canonical
+// parent of the given block.
+func (b *backend) restoreExecutedParent(ctx context.Context, child *types.Block) (*blocks.Block, error) {
+	return b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithHash(child.ParentHash(), true /* canonical */))
+}
+
 // restoreExecutedBlock finds any available canonical block by number or hash,
 // restoring it from the database if necessary, and waits for its execution. A
 // missing block is reported as [blocks.ErrNotFound].
