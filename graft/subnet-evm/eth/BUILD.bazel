@@ -22,6 +22,7 @@ go_library(
     deps = [
         "//graft/evm/core/state/pruner",
         "//graft/evm/firewood",
+        "//graft/evm/firewood/statehistory",
         "//graft/evm/rpc",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",

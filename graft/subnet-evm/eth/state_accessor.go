@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood/statehistory"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
@@ -193,6 +194,48 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 	return statedb, func() { tdb.Dereference(block.Root()) }, nil
 }
 
+// historicalStateOverlay returns a read-only StateDB serving state as of
+// header from the flat state history store, with ok=false when the store is
+// disabled, empty, or the height is above the latest captured block (the live
+// state DB serves those), and a loud error when the height predates the
+// captured history. Reads below the first captured block are never answered
+// best-effort.
+func (eth *Ethereum) historicalStateOverlay(header *types.Header) (*state.StateDB, bool, error) {
+	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return nil, false, nil
+	}
+	store := fwDB.HistoryStore()
+	if store == nil {
+		return nil, false, nil
+	}
+	target := header.Number.Uint64()
+	first, ok, err := store.FirstBlock()
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return nil, false, nil
+	}
+	if target < first {
+		return nil, false, fmt.Errorf("historical state for block %d unavailable: state history starts at block %d", target, first)
+	}
+	head, ok, err := store.Head()
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok || target > head {
+		// Tip (or ahead of the latest flush): let the live state DB serve it.
+		return nil, false, nil
+	}
+	overlay := statehistory.NewOverlay(store, eth.blockchain.StateCache(), target, header.Root)
+	sdb, err := state.New(header.Root, overlay, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	return sdb, true, nil
+}
+
 // This is compatible with both PathDB and FirewoodDB schemes.
 func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), error) {
 	// Check if the requested state is available in the live chain.
@@ -216,6 +259,14 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	// Fast path: state is available directly.
 	if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
 		return statedb, noopReleaser, nil
+	}
+
+	// Flat state-history overlay: serve historical heights from flat value
+	// rows (no re-execution) when the store is enabled and covers this height.
+	if sdb, ok, err := eth.historicalStateOverlay(header); err != nil {
+		return nil, nil, err
+	} else if ok {
+		return sdb, noopReleaser, nil
 	}
 
 	// Get the Firewood TrieDB.

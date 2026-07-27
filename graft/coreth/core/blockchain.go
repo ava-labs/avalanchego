@@ -200,6 +200,7 @@ type CacheConfig struct {
 	TransactionHistory              uint64  // Number of recent blocks for which to maintain transaction lookup indices
 	SkipTxIndexing                  bool    // Whether to skip transaction indexing
 	StateHistory                    uint64  // Number of blocks from head whose state histories are reserved.
+	StateHistoryEnabled             bool    // Whether to record flat state history rows for every block (Firewood only)
 	StateScheme                     string  // Scheme used to store ethereum states and merkle tree nodes on top
 
 	ChainDataDir    string // Directory to store chain data in (used by Firewood)
@@ -237,6 +238,7 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 			CacheStrategy:          ffi.CacheAllReads,
 			Archive:                !c.Pruning,
 			DeferredCommitInterval: c.CommitInterval,
+			EnableStateHistory:     c.StateHistoryEnabled,
 		}.BackendConstructor
 	}
 	return config

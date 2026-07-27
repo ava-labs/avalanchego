@@ -145,6 +145,10 @@ var (
 	errFirewoodSnapshotCacheDisabled              = errors.New("snapshot cache must be disabled for Firewood")
 	errFirewoodOfflinePruningUnsupported          = errors.New("offline pruning is not supported for Firewood")
 	errFirewoodMissingTrieRepopulationUnsupported = errors.New("missing trie repopulation is not supported for Firewood")
+	errStateHistoryRequiresFirewood               = errors.New("state history requires the Firewood state scheme")
+	errStateHistoryRequiresPruning                = errors.New("state history requires pruning: an archive (non-pruning) Firewood node already retains every revision")
+	errStateHistoryNoBaseline                     = errors.New("state history has no baseline")
+	errStateHistoryStateSyncUnsupported           = errors.New("state history is incompatible with state sync: it must capture every block from genesis")
 )
 
 var originalStderr *os.File
@@ -390,7 +394,21 @@ func (vm *VM) Initialize(
 	vm.ethConfig.TransactionHistory = vm.config.TransactionHistory
 	vm.ethConfig.SkipTxIndexing = vm.config.SkipTxIndexing
 	vm.ethConfig.StateScheme = vm.config.StateScheme
+	vm.ethConfig.StateHistoryEnabled = vm.config.StateHistoryEnabled
 
+	if vm.config.StateHistoryEnabled {
+		if vm.config.StateScheme != customrawdb.FirewoodScheme {
+			return errStateHistoryRequiresFirewood
+		}
+		if !vm.config.Pruning {
+			return errStateHistoryRequiresPruning
+		}
+		// State sync defaults to on for an empty chain, so a fresh state
+		// history node must set state-sync-enabled to false explicitly.
+		if vm.stateSyncEnabled(lastAcceptedHeight) {
+			return errStateHistoryStateSyncUnsupported
+		}
+	}
 	if vm.ethConfig.StateScheme == customrawdb.FirewoodScheme {
 		log.Warn("Firewood state scheme is enabled")
 		log.Warn("This is untested in production, use at your own risk")
@@ -456,6 +474,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
+		return err
+	}
+	if err := vm.verifyStateHistoryBaseline(lastAcceptedHeight); err != nil {
 		return err
 	}
 
@@ -574,6 +595,33 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 
 	vm.eth.Start()
 	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
+}
+
+// verifyStateHistoryBaseline refuses to start when state history is enabled
+// but the store cannot cover [genesis, lastAccepted]: an empty store on a
+// chain past genesis (e.g. enabled on a previously synced or state-synced
+// node), or a store head behind the last accepted block (e.g. state history
+// was disabled for a while). Without this check the first block flush would
+// fail the same way, but only when the next block arrives.
+func (vm *VM) verifyStateHistoryBaseline(lastAcceptedHeight uint64) error {
+	if !vm.config.StateHistoryEnabled {
+		return nil
+	}
+	tdb, ok := vm.blockChain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return errStateHistoryRequiresFirewood
+	}
+	head, ok, err := tdb.HistoryStore().Head()
+	if err != nil {
+		return fmt.Errorf("reading state history head: %w", err)
+	}
+	switch {
+	case !ok && lastAcceptedHeight > 0:
+		return fmt.Errorf("%w: chain is at height %d but the state history store is empty; resync from genesis with state history enabled", errStateHistoryNoBaseline, lastAcceptedHeight)
+	case ok && head < lastAcceptedHeight:
+		return fmt.Errorf("%w: state history head %d is behind the last accepted block %d; blocks were accepted while state history was disabled, resync from genesis with state history enabled", errStateHistoryNoBaseline, head, lastAcceptedHeight)
+	}
+	return nil
 }
 
 // initializeStateSync initializes the vm for performing state sync and responding to peer requests.
