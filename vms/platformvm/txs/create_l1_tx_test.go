@@ -517,7 +517,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			},
 		}
 		validVMID       = ids.GenerateTestID()
-		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
+		tooLongAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
 		validValidators = []*CreateL1Validator{
 			{
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
@@ -549,7 +549,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 					SyntacticallyVerified: true,
 				},
 				VMID:           ids.Empty,
-				ManagerAddress: invalidAddress,
+				ManagerAddress: tooLongAddress,
 				Validators:     nil,
 			},
 			expectedErr: nil,
@@ -568,7 +568,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
 				VMID:           validVMID,
-				ManagerAddress: invalidAddress,
+				ManagerAddress: tooLongAddress,
 				Validators:     validValidators,
 			},
 			expectedErr: ErrAddressTooLong,
@@ -789,7 +789,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "fails verification with empty manager chain ID",
+			name: "passes verification with empty manager chain ID",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
 				VMID:           validVMID,
@@ -797,7 +797,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				ManagerAddress: make([]byte, 20),
 				Validators:     validValidators,
 			},
-			expectedErr: errEmptyManagerChainID,
+			expectedErr: nil,
 		},
 	}
 

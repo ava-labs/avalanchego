@@ -18,7 +18,9 @@ import (
 
 var (
 	_ UnsignedTx = (*CreateL1Tx)(nil)
-
+	// SelfManagerChainID is a sentinel value for ManagerChainID that indicates that the L1
+	// validator manager lives on the same chain created by this tx. It is used because the chainID
+	// is not known until the tx is executed.
 	SelfManagerChainID = ids.ID{'m', 'a', 'n', 'a', 'g', 'e', 'r', ' ', 'o', 'n', ' ', 's', 'e', 'l', 'f'}
 )
 
@@ -33,8 +35,8 @@ type CreateL1Tx struct {
 	GenesisData []byte `serialize:"true" json:"genesisData"`
 
 	// Chain where the L1 validator manager lives.
-	// it can be sekfManagerChainID if the validator manager lives on the same chain created by this tx.
-	ManagerChainID ids.ID `serialize:"true" json:"chainID"`
+	// it can be SelfManagerChainID if the validator manager lives on the same chain created by this tx.
+	ManagerChainID ids.ID `serialize:"true" json:"managerChainID"`
 
 	// Address of the L1 validator manager
 	ManagerAddress types.JSONByteSlice `serialize:"true" json:"address"`
@@ -53,8 +55,6 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 		return errInvalidVMID
 	case len(tx.ManagerAddress) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
-	case tx.ManagerChainID == ids.Empty:
-		return errEmptyManagerChainID
 	case len(tx.Validators) == 0:
 		return ErrConvertMustIncludeValidators
 	case !utils.IsSortedAndUnique(tx.Validators):
