@@ -17,41 +17,19 @@ import (
 // TestStateSyncEnabled checks that various configs and states will correctly
 // initiate state sync or skip it, and WaitForEvent matches this behavior.
 func TestStateSyncEnabled(t *testing.T) {
-	enabled, disabled := true, false
 	tests := []struct {
 		name        string
-		enabled     *bool
-		initialized bool
+		enabled     bool
 		wantEnabled bool
 	}{
 		{
-			name:        "explicitly disabled is skipped",
-			enabled:     &disabled,
-			initialized: false,
+			name:        "disabled is skipped",
+			enabled:     false,
 			wantEnabled: false,
 		},
 		{
-			name:        "unset is skipped once a block was processed",
-			enabled:     nil,
-			initialized: true,
-			wantEnabled: false,
-		},
-		{
-			name:        "unset starts sync on a fresh database",
-			enabled:     nil,
-			initialized: false,
-			wantEnabled: true,
-		},
-		{
-			name:        "explicitly enabled starts sync",
-			enabled:     &enabled,
-			initialized: false,
-			wantEnabled: true,
-		},
-		{
-			name:        "explicitly enabled starts sync even after a block was processed",
-			enabled:     &enabled,
-			initialized: true,
+			name:        "enabled starts sync",
+			enabled:     true,
 			wantEnabled: true,
 		},
 	}
@@ -59,15 +37,10 @@ func TestStateSyncEnabled(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			opts := []sutOption{
+			sut := newSUT(t,
 				withEnabled(tt.enabled),
-			}
-			if tt.initialized {
-				opts = append(opts, withNumBlocks(1))
-			} else {
-				opts = append(opts, withoutInitialization())
-			}
-			sut := newSUT(t, opts...)
+				withNumBlocks(1), // initialization doesn't change result
+			)
 
 			gotEnabled, err := sut.StateSyncEnabled(t.Context())
 			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
@@ -77,11 +50,12 @@ func TestStateSyncEnabled(t *testing.T) {
 }
 
 func TestAcceptSummary(t *testing.T) {
-	const numBlocks = 5
+	const numBlocks = defaultCommitInterval
 
 	tests := []struct {
 		name          string
 		summaryHeight uint64
+		opts          []sutOption
 		want          block.StateSyncMode
 	}{
 		{
@@ -92,6 +66,18 @@ func TestAcceptSummary(t *testing.T) {
 		{
 			name:          "non-genesis summary starts sync",
 			summaryHeight: numBlocks,
+			opts:          []sutOption{withoutInitialization()},
+			want:          block.StateSyncStatic,
+		},
+		{
+			name:          "sync skipped if multiple blocks accepted",
+			summaryHeight: numBlocks,
+			opts:          []sutOption{withNumBlocks(1)},
+			want:          block.StateSyncSkipped,
+		},
+		{
+			name:          "sync started if only genesis is accepted",
+			summaryHeight: numBlocks,
 			want:          block.StateSyncStatic,
 		},
 	}
@@ -99,9 +85,11 @@ func TestAcceptSummary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sut := newSUT(t, withNumBlocks(numBlocks))
-			b := sut.blocks[tt.summaryHeight]
-			s := NewSummary(b.Hash(), b.Height())
+			src := newSUT(t, withNumBlocks(numBlocks))
+			s, err := src.GetStateSummary(t.Context(), tt.summaryHeight)
+			require.NoErrorf(t, err, "%T.GetStateSummary(%d)", src.SummaryHandler, tt.summaryHeight)
+
+			sut := newSUT(t, append(tt.opts, withEnabled(true))...)
 
 			mode, err := sut.AcceptSummary(t.Context(), s)
 			require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)

@@ -14,18 +14,7 @@ import (
 
 // StateSyncEnabled checks whether the node should query for state summaries.
 func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
-	enabled := h.cfg.Enabled
-	if enabled != nil {
-		return *enabled, nil
-	}
-
-	// If any blocks have been accepted, don't state sync.
-	hash, ok := h.lastAcceptedHash()
-	if !ok {
-		return true, nil
-	}
-	height := rawdb.ReadHeaderNumber(h.db, hash)
-	return height == nil || *height == 0, nil
+	return h.cfg.Enabled, nil
 }
 
 // AcceptSummary performs the entire state sync given the provided summary. If
@@ -37,6 +26,14 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.S
 	if s.height == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
 		return block.StateSyncSkipped, nil
+	}
+
+	// If any blocks have been accepted, don't state sync.
+	hash, ok := h.lastAcceptedHash()
+	if ok {
+		if height := rawdb.ReadHeaderNumber(h.db, hash); height != nil && *height > 0 {
+			return block.StateSyncSkipped, nil
+		}
 	}
 
 	go func() {

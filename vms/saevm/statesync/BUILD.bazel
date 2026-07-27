@@ -47,7 +47,6 @@ go_test(
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/snowtest",
-        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/set",

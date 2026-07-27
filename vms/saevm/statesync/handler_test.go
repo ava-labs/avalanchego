@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -48,7 +47,7 @@ type (
 		blocks  []*blocks.Block
 	}
 	sutConfig struct {
-		enabled        *bool
+		enabled        bool
 		numBlocks      uint64
 		commitInterval uint64
 		initializeVM   bool
@@ -68,7 +67,7 @@ func withoutInitialization() sutOption {
 	})
 }
 
-func withEnabled(e *bool) sutOption {
+func withEnabled(e bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.enabled = e
 	})
@@ -83,7 +82,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		enabled:        utils.PointerTo(true),
+		enabled:        true,
 		commitInterval: defaultCommitInterval,
 		initializeVM:   true,
 	}, opts...)

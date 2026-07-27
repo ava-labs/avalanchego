@@ -24,7 +24,7 @@ import (
 // Config provides all user-configurable information for the [SummaryHandler].
 type Config struct {
 	CommitInterval uint64
-	Enabled        *bool // nil means state sync is enabled only if no blocks have been accepted yet
+	Enabled        bool
 }
 
 var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
