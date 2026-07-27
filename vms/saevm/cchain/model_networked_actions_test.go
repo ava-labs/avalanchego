@@ -485,6 +485,12 @@ func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 	if !n.delayed || nm.inMinority(idx) {
 		return
 	}
+	// hadProgress records whether the loop below will run at all. When it
+	// does and the in-loop resolution arm is intact, the arm fires on the
+	// loop's first iteration (see comment below) and nils the fork before
+	// the loop exits — so the sweep below can only legally observe a
+	// surviving fork when hadProgress is false.
+	hadProgress := n.acceptedCount < len(nm.canonical)
 	for n.acceptedCount < len(nm.canonical) {
 		nm.deliverBlock(rt, n, nm.canonical[n.acceptedCount])
 		// Fork resolution: the canonical block just accepted (deliverBlock
@@ -508,7 +514,14 @@ func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 	// ever arrive at the fork root's height for THIS catch-up — n abandons
 	// its fork here instead. RejectBlock is a near no-op in SAE; leaving the
 	// blocks processing would strand them.
+	//
+	// This sweep must only ever fire for that no-progress case: if
+	// hadProgress is true, the in-loop arm above should have already nilled
+	// the fork on its first iteration. A fork surviving here despite
+	// hadProgress means the in-loop arm is broken, not that this sweep is
+	// doing legitimate work — assert on it rather than silently masking it.
 	if len(n.fork) > 0 {
+		require.Falsef(rt, hadProgress, "fork survived the delivery loop despite a canonical sibling at the fork root's height")
 		for _, db := range n.fork {
 			require.NoErrorf(rt, n.sut.RejectBlock(n.ctx, db.blk), "%T.RejectBlock(doomed block at height %d, no-sibling catch-up) on node %d", n.sut.VM, db.height, n.idx)
 		}
@@ -915,14 +928,6 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 		return
 	}
 
-	// A processing (verified-but-unaccepted) doomed fork is memory-only: a
-	// real node loses it on restart and it simply never gets rejected. Drop
-	// the records — the handles are bound to the VM instance Shutdown below
-	// destroys — and let the existing machinery converge the node; the
-	// fork's txs live on in pools regardless (pool eviction happens only at
-	// execution), like any other pending txs.
-	n.fork = nil
-
 	// Another live (non-delayed) validator must exist: it anchors the
 	// pending txs while n's pool is dropped, serves pull-gossip recovery,
 	// and receives any re-pinned accounts. Without one, skip.
@@ -986,6 +991,14 @@ func (nm *networkedMachine) restartNode(rt *rapid.T) {
 			o.sut.Sender().Drain()
 		}
 	}
+	// A processing (verified-but-unaccepted) doomed fork is memory-only: a
+	// real node loses it on restart and it simply never gets rejected. Drop
+	// the records — the handles are bound to the VM instance Shutdown below
+	// destroys — and let the existing machinery converge the node; the
+	// fork's txs live on in pools regardless (pool eviction happens only at
+	// execution), like any other pending txs.
+	n.fork = nil
+
 	require.NoErrorf(rt, n.sut.Shutdown(n.ctx), "%T.Shutdown() on node %d", n.sut.VM, idx)
 
 	if n.storage.kv == kvLevelDB {
