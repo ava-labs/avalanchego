@@ -1141,6 +1141,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Router:                                  n.chainRouter,
 			Net:                                     n.Net,
 			Validators:                              n.vdrs,
+			PChainFollowOnly:                        n.Config.PChainFollowOnly,
 			PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
 			NodeID:                                  n.ID,
 			NetworkID:                               n.Config.NetworkID,

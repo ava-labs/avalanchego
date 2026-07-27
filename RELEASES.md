@@ -78,6 +78,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 - `min-price-target` for C-Chain
 - `proposerWindowMilliseconds` in subnet configs
 - `proposerMillisecondTimestamps` in subnet configs
+- `--p-chain-follow-only`
 
 ### Deprecated in C-Chain
 
