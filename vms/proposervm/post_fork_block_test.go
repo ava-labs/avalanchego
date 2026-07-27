@@ -1052,7 +1052,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	// Build the child
 	statelessChild, err := block.Build(
 		postForkOracleBlk.ID(),
-		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
+		postForkOracleBlk.Timestamp().Add(proposer.DefaultWindowDuration),
 		postForkOracleBlk.PChainHeight(),
 		block.Epoch{},
 		proVM.StakingCertLeaf,
