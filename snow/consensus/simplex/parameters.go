@@ -17,6 +17,10 @@ var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 // [Parameters.MaxNetworkDelay] and [Parameters.MaxRebroadcastWait]. The engine
 // ticks at a tenth of the smaller of the two values, so this bound keeps the
 // tick interval from being set too fast.
+//
+// NOTE: the "tenth" divisor lives in getTickInterval (simplex/engine.go). If
+// that divisor ever changes, update this bound to keep the effective minimum
+// tick interval unchanged.
 const MinWaitDuration = 500 * time.Millisecond
 
 type ValidatorInfo struct {
