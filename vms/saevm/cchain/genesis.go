@@ -146,6 +146,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
+	case utils.BigEqual(chainID, corethparams.TestUpgradechainChainID):
+		return int64(corethparams.TestUpgradechainBerlinBlock)
 	default:
 		return 0
 	}
@@ -157,6 +159,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
+	case utils.BigEqual(chainID, corethparams.TestUpgradechainChainID):
+		return int64(corethparams.TestUpgradechainLondonBlock)
 	default:
 		return 0
 	}
