@@ -238,7 +238,7 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		hdr.BaseFee = saexec.BlockGasClock(parent, a.b.Hooks(), hdr).BaseFee().ToBig()
 		block = block.WithSeal(hdr)
 	}
-	return tracers.TraceFullBlock(ctx, a.API, block, config)
+	return tracers.TraceBlock(ctx, a.API, block, config)
 }
 
 // TraceBlockFromFile shadows [tracers.API.TraceBlockFromFile], which would
