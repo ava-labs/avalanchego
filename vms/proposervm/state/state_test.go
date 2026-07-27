@@ -18,7 +18,7 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s := New(vdb, false)
+	s := New(vdb, nil, false, nil)
 
 	testBlockState(a, s)
 	testChainState(a, s)
@@ -29,7 +29,7 @@ func TestMeteredState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := NewMetered(vdb, "", prometheus.NewRegistry(), false)
+	s, err := NewMetered(vdb, "", prometheus.NewRegistry(), nil, false, nil)
 	a.NoError(err)
 
 	testBlockState(a, s)

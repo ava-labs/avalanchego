@@ -25,6 +25,7 @@ var (
 	_ block.SetPreferenceWithContextChainVM = (*blockVM)(nil)
 	_ block.BatchedChainVM                  = (*blockVM)(nil)
 	_ block.StateSyncableVM                 = (*blockVM)(nil)
+	_ block.RetainsAcceptedBlocksVM         = (*blockVM)(nil)
 )
 
 type blockVM struct {
@@ -124,6 +125,13 @@ func (vm *blockVM) Initialize(
 		fxs,
 		appSender,
 	)
+}
+
+// RetainsAcceptedBlocks forwards the wrapped VM's capability so it remains
+// visible through the tracing wrapper.
+func (vm *blockVM) RetainsAcceptedBlocks() bool {
+	r, ok := vm.ChainVM.(block.RetainsAcceptedBlocksVM)
+	return ok && r.RetainsAcceptedBlocks()
 }
 
 func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {

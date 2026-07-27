@@ -579,8 +579,11 @@ type InitializeResponse struct {
 	Height               uint64                 `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
 	Bytes                []byte                 `protobuf:"bytes,4,opt,name=bytes,proto3" json:"bytes,omitempty"`
 	Timestamp            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// retains_accepted_blocks is true if the VM durably retains the bytes of
+	// every accepted block, retrievable via GetBlock, forever.
+	RetainsAcceptedBlocks bool `protobuf:"varint,6,opt,name=retains_accepted_blocks,json=retainsAcceptedBlocks,proto3" json:"retains_accepted_blocks,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -646,6 +649,13 @@ func (x *InitializeResponse) GetTimestamp() *timestamppb.Timestamp {
 		return x.Timestamp
 	}
 	return nil
+}
+
+func (x *InitializeResponse) GetRetainsAcceptedBlocks() bool {
+	if x != nil {
+		return x.RetainsAcceptedBlocks
+	}
+	return false
 }
 
 type SetStateRequest struct {
@@ -2915,13 +2925,14 @@ const file_vm_vm_proto_rawDesc = "" +
 	"\ffortuna_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vfortunaTime\x12=\n" +
 	"\fgranite_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\vgraniteTime\x12O\n" +
 	"\x16granite_epoch_duration\x18\x11 \x01(\v2\x19.google.protobuf.DurationR\x14graniteEpochDuration\x12=\n" +
-	"\fhelicon_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vheliconTime\"\xdd\x01\n" +
+	"\fhelicon_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vheliconTime\"\x95\x02\n" +
 	"\x12InitializeResponse\x12(\n" +
 	"\x10last_accepted_id\x18\x01 \x01(\fR\x0elastAcceptedId\x125\n" +
 	"\x17last_accepted_parent_id\x18\x02 \x01(\fR\x14lastAcceptedParentId\x12\x16\n" +
 	"\x06height\x18\x03 \x01(\x04R\x06height\x12\x14\n" +
 	"\x05bytes\x18\x04 \x01(\fR\x05bytes\x128\n" +
-	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"2\n" +
+	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x126\n" +
+	"\x17retains_accepted_blocks\x18\x06 \x01(\bR\x15retainsAcceptedBlocks\"2\n" +
 	"\x0fSetStateRequest\x12\x1f\n" +
 	"\x05state\x18\x01 \x01(\x0e2\t.vm.StateR\x05state\"\xdb\x01\n" +
 	"\x10SetStateResponse\x12(\n" +
