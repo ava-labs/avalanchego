@@ -581,7 +581,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				Validators:     nil,
 				ManagerChainID: ids.GenerateTestID(),
 			},
-			expectedErr: ErrConvertMustIncludeValidators,
+			expectedErr: ErrCreateL1MustIncludeValidators,
 		},
 		{
 			name: "validators not sorted",
@@ -606,7 +606,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				},
 				ManagerChainID: ids.GenerateTestID(),
 			},
-			expectedErr: ErrConvertValidatorsNotSortedAndUnique,
+			expectedErr: ErrCreateL1ValidatorsNotSortedAndUnique,
 		},
 		{
 			name: "duplicate validators",
@@ -631,7 +631,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				},
 				ManagerChainID: ids.GenerateTestID(),
 			},
-			expectedErr: ErrConvertValidatorsNotSortedAndUnique,
+			expectedErr: ErrCreateL1ValidatorsNotSortedAndUnique,
 		},
 		{
 			name: "genesis too long",

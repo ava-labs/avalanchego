@@ -5,6 +5,7 @@ package txs
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -22,6 +23,9 @@ var (
 	// validator manager lives on the same chain created by this tx. It is used because the chainID
 	// is not known until the tx is executed.
 	SelfManagerChainID = ids.ID{'m', 'a', 'n', 'a', 'g', 'e', 'r', ' ', 'o', 'n', ' ', 's', 'e', 'l', 'f'}
+
+	ErrCreateL1MustIncludeValidators        = errors.New("create l1 tx must include at least one validator")
+	ErrCreateL1ValidatorsNotSortedAndUnique = errors.New("create l1 validators must be sorted and unique")
 )
 
 type CreateL1Tx struct {
@@ -56,9 +60,9 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 	case len(tx.ManagerAddress) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
 	case len(tx.Validators) == 0:
-		return ErrConvertMustIncludeValidators
+		return ErrCreateL1MustIncludeValidators
 	case !utils.IsSortedAndUnique(tx.Validators):
-		return ErrConvertValidatorsNotSortedAndUnique
+		return ErrCreateL1ValidatorsNotSortedAndUnique
 	case len(tx.GenesisData) > MaxGenesisLen:
 		return errGenesisTooLong
 	}
