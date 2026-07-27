@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("sssssssssssss&ysssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssxss\"ssssssssss8ssssssssy,ssssss9ssssssssssssssssssssssssssssssssss)sssssssssszsssssssssssssssssssssssssssssssssssssssssss0sssssssssZsssss!ss%ssAsssss!sssssXscs0s0sssssss")

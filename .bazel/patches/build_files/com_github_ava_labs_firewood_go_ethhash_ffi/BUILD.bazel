@@ -39,6 +39,7 @@ go_library(
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_model//go",
         "@com_github_prometheus_common//expfmt",
+        "@org_golang_google_protobuf//proto",
     ],
 )
 

@@ -29,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -61,10 +63,10 @@ const (
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
 	// Default base grafana URI.
-	DefaultBaseGrafanaURI = "https://grafana-poc.avax-dev.network/"
+	DefaultBaseGrafanaURI = "https://avalabs.grafana.net/"
 
 	// Default grafana URI used to construct metrics links. Can be overridden by setting GRAFANA_URI env var.
-	defaultGrafanaURI = DefaultBaseGrafanaURI + "d/kBQpRdWnk/avalanche-main-dashboard"
+	defaultGrafanaURI = DefaultBaseGrafanaURI + "d/mabpvtq/avalanche-main-dashboard"
 )
 
 var (
@@ -366,6 +368,43 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 	keysToFund = append(keysToFund, n.PreFundedKeys...)
 
 	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+}
+
+// UpgradeConfig configures the latest upgrade:
+//   - activateLatestAfter < 0: leave latest unscheduled
+//   - activateLatestAfter == 0: activate latest from genesis
+//   - activateLatestAfter > 0: schedule latest that duration after starting
+func UpgradeConfig(activateLatestAfter time.Duration) upgrade.Config {
+	const previous = upgradetest.Latest - 1
+	var upgrades upgrade.Config
+	switch {
+	case activateLatestAfter < 0:
+		upgrades = upgradetest.GetConfig(previous)
+	case activateLatestAfter == 0:
+		upgrades = upgradetest.GetConfig(upgradetest.Latest)
+	default:
+		upgrades = upgradetest.GetConfigWithUpgradeTime(
+			upgradetest.Latest,
+			time.Now().Add(activateLatestAfter),
+		)
+		upgradetest.SetTimesTo(&upgrades, previous, upgrade.InitiallyActiveTime)
+	}
+	upgrades.GraniteEpochDuration = 4 * time.Second
+	return upgrades
+}
+
+// UpgradeFlags returns flags applying the provided upgrade schedule
+// and a min stake duration compatible with testing staking logic.
+func UpgradeFlags(upgrades upgrade.Config) (FlagsMap, error) {
+	upgradeJSON, err := json.Marshal(upgrades)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to marshal upgrade config: %w", err)
+	}
+	return FlagsMap{
+		config.UpgradeFileContentKey:      base64.StdEncoding.EncodeToString(upgradeJSON),
+		config.MinStakeDurationKey:        DefaultMinStakeDuration,
+		config.HeliconMinStakeDurationKey: DefaultHeliconMinStakeDuration,
+	}, nil
 }
 
 // Starts the specified nodes

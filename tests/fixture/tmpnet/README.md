@@ -131,11 +131,10 @@ extend a cli tool like `tmpnetctl` to support similar capabilities.
 ### Simplifying usage with direnv
 [Top](#table-of-contents)
 
-The repo includes a [.envrc](../../../.envrc) that can be applied by
-[direnv](https://direnv.net/) when in a shell. This will enable
-`tmpnetctl` to be invoked directly (without a `./bin/` prefix ) and
-without having to specify the `--avalanchego-path` or `--plugin-dir`
-flags.
+For repo-level `direnv` setup and behavior, see [CONTRIBUTING.md](../../../CONTRIBUTING.md#direnv).
+In this workflow, the repo's [`.envrc`](../../../.envrc) makes
+`tmpnetctl` available without a `./bin/` prefix and avoids having to
+specify the `--avalanchego-path` or `--plugin-dir` flags.
 
 ### Via code
 [Top](#table-of-contents)
@@ -496,7 +495,7 @@ Example usage:
 [Top](#table-of-contents)
 
 When a network is started with tmpnet, a link to the [default grafana
-instance](https://grafana-poc.avax-dev.network) will be
+instance](https://avalabs.grafana.net) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.

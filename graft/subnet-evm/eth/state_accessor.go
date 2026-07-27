@@ -33,10 +33,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -203,6 +206,191 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 	return nil, nil, errors.New("historical state not available in path scheme yet")
 }
 
+// firewoodState returns the state at the requested block (`header`), using the
+// live trie if it has the state and otherwise falling back to a reconstructed
+// view via firewoodReconstructedState.
+func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, reexec uint64) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	// Fast path: state is available directly.
+	if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
+		return statedb, noopReleaser, nil
+	}
+	return eth.firewoodReconstructedState(ctx, header, reexec)
+}
+
+// firewoodReconstructedState reconstructs the state at the requested block
+// (`header`) by walking back to a persisted revision or genesis, then
+// re-executing blocks forward. Unlike firewoodState, it always builds a fresh,
+// non-persistent reconstructed view rather than using the live trie.
+//
+// The walk-back is bounded by `reexec`. If no persisted revision or genesis is
+// found within `reexec` blocks of the requested block, this returns an error.
+func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *types.Header, reexec uint64) (_ *state.StateDB, _ tracers.StateReleaseFunc, finalErr error) {
+	// Get the Firewood TrieDB.
+	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return nil, nil, errors.New("expected Firewood backend for historical state reconstruction")
+	}
+
+	var (
+		current        = header
+		reachedGenesis = false
+	)
+
+	for i := uint64(0); i < reexec; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		if eth.blockchain.HasState(current.Root) {
+			break
+		}
+		if current.Number.Uint64() == 0 {
+			reachedGenesis = true
+			break
+		}
+		parent := eth.blockchain.GetHeader(current.ParentHash, current.Number.Uint64()-1)
+		if parent == nil {
+			return nil, nil, fmt.Errorf("missing block %v %d", current.ParentHash, current.Number.Uint64()-1)
+		}
+		current = parent
+	}
+
+	var (
+		release tracers.StateReleaseFunc
+		recon   *ffi.Reconstructed
+	)
+
+	// Establish the base reconstructed view and the starting point for replay.
+	if reachedGenesis {
+		// Genesis state is not in Firewood; rebuild it from the genesis spec.
+		genesisRecon, err := eth.reconstructGenesis(fwDB)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Use the canonical genesis root and header as the starting point for
+		// optional re-execution.
+		genesisBlock := eth.blockchain.GetBlockByNumber(0)
+		if genesisBlock == nil {
+			if dropErr := genesisRecon.Drop(); dropErr != nil {
+				log.Warn("Failed to drop reconstructed view", "err", dropErr)
+			}
+			return nil, nil, errors.New("genesis block not found")
+		}
+		recon = genesisRecon
+		current = genesisBlock.Header()
+	} else {
+		if !eth.blockchain.HasState(current.Root) {
+			return nil, nil, fmt.Errorf("no persisted state found within %d blocks", reexec)
+		}
+
+		// Create the initial reconstructed revision from the base revision.
+		var err error
+		recon, err = reconstructRevision(fwDB, current.Root)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	release = func() { recon.Drop() }
+
+	defer func() {
+		if finalErr != nil {
+			release()
+		}
+	}()
+
+	// Re-execute blocks forward from current+1 to the target block, if any.
+	if current.Number.Uint64() < header.Number.Uint64() {
+		// Build a replay-mode state database backed by the reconstructed view. The
+		// reconstructed revision is mutated in place across blocks, so a single database
+		// remains valid for the whole replay. Root hashing is deferred until after replay,
+		// when the target root is validated once against the requested header.
+		replayTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, false /* computeRootOnHash */)
+		cache, err := state.New(current.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, replayTrieDB), nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for current.Number.Uint64() < header.Number.Uint64() {
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
+
+			next := current.Number.Uint64() + 1
+			nextBlock := eth.blockchain.GetBlockByNumber(next)
+			if nextBlock == nil {
+				return nil, nil, fmt.Errorf("block %d not found", next)
+			}
+
+			_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
+			if err != nil {
+				return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
+			}
+
+			// Flush the block's writes into the reconstructed view. The returned root
+			// is ignored; the final root is computed from recon once after replay.
+			cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
+			current = nextBlock.Header()
+		}
+	}
+
+	// Root computation was deferred during replay; compute it once now and
+	// validate it against the requested header.
+	if replayRoot := common.Hash(recon.Root()); replayRoot != header.Root {
+		return nil, nil, fmt.Errorf(
+			"state root mismatch at block %d: got %s, want %s",
+			header.Number.Uint64(),
+			replayRoot.Hex(),
+			header.Root.Hex(),
+		)
+	}
+
+	returnTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
+	cache, err := state.New(header.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, returnTrieDB), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cache, release, nil
+}
+
+// reconstructRevision opens the Firewood revision at root and returns a
+// reconstructed view seeded from it.
+func reconstructRevision(fwDB *firewood.TrieDB, root common.Hash) (*ffi.Reconstructed, error) {
+	rev, err := fwDB.Firewood.Revision(ffi.Hash(root))
+	if err != nil {
+		return nil, fmt.Errorf("opening revision at %s: %w", root.Hex(), err)
+	}
+	recon, err := rev.Reconstruct(nil)
+	if dropErr := rev.Drop(); dropErr != nil {
+		log.Warn("Failed to drop revision", "root", root.Hex(), "err", dropErr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reconstructing revision at %s: %w", root.Hex(), err)
+	}
+	return recon, nil
+}
+
+// reconstructGenesis builds a Firewood reconstructed revision populated with
+// the committed genesis state.
+func (eth *Ethereum) reconstructGenesis(fwDB *firewood.TrieDB) (*ffi.Reconstructed, error) {
+	recon, err := reconstructRevision(fwDB, types.EmptyRootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// Commit the genesis allocation into the reconstructed view. Root hashing is enabled
+	// so the commit produces the canonical genesis root. The in-memory database is a throwaway;
+	// the reconstructed trie serves all reads and writes.
+	genesisTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
+	if _, err := eth.config.Genesis.Commit(rawdb.NewMemoryDatabase(), genesisTrieDB); err != nil {
+		if dropErr := recon.Drop(); dropErr != nil {
+			log.Warn("Failed to drop reconstructed view", "err", dropErr)
+		}
+		return nil, err
+	}
+	return recon, nil
+}
+
 // stateAtBlock retrieves the state database associated with a certain block.
 // If no state is locally available for the given block, a number of blocks
 // are attempted to be reexecuted to generate the desired state. The optional
@@ -224,15 +412,22 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 //     Otherwise, the trash generated by caller may be persisted permanently.
 //   - preferDisk: This arg can be used by the caller to signal that even though the 'base' is
 //     provided, it would be preferable to start from a fresh state, if we have it
-//     on disk.
+//     on disk. For the Firewood scheme this is meaningful even when 'base' is nil: it
+//     causes the state to be served from a freshly reconstructed, non-persistent revision
+//     rather than the live trie, so callers that re-execute on top (e.g.
+//     debug_intermediateRoots) get a mutable view.
 func (eth *Ethereum) stateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
-	isFirewood := eth.blockchain.CacheConfig().StateScheme == customrawdb.FirewoodScheme
-
-	// Use `hashState` if the state can be recomputed from the live database.
-	if eth.blockchain.TrieDB().Scheme() == rawdb.HashScheme && !isFirewood {
+	switch eth.blockchain.CacheConfig().StateScheme {
+	case customrawdb.FirewoodScheme:
+		if preferDisk {
+			return eth.firewoodReconstructedState(ctx, block.Header(), reexec)
+		}
+		return eth.firewoodState(ctx, block.Header(), reexec)
+	case rawdb.PathScheme:
+		return eth.pathState(block)
+	default:
 		return eth.hashState(ctx, block, reexec, base, readOnly, preferDisk)
 	}
-	return eth.pathState(block)
 }
 
 // stateAtTransaction returns the execution environment of a certain transaction.

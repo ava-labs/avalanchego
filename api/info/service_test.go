@@ -8,31 +8,33 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 var errTest = errors.New("non-nil error")
 
+type testFactory struct{}
+
+func (testFactory) New(logging.Logger) (interface{}, error) { return nil, nil }
+
 type getVMsTest struct {
-	info          *Info
-	mockVMManager *vmsmock.Manager
+	info      *Info
+	vmManager *vms.Manager
 }
 
-func initGetVMsTest(t *testing.T) *getVMsTest {
-	ctrl := gomock.NewController(t)
-	mockVMManager := vmsmock.NewManager(ctrl)
+func initGetVMsTest(*testing.T) *getVMsTest {
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
 	return &getVMsTest{
 		info: &Info{
 			Parameters: Parameters{
-				VMManager: mockVMManager,
+				VMManager: vmManager,
 			},
 			log: logging.NoLog{},
 		},
-		mockVMManager: mockVMManager,
+		vmManager: vmManager,
 	}
 }
 
@@ -45,34 +47,33 @@ func TestGetVMsSuccess(t *testing.T) {
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
 
-	vmIDs := []ids.ID{id1, id2}
-	// every vm is at least aliased to itself.
-	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
-	alias2 := []string{id2.String(), "vm2-alias-1", "vm2-alias-2"}
+	// Register factories and aliases
+	require.NoError(resources.vmManager.RegisterFactory(t.Context(), id1, testFactory{}))
+	require.NoError(resources.vmManager.Alias(id1, "vm1-alias-1"))
+	require.NoError(resources.vmManager.Alias(id1, "vm1-alias-2"))
+	require.NoError(resources.vmManager.RegisterFactory(t.Context(), id2, testFactory{}))
+	require.NoError(resources.vmManager.Alias(id2, "vm2-alias-1"))
+	require.NoError(resources.vmManager.Alias(id2, "vm2-alias-2"))
+
 	// we expect that we dedup the redundant alias of vmId.
 	expectedVMRegistry := map[ids.ID][]string{
-		id1: alias1[1:],
-		id2: alias2[1:],
+		id1: {"vm1-alias-1", "vm1-alias-2"},
+		id2: {"vm2-alias-1", "vm2-alias-2"},
 	}
-
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	reply := GetVMsReply{}
 	require.NoError(resources.info.GetVMs(nil, nil, &reply))
 	require.Equal(expectedVMRegistry, reply.VMs)
 }
 
-// Tests GetVMs if we fail to list our vms.
-func TestGetVMsVMsListFactoriesFails(t *testing.T) {
-	resources := initGetVMsTest(t)
+// failingAliaser wraps an Aliaser and returns an error from Aliases.
+type failingAliaser struct {
+	ids.Aliaser
+	err error
+}
 
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
-
-	reply := GetVMsReply{}
-	err := resources.info.GetVMs(nil, nil, &reply)
-	require.ErrorIs(t, err, errTest)
+func (f *failingAliaser) Aliases(ids.ID) ([]string, error) {
+	return nil, f.err
 }
 
 // Tests GetVMs if we can't get our vm aliases.
@@ -81,12 +82,15 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
-	vmIDs := []ids.ID{id1, id2}
-	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
+	require.NoError(t, resources.vmManager.RegisterFactory(t.Context(), id1, testFactory{}))
+	require.NoError(t, resources.vmManager.RegisterFactory(t.Context(), id2, testFactory{}))
+
+	// Inject a failing aliaser so Aliases returns an error
+	resources.vmManager.Aliaser = &failingAliaser{
+		Aliaser: resources.vmManager.Aliaser,
+		err:     errTest,
+	}
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)

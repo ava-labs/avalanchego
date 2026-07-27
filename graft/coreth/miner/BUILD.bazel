@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "miner",
     srcs = [
@@ -9,13 +14,13 @@ go_library(
         "worker.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/miner",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/params",
+        "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/plugin/evm/upgrade/cortina",

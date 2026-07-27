@@ -16,15 +16,20 @@ var _ snowman.Block = (*memoryBlock)(nil)
 type memoryBlock struct {
 	snowman.Block
 
-	tree    ancestor.Tree
-	metrics *metrics
+	tree     ancestor.Tree
+	metrics  *metrics
+	onAccept func()
 }
 
 // Accept accepts the underlying block & removes sibling subtrees
 func (mb *memoryBlock) Accept(ctx context.Context) error {
 	mb.tree.RemoveDescendants(mb.Parent())
 	mb.metrics.numNonVerifieds.Set(float64(mb.tree.Len()))
-	return mb.Block.Accept(ctx)
+	if err := mb.Block.Accept(ctx); err != nil {
+		return err
+	}
+	mb.onAccept()
+	return nil
 }
 
 // Reject rejects the underlying block & removes child subtrees

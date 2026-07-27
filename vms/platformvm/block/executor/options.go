@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -36,6 +37,7 @@ type options struct {
 	// inputs populated before calling this struct's methods:
 	log                     logging.Logger
 	primaryUptimePercentage float64
+	upgradeConfig           upgrade.Config
 	uptimes                 uptime.Calculator
 	state                   state.Chain
 
@@ -141,12 +143,12 @@ func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
 }
 
 func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
-	unsignedTx, ok := tx.Unsigned.(*txs.RewardValidatorTx)
+	unsignedTx, ok := tx.Unsigned.(txs.RewardTx)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}
 
-	stakerTx, _, err := o.state.GetTx(unsignedTx.TxID)
+	stakerTx, _, err := o.state.GetTx(unsignedTx.StakerTxID())
 	if err != nil {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}
@@ -173,6 +175,10 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	} else if o.upgradeConfig.IsHeliconActivated(primaryNetworkValidator.StartTime) {
+		// ACP-267 requires 90% uptime for Primary Network validators that start at
+		// or after Helicon activation.
+		expectedUptimePercentage = .9
 	}
 
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(

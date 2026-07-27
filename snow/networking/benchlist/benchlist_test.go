@@ -180,7 +180,7 @@ func TestBenchlistSkipsBenchingWhenMaxPortionExceeded(t *testing.T) {
 
 	select {
 	case <-benchable.updated:
-		require.FailNow("unexpected bench/unbench callback")
+		t.Fatal("unexpected bench/unbench callback")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -476,7 +476,7 @@ func TestBenchlistEvictionRefusedWhenNoBetterCandidate(t *testing.T) {
 
 	select {
 	case <-benchable.updated:
-		require.FailNow("unexpected bench/unbench — eviction should not occur")
+		t.Fatal("unexpected bench/unbench — eviction should not occur")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -541,7 +541,7 @@ func TestBenchlistEvictionRespectsStakeConstraints(t *testing.T) {
 
 	select {
 	case <-benchable.updated:
-		require.FailNow("unexpected bench/unbench — stake constraint should prevent eviction")
+		t.Fatal("unexpected bench/unbench — stake constraint should prevent eviction")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -653,7 +653,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	select {
 	case <-benchable.benchedCalled:
 	case <-time.After(defaultTestTimeout):
-		require.FailNow("timed out waiting for consumer to block in Benched")
+		t.Fatal("timed out waiting for consumer to block in Benched")
 	}
 
 	done := make(chan struct{})
@@ -672,7 +672,7 @@ func TestObserveDoesNotBlockWhenConsumerIsBlocked(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(defaultTestTimeout):
-		require.FailNow("observe path blocked while consumer was blocked")
+		t.Fatal("observe path blocked while consumer was blocked")
 	}
 
 	close(benchable.unblock)

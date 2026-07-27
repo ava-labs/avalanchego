@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
 go_library(
     name = "eth",
     srcs = [
@@ -14,9 +19,9 @@ go_library(
         "state_accessor.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/core/state/pruner",
+        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
@@ -36,6 +41,7 @@ go_library(
         "//utils/timer/mockable",
         "//version",
         "//vms/evm/sync/customrawdb",
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",

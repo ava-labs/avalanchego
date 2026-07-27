@@ -12,6 +12,7 @@ package precompileconfig
 import (
 	reflect "reflect"
 
+	precompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	gomock "go.uber.org/mock/gomock"
@@ -42,7 +43,7 @@ func (m *MockPredicater) EXPECT() *MockPredicaterMockRecorder {
 }
 
 // PredicateGas mocks base method.
-func (m *MockPredicater) PredicateGas(pred predicate.Predicate, rules Rules) (uint64, error) {
+func (m *MockPredicater) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PredicateGas", pred, rules)
 	ret0, _ := ret[0].(uint64)
@@ -57,7 +58,7 @@ func (mr *MockPredicaterMockRecorder) PredicateGas(pred, rules any) *gomock.Call
 }
 
 // VerifyPredicate mocks base method.
-func (m *MockPredicater) VerifyPredicate(predicateContext *PredicateContext, pred predicate.Predicate) error {
+func (m *MockPredicater) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred predicate.Predicate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyPredicate", predicateContext, pred)
 	ret0, _ := ret[0].(error)

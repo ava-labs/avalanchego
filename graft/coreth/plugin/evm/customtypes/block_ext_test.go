@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestCopyHeader(t *testing.T) {
@@ -90,6 +91,10 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.TargetExponent:
+				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.PriceExponent:
+				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
 			case *[]uint8:
@@ -97,7 +102,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case []uint8:
 				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
 			default:
-				require.Failf(t, "field type needs to be added to switch cases", "field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
+				t.Fatalf("field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
 		})
 	}

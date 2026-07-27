@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,10 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -38,7 +35,6 @@ import (
 
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
@@ -54,12 +50,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	onParentAccept := state.NewMockDiff(ctrl)
-	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-		statelessBlock: apricotParentBlk,
-		onAcceptState:  onParentAccept,
-	}
-	env.blkManager.(*manager).lastAccepted = parentID
 	chainTime := env.clk.Time().Truncate(time.Second)
 
 	// create a proposal transaction to be included into proposal block
@@ -88,26 +78,24 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	// setup state to validate proposal block transaction
-	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
-	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	env.state.AddTx(addValTx, status.Committed)
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
+		TxID:      addValTx.ID(),
+		NodeID:    utx.NodeID(),
+		SubnetID:  utx.SubnetID(),
+		StartTime: utx.StartTime(),
+		EndTime:   chainTime,
+		NextTime:  chainTime,
+	}))
+	require.NoError(env.state.Commit())
 
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
-		iterator.FromSlice(&state.Staker{
-			TxID:      addValTx.ID(),
-			NodeID:    utx.NodeID(),
-			SubnetID:  utx.SubnetID(),
-			StartTime: utx.StartTime(),
-			NextTime:  chainTime,
-			EndTime:   chainTime,
-		}),
-		nil,
-	)
-	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, utx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
+	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: apricotParentBlk,
+		onAcceptState:  onParentAccept,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
 
 	// wrong height
 	statelessProposalBlock, err := block.NewApricotProposalBlock(
@@ -136,7 +124,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	env := newEnvironment(t, upgradetest.Banff)
 
@@ -154,22 +141,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
-	onParentAccept := state.NewMockDiff(ctrl)
-	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
-	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-
-	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-		statelessBlock: banffParentBlk,
-		onAcceptState:  onParentAccept,
-		timestamp:      parentTime,
-	}
-	env.blkManager.(*manager).lastAccepted = parentID
-	env.state.SetLastAccepted(parentID)
-	env.state.AddStatelessBlock(banffParentBlk)
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
@@ -191,25 +162,30 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}
 	nextStakerTx := &txs.Tx{Unsigned: unsignedNextStakerTx}
 	require.NoError(nextStakerTx.Initialize(txs.Codec))
-
 	nextStakerTxID := nextStakerTx.ID()
-	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	onParentAccept.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
-		return iterator.FromSlice(
-			&state.Staker{
-				TxID:     nextStakerTxID,
-				EndTime:  nextStakerTime,
-				NextTime: nextStakerTime,
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-			},
-		), nil
-	}).AnyTimes()
-	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
-	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
+	env.state.AddTx(nextStakerTx, status.Committed)
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
+		TxID:      nextStakerTxID,
+		NodeID:    unsignedNextStakerTx.NodeID(),
+		SubnetID:  unsignedNextStakerTx.SubnetID(),
+		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		StartTime: nextStakerTime,
+		EndTime:   nextStakerTime,
+		NextTime:  nextStakerTime,
+	}))
+	require.NoError(env.state.Commit())
 
-	onParentAccept.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
+	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: banffParentBlk,
+		onAcceptState:  onParentAccept,
+		timestamp:      parentTime,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.state.SetLastAccepted(parentID)
+	env.state.AddStatelessBlock(banffParentBlk)
 
 	// create proposal tx to be included in the proposal block
 	blkTx := &txs.Tx{

@@ -40,7 +40,7 @@ func Trace(router Router, tracer trace.Tracer) Router {
 func (r *tracedRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	timeoutManager timeout.Manager,
+	timeoutManager *timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains set.Set[ids.ID],
 	sybilProtectionEnabled bool,

@@ -1,6 +1,13 @@
 # Keep MODULE.bazel.lock up to date automatically
 common --lockfile_mode=update
 
+# Allow isolated module-extension usages so Bazel can manage repo tools from a
+# dedicated tools/external/go.mod independently of the main workspace go_deps.
+common --experimental_isolated_extension_usages
+
+# Enable platform-specific config sections (build:macos, build:linux, etc.)
+common --enable_platform_specific_config
+
 # Go settings - match scripts/build_test.sh defaults
 
 # Test settings (match scripts/build_test.sh)
@@ -39,6 +46,18 @@ test:norace --@io_bazel_rules_go//go/config:race=false
 # The BLST library requires -D__BLST_PORTABLE__ for portable builds across CPU architectures.
 build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 build --action_env=CGO_ENABLED=1
+
+# macOS: Use the default CommandLineTools location (also used by GitHub Actions
+# runners for CI). Hosts with a different active Apple toolchain can either rely on
+# direnv to create `.bazelrc.local` with appropriate values or run `task
+# bazel-configure-local` to generate the file manually.
+build:macos --repo_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
+build:macos --repo_env=SYSTEMROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+build:macos --action_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
+build:macos --action_env=SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+build:macos --action_env=CC=
+build:macos --action_env=CXX=
+try-import %workspace%/.bazelrc.local
 
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache

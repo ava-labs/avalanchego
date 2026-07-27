@@ -177,7 +177,7 @@ func fuzzHelper(f *testing.F, compressionType Type) {
 		compressor, err = NewZstdCompressor(maxMessageSize)
 		require.NoError(f, err)
 	default:
-		require.FailNow(f, "Unknown compression type")
+		f.Fatal("Unknown compression type")
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {

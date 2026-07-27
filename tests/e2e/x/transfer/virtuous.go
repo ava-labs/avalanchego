@@ -273,12 +273,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
+					require.NoError(xc.AwaitTxAccepted(tc.DefaultContext(), txID, 2*time.Second))
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
+					require.NoError(xc.AwaitTxAccepted(tc.DefaultContext(), txID, 2*time.Second))
 
 					mm, err := tests.GetNodeMetrics(tc.DefaultContext(), u)
 					require.NoError(err)

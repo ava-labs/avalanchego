@@ -11,9 +11,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -23,7 +26,8 @@ import (
 
 const (
 	// allowable block issuance in the future
-	maxSkew = 10 * time.Second
+	maxSkew                         = 10 * time.Second
+	bootstrappingWarningGracePeriod = 5 * time.Minute
 )
 
 var (
@@ -140,10 +144,9 @@ func (p *postForkCommonComponents) Verify(
 		// has been synced up to this point yet.
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
-			p.vm.ctx.Log.Error("block verification failed",
+			logUnexpectedPChainError(p.vm.ctx.Log, err, "block verification failed",
 				zap.String("reason", "failed to get current P-Chain height"),
 				zap.Stringer("blkID", child.ID()),
-				zap.Error(err),
 			)
 			return err
 		}
@@ -214,10 +217,9 @@ func (p *postForkCommonComponents) buildChild(
 	// is at least the parent's P-Chain height
 	pChainHeight, err := p.vm.selectChildPChainHeight(ctx, parentPChainHeight)
 	if err != nil {
-		p.vm.ctx.Log.Error("unexpected build block failure",
+		logUnexpectedPChainError(p.vm.ctx.Log, err, "unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
 			zap.Stringer("parentID", parentID),
-			zap.Error(err),
 		)
 		return nil, err
 	}
@@ -420,10 +422,9 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // block should be unsigned
 	case err != nil:
-		p.vm.ctx.Log.Error("unexpected block verification failure",
+		logUnexpectedPChainError(p.vm.ctx.Log, err, "unexpected block verification failure",
 			zap.String("reason", "failed to calculate expected proposer"),
 			zap.Stringer("blkID", blk.ID()),
-			zap.Error(err),
 		)
 		return false, err
 	case expectedProposerID == proposerID:
@@ -451,11 +452,18 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
-	case err != nil:
-		p.vm.ctx.Log.Error("unexpected build block failure",
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		p.logWarnOrError()("build block failed, validator set not yet finalized",
 			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
 			zap.Stringer("parentID", parentID),
 			zap.Error(err),
+		)
+		return false, err
+	case err != nil:
+		logUnexpectedPChainError(p.vm.ctx.Log, err, "unexpected build block failure",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Stringer("parentID", parentID),
 		)
 		return false, err
 	case expectedProposerID == p.vm.ctx.NodeID:
@@ -513,4 +521,30 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 		zap.Time("blockTimestamp", newTimestamp),
 	)
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
+}
+
+func (p *postForkCommonComponents) logWarnOrError() func(msg string, fields ...zap.Field) {
+	timeSinceBootstrapping := p.vm.Clock.Time().Sub(p.vm.finishedBootstrappingAt)
+	if p.vm.finishedBootstrappingAt.IsZero() || timeSinceBootstrapping < bootstrappingWarningGracePeriod {
+		return p.vm.ctx.Log.Warn
+	}
+	return p.vm.ctx.Log.Error
+}
+
+// logUnexpectedPChainError logs an unexpected P-chain failure: Warn when err
+// wraps database.ErrClosed, Error otherwise.
+//
+// ErrClosed is expected during VM shutdown because the P-chain can stop and
+// close its DB before chains that consult it finish stopping. Logging at Warn
+// avoids noise in that normal path. If ErrClosed happens during normal
+// operation, the failure will still be surfaced elsewhere.
+func logUnexpectedPChainError(log logging.Logger, err error, msg string, fields ...zap.Field) {
+	// Caller skip so the caller field points at the call site, not here.
+	log = log.WithOptions(zap.AddCallerSkip(1))
+	fields = append(fields, zap.Error(err))
+	if errors.Is(err, database.ErrClosed) {
+		log.Warn(msg, fields...)
+		return
+	}
+	log.Error(msg, fields...)
 }

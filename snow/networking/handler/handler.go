@@ -94,7 +94,9 @@ type handler struct {
 	// since peerTracker is already tracking validators
 	validators validators.Manager
 	// Receives messages from the VM
-	msgFromVMChan   chan common.Message
+	msgFromVMChan chan common.Message
+	// How often to fire an internal gossip request to the engine. A value of 0
+	// disables the gossip ticker so [engine.Gossip] is never called.
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -401,7 +403,7 @@ func (h *handler) dispatchAsync(ctx context.Context) {
 }
 
 func (h *handler) dispatchChans(ctx context.Context) {
-	gossiper := time.NewTicker(h.gossipFrequency)
+	gossiper := newGossipTicker(h.gossipFrequency)
 	defer func() {
 		gossiper.Stop()
 		h.closeDispatcher(ctx)
@@ -738,12 +740,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.Simplex:
-		h.ctx.Log.Debug("received simplex message",
-			zap.Stringer("nodeID", nodeID),
-			zap.String("messageOp", op),
-			zap.Stringer("message", body),
-		)
-		return nil
+		return engine.Simplex(ctx, nodeID, msg)
+
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)

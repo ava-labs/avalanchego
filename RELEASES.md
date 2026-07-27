@@ -1,6 +1,43 @@
 # Release Notes
 
-## Pending (v1.14.2)
+## Pending (v1.14.3)
+
+### Metrics
+
+- Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+- Added SAE execution-pressure metrics:
+  - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
+  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
+  - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): sum of the gas limits of accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
+  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
+- Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
+- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+- Added SAE gas-time and pricing metrics:
+  - `avalanche_{vmName}_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
+  - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
+  - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest enqueued block.
+  - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest enqueued block.
+  - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
+- Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
+- Renamed Coreth and Subnet-EVM state-sync p2p metrics:
+  - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
+  - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
+  - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
+
+NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
+
+### Fixes
+- Updated minimum Go version from `v1.25.8` to `v1.25.10`.
+
+## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
+
+This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
+
+The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Breaking Changes
 
@@ -8,13 +45,48 @@
 
 ### Config
 
-- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
-- Removed `proposerMinBlockDelay` from subnet configs.
+- Added:
+  - `--simplex-max-network-delay`
+  - `--simplex-max-rebroadcast-wait`
+  - `--benchlist-halflife`
+  - `--benchlist-unbench-probability`
+  - `--benchlist-bench-probability`
+  - `snowParameters` in subnet configs
+  - `simplexParameters` in subnet configs
+- Deprecated:
+  - `consensusParameters` in subnet configs
+- Removed:
+  - `--benchlist-fail-threshold`
+  - `--benchlist-min-failing-duration`
+  - `pull-gossip-poll-size` from the X-chain and P-chain configs
+  - `proposerMinBlockDelay` from subnet configs
+
+### API
+
+- Added `avalanche_snowman_consensus_latencies` histogram for each chain
 
 ### Fixes
 
-- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
-- Updated minimum go version to `v1.25.8`.
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space
+- Fixed crash in `TraceCall` with `BlockOverrides`
+- Fixed snapshot generation shutdown race
+- Downgraded flaky `ERROR` log to `WARN` if recently bootstrapped
+- Updated minimum Go version from 1.24 to `v1.25.8`
+
+### Consensus
+
+- Redesigned benchlisting with predicated failure rates
+- Added health checks to ensure average block acceptance times are reasonable
+- Introduced Simplex consensus engine and parameters (experimental)
+
+### Firewood
+
+- Enabled Firewood deferred persistence for non-pruning nodes
+- Fixed Firewood metrics registration
+- Unsupported APIs now return an error when Firewood is enabled
+- Updated Firewood to v0.3.1 (from v0.0.18)
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
 
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 

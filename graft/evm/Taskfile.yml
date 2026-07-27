@@ -1,40 +1,47 @@
 # https://taskfile.dev
-# To run on a system without task installed, `./scripts/run_task.sh` will execute it with `go run`.
-# If in the nix dev shell, `task` is available.
+# To run on a system without task installed, `./scripts/run_task.sh` will
+# prefer host task, otherwise use the repo's nix-pinned task when nix is
+# installed, otherwise bootstrap task via `go tool`.
+# If in the nix dev shell, repo tasks use the pinned toolchain.
 
 version: '3'
 
 env:
   AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/avalanchego/build" .TASKFILE_DIR) }}'
 
+vars:
+  # Task entrypoints run through the repo's nix wrapper so they use the pinned
+  # dev-shell toolchain when nix is available, without nesting nix shells.
+  NIX_RUN: '{{printf "%s/../../scripts/nix_run.sh" .TASKFILE_DIR}}'
+
 tasks:
-  default: ./scripts/run_task.sh --list
+  default: '{{.NIX_RUN}} ./scripts/run_task.sh --list'
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
     cmds:
-      - cmd: git add --all
-      - cmd: git update-index --really-refresh >> /dev/null
-      - cmd: git status --short # Show the status of the working tree.
-      - cmd: git diff-index --quiet HEAD # Exits if any uncommitted changes are found.
+      - cmd: '{{.NIX_RUN}} git add --all'
+      - cmd: '{{.NIX_RUN}} bash -c "git update-index --really-refresh >> /dev/null"'
+      - cmd: '{{.NIX_RUN}} git status --short' # Show the status of the working tree.
+      - cmd: '{{.NIX_RUN}} git diff-index --quiet HEAD' # Exits if any uncommitted changes are found.
 
   check-go-mod-tidy:
     desc: Checks that all go.mod and go.sum files are up-to-date (requires a clean git working tree)
     cmds:
-      - cmd: go mod tidy
+      - cmd: '{{.NIX_RUN}} go mod tidy'
       - task: check-clean-branch
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
-    cmd: ./scripts/coverage.sh
+    cmd: '{{.NIX_RUN}} ./scripts/coverage.sh'
 
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
-    cmd: ./scripts/lint.sh
+    cmd: '{{.NIX_RUN}} ./scripts/lint.sh'
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
@@ -43,4 +50,4 @@ tasks:
 
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    cmd: ./scripts/lint_fix.sh
+    cmd: '{{.NIX_RUN}} ./scripts/lint_fix.sh'

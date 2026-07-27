@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("000000\xfa\x03\x04000\x04\x04\x04\x04\x04")

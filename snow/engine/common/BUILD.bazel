@@ -29,6 +29,7 @@ go_library(
         "//database",
         "//ids",
         "//message",
+        "//proto/pb/p2p",
         "//snow",
         "//snow/validators",
         "//trace",

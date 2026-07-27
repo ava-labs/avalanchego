@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "customheader",
     srcs = [
@@ -11,10 +16,12 @@ go_library(
         "extra.go",
         "gas_limit.go",
         "min_delay_excess.go",
+        "min_price_exponent.go",
+        "settled.go",
+        "target_exponent.go",
         "time.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/customtypes",
@@ -44,6 +51,9 @@ graft_go_test(
         "extra_test.go",
         "gas_limit_test.go",
         "min_delay_excess_test.go",
+        "min_price_exponent_test.go",
+        "settled_test.go",
+        "target_exponent_test.go",
         "time_test.go",
     ],
     embed = [":customheader"],
@@ -62,6 +72,7 @@ graft_go_test(
         "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
+        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",

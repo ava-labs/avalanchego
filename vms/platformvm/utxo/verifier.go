@@ -512,6 +512,23 @@ func (i *inputOutputGetter) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 	return nil
 }
 
+func (i *inputOutputGetter) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (*inputOutputGetter) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return fmt.Errorf("%w: RewardAutoRenewedValidatorTx", ErrUnsupportedTxType)
+}
+
 func (i *inputOutputGetter) getUTXOs(tx txs.BaseTx) {
 	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)

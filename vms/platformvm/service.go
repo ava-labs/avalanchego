@@ -77,11 +77,12 @@ type Service struct {
 
 // All attributes are optional and may not be filled for each stakerTx.
 type stakerAttributes struct {
-	shares                 uint32
-	rewardsOwner           fx.Owner
-	validationRewardsOwner fx.Owner
-	delegationRewardsOwner fx.Owner
-	proofOfPossession      *signer.ProofOfPossession
+	shares                        uint32
+	rewardsOwner                  fx.Owner
+	validationRewardsOwner        fx.Owner
+	delegationRewardsOwner        fx.Owner
+	proofOfPossession             *signer.ProofOfPossession
+	autoRenewedValidatorAuthority fx.Owner
 }
 
 // GetHeight returns the height of the last accepted block
@@ -675,18 +676,26 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 
 	switch stakerTx := tx.Unsigned.(type) {
 	case txs.ValidatorTx:
-		var pop *signer.ProofOfPossession
-		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
-		}
-
 		attr = &stakerAttributes{
 			shares:                 stakerTx.Shares(),
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
 			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
-			proofOfPossession:      pop,
+		}
+
+		switch stakerTx := stakerTx.(type) {
+		case *txs.AddPermissionlessValidatorTx:
+			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+		case *txs.AddAutoRenewedValidatorTx:
+			pop, ok := stakerTx.Signer.(*signer.ProofOfPossession)
+			if !ok {
+				return nil, fmt.Errorf("expected *signer.ProofOfPossession but got %T", stakerTx.Signer)
+			}
+
+			attr.proofOfPossession = pop
+			attr.autoRenewedValidatorAuthority = stakerTx.ValidatorAuthority
+		case *txs.AddValidatorTx:
+		default:
+			return nil, fmt.Errorf("unknown tx type %T", stakerTx)
 		}
 
 	case txs.DelegatorTx:
@@ -903,6 +912,23 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				DelegationFee:          delegationFee,
 				Signer:                 attr.proofOfPossession,
 			}
+
+			if attr.autoRenewedValidatorAuthority != nil {
+				validatorAuthority, ok := attr.autoRenewedValidatorAuthority.(*secp256k1fx.OutputOwners)
+				if !ok {
+					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorAuthority)
+				}
+				apiAuthority, err := s.getAPIOwner(validatorAuthority)
+				if err != nil {
+					return nil, err
+				}
+				vdr.AutoRenewedConfig = &platformapi.AutoRenewedConfig{
+					ValidatorAuthority:       apiAuthority,
+					NextPeriod:               avajson.Uint64(stakingInfo.NextPeriod),
+					AutoCompoundRewardShares: avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
+				}
+			}
+
 			validators = append(validators, vdr)
 
 		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:

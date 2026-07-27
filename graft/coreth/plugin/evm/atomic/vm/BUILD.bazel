@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "vm",
     srcs = [
@@ -17,7 +22,6 @@ go_library(
         "mainnet_ext_data_hashes.json",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm",
-    visibility = ["//visibility:public"],
     deps = [
         "//api",
         "//codec",
@@ -83,13 +87,16 @@ graft_go_test(
     embed = [":vm"],
     deps = [
         "//chains/atomic",
+        "//database",
         "//database/memdb",
         "//graft/coreth/consensus/dummy",
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
+        "//graft/coreth/ethclient",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
+        "//graft/coreth/params/paramstest",
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/atomictest",
@@ -99,6 +106,7 @@ graft_go_test(
         "//graft/coreth/plugin/evm/upgrade/ap0",
         "//graft/coreth/plugin/evm/upgrade/ap1",
         "//graft/coreth/plugin/evm/vmtest",
+        "//graft/evm/firewood",
         "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
         "//ids",
@@ -123,6 +131,7 @@ graft_go_test(
         "//vms/components/avax",
         "//vms/components/chain",
         "//vms/evm/predicate",
+        "//vms/evm/sync/customrawdb",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

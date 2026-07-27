@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "params",
     srcs = [
@@ -12,7 +17,6 @@ go_library(
         "protocol_params_ext.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/nativeasset",
         "//graft/coreth/params/extras",
@@ -20,16 +24,20 @@ go_library(
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/constants",
+        "//graft/evm/precompileconfig",
         "//snow",
         "//upgrade",
         "//utils",
         "//utils/set",
         "//vms/evm/predicate",
+        "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/legacy",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
     ],
 )
 
@@ -38,6 +46,7 @@ graft_go_test(
     srcs = [
         "config_extra_test.go",
         "config_test.go",
+        "hooks_libevm_test.go",
         "protocol_params_test.go",
     ],
     embed = [":params"],
@@ -47,6 +56,7 @@ graft_go_test(
         "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )

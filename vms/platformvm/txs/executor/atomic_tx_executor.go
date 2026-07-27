@@ -27,7 +27,7 @@ func AtomicTx(
 	parentID ids.ID,
 	stateVersions state.Versions,
 	tx *txs.Tx,
-) (state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
+) (*state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
 	atomicExecutor := atomicTxExecutor{
 		backend:       backend,
 		feeCalculator: feeCalculator,
@@ -51,7 +51,7 @@ type atomicTxExecutor struct {
 	tx            *txs.Tx
 
 	// outputs of visitor execution
-	onAccept       state.Diff
+	onAccept       *state.Diff
 	inputs         set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests
 }
@@ -125,6 +125,18 @@ func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBa
 }
 
 func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
 

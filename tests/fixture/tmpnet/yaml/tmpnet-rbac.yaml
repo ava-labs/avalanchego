@@ -11,32 +11,32 @@ metadata:
   name: tmpnet
   namespace: tmpnet
 rules:
-# Regular usage
-- apiGroups: ["apps"]
-  resources: ["statefulsets"]
-  verbs: ["get", "create", "update", "patch"]
-- apiGroups: ["apps"]
-  resources: ["statefulsets/scale"]
-  verbs: ["get", "update"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "watch"]
-- apiGroups: [""]
-  resources: ["pods/portforward"]
-  verbs: ["create"]
-# Enable external node access via ingress
-- apiGroups: ["networking.k8s.io"]
-  resources: ["ingresses"]
-  verbs: ["get", "create"]
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get"]
-- apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get"]
-- apiGroups: [""]
-  resources: ["services"]
-  verbs: ["create"]
+  # Regular usage
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets/scale"]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+  # Enable external node access via ingress
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -48,6 +48,6 @@ roleRef:
   kind: Role
   name: tmpnet
 subjects:
-- kind: ServiceAccount
-  name: tmpnet
-  namespace: tmpnet
+  - kind: ServiceAccount
+    name: tmpnet
+    namespace: tmpnet

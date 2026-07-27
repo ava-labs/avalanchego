@@ -246,9 +246,9 @@ func TestEngineQuery(t *testing.T) {
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case parent.ID(), child.ID():
-			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 	vm.ParseBlockF = nil
@@ -289,8 +289,9 @@ func TestEngineQuery(t *testing.T) {
 				return parent, nil
 			case child.ID():
 				return child, nil
+			default:
+				t.Fatal(errUnknownBlock)
 			}
-			require.FailNow(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -400,8 +401,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 			return blk0, nil
 		case blk1.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -424,8 +426,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 				return blk0, nil
 			case blkID == blk1.ID():
 				return blk1, nil
+			default:
+				t.Fatal(errUnknownBlock)
 			}
-			require.FailNow(errUnknownBlock.Error())
 			return nil, errUnknownBlock
 		}
 
@@ -593,7 +596,7 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 
 	sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {
-		require.FailNow("should not be sending pulls when we are the block producer")
+		t.Fatal("should not be sending pulls when we are the block producer")
 	}
 
 	pushSent := new(bool)
@@ -838,8 +841,9 @@ func TestEngineAbandonChit(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -891,8 +895,9 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return nil, errUnknownBlock
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1550,8 +1555,9 @@ func TestEngineDoubleChit(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1727,7 +1733,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		case bytes.Equal(b, nonPreferredBlk.Bytes()):
 			return nonPreferredBlk, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -1785,7 +1791,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		case bytes.Equal(b, blk2.Bytes()):
 			return blk2, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -1945,7 +1951,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			require.FailNow(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -2003,7 +2009,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
-			require.FailNow("Unexpectedly sent a Get request for blk1")
+			t.Fatal("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
 			t.Logf("sending get for blk2 with %d", requestID)
 			*sendReqID = requestID
@@ -2015,7 +2021,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 			*reqVdr = inVdr
 			return
 		default:
-			require.FailNow("Unexpectedly sent a Get request for unknown block")
+			t.Fatal("Unexpectedly sent a Get request for unknown block")
 		}
 	}
 
@@ -2217,8 +2223,9 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -2329,8 +2336,9 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 			return snowmantest.Genesis, nil
 		case blk.ID():
 			return blk, nil
+		default:
+			t.Fatal(errUnknownBlock)
 		}
-		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -3300,4 +3308,63 @@ func TestEngineAcceptedHeight(t *testing.T) {
 	require.Equal(blk2.ID(), eBlk2)
 	require.Equal(blk1.Height(), h1)
 	require.Equal(blk2.Height(), h2)
+}
+
+func TestPChainProgressUpdaterCalledOnAccept(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+
+	var updatedHeight uint64
+	var progressUpdated bool
+	engCfg.PChainProgressUpdater = &mockPChainProgressUpdater{
+		setProgressF: func(height uint64) {
+			progressUpdated = true
+			updatedHeight = height
+		},
+	}
+
+	vdr, _, sender, vm, te := setup(t, engCfg)
+
+	sender.Default(true)
+
+	blk := snowmantest.BuildChild(snowmantest.Genesis)
+
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case blk.ID():
+			return blk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	queryRequestID := new(uint32)
+	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, _ []byte, _ uint64) {
+		*queryRequestID = requestID
+	}
+
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return blk, nil
+	}
+	require.NoError(te.Notify(t.Context(), common.PendingTxs))
+
+	require.False(progressUpdated)
+
+	// Vote for the block to accept it
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+
+	require.Equal(snowtest.Accepted, blk.Status)
+	require.True(progressUpdated)
+	require.Equal(blk.Height(), updatedHeight)
+}
+
+type mockPChainProgressUpdater struct {
+	setProgressF func(height uint64)
+}
+
+func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
+	m.setProgressF(height)
 }

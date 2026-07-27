@@ -10,6 +10,9 @@ on:
     tags:
       - "*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-22.04
@@ -18,7 +21,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -35,7 +38,7 @@ jobs:
         run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
           role-session-name: githubrolesession
@@ -65,13 +68,13 @@ jobs:
           RELEASE: "jammy"
 
       - name: Save avalanchego as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: avalanchego-amd64
           path: /tmp/avalanchego/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
 
       - name: Save subnet-evm as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-amd64
           path: /tmp/avalanchego/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz
@@ -82,13 +85,13 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: custom-arm64-jammy
+    runs-on: ubuntu-22.04-arm
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -105,7 +108,7 @@ jobs:
         run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
           role-session-name: githubrolesession
@@ -135,13 +138,13 @@ jobs:
           RELEASE: "jammy"
 
       - name: Save avalanchego as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: avalanchego-arm64
           path: /tmp/avalanchego/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz
 
       - name: Save subnet-evm as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-arm64
           path: /tmp/avalanchego/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz

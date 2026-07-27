@@ -20,13 +20,13 @@ metadata:
 rules:
   - apiGroups: [""]
     resources:
-    - nodes
-    - services
-    - pods
+      - nodes
+      - services
+      - pods
     verbs:
-    - get
-    - watch
-    - list
+      - get
+      - watch
+      - list
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -34,13 +34,13 @@ kind: ClusterRoleBinding
 metadata:
   name: promtail-clusterrolebinding
 subjects:
-    - kind: ServiceAccount
-      name: promtail-serviceaccount
-      namespace: ci-monitoring
+  - kind: ServiceAccount
+    name: promtail-serviceaccount
+    namespace: ci-monitoring
 roleRef:
-    kind: ClusterRole
-    name: promtail-clusterrole
-    apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promtail-clusterrole
+  apiGroup: rbac.authorization.k8s.io
 
 ---
 apiVersion: v1
@@ -144,48 +144,48 @@ spec:
     spec:
       serviceAccount: promtail-serviceaccount
       containers:
-      - name: promtail-container
-        image: grafana/promtail:3.3.2 # Pin latest version
-        args:
-        - -config.file=/etc/promtail/promtail.yaml
-        - -config.expand-env=true # Enable substitution of env variables in the configuration i.e. for credentials
-        env:
-        - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
-          valueFrom:
-            fieldRef:
-              fieldPath: 'spec.nodeName'
-        - name: LOKI_URL
-          valueFrom:
-            secretKeyRef:
-              name: loki-config
-              key: url
-        - name: LOKI_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: loki-config
-              key: username
-        - name: LOKI_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: loki-config
-              key: password
-        volumeMounts:
-        - name: logs
-          mountPath: /var/log
-          readOnly: true
-        - name: promtail-config
-          mountPath: /etc/promtail
-          readOnly: true
-        - mountPath: /var/lib/docker/containers
-          name: varlibdockercontainers
-          readOnly: true
+        - name: promtail-container
+          image: grafana/promtail:3.3.2 # Pin latest version
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+            - -config.expand-env=true # Enable substitution of env variables in the configuration i.e. for credentials
+          env:
+            - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
+              valueFrom:
+                fieldRef:
+                  fieldPath: 'spec.nodeName'
+            - name: LOKI_URL
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: url
+            - name: LOKI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: username
+            - name: LOKI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: loki-config
+                  key: password
+          volumeMounts:
+            - name: logs
+              mountPath: /var/log
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+              readOnly: true
+            - mountPath: /var/lib/docker/containers
+              name: varlibdockercontainers
+              readOnly: true
       volumes:
-      - name: logs
-        hostPath:
-          path: /var/log
-      - name: varlibdockercontainers
-        hostPath:
-          path: /var/lib/docker/containers
-      - name: promtail-config
-        configMap:
-          name: promtail-config
+        - name: logs
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: promtail-config
+          configMap:
+            name: promtail-config

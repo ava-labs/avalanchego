@@ -5,6 +5,7 @@ package simplex
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,7 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
@@ -46,6 +53,49 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 }
 
+func TestHealthCheck(t *testing.T) {
+	vmHealthErr := errors.New("vm health error")
+	vmHealthResult := map[string]interface{}{"healthy": true}
+
+	tests := []struct {
+		name        string
+		vmResult    interface{}
+		vmErr       error
+		expectedErr error
+	}{
+		{
+			name:        "vm healthy",
+			vmResult:    vmHealthResult,
+			vmErr:       nil,
+			expectedErr: nil,
+		},
+		{
+			name:        "vm unhealthy",
+			vmResult:    nil,
+			vmErr:       vmHealthErr,
+			expectedErr: vmHealthErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine, _ := setupEngine(t)
+			engine.vm.(*wrappedVM).VM.VM.HealthCheckF = func(context.Context) (interface{}, error) {
+				return tt.vmResult, tt.vmErr
+			}
+
+			result, err := engine.HealthCheck(t.Context())
+			require.ErrorIs(t, err, tt.expectedErr)
+
+			resultMap, ok := result.(map[string]interface{})
+			require.True(t, ok)
+			require.Contains(t, resultMap, "consensus")
+			require.Contains(t, resultMap, "vm")
+			require.Equal(t, tt.vmResult, resultMap["vm"])
+		})
+	}
+}
+
 func TestSimplexEngineNilParameters(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	ctx := t.Context()
@@ -61,6 +111,68 @@ func TestSimplexEngineShutdown(t *testing.T) {
 	require.NotPanics(t, func() {
 		require.NoError(t, engine.Shutdown(t.Context()))
 	})
+}
+
+func TestEngineInterfaceNoOps(t *testing.T) {
+	engine, _ := setupEngine(t)
+	ctx := t.Context()
+	nodeID := ids.GenerateTestNodeID()
+	containerID := ids.GenerateTestID()
+
+	// common.AllGetsServer
+	require.NoError(t, engine.GetStateSummaryFrontier(ctx, nodeID, 0))
+	require.NoError(t, engine.GetAcceptedStateSummary(ctx, nodeID, 0, set.Set[uint64]{}))
+	require.NoError(t, engine.GetAcceptedFrontier(ctx, nodeID, 0))
+	require.NoError(t, engine.GetAccepted(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAncestors(ctx, nodeID, 0, containerID))
+	require.NoError(t, engine.Get(ctx, nodeID, 0, containerID))
+
+	// common.StateSummaryFrontierHandler
+	require.NoError(t, engine.StateSummaryFrontier(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetStateSummaryFrontierFailed(ctx, nodeID, 0))
+
+	// common.AcceptedStateSummaryHandler
+	require.NoError(t, engine.AcceptedStateSummary(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAcceptedStateSummaryFailed(ctx, nodeID, 0))
+
+	// common.AcceptedFrontierHandler
+	require.NoError(t, engine.AcceptedFrontier(ctx, nodeID, 0, containerID))
+	require.NoError(t, engine.GetAcceptedFrontierFailed(ctx, nodeID, 0))
+
+	// common.AcceptedHandler
+	require.NoError(t, engine.Accepted(ctx, nodeID, 0, set.Set[ids.ID]{}))
+	require.NoError(t, engine.GetAcceptedFailed(ctx, nodeID, 0))
+
+	// common.AncestorsHandler
+	require.NoError(t, engine.Ancestors(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetAncestorsFailed(ctx, nodeID, 0))
+
+	// common.PutHandler
+	require.NoError(t, engine.Put(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.GetFailed(ctx, nodeID, 0))
+
+	// common.QueryHandler
+	require.NoError(t, engine.PullQuery(ctx, nodeID, 0, containerID, 0))
+	require.NoError(t, engine.PushQuery(ctx, nodeID, 0, nil, 0))
+
+	// common.ChitsHandler
+	require.NoError(t, engine.Chits(ctx, nodeID, 0, containerID, containerID, containerID, 0))
+	require.NoError(t, engine.QueryFailed(ctx, nodeID, 0))
+
+	// common.AppHandler
+	require.NoError(t, engine.AppRequest(ctx, nodeID, 0, time.Time{}, nil))
+	require.NoError(t, engine.AppResponse(ctx, nodeID, 0, nil))
+	require.NoError(t, engine.AppRequestFailed(ctx, nodeID, 0, &common.AppError{}))
+	require.NoError(t, engine.AppGossip(ctx, nodeID, nil))
+
+	// common.InternalHandler
+	require.NoError(t, engine.Connected(ctx, nodeID, &version.Application{}))
+	require.NoError(t, engine.Disconnected(ctx, nodeID))
+	require.NoError(t, engine.Gossip(ctx))
+	require.NoError(t, engine.Notify(ctx, common.PendingTxs))
+
+	// common.SimplexHandler
+	require.NoError(t, engine.Simplex(ctx, nodeID, &p2p.Simplex{}))
 }
 
 func TestGetTickInterval(t *testing.T) {
@@ -312,6 +424,7 @@ var (
 	canotoBlock = &canotoSimplexBlock{
 		Metadata:   blockMetadata.Bytes(),
 		InnerBlock: []byte("inner-block"),
+		Blacklist:  emptyBlacklist.Bytes(),
 	}
 
 	blockBytes = canotoBlock.MarshalCanoto()
@@ -515,7 +628,7 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 func FuzzSimplexVotes(f *testing.F) {
 	f.Fuzz(func(t *testing.T, blockDigest []byte, signer []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_Vote{
@@ -542,7 +655,7 @@ func FuzzSimplexVotes(f *testing.F) {
 func FuzzSimplexEmptyVotes(f *testing.F) {
 	f.Fuzz(func(t *testing.T, signer []byte, epoch, round uint64, signerValue []byte) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_EmptyVote{
@@ -560,7 +673,7 @@ func FuzzSimplexEmptyVotes(f *testing.F) {
 func FuzzSimplexFinalizeVotes(f *testing.F) {
 	f.Fuzz(func(t *testing.T, signer []byte, signerValue []byte, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_FinalizeVote{
@@ -585,10 +698,11 @@ func FuzzSimplexFinalizeVotes(f *testing.F) {
 }
 
 func FuzzSimplexNotarizations(f *testing.F) {
-	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+	qc := buildQCWithBytes(f, newConfigsForQC(f), []byte("fuzz qc message"))
+
+	f.Fuzz(func(t *testing.T, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
-		qc := buildQCWithBytes(t, configs, qcData)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_Notarization{
@@ -613,10 +727,11 @@ func FuzzSimplexNotarizations(f *testing.F) {
 }
 
 func FuzzSimplexFinalizations(f *testing.F) {
-	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+	qc := buildQCWithBytes(f, newConfigsForQC(f), []byte("fuzz qc message"))
+
+	f.Fuzz(func(t *testing.T, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
-		qc := buildQCWithBytes(t, configs, qcData)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_Finalization{
@@ -643,7 +758,7 @@ func FuzzSimplexFinalizations(f *testing.F) {
 func FuzzSimplexReplicationRequests(f *testing.F) {
 	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationRequest{
@@ -659,10 +774,11 @@ func FuzzSimplexReplicationRequests(f *testing.F) {
 }
 
 func FuzzSimplexReplicationResponses(f *testing.F) {
-	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+	qc := buildQCWithBytes(f, newConfigsForQC(f), []byte("fuzz qc message"))
+
+	f.Fuzz(func(t *testing.T, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
-		qc := buildQCWithBytes(t, configs, qcData)
+		engine, configs := setupEngineForFuzz(t)
 
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_ReplicationResponse{
@@ -697,7 +813,7 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 func FuzzSimplexBlockProposals(f *testing.F) {
 	f.Fuzz(func(t *testing.T, blockBytes []byte, blockDigest []byte, round, epoch, seq uint64, version uint32) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
+		engine, configs := setupEngineForFuzz(t)
 		msg := &p2p.Simplex{
 			ChainId: []byte("chain-1"),
 			Message: &p2p.Simplex_BlockProposal{
@@ -725,10 +841,11 @@ func FuzzSimplexBlockProposals(f *testing.F) {
 }
 
 func FuzzSimplexEmptyNotarizations(f *testing.F) {
-	f.Fuzz(func(t *testing.T, data []byte, round uint64, epoch uint64) {
+	qc := buildQCWithBytes(f, newConfigsForQC(f), []byte("fuzz qc message"))
+
+	f.Fuzz(func(t *testing.T, round uint64, epoch uint64) {
 		ctx := t.Context()
-		engine, configs := setupEngine(t)
-		qc := buildQCWithBytes(t, configs, data)
+		engine, configs := setupEngineForFuzz(t)
 		msg := &p2p.Simplex{
 			Message: &p2p.Simplex_EmptyNotarization{
 				EmptyNotarization: &p2p.EmptyNotarization{
@@ -742,27 +859,79 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 	})
 }
 
-func setupEngine(t *testing.T) (*Engine, []*Config) {
-	configs := newNetworkConfigs(t, 4)
-	ctx := t.Context()
+func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
+	configs := createSimplexEngineConfig(t, reuseKeys)
 
-	config := configs[0]
-	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	engine, err := NewEngine(ctx, config)
+	signer := BLSSigner{
+		chainID:   configs[0].Ctx.ChainID,
+		networkID: constants.UnitTestID,
+		signBLS:   cachedBLSKey.Sign,
+	}
+
+	verifier := createVerifierForFuzz(configs[0])
+
+	ctx := t.Context()
+	engine, err := newEngineWithSignerVerifier(ctx, configs[0], signer, verifier)
 	require.NoError(t, err)
 
-	// ensure any go-routines started by the engine are cleaned up after the test finishes
 	t.Cleanup(func() {
 		require.NoError(t, engine.Shutdown(ctx))
 	})
 
-	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
-	}
+	// We start the epoch directly instead of calling engine.Start because we want to avoid starting the engine's internal ticker.
+	// We don't need the ticker because it won't have enough time to tick during the fuzz iteration.
+	require.NoError(t, engine.epoch.Start())
 
-	require.NoError(t, engine.Start(ctx, 1))
+	return engine, configs
+}
+
+func setupEngine(t *testing.T) (*Engine, []*Config) {
+	configs := createSimplexEngineConfig(t, noKeyReuse)
+
+	engine, err := NewEngine(t.Context(), configs[0])
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, engine.Shutdown(t.Context()))
+	})
+
+	require.NoError(t, engine.Start(t.Context(), 1))
 	md := engine.epoch.Metadata()
 	require.Equal(t, uint64(1), md.Seq)
 	require.Equal(t, uint64(1), md.Round)
 	return engine, configs
+}
+
+func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config {
+	configs := newNetworkConfigsWithKeyReuse(t, 4, reuseKeys)
+
+	config := configs[0]
+	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
+		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+	}
+	return configs
+}
+
+func createVerifierForFuzz(config *Config) BLSVerifier {
+	verifier := BLSVerifier{
+		nodeID2PK: make(map[ids.NodeID]*bls.PublicKey),
+		networkID: config.Ctx.NetworkID,
+		chainID:   config.Ctx.ChainID,
+	}
+
+	nodeIDs := make([]ids.NodeID, 0, len(config.Params.InitialValidators))
+	for _, node := range config.Params.InitialValidators {
+		verifier.nodeID2PK[node.NodeID] = cachedBLSKey.PublicKey()
+		nodeIDs = append(nodeIDs, node.NodeID)
+	}
+	utils.Sort(nodeIDs)
+	verifier.canonicalNodeIDs = nodeIDs
+	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		verifier.canonicalNodeIDIndices[nodeID] = i
+	}
+
+	return verifier
 }

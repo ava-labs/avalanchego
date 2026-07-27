@@ -1,0 +1,276 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "targetGas",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "minGasPrice",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timeToDouble",
+            "type": "uint64"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "oldGasPriceConfig",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "targetGas",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "minGasPrice",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timeToDouble",
+            "type": "uint64"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "newGasPriceConfig",
+        "type": "tuple"
+      }
+    ],
+    "name": "GasPriceConfigUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldRole",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoleSet",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "getGasPriceConfig",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "targetGas",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "minGasPrice",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timeToDouble",
+            "type": "uint64"
+          }
+        ],
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "config",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getGasPriceConfigLastChangedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockNumber",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "readAllowList",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "role",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setAdmin",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setEnabled",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bool",
+            "name": "validatorTargetGas",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "targetGas",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "staticPricing",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint64",
+            "name": "minGasPrice",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timeToDouble",
+            "type": "uint64"
+          }
+        ],
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "config",
+        "type": "tuple"
+      }
+    ],
+    "name": "setGasPriceConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      }
+    ],
+    "name": "setNone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

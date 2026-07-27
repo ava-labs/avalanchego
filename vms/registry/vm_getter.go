@@ -37,7 +37,7 @@ type VMGetter interface {
 // VMGetterConfig defines settings for VMGetter
 type VMGetterConfig struct {
 	FileReader      filesystem.Reader
-	Manager         vms.Manager
+	Manager         *vms.Manager
 	PluginDirectory string
 	CPUTracker      resource.ProcessTracker
 	RuntimeTracker  runtime.Tracker

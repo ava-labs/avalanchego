@@ -81,6 +81,7 @@ type VM struct {
 	proposer.Windower
 	tree.Tree
 	mockable.Clock
+	finishedBootstrappingAt time.Time
 
 	ctx *snow.Context
 	db  *versiondb.Database
@@ -111,6 +112,11 @@ type VM struct {
 
 	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
 	// proposed in.
+	// The histogram is intended to be interpreted as integer slot indices (0, 1, 2, >2).
+	// To bucket integer observations correctly, the Prometheus upper bounds are half-steps:
+	// 0.5, 1.5, 2.5, +Inf.
+	// 0 means the block was proposed in slot 0 (within the first proposer window after the parent timestamp).
+	// 1 and 2 mean the block was proposed in slots 1 or 2, respectively; +Inf means slot >= 3.
 	acceptedBlocksSlotHistogram prometheus.Histogram
 
 	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
@@ -316,6 +322,11 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	}
 
 	oldState := vm.consensusState
+
+	if newState == snow.NormalOp && oldState != snow.NormalOp {
+		vm.finishedBootstrappingAt = vm.Clock.Time()
+	}
+
 	vm.consensusState = newState
 	if oldState != snow.StateSyncing {
 		return nil

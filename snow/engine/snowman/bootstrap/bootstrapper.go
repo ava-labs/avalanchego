@@ -81,6 +81,7 @@ type Bootstrapper struct {
 	common.QueryHandler
 	common.ChitsHandler
 	common.AppHandler
+	common.SimplexHandler
 
 	requestID uint32 // Tracks the last requestID that was used in a request
 
@@ -136,6 +137,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
+		SimplexHandler:              common.NewNoOpSimplexHandler(config.Ctx.Log),
 		AppHandler:                  config.VM,
 
 		minority: bootstrapper.Noop,

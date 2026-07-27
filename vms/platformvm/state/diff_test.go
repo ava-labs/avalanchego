@@ -397,7 +397,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	require.Equal(currentValidator, gotCurrentValidator)
 
 	// Delete the current validator
-	d.DeleteCurrentValidator(currentValidator)
+	require.NoError(d.DeleteCurrentValidator(currentValidator))
 
 	// Make sure the deletion worked
 	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
@@ -436,19 +436,27 @@ func TestDiffPendingValidator(t *testing.T) {
 func TestDiffCurrentDelegator(t *testing.T) {
 	require := require.New(t)
 
-	currentDelegator := &Staker{
-		TxID:     ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
-		NodeID:   ids.GenerateTestNodeID(),
-	}
-
 	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	// Put a current delegator
-	d.PutCurrentDelegator(currentDelegator)
+	currentValidator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
+
+	require.NoError(d.PutCurrentValidator(currentValidator))
+
+	currentDelegator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: currentValidator.SubnetID,
+		NodeID:   currentValidator.NodeID,
+	}
+
+	require.NoError(d.PutCurrentDelegator(currentDelegator))
 
 	// Assert that we get the current delegator back
 	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
@@ -458,7 +466,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	require.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
 
 	// Delete the current delegator
-	d.DeleteCurrentDelegator(currentDelegator)
+	require.NoError(d.DeleteCurrentDelegator(currentDelegator))
 
 	// Make sure the deletion worked.
 	// The iterator should have no elements.

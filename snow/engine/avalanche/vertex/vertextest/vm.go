@@ -40,8 +40,8 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	if vm.LinearizeF != nil {
 		return vm.LinearizeF(ctx, stopVertexID)
 	}
-	if vm.CantLinearize && vm.T != nil {
-		require.FailNow(vm.T, errLinearize.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantLinearize, errLinearize)
 	}
 	return errLinearize
 }
@@ -50,8 +50,8 @@ func (vm *VM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 	if vm.ParseTxF != nil {
 		return vm.ParseTxF(ctx, b)
 	}
-	if vm.CantParse && vm.T != nil {
-		require.FailNow(vm.T, errParse.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantParse, errParse)
 	}
 	return nil, errParse
 }

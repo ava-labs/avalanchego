@@ -18,6 +18,9 @@ on:
         description: "Load test duration: e.g. 5m, 10m, 1h..."
         required: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   load_test:
     name: Run load test on self-hosted runners
@@ -33,7 +36,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run load test
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

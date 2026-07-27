@@ -17,24 +17,24 @@ func TestSet(t *testing.T) {
 
 	set := NewSet()
 
-	peer1 := &peer{
+	peer1 := &Peer{
 		id:             ids.BuildTestNodeID([]byte{0x01}),
 		observedUptime: *utils.NewAtomic[uint32](0),
 	}
-	updatedPeer1 := &peer{
+	updatedPeer1 := &Peer{
 		id:             ids.BuildTestNodeID([]byte{0x01}),
 		observedUptime: *utils.NewAtomic[uint32](1),
 	}
-	peer2 := &peer{
+	peer2 := &Peer{
 		id: ids.BuildTestNodeID([]byte{0x02}),
 	}
-	unknownPeer := &peer{
+	unknownPeer := &Peer{
 		id: ids.BuildTestNodeID([]byte{0xff}),
 	}
-	peer3 := &peer{
+	peer3 := &Peer{
 		id: ids.BuildTestNodeID([]byte{0x03}),
 	}
-	peer4 := &peer{
+	peer4 := &Peer{
 		id: ids.BuildTestNodeID([]byte{0x04}),
 	}
 
@@ -104,10 +104,10 @@ func TestSetSample(t *testing.T) {
 
 	set := NewSet()
 
-	peer1 := &peer{
+	peer1 := &Peer{
 		id: ids.BuildTestNodeID([]byte{0x01}),
 	}
-	peer2 := &peer{
+	peer2 := &Peer{
 		id: ids.BuildTestNodeID([]byte{0x02}),
 	}
 
@@ -128,10 +128,10 @@ func TestSetSample(t *testing.T) {
 	require.Empty(peers)
 
 	peers = set.Sample(1, NoPrecondition)
-	require.Equal([]Peer{peer1}, peers)
+	require.Equal([]*Peer{peer1}, peers)
 
 	peers = set.Sample(2, NoPrecondition)
-	require.Equal([]Peer{peer1}, peers)
+	require.Equal([]*Peer{peer1}, peers)
 
 	// Case: 2 peers
 	set.Add(peer2)

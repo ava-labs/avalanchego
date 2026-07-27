@@ -40,6 +40,16 @@ func ShortFromString(idStr string) (ShortID, error) {
 	return ToShortID(bytes)
 }
 
+// ShortFromStringOrPanic is the same as ShortFromString, but will panic on
+// error.
+func ShortFromStringOrPanic(idStr string) ShortID {
+	id, err := ShortFromString(idStr)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // ShortFromPrefixedString returns a ShortID assuming the cb58 format is
 // prefixed
 func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {

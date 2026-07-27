@@ -47,6 +47,7 @@ graft_go_test(
         "disklayer_test.go",
         "generate_test.go",
         "iterator_test.go",
+        "main_test.go",
         "snapshot_test.go",
         "wipe_test.go",
     ],
@@ -70,5 +71,6 @@ graft_go_test(
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
         "@org_golang_x_crypto//sha3",
+        "@org_uber_go_goleak//:goleak",
     ],
 )

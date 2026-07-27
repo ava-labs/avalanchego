@@ -70,6 +70,8 @@ go_library(
         "//vms/platformvm/signer",
         "//vms/registry",
         "//vms/rpcchainvm/runtime",
+        "//vms/saevm/cchain",
+        "//vms/transitionvm",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_golang//prometheus/collectors",
         "@com_github_prometheus_client_golang//prometheus/promhttp",
@@ -87,11 +89,10 @@ go_test(
     embed = [":node"],
     deps = [
         "//ids",
-        "//snow/networking/router/routermock",
+        "//message",
         "//snow/validators",
         "//utils/constants",
         "//version",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )

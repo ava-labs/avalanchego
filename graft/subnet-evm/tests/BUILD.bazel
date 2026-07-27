@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
 go_library(
     name = "tests",
     srcs = [
@@ -8,7 +13,6 @@ go_library(
     ],
     embedsrcs = ["genesis.json"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/tests",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/core/state/snapshot",
         "//graft/evm/firewood",

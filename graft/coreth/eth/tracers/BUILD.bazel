@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "tracers",
     srcs = [
@@ -9,13 +14,11 @@ go_library(
         "tracker.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/tracers",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
         "//graft/coreth/internal/ethapi",
         "//graft/coreth/params",
-        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",

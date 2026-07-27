@@ -40,7 +40,7 @@ type sender struct {
 
 	sender   ExternalSender // Actually does the sending over the network
 	router   router.InternalHandler
-	timeouts timeout.Manager
+	timeouts *timeout.Manager
 
 	// Counts how many request have failed because the node was benched
 	failedDueToBench *prometheus.CounterVec // op
@@ -54,7 +54,7 @@ func New(
 	msgCreator message.OutboundMsgBuilder,
 	externalSender ExternalSender,
 	router router.InternalHandler,
-	timeouts timeout.Manager,
+	timeouts *timeout.Manager,
 	engineType p2p.EngineType,
 	subnet subnets.Subnet,
 	reg prometheus.Registerer,

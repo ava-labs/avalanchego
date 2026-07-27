@@ -15,9 +15,9 @@ import (
 )
 
 type proposalBlockState struct {
-	onDecisionState state.Diff
-	onCommitState   state.Diff
-	onAbortState    state.Diff
+	onDecisionState *state.Diff
+	onCommitState   *state.Diff
+	onAbortState    *state.Diff
 }
 
 // The state of a block.
@@ -26,7 +26,7 @@ type blockState struct {
 	proposalBlockState
 	statelessBlock block.Block
 
-	onAcceptState state.Diff
+	onAcceptState *state.Diff
 	onAcceptFunc  func()
 
 	inputs          set.Set[ids.ID]

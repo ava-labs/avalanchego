@@ -310,3 +310,43 @@ func (w *withOptions) NewAddPermissionlessDelegatorTx(
 		common.UnionOptions(w.options, options)...,
 	)
 }
+
+func (w *withOptions) NewAddAutoRenewedValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer signer.Signer,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	validatorAuthority *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoCompoundRewardShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.AddAutoRenewedValidatorTx, error) {
+	return w.builder.NewAddAutoRenewedValidatorTx(
+		validatorNodeID,
+		weight,
+		signer,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		validatorAuthority,
+		delegationShares,
+		autoCompoundRewardShares,
+		period,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewSetAutoRenewedValidatorConfigTx(
+	txID ids.ID,
+	autoCompoundRewardShares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.SetAutoRenewedValidatorConfigTx, error) {
+	return w.builder.NewSetAutoRenewedValidatorConfigTx(
+		txID,
+		autoCompoundRewardShares,
+		period,
+		common.UnionOptions(w.options, options)...,
+	)
+}

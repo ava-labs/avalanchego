@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "utils",
     srcs = [
@@ -10,7 +15,6 @@ go_library(
         "tmpnet.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/tests/utils",
-    visibility = ["//visibility:public"],
     deps = [
         "//api/health",
         "//config",

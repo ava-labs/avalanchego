@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-const firewoodDir = "firewood"
+const Directory = "firewood"
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -40,6 +40,8 @@ var (
 	proposeOnDiskCount     = metrics.GetOrRegisterCounter("firewood/triedb/propose/disk/count", nil)
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
+
+	ErrNoRevisionFound = errors.New("no revision found")
 
 	errNoProposalFound         = errors.New("no proposal found")
 	errUnexpectedProposalFound = errors.New("unexpected proposal found")
@@ -101,19 +103,24 @@ type TrieDBConfig struct {
 	RevisionsInMemory uint // must be >= 2
 	CacheStrategy     ffi.CacheStrategy
 	Archive           bool
+	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
+	// possible to reap the latest persisted revision.
+	DeferredCommitInterval uint64
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
 //   - CacheSizeBytes: 1MB
-//   - RevisionsInMemory: 100
+//   - RevisionsInMemory: 128
 //   - CacheStrategy: [ffi.CacheAllReads]
+//   - DeferredCommitInterval: 64
 func DefaultConfig(dir string) TrieDBConfig {
 	return TrieDBConfig{
-		DatabaseDir:       dir,
-		CacheSizeBytes:    1024 * 1024, // 1MB
-		RevisionsInMemory: 100,
-		CacheStrategy:     ffi.CacheAllReads,
+		DatabaseDir:            dir,
+		CacheSizeBytes:         1024 * 1024, // 1MB
+		RevisionsInMemory:      128,
+		CacheStrategy:          ffi.CacheAllReads,
+		DeferredCommitInterval: 64,
 	}
 }
 
@@ -130,16 +137,25 @@ func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 
 // New creates a new Firewood database with the given configuration.
 // The database will not be opened on error.
+//
+// If config.DeferredCommitInterval >= config.RevisionsInMemory, then
+// config.DeferredCommitInterval is set to config.RevisionsInMemory - 1 to
+// uphold the invariant that DeferredCommitInterval < RevisionsInMemory.
 func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, firewoodDir)
+	path := filepath.Join(config.DatabaseDir, Directory)
+
+	// The Firewood constructor will check that commitCount is nonzero.
+	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
+	commitCount := min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
+
 	options := []ffi.Option{
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
-		ffi.WithDeferredPersistenceCommitCount(1),
+		ffi.WithDeferredPersistenceCommitCount(commitCount),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
@@ -154,6 +170,12 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 
 	initialRoot := fw.Root()
+	if initialRoot == ffi.EmptyRoot {
+		log.Debug("empty firewood database opened", "path", path)
+	} else {
+		log.Debug("firewood database opened", "root", initialRoot, "path", path)
+	}
+
 	blockHashes := make(map[common.Hash]struct{})
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
@@ -203,6 +225,15 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
 	t.tree.root = common.Hash(t.Firewood.Root())
+}
+
+// ClearAll resets the database to an empty state, without a genesis block committed.
+func (t *TrieDB) ClearAll() error {
+	if _, err := t.Firewood.Update([]ffi.BatchOp{ffi.PrefixDelete(nil)}); err != nil {
+		return fmt.Errorf("clearing database: %w", err)
+	}
+	t.SetHashAndHeight(common.Hash{}, 0)
+	return nil
 }
 
 // Scheme returns the scheme of the database.
@@ -259,10 +290,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// encourage finalizers to run before we wait, otherwise the database won't close properly.
-	// N.B.: this is wrapped in a user-defined function as a workaround for
-	// https://github.com/golang/go/issues/78059.
-	// See https://github.com/ava-labs/firewood/issues/1679 for full details.
-	go func() { runtime.GC() }()
+	go runtime.GC()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -572,7 +600,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (com
 func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
 	revision, err := t.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
-		return nil, fmt.Errorf("retrieve revision at root %s: %w", root.Hex(), err)
+		return nil, fmt.Errorf("%w: expected root %s, got %w", ErrNoRevisionFound, root.Hex(), err)
 	}
 	return &reader{revision: revision}, nil
 }

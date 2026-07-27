@@ -1,0 +1,81 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package firewood
+
+import (
+	"fmt"
+
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/log"
+)
+
+var _ state.Database = (*reconstructedStateAccessor)(nil)
+
+// reconstructedStateAccessor wraps a [state.Database] and overrides OpenTrie
+// and OpenStorageTrie to return reconstructed tries backed by an [ffi.Reconstructed].
+//
+// The [ffi.Reconstructed] view is mutated in place by trie operations, so it must
+// not be used concurrently. Instances are constructed by [NewStateAccessor] when
+// the trie database backend is a [reconstructedTrieDB]; see [NewReconstructedTrieDB].
+type reconstructedStateAccessor struct {
+	state.Database
+	recon             *ffi.Reconstructed
+	computeRootOnHash bool
+}
+
+// newReconstructedStateAccessor wraps db so that trie operations are served by
+// the reconstructed view backing fw.
+func newReconstructedStateAccessor(db state.Database, fw *reconstructedTrieDB) state.Database {
+	return &reconstructedStateAccessor{
+		Database:          db,
+		recon:             fw.recon,
+		computeRootOnHash: fw.computeRootOnHash,
+	}
+}
+
+// OpenTrie opens an account trie backed by the [ffi.Reconstructed] view.
+// Only the view's current root is accepted; passing an arbitrary root will
+// return an error.
+func (s *reconstructedStateAccessor) OpenTrie(hash common.Hash) (state.Trie, error) {
+	currRoot := common.Hash(s.recon.Root())
+	if currRoot != hash {
+		return nil, fmt.Errorf("expected root hash %s but got %s", hash, currRoot)
+	}
+
+	t, err := newReconstructedAccountTrie(s.recon, s.computeRootOnHash)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// OpenStorageTrie opens a reconstructed storage trie wrapping the account trie.
+//
+//nolint:revive // removing names loses context.
+func (*reconstructedStateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
+	accountTrie, ok := self.(*reconstructedAccountTrie)
+	if !ok {
+		return nil, fmt.Errorf("invalid account trie type for reconstructed storage: %T", self)
+	}
+	return newStorageTrie(&accountTrie.baseTrie), nil
+}
+
+// CopyTrie returns a deep copy of the given trie.
+func (*reconstructedStateAccessor) CopyTrie(t state.Trie) state.Trie {
+	switch t := t.(type) {
+	case *reconstructedAccountTrie:
+		cp, err := t.Copy()
+		if err != nil {
+			log.Error("Failed to copy reconstructed trie", "error", err)
+			return nil
+		}
+		return cp
+	case *storageTrie:
+		return nil // The storage trie just wraps the account trie, so we must re-open it separately.
+	default:
+		panic(fmt.Errorf("unknown trie type %T", t))
+	}
+}

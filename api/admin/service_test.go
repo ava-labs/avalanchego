@@ -14,15 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 type loadVMsTest struct {
 	admin          *Admin
-	mockVMManager  *vmsmock.Manager
+	vmManager      *vms.Manager
 	mockVMRegistry *registrymock.VMRegistry
 }
 
@@ -30,15 +30,15 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 	ctrl := gomock.NewController(t)
 
 	mockVMRegistry := registrymock.NewVMRegistry(ctrl)
-	mockVMManager := vmsmock.NewManager(ctrl)
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
 
 	return &loadVMsTest{
 		admin: &Admin{Config: Config{
 			Log:        logging.NoLog{},
 			VMRegistry: mockVMRegistry,
-			VMManager:  mockVMManager,
+			VMManager:  vmManager,
 		}},
-		mockVMManager:  mockVMManager,
+		vmManager:      vmManager,
 		mockVMRegistry: mockVMRegistry,
 	}
 }
@@ -52,22 +52,25 @@ func TestLoadVMsSuccess(t *testing.T) {
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
 
+	// Set up aliases on the real manager
+	require.NoError(resources.vmManager.Alias(id1, id1.String()))
+	require.NoError(resources.vmManager.Alias(id1, "vm1-alias-1"))
+	require.NoError(resources.vmManager.Alias(id1, "vm1-alias-2"))
+	require.NoError(resources.vmManager.Alias(id2, id2.String()))
+	require.NoError(resources.vmManager.Alias(id2, "vm2-alias-1"))
+	require.NoError(resources.vmManager.Alias(id2, "vm2-alias-2"))
+
 	newVMs := []ids.ID{id1, id2}
 	failedVMs := map[ids.ID]error{
 		ids.GenerateTestID(): errTest,
 	}
-	// every vm is at least aliased to itself.
-	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
-	alias2 := []string{id2.String(), "vm2-alias-1", "vm2-alias-2"}
 	// we expect that we dedup the redundant alias of vmId.
 	expectedVMRegistry := map[ids.ID][]string{
-		id1: alias1[1:],
-		id2: alias2[1:],
+		id1: {"vm1-alias-1", "vm1-alias-2"},
+		id2: {"vm2-alias-1", "vm2-alias-2"},
 	}
 
 	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	// execute test
 	reply := LoadVMsReply{}
@@ -89,6 +92,16 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	require.ErrorIs(err, errTest)
 }
 
+// failingAliaser wraps an Aliaser and returns an error from Aliases.
+type failingAliaser struct {
+	ids.Aliaser
+	err error
+}
+
+func (f *failingAliaser) Aliases(ids.ID) ([]string, error) {
+	return nil, f.err
+}
+
 // Tests behavior for LoadVMs if we fail to fetch our aliases
 func TestLoadVMsGetAliasesFails(t *testing.T) {
 	require := require.New(t)
@@ -101,12 +114,13 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	failedVMs := map[ids.ID]error{
 		ids.GenerateTestID(): errTest,
 	}
-	// every vm is at least aliased to itself.
-	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
 	resources.mockVMRegistry.EXPECT().Reload(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
-	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
+	// Inject a failing aliaser so Aliases returns an error
+	resources.vmManager.Aliaser = &failingAliaser{
+		Aliaser: resources.vmManager.Aliaser,
+		err:     errTest,
+	}
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)

@@ -43,7 +43,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"golangci_lint warn_testify_assert license_header single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
   ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
@@ -80,13 +80,6 @@ function test_license_header {
 
 function test_single_import {
   if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'import \(\n\t".*"\n\)'; then
-    echo ""
-    return 1
-  fi
-}
-
-function test_require_error_is_no_funcs_as_params {
-  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n'; then
     echo ""
     return 1
   fi

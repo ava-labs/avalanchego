@@ -34,8 +34,8 @@ func (p *Parser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, erro
 	if p.ParseVtxF != nil {
 		return p.ParseVtxF(ctx, b)
 	}
-	if p.CantParseVtx && p.T != nil {
-		require.FailNow(p.T, errParse.Error())
+	if p.T != nil {
+		require.False(p.T, p.CantParseVtx, errParse)
 	}
 	return nil, errParse
 }

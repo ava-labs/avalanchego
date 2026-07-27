@@ -4,7 +4,6 @@
 package c
 
 import (
-	"context"
 	"math/big"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -66,7 +64,7 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	avaxClient client.Client,
+	avaxClient *client.Client,
 	ethClient *ethclient.Client,
 	backend Backend,
 ) Wallet {
@@ -83,7 +81,7 @@ type wallet struct {
 	Backend
 	builder    Builder
 	signer     Signer
-	avaxClient client.Client
+	avaxClient *client.Client
 	ethClient  *ethclient.Client
 }
 
@@ -168,7 +166,7 @@ func (w *wallet) IssueAtomicTx(
 		return w.Backend.AcceptAtomicTx(ctx, tx)
 	}
 
-	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
+	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
@@ -196,33 +194,4 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 
 	ctx := ops.Context()
 	return w.ethClient.EstimateBaseFee(ctx)
-}
-
-// TODO: Upstream this function into coreth.
-func awaitTxAccepted(
-	c client.Client,
-	ctx context.Context,
-	txID ids.ID,
-	freq time.Duration,
-	options ...rpc.Option,
-) error {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
-		if err != nil {
-			return err
-		}
-
-		if status == atomic.Accepted {
-			return nil
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
 }
