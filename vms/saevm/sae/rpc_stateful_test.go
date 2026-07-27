@@ -111,6 +111,25 @@ type txTraceResult struct {
 	Error  string                  `json:"error"`
 }
 
+// blockRLP returns the block's RLP encoding, as accepted by debug_traceBlock.
+func blockRLP(tb testing.TB, b *types.Block) hexutil.Bytes {
+	tb.Helper()
+	buf, err := rlp.EncodeToBytes(b)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%T)", b)
+	return buf
+}
+
+// blockRLPFile writes the block's RLP encoding to a temporary file, returning
+// both the encoding and the file path, as accepted by debug_traceBlock and
+// debug_traceBlockFromFile respectively.
+func blockRLPFile(tb testing.TB, b *types.Block) (hexutil.Bytes, string) {
+	tb.Helper()
+	buf := blockRLP(tb, b)
+	file := filepath.Join(tb.TempDir(), "block.rlp")
+	require.NoError(tb, os.WriteFile(file, buf, 0o600), "os.WriteFile()")
+	return buf, file
+}
+
 // onlyLOG1At returns cmp options comparing only the LOG1 [logger.StructLogRes]
 // at pc, ignoring its Gas and GasCost. It fails tb if code[pc] isn't LOG1.
 func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
@@ -165,10 +184,7 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
-	blockFile := filepath.Join(t.TempDir(), "block.rlp")
-	blockRLP, err := rlp.EncodeToBytes(depositBlock.EthBlock())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", depositBlock.EthBlock())
-	require.NoError(t, os.WriteFile(blockFile, blockRLP, 0o600), "os.WriteFile()")
+	blockRLP, blockFile := blockRLPFile(t, depositBlock.EthBlock())
 
 	tests := []rpcTest{
 		{
@@ -203,7 +219,7 @@ func TestDebugTrace(t *testing.T) {
 		},
 		{
 			method:       "debug_traceBlock",
-			args:         []any{hexutil.Bytes(blockRLP)},
+			args:         []any{blockRLP},
 			want:         wantDeposit,
 			extraCmpOpts: ignore,
 		},
@@ -369,6 +385,22 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 		}},
 	}
 
+	canonicalRLP, blockFile := blockRLPFile(t, b.EthBlock())
+
+	// debug_traceBlock accepts any block whose parent is canonical, not just
+	// blocks known to the backend. Tweaking a field outside execution's
+	// inputs changes the hash, making the block unknown while leaving its
+	// trace identical.
+	hdr := b.EthBlock().Header()
+	hdr.Nonce = types.BlockNonce{'u', 'n', 'k', 'n', 'o', 'w', 'n'}
+	nonCanonicalRLP := blockRLP(t, b.EthBlock().WithSeal(hdr))
+
+	// All block-tracing methods MUST report the executed base fee.
+	wantBlockTrace := []txTraceResult{{
+		TxHash: txHash,
+		Result: &want,
+	}}
+
 	sut.testRPC(ctx, t, []rpcTest{
 		{
 			method:       "debug_traceTransaction",
@@ -377,21 +409,33 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			extraCmpOpts: ignore,
 		},
 		{
-			method: "debug_traceBlockByNumber",
-			args:   []any{hexutil.Uint64(b.NumberU64())},
-			want: []txTraceResult{{
-				TxHash: txHash,
-				Result: &want,
-			}},
+			method:       "debug_traceBlockByNumber",
+			args:         []any{hexutil.Uint64(b.NumberU64())},
+			want:         wantBlockTrace,
 			extraCmpOpts: ignore,
 		},
 		{
-			method: "debug_traceBlockByHash",
-			args:   []any{b.Hash()},
-			want: []txTraceResult{{
-				TxHash: txHash,
-				Result: &want,
-			}},
+			method:       "debug_traceBlockByHash",
+			args:         []any{b.Hash()},
+			want:         wantBlockTrace,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlock",
+			args:         []any{canonicalRLP},
+			want:         wantBlockTrace,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlock",
+			args:         []any{nonCanonicalRLP},
+			want:         wantBlockTrace,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockFromFile",
+			args:         []any{blockFile},
+			want:         wantBlockTrace,
 			extraCmpOpts: ignore,
 		},
 	}...)

@@ -170,6 +170,14 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 	return nil
 }
 
+// BlockGasClock returns the parent's execution (gas) clock advanced to the
+// start of the block carrying hdr, which determines the block's base fee.
+func BlockGasClock(parent *blocks.Block, hooks hook.Points, hdr *types.Header) *gastime.Time {
+	clock := parent.ExecutedByGasTime()
+	clock.BeforeBlock(hooks.BlockTime(hdr))
+	return clock
+}
+
 // Execute executes the transactions in the [blocks.Block], beginning from the
 // post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
 // the number of transactions to process, allowing partial execution for
@@ -194,8 +202,7 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	gasClock := parent.ExecutedByGasTime().Clone()
-	gasClock.BeforeBlock(hooks.BlockTime(header))
+	gasClock := BlockGasClock(parent, hooks, header)
 	perTxClock := gasClock.Time.Clone()
 
 	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())

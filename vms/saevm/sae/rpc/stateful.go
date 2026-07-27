@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/consensus"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -18,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/ethapi"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"go.uber.org/zap"
 
@@ -154,7 +157,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	parent, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
+	parent, err := b.restoreExecutedParent(ctx, ethB)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
 	}
@@ -197,6 +200,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 // applied by using a special backend.
 type tracerAPI struct {
 	*tracers.API
+	b         *backend
 	traceCall *tracers.API
 }
 
@@ -204,6 +208,7 @@ func newTracerAPI(b *backend) *tracerAPI {
 	tb := &tracerBackend{b}
 	return &tracerAPI{
 		API:       tracers.NewAPI(tb),
+		b:         b,
 		traceCall: tracers.NewAPI(&traceCallBackend{tb}),
 	}
 }
@@ -212,6 +217,38 @@ func newTracerAPI(b *backend) *tracerAPI {
 // [traceCallBackend] instead.
 func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *tracers.TraceCallConfig) (any, error) {
 	return a.traceCall.TraceCall(ctx, args, blockNrOrHash, config)
+}
+
+// TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
+// block's worst-case base fee with the executed base fee before delegating.
+// The block need not be canonical, but its parent MUST be.
+func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
+	block := new(types.Block)
+	if err := rlp.DecodeBytes(blob, block); err != nil {
+		return nil, fmt.Errorf("decoding block: %v", err)
+	}
+	// Genesis falls through untouched for [tracers.API.TraceFullBlock] to
+	// reject.
+	if block.NumberU64() > 0 {
+		parent, err := a.b.restoreExecutedParent(ctx, block)
+		if err != nil {
+			return nil, fmt.Errorf("restoring parent block: %w", err)
+		}
+		hdr := block.Header()
+		hdr.BaseFee = saexec.BlockGasClock(parent, a.b.Hooks(), hdr).BaseFee().ToBig()
+		block = block.WithSeal(hdr)
+	}
+	return tracers.TraceFullBlock(ctx, a.API, block, config)
+}
+
+// TraceBlockFromFile shadows [tracers.API.TraceBlockFromFile], which would
+// otherwise dispatch to the embedded API's TraceBlock instead of the shadow.
+func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
+	blob, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("reading file: %v", err)
+	}
+	return a.TraceBlock(ctx, blob, config)
 }
 
 // traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
