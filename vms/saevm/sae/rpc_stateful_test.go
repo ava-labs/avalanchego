@@ -327,7 +327,7 @@ func TestDebugTrace(t *testing.T) {
 // header's, which a buggy replay might source instead.
 func TestDebugTraceFeeSensitive(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
+	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei), withArchivalState())
 
 	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
 	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
@@ -351,6 +351,8 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	baseFee := b.ExecutedBaseFee()
 	require.NotZerof(t, baseFee.ToBig().Cmp(b.EthBlock().BaseFee()), "%T.ExecutedBaseFee() = consensus header's worst-case base fee (%v); fees MUST differ to be pinned", b, baseFee)
 	require.NotZerof(t, baseFee.Cmp(parent.ExecutedBaseFee()), "%T.ExecutedBaseFee() = parent's executed base fee (%v); fees MUST differ to be pinned", b, baseFee)
+	t.Logf("base fees: parent executed = %v; consensus header (worst-case bound) = %v; executed = %v",
+		parent.ExecutedBaseFee(), b.EthBlock().BaseFee(), baseFee)
 
 	receipts := b.Receipts()
 	require.Lenf(t, receipts, 1, "%T.Receipts()", b)
@@ -369,7 +371,7 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 		}},
 	}
 
-	sut.testRPC(ctx, t, []rpcTest{
+	tests := []rpcTest{
 		{
 			method:       "debug_traceTransaction",
 			args:         []any{txHash},
@@ -394,7 +396,25 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			}},
 			extraCmpOpts: ignore,
 		},
-	}...)
+	}
+
+	t.Run("block_in_memory", func(t *testing.T) {
+		sut.testRPC(ctx, t, tests...)
+	})
+
+	// Once settled and evicted from VM memory, b must be restored from disk,
+	// where its header only carries the worst-case fee bound.
+	vmTime.AdvanceToSettle(ctx, t, b)
+	for range 2 {
+		bb := sut.runConsensusLoop(t)
+		vmTime.AdvanceToSettle(ctx, t, bb)
+	}
+	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
+	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
+
+	t.Run("block_on_disk", func(t *testing.T) {
+		sut.testRPC(ctx, t, tests...)
+	})
 }
 
 // TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
