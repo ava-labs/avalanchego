@@ -165,10 +165,11 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	}
 
 	// ethB was served by [tracerBackend], so its faked header carries the
-	// executed base fee (see [executedHeader]), which the gas clock cannot
-	// re-derive for pre-SAE blocks and the real header only bounds for
-	// asynchronous ones. The faked base fee is never nil, so the guard only
-	// avoids a panic in [uint256.FromBig].
+	// executed base fee (see [executedHeader]). We have no other way to
+	// recover that fee. The gas clock cannot re-derive it for pre-SAE blocks
+	// and an asynchronous block's real header only holds the worst-case
+	// bound. The faked fee is never nil, so the guard just avoids a panic in
+	// [uint256.FromBig].
 	baseFee := new(uint256.Int)
 	if bf := ethB.BaseFee(); bf != nil {
 		var overflow bool
