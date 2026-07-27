@@ -172,6 +172,11 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 
 // BlockGasClock returns the parent's execution (gas) clock advanced to the
 // start of the block carrying hdr, which determines the block's base fee.
+//
+// TODO(JonathanOppenheimer): synchronous (pre-SAE) blocks carry their real
+// base fee in hdr and their parents have no gas clock. If we modify the
+// hook.Points.SettledBy hook, we ca detect them as hooks.SettledBy(hdr) ==
+// (hook.Settled{}) and source execution inputs from the header instead.
 func BlockGasClock(parent *blocks.Block, hooks hook.Points, hdr *types.Header) *gastime.Time {
 	clock := parent.ExecutedByGasTime()
 	clock.BeforeBlock(hooks.BlockTime(hdr))

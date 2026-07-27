@@ -111,6 +111,19 @@ type txTraceResult struct {
 	Error  string                  `json:"error"`
 }
 
+// flatCallTrace is the flatCallTracer analogue of [txTraceResult], used to
+// pin reported block hashes, which no other tracer output carries.
+type flatCallTrace struct {
+	Result []native.FlatCallFrame `json:"result"`
+}
+
+// onlyFlatCallBlockHash compares [native.FlatCallFrame]s by block hash alone.
+var onlyFlatCallBlockHash = cmp.Options{
+	cmp.Transformer("onlyBlockHash", func(f native.FlatCallFrame) *common.Hash {
+		return f.BlockHash
+	}),
+}
+
 // blockRLP returns the block's RLP encoding, as accepted by debug_traceBlock.
 func blockRLP(tb testing.TB, b *types.Block) hexutil.Bytes {
 	tb.Helper()
@@ -393,7 +406,8 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	// trace identical.
 	hdr := b.EthBlock().Header()
 	hdr.Nonce = types.BlockNonce{'u', 'n', 'k', 'n', 'o', 'w', 'n'}
-	nonCanonicalRLP := blockRLP(t, b.EthBlock().WithSeal(hdr))
+	sibling := b.EthBlock().WithSeal(hdr)
+	nonCanonicalRLP := blockRLP(t, sibling)
 
 	// All block-tracing methods MUST report the executed base fee.
 	wantBlockTrace := []txTraceResult{{
@@ -433,12 +447,73 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			extraCmpOpts: onlyLOG1,
 		},
 		{
+			// The sibling's own hash MUST be reported, not the hash of the
+			// canonical block at the same height.
+			method:       "debug_traceBlock",
+			args:         []any{nonCanonicalRLP, &tracers.TraceConfig{Tracer: utils.PointerTo("flatCallTracer")}},
+			want:         []flatCallTrace{{Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(sibling.Hash())}}}},
+			extraCmpOpts: onlyFlatCallBlockHash,
+		},
+		{
 			method:       "debug_traceBlockFromFile",
 			args:         []any{blockFile},
 			want:         wantBlockTrace,
 			extraCmpOpts: onlyLOG1,
 		},
 	}...)
+}
+
+// TestDebugTraceUnacceptedBlock builds and parses a block without verifying or
+// accepting it, then traces it, sequentially and concurrently. debug_traceBlock
+// only requires the block's parent to be canonical, so tracing MUST work even
+// though the block itself is unknown to the node, and MUST report the supplied
+// block's own hash to tracers.
+func TestDebugTraceUnacceptedBlock(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &common.Address{'r', 'e', 'c', 'v'},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(params.GWei),
+		Value:     big.NewInt(1),
+	})
+	b := unwrap(t, sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t), tx)).EthBlock()
+	unacceptedRLP, blockFile := blockRLPFile(t, b)
+
+	want := []txTraceResult{{
+		TxHash: tx.Hash(),
+		Result: &logger.ExecutionResult{
+			Gas:        params.TxGas,
+			StructLogs: []logger.StructLogRes{},
+		},
+	}}
+
+	tests := []rpcTest{
+		{
+			method: "debug_traceBlockFromFile",
+			args:   []any{blockFile},
+			want:   want,
+		},
+		{
+			// The internal re-seal with the executed base fee changes the
+			// block's hash; the supplied block's own hash MUST be reported.
+			method:       "debug_traceBlock",
+			args:         []any{unacceptedRLP, &tracers.TraceConfig{Tracer: utils.PointerTo("flatCallTracer")}},
+			want:         []flatCallTrace{{Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(b.Hash())}}}},
+			extraCmpOpts: onlyFlatCallBlockHash,
+		},
+	}
+	for range 4 {
+		tests = append(tests,
+			rpcTest{
+				method:   "debug_traceBlock",
+				args:     []any{unacceptedRLP},
+				want:     want,
+				parallel: true,
+			},
+		)
+	}
+	sut.testRPC(ctx, t, tests...)
 }
 
 // TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one

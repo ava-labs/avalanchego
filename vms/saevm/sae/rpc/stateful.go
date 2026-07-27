@@ -209,7 +209,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 //     debug_traceTransaction, and debug_traceCall with a transaction index.
 type tracerAPI struct {
 	*tracers.API
-	b         *backend
+	b         *tracerBackend
 	traceCall *tracers.API
 }
 
@@ -217,7 +217,7 @@ func newTracerAPI(b *backend) *tracerAPI {
 	tb := &tracerBackend{b}
 	return &tracerAPI{
 		API:       tracers.NewAPI(tb),
-		b:         b,
+		b:         tb,
 		traceCall: tracers.NewAPI(&traceCallBackend{tb}),
 	}
 }
@@ -236,18 +236,27 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	if err := rlp.DecodeBytes(blob, block); err != nil {
 		return nil, fmt.Errorf("decoding block: %v", err)
 	}
-	// Genesis falls through untouched for [tracers.API.TraceFullBlock] to
-	// reject.
+	api := a.API
+	// Genesis falls through untouched for [tracers.TraceBlock] to reject.
 	if block.NumberU64() > 0 {
 		parent, err := a.b.restoreExecutedParent(ctx, block)
 		if err != nil {
 			return nil, fmt.Errorf("restoring parent block: %w", err)
 		}
+		supplied := block.Hash()
 		hdr := block.Header()
 		hdr.BaseFee = saexec.BlockGasClock(parent, a.b.Hooks(), hdr).BaseFee().ToBig()
 		block = block.WithSeal(hdr)
+
+		// The re-seal changed the block's hash, so trace via a backend that
+		// reports the hash of the block as supplied.
+		api = tracers.NewAPI(&suppliedHashBackend{
+			tracerBackend: a.b,
+			resealed:      block.Hash(),
+			supplied:      supplied,
+		})
 	}
-	return tracers.TraceBlock(ctx, a.API, block, config)
+	return tracers.TraceBlock(ctx, api, block, config)
 }
 
 // TraceBlockFromFile shadows [tracers.API.TraceBlockFromFile], which would
@@ -258,6 +267,21 @@ func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config 
 		return nil, fmt.Errorf("reading file: %v", err)
 	}
 	return a.TraceBlock(ctx, blob, config)
+}
+
+// suppliedHashBackend is a per-trace [tracerBackend] reporting the supplied
+// hash of the block re-sealed by [tracerAPI.TraceBlock], which MAY be
+// non-canonical and therefore unknown to [tracerBackend.BlockHash].
+type suppliedHashBackend struct {
+	*tracerBackend
+	resealed, supplied common.Hash
+}
+
+func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
+	if block.Hash() == b.resealed {
+		return b.supplied
+	}
+	return b.tracerBackend.BlockHash(block)
 }
 
 // traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
@@ -322,6 +346,8 @@ func (b *tracerBackend) applyChildBeforeBlock(ctx context.Context, sdb *state.St
 
 // BlockHash returns the block's canonical hash, which differs from
 // block.Hash() because the blocks served by this backend carry faked headers.
+// Caller-supplied blocks, which MAY not be canonical, are instead handled by
+// [suppliedHashBackend].
 func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
 	hash := rawdb.ReadCanonicalHash(b.DB(), block.NumberU64())
 	if hash == (common.Hash{}) {
