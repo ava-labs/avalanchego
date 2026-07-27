@@ -248,6 +248,16 @@ type modelNode struct {
 	// fork[0] is accepted, or discarded wholesale by restartNode
 	// (crash-realistic: processing blocks are memory-only).
 	fork []doomedBlock
+
+	// strandedConsumed is the count of stranded txs issued to this node as
+	// of its last successful doomed build (see strandedCountFor):
+	// freshStrandedFor's guard is issuedTo(n) > strandedConsumed. The SAE
+	// builder is greedy, so one doomed build can sweep up several
+	// issued-to-n stranded txs at once — strandedConsumed tracks exactly how
+	// many, so a later build isn't judged eligible on txs that already sit
+	// inside a doomed ancestor. Only ever nonzero during a partition:
+	// healPartition resets it alongside clear(nm.stranded).
+	strandedConsumed int
 }
 
 // doomedBlock is one verified-but-unaccepted block of a minority validator's
@@ -635,28 +645,35 @@ func (nm *networkedMachine) issueTargets(from common.Address) []*modelNode {
 	return out
 }
 
-// freshStrandedFor reports whether minority validator n has had more
-// stranded txs issued to it than it has made doomed builds, i.e. at least
-// one issued-to-n tx no doomed build has yet consumed — under the
-// assumption that each doomed build consumes at least one (the freshness
-// guard ensured one was pending at that build's time). Only issued-to-n txs
-// are guaranteed pending in n's pool (issueTx's admission sync ran at
-// issuance, and a delayed node never executes, so nothing evicts); a
-// stranded tx gossiped over from another minority validator has no
-// admission guarantee. A model-count proxy rather than inspecting built
-// block contents (which are not a pure function of model state — gossiped
-// extras, pool leftovers, wall-clock tie-breaks — and would make the
-// "doomedBuilder" draw's very occurrence depend on non-model state,
-// breaking rapid replay/shrink). Pure model state, so draw counts
-// downstream stay replay-deterministic.
-func (nm *networkedMachine) freshStrandedFor(n *modelNode) bool {
-	var issuedToN int
+// strandedCountFor returns the number of currently-stranded txs issued to n.
+// Shared by freshStrandedFor and minorityBuild's consumed-floor update so the
+// two sites cannot drift apart.
+func (nm *networkedMachine) strandedCountFor(n *modelNode) int {
+	var count int
 	for _, idx := range nm.stranded {
 		if idx == n.idx {
-			issuedToN++
+			count++
 		}
 	}
-	return issuedToN > len(n.fork)
+	return count
+}
+
+// freshStrandedFor reports whether minority validator n has had at least one
+// stranded tx issued to it AFTER n's last doomed build (n.strandedConsumed,
+// the consumed floor set by minorityBuild). Such a tx cannot be inside any
+// of n's doomed ancestors — all of which predate it — so it is unconsumed by
+// construction. It is also guaranteed pending in n's pool: issueTx's
+// admission sync ran at issuance, and a delayed node never executes, so
+// nothing evicts it. A stranded tx gossiped over from another minority
+// validator carries neither guarantee, which is why the floor is counted
+// from nm.stranded rather than from fork contents (block contents are not a
+// pure function of model state — gossiped extras, pool leftovers,
+// wall-clock tie-breaks — and would make the "doomedBuilder" draw's very
+// occurrence depend on non-model state, breaking rapid replay/shrink). The
+// count is model/machine state only, so draw counts downstream stay
+// replay-deterministic.
+func (nm *networkedMachine) freshStrandedFor(n *modelNode) bool {
+	return nm.strandedCountFor(n) > n.strandedConsumed
 }
 
 // allSUTs is every node's SUT in index order, the fan-out set for

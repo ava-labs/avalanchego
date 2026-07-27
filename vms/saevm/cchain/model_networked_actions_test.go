@@ -502,6 +502,18 @@ func (nm *networkedMachine) catchUpNode(rt *rapid.T) {
 			n.fork = nil
 		}
 	}
+	// No-canonical-progress case: the partition produced no canonical blocks
+	// at all, so the loop above never ran (n.acceptedCount was already
+	// len(nm.canonical)) and any fork survived untouched. No sibling will
+	// ever arrive at the fork root's height for THIS catch-up — n abandons
+	// its fork here instead. RejectBlock is a near no-op in SAE; leaving the
+	// blocks processing would strand them.
+	if len(n.fork) > 0 {
+		for _, db := range n.fork {
+			require.NoErrorf(rt, n.sut.RejectBlock(n.ctx, db.blk), "%T.RejectBlock(doomed block at height %d, no-sibling catch-up) on node %d", n.sut.VM, db.height, n.idx)
+		}
+		n.fork = nil
+	}
 	n.delayed = false
 }
 
@@ -645,6 +657,11 @@ func (nm *networkedMachine) healPartition(_ *rapid.T) {
 		saetest.ConnectTo(nm.tb, n.sut, peers...)
 	}
 	clear(nm.stranded)
+	// The floor counts entries of the map just cleared; a stale floor would
+	// make a re-partitioned node permanently ineligible in freshStrandedFor.
+	for _, n := range nm.nodes {
+		n.strandedConsumed = 0
+	}
 	nm.minority = nil
 }
 
@@ -732,6 +749,12 @@ func (nm *networkedMachine) minorityBuild(rt *rapid.T) {
 	// later preference consumer (buildOn, another minorityBuild, ...)
 	// re-runs SetPreference before building.
 	b.fork = append(b.fork, newDoomedBlock(blk))
+	// Consumed floor: the SAE builder is greedy and may have just swept up
+	// more than one issued-to-b stranded tx into this single block, so
+	// record the current count rather than incrementing by one — otherwise
+	// freshStrandedFor would judge b eligible again on txs that already sit
+	// inside this doomed ancestor (see flake-investigation.md).
+	b.strandedConsumed = nm.strandedCountFor(b)
 }
 
 func (nm *networkedMachine) advanceClock(rt *rapid.T) {
