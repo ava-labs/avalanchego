@@ -77,7 +77,7 @@ func TestRecoverAfterCrash(t *testing.T) {
 	})
 }
 
-func TestRecoverSimple(t *testing.T) {
+func TestRecover(t *testing.T) {
 	t.Parallel()
 
 	const commitInterval = 16
@@ -209,7 +209,13 @@ func TestRecoverSimple(t *testing.T) {
 
 			t.Run("settle_after_recovery", func(t *testing.T) {
 				vmTime.AdvanceToSettle(ctx, t, sut.lastAcceptedBlock(t))
-				b := sut.runConsensusLoop(t)
+				// use old wallet for correct nonce.
+				tx := src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: big.NewInt(1),
+				})
+				b := sut.runConsensusLoop(t, tx)
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			})
 		})
