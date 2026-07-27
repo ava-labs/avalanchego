@@ -1,28 +1,68 @@
 # Release Notes
 
-## Pending (v1.14.3)
+## Pending (v1.15.0)
 
-### Metrics
+## [v1.15.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0-fuji)
 
-- Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md) C-Chain Async Execution
+- [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
+- [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
+- [ACP-273](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md) Reduce Minimum Validator Staking Duration
+- [ACP-283](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md) Dynamic Minimum C-Chain Gas Price
+- [ACP-285](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md) Reduce Minimum Consumption Rate
+
+The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, July 28th, 2026 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, July 28th 2026.**
+
+### APIs
+
+The wallet now supports the transaction types:
+- `NewAddAutoRenewedValidatorTx`
+- `NewSetAutoRenewedValidatorConfigTx`
+
+#### C-Chain RPCs
+
+- All RPCs that rely on state, if called after a block is accepted, will return after the block is executed.
+- The `admin` API namespace is deprecated.
+- The `warp` API namespace is deprecated.
+- The `avax.getAtomicTxStatus` RPC is deprecated.
+- All APIs that rely on state of pending blocks is deprecated.
+- In the `debug` namespace, the following APIs are deprecated:
+  - `debug_dumpBlock`
+  - `debug_preimage`
+  - `debug_getBadBlocks`
+  - `debug_accountRange`
+  - `debug_storageRangeAt`
+  - `debug_getModifiedAccountsByNumber`
+  - `debug_getModifiedAccountsByHash`
+  - `debug_getAccessibleState`
+
+#### Metrics
+
+- Histogram `avalanche_snowman_consensus_latencies` creates 8 buckets instead of 4, each a second wide.
+- Added `avalanche_evm_sae_last_executed_height` and `avalanche_evm_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
 - Added SAE execution-pressure metrics:
-  - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
-  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
-  - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
-  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): sum of the gas limits of accepted blocks that have not yet completed execution.
-  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
-  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
-- Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
-- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+  - `avalanche_evm_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
+  - `avalanche_evm_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
+  - `avalanche_evm_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
+  - `avalanche_evm_sae_execution_queue_gas_limit` (gauge): sum of the gas limits of accepted blocks that have not yet completed execution.
+  - `avalanche_evm_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
+  - `avalanche_evm_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
+- Added `avalanche_evm_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
+- Added `avalanche_evm_sae_accepted_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
 - Added SAE gas-time and pricing metrics:
-  - `avalanche_{vmName}_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
-  - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
-  - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest enqueued block.
-  - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest enqueued block.
-  - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
-- Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
+  - `avalanche_evm_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
+  - `avalanche_evm_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
+  - `avalanche_evm_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest enqueued block.
+  - `avalanche_evm_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
+  - `avalanche_evm_sae_worst_case_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest enqueued block.
+  - `avalanche_evm_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
+  - `avalanche_evm_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
+- Added `avalanche_evm_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
@@ -30,8 +70,88 @@
 
 NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
+### Configs
+
+#### New
+
+- `helicon-min-stake-duration` (only on local networks)
+- `min-price-target` for C-Chain
+
+### Deprecated in C-Chain
+
+- `skip-upgrade-check`
+- `admin-api-enabled`
+- `admin-api-dir`
+- `warp-api-enabled`
+- `continuous-profiler-dir`
+- `continuous-profiler-frequency`
+- `continuous-profiler-max-files`
+- `rpc-gas-cap`
+- `rpc-tx-fee-cap`
+- `trie-dirty-cache`
+- `trie-dirty-commit-target`
+- `trie-prefetcher-parallelism`
+- `preimages-enabled`
+- `snapshot-wait`
+- `snapshot-verification-enabled`
+- `accepted-queue-limit`
+- `populate-missing-tries-parallelism`
+- `prune-warp-db-enabled`
+- `historical-proof-query-window`
+- `metrics-expensive-enabled`
+- `price-options-slow-fee-percentage`
+- `price-options-fast-fee-percentage`
+- `price-options-max-tip`
+- `tx-pool-price-limit`
+- `tx-pool-price-bump`
+- `tx-pool-lifetime`
+- `api-max-duration`
+- `ws-cpu-refill-rate`
+- `ws-cpu-max-stored`
+- `allow-unfinalized-queries`
+- `allow-unprotected-tx-hashes`
+- `keystore-directory`
+- `keystore-external-signer`
+- `keystore-insecure-unlock-allowed`
+- `push-gossip-percent-stake`
+- `push-gossip-num-validators`
+- `push-gossip-num-peers`
+- `push-regossip-num-validators`
+- `push-regossip-num-peers`
+- `push-gossip-frequency`
+- `pull-gossip-frequency`
+- `regossip-frequency`
+- `log-level`
+- `log-json-format`
+- `enable-db-inspecting-api`
+- `enable-profiling-api`
+- `offline-pruning-bloom-filter-size`
+- `max-outbound-active-requests`
+- `state-sync-skip-resume`
+- `state-sync-server-trie-cache`
+- `state-sync-commit-interval`
+- `state-sync-min-blocks`
+- `state-sync-request-size`
+- `inspect-database`
+- `accepted-cache-size`
+- `state-history`
+- `skip-tx-indexing`
+- `http-body-limit`
+- `batch-response-max-size`
+
+### Features
+
+- Subnet-EVM allows providing the initial block delay at genesis via `InitialMinDelayMS` in the chain config.
+- Add `transitionvm` as a type of VM that can swap between two different implementations at a specific fork.
+
 ### Fixes
+
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
+- Archival nodes with re-execution will correctly skip atomic transaction application.
+- Fixed bug where code syncer could finish with improper disk artifacts.
+- P-Chain `ERROR` logs during close are downgraded to `WARN`.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.2...v1.15.0-fuji
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
