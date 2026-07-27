@@ -977,6 +977,8 @@ func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 // TestDebugTraceDoesNotApplyAtomicState asserts that executing a debug trace
 // does not apply atomic state changes before the block is accepted.
 func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
+	t.Skip("TODO(JonathanOppenheimer): unaccepted blocks are no longer traceable, rewrite or delete this test ")
+
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	ethSender := ethWallet.Addresses()[0]
 	exportKey := txtest.NewKey(t)

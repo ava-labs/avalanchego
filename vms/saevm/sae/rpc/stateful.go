@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -164,19 +163,19 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
 
-	// ethB was served by [tracerBackend], so its faked header carries the
-	// executed base fee (see [executedHeader]). We have no other way to
-	// recover that fee. The gas clock cannot re-derive it for pre-SAE blocks
-	// and an asynchronous block's real header only holds the worst-case
-	// bound. The faked fee is never nil, so the guard just avoids a panic in
-	// [uint256.FromBig].
-	baseFee := new(uint256.Int)
-	if bf := ethB.BaseFee(); bf != nil {
-		var overflow bool
-		baseFee, overflow = uint256.FromBig(bf)
-		if overflow {
-			return nil, bCtx, nil, nil, fmt.Errorf("base fee %v of block %d overflows 256 bits", bf, ethB.NumberU64())
-		}
+	// ethB's header usually carries the executed base fee already (courtesy
+	// of [tracerBackend]), but we can't guarantee that every caller goes through
+	// there, so we restore the fee ourselves. Restored by number because a faked header's
+	// hash differs from the canonical one.
+	//
+	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
+	// decodes the full block body and receipts but only the executed base fee
+	// is needed here; see the similar TODO in
+	// [backend.StateAndHeaderByNumberOrHash].
+	num := rpc.BlockNumber(ethB.NumberU64()) // #nosec G115 -- won't overflow for a while.
+	executed, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
+	if err != nil {
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring traced block: %w", err)
 	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
@@ -185,7 +184,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		block,
 		b,
 		txIndex,
-		baseFee,
+		executed.ExecutedBaseFee(),
 		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),
