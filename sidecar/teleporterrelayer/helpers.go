@@ -79,7 +79,7 @@ func deliver(
 	}
 
 	tx := types.MustSignNewTx(ethKey, types.LatestSignerForChainID(chainID), &types.DynamicFeeTx{
-		ChainID: chainID, Nonce: nonce, GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(100_000_000_000),
+		ChainID: chainID, Nonce: nonce, GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(40_000_000_000),
 		Gas: 6_000_000, To: &teleporterAddr, Data: callData,
 		AccessList: relayer.BuildPredicate(signedMsg.Bytes()),
 	})

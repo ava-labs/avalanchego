@@ -63,7 +63,7 @@ func main() {
 		log.Fatalf("--uri is required")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	// ---- Selection: top-N primary validators by weight, keyed only ----
@@ -168,7 +168,7 @@ func main() {
 			// A refusal IS a response: the peer handshook and its ACP-118
 			// handler processed the request. Only transport-level failures
 			// count against reachability.
-			if err == nil || strings.Contains(err.Error(), "refused") {
+			if err == nil || strings.Contains(err.Error(), "signer refused") {
 				c.Reachable = true
 				reachable++
 				reachableWeight += c.Weight

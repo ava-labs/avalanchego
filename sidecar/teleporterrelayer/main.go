@@ -13,9 +13,12 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -27,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle/teleporter"
 	"github.com/ava-labs/avalanchego/sidecar/internal/relayer"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -46,6 +50,7 @@ func main() {
 	teleporterStr := flag.String("teleporter", "", "destination TeleporterMessengerV2 address (required)")
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
 	ethKeyStr := flag.String("eth-key", "", "funded destination-chain key, PrivateKey-... CB58 (required)")
+	committeePath := flag.String("committee", "", "gateway.json artifact — source the committee set (nodeID+BLS key+weight) from it instead of the P-Chain (required on public networks where getValidatorsAt is unavailable)")
 	flag.Parse()
 
 	if *avalancheURI == "" {
@@ -94,18 +99,30 @@ func main() {
 	}
 
 	// ---- 3. Canonical committee set ----
-	pClient := platformvm.NewClient(*avalancheURI)
-	pHeight, err := pClient.GetHeight(ctx)
-	if err != nil {
-		log.Fatalf("P-Chain height: %v", err)
-	}
-	vdrMap, err := pClient.GetValidatorsAt(ctx, subnetID, platformapi.Height(pHeight))
-	if err != nil {
-		log.Fatalf("validators: %v", err)
-	}
-	warpSet, err := validators.FlattenValidatorSet(vdrMap)
-	if err != nil {
-		log.Fatalf("flatten set: %v", err)
+	// The committee is our own registered set, known exactly at registration —
+	// prefer the artifact (--committee) over a P-Chain query, which is both
+	// authoritative and immune to getValidatorsAt being unavailable on public
+	// networks / partial-sync nodes.
+	var warpSet validators.WarpSet
+	if *committeePath != "" {
+		warpSet, err = committeeSetFromArtifact(*committeePath)
+		if err != nil {
+			log.Fatalf("committee set from artifact: %v", err)
+		}
+	} else {
+		pClient := platformvm.NewClient(*avalancheURI)
+		pHeight, err := pClient.GetHeight(ctx)
+		if err != nil {
+			log.Fatalf("P-Chain height: %v", err)
+		}
+		vdrMap, err := pClient.GetValidatorsAt(ctx, subnetID, platformapi.Height(pHeight))
+		if err != nil {
+			log.Fatalf("validators: %v", err)
+		}
+		warpSet, err = validators.FlattenValidatorSet(vdrMap)
+		if err != nil {
+			log.Fatalf("flatten set: %v", err)
+		}
 	}
 	log.Printf("committee: %d validators, total weight %d", len(warpSet.Validators), warpSet.TotalWeight)
 
@@ -147,4 +164,54 @@ func mustID(s, name string) ids.ID {
 		log.Fatalf("parse %s: %v", name, err)
 	}
 	return id
+}
+
+// committeeSetFromArtifact builds the committee WarpSet from cmd/register's
+// gateway.json (blsPublicHex is the 48-byte compressed key; nodeID and weight
+// are as registered). This is the authoritative committee set — no P-Chain
+// query needed.
+func committeeSetFromArtifact(path string) (validators.WarpSet, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return validators.WarpSet{}, err
+	}
+	var art struct {
+		Attestors []struct {
+			NodeID       string `json:"nodeID"`
+			BLSPublicHex string `json:"blsPublicHex"`
+			Weight       uint64 `json:"weight"`
+		} `json:"attestors"`
+	}
+	if err := json.Unmarshal(raw, &art); err != nil {
+		return validators.WarpSet{}, err
+	}
+	if len(art.Attestors) == 0 {
+		return validators.WarpSet{}, fmt.Errorf("no attestors in %s", path)
+	}
+	var ws validators.WarpSet
+	for i, a := range art.Attestors {
+		nodeID, err := ids.NodeIDFromString(a.NodeID)
+		if err != nil {
+			return validators.WarpSet{}, fmt.Errorf("attestor %d nodeID: %w", i, err)
+		}
+		keyBytes, err := hex.DecodeString(a.BLSPublicHex)
+		if err != nil {
+			return validators.WarpSet{}, fmt.Errorf("attestor %d key hex: %w", i, err)
+		}
+		pk, err := bls.PublicKeyFromCompressedBytes(keyBytes)
+		if err != nil {
+			return validators.WarpSet{}, fmt.Errorf("attestor %d key parse: %w", i, err)
+		}
+		ws.Validators = append(ws.Validators, &validators.Warp{
+			PublicKey:      pk,
+			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+			Weight:         a.Weight,
+			NodeIDs:        []ids.NodeID{nodeID},
+		})
+		ws.TotalWeight += a.Weight
+	}
+	// Canonical order: ascending by uncompressed public key, matching how the
+	// warp precompile builds the set for verification.
+	utils.Sort(ws.Validators)
+	return ws, nil
 }

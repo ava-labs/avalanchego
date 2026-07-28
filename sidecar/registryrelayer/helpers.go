@@ -193,7 +193,7 @@ func deliver(
 	}
 	tx := types.MustSignNewTx(key, types.LatestSignerForChainID(chainID), &types.DynamicFeeTx{
 		ChainID: chainID, Nonce: nonce,
-		GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(100_000_000_000),
+		GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(20_000_000_000),
 		Gas: 8_000_000, To: &teleporter, Data: callData,
 	})
 	if err := client.SendTransaction(ctx, tx); err != nil {

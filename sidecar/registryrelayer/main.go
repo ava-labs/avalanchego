@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 
 	"github.com/ava-labs/libevm/common"
 )
@@ -62,7 +61,7 @@ func main() {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	teleporterAddr := common.HexToAddress(*teleporterStr)
@@ -77,21 +76,17 @@ func main() {
 	log.Printf("warp message: source C-Chain %s, %d payload bytes, nonce %s",
 		cChainID, len(unsigned.Payload), teleporterMsg.MessageNonce)
 
-	// ---- 2. Canonical primary-network validator set ----
+	// ---- 2. Current primary-network validators (key -> NodeID map only) ----
+	// getCurrentValidators is served by full nodes (unlike getValidatorsAt,
+	// which the public API rejects and a partial-sync node can't answer); we
+	// only need it to map each registered BLS key to the NodeID(s) serving it,
+	// so signature responses can be credited to the right registered index.
 	pClient := platformvm.NewClient(*avalancheURI)
-	pHeight, err := pClient.GetHeight(ctx)
+	curVdrs, err := pClient.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nil)
 	if err != nil {
-		log.Fatalf("P-Chain height: %v", err)
+		log.Fatalf("current validators: %v", err)
 	}
-	vdrMap, err := pClient.GetValidatorsAt(ctx, constants.PrimaryNetworkID, platformapi.Height(pHeight))
-	if err != nil {
-		log.Fatalf("primary validators: %v", err)
-	}
-	warpSet, err := validators.FlattenValidatorSet(vdrMap)
-	if err != nil {
-		log.Fatalf("flatten set: %v", err)
-	}
-	log.Printf("primary network: %d validators, total weight %d", len(warpSet.Validators), warpSet.TotalWeight)
+	log.Printf("primary network: %d current validators", len(curVdrs))
 
 	// ---- 2b. The registry's REGISTERED set — the array the contract applies
 	// the signature bitset to. Indexes, weights, and the quorum denominator
@@ -106,13 +101,17 @@ func main() {
 	// key to the node IDs currently serving it. Stored validators no longer
 	// in the current set get no node IDs — they cannot sign, and their weight
 	// is the drift the quorum check surfaces.
-	nodeIDsByKey := make(map[string][]ids.NodeID, len(vdrMap))
-	for nodeID, v := range vdrMap {
-		if v.PublicKey == nil {
+	nodeIDsByKey := make(map[string][]ids.NodeID, len(curVdrs))
+	for _, v := range curVdrs {
+		if v.Signer == nil {
 			continue
 		}
-		k := string(bls.PublicKeyToUncompressedBytes(v.PublicKey))
-		nodeIDsByKey[k] = append(nodeIDsByKey[k], nodeID)
+		pk, err := bls.PublicKeyFromCompressedBytes(v.Signer.PublicKey[:])
+		if err != nil {
+			continue
+		}
+		k := string(bls.PublicKeyToUncompressedBytes(pk))
+		nodeIDsByKey[k] = append(nodeIDsByKey[k], v.NodeID)
 	}
 	regSet := validators.WarpSet{TotalWeight: reg.TotalWeight}
 	live := 0
@@ -153,11 +152,11 @@ func main() {
 	if *validatorList != "" {
 		validatorAddrs = strings.Split(*validatorList, ",")
 	} else {
-		validatorAddrs, err = discoverPrimaryValidators(ctx, *avalancheURI, warpSet)
+		validatorAddrs, err = discoverPrimaryValidators(ctx, *avalancheURI, regSet)
 		if err != nil {
 			log.Fatalf("discover primary validators: %v", err)
 		}
-		log.Printf("discovered %d primary validator staking addresses", len(validatorAddrs))
+		log.Printf("discovered %d staking addresses for the registered set", len(validatorAddrs))
 	}
 	// On-chain warp messages need no justification: each node signs anything
 	// its C-Chain warp backend has stored.
