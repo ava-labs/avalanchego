@@ -504,8 +504,8 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(500*time.Millisecond), config.SimplexParameters.MaxNetworkDelay)
-				require.Equal(time.Duration(500*time.Millisecond), config.SimplexParameters.MaxRebroadcastWait)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxRebroadcastWait)
 
 				pkBytes, err := base64.StdEncoding.DecodeString(
 					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
