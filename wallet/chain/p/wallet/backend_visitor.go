@@ -136,7 +136,7 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+func (*backendVisitor) CreateL1Tx(*txs.CreateL1Tx) error {
 	// this function will be implemented in a follow-up PR. until then, this transaction is rejected.
 	return ErrUnsupportedTxType
 }

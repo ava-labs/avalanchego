@@ -197,7 +197,7 @@ func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+func (*visitor) CreateL1Tx(*txs.CreateL1Tx) error {
 	// This function will be implemented in a follow up PR. Until then, this transaction is rejected.
 	return ErrUnsupportedTxType
 }
