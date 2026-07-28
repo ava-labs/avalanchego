@@ -120,6 +120,8 @@ func (mb *msgBuilder) marshal(
 		return nil, 0, 0, err
 	}
 
+	proto.Marshal(uncompressedMsg)
+
 	op, err := ToOp(uncompressedMsg)
 	if err != nil {
 		return nil, 0, 0, err
