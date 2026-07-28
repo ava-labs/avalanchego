@@ -66,6 +66,10 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		if err != nil {
 			return fmt.Errorf("failed to get master image details: %w", err)
 		}
+		log.Info("Updating owning statefulset with image details",
+			zap.String("image", masterImageDetails.Image),
+			zap.Reflect("versions", masterImageDetails.Versions),
+		)
 		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}

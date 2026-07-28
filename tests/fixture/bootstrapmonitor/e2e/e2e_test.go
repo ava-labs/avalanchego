@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -168,7 +169,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReady)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the success of the bootstrap test", monitorContainerName))
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged, "" /* wantImage */)
 		_ = waitForNodeHealthy(tc, kubeconfig, namespace, nodePodName)
 
 		ginkgo.By("Checking that bootstrap testing is resumed when a pod is rescheduled")
@@ -441,10 +442,18 @@ func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clients
 	require.NoError(err)
 }
 
-// waitForLogOutput streams the logs from the specified pod container until a line containing all of the
-// desired outputs is found or the stream ends. Log lines are JSON-encoded, so a message and its fields
-// (e.g. the image) appear as separate substrings of a single line.
-func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput ...string) {
+// waitForLogOutput streams the logs from the specified pod container until a JSON log line with the
+// given message is found or the stream ends. If wantImage is non-empty, the line's test config image
+// MUST also equal it.
+func waitForLogOutput(
+	tc tests.TestContext,
+	clientset *kubernetes.Clientset,
+	namespace string,
+	podName string,
+	containerName string,
+	wantMsg string,
+	wantImage string,
+) {
 	// TODO(marun) Figure out why log output is randomly truncated (not flushed?)
 	// TODO(JonathanOppenheimer): Once this truncation is fixed, fail if the desired output is not found
 
@@ -463,22 +472,30 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 	require.NoError(tc, err)
 	defer readCloser.Close()
 
+	// logLine is the subset of a JSON-encoded log line that the log assertions match on.
+	type logLine struct {
+		Msg        string `json:"msg"`
+		TestConfig struct {
+			Image string `json:"image"`
+		} `json:"testConfig"`
+	}
+
 	scanner := bufio.NewScanner(readCloser)
 	for scanner.Scan() {
 		line := scanner.Text()
 		tc.Log().Info(" > " + line)
-		if len(desiredOutput) > 0 && containsAll(line, desiredOutput) {
-			return
-		}
-	}
-}
 
-// containsAll returns whether the line contains all of the provided substrings
-func containsAll(line string, substrings []string) bool {
-	for _, substring := range substrings {
-		if !strings.Contains(line, substring) {
-			return false
+		var parsed logLine
+		if err := json.Unmarshal([]byte(line), &parsed); err != nil {
+			// A truncated line isn't valid JSON
+			continue
 		}
+		if parsed.Msg != wantMsg {
+			continue
+		}
+		if len(wantImage) > 0 && parsed.TestConfig.Image != wantImage {
+			continue
+		}
+		return
 	}
-	return true
 }
