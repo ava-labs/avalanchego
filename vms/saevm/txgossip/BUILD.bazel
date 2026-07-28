@@ -14,8 +14,10 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p/gossip",
+        "//vms/saevm/params",
         "//vms/saevm/saexec",
         "//vms/saevm/types",
+        "//vms/saevm/worstcase",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/state",
@@ -46,6 +48,7 @@ go_test(
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/cmputils",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/params",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",

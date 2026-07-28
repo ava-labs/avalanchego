@@ -54,6 +54,7 @@ go_test(
     embed = [":tx"],
     deps = [
         "//chains/atomic",
+        "//codec",
         "//database/memdb",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params/extras/extrastest",
