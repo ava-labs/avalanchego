@@ -217,8 +217,11 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 // Therefore, the state is returned without any before-block changes being
 // applied by using a special backend.
 //
-// Every debug_trace* endpoint MUST source its state from one of three places:
-//   - [tracerBackend.StateAtBlock] re-executes the child: all but those below.
+// Every debug_trace* endpoint MUST source its state from one of four places:
+//   - [tracerBackend.StateAtBlock] re-executes the canonical child: all but
+//     those below.
+//   - [suppliedHashBackend.StateAtBlock] re-executes the caller-supplied
+//     block: debug_traceBlock and debug_traceBlockFromFile.
 //   - [traceCallBackend.StateAtBlock] gives state as of the block:
 //     debug_traceCall.
 //   - [backend.StateAtTransaction] replays within the block:
@@ -252,26 +255,29 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	if err := rlp.DecodeBytes(blob, block); err != nil {
 		return nil, fmt.Errorf("decoding block: %v", err)
 	}
-	api := a.API
-	// Genesis falls through untouched for [tracers.TraceBlock] to reject.
-	if block.NumberU64() > 0 {
-		parent, err := a.b.restoreExecutedParent(ctx, block)
-		if err != nil {
-			return nil, fmt.Errorf("restoring parent block: %w", err)
-		}
-		supplied := block.Hash()
-		hdr := block.Header()
-		hdr.BaseFee = saexec.BlockGasClock(parent, a.b.Hooks(), hdr).BaseFee().ToBig()
-		block = block.WithSeal(hdr)
-
-		// The re-seal changed the block's hash, so trace via a backend that
-		// reports the hash of the block as supplied.
-		api = tracers.NewAPI(&suppliedHashBackend{
-			tracerBackend: a.b,
-			resealed:      block.Hash(),
-			supplied:      supplied,
-		})
+	if block.NumberU64() == 0 {
+		// Copied from [tracers.TraceBlock] for want of a sentinel error.
+		return nil, errors.New("genesis is not traceable")
 	}
+
+	parent, err := a.b.restoreExecutedParent(ctx, block)
+	if err != nil {
+		return nil, fmt.Errorf("restoring parent block: %w", err)
+	}
+	supplied := block.Hash()
+	hdr := block.Header()
+	// The parent's gas clock, advanced to the start of the block, determines
+	// the executed base fee.
+	gasClock := parent.ExecutedByGasTime()
+	gasClock.BeforeBlock(a.b.Hooks().BlockTime(hdr))
+	hdr.BaseFee = gasClock.BaseFee().ToBig()
+	block = block.WithSeal(hdr)
+
+	api := tracers.NewAPI(&suppliedHashBackend{
+		tracerBackend: a.b,
+		block:         block,
+		supplied:      supplied,
+	})
 	return tracers.TraceBlock(ctx, api, block, config)
 }
 
@@ -285,19 +291,27 @@ func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config 
 	return a.TraceBlock(ctx, blob, config)
 }
 
-// suppliedHashBackend is a per-trace [tracerBackend] reporting the supplied
-// hash of the block re-sealed by [tracerAPI.TraceBlock], which MAY be
-// non-canonical and therefore unknown to [tracerBackend.BlockHash].
+// suppliedHashBackend is a per-trace [tracerBackend] for the caller-supplied
+// block re-sealed by [tracerAPI.TraceBlock], which MAY be non-canonical: it
+// reports the block's hash as supplied and applies the block's own
+// before-block changes.
 type suppliedHashBackend struct {
 	*tracerBackend
-	resealed, supplied common.Hash
+	block    *types.Block // re-sealed with the executed base fee
+	supplied common.Hash  // hash of the block as supplied by the caller
 }
 
 func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
-	if block.Hash() == b.resealed {
+	if block.Hash() == b.block.Hash() {
 		return b.supplied
 	}
 	return b.tracerBackend.BlockHash(block)
+}
+
+// StateAtBlock returns the parent's post-execution state with the supplied
+// block's before-block changes applied.
+func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	return b.stateAtBlockWithChild(ctx, parent, reexec, base, readOnly, preferDisk, b.block)
 }
 
 // traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
@@ -324,40 +338,35 @@ type tracerBackend struct {
 // the block-tracing endpoints request the state that the child's transactions
 // ran on.
 func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	sdb, release, err := b.backend.StateAtBlock(ctx, block, reexec, base, readOnly, preferDisk)
+	num := rpc.BlockNumber(block.NumberU64() + 1) // #nosec G115 -- won't overflow for a while.
+	child, err := b.backend.BlockByNumber(ctx, num)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading child block %d: %w", num, err)
+	}
+	if child == nil {
+		// This backend only traces canonical blocks ([suppliedHashBackend]
+		// serves the rest), so the child MUST exist.
+		return nil, nil, fmt.Errorf("no canonical child of block %d", block.NumberU64())
+	}
+	return b.stateAtBlockWithChild(ctx, block, reexec, base, readOnly, preferDisk, child)
+}
+
+// stateAtBlockWithChild returns the parent's post-execution state with the
+// child block's pre-transaction state changes applied.
+func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool, child *types.Block) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	sdb, release, err := b.backend.StateAtBlock(ctx, parent, reexec, base, readOnly, preferDisk)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	if err := b.applyChildBeforeBlock(ctx, sdb, block.Header()); err != nil {
+	rules := b.ChainConfig().Rules(child.Number(), true /*isMerge*/, child.Time())
+	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
+	// beacon root (already fixed upstream in geth), it will be applied twice,
+	// so we should drop it here.
+	if err := saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parent.Header(), child); err != nil {
 		release()
 		return nil, nil, err
 	}
 	return sdb, release, nil
-}
-
-// applyChildBeforeBlock applies the canonical child block's pre-transaction
-// state changes to sdb, the parent's post-execution state. It is a no-op if
-// the parent has no canonical child.
-func (b *tracerBackend) applyChildBeforeBlock(ctx context.Context, sdb *state.StateDB, parent *types.Header) error {
-	child := rpc.BlockNumber(parent.Number.Uint64() + 1) // #nosec G115 -- won't overflow for a while.
-	ethB, err := b.backend.BlockByNumber(ctx, child)
-	if err != nil {
-		return fmt.Errorf("reading child block %d: %w", child, err)
-	}
-	if ethB == nil {
-		// Normal when the parent is the last accepted block, e.g. when tracing
-		// a caller-supplied block built on the tip.
-		b.Logger().Debug("No canonical child, tracing without before-block changes",
-			zap.Uint64("parent_height", parent.Number.Uint64()),
-		)
-		return nil
-	}
-	rules := b.ChainConfig().Rules(ethB.Number(), true /*isMerge*/, ethB.Time())
-	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
-	// beacon root (already fixed upstream in geth), it will be applied twice,
-	// so we should drop it here.
-	return saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parent, ethB)
 }
 
 // BlockHash returns the block's canonical hash, which differs from

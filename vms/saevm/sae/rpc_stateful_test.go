@@ -103,18 +103,20 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
-// txTraceResult is [tracers.TxTraceResult] with Result typed rather than
-// `any`, which would JSON-unmarshal into a map.
-type txTraceResult struct {
-	TxHash common.Hash             `json:"txHash"`
-	Result *logger.ExecutionResult `json:"result"`
-	Error  string                  `json:"error"`
+// traceResult is [tracers.TxTraceResult] with Result typed by the tracer in
+// use rather than `any`, which would JSON-unmarshal into a map.
+type traceResult[T any] struct {
+	TxHash common.Hash `json:"txHash"`
+	Result T           `json:"result"`
+	Error  string      `json:"error"`
 }
 
-// flatCallTrace is the flatCallTracer analogue of [txTraceResult], used to
-// pin reported block hashes, which no other tracer output carries.
-type flatCallTrace struct {
-	Result []native.FlatCallFrame `json:"result"`
+// resealWithNonce re-seals the block with the given header nonce, changing
+// its hash but not its trace (the nonce is outside execution's inputs).
+func resealWithNonce(b *types.Block, nonce uint64) *types.Block {
+	hdr := b.Header()
+	hdr.Nonce = types.EncodeNonce(nonce)
+	return b.WithSeal(hdr)
 }
 
 // onlyFlatCallBlockHash compares [native.FlatCallFrame]s by block hash alone.
@@ -170,7 +172,7 @@ func TestDebugTrace(t *testing.T) {
 	const logPC = 185
 	onlyLOG1 := onlyLOG1At(t, escrow.ByteCode(), logPC)
 
-	want := []txTraceResult{
+	want := []traceResult[*logger.ExecutionResult]{
 		{
 			TxHash: deployTx.Hash(),
 			Result: &logger.ExecutionResult{
@@ -416,16 +418,12 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 	canonicalRLP, blockFile := blockRLPFile(t, b.EthBlock())
 
 	// debug_traceBlock accepts any block whose parent is canonical, not just
-	// blocks known to the backend. Tweaking a field outside execution's
-	// inputs changes the hash, making the block unknown while leaving its
-	// trace identical.
-	hdr := b.EthBlock().Header()
-	hdr.Nonce = types.BlockNonce{'u', 'n', 'k', 'n', 'o', 'w', 'n'}
-	sibling := b.EthBlock().WithSeal(hdr)
+	// blocks known to the backend.
+	sibling := resealWithNonce(b.EthBlock(), 'u')
 	nonCanonicalRLP := blockRLP(t, sibling)
 
 	// All block-tracing methods MUST report the executed base fee.
-	wantBlockTrace := []txTraceResult{{
+	wantBlockTrace := []traceResult[*logger.ExecutionResult]{{
 		TxHash: txHash,
 		Result: &want,
 	}}
@@ -466,7 +464,7 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			// canonical block at the same height.
 			method:       "debug_traceBlock",
 			args:         []any{nonCanonicalRLP, &tracers.TraceConfig{Tracer: utils.PointerTo("flatCallTracer")}},
-			want:         []flatCallTrace{{Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(sibling.Hash())}}}},
+			want:         []traceResult[[]native.FlatCallFrame]{{TxHash: txHash, Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(sibling.Hash())}}}},
 			extraCmpOpts: onlyFlatCallBlockHash,
 		},
 		{
@@ -511,7 +509,7 @@ func TestDebugTraceUnacceptedBlock(t *testing.T) {
 	b := unwrap(t, sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t), tx)).EthBlock()
 	unacceptedRLP, blockFile := blockRLPFile(t, b)
 
-	want := []txTraceResult{{
+	want := []traceResult[*logger.ExecutionResult]{{
 		TxHash: tx.Hash(),
 		Result: &logger.ExecutionResult{
 			Gas:        params.TxGas,
@@ -530,7 +528,7 @@ func TestDebugTraceUnacceptedBlock(t *testing.T) {
 			// block's hash; the supplied block's own hash MUST be reported.
 			method:       "debug_traceBlock",
 			args:         []any{unacceptedRLP, &tracers.TraceConfig{Tracer: utils.PointerTo("flatCallTracer")}},
-			want:         []flatCallTrace{{Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(b.Hash())}}}},
+			want:         []traceResult[[]native.FlatCallFrame]{{TxHash: tx.Hash(), Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(b.Hash())}}}},
 			extraCmpOpts: onlyFlatCallBlockHash,
 		},
 	}
@@ -578,23 +576,28 @@ func TestDebugIntermediateRoots(t *testing.T) {
 	assert.Equal(t, block.PostExecutionStateRoot(), roots[len(roots)-1], "last root is the block's post-execution root")
 }
 
-// TestDebugTraceBeforeBlockHook verifies that tracing a block applies the
-// block's own before-block hook changes, while querying state as of a block
-// does not apply the next block's.
+// TestDebugTraceBeforeBlockHook verifies that tracing a block — canonical or
+// caller-supplied — applies the block's own before-block hook changes, while
+// querying state as of a block does not apply the next block's.
 func TestDebugTraceBeforeBlockHook(t *testing.T) {
+	const suppliedNonce = 7
 	marker := common.Address{'m', 'a', 'r', 'k'}
 	ctx, sut := newSUT(t, 1)
-	sut.hooks.BeforeExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, _ *types.Header, _ *types.Block) error {
-		sdb.AddBalance(marker, uint256.NewInt(1))
+	sut.hooks.BeforeExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, _ *types.Header, b *types.Block) error {
+		sdb.AddBalance(marker, uint256.NewInt(1+b.Nonce()))
 		return nil
+	}
+	newMarkerTx := func() *types.Transaction {
+		return sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &marker,
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		})
 	}
 
 	b1 := sut.runConsensusLoop(t)
-	b2 := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &marker,
-		Gas:      params.TxGas,
-		GasPrice: big.NewInt(1),
-	}))
+	b2 := sut.runConsensusLoop(t, newMarkerTx())
+	unaccepted := unwrap(t, sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t), newMarkerTx())).EthBlock()
 
 	// b2's post-execution root includes the hook's credit, so re-execution
 	// only reproduces it if the trace's base state includes the credit too.
@@ -638,6 +641,40 @@ func TestDebugTraceBeforeBlockHook(t *testing.T) {
 		require.Contains(t, prestate, marker, "prestate accounts")
 		assert.Equal(t, int64(1), prestate[marker].Balance.Int64(), "marker balance as of b1")
 	})
+
+	// Tracing a caller-supplied block MUST apply the supplied block's own
+	// before-block changes.
+	suppliedTests := []struct {
+		name        string
+		supplied    *types.Block
+		wantBalance int64
+	}{
+		{
+			// The canonical child (b2, crediting 1) MUST NOT be the source.
+			name:        "supplied_over_canonical_child",
+			supplied:    resealWithNonce(b2.EthBlock(), suppliedNonce),
+			wantBalance: 1 + 1 + suppliedNonce,
+		},
+		{
+			// No canonical child exists; changes MUST still be applied.
+			name:        "supplied_parent_is_tip",
+			supplied:    resealWithNonce(unaccepted, suppliedNonce),
+			wantBalance: 2 + 1 + suppliedNonce,
+		},
+	}
+	for _, tt := range suppliedTests {
+		t.Run(tt.name, func(t *testing.T) {
+			var results []traceResult[map[common.Address]native.Account]
+			err := sut.CallContext(ctx, &results, "debug_traceBlock",
+				blockRLP(t, tt.supplied),
+				tracers.TraceConfig{Tracer: utils.PointerTo("prestateTracer")},
+			)
+			require.NoError(t, err, "CallContext(debug_traceBlock, prestateTracer)")
+			require.Len(t, results, 1, "one result per transaction")
+			require.Contains(t, results[0].Result, marker, "prestate accounts")
+			assert.Equal(t, tt.wantBalance, results[0].Result[marker].Balance.Int64(), "marker balance credited by the supplied block's before-block hook")
+		})
+	}
 }
 
 func TestStatefulRPCs(t *testing.T) {
