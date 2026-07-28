@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Build the RPM builder Docker image with Go checksum verification.
+# Build a packaging builder Docker image with Go checksum verification.
 #
 # Fetches the SHA256 checksum for the Go tarball from go.dev release
 # metadata and passes it to the Docker build for integrity verification.
@@ -9,24 +9,43 @@
 #   GO_VERSION    - Go version to install (e.g., "1.24.12")
 #   DOCKER_IMAGE  - Name for the built Docker image
 #   CONTEXT_DIR   - Path to the Dockerfile directory
-#   DOCKERFILE    - Dockerfile name (e.g., "Dockerfile.rpm")
+#
+# Optional env vars:
+#   DOCKERFILE    - Dockerfile name within CONTEXT_DIR (default: "Dockerfile")
 
 set -euo pipefail
 
 : "${GO_VERSION:?GO_VERSION must be set}"
 : "${DOCKER_IMAGE:?DOCKER_IMAGE must be set}"
 : "${CONTEXT_DIR:?CONTEXT_DIR must be set}"
-: "${DOCKERFILE:?DOCKERFILE must be set (e.g. Dockerfile.rpm)}"
+
+DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required but not found on PATH" >&2; exit 1; }
 
-# Map host arch to Go's naming convention
-arch=$(uname -m)
-case "${arch}" in
-    x86_64)       goarch="amd64" ;;
+# Resolve the target arch for the builder image. The whole packaging
+# pipeline only supports host-arch builds: the Taskfile's RPM_ARCH
+# defaults to host uname, validate-tgz.sh derives its arch from host
+# uname, and so on. Cross-arch builds would produce mislabeled or
+# unvalidatable artifacts, so we reject any divergence between the
+# host arch and DOCKER_DEFAULT_PLATFORM up front.
+case "$(uname -m)" in
+    x86_64)        goarch="amd64" ;;
     aarch64|arm64) goarch="arm64" ;;
-    *) echo "Unsupported arch: ${arch}" >&2; exit 1 ;;
+    *) echo "Unsupported host arch: $(uname -m)" >&2; exit 1 ;;
 esac
+if [[ -n "${DOCKER_DEFAULT_PLATFORM:-}" && "${DOCKER_DEFAULT_PLATFORM}" != "linux/${goarch}" ]]; then
+    cat >&2 <<MSG
+ERROR: DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM} differs from
+       the host arch (linux/${goarch}). The packaging pipeline does
+       not support cross-arch builds — downstream tasks derive their
+       arch from host uname and would produce mislabeled artifacts.
+
+       Unset DOCKER_DEFAULT_PLATFORM (or align it with the host arch)
+       and re-run.
+MSG
+    exit 1
+fi
 
 # Fetch SHA256 checksum from go.dev release metadata
 filename="go${GO_VERSION}.linux-${goarch}.tar.gz"
@@ -51,6 +70,11 @@ build_driver=$(
 if [[ "${build_driver}" == "docker-container" ]]; then
     build_flags+=(--load)
 fi
+
+# Pin the build to the arch we resolved goarch / GO_CHECKSUM for, so the
+# Dockerfile's Go SHA256 verification matches Docker's TARGETARCH
+# regardless of any DOCKER_DEFAULT_PLATFORM ambient setting.
+build_flags+=(--platform "linux/${goarch}")
 
 docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
