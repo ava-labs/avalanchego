@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/native"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/libevm/ethapi"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -253,10 +254,6 @@ func TestPreSAETransactionRPCs(t *testing.T) {
 	})
 }
 
-// TestPreSAETraceBlockRPCs checks parity with the following methods:
-//   - debug_traceBlockByNumber
-//   - debug_traceBlockByHash
-//
 // Tracer configs shared by the debug_trace* tests. The callTracer reports
 // each transaction's tree of EVM calls; the prestateTracer reports the state
 // each transaction read, or the state changes it made in diff mode.
@@ -269,6 +266,10 @@ var (
 	}
 )
 
+// TestPreSAETraceBlockRPCs checks parity with the following methods:
+//   - debug_traceBlockByNumber
+//   - debug_traceBlockByHash
+//   - debug_traceBlock
 func TestPreSAETraceBlockRPCs(t *testing.T) {
 	ctx, sut, fx := newPreSAESUT(t)
 
@@ -287,12 +288,16 @@ func TestPreSAETraceBlockRPCs(t *testing.T) {
 			wantErr = upgradechaintest.NativeAssetCallTraceError
 		}
 
+		blob, err := rlp.EncodeToBytes(eth)
+		require.NoError(t, err, "rlp.EncodeToBytes(block %d)", fxBlock.Number)
+
 		tests := []struct {
 			method string
 			arg    any
 		}{
 			{"debug_traceBlockByNumber", hexutil.Uint64(fxBlock.Number)},
 			{"debug_traceBlockByHash", fxBlock.Hash},
+			{"debug_traceBlock", hexutil.Bytes(blob)},
 		}
 		for _, tt := range tests {
 			t.Run(tt.method, func(t *testing.T) {
@@ -308,27 +313,24 @@ func TestPreSAETraceBlockRPCs(t *testing.T) {
 					assert.Empty(t, trace.Error, "trace %d error", i)
 					assert.NotEmpty(t, trace.Result, "trace %d result", i)
 				}
-			})
-		}
 
-		if wantErr == "" {
-			assertTraceReplaysIntraBlockState(ctx, t, sut, fxBlock, eth)
+				assertTraceReplaysIntraBlockState(ctx, t, sut, fxBlock, eth, tt.method, tt.arg)
+			})
 		}
 	})
 }
 
-// assertTraceReplaysIntraBlockState asserts that block tracing executes
-// transaction i on the state left by transactions 0..i-1, not on the block's
-// parent state.
-func assertTraceReplaysIntraBlockState(ctx context.Context, t *testing.T, sut *SUT, fxBlock upgradechaintest.Block, eth *types.Block) {
+// assertTraceReplaysIntraBlockState asserts that `method` traces transaction i
+// on the state left by transactions 0..i-1, not on the block's parent state.
+func assertTraceReplaysIntraBlockState(ctx context.Context, t *testing.T, sut *SUT, fxBlock upgradechaintest.Block, eth *types.Block, method string, arg any) {
 	t.Helper()
 
 	var prestates []struct {
 		Result map[common.Address]native.Account `json:"result"`
 	}
 	require.NoError(t,
-		sut.ethclient.Client().CallContext(ctx, &prestates, "debug_traceBlockByNumber", hexutil.Uint64(fxBlock.Number), prestateTracer),
-		"debug_traceBlockByNumber(%d, prestateTracer)", fxBlock.Number)
+		sut.ethclient.Client().CallContext(ctx, &prestates, method, arg, prestateTracer),
+		"%s(block %d, prestateTracer)", method, fxBlock.Number)
 	require.Len(t, prestates, len(eth.Transactions()), "prestates per EVM transaction")
 
 	assertCoinbaseReplayFees(ctx, t, sut, fxBlock, eth, func(i int) map[common.Address]native.Account {

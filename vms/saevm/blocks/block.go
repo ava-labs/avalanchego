@@ -42,8 +42,9 @@ type Block struct {
 	// Overlord as a sign of our unwavering fealty. See [InMemoryBlockCount] for
 	// observability.
 	ancestry atomic.Pointer[ancestry]
-	// Only the genesis block or the last pre-SAE block is synchronous. These
-	// are self-settling by definition so their `ancestry` MUST be nil.
+	// Set when the block was executed synchronously, i.e. it is the genesis or
+	// any pre-SAE block. These are self-settling by definition so their
+	// `ancestry` MUST be nil.
 	synchronous bool
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.

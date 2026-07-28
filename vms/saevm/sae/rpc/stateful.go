@@ -250,6 +250,9 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
 // block's worst-case base fee with the executed base fee before delegating.
 // The block need not be canonical, but its parent MUST be.
+//
+// A synchronous (pre-SAE) block is traced with the base fee as supplied, which
+// is the real fee paid by its transactions.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
@@ -260,18 +263,19 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable")
 	}
 
-	parent, err := a.b.restoreExecutedParent(ctx, block)
-	if err != nil {
-		return nil, fmt.Errorf("restoring parent block: %w", err)
-	}
 	supplied := block.Hash()
-	hdr := block.Header()
-	// The parent's gas clock, advanced to the start of the block, determines
-	// the executed base fee.
-	gasClock := parent.ExecutedByGasTime()
-	gasClock.BeforeBlock(a.b.Hooks().BlockTime(hdr))
-	hdr.BaseFee = gasClock.BaseFee().ToBig()
-	block = block.WithSeal(hdr)
+	if hdr := block.Header(); !hook.Synchronous(a.b.Hooks(), hdr) {
+		// The parent's gas clock, advanced to the start of the block,
+		// determines the executed base fee.
+		parent, err := a.b.restoreExecutedParent(ctx, block)
+		if err != nil {
+			return nil, fmt.Errorf("restoring parent block: %w", err)
+		}
+		gasClock := parent.ExecutedByGasTime()
+		gasClock.BeforeBlock(a.b.Hooks().BlockTime(hdr))
+		hdr.BaseFee = gasClock.BaseFee().ToBig()
+		block = block.WithSeal(hdr)
+	}
 
 	api := tracers.NewAPI(&suppliedHashBackend{
 		tracerBackend: a.b,
