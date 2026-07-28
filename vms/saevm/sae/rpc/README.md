@@ -13,8 +13,8 @@ base fee and no post-execution state root. RPCs that need state (`eth_call`,
 headers carrying the executed base fee and post-execution root, mimicking a
 synchronous chain.
 
-The `debug_trace*` endpoints are served by `tracerAPI`, which routes each call
-to a `tracers.API` instance over one of three backends. All of them wrap
+The tracing endpoints of the `debug` namespace are served by `tracerAPI`,
+which routes each call to a `tracers.API` instance over one of three backends. All of them wrap
 `backend`, and any method a wrapper doesn't override falls through to the next
 layer:
 
@@ -22,8 +22,11 @@ layer:
   to `backend`: `debug_traceCall` wants the state as of the block itself, not
   a base state for re-executing its child.
 - `suppliedHashBackend` wraps `tracerBackend` for a single `debug_traceBlock`
-  call. The caller-supplied block is re-sealed with the executed base fee,
-  changing its hash, so `BlockHash` reports the hash as supplied.
+  call. The caller-supplied block need not be canonical, so its `StateAtBlock`
+  routes straight to `backend` and applies the supplied block's own
+  before-block changes instead of the canonical child's. The block is also
+  re-sealed with the executed base fee, changing its hash, so `BlockHash`
+  reports the hash as supplied.
 - `tracerBackend` wraps `backend`. Its `StateAtBlock` returns the parent's
   post-execution state with the canonical child's before-block changes
   applied (block tracing re-executes the child), and its `BlockHash` reports
@@ -33,9 +36,6 @@ layer:
   post-execution state root. Its `StateAtBlock` opens the state as of the
   block's own execution, and its `StateAtTransaction` replays the preceding
   transactions within the block.
-
-
-
 
 No wrapper overrides `StateAtTransaction`, so `debug_traceTransaction` and
 `debug_traceCall` with a transaction index always resolve to
@@ -49,6 +49,7 @@ graph TD
     canonical["debug_traceBlockByNumber<br/>debug_traceBlockByHash<br/>debug_traceChain<br/>debug_standardTraceBlockToFile<br/>debug_intermediateRoots<br/>debug_traceTransaction"] --> tracerBackend
 
     suppliedHashBackend --> tracerBackend
+    suppliedHashBackend -->|"StateAtBlock"| backend
     traceCallBackend --> tracerBackend
     traceCallBackend -->|"StateAtBlock"| backend
     tracerBackend --> backend
