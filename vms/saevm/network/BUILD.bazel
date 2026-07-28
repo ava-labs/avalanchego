@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "network",
+    srcs = ["network.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/network",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//network/p2p",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/validators",
+    ],
+)
