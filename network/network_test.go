@@ -320,32 +320,28 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 	heliconTime := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name           string
-		startTime      time.Time
-		peerUptime     float64
-		wantPeerUptime uint32
-		want           float64
+		name       string
+		startTime  time.Time
+		peerUptime float64
+		want       float64
 	}{
 		{
-			name:           "started_before_helicon",
-			startTime:      heliconTime.Add(-time.Second),
-			peerUptime:     .85,
-			wantPeerUptime: 85,
-			want:           100,
+			name:       "started_before_helicon",
+			startTime:  heliconTime.Add(-time.Second),
+			peerUptime: .85,
+			want:       100,
 		},
 		{
-			name:           "started_at_helicon_below_requirement",
-			startTime:      heliconTime,
-			peerUptime:     .85,
-			wantPeerUptime: 85,
-			want:           50, // only the local validator's half of total stake qualifies
+			name:       "started_at_helicon_below_requirement",
+			startTime:  heliconTime,
+			peerUptime: .85,
+			want:       50, // only the local validator's half of total stake qualifies
 		},
 		{
-			name:           "started_at_helicon_at_requirement",
-			startTime:      heliconTime,
-			peerUptime:     .9,
-			wantPeerUptime: 90,
-			want:           100,
+			name:       "started_at_helicon_at_requirement",
+			startTime:  heliconTime,
+			peerUptime: .9,
+			want:       100,
 		},
 	}
 	for _, tt := range tests {
@@ -372,7 +368,7 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 
 			require.Eventually(t, func() bool {
 				peers := networks[0].PeerInfo(nil)
-				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == tt.wantPeerUptime
+				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == uint32(tt.peerUptime*100)
 			}, 10*time.Second, 10*time.Millisecond)
 
 			uptime, err := networks[0].NodeUptime()
