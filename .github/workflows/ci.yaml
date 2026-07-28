@@ -286,6 +286,56 @@ jobs:
         # cgocheck2 is expensive but provides complete pointer checks
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
 
+  # Replay recorded C-Chain execution logs against Firewood to catch changes that would break the C-Chain.
+  replay-test:
+    needs: [build]
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cchain-mainnet-250k
+            replay-log: s3://firewood-cchain-replay-logs/cchain-mainnet-250k.replay
+            expected-root: 69f6e82aa25242787095e7deff07568a3be4496654203ef8c343648c76ecda32
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2 -> v2.9.1
+        with:
+          save-if: "false"
+          shared-key: "maxperf-ethhash-logger"
+      - name: Build Firewood FFI
+        run: cargo build --locked -p firewood-ffi --profile maxperf --features ethhash,logger
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "ffi/go.mod"
+          cache-dependency-path: ffi/go.sum
+      - name: Install s5cmd
+        run: go install github.com/peak/s5cmd/v2@v2.3.0
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # @v6.2.2
+        with:
+          role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+      - name: Download replay log
+        run: s5cmd cp '${{ matrix.replay-log }}' '${{ runner.temp }}/${{ matrix.name }}.replay'
+      - name: Run C-Chain replay test
+        working-directory: ffi
+        env:
+          REPLAY_LOG: ${{ runner.temp }}/${{ matrix.name }}.replay
+          REPLAY_MAX_COMMITS: "0"
+          REPLAY_EXPECTED_ROOT: ${{ matrix.expected-root }}
+          TEST_FIREWOOD_HASH_MODE: ethhash
+        run: go test -run 'TestReplayLogExecution$' -v -timeout 20m .
+
   firewood-ethhash-differential-fuzz:
     needs: build
     runs-on: ubuntu-latest

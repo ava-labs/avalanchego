@@ -6,6 +6,7 @@ package ffi
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -31,6 +32,11 @@ const (
 	// number of executed commits.
 	// If empty, defaults to 10000. Set to 0 for unlimited.
 	replayMaxCommitsEnv = "REPLAY_MAX_COMMITS"
+
+	// replayExpectedRootEnv is the environment variable holding the
+	// hex-encoded root expected once the replay completes. When set, the
+	// final root is asserted against this value.
+	replayExpectedRootEnv = "REPLAY_EXPECTED_ROOT"
 )
 
 // replayLog mirrors the Rust ReplayLog type.
@@ -90,16 +96,46 @@ type commit struct {
 	ReturnedHash []byte `msgpack:"returned_hash"` // nil when absent
 }
 
+// replayExpectedRootFromEnv decodes REPLAY_EXPECTED_ROOT. The returned
+// boolean reports whether the variable is set.
+func replayExpectedRootFromEnv() (Hash, bool, error) {
+	var root Hash
+
+	rootHex := os.Getenv(replayExpectedRootEnv)
+	if rootHex == "" {
+		return root, false, nil
+	}
+
+	decoded, err := hex.DecodeString(rootHex)
+	if err != nil {
+		return root, true, fmt.Errorf("decode %s: %w", replayExpectedRootEnv, err)
+	}
+	if len(decoded) != RootLength {
+		return root, true, fmt.Errorf("%s must encode a %d-byte root, got %d bytes", replayExpectedRootEnv, RootLength, len(decoded))
+	}
+	copy(root[:], decoded)
+
+	return root, true, nil
+}
+
 // TestReplayLogExecution reads a length-prefixed MessagePack replay log
 // and replays it against a fresh Firewood database using the Go FFI bindings.
 //
 // Environment variables:
 //   - REPLAY_LOG: path to the replay log (required)
 //   - REPLAY_MAX_COMMITS: max commits to replay (default: 10000, 0 for unlimited)
+//   - REPLAY_EXPECTED_ROOT: hex-encoded root asserted once the replay
+//     completes (optional)
 func TestReplayLogExecution(t *testing.T) {
 	r := require.New(t)
 
+	expectedRoot, haveExpectedRoot, err := replayExpectedRootFromEnv()
+	r.NoError(err)
+
 	logPath := os.Getenv(replayLogEnv)
+	if haveExpectedRoot {
+		r.NotEmpty(logPath, "%s must be set when %s is set", replayLogEnv, replayExpectedRootEnv)
+	}
 	if logPath == "" {
 		t.Skipf("%s not set; skipping replay execution test", replayLogEnv)
 	}
@@ -112,9 +148,7 @@ func TestReplayLogExecution(t *testing.T) {
 	}
 
 	logs, err := loadReplayLogs(filepath.Clean(logPath), maxCommits)
-	if err != nil {
-		t.Skipf("unable to read replay log %q: %v", logPath, err)
-	}
+	r.NoError(err, "load replay log %q", logPath)
 	r.NotEmpty(logs, "expected at least one replay segment")
 
 	db := newTestDatabase(t, WithTruncate(true))
@@ -126,6 +160,9 @@ func TestReplayLogExecution(t *testing.T) {
 
 	root := db.Root()
 	r.NotEqual(EmptyRoot, root, "root should not be EmptyRoot after replay")
+	if haveExpectedRoot {
+		r.Equal(expectedRoot, root, "final state root")
+	}
 
 	t.Logf("Replay completed in %v (%d commits), final root: %x", elapsed, commits, root)
 }
