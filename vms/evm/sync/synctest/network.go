@@ -5,17 +5,20 @@ package synctest
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -31,22 +34,42 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 	net, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
+	log := loggingtest.New(t, logging.Debug)
+
+	// Joining the delivery goroutines keeps them from outliving the test, 
+	// so their logs can never reach a completed [testing.T].
+	var wg sync.WaitGroup
+	t.Cleanup(wg.Wait)
+	deliver := func(name string, fn func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(); err != nil {
+				log.Debug(name, zap.Error(err))
+			}
+		}()
+	}
+
 	// Loop each send back into the same network asynchronously to avoid
 	// deadlocking when the response is delivered on the sending goroutine.
 	sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 		for range nodeIDs {
-			go func() { _ = net.AppRequest(ctx, nodeID, requestID, time.Time{}, requestBytes) }()
+			deliver("AppRequest", func() error {
+				return net.AppRequest(ctx, nodeID, requestID, time.Time{}, requestBytes)
+			})
 		}
 		return nil
 	}
 	sender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-		go func() { _ = net.AppResponse(ctx, nodeID, requestID, responseBytes) }()
+		deliver("AppResponse", func() error {
+			return net.AppResponse(ctx, nodeID, requestID, responseBytes)
+		})
 		return nil
 	}
 	sender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, code int32, message string) error {
-		go func() {
-			_ = net.AppRequestFailed(ctx, nodeID, requestID, &common.AppError{Code: code, Message: message})
-		}()
+		deliver("AppRequestFailed", func() error {
+			return net.AppRequestFailed(ctx, nodeID, requestID, &common.AppError{Code: code, Message: message})
+		})
 		return nil
 	}
 
