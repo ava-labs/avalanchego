@@ -28,6 +28,7 @@ const (
 
 	BootstrapStartingMessage = "Starting bootstrap test"
 	BootstrapResumingMessage = "Resuming bootstrap test"
+	PodDeletingMessage       = "Deleting pod to trigger recreation with the digest-pinned image"
 )
 
 var (
@@ -76,7 +77,8 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		// The statefulset controller won't replace a pod that was never ready
 		// (init blocks readiness), so self-delete, and let the digest-pinned
 		// replacement make the start/resume decision.
-		log.Info("Deleting pod to trigger recreation with the digest-pinned image",
+		log.Info(PodDeletingMessage,
+			zap.String("image", masterImageDetails.Image),
 			zap.String("namespace", namespace),
 			zap.String("pod", podName),
 			zap.Duration("terminationTimeout", reapTimeout),
