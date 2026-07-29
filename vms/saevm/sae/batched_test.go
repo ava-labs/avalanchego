@@ -9,12 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/pebbledb"
@@ -25,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -130,22 +127,6 @@ func TestGetAncestors(t *testing.T) {
 			require.Equalf(t, tt.want, got, "GetAncestors(%s, %d, %d)", tt.blkID, tt.maxNum, tt.maxSize)
 		})
 	}
-
-	t.Run("returned_bytes_parse", func(t *testing.T) {
-		got, err := batched.GetAncestors(ctx, tip.ID(), len(chain), noSizeLimit, time.Minute)
-		require.NoError(t, err, "GetAncestors()")
-		require.Len(t, got, len(chain), "GetAncestors()")
-
-		parsed, err := batched.BatchedParseBlock(ctx, got)
-		require.NoError(t, err, "BatchedParseBlock()")
-		require.Len(t, parsed, len(chain), "BatchedParseBlock()")
-
-		for i, b := range parsed {
-			want := chain[len(chain)-1-i]
-			assert.Equalf(t, want.ID(), b.ID(), "BatchedParseBlock()[%d].ID()", i)
-			assert.Equalf(t, want.Height(), b.Height(), "BatchedParseBlock()[%d].Height()", i)
-		}
-	})
 }
 
 func TestBatchedParseBlock(t *testing.T) {
@@ -167,40 +148,20 @@ func TestBatchedParseBlock(t *testing.T) {
 		))
 	}
 
-	parsedChain := make([][]byte, len(chain))
+	bytes := make([][]byte, len(chain))
 	for i, b := range chain {
-		parsedChain[i] = b.Bytes()
+		bytes[i] = b.Bytes()
 	}
 
-	// Syntactically invalid block: valid RLP but the header's TxHash doesn't
-	// commit to the (empty) body.
-	invalidBlock := blockstest.NewBlock(t, types.NewBlockWithHeader(&types.Header{
-		Number:    big.NewInt(1),
-		UncleHash: types.EmptyUncleHash,
-		TxHash:    common.Hash{}, // MUST be [types.EmptyTxsHash]
-	}), nil, nil).Bytes()
-
-	t.Run("whole_chain", func(t *testing.T) {
-		got, err := batched.BatchedParseBlock(ctx, parsedChain)
-		require.NoError(t, err, "BatchedParseBlock()")
-		require.Len(t, got, len(chain), "BatchedParseBlock()")
-
-		for i, b := range got {
-			want := chain[i]
-			assert.Equalf(t, want.ID(), b.ID(), "BatchedParseBlock()[%d].ID()", i)
-			assert.Equalf(t, want.Height(), b.Height(), "BatchedParseBlock()[%d].Height()", i)
-		}
+	t.Run("batched_parse", func(t *testing.T) {
+		_, err := batched.BatchedParseBlock(ctx, bytes)
+		require.Equalf(t, block.ErrRemoteVMNotImplemented, err, "%T.BatchedParseBlock()", batched)
 	})
 
-	t.Run("empty_input", func(t *testing.T) {
-		got, err := batched.BatchedParseBlock(ctx, nil)
-		require.NoError(t, err, "BatchedParseBlock(nil)")
-		assert.Empty(t, got, "BatchedParseBlock(nil)")
-	})
-
-	t.Run("invalid_block_among_valid", func(t *testing.T) {
-		_, err := batched.BatchedParseBlock(ctx, [][]byte{parsedChain[0], invalidBlock, parsedChain[1]})
-		require.ErrorIs(t, err, errTxHashMismatch, "BatchedParseBlock([valid, invalid, valid])")
+	t.Run("batched_implementer_works", func(t *testing.T) {
+		parsed, err := block.BatchedParseBlock(t.Context(), sut, bytes)
+		require.NoError(t, err, "block.BatchedParseBlock()")
+		require.Len(t, parsed, len(chain), "block.BatchedParseBlock()")
 	})
 }
 
@@ -240,12 +201,6 @@ func BenchmarkGetAncestors(b *testing.B) {
 		vmTime.AdvanceToSettle(ctx, b, tip)
 	}
 
-	batched, ok := sut.ChainVM.(block.BatchedChainVM)
-	require.Truef(b, ok, "%T must implement block.BatchedChainVM", sut.ChainVM)
-	want, err := batched.GetAncestors(ctx, tip.ID(), maxBlocksNum, maxBlocksSize, time.Minute)
-	require.NoError(b, err, "GetAncestors()")
-	require.Greaterf(b, tip.Height()+1, uint64(len(want)), "size limit MUST truncate the response; increase the number of blocks built")
-
 	type serialGetter struct{ block.Getter }
 	for _, bench := range []struct {
 		name string
@@ -258,7 +213,7 @@ func BenchmarkGetAncestors(b *testing.B) {
 			for b.Loop() {
 				got, err := block.GetAncestors(ctx, logging.NoLog{}, bench.vm, tip.ID(), maxBlocksNum, maxBlocksSize, time.Minute)
 				require.NoError(b, err, "block.GetAncestors()")
-				require.Len(b, got, len(want), "block.GetAncestors()")
+				b.ReportMetric(float64(len(got)), "blocks")
 			}
 		})
 	}
