@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -21,17 +21,17 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// MaxHashesPerRequest caps the hashes per request so a response of that many
+// maxHashesPerRequest caps the hashes per request so a response of that many
 // max-size contracts stays within the p2p message limit, with headroom for
 // proto framing and the other message fields.
-const MaxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
+const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
-func RegisterHandler(net *p2p.Network, log logging.Logger, codeReader ethdb.KeyValueReader) error {
+func RegisterHandler(log logging.Logger, net *p2p.Network, codeReader ethdb.KeyValueReader) error {
 	h := handlers.NewHandler(
 		log,
 		func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} },
-		newResponder(codeReader),
+		newResponder(log, codeReader),
 	)
 	return net.AddHandler(p2p.EVMCodeRequestHandlerID, h)
 }
@@ -40,17 +40,21 @@ var _ handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse] = (*re
 
 // responder reads code by hash via [rawdb.ReadCode].
 type responder struct {
+	log        logging.Logger
 	codeReader ethdb.KeyValueReader
 }
 
-func newResponder(codeReader ethdb.KeyValueReader) *responder {
-	return &responder{codeReader: codeReader}
+func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responder {
+	return &responder{log: log, codeReader: codeReader}
 }
 
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, error) {
 	hashes := req.GetHashes()
-	if len(hashes) > MaxHashesPerRequest {
-		log.Debug("too many hashes requested, dropping request", "nodeID", nodeID, "numHashes", len(hashes))
+	if len(hashes) > maxHashesPerRequest {
+		r.log.Debug("too many hashes requested, dropping request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Int("numHashes", len(hashes)),
+		)
 		return nil, nil
 	}
 
@@ -59,7 +63,10 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 		hash := common.BytesToHash(raw)
 		data[i] = rawdb.ReadCode(r.codeReader, hash)
 		if len(data[i]) == 0 {
-			log.Debug("requested code not found, dropping request", "nodeID", nodeID, "hash", hash)
+			r.log.Debug("requested code not found, dropping request",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("hash", hash),
+			)
 			return nil, nil
 		}
 	}

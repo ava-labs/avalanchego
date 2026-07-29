@@ -14,10 +14,11 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -36,6 +37,7 @@ var (
 // dedupes concurrent fetches, and clears the durable to-fetch marker for each
 // hash it satisfies.
 type Syncer struct {
+	log        logging.Logger
 	client     *Client
 	db         ethdb.KeyValueStore
 	codeHashes <-chan common.Hash
@@ -65,10 +67,10 @@ func WithNumWorkers(n int) SyncerOption {
 }
 
 // WithCodeHashesPerRequest overrides the best-effort batch size per request. It
-// is capped at [MaxHashesPerRequest], the largest batch the handler accepts.
+// is capped at [maxHashesPerRequest], the largest batch the handler accepts.
 func WithCodeHashesPerRequest(n int) SyncerOption {
 	return options.Func[syncerConfig](func(c *syncerConfig) {
-		if n > 0 && n <= MaxHashesPerRequest {
+		if n > 0 && n <= maxHashesPerRequest {
 			c.codeHashesPerReq = n
 		}
 	})
@@ -76,14 +78,15 @@ func WithCodeHashesPerRequest(n int) SyncerOption {
 
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
 // verified code into db, fetching from peers through c.
-func NewSyncer(c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash, opts ...SyncerOption) *Syncer {
+func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash, opts ...SyncerOption) *Syncer {
 	cfg := syncerConfig{
 		numWorkers:       defaultNumWorkers,
-		codeHashesPerReq: MaxHashesPerRequest,
+		codeHashesPerReq: maxHashesPerRequest,
 	}
 	options.ApplyTo(&cfg, opts...)
 
 	return &Syncer{
+		log:              log,
 		client:           c,
 		db:               db,
 		codeHashes:       codeHashes,
@@ -143,7 +146,7 @@ func (s *Syncer) work(ctx context.Context) error {
 // fulfill fetches code for hashes, then writes it and clears the to-fetch
 // markers in one batch.
 func (s *Syncer) fulfill(ctx context.Context, hashes []common.Hash) error {
-	data, err := getCode(ctx, s.client, hashes)
+	data, err := getCode(ctx, s.log, s.client, hashes)
 	if err != nil {
 		return err
 	}
@@ -181,7 +184,7 @@ func (s *Syncer) clearMarker(codeHash common.Hash) error {
 // getCode requests hashes through c, verifies every returned blob against its
 // hash, and scores the peer. It re-requests on any network or verification
 // failure until ctx ends.
-func getCode(ctx context.Context, c *Client, hashes []common.Hash) ([][]byte, error) {
+func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -197,7 +200,7 @@ func getCode(ctx context.Context, c *Client, hashes []common.Hash) ([][]byte, er
 
 		if err := verifyCode(hashes, resp.GetData()); err != nil {
 			outcome.Failure()
-			log.Debug("invalid code response, re-requesting", "err", err)
+			log.Debug("invalid code response, re-requesting", zap.Error(err))
 			continue
 		}
 

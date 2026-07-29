@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -53,7 +54,7 @@ func TestResponder(t *testing.T) {
 		},
 		{
 			name:     "too many hashes drops",
-			hashes:   make([]common.Hash, MaxHashesPerRequest+1),
+			hashes:   make([]common.Hash, maxHashesPerRequest+1),
 			wantDrop: true,
 		},
 	}
@@ -62,7 +63,7 @@ func TestResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := newResponder(db)
+			r := newResponder(logging.NoLog{}, db)
 
 			rawHashes := make([][]byte, len(tt.hashes))
 			for i, h := range tt.hashes {

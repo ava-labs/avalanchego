@@ -112,7 +112,7 @@ func TestSyncer(t *testing.T) {
 			}
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			require.NoError(t, RegisterHandler(net, logging.NoLog{}, source))
+			require.NoError(t, RegisterHandler(logging.NoLog{}, net, source))
 
 			ch := make(chan common.Hash, len(want))
 			for hash := range want {
@@ -125,7 +125,7 @@ func TestSyncer(t *testing.T) {
 			if tt.perReq > 0 {
 				opts = append(opts, WithCodeHashesPerRequest(tt.perReq))
 			}
-			require.NoError(t, NewSyncer(NewClient(net, tracker), target, ch, opts...).Sync(ctx))
+			require.NoError(t, NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch, opts...).Sync(ctx))
 
 			for hash, code := range want {
 				require.Equal(t, code, rawdb.ReadCode(target, hash))
@@ -148,7 +148,7 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, tamperingHandler()))
 
-	got, err := getCode(ctx, NewClient(net, tracker), []common.Hash{hash})
+	got, err := getCode(ctx, logging.NoLog{}, NewClient(net, tracker), []common.Hash{hash})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, got, "tampered code must never be accepted")
 }
