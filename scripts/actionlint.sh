@@ -29,8 +29,11 @@ fi
 
 echo "Checking for workflow task invocations configured with passthrough flags..."
 # CI should invoke stable named tasks rather than redefining task behavior at
-# the workflow callsite. As a practical guardrail, reject task invocations that
-# pass extra option flags after `--`.
+# the workflow callsite. As a practical, best-effort guardrail, reject task
+# invocations that pass extra option flags after `--`.
+#
+# This check is intentionally narrow. It is meant to catch a common failure
+# mode, not to exhaustively model every possible workflow command form.
 TASK_CONFIGURATION=
 for file in "${AVALANCHE_PATH}"/.github/workflows/*.{yml,yaml}; do
   [[ -f "$file" ]] || continue

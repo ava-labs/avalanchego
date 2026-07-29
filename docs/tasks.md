@@ -1,172 +1,181 @@
 # Tasks
 
 This document explains why avalanchego uses [Task](https://taskfile.dev) and
-how tasks should be maintained in this repo.
+how to maintain tasks in this repo.
 
-For basic usage, including how to list and run tasks, see the [Running
-tasks](../CONTRIBUTING.md#running-tasks) section of
+For basic usage, including how to list and run tasks, see [Running
+tasks](../CONTRIBUTING.md#running-tasks) in
 [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## Table of contents
 
-- [Overview](#overview)
+- [Principles](#principles)
 - [Why this repo uses Task](#why-this-repo-uses-task)
-  - [Why not Make?](#why-not-make)
-  - [Why Task instead of just?](#why-task-instead-of-just)
+  - [The double dash delimiter](#the-double-dash-delimiter)
+  - [Why not Make or just?](#why-not-make-or-just)
 - [How tasks should work in this repo](#how-tasks-should-work-in-this-repo)
-  - [Tasks used directly by CI should use stable named entrypoints](#tasks-used-directly-by-ci-should-use-stable-named-entrypoints)
-  - [Exception: CI execution environment details](#exception-ci-execution-environment-details)
-  - [Example: good pattern](#example-good-pattern)
-  - [Example: pattern to avoid](#example-pattern-to-avoid)
+  - [Keep tasks simple](#keep-tasks-simple)
+  - [CI should run named tasks](#ci-should-run-named-tasks)
+  - [Some CI-only setup still belongs in workflows](#some-ci-only-setup-still-belongs-in-workflows)
+- [Examples](#examples)
+  - [Good: CI runs a named task](#good-ci-runs-a-named-task)
+  - [Good: the workflow passes a normal task argument](#good-the-workflow-passes-a-normal-task-argument)
+  - [Avoid: the workflow changes what the task does](#avoid-the-workflow-changes-what-the-task-does)
 - [When to add or change a task](#when-to-add-or-change-a-task)
 
-## Overview
+## Principles
 
-This repo uses Task so contributors can list useful commands and run them
-consistently.
-
-Two goals matter here:
-
-- **Discoverability**: Invoking `task` without arguments lists available commands
-- **Reproducibility**: when CI runs a task, a contributor can run the same task
-  locally and expect broadly similar behavior. This is intended to maximize the
-  chances of reproducing CI failures locally.
-
-Not every task in this repo is used directly by CI. Some tasks are simple wrappers
-around tools that naturally take arguments or other user input. The stronger rules
-below apply mainly to tasks used directly by CI or used as stable entrypoints that
-contributors are expected to rerun locally to reproduce CI behavior.
+- Defining common repo operations with Task makes them **easy to find**.
+  - `task` without arguments lists supported commands.
+- Requiring that CI runs named tasks makes **CI easier to reproduce locally**.
+  - A contributor can usually rerun the same task locally.
+  - Local execution may still depend on supporting tools such as nix or bazel.
 
 ## Why this repo uses Task
 
-Task is a command runner: a tool for defining named commands that can be
-listed and run in a consistent way.
+Task is a tool for naming and running commands. This repo wanted that kind of tool,
+not a build system.
 
-This repo wanted a command runner, not a build system. The main need was a simple way
-to expose common commands for builds, tests, linting, generation, and similar work,
-while keeping those commands easy to find and easy to rerun.
+What matters is less the specific tool than what it enables. The repo needs a way to
+define stable, discoverable command names for builds, tests, linting, code generation,
+and similar work. Task was a reasonable fit for that need.
 
-### Why not Make?
+### The double dash delimiter
 
-Make brings build dependency features and rules for deciding what needs to be
-rebuilt. Those can be useful for some projects, but they were not the point
-here. This repo mainly wanted stable, discoverable command names.
+Task has one quirk worth noting: task arguments come after `--` (for example,
+`task task-name -- arg1 arg2`). Without that delimiter, Task treats additional
+words as more task names rather than arguments.
 
-### Why Task instead of just?
+This repo generally prefers tasks that can be run without extra arguments, so
+that tradeoff was considered acceptable.
 
-[just](https://just.systems) could also serve as a command runner here. Task was
-chosen because it fit this repo's toolchain and needs at the time:
+### Why not Make or just?
 
-- it was a mature enough tool for the job
-- it fit naturally with the repo's existing Go-based tooling
-- its structured YAML format was considered acceptable for repo maintenance
+Make is most useful when a repo needs build rules and dependency tracking, but this
+repo already has solutions for those concerns. This repo just needs a way to define
+and discover commands on top of existing tooling. Make is more tool than is needed for
+that job, and its configuration format can be harder for casual users to understand.
 
-This does not mean Task needs to be a permanent fixture of the repo. What matters is
-the task model, not the specific tool. The repo needs a command runner that makes
-common commands easy to find and run, especially commands that CI and developers both
-need to run.
+[just](https://just.systems) is a reasonable alternative to Task. Its syntax is more
+like Make or shell scripting, which some people may prefer to Task's YAML style. Task
+was chosen over just because the existing dependency on Go tooling made adoption
+simpler and the repo's use of GitHub Actions also meant that YAML was already a
+familiar format.
 
 ## How tasks should work in this repo
 
-Tasks should be simple named commands. In most cases, the task name should be what
-people and CI use, while scripts and code hold the real behavior.
+These guidelines describe the repo's default approach to tasks, not rules that
+forbid every exception. When a different design is warranted, it should still
+be easy to explain in terms of making commands easy to find and easy to rerun
+locally.
 
-This is a general preference across the repo, and a stronger expectation for tasks
-used directly by CI or reused as stable reproduction entrypoints.
+### Keep tasks simple
 
-That means tasks should usually:
+In most cases, the task name should be the thing people run, while scripts and code do
+the real work.
+
+Task names should be clear enough that someone scanning `task` output can identify the
+command they want. For common repo operations, the task name should ideally also be a
+standard, memorable entrypoint that people can reuse in discussion, review, CI, and
+local reproduction. Names do not need to carry every detail because the `desc` field of
+a task can provide additional context, but they should avoid unusual wording that makes
+a task's purpose harder to recognize.
+
+In practice, tasks should usually:
 
 - stay simple
-- call scripts, tools, or other tasks that hold the real logic
-- avoid turning into their own separate place to configure behavior
+- call scripts, tools, or other tasks
+- avoid requiring extra workflow-only configuration
 
-Composing a few commands or other tasks inside `Taskfile.yml` is fine when that
-keeps the supported entrypoint clear. The main thing to avoid is hiding the real
-configuration or behavior only in workflow callsites or Task-specific wiring that a
-local user would have to rediscover.
+Most non-trivial shell logic should usually live under [`scripts/`](../scripts/). The
+main exception is code under [`.github/`](../.github/) when it is specific to GitHub
+Actions or packaging.
 
-Keeping non-trivial logic out of tasks makes it easier to apply the right linting and
-validation to scripts or code. That is much harder to do when behavior only exists
-inside a task definition.
+This makes the real behavior easier to check, test, reuse, and review.
 
-### Tasks used directly by CI should use stable named entrypoints
+### CI should run named tasks
 
-A **CI entrypoint task** is a task CI uses as the named way to run a
-repo-managed operation.
+When CI runs a repo operation, it should usually do so by running a named task. CI
+behavior existing only in GitHub Actions YAML is harder to discover, run, and
+maintain.
 
-A CI entrypoint task should usually be invoked through a stable named
-entrypoint.
+In this repo, that usually means calling `./scripts/run_task.sh` from a workflow. That
+helps keep the task runnable even when `task` is not already installed.
 
-In GitHub Actions workflows in this repo, that normally means invoking the task via
-`./scripts/run_task.sh` which ensures that task will run in a variety of different
-environments that may not have it directly installed.
-
-In normal use, the caller should not need to know special:
+For tasks that CI runs directly, the caller should usually not need special:
 
 - flags
 - environment variables
 - Taskfile variables
-- other task-specific configuration
+- other task-only configuration
 
-Tasks used directly by CI should usually not require positional arguments or other
-caller-supplied input. If CI needs different behavior, that should usually be
-expressed as a different named task rather than by parameterizing a single task at the
-workflow callsite.
-
-A task does not need to reject all input in every context. The potential problem is in
-defining behavior via CI-only settings that a local user would have to manually apply
+If CI needs different behavior, prefer a different named task instead of having the
+workflow reconfigure a shared task. Avoid workflow-only configuration that forces
+contributors to reconstruct the CI invocation manually when reproducing a failure
 locally.
 
-This repo does have some intentional exceptions. A small number of tasks are used as
-stable launchers for a family of related runs where the varying input is part of the
-user-facing interface rather than hidden CI-only behavior. For example, CI may select
-a fuzz shard, a particular re-execution scenario, or load-test flags that a developer
-can also pass locally to reproduce the same run.
+An exception is tasks that already support many different configurations. When a
+separate task for each configuration would be too cumbersome, CI may pass arguments to
+choose one, as long as contributors can use the same form locally. See [Good: the
+workflow passes a normal task argument](#good-the-workflow-passes-a-normal-task-argument).
 
-As a practical guardrail, workflow task invocations should not pass extra option flags
-after `--`. In this repo, `scripts/actionlint.sh` checks for that exact pattern in
-workflow `run:` steps because it is usually a sign that CI is changing task behavior
-where it is called instead of invoking a stable named task. This is only a narrow
-guardrail, not a full semantic check of all workflow task usage.
+As a practical, best-effort check, workflow task invocations should usually not pass
+extra option flags after `--`. In this repo, `scripts/actionlint.sh` checks for that
+pattern in workflow `run:` steps. The check is best-effort: it only catches a common
+mistake rather than every possible form.
 
-The goal is that a contributor should usually be able to reproduce the results of a CI
-command locally by running the same named task without additional configuration. Only
-in exceptional cases should it be necessary to locally configure a task run by CI.
+### Some CI-only setup still belongs in workflows
 
-### Exception: CI execution environment details
+CI sometimes needs extra CI-specific setup. That is usually fine when the setup is
+about the environment rather than about changing what repo operation is being run.
 
-CI sometimes needs extra settings because of the CI environment itself. That is
-acceptable when those settings support how the task runs in CI, rather than changing
-the fundamental behavior of the task.
+For example, workflows may still need runner choice, container setup, artifact
+uploads, or secrets. That is normal CI setup, not task definition.
 
-For example, CI may need launcher or environment settings because of CI setup
-requirements. But the same task should still be runnable locally without those CI-only
-settings.
+## Examples
 
-### Example: good pattern
+### Good: CI runs a named task
 
-If a workflow runs:
+In [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the process-based
+load test runs:
 
 ```bash
-./scripts/run_task.sh bazel-test-main
+./scripts/run_task.sh test-load-ci
 ```
 
-then a contributor should usually be able to run the same task locally:
+A contributor can run the same thing locally with:
 
 ```bash
-task bazel-test-main
+task test-load-ci
 ```
 
-The task may call wrappers, scripts, or tools underneath, but the caller should not
-need to know those details just to rerun the command.
+The task may call other tasks, scripts, or tools underneath, but the workflow
+is not hiding extra behavior.
 
-### Example: pattern to avoid
+### Good: the workflow passes a normal task argument
 
-Avoid designs where CI is effectively defining the real command through extra
-configuration that a local user has to rediscover, for example by putting the
-important behavior in workflow-only task vars, flags, or environment settings.
+In [`.github/workflows/fuzz.yml`](../.github/workflows/fuzz.yml), CI runs:
 
-For example, avoid the following style of job definition:
+```bash
+./scripts/run_task.sh test-fuzz-long -- ./vms/platformvm
+```
+
+That is fine because the path is part of the task's normal interface, and a
+contributor can run the same form locally:
+
+```bash
+task test-fuzz-long -- ./vms/platformvm
+```
+
+The workflow is choosing from an existing task interface rather than inventing
+hidden CI-only behavior.
+
+### Avoid: the workflow changes what the task does
+
+Prefer to avoid designs where the workflow defines the real command through
+workflow-only environment variables or task configuration.
+
+For example:
 
 ```yaml
 - run: ./scripts/run_task.sh test-e2e
@@ -175,17 +184,8 @@ For example, avoid the following style of job definition:
     E2E_RUNTIME: kube
 ```
 
-Reproduction of a CI failure for this job would require duplicating the environment
-configured by the job rather than just invoking the task.
-
-The problem here is not that environment variables exist at all. The problem is that
-these variables change what the task does, rather than only adapting it to run inside
-CI. A developer should not need those settings just to run the same task locally.
-
-By contrast, workflows may pass arguments that are already part of the task's intended
-public interface when that interface is also available to local users.  That kind of
-parameterization should stay explicit and reproducible rather than being hidden in
-CI-only environment configuration.
+That forces a contributor to reconstruct workflow state instead of rerunning a clear
+named task. In a case like this, prefer a dedicated task such as `test-e2e-kube-ci`.
 
 ## When to add or change a task
 
@@ -195,24 +195,21 @@ or CI are expected to run.
 A task is often a good fit when:
 
 - contributors will run it regularly
-- CI and local use should share the same named command
+- CI and local use should share the same command name
 - the task makes a supported command easier to find with `task`
 
 A task is often **not** the right fit when:
 
 - the command is a one-off maintenance step
-- the real interface needs a lot of user-supplied configuration
-- the script or tool should remain the primary interface
-- the task would mostly duplicate implementation detail rather than provide a useful
-  stable command name
+- the real command needs a lot of user-supplied configuration
+- the script or tool should remain the main thing people run
+- the task would mostly duplicate lower-level details instead of adding a useful
+  command name
 
-Direct script execution is acceptable when the script is the real interface and
-the repo does not need a separate stable, discoverable task name for CI or
-contributors. Add a task when the repo wants that named entrypoint; do not add
-one when it would only hide or duplicate the real interface.
+Direct script execution is fine when the script itself is the main thing people should
+run, or when the command is too one-off to benefit from a stable task name. Add a task
+only when a given capability would benefit from being discoverable and reproducible.
 
-When changing an existing task, preserve the main reasons tasks exist here:
-
-- people should be able to find supported commands easily
-- tasks used directly by CI should stay easy to rerun locally
-- the real behavior should stay in scripts or code, not in task-only settings
+When changing an existing task, check whether the change still leaves the task easy to
+find in `task` output, easy to rerun locally if CI uses it, and free of behavior that
+is only defined in workflow YAML.
