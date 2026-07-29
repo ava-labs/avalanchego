@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -54,7 +55,11 @@ type config struct {
 
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
+
+	// APIs is the exhaustive set of JSON-RPC APIs this node serves. Methods of
+	// any other API return "method not found".
+	APIs                set.Set[rpc.API] `json:"apis"`
+	AllowUnprotectedTxs bool             `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
@@ -86,6 +91,7 @@ func defaultConfig() config {
 		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+		APIs:               rpc.DefaultAPIs(),
 		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
@@ -135,6 +141,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
+			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
 		},

@@ -40,6 +40,7 @@ import (
 	_ "github.com/ava-labs/libevm/eth/filters"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -47,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -549,7 +551,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withAllAPIs())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -625,7 +627,7 @@ func TestEthGetters(t *testing.T) {
 }
 
 func TestMempoolTxGetters(t *testing.T) {
-	ctx, sut := newSUT(t, 1, withDebugAPI())
+	ctx, sut := newSUT(t, 1, withAllAPIs())
 
 	// These RPC methods use GetPoolTransaction, which returns any transaction
 	// accepted into the pool regardless of pending/queued status. A
@@ -864,7 +866,7 @@ func TestGetReceipts(t *testing.T) {
 
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withAllAPIs())
 	t.Cleanup(unblock)
 
 	var (
@@ -1302,7 +1304,7 @@ func TestUnprotectedTxs(t *testing.T) {
 }
 
 func TestDebugRPCs(t *testing.T) {
-	ctx, sut := newSUT(t, 0, withDebugAPI())
+	ctx, sut := newSUT(t, 0, withAllAPIs())
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1646,12 +1648,111 @@ func withTxFeeCap(feeCap float64) sutOption {
 	})
 }
 
-// withDebugAPI returns a sutOption that enables the debug API.
-func withDebugAPI() sutOption {
+// withAPIs returns a sutOption that serves only the APIs in apis.
+func withAPIs(apis set.Set[saerpc.API]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.EnableDBInspecting = true
-		c.vmConfig.RPCConfig.EnableProfiling = true
+		c.vmConfig.RPCConfig.APIs = apis
 	})
+}
+
+// withAllAPIs returns a sutOption that serves every API, including those
+// excluded from [saerpc.DefaultAPIs].
+func withAllAPIs() sutOption {
+	return withAPIs(saerpc.AllAPIs())
+}
+
+// errCodeMethodNotFound is the JSON-RPC 2.0 code returned for a method the
+// server doesn't serve. libevm's rpc package doesn't export it.
+const errCodeMethodNotFound = -32601
+
+// methodRegistered reports whether sut serves method.
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string, args ...any) bool {
+	tb.Helper()
+
+	err := sut.CallContext(ctx, new(json.RawMessage), method, args...)
+	if err == nil {
+		return true
+	}
+	var rpcErr rpc.Error
+	require.ErrorAsf(tb, err, &rpcErr, "%T.CallContext(%q)", sut, method)
+	return rpcErr.ErrorCode() != errCodeMethodNotFound
+}
+
+func TestAPIsServed(t *testing.T) {
+	// The non-bool second argument fails to parse, but only after the
+	// subscription is looked up.
+	acceptedTxs := []any{"newAcceptedTransactions", "not-a-bool"}
+
+	tests := []struct {
+		name   string
+		apis   set.Set[saerpc.API]
+		method string
+		args   []any
+		want   bool
+	}{
+		// APIs sharing the `eth` namespace are independently selectable.
+		{
+			name:   "filters_serves_get_logs",
+			apis:   set.Of(saerpc.APIFilters),
+			method: "eth_getLogs",
+			want:   true,
+		},
+		{
+			name:   "filters_alone_does_not_serve_eth_call",
+			apis:   set.Of(saerpc.APIFilters),
+			method: "eth_call",
+		},
+		// The Avalanche extensions and their subscription separate in
+		// both directions.
+		{
+			name:   "avalanche_serves_call_detailed",
+			apis:   set.Of(saerpc.APIAvalanche),
+			method: "eth_callDetailed",
+			want:   true,
+		},
+		{
+			name:   "avalanche_alone_does_not_serve_its_subscription",
+			apis:   set.Of(saerpc.APIAvalanche),
+			method: "eth_subscribe",
+			args:   acceptedTxs,
+		},
+		{
+			name:   "subscriptions_alone_serves_accepted_transactions",
+			apis:   set.Of(saerpc.APIAvalancheSubscriptions),
+			method: "eth_subscribe",
+			args:   acceptedTxs,
+			want:   true,
+		},
+		{
+			name:   "subscriptions_alone_does_not_serve_call_detailed",
+			apis:   set.Of(saerpc.APIAvalancheSubscriptions),
+			method: "eth_callDetailed",
+		},
+		// Defaults.
+		{
+			name:   "default_serves_tracing",
+			apis:   saerpc.DefaultAPIs(),
+			method: "debug_traceBlockByNumber",
+			want:   true,
+		},
+		{
+			name:   "default_omits_db_inspection",
+			apis:   saerpc.DefaultAPIs(),
+			method: "debug_dbGet",
+		},
+		{
+			name:   "default_omits_profiling",
+			apis:   saerpc.DefaultAPIs(),
+			method: "debug_blockProfile",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(test.apis))
+			got := methodRegistered(ctx, t, sut, test.method, test.args...)
+			require.Equalf(t, test.want, got, "%s served", test.method)
+		})
+	}
 }
 
 func TestResolveBlockNumberOrHash(t *testing.T) {
