@@ -55,7 +55,9 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 
 	lastSettledHash := rawdb.ReadFinalizedBlockHash(rec.db)
 	if lastSettledHash == (common.Hash{}) {
-		return nil, errors.New("no finalized block recorded")
+		// This is guaranteed to be written by the executor, but the synchronous VM may not have.
+		// Fall-back to head block
+		lastSettledHash = rawdb.ReadHeadBlockHash(rec.db)
 	}
 	lastSettledHeight := rawdb.ReadHeaderNumber(rec.db, lastSettledHash)
 	if lastSettledHeight == nil {

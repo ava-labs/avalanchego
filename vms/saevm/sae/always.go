@@ -10,7 +10,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
@@ -23,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
@@ -84,15 +82,9 @@ func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []by
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
 		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
 	}
-	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
 	if err != nil {
 		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
-	}
-
-	// [NewVM] assumes that the genesis block is "finalized", which does not
-	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
-	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
-		rawdb.WriteFinalizedBlockHash(db, hash)
 	}
 
 	return config, nil

@@ -643,7 +643,9 @@ func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
 		// The RPC implementation doesn't use the database to resolve the block
 		// labels above, so we still need to check them.
 		assert.Equal(t, b.Hash(), rawdb.ReadHeadBlockHash(s.db), "rawdb.ReadHeadBlockHash() MUST reflect last-executed block")
-		assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
+		if s.rawVM.last.settled.Load().NumberU64() > 0 {
+			assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
+		}
 	})
 }
 
