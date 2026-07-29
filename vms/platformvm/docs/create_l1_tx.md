@@ -12,12 +12,11 @@ Currently, creating an Avalanche L1 requires three separate P-Chain transactions
 
 Therefore, a single atomic transaction provides a better user experience for builders on Avalanche, both internally and externally, by: 
 1. Eliminating the intermediary Subnet Authorization credentials step and their database.
-2. Creating an L1 in one step and signing one transaction.
-3. Minimizing the cost and friction that it takes to set up a new Simplex L1. 
+2. Creating an L1 in one step and signing one transaction, which minimizes the cost and friction to set up a new Simplex L1. 
 
 ![](./create_l1_tx_images/External_builder_story.png)
 
-# Background 
+# Legacy L1 Creation Flow 
 [CreateSubnetTx](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/txs/create_subnet_tx.go):
 - Creates a new subnet on the P-Chain
 - The subnetID is the transaction ID
@@ -100,7 +99,7 @@ CreateL1Tx atomically replaces all three steps above:
 3. Sets the validator manager (validatorManagerChainID, validatorManagerAddress) and registers the initial validator set with their BLS keys and balances, identical to what ConvertSubnetToL1Tx does.
 
 
-# Alternatives
+# Alternatives And Tradeoffs
 In this section, we will discuss other approaches and how they benefit the common use case: 
 ![](./create_l1_tx_images/chains_per_subnet_histogram.png)
 
