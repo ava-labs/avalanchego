@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -98,19 +99,16 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
-		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
-		if lastAcceptedHash == (common.Hash{}) {
-			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
-			// asynchronous blocks MUST be empty.
-			return
-		}
+		// Old nodes may have written a head fast block hash at genesis, so non-empty is
+		// not sufficient to correct missing the activation.
+		nums, _ := rawdb.ReadAllCanonicalHashes(rec.db, parent.NumberU64()+1, math.MaxUint64, math.MaxInt)
 
-		for curr := parent; curr.Hash() != lastAcceptedHash; {
-			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
+		for _, num := range nums {
+			b, err := rec.newCanonicalBlock(num, parent)
 			if !yield(b, err) || err != nil {
 				return
 			}
-			curr = b
+			parent = b
 		}
 	}
 }
