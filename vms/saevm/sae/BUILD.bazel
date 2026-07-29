@@ -124,6 +124,7 @@ go_test(
         "//vms/saevm/saetest/escrow",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
+        "//x/blockdb",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",

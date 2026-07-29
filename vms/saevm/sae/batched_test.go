@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -166,11 +167,21 @@ func TestBatchedParseBlock(t *testing.T) {
 }
 
 func BenchmarkGetAncestors(b *testing.B) {
-	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
-	db, err := pebbledb.New(b.TempDir(), nil, loggingtest.New(b, logging.Info), prometheus.NewRegistry())
+	log := loggingtest.New(b, logging.Info)
+
+	db, err := pebbledb.New(b.TempDir(), nil, log, prometheus.NewRegistry())
 	require.NoError(b, err, "pebbledb.New()")
 	b.Cleanup(func() { require.NoErrorf(b, db.Close(), "%T.Close()", db) })
-	ctx, sut := newSUT(b, 1, opt, options.Func[sutConfig](func(c *sutConfig) {
+
+	// Closed by SUT
+	xdb, err := blockdb.New(
+		blockdb.DefaultConfig().WithDir(b.TempDir()),
+		log,
+	)
+	require.NoError(b, err, "blockdb.New()")
+
+	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(b, 1, opt, withExecResultsDB(xdb), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
 	}))
 

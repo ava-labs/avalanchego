@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 	"golang.org/x/sync/errgroup"
 
@@ -88,7 +91,15 @@ func (vm *VM) GetAncestors(ctx context.Context, blkID ids.ID, maxBlocksNum int, 
 				func(b *blocks.Block) *blocks.Block {
 					return b
 				},
-				vm.settledBlockFromDB,
+				func(db ethdb.Reader, hash common.Hash, num uint64) (*blocks.Block, error) {
+					// [VM.settledBlockFromDB] could be used, but the
+					// execution results are slow and unneeded.
+					ethB := rawdb.ReadBlock(db, hash, num)
+					if ethB == nil {
+						return nil, database.ErrNotFound
+					}
+					return blocks.New(ethB, nil, nil, vm.log())
+				},
 			)
 
 			mu.Lock()
