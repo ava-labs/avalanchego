@@ -164,6 +164,42 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	require.Zero(t, calls.Load())
 }
 
+func TestSend_CtxExpiryReportsLastFailure(t *testing.T) {
+	errInvalid := errors.New("invalid")
+	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		tracked  bool
+		verify   func(*syncpb.GetLeafResponse) error
+		wantLast error
+	}{
+		{"verify always fails", true, func(*syncpb.GetLeafResponse) error { return errInvalid }, errInvalid},
+		{"no peer ever connects", false, acceptLeaf, errNoPeers},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+			defer cancel()
+
+			nodeID := ids.GenerateTestNodeID()
+			handler, _ := scriptHandler(scriptResponse{bytes: okBytes})
+			var peers []ids.NodeID
+			if tt.tracked {
+				peers = []ids.NodeID{nodeID}
+			}
+			_, tracker := newTestTracker(t, peers...)
+			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
+
+			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, newLeafResp, tt.verify)
+			require.Nil(t, got)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			require.ErrorIs(t, err, tt.wantLast)
+		})
+	}
+}
+
 func newLeafResp() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} }
 
 func acceptLeaf(*syncpb.GetLeafResponse) error { return nil }

@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -95,40 +96,58 @@ func doRetry[Resp proto.Message](
 	verify func(Resp) error,
 	attempt func() (Resp, *Outcome, error),
 ) (Resp, error) {
-	var zero Resp
-	noPeerAttempts := 0
+	var (
+		zero           Resp
+		attempts       int
+		lastErr        error
+		noPeerAttempts int
+	)
 	for {
 		if err := ctx.Err(); err != nil {
-			return zero, err
+			return zero, retryFailure(err, lastErr, attempts)
 		}
 
+		attempts++
 		resp, outcome, err := attempt()
 		var wait time.Duration
 		switch err {
 		case nil:
-			if verify(resp) == nil {
+			verifyErr := verify(resp)
+			if verifyErr == nil {
 				outcome.Success()
 				return resp, nil
 			}
 			outcome.Failure()
+			lastErr = verifyErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
 		default:
 			switch classify(err) {
 			case retryFatal:
-				return zero, err
+				return zero, retryFailure(err, lastErr, attempts)
 			case retryNoPeers:
+				lastErr = err
 				wait = policy.noPeersBackoff(noPeerAttempts)
 				noPeerAttempts++
 			default:
+				lastErr = err
 				noPeerAttempts = 0
 				wait = policy.peerFailureBackoff
 			}
 		}
 		if err := backoff(ctx, wait); err != nil {
-			return zero, err
+			return zero, retryFailure(err, lastErr, attempts)
 		}
 	}
+}
+
+// retryFailure pairs the error that ended the loop with the one that kept it
+// retrying, so an expired ctx names a cause.
+func retryFailure(err, lastErr error, attempts int) error {
+	if lastErr == nil || errors.Is(err, lastErr) {
+		return err
+	}
+	return fmt.Errorf("%w after %d attempts, last failure: %w", err, attempts, lastErr)
 }
 
 // backoff waits d or until ctx ends, returning the ctx error if it ends first.
