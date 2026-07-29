@@ -189,10 +189,28 @@ func main() {
 		"timeUntilHelicon": timeUntilHelicon.String(),
 	})
 
+	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
+
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
+}
+
+// awaitHeliconActivation reports that Helicon activated. Nothing is reported if
+// ctx is canceled first, failing the reachability assertion for runs that end
+// before the activation.
+func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
+	timer := time.NewTimer(time.Until(heliconTime))
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		assert.Reachable("Helicon activating", map[string]any{
+			"heliconTime": heliconTime,
+		})
+	case <-ctx.Done():
+	}
 }
 
 type workload struct {
