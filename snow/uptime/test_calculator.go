@@ -9,15 +9,19 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// TestCalculator is a [Calculator] stub for tests that returns the configured
-// Percent and Err from every method.
+// TestCalculator is a [Calculator] stub for tests.
 type TestCalculator struct {
-	Percent float64
-	Err     error
+	StartTime time.Time
+	Percent   float64
+	Err       error
 }
 
 func (c TestCalculator) CalculateUptime(ids.NodeID) (time.Duration, time.Time, error) {
 	return 0, time.Time{}, c.Err
+}
+
+func (c TestCalculator) GetStartTime(ids.NodeID) (time.Time, error) {
+	return c.StartTime, c.Err
 }
 
 func (c TestCalculator) CalculateUptimePercent(ids.NodeID) (float64, error) {
