@@ -5,7 +5,6 @@ package e2e
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -142,7 +141,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		ginkgo.By(fmt.Sprintf("Created pod %s.%s", namespace, bootstrapPodName))
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report deletion of its pod to prompt recreation with a digest-pinned image", initContainerName))
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.PodDeletingMessage, "" /* wantImage */)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.PodDeletingMessage)
 
 		ginkgo.By("Waiting for the pod image to be updated to include an image digest")
 		var containerImage string
@@ -166,13 +165,14 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		bootstrapStartingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 
 		ginkgo.By("Waiting for the pod to report readiness")
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReady)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the success of the bootstrap test", monitorContainerName))
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged, "" /* wantImage */)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged)
 		_ = waitForNodeHealthy(tc, kubeconfig, namespace, nodePodName)
 
 		ginkgo.By("Checking that bootstrap testing is resumed when a pod is rescheduled")
@@ -198,7 +198,8 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return pod.UID != podUID
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapResumingMessage, containerImage)
+		bootstrapResumingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapResumingMessage, containerImage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
 		buildAvalanchegoImage(tc, avalanchegoImage, true /* forceNewHash */)
@@ -224,9 +225,14 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a new bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		bootstrapStartingMessage = bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 	})
 })
+
+func bootstrapMessageForImage(message, image string) string {
+	return message + fmt.Sprintf(`{"image": "%s"}`, image)
+}
 
 func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash bool) {
 	buildImage(tc, imageName, forceNewHash, "build_image.sh")
@@ -445,20 +451,9 @@ func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clients
 	require.NoError(err)
 }
 
-// waitForLogOutput streams the logs from the specified pod container until a JSON log line with the
-// given message is found or the stream ends. If wantImage is non-empty, the line's test config image
-// MUST also equal it.
-func waitForLogOutput(
-	tc tests.TestContext,
-	clientset *kubernetes.Clientset,
-	namespace string,
-	podName string,
-	containerName string,
-	wantMsg string,
-	wantImage string,
-) {
+// waitForLogOutput streams the logs from the specified pod container until the desired output is found or the context times out.
+func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput string) {
 	// TODO(marun) Figure out why log output is randomly truncated (not flushed?)
-	// TODO(JonathanOppenheimer): Once this truncation is fixed, fail if the desired output is not found
 
 	tc.Log().Info("log output from container (may not be complete)",
 		zap.String("namespace", namespace),
@@ -475,30 +470,12 @@ func waitForLogOutput(
 	require.NoError(tc, err)
 	defer readCloser.Close()
 
-	// logLine is the subset of a JSON-encoded log line that the log assertions match on.
-	type logLine struct {
-		Msg        string `json:"msg"`
-		TestConfig struct {
-			Image string `json:"image"`
-		} `json:"testConfig"`
-	}
-
 	scanner := bufio.NewScanner(readCloser)
 	for scanner.Scan() {
 		line := scanner.Text()
 		tc.Log().Info(" > " + line)
-
-		var parsed logLine
-		if err := json.Unmarshal([]byte(line), &parsed); err != nil {
-			// A truncated line isn't valid JSON
-			continue
+		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
+			return
 		}
-		if parsed.Msg != wantMsg {
-			continue
-		}
-		if len(wantImage) > 0 && parsed.TestConfig.Image != wantImage {
-			continue
-		}
-		return
 	}
 }
