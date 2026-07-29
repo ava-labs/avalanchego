@@ -156,6 +156,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			addValTx.EndTime(),
+			addValTx.Weight(),
 			0,
 		)
 		require.NoError(err)
@@ -191,6 +193,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			newValidatorStartTime,
+			addValTx.EndTime(),
+			addValTx.Weight(),
 			0,
 		)
 		require.NoError(err)
@@ -507,6 +511,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		addDSTx.ID(),
 		addValTx,
 		dsStartTime,
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -676,6 +682,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		subnetTx.ID(),
 		addSubnetValTx,
 		genesistest.DefaultValidatorStartTime,
+		addSubnetValTx.EndTime(),
+		addSubnetValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -861,6 +869,8 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			subnetTx.ID(),
 			addSubnetValTx,
 			genesistest.DefaultValidatorStartTime,
+			addSubnetValTx.EndTime(),
+			addSubnetValTx.Weight(),
 			0,
 		)
 		require.NoError(err)
@@ -993,6 +1003,8 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx.ID(),
 			addValTx,
 			startTime,
+			addValTx.EndTime(),
+			addValTx.Weight(),
 			0,
 		)
 		require.NoError(err)
@@ -4850,7 +4862,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 
 	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
 	duration := time.Duration(validatorTx.Period) * time.Second
-	staker, err := state.NewStaker(
+	staker, err := state.NewCurrentStaker(
 		addAutoRenewedValidatorTx.ID(),
 		validatorTx,
 		startTime,
