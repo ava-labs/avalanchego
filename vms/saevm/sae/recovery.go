@@ -63,7 +63,11 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		return nil, fmt.Errorf("no height for finalized block %s", lastSettledHash)
 	}
 
-	rec.snowCtx.Log.Info("Searching for state from last settled block", zap.Stringer("hash", lastSettledHash), zap.Uint64("height", *lastSettledHeight))
+	rec.snowCtx.Log.Info(
+		"searching for state from last settled block",
+		zap.Stringer("hash", lastSettledHash),
+		zap.Uint64("height", *lastSettledHeight),
+	)
 
 	// Search for highest settled post-execution state
 	// Invariant: The state is written to disk AFTER the block is written to
@@ -89,7 +93,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 
 		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
 			rec.snowCtx.Log.Info(
-				"Found most recently executed settled block with available post-execution state",
+				"found most recently executed settled block with available post-execution state",
 				zap.Stringer("hash", b.Hash()),
 				zap.Uint64("height", height),
 			)
@@ -106,7 +110,7 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 	return func(yield func(*blocks.Block, error) bool) {
 		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
 		rec.snowCtx.Log.Info(
-			"Finding canonical blocks",
+			"finding canonical blocks",
 			zap.Stringer("parent_hash", parent.Hash()),
 			zap.Uint64("parent_height", parent.Height()),
 			zap.Stringer("last_accepted_hash", lastAcceptedHash),
@@ -144,13 +148,11 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		return err
 	}
 
-	if last.Height() > after.Height() {
-		rec.snowCtx.Log.Info(
-			"Executed all accepted blocks",
-			zap.Uint64("from", after.Height()+1),
-			zap.Uint64("to", last.Height()),
-		)
-	}
+	rec.snowCtx.Log.Info(
+		"executed all accepted blocks",
+		zap.Uint64("previously_executed_height", after.Height()),
+		zap.Uint64("last_accepted_height", last.Height()),
+	)
 
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
