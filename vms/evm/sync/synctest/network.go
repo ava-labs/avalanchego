@@ -37,7 +37,7 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 
 	log := loggingtest.New(t, logging.Debug)
 
-	// Joining the delivery goroutines keeps them from outliving the test, 
+	// Joining the delivery goroutines keeps them from outliving the test,
 	// so their logs can never reach a completed [testing.T].
 	var wg sync.WaitGroup
 	t.Cleanup(wg.Wait)
