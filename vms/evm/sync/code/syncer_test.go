@@ -210,6 +210,7 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 
 	got, err := getCode(ctx, logging.NoLog{}, NewClient(net, tracker), []common.Hash{hash})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, errCodeHashMismatch, "the timeout must report what kept the retry loop going")
 	require.Nil(t, got, "tampered code must never be accepted")
 }
 
