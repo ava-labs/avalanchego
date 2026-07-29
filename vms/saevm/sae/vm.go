@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -99,7 +100,8 @@ type Config struct {
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
-	Now func() time.Time // defaults to [time.Now] if nil
+	// Now defaults to [time.Now] if nil
+	Now func() time.Time `json:"-"`
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
@@ -120,6 +122,10 @@ func NewVM[T hook.Transaction](
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	snowCtx.Log.Info("creating VM",
+		zap.Reflect("config", cfg),
+	)
+
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
@@ -208,7 +214,7 @@ func NewVM[T hook.Transaction](
 			return nil, err
 		}
 		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		pool, err := txgossip.NewSet(txPool, conf)
+		pool, err := txgossip.NewSet(vm.exec, txPool, conf)
 		if err != nil {
 			return nil, err
 		}

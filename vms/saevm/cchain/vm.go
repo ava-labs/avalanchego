@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -96,6 +98,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
+	vm.ctx.Log.Info("initializing C-Chain",
+		zap.Reflect("config", userConfig),
+	)
+
 	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return fmt.Errorf("parsing warp messages: %w", err)
