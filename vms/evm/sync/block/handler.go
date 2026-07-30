@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/log"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	// MaxParentsPerRequest bounds the parent walk per request. A block has no
+	// maxParentsPerRequest bounds the parent walk per request. A block has no
 	// fixed size, so targetResponseBytes bounds the response, and this only
 	// caps how many blocks the handler looks up and encodes for one request.
-	MaxParentsPerRequest = uint16(64)
+	maxParentsPerRequest = uint16(64)
 
 	// targetResponseBytes caps the total block bytes per response at the usable
 	// p2p message budget.
@@ -32,11 +32,11 @@ const (
 )
 
 // RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
-func RegisterHandler(net *p2p.Network, log logging.Logger, blocks Provider) error {
+func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider) error {
 	h := handlers.NewHandler(
 		log,
 		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(blocks),
+		newResponder(log, blocks),
 	)
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
@@ -53,15 +53,16 @@ var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*
 // responder walks the parent chain from the canonical block at the
 // requested height.
 type responder struct {
+	log    logging.Logger
 	blocks Provider
 }
 
-func newResponder(blocks Provider) *responder {
-	return &responder{blocks: blocks}
+func newResponder(log logging.Logger, blocks Provider) *responder {
+	return &responder{log: log, blocks: blocks}
 }
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, error) {
-	parents := uint16(min(req.GetNumParents(), uint32(MaxParentsPerRequest)))
+	parents := uint16(min(req.GetNumParents(), uint32(maxParentsPerRequest)))
 
 	encoded := make([][]byte, 0, parents)
 	totalBytes := 0
@@ -72,17 +73,27 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 			break
 		}
 		if block == nil {
-			log.Debug("requested block not found, stopping parent walk", "nodeID", nodeID)
+			r.log.Debug("requested block not found, stopping parent walk",
+				zap.Stringer("nodeID", nodeID),
+			)
 			break
 		}
 
 		buf := new(bytes.Buffer)
 		if err := block.EncodeRLP(buf); err != nil {
-			log.Error("failed to RLP encode block", "hash", block.Hash(), "height", block.NumberU64(), "err", err)
+			r.log.Error("failed to RLP encode block",
+				zap.Stringer("hash", block.Hash()),
+				zap.Uint64("height", block.NumberU64()),
+				zap.Error(err),
+			)
 			return nil, nil
 		}
 		if buf.Len()+totalBytes > targetResponseBytes && len(encoded) > 0 {
-			log.Debug("skipping block due to max total bytes size", "totalBlockDataSize", totalBytes, "blockSize", buf.Len(), "max", targetResponseBytes)
+			r.log.Debug("skipping block due to max total bytes size",
+				zap.Int("totalBlockDataSize", totalBytes),
+				zap.Int("blockSize", buf.Len()),
+				zap.Int("max", targetResponseBytes),
+			)
 			break
 		}
 
@@ -95,7 +106,11 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	}
 
 	if len(encoded) == 0 {
-		log.Debug("no requested blocks found, dropping request", "nodeID", nodeID, "height", req.GetHeight(), "parents", req.GetNumParents())
+		r.log.Debug("no requested blocks found, dropping request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("height", req.GetHeight()),
+			zap.Uint32("parents", req.GetNumParents()),
+		)
 		return nil, nil
 	}
 	return &syncpb.GetBlockResponse{Blocks: encoded}, nil
