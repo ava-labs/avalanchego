@@ -22,7 +22,9 @@ go_library(
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -47,6 +49,7 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
     ],

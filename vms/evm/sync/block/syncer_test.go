@@ -5,6 +5,8 @@ package block
 
 import (
 	"context"
+	"errors"
+	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -28,7 +31,7 @@ import (
 )
 
 func TestVerifyBlocks(t *testing.T) {
-	blocks := synctest.MakeChain(t, 5)
+	blocks := synctest.MakeChain(t, 5, synctest.WithTxsPerBlock(2))
 	tip := blocks[len(blocks)-1]
 	chain := encodeTipFirst(t, blocks, 3)
 
@@ -37,6 +40,7 @@ func TestVerifyBlocks(t *testing.T) {
 		hash       common.Hash
 		numParents uint16
 		raw        [][]byte
+		verify     BlockVerifier
 		wantErr    error
 	}{
 		{
@@ -44,6 +48,36 @@ func TestVerifyBlocks(t *testing.T) {
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        chain,
+		},
+		{
+			// The block hash still matches, so only the body roots catch this.
+			name:       "forged transactions",
+			hash:       tip.Hash(),
+			numParents: 3,
+			raw:        [][]byte{forgeBody(t, tip, withForgedTxs)},
+			wantErr:    errTxHashMismatch,
+		},
+		{
+			name:       "forged uncles",
+			hash:       tip.Hash(),
+			numParents: 3,
+			raw:        [][]byte{forgeBody(t, tip, withForgedUncles)},
+			wantErr:    errUncleHashMismatch,
+		},
+		{
+			name:       "chain-specific verifier rejects",
+			hash:       tip.Hash(),
+			numParents: 3,
+			raw:        chain,
+			verify:     func(*types.Block) error { return errTestVerifier },
+			wantErr:    errTestVerifier,
+		},
+		{
+			name:       "chain-specific verifier accepts",
+			hash:       tip.Hash(),
+			numParents: 3,
+			raw:        chain,
+			verify:     func(*types.Block) error { return nil },
 		},
 		{
 			name:       "empty response",
@@ -77,7 +111,7 @@ func TestVerifyBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := verifyBlocks(tt.hash, tt.numParents, tt.raw)
+			got, err := verifyBlocks(tt.hash, tt.numParents, tt.raw, tt.verify)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.Nil(t, got)
@@ -101,6 +135,7 @@ func TestSyncer(t *testing.T) {
 		blocksToFetch uint64
 		wantHeights   []int
 		wantRequests  int32 // requests the syncer must send to peers
+		wantVerified  int32 // blocks the verifier must see
 	}{
 		{
 			name:          "all from network",
@@ -165,12 +200,20 @@ func TestSyncer(t *testing.T) {
 			wantHeights:   []int{0, 1, 5, 10},
 			wantRequests:  1,
 		},
+		{
+			name:          "accepting verifier sees every block",
+			numBlocks:     10,
+			fromHeight:    5,
+			blocksToFetch: 3,
+			wantHeights:   []int{3, 4, 5},
+			wantRequests:  1,
+			wantVerified:  3,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
+			ctx := t.Context()
 			nodeID := ids.GenerateTestNodeID()
 
 			blocks := synctest.MakeChain(t, tt.numBlocks)
@@ -183,11 +226,21 @@ func TestSyncer(t *testing.T) {
 			handler, requests := countingHandler(blocks)
 			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
+			var verified atomic.Int32
+			var opts []SyncerOption
+			if tt.wantVerified > 0 {
+				opts = append(opts, WithBlockVerifier(func(*types.Block) error {
+					verified.Add(1)
+					return nil
+				}))
+			}
+
 			tip := blocks[tt.fromHeight]
-			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch)
+			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch, opts...)
 			require.NoError(t, err)
 			require.NoError(t, syncer.Sync(ctx))
 
+			require.Equal(t, tt.wantVerified, verified.Load())
 			// Skipped blocks must never be requested from peers.
 			require.Equal(t, tt.wantRequests, requests.Load())
 			for _, h := range tt.wantHeights {
@@ -223,42 +276,166 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
 }
 
-func TestSyncer_RejectsTamperedResponse(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
-	defer cancel()
-	nodeID := ids.GenerateTestNodeID()
-
-	blocks := synctest.MakeChain(t, 5)
+// Every response the syncer rejects must be re-requested and must not reach disk.
+func TestSyncer_RejectsBadResponse(t *testing.T) {
+	blocks := synctest.MakeChain(t, 5, synctest.WithTxsPerBlock(2))
 	tip := blocks[len(blocks)-1]
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, tamperingHandler(t, blocks[0])))
+	tests := []struct {
+		name   string
+		served []byte
+		verify BlockVerifier
+	}{
+		{
+			name:   "block does not hash to the requested tip",
+			served: encodeBlock(t, blocks[0]),
+		},
+		{
+			name:   "body does not match the header",
+			served: forgeBody(t, tip, withForgedTxs),
+		},
+		{
+			name:   "chain-specific verifier rejects",
+			served: encodeBlock(t, tip),
+			verify: func(*types.Block) error { return errTestVerifier },
+		},
+	}
 
-	got, err := getBlocks(ctx, logging.NoLog{}, NewClient(net, tracker), tip.Hash(), tip.NumberU64(), 3)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Nil(t, got, "tampered blocks must never be accepted")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+			handler, served := staticBlockHandler(tt.served, cancel)
+			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+
+			var opts []SyncerOption
+			if tt.verify != nil {
+				opts = append(opts, WithBlockVerifier(tt.verify))
+			}
+			target := rawdb.NewMemoryDatabase()
+			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 1, opts...)
+			require.NoError(t, err)
+
+			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
+			require.Nil(t, rawdb.ReadBlock(target, tip.Hash(), tip.NumberU64()))
+			require.Greater(t, served.Load(), int32(1), "the response was never rejected and re-requested")
+		})
+	}
 }
 
-// tamperingHandler returns a well-formed block whose hash never matches the
-// requested tip, so verification always fails.
-func tamperingHandler(t *testing.T, wrong *types.Block) p2p.Handler {
-	t.Helper()
-	wrongBytes, err := rlp.EncodeToBytes(wrong)
-	require.NoError(t, err)
-
-	return p2p.TestHandler{
-		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *avacommon.AppError) {
-			req := &syncpb.GetBlockRequest{}
-			if err := proto.Unmarshal(requestBytes, req); err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			respBytes, err := proto.Marshal(&syncpb.GetBlockResponse{Blocks: [][]byte{wrongBytes}})
+// staticBlockHandler serves blockBytes to every request, cancelling once the
+// syncer rejects it.
+func staticBlockHandler(blockBytes []byte, cancel context.CancelFunc) (p2p.Handler, *atomic.Int32) {
+	var served atomic.Int32
+	h := p2p.TestHandler{
+		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *avacommon.AppError) {
+			respBytes, err := proto.Marshal(&syncpb.GetBlockResponse{Blocks: [][]byte{blockBytes}})
 			if err != nil {
 				return nil, avacommon.ErrUndefined
+			}
+			if served.Add(1) > 1 {
+				cancel()
 			}
 			return respBytes, nil
 		},
 	}
+	return h, &served
+}
+
+var errTestVerifier = errors.New("chain-specific verifier rejected the block")
+
+// rlpBlock is the shape [types.Block] encodes to, so a test can pair a real
+// header with a body it never committed to.
+type rlpBlock struct {
+	Header      *types.Header
+	Txs         []*types.Transaction
+	Uncles      []*types.Header
+	Withdrawals []*types.Withdrawal `rlp:"optional"`
+}
+
+func withForgedTxs(b *rlpBlock) {
+	b.Txs = []*types.Transaction{
+		types.NewTransaction(99, common.Address{0xff}, big.NewInt(1), 21_000, big.NewInt(1), nil),
+	}
+}
+
+func withForgedUncles(b *rlpBlock) {
+	b.Uncles = []*types.Header{{Number: big.NewInt(1), Extra: []byte{}}}
+}
+
+// Driven directly because these cases change the header, which verifyBlocks
+// rejects on the hash before reaching verifyBody.
+func TestVerifyBody_Withdrawals(t *testing.T) {
+	withdrawals := []*types.Withdrawal{{Index: 1, Validator: 2, Amount: 3}}
+	committed := types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
+	other := common.Hash{0xab}
+
+	tests := []struct {
+		name    string
+		commits *common.Hash // header WithdrawalsHash
+		body    []*types.Withdrawal
+		wantErr error
+	}{
+		{
+			name:    "committed and present",
+			commits: &committed,
+			body:    withdrawals,
+		},
+		{
+			name:    "committed but body has none",
+			commits: &committed,
+			wantErr: errMissingWithdrawals,
+		},
+		{
+			name:    "committed to a different root",
+			commits: &other,
+			body:    withdrawals,
+			wantErr: errWithdrawalsHashMismatch,
+		},
+		{
+			name:    "present but header commits to none",
+			body:    withdrawals,
+			wantErr: errUnexpectedWithdrawals,
+		},
+	}
+
+	blocks := synctest.MakeChain(t, 2)
+	tip := blocks[len(blocks)-1]
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := forgeBody(t, tip, func(b *rlpBlock) {
+				b.Header.WithdrawalsHash = tt.commits
+				b.Withdrawals = tt.body
+			})
+			block := new(types.Block)
+			require.NoError(t, rlp.DecodeBytes(raw, block))
+
+			err := verifyBody(block)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+// forgeBody re-encodes block with its real header and a tampered body.
+func forgeBody(t *testing.T, block *types.Block, tamper func(*rlpBlock)) []byte {
+	t.Helper()
+	forged := &rlpBlock{
+		Header: block.Header(),
+		Txs:    block.Transactions(),
+		Uncles: block.Uncles(),
+	}
+	tamper(forged)
+
+	raw, err := rlp.EncodeToBytes(forged)
+	require.NoError(t, err)
+	return raw
 }
 
 // countingHandler serves blocks and counts how many requests it receives, so a
@@ -284,6 +461,13 @@ func writeBlock(db ethdb.Database, block *types.Block) {
 	rawdb.WriteBlock(batch, block)
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	_ = batch.Write()
+}
+
+func encodeBlock(t *testing.T, block *types.Block) []byte {
+	t.Helper()
+	raw, err := rlp.EncodeToBytes(block)
+	require.NoError(t, err)
+	return raw
 }
 
 func encodeTipFirst(t *testing.T, blocks []*types.Block, n int) [][]byte {
