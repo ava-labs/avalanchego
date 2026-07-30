@@ -21,10 +21,10 @@ below vary:
 
 | Method | Behavior | Implementation |
 | --- | --- | --- |
-| `StateAtBlock` | The state as of the block's own execution, applying **no** before-block changes. | `backend` |
-| | The parent's post-execution state with the **canonical child's** before-block changes applied, because block tracing asks for the state the child's transactions ran on. | `tracerBackend` |
-| | Straight to `backend`, so **no** before-block changes: `debug_traceCall` wants the state as of the block itself, not the base state its child's transactions ran on. | `traceCallBackend` |
-| | As `tracerBackend`, except the **caller-supplied block** supplies the before-block changes, since it need not be canonical. | `suppliedHashBackend` |
+| `StateAtBlock` | The post-execution state of the provided block. | `backend` |
+| | The provided block's post-execution state with the **canonical child's** before-block changes applied, allowing transaction tracing on the child to include these operations. | `tracerBackend` |
+| | The post-execution state of the provided block. `debug_traceCall` is expected to be executed as if it was the last transaction. | `traceCallBackend` |
+| | The provided block's post-execution state with the **caller-supplied block** before-block changes. | `suppliedHashBackend` |
 | `StateAtTransaction` | Replays the block's earlier transactions to reach the state just before the target transaction — the only method here that executes anything. Never overridden, so `debug_traceTransaction` and `debug_traceCall` with a transaction index always resolve here. | `backend` |
 | `BlockByHash`, `BlockByNumber` | The stored block: worst-case base fee, no post-execution root. | `backend` |
 | | Faked to carry the executed base fee and post-execution state root. Both other wrappers inherit this. | `tracerBackend` |
