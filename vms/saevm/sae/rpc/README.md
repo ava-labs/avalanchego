@@ -7,40 +7,35 @@ single `rpc.Server`; see `server.go` for the full endpoint list.
 
 ## Stateful RPCs
 
-SAE executes blocks asynchronously, so a stored header carries the worst-case
+Blocks are executed after acceptance, so a stored header carries the worst-case
 base fee and no post-execution state root. RPCs that need state (`eth_call`,
 `eth_getBalance`, `debug_trace*`, …) wait for execution and are served faked
 headers carrying the executed base fee and post-execution root, mimicking a
 synchronous chain.
 
-The tracing endpoints of the `debug` namespace are served by `tracerAPI`,
-which routes each call to a `tracers.API` instance over one of three backends. All of them wrap
-`backend`, and any method a wrapper doesn't override falls through to the next
-layer:
+The tracing endpoints of the `debug` namespace are served by `tracerAPI`, which
+routes each call to a `tracers.API` instance over one of three wrappers around
+`backend`, the adapter from the SAE `Chain` to libevm's API packages. Any method
+a wrapper doesn't override falls through to the next layer, so only the methods
+below vary:
 
-- `traceCallBackend` wraps `tracerBackend` but routes `StateAtBlock` straight
-  to `backend`: `debug_traceCall` wants the state as of the block itself, not
-  a base state for re-executing its child.
-- `suppliedHashBackend` wraps `tracerBackend` for a single `debug_traceBlock`
-  call. The caller-supplied block need not be canonical, so its `StateAtBlock`
-  routes straight to `backend` and applies the supplied block's own
-  before-block changes instead of the canonical child's. The block is also
-  re-sealed with the executed base fee, changing its hash, so `BlockHash`
-  reports the hash as supplied.
-- `tracerBackend` wraps `backend`. Its `StateAtBlock` returns the parent's
-  post-execution state with the canonical child's before-block changes
-  applied (block tracing re-executes the child), and its `BlockHash` reports
-  canonical hashes for the faked headers.
-- `backend` adapts the SAE `Chain` for libevm's API packages. It waits for a
-  block's execution and fakes its header with the executed base fee and
-  post-execution state root. Its `StateAtBlock` opens the state as of the
-  block's own execution, and its `StateAtTransaction` replays the preceding
-  transactions within the block.
+| Method | Behavior | Implementation |
+| --- | --- | --- |
+| `StateAtBlock` | The state as of the block's own execution, applying **no** before-block changes. | `backend` |
+| | The parent's post-execution state with the **canonical child's** before-block changes applied, because block tracing asks for the state the child's transactions ran on. | `tracerBackend` |
+| | Straight to `backend`, so **no** before-block changes: `debug_traceCall` wants the state as of the block itself, not the base state its child's transactions ran on. | `traceCallBackend` |
+| | As `tracerBackend`, except the **caller-supplied block** supplies the before-block changes, since it need not be canonical. | `suppliedHashBackend` |
+| `StateAtTransaction` | Replays the block's earlier transactions to reach the state just before the target transaction — the only method here that executes anything. Never overridden, so `debug_traceTransaction` and `debug_traceCall` with a transaction index always resolve here. | `backend` |
+| `BlockByHash`, `BlockByNumber` | The stored block: worst-case base fee, no post-execution root. | `backend` |
+| | Faked to carry the executed base fee and post-execution state root. Both other wrappers inherit this. | `tracerBackend` |
+| `BlockHash` | Not implemented; only the wrappers below override block hashes. | `backend` |
+| | The block's canonical hash, which its faked header does not hash to. | `tracerBackend` |
+| | The hash as supplied, for the one block re-sealed with the executed base fee; any other block falls through to `tracerBackend`. | `suppliedHashBackend` |
 
-No wrapper overrides `StateAtTransaction`, so `debug_traceTransaction` and
-`debug_traceCall` with a transaction index always resolve to
-`backend.StateAtTransaction`, which replays the preceding transactions within
-the block.
+So two of the four apply before-block changes — `tracerBackend` from the
+canonical child and `suppliedHashBackend` from the supplied block — and all
+three wrappers serve faked headers, with only `backend` returning the block as
+stored.
 
 ```mermaid
 graph TD
@@ -48,8 +43,7 @@ graph TD
     traceCall["debug_traceCall"] --> traceCallBackend
     canonical["debug_traceBlockByNumber<br/>debug_traceBlockByHash<br/>debug_traceChain<br/>debug_standardTraceBlockToFile<br/>debug_intermediateRoots<br/>debug_traceTransaction"] --> tracerBackend
 
-    suppliedHashBackend --> tracerBackend
-    suppliedHashBackend -->|"StateAtBlock"| backend
+    suppliedHashBackend -->|"StateAtBlock:<br/>supplied block as child"| tracerBackend
     traceCallBackend --> tracerBackend
     traceCallBackend -->|"StateAtBlock"| backend
     tracerBackend --> backend
