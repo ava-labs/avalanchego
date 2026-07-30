@@ -310,15 +310,13 @@ func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 func (e *Engine) Shutdown(ctx context.Context) error {
 	// A non-validator never started an epoch instance, so no need
 	// to shut it down
-	if e.nonValidator {
-		return e.vm.Shutdown(ctx)
+	if !e.nonValidator {
+		e.shutdownOnce.Do(func() {
+			e.epoch.Stop()
+			e.logger.Info("Stopped simplex engine")
+			close(e.shutdown)
+		})
 	}
-
-	e.shutdownOnce.Do(func() {
-		e.epoch.Stop()
-		e.logger.Info("Stopped simplex engine")
-		close(e.shutdown)
-	})
 
 	return e.vm.Shutdown(ctx)
 }
