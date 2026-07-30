@@ -543,10 +543,10 @@ func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
@@ -562,12 +562,12 @@ func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Addres
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recipient),
-		Value:    depositVal,
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)

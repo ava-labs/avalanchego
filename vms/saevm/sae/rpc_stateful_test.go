@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 	"time"
 
@@ -147,15 +146,17 @@ func blockRLPFile(tb testing.TB, b *types.Block) (hexutil.Bytes, string) {
 	return buf, file
 }
 
-// onlyLOG1At returns cmp options for comparing the trace result of the LOG1
-// opcode at pc in the provided code. It fails tb if code[pc] isn't LOG1.
+// onlyLOG1At returns the program counter of the sole LOG1 in code built by
+// [saetest.LogTopOfStackAfter], along with cmp options for comparing that
+// opcode's trace result. It fails tb if the opcode there isn't LOG1.
 //
-// It ignores all other opcode results and ignores [logger.StructLogRes.Gas] and
-// [logger.StructLogRes.GasCost].
-func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
+// The options ignore all other opcode results and ignore
+// [logger.StructLogRes.Gas] and [logger.StructLogRes.GasCost].
+func onlyLOG1At(tb testing.TB, code []byte) (uint64, cmp.Options) {
 	tb.Helper()
+	pc := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
 	require.Equalf(tb, vm.LOG1, vm.OpCode(code[pc]), "Bad test setup; opcode at program counter %d", pc)
-	return cmp.Options{
+	return pc, cmp.Options{
 		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
 			return r.Pc != pc || r.Op != vm.LOG1.String()
 		}),
@@ -166,7 +167,7 @@ func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
 // traceBlockTests returns an [rpcTest] for every method that traces a canonical
 // block — by number, by hash, by RLP, and by RLP file — each of which MUST
 // return want.
-func traceBlockTests(tb testing.TB, b *types.Block, want any, extraCmpOpts ...cmp.Option) []rpcTest {
+func traceBlockTests(tb testing.TB, block string, b *types.Block, want any, extraCmpOpts ...cmp.Option) []rpcTest {
 	tb.Helper()
 	buf, file := blockRLPFile(tb, b)
 
@@ -189,6 +190,7 @@ func traceBlockTests(tb testing.TB, b *types.Block, want any, extraCmpOpts ...cm
 		},
 	}
 	for i := range tests {
+		tests[i].name = block + "/" + tests[i].method
 		tests[i].want = want
 	}
 	return withCmpOpts(tests, extraCmpOpts...)
@@ -216,9 +218,11 @@ func traceFileStructLogs(tb testing.TB, file string) []logger.StructLogRes {
 }
 
 // TestDebugTrace covers what the debug tracers return for canonical blocks:
-// structured logs, call frames, and error paths.
+// structured logs, the base fee transactions are replayed with, call frames,
+// and error paths.
 func TestDebugTrace(t *testing.T) {
-	ctx, sut := newSUT(t, 1)
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
 
 	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
 
@@ -226,52 +230,76 @@ func TestDebugTrace(t *testing.T) {
 	recipient := common.Address{'r', 'e', 'c', 'v'}
 	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
-	// The full trace would be excessive and uninformative, so pin only the
-	// LOG1 for `emit Deposit()`.
-	const logPC = 185
-	onlyLOG1 := onlyLOG1At(t, escrow.ByteCode(), logPC)
+	vmTime.Advance(time.Second)
 
-	want := []traceResult[*logger.ExecutionResult]{
-		{
-			TxHash: deployTx.Hash(),
-			Result: &logger.ExecutionResult{
-				Gas:         deployBlock.Receipts()[0].GasUsed,
-				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
-				StructLogs:  []logger.StructLogRes{},
-			},
-		},
-		{
-			TxHash: depositTx.Hash(),
-			Result: &logger.ExecutionResult{
-				Gas: depositBlock.Receipts()[0].GasUsed,
-				StructLogs: []logger.StructLogRes{{
-					Pc:    logPC,
-					Op:    vm.LOG1.String(),
-					Depth: 1,
-					Stack: utils.PointerTo([]string{
-						escrow.DepositEvent(recipient, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
-						"0x40", "0x80", // arbitrary memory locations selected by Solidity
-					}),
-				}},
-			},
-		},
+	// Logging BASEFEE pins the base fee the debug APIs replay with, while
+	// the gas the blocks above consumed inflates this block's worst-case fee
+	// bound.
+	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
+	logPC, onlyLOG1 := onlyLOG1At(t, code)
+
+	baseFeeTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      code,
+	})
+	baseFeeBlock := sut.runConsensusLoop(t, baseFeeTx)
+	require.NoErrorf(t, baseFeeBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", baseFeeBlock)
+
+	// If these coincided with the executed fee, a replay sourcing the wrong one
+	// would go undetected.
+	baseFee := baseFeeBlock.ExecutedBaseFee()
+	require.NotZerof(t, baseFee.ToBig().Cmp(baseFeeBlock.EthBlock().BaseFee()), "%T.ExecutedBaseFee() = consensus header's worst-case base fee (%v); fees MUST differ to be pinned", baseFeeBlock, baseFee)
+	require.NotZerof(t, baseFee.Cmp(depositBlock.ExecutedBaseFee()), "%T.ExecutedBaseFee() = parent's executed base fee (%v); fees MUST differ to be pinned", baseFeeBlock, baseFee)
+
+	// A contract deployment's structured logs are excessive and uninformative,
+	// so only its returned code is pinned.
+	ignoreStructLogs := cmp.Options{
+		cmpopts.IgnoreFields(logger.ExecutionResult{}, "StructLogs"),
 	}
-	wantDeploy, wantDeposit := want[:1], want[1:]
+	wantDeploy := logger.ExecutionResult{
+		Gas:         deployBlock.Receipts()[0].GasUsed,
+		ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
+	}
+	wantBaseFee := oneTxTrace(baseFeeTx, &logger.ExecutionResult{
+		Gas: baseFeeBlock.Receipts()[0].GasUsed,
+		StructLogs: []logger.StructLogRes{{
+			Pc:    logPC,
+			Op:    vm.LOG1.String(),
+			Depth: 1,
+			Stack: utils.PointerTo([]string{
+				baseFee.Hex(),
+				"0x0", "0x0", // LOG1's size and offset
+			}),
+		}},
+	})
 
-	tests := slices.Concat(
-		traceBlockTests(t, deployBlock.EthBlock(), wantDeploy, onlyLOG1),
-		traceBlockTests(t, depositBlock.EthBlock(), wantDeposit, onlyLOG1),
-	)
+	// debug_traceBlock accepts any block with a canonical parent, not just
+	// blocks known to the backend. The nonce only has to differ from
+	// baseFeeBlock's.
+	baseFeeEthBlock := baseFeeBlock.EthBlock()
+	nonCanonicalRLP := blockRLP(t, mutateBlockNonce(baseFeeEthBlock, baseFeeEthBlock.Nonce()+1))
+
+	tests := traceBlockTests(t, "base_fee_block", baseFeeEthBlock, wantBaseFee, onlyLOG1)
 	tests = append(tests, []rpcTest{
 		{
+			name:         "latest_block",
 			method:       "debug_traceBlockByNumber",
 			args:         []any{rpc.LatestBlockNumber},
-			want:         wantDeposit,
+			want:         wantBaseFee,
+			extraCmpOpts: onlyLOG1,
+		},
+		{
+			name:         "supplied_sibling_of_canonical",
+			method:       "debug_traceBlock",
+			args:         []any{nonCanonicalRLP},
+			want:         wantBaseFee,
 			extraCmpOpts: onlyLOG1,
 		},
 		{
 			// The returned deposit balance proves that the call ran against the
 			// post-execution state of the latest block.
+			name:   "call_on_latest_state",
 			method: "debug_traceCall",
 			args: []any{
 				ethapi.TransactionArgs{
@@ -288,11 +316,13 @@ func TestDebugTrace(t *testing.T) {
 			},
 		},
 		{
+			name:    "unknown_transaction",
 			method:  "debug_traceTransaction",
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
 		},
 		{
+			name:   "tracer_timeout",
 			method: "debug_traceTransaction",
 			args: []any{depositTx.Hash(), tracers.TraceConfig{
 				Tracer: utils.PointerTo(`{
@@ -306,6 +336,7 @@ func TestDebugTrace(t *testing.T) {
 			wantErr: testerr.Contains("execution timeout"),
 		},
 		{
+			name:   "call_tracer",
 			method: "debug_traceTransaction",
 			args: []any{depositTx.Hash(), tracers.TraceConfig{
 				Tracer: utils.PointerTo("callTracer"),
@@ -320,16 +351,21 @@ func TestDebugTrace(t *testing.T) {
 			},
 			extraCmpOpts: cmp.Options{cmputils.BigInts()},
 		},
-	}...)
-
-	for _, tx := range want {
-		tests = append(tests, rpcTest{
+		{
+			name:         "deploy_transaction",
 			method:       "debug_traceTransaction",
-			args:         []any{tx.TxHash},
-			want:         *tx.Result,
+			args:         []any{deployTx.Hash()},
+			want:         wantDeploy,
+			extraCmpOpts: ignoreStructLogs,
+		},
+		{
+			name:         "base_fee_transaction",
+			method:       "debug_traceTransaction",
+			args:         []any{baseFeeTx.Hash()},
+			want:         *wantBaseFee[0].Result,
 			extraCmpOpts: onlyLOG1,
-		})
-	}
+		},
+	}...)
 
 	sut.testRPC(ctx, t, tests...)
 }
@@ -344,8 +380,7 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.NUMBER))
-	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
-	onlyLOG1 := onlyLOG1At(t, code, logPC)
+	logPC, onlyLOG1 := onlyLOG1At(t, code)
 
 	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		Gas:       1e6,
@@ -381,81 +416,6 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 	if diff := cmp.Diff(want, got, onlyLOG1); diff != "" {
 		t.Errorf("Structured logs in file written by debug_standardTraceBlockToFile diff (-want +got):\n%s", diff)
 	}
-}
-
-// TestDebugTraceExecutedBaseFee pins the base fee used when the debug APIs
-// replay transactions, by tracing a contract that logs BASEFEE. The setup
-// distinguishes the executed base fee from the parent's and the consensus
-// header's, which a buggy replay might source instead.
-func TestDebugTraceExecutedBaseFee(t *testing.T) {
-	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, timeOpt, withGenesisBaseFee(params.GWei))
-
-	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.BASEFEE))
-	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
-	onlyLOG1 := onlyLOG1At(t, code, logPC)
-
-	newCreateTx := func() *types.Transaction {
-		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			Gas:       1e6, // inflates the next block's worst-case fee bound
-			GasFeeCap: big.NewInt(2 * params.GWei),
-			Data:      code,
-		})
-	}
-
-	parent := sut.runConsensusLoop(t, newCreateTx())
-	vmTime.Advance(time.Second)
-	b := sut.runConsensusLoop(t, newCreateTx())
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-
-	// If these coincided with the executed fee, a replay sourcing the wrong
-	// one would go undetected.
-	baseFee := b.ExecutedBaseFee()
-	require.NotZerof(t, baseFee.ToBig().Cmp(b.EthBlock().BaseFee()), "%T.ExecutedBaseFee() = consensus header's worst-case base fee (%v); fees MUST differ to be pinned", b, baseFee)
-	require.NotZerof(t, baseFee.Cmp(parent.ExecutedBaseFee()), "%T.ExecutedBaseFee() = parent's executed base fee (%v); fees MUST differ to be pinned", b, baseFee)
-
-	receipts := b.Receipts()
-	require.Lenf(t, receipts, 1, "%T.Receipts()", b)
-	txHash := b.Transactions()[0].Hash()
-
-	want := logger.ExecutionResult{
-		Gas: receipts[0].GasUsed,
-		StructLogs: []logger.StructLogRes{{
-			Pc:    logPC,
-			Op:    vm.LOG1.String(),
-			Depth: 1,
-			Stack: utils.PointerTo([]string{
-				baseFee.Hex(),
-				"0x0", "0x0", // LOG1's size and offset
-			}),
-		}},
-	}
-
-	// debug_traceBlock accepts any block with a canonical parent, not just
-	// blocks known to the backend. The nonce only has to differ from b's.
-	ethBlock := b.EthBlock()
-	nonCanonicalRLP := blockRLP(t, mutateBlockNonce(ethBlock, ethBlock.Nonce()+1))
-
-	// All block-tracing methods MUST report the executed base fee.
-	wantBlockTrace := oneTxTrace(b.Transactions()[0], &want)
-
-	tests := traceBlockTests(t, ethBlock, wantBlockTrace, onlyLOG1)
-	tests = append(tests, []rpcTest{
-		{
-			method:       "debug_traceTransaction",
-			args:         []any{txHash},
-			want:         want,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlock",
-			args:         []any{nonCanonicalRLP},
-			want:         wantBlockTrace,
-			extraCmpOpts: onlyLOG1,
-		},
-	}...)
-
-	sut.testRPC(ctx, t, tests...)
 }
 
 // TestDebugTraceReportedBlockHash pins the block hash a trace reports: the
