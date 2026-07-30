@@ -32,18 +32,17 @@ type API string
 // Every available [API]. The methods each one carries are listed alongside its
 // registration in [apiServices].
 const (
-	APIWeb3                   API = "web3"
-	APINet                    API = "net"
-	APITxPool                 API = "txpool"
-	APIGas                    API = "gas"
-	APIChain                  API = "chain"
-	APITransactions           API = "transactions"
-	APIFilters                API = "filters"
-	APIAvalanche              API = "avalanche"
-	APIAvalancheSubscriptions API = "avalanche-subscriptions"
-	APIDBInspect              API = "db-inspect"
-	APIProfile                API = "profile"
-	APITrace                  API = "trace"
+	APIWeb3          API = "web3"
+	APINet           API = "net"
+	APITxPool        API = "txpool"
+	APIGas           API = "gas"
+	APIChain         API = "chain"
+	APITransactions  API = "transactions"
+	APISubscriptions API = "subscriptions"
+	APIAvalanche     API = "avalanche"
+	APIDB            API = "db"
+	APIProfile       API = "profile"
+	APITrace         API = "trace"
 )
 
 // AllAPIs returns every [API].
@@ -75,7 +74,9 @@ type apiService struct {
 	receiver  func(b *backend, filter *filters.FilterAPI) any
 }
 
-// apiServices is every registerable service, in registration order.
+// apiServices is every registerable service, in registration order. An [API]
+// MAY have more than one service, in which case they are all registered
+// together.
 //
 // Standard Ethereum APIs are documented at: https://ethereum.org/developers/docs/apis/json-rpc
 // geth-specific APIs are documented at: https://geth.ethereum.org/docs/interacting-with-geth/rpc
@@ -185,8 +186,15 @@ var apiServices = []apiService{
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
-		name: APIFilters, namespace: "eth", defaultOn: true,
+		name: APISubscriptions, namespace: "eth", defaultOn: true,
 		receiver: func(_ *backend, filter *filters.FilterAPI) any { return filter },
+	},
+	{
+		// Avalanche-custom eth extensions:
+		// - eth_subscribe
+		//  - newAcceptedTransactions
+		name: APISubscriptions, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customSubscriptionAPI{b} },
 	},
 	{
 		// Avalanche-custom eth extensions:
@@ -196,13 +204,6 @@ var apiServices = []apiService{
 		// - eth_suggestPriceOptions
 		name: APIAvalanche, namespace: "eth", defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customAPI{b} },
-	},
-	{
-		// Avalanche-custom eth extensions:
-		// - eth_subscribe
-		//  - newAcceptedTransactions
-		name: APIAvalancheSubscriptions, namespace: "eth", defaultOn: true,
-		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customSubscriptionAPI{b} },
 	},
 	{
 		// geth-specific APIs:
@@ -217,7 +218,7 @@ var apiServices = []apiService{
 		// - debug_getRawTransaction
 		// - debug_printBlock
 		// - debug_setHead          (no-op, logs info)
-		name: APIDBInspect, namespace: "debug", // raw database access
+		name: APIDB, namespace: "debug", // raw database access
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return ethapi.NewDebugAPI(b) },
 	},
 	{

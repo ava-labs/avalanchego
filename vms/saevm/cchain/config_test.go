@@ -135,9 +135,9 @@ func TestParseConfig(t *testing.T) {
 		// APIs
 		{
 			name: "api/apis",
-			json: `{"apis":["filters","avalanche-subscriptions","net","web3"]}`,
+			json: `{"apis":["subscriptions","db","net","web3"]}`,
 			want: with(func(c *config) {
-				c.APIs = set.Of(rpc.APIFilters, rpc.APIAvalancheSubscriptions, rpc.APINet, rpc.APIWeb3)
+				c.APIs = set.Of(rpc.APISubscriptions, rpc.APIDB, rpc.APINet, rpc.APIWeb3)
 			}),
 		},
 		{

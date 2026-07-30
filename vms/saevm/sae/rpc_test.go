@@ -1692,14 +1692,14 @@ func TestAPIsServed(t *testing.T) {
 	}{
 		// APIs sharing the `eth` namespace are independently selectable.
 		{
-			name:   "filters_serves_get_logs",
-			apis:   set.Of(saerpc.APIFilters),
+			name:   "subscriptions_serves_get_logs",
+			apis:   set.Of(saerpc.APISubscriptions),
 			method: "eth_getLogs",
 			want:   true,
 		},
 		{
-			name:   "filters_alone_does_not_serve_eth_call",
-			apis:   set.Of(saerpc.APIFilters),
+			name:   "subscriptions_alone_does_not_serve_eth_call",
+			apis:   set.Of(saerpc.APISubscriptions),
 			method: "eth_call",
 		},
 		// The Avalanche extensions and their subscription separate in
@@ -1718,14 +1718,14 @@ func TestAPIsServed(t *testing.T) {
 		},
 		{
 			name:   "subscriptions_alone_serves_accepted_transactions",
-			apis:   set.Of(saerpc.APIAvalancheSubscriptions),
+			apis:   set.Of(saerpc.APISubscriptions),
 			method: "eth_subscribe",
 			args:   acceptedTxs,
 			want:   true,
 		},
 		{
 			name:   "subscriptions_alone_does_not_serve_call_detailed",
-			apis:   set.Of(saerpc.APIAvalancheSubscriptions),
+			apis:   set.Of(saerpc.APISubscriptions),
 			method: "eth_callDetailed",
 		},
 		// Defaults.
@@ -1736,7 +1736,7 @@ func TestAPIsServed(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:   "default_omits_db_inspection",
+			name:   "default_omits_db_access",
 			apis:   saerpc.DefaultAPIs(),
 			method: "debug_dbGet",
 		},
