@@ -1030,9 +1030,10 @@ func TestGetReceipts(t *testing.T) {
 	})
 	pending := sut.runConsensusLoop(t, pendingTx)
 
-	// Receipts only exist after execution, so receipt queries for the
-	// accepted-but-unexecuted block (and its transaction) wait until it has
-	// been executed.
+	// Release execution of the block just accepted. The queries below may
+	// still beat it, but receipt RPCs wait for execution.
+	unblock()
+
 	wantPending := []*types.Receipt{{
 		TxHash:            pendingTx.Hash(),
 		Status:            types.ReceiptStatusSuccessful,
@@ -1045,31 +1046,26 @@ func TestGetReceipts(t *testing.T) {
 	}}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
-			method:   "eth_getBlockReceipts",
-			args:     []any{pending.Hash()},
-			want:     wantPending,
-			parallel: true,
+			method: "eth_getBlockReceipts",
+			args:   []any{pending.Hash()},
+			want:   wantPending,
 		},
 		{
-			method:   "eth_getBlockReceipts",
-			args:     []any{hexutil.Uint64(pending.Height())},
-			want:     wantPending,
-			parallel: true,
+			method: "eth_getBlockReceipts",
+			args:   []any{hexutil.Uint64(pending.Height())},
+			want:   wantPending,
 		},
 		{
-			method:   "debug_getRawReceipts",
-			args:     []any{pending.Hash()},
-			want:     marshalReceipts(wantPending),
-			parallel: true,
+			method: "debug_getRawReceipts",
+			args:   []any{pending.Hash()},
+			want:   marshalReceipts(wantPending),
 		},
 		{
-			method:   "eth_getTransactionReceipt",
-			args:     []any{pendingTx.Hash()},
-			want:     wantPending[0],
-			parallel: true,
+			method: "eth_getTransactionReceipt",
+			args:   []any{pendingTx.Hash()},
+			want:   wantPending[0],
 		},
 	}...)
-	unblock()
 }
 
 func TestGetTransactionCount(t *testing.T) {

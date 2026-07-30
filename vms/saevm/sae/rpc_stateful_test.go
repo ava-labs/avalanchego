@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
+	"slices"
 	"testing"
 	"time"
 
@@ -111,15 +111,15 @@ type traceResult[T any] struct {
 	Error  string      `json:"error"`
 }
 
-// resealWithNonce re-seals the block with the given header nonce, changing
-// its hash but not its trace (the nonce is outside execution's inputs).
-func resealWithNonce(b *types.Block, nonce uint64) *types.Block {
+// mutateBlockNonce re-seals the block with the given [types.Header] nonce,
+// changing its hash. Execution ignores the nonce unless a hook reads it.
+func mutateBlockNonce(b *types.Block, nonce uint64) *types.Block {
 	hdr := b.Header()
 	hdr.Nonce = types.EncodeNonce(nonce)
 	return b.WithSeal(hdr)
 }
 
-// onlyFlatCallBlockHash compares [native.FlatCallFrame]s by block hash alone.
+// onlyFlatCallBlockHash compares each [native.FlatCallFrame] by block hash alone.
 var onlyFlatCallBlockHash = cmp.Options{
 	cmp.Transformer("onlyBlockHash", func(f native.FlatCallFrame) *common.Hash {
 		return f.BlockHash
@@ -145,8 +145,11 @@ func blockRLPFile(tb testing.TB, b *types.Block) (hexutil.Bytes, string) {
 	return buf, file
 }
 
-// onlyLOG1At returns cmp options comparing only the LOG1 [logger.StructLogRes]
-// at pc, ignoring its Gas and GasCost. It fails tb if code[pc] isn't LOG1.
+// onlyLOG1At returns cmp options for comparing the trace result of the LOG1
+// opcode at pc in the provided code. It fails tb if code[pc] isn't LOG1.
+//
+// It ignores all other opcode results and ignores [logger.StructLogRes.Gas] and
+// [logger.StructLogRes.GasCost].
 func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
 	tb.Helper()
 	require.Equalf(tb, vm.LOG1, vm.OpCode(code[pc]), "Bad test setup; opcode at program counter %d", pc)
@@ -156,6 +159,59 @@ func onlyLOG1At(tb testing.TB, code []byte, pc uint64) cmp.Options {
 		}),
 		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
 	}
+}
+
+// traceBlockTests returns an [rpcTest] for every method that traces a canonical
+// block — by number, by hash, by RLP, and by RLP file — each of which MUST
+// return want.
+func traceBlockTests(tb testing.TB, b *types.Block, want any, extraCmpOpts ...cmp.Option) []rpcTest {
+	tb.Helper()
+	buf, file := blockRLPFile(tb, b)
+
+	tests := []rpcTest{
+		{
+			method: "debug_traceBlockByNumber",
+			args:   []any{hexutil.Uint64(b.NumberU64())},
+		},
+		{
+			method: "debug_traceBlockByHash",
+			args:   []any{b.Hash()},
+		},
+		{
+			method: "debug_traceBlock",
+			args:   []any{buf},
+		},
+		{
+			method: "debug_traceBlockFromFile",
+			args:   []any{file},
+		},
+	}
+	for i := range tests {
+		tests[i].want = want
+		tests[i].extraCmpOpts = extraCmpOpts
+	}
+	return tests
+}
+
+// traceFileStructLogs reads a file written by debug_standardTraceBlockToFile,
+// returning its logs in the same form as the debug_trace* methods return them,
+// so the same cmp options can be used.
+func traceFileStructLogs(tb testing.TB, file string) []logger.StructLogRes {
+	tb.Helper()
+
+	trace, err := os.ReadFile(file)
+	require.NoErrorf(tb, err, "os.ReadFile(%q)", file)
+
+	// Every line describes one executed opcode, bar the last, which summarises
+	// the execution and therefore decodes as a zero [logger.StructLog].
+	var steps []logger.StructLog
+	dec := json.NewDecoder(bytes.NewReader(trace))
+	for dec.More() {
+		var step logger.StructLog
+		require.NoError(tb, dec.Decode(&step), "decoding trace line")
+		steps = append(steps, step)
+	}
+	return logger.FormatLogs(steps)
 }
 
 func TestDebugTrace(t *testing.T) {
@@ -199,48 +255,14 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantDeploy, wantDeposit := want[:1], want[1:]
 
-	blockRLP, blockFile := blockRLPFile(t, depositBlock.EthBlock())
-
-	tests := []rpcTest{
-		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(deployBlock.NumberU64())},
-			want:         wantDeploy,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(depositBlock.NumberU64())},
-			want:         wantDeposit,
-			extraCmpOpts: onlyLOG1,
-		},
+	tests := slices.Concat(
+		traceBlockTests(t, deployBlock.EthBlock(), wantDeploy, onlyLOG1),
+		traceBlockTests(t, depositBlock.EthBlock(), wantDeposit, onlyLOG1),
+	)
+	tests = append(tests, []rpcTest{
 		{
 			method:       "debug_traceBlockByNumber",
 			args:         []any{rpc.LatestBlockNumber},
-			want:         wantDeposit,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockByHash",
-			args:         []any{deployBlock.Hash()},
-			want:         wantDeploy,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockByHash",
-			args:         []any{depositBlock.Hash()},
-			want:         wantDeposit,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlock",
-			args:         []any{blockRLP},
-			want:         wantDeposit,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockFromFile",
-			args:         []any{blockFile},
 			want:         wantDeposit,
 			extraCmpOpts: onlyLOG1,
 		},
@@ -305,7 +327,7 @@ func TestDebugTrace(t *testing.T) {
 			},
 			extraCmpOpts: cmp.Options{cmputils.BigInts()},
 		},
-	}
+	}...)
 
 	for _, tx := range want {
 		tests = append(tests, rpcTest{
@@ -329,6 +351,7 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 
 	code := saetest.LogTopOfStackAfter(saetest.Ops(vm.NUMBER))
 	logPC := uint64(len(code) - 2) //#nosec G115 -- Known non-negative
+	onlyLOG1 := onlyLOG1At(t, code, logPC)
 
 	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		Gas:       1e6,
@@ -340,29 +363,30 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 	var files []string
 	require.NoError(t, sut.CallContext(ctx, &files, "debug_standardTraceBlockToFile", b.Hash()), "CallContext(debug_standardTraceBlockToFile)")
 	require.Len(t, files, 1, "one trace file per transaction")
+	file := files[0]
 	t.Cleanup(func() {
-		assert.NoError(t, os.Remove(files[0]), "os.Remove(trace file)")
+		assert.NoError(t, os.Remove(file), "os.Remove(trace file)")
 	})
 
-	wantPrefix := fmt.Sprintf("block_%#x-%d-%#x-", b.Hash().Bytes()[:4], 0, tx.Hash().Bytes()[:4])
-	assert.Truef(t, strings.HasPrefix(filepath.Base(files[0]), wantPrefix), "file name %q returned by debug_standardTraceBlockToFile MUST have prefix %q", filepath.Base(files[0]), wantPrefix)
+	// Blocks served for tracing carry faked headers, so the name demonstrates
+	// that the canonical hash was reported instead of the block's own.
+	assert.Containsf(t, filepath.Base(file), fmt.Sprintf("%#x", b.Hash().Bytes()[:4]), "file name returned by debug_standardTraceBlockToFile MUST contain the canonical hash of block %#x", b.Hash())
 
-	trace, err := os.ReadFile(files[0])
-	require.NoErrorf(t, err, "os.ReadFile(%q)", files[0])
-	// The file should be a structured log file, each line is a separate JSON
-	// object describing an EVM opcode executed. The contract LOG1s at
-	// [logPC], so if that shows up there, and only there, the file really
-	// does trace the transaction's execution.
-	var log1PCs []uint64
-	dec := json.NewDecoder(bytes.NewReader(trace))
-	for dec.More() {
-		var step logger.StructLog
-		require.NoError(t, dec.Decode(&step), "decoding trace line")
-		if step.Op == vm.LOG1 {
-			log1PCs = append(log1PCs, step.Pc)
-		}
+	// The contract LOG1s the block number, so this log only appears if the file
+	// really does trace the execution, in the block that executed it.
+	want := []logger.StructLogRes{{
+		Pc:    logPC,
+		Op:    vm.LOG1.String(),
+		Depth: 1,
+		Stack: utils.PointerTo([]string{
+			uint256.NewInt(b.NumberU64()).Hex(),
+			"0x0", "0x0", // LOG1's size and offset
+		}),
+	}}
+	got := traceFileStructLogs(t, file)
+	if diff := cmp.Diff(want, got, onlyLOG1); diff != "" {
+		t.Errorf("Structured logs in file written by debug_standardTraceBlockToFile diff (-want +got):\n%s", diff)
 	}
-	assert.Equalf(t, []uint64{logPC}, log1PCs, "PCs of %s opcodes in trace", vm.LOG1)
 }
 
 // TestDebugTraceFeeSensitive pins the base fee used when the debug APIs
@@ -413,11 +437,10 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 		}},
 	}
 
-	canonicalRLP, blockFile := blockRLPFile(t, b.EthBlock())
-
-	// debug_traceBlock accepts any block whose parent is canonical, not just
-	// blocks known to the backend.
-	sibling := resealWithNonce(b.EthBlock(), 'u')
+	// debug_traceBlock accepts any block with a canonical parent, not just
+	// blocks known to the backend. The nonce only has to differ from b's.
+	ethBlock := b.EthBlock()
+	sibling := mutateBlockNonce(ethBlock, ethBlock.Nonce()+1)
 	nonCanonicalRLP := blockRLP(t, sibling)
 
 	// All block-tracing methods MUST report the executed base fee.
@@ -426,29 +449,12 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 		Result: &want,
 	}}
 
-	sut.testRPC(ctx, t, []rpcTest{
+	tests := traceBlockTests(t, ethBlock, wantBlockTrace, onlyLOG1)
+	tests = append(tests, []rpcTest{
 		{
 			method:       "debug_traceTransaction",
 			args:         []any{txHash},
 			want:         want,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(b.NumberU64())},
-			want:         wantBlockTrace,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlockByHash",
-			args:         []any{b.Hash()},
-			want:         wantBlockTrace,
-			extraCmpOpts: onlyLOG1,
-		},
-		{
-			method:       "debug_traceBlock",
-			args:         []any{canonicalRLP},
-			want:         wantBlockTrace,
 			extraCmpOpts: onlyLOG1,
 		},
 		{
@@ -465,18 +471,14 @@ func TestDebugTraceFeeSensitive(t *testing.T) {
 			want:         []traceResult[[]native.FlatCallFrame]{{TxHash: txHash, Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(sibling.Hash())}}}},
 			extraCmpOpts: onlyFlatCallBlockHash,
 		},
-		{
-			method:       "debug_traceBlockFromFile",
-			args:         []any{blockFile},
-			want:         wantBlockTrace,
-			extraCmpOpts: onlyLOG1,
-		},
 	}...)
+
+	sut.testRPC(ctx, t, tests...)
 }
 
 // TestDebugTraceUnacceptedBlock traces a block that was built but never
-// verified or accepted, sequentially and in parallel. Only the parent MUST be
-// canonical. The trace MUST succeed and report the supplied block's hash.
+// verified or accepted. Only the parent MUST be canonical. The trace MUST
+// succeed and report the supplied block's hash.
 func TestDebugTraceUnacceptedBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
@@ -497,7 +499,12 @@ func TestDebugTraceUnacceptedBlock(t *testing.T) {
 		},
 	}}
 
-	tests := []rpcTest{
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "debug_traceBlock",
+			args:   []any{unacceptedRLP},
+			want:   want,
+		},
 		{
 			method: "debug_traceBlockFromFile",
 			args:   []any{blockFile},
@@ -511,18 +518,7 @@ func TestDebugTraceUnacceptedBlock(t *testing.T) {
 			want:         []traceResult[[]native.FlatCallFrame]{{TxHash: tx.Hash(), Result: []native.FlatCallFrame{{BlockHash: utils.PointerTo(b.Hash())}}}},
 			extraCmpOpts: onlyFlatCallBlockHash,
 		},
-	}
-	for range 4 {
-		tests = append(tests,
-			rpcTest{
-				method:   "debug_traceBlock",
-				args:     []any{unacceptedRLP},
-				want:     want,
-				parallel: true,
-			},
-		)
-	}
-	sut.testRPC(ctx, t, tests...)
+	}...)
 }
 
 // TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
@@ -632,13 +628,13 @@ func TestDebugTraceBeforeBlockHook(t *testing.T) {
 		{
 			// The canonical child (b2, crediting 1) MUST NOT be the source.
 			name:        "supplied_over_canonical_child",
-			supplied:    resealWithNonce(b2.EthBlock(), suppliedNonce),
+			supplied:    mutateBlockNonce(b2.EthBlock(), suppliedNonce),
 			wantBalance: 1 + 1 + suppliedNonce,
 		},
 		{
 			// No canonical child exists; changes MUST still be applied.
 			name:        "supplied_parent_is_tip",
-			supplied:    resealWithNonce(unaccepted, suppliedNonce),
+			supplied:    mutateBlockNonce(unaccepted, suppliedNonce),
 			wantBalance: 2 + 1 + suppliedNonce,
 		},
 	}

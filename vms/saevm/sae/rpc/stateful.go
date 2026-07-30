@@ -124,7 +124,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	// The tracers API passes back blocks carrying faked [executedHeader]s,
+	// The tracers API passes back blocks carrying a faked [executedHeader],
 	// whose hashes match no stored block, so look up by number instead.
 	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
 	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
@@ -191,28 +191,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
 }
 
-// tracerAPI serves the debug tracer APIs.
-//
-// Most APIs trace a full block from the parent's state. For these APIs, the
-// backend returns the parent's state with the child block's before-block
-// changes applied.
-//
-// debug_traceCall is special, because it doesn't expect the parent's state.
-// Therefore, the state is returned without any before-block changes being
-// applied by using a special backend.
-//
-// Every debug_trace* endpoint MUST source its state from one of four places:
-//   - [tracerBackend.StateAtBlock] re-executes the canonical child: all but
-//     those below.
-//   - [suppliedHashBackend.StateAtBlock] re-executes the caller-supplied
-//     block: debug_traceBlock and debug_traceBlockFromFile.
-//   - [traceCallBackend.StateAtBlock] gives state as of the block:
-//     debug_traceCall.
-//   - [backend.StateAtTransaction] replays within the block:
-//     debug_traceTransaction, and debug_traceCall with a transaction index.
+// tracerAPI serves the debug tracer APIs, routing each endpoint to a
+// [tracers.API] over whichever backend supplies the state that endpoint
+// expects. See this package's README for full mapping and what each backend
+// exists for.
 type tracerAPI struct {
 	*tracers.API
-	b         *tracerBackend
+	canonical *tracerBackend
 	traceCall *tracers.API
 }
 
@@ -220,7 +205,7 @@ func newTracerAPI(b *backend) *tracerAPI {
 	tb := &tracerBackend{b}
 	return &tracerAPI{
 		API:       tracers.NewAPI(tb),
-		b:         tb,
+		canonical: tb,
 		traceCall: tracers.NewAPI(&traceCallBackend{tb}),
 	}
 }
@@ -243,21 +228,21 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 
-	parent, err := a.b.restoreExecutedParent(ctx, block)
+	parent, err := a.canonical.restoreExecutedParent(ctx, block)
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)
 	}
 	supplied := block.Hash()
 	hdr := block.Header()
 	// The parent's gas clock, advanced to the start of the block, determines
-	// the executed base fee.
+	// the executed base fee, so the supplied one is discarded.
 	gasClock := parent.ExecutedByGasTime()
-	gasClock.BeforeBlock(a.b.Hooks().BlockTime(hdr))
+	gasClock.BeforeBlock(a.canonical.Hooks().BlockTime(hdr))
 	hdr.BaseFee = gasClock.BaseFee().ToBig()
 	block = block.WithSeal(hdr)
 
 	api := tracers.NewAPI(&suppliedHashBackend{
-		tracerBackend: a.b,
+		tracerBackend: a.canonical,
 		block:         block,
 		supplied:      supplied,
 	})
@@ -357,10 +342,11 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, parent *types
 // Caller-supplied blocks, which MAY not be canonical, are instead handled by
 // [suppliedHashBackend].
 func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
-	hash := rawdb.ReadCanonicalHash(b.DB(), block.NumberU64())
+	num := block.NumberU64()
+	hash := rawdb.ReadCanonicalHash(b.DB(), num)
 	if hash == (common.Hash{}) {
 		b.Logger().Error("missing canonical hash override for block",
-			zap.Uint64("block_height", block.NumberU64()),
+			zap.Uint64("block_height", num),
 		)
 		return block.Hash()
 	}
