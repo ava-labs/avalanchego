@@ -31,7 +31,7 @@ import (
 func TestVerifyLeafs(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
-	r := newResponder(trieDB, common.HashLength, nil)
+	r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 
 	partial, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 20})
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestSyncer(t *testing.T) {
 }
 
 func TestNewSyncer_Validation(t *testing.T) {
-	_, err := NewSyncer(nil, rawdb.NewMemoryDatabase(), common.Hash{}, common.Hash{})
+	_, err := NewSyncer(logging.NoLog{}, nil, rawdb.NewMemoryDatabase(), common.Hash{}, common.Hash{})
 	require.ErrorIs(t, err, errRootRequired)
 }
 
@@ -112,9 +112,9 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, RegisterHandler(net, logging.NoLog{}, trieDB, common.HashLength, nil))
+	require.NoError(t, RegisterHandler(logging.NoLog{}, net, trieDB, common.HashLength, nil))
 
-	syncer, err := NewSyncer(NewClient(net, tracker), rawdb.NewMemoryDatabase(), root, common.Hash{})
+	syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), rawdb.NewMemoryDatabase(), root, common.Hash{})
 	require.NoError(t, err)
 
 	cancel() // cancel before Sync runs
@@ -169,7 +169,7 @@ func newSyncer(t *testing.T, ctx context.Context, root common.Hash, handler p2p.
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
 	target := rawdb.NewMemoryDatabase()
-	syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
+	syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, root, common.Hash{})
 	require.NoError(t, err)
 	return syncer, target
 }
@@ -193,7 +193,7 @@ func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
 	inner := handlers.NewHandler(
 		logging.NoLog{},
 		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
-		newResponder(trieDB, common.HashLength, nil),
+		newResponder(logging.NoLog{}, trieDB, common.HashLength, nil),
 	)
 	var requests atomic.Int32
 	h := p2p.TestHandler{
@@ -209,7 +209,7 @@ func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
 // range proof fails, then serves correctly. A negative badResponses corrupts
 // every response.
 func flakyLeafHandler(trieDB *triedb.Database, badResponses int32) p2p.Handler {
-	inner := newResponder(trieDB, common.HashLength, nil)
+	inner := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 	var count atomic.Int32
 	return p2p.TestHandler{
 		AppRequestF: func(ctx context.Context, n ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *avacommon.AppError) {
