@@ -168,28 +168,12 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
 
-	// ethB's header usually carries the executed base fee already (courtesy
-	// of [tracerBackend]), but we can't guarantee that every caller goes through
-	// there, so we restore the fee ourselves. Restored by number because a faked header's
-	// hash differs from the canonical one.
-	//
-	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
-	// decodes the full block body and receipts but only the executed base fee
-	// is needed here; see the similar TODO in
-	// [backend.StateAndHeaderByNumberOrHash].
-	num := rpc.BlockNumber(ethB.NumberU64()) // #nosec G115 -- won't overflow for a while.
-	executed, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
-	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("restoring traced block: %w", err)
-	}
-
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	result, err := saexec.Execute(
 		block,
 		b,
 		txIndex,
-		executed.ExecutedBaseFee(),
 		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),

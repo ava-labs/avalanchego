@@ -123,7 +123,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, nil, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
@@ -175,12 +175,11 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
 //
-// Both the base fee and the gas clock come from the parent's post-execution gas
-// clock. If [hook.Synchronous] reports the block as synchronous (pre-SAE), its
-// own header carries both instead. A non-nil `baseFee` overrides the fee from
-// either source, and replays MUST pass the block's recorded
-// [blocks.Block.ExecutedBaseFee] so they price transactions as history did, not
-// as a recomputation would.
+// The gas clock always comes from the parent's post-execution clock, as does the
+// base fee, except for a block that [hook.Synchronous] reports as synchronous
+// (pre-SAE), which uses the fee committed to by its own header. Both are
+// therefore reproducible, so replaying a block prices its transactions as
+// history did.
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
@@ -190,7 +189,6 @@ func Execute(
 	b *blocks.Block,
 	sdbo saedb.StateDBOpener,
 	maxNumTxs int,
-	baseFee *uint256.Int,
 	hooks hook.Points,
 	config *params.ChainConfig,
 	chainCtx core.ChainContext,
@@ -202,26 +200,8 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	var gasClock *gastime.Time
-	if hook.Synchronous(hooks, header) {
-		// Pre-SAE blocks predate the gas clock, so theirs is reconstructed from
-		// their header.
-		var err error
-		if gasClock, err = b.WorstCaseGasTime(hooks); err != nil {
-			return nil, fmt.Errorf("gas time of synchronous block: %w", err)
-		}
-		if baseFee == nil {
-			baseFee = new(uint256.Int).SetUint64(b.HeaderBaseFee())
-		}
-	} else {
-		gasClock = parent.ExecutedByGasTime()
-		gasClock.BeforeBlock(hooks.BlockTime(header))
-		if baseFee == nil {
-			baseFee = gasClock.BaseFee()
-			b.CheckBaseFeeBound(baseFee)
-		}
-	}
-	header.BaseFee = baseFee.ToBig()
+	gasClock := parent.ExecutedByGasTime()
+	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
 	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
@@ -233,6 +213,14 @@ func Execute(
 	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
+
+	baseFee := gasClock.BaseFee()
+	if hook.Synchronous(hooks, header) {
+		baseFee = uint256.NewInt(b.HeaderBaseFee())
+	} else {
+		b.CheckBaseFeeBound(baseFee)
+	}
+	header.BaseFee = baseFee.ToBig()
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
