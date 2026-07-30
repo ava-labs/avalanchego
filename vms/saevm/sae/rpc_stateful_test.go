@@ -200,7 +200,7 @@ func traceBlockTests(tb testing.TB, b *types.Block, want any, extraCmpOpts ...cm
 func traceFileStructLogs(tb testing.TB, file string) []logger.StructLogRes {
 	tb.Helper()
 
-	trace, err := os.ReadFile(file)
+	trace, err := os.ReadFile(file) //#nosec G304 -- The path comes from the test itself, not from user input.
 	require.NoErrorf(tb, err, "os.ReadFile(%q)", file)
 
 	// Every line describes one executed opcode, bar the last, which summarises
