@@ -6,6 +6,7 @@ package block
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -81,12 +82,8 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 
 		buf := new(bytes.Buffer)
 		if err := block.EncodeRLP(buf); err != nil {
-			r.log.Error("failed to RLP encode block",
-				zap.Stringer("hash", block.Hash()),
-				zap.Uint64("height", block.NumberU64()),
-				zap.Error(err),
-			)
-			return nil, nil
+			// A server fault, not a drop.
+			return nil, fmt.Errorf("encoding block %s at height %d: %w", block.Hash(), block.NumberU64(), err)
 		}
 		if buf.Len()+totalBytes > targetResponseBytes && len(encoded) > 0 {
 			r.log.Debug("skipping block due to max total bytes size",
