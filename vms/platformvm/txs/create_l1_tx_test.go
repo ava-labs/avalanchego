@@ -67,12 +67,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 			0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 			0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		}
-		vmID = ids.ID{
-			0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-			0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-			0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-			0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-		}
 		managerChainID = ids.ID{
 			0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
 			0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
@@ -119,7 +113,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 			name: "simple",
 			tx: &CreateL1Tx{
 				BaseTx:         baseWithInput,
-				VMID:           vmID,
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
 				Validators:     []*CreateL1Validator{},
@@ -163,11 +156,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0x00, 0x00, 0x00, 0x05,
 				// length of memo
 				0x00, 0x00, 0x00, 0x00,
-				// vmID
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				// length of genesis data
 				0x00, 0x00, 0x00, 0x00,
 				// manager chain ID
@@ -255,7 +243,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 						Memo: types.JSONByteSlice("😅\nwell that's\x01\x23\x45!"),
 					},
 				},
-				VMID:           vmID,
 				GenesisData:    []byte("genesis"),
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
@@ -409,11 +396,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0xf0, 0x9f, 0x98, 0x85, 0x0a, 0x77, 0x65, 0x6c,
 				0x6c, 0x20, 0x74, 0x68, 0x61, 0x74, 0x27, 0x73,
 				0x01, 0x23, 0x45, 0x21,
-				// vmID
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				// length of genesis data "genesis" = 7
 				0x00, 0x00, 0x00, 0x07,
 				// genesis data "genesis"
@@ -516,7 +498,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				BlockchainID: ctx.ChainID,
 			},
 		}
-		validVMID       = ids.GenerateTestID()
 		tooLongAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
 		validValidators = []*CreateL1Validator{
 			{
@@ -548,26 +529,15 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				BaseTx: BaseTx{
 					SyntacticallyVerified: true,
 				},
-				VMID:           ids.Empty,
 				ManagerAddress: tooLongAddress,
 				Validators:     nil,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "invalid VMID",
-			tx: &CreateL1Tx{
-				BaseTx:     validBaseTx,
-				VMID:       ids.Empty,
-				Validators: validValidators,
-			},
-			expectedErr: errInvalidVMID,
-		},
-		{
 			name: "address too long",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				ManagerAddress: tooLongAddress,
 				Validators:     validValidators,
 			},
@@ -577,7 +547,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "no validators",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				Validators:     nil,
 				ManagerChainID: ids.GenerateTestID(),
 			},
@@ -587,7 +556,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "validators not sorted",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID: []byte{
@@ -612,7 +580,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "duplicate validators",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID: []byte{
@@ -637,7 +604,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "genesis too long",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				GenesisData:    make([]byte, MaxGenesisLen+1),
 				Validators:     validValidators,
 				ManagerChainID: ids.GenerateTestID(),
@@ -648,7 +614,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid BaseTx",
 			tx: &CreateL1Tx{
 				BaseTx:         BaseTx{},
-				VMID:           validVMID,
 				Validators:     validValidators,
 				ManagerChainID: ids.GenerateTestID(),
 			},
@@ -658,7 +623,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator weight",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
@@ -676,7 +640,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator nodeID length",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen + 1),
@@ -694,7 +657,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator nodeID",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID:                ids.EmptyNodeID[:],
@@ -712,7 +674,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator pop",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
@@ -730,7 +691,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator remaining balance owner",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID: utils.RandomBytes(ids.NodeIDLen),
@@ -750,7 +710,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "invalid validator deactivation owner",
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
-				VMID:   validVMID,
 				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
@@ -770,7 +729,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "passes verification",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				Validators:     validValidators,
 				ManagerChainID: ids.GenerateTestID(),
 			},
@@ -780,7 +738,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "passes verification with all fields",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				GenesisData:    make([]byte, units.KiB),
 				ManagerChainID: ids.GenerateTestID(),
 				ManagerAddress: make([]byte, 20),
@@ -792,7 +749,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "passes verification with empty manager chain ID",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				VMID:           validVMID,
 				ManagerChainID: ids.Empty,
 				ManagerAddress: make([]byte, 20),
 				Validators:     validValidators,

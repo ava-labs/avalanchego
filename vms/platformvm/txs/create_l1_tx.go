@@ -32,9 +32,6 @@ type CreateL1Tx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 
-	// ID of the VM running on the chain
-	VMID ids.ID `serialize:"true" json:"vmID"`
-
 	// Byte representation of genesis state of the chain
 	GenesisData []byte `serialize:"true" json:"genesisData"`
 
@@ -55,8 +52,6 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified:
 		return nil
-	case tx.VMID == ids.Empty:
-		return errInvalidVMID
 	case len(tx.ManagerAddress) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
 	case len(tx.Validators) == 0:
