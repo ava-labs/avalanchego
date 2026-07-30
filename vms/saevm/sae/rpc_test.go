@@ -54,12 +54,22 @@ var zeroAddr common.Address
 
 type rpcTest struct {
 	method       string
+	name         string
 	args         []any
 	want         any // untyped nil means no return value.
 	wantErr      testerr.Want
 	parallel     bool
 	eventually   bool
 	extraCmpOpts []cmp.Option
+}
+
+// withCmpOpts sets opts as the [rpcTest.extraCmpOpts] of every test, for tables
+// whose rows all compare their results the same way.
+func withCmpOpts(tests []rpcTest, opts ...cmp.Option) []rpcTest {
+	for i := range tests {
+		tests[i].extraCmpOpts = opts
+	}
+	return tests
 }
 
 func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
@@ -94,7 +104,11 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			}
 		}
 
-		t.Run(tc.method, func(t *testing.T) {
+		name := tc.name
+		if name == "" {
+			name = tc.method
+		}
+		t.Run(name, func(t *testing.T) {
 			if tc.parallel {
 				t.Parallel()
 			}
