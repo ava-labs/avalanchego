@@ -81,6 +81,20 @@ func (mr *IteratorMockRecorder) Next() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*Iterator)(nil).Next))
 }
 
+// Prev mocks base method.
+func (m *Iterator) Prev() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Prev")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Prev indicates an expected call of Prev.
+func (mr *IteratorMockRecorder) Prev() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prev", reflect.TypeOf((*Iterator)(nil).Prev))
+}
+
 // Release mocks base method.
 func (m *Iterator) Release() {
 	m.ctrl.T.Helper()

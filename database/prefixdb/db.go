@@ -182,14 +182,21 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
-	prefixedStart := db.prefix(start)
-	defer db.bufferPool.Put(prefixedStart)
+	// Without a caller-provided start there must be none on the inner
+	// iterator either. Synthesizing one from the prefix would position a
+	// backward iteration below the prefix, before every covered key.
+	var prefixedStart []byte
+	if len(start) > 0 {
+		prefixedStartBuf := db.prefix(start)
+		defer db.bufferPool.Put(prefixedStartBuf)
+		prefixedStart = *prefixedStartBuf
+	}
 
 	prefixedPrefix := db.prefix(prefix)
 	defer db.bufferPool.Put(prefixedPrefix)
 
 	return &iterator{
-		Iterator: db.db.NewIteratorWithStartAndPrefix(*prefixedStart, *prefixedPrefix),
+		Iterator: db.db.NewIteratorWithStartAndPrefix(prefixedStart, *prefixedPrefix),
 		db:       db,
 	}
 }
@@ -346,6 +353,15 @@ type iterator struct {
 
 // Next calls the inner iterators Next() function and strips the keys prefix
 func (it *iterator) Next() bool {
+	return it.move(true)
+}
+
+// Prev calls the inner iterators Prev() function and strips the keys prefix
+func (it *iterator) Prev() bool {
+	return it.move(false)
+}
+
+func (it *iterator) move(forward bool) bool {
 	if it.db.isClosed() {
 		it.key = nil
 		it.val = nil
@@ -353,8 +369,13 @@ func (it *iterator) Next() bool {
 		return false
 	}
 
-	hasNext := it.Iterator.Next()
-	if hasNext {
+	var hasValue bool
+	if forward {
+		hasValue = it.Iterator.Next()
+	} else {
+		hasValue = it.Iterator.Prev()
+	}
+	if hasValue {
 		key := it.Iterator.Key()
 		if prefixLen := len(it.db.dbPrefix); len(key) >= prefixLen {
 			key = key[prefixLen:]
@@ -366,7 +387,7 @@ func (it *iterator) Next() bool {
 		it.val = nil
 	}
 
-	return hasNext
+	return hasValue
 }
 
 func (it *iterator) Key() []byte {

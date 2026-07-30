@@ -75,6 +75,15 @@ type viewIterator struct {
 	initialized, parentIterExhausted bool
 }
 
+// Prev is not supported, the iterator merges two forward streams, the view's
+// sorted changes and the parent iterator, and cannot reverse them.
+func (it *viewIterator) Prev() bool {
+	it.key = nil
+	it.value = nil
+	it.err = database.ErrPrevNotSupported
+	return false
+}
+
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted. We must pay careful attention to set the proper values
 // based on if the in memory changes or the underlying db should be read next

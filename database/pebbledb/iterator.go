@@ -29,6 +29,9 @@ type iter struct {
 
 	db   *Database
 	iter *pebble.Iterator
+	// start is the key the first movement positions relative to; see
+	// [database.Iterator.Prev].
+	start []byte
 
 	initialized bool
 	closed      bool
@@ -41,6 +44,15 @@ type iter struct {
 
 // Must not be called with [db.lock] held.
 func (it *iter) Next() bool {
+	return it.move(true)
+}
+
+// Must not be called with [db.lock] held.
+func (it *iter) Prev() bool {
+	return it.move(false)
+}
+
+func (it *iter) move(forward bool) bool {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
@@ -53,10 +65,21 @@ func (it *iter) Next() bool {
 		it.err = database.ErrClosed
 		return false
 	case !it.initialized:
-		it.hasNext = it.iter.First()
+		switch {
+		case forward && len(it.start) > 0:
+			it.hasNext = it.iter.SeekGE(it.start)
+		case forward:
+			it.hasNext = it.iter.First()
+		case len(it.start) > 0:
+			it.hasNext = it.iter.SeekLT(it.start)
+		default:
+			it.hasNext = it.iter.Last()
+		}
 		it.initialized = true
-	default:
+	case forward:
 		it.hasNext = it.iter.Next()
+	default:
+		it.hasNext = it.iter.Prev()
 	}
 
 	if !it.hasNext {

@@ -49,6 +49,7 @@ var Tests = map[string]func(t *testing.T, db database.Database){
 	"BatchLargeSize":                   TestBatchLargeSize,
 	"IteratorSnapshot":                 TestIteratorSnapshot,
 	"Iterator":                         TestIterator,
+	"IteratorPrev":                     TestIteratorPrev,
 	"IteratorStart":                    TestIteratorStart,
 	"IteratorPrefix":                   TestIteratorPrefix,
 	"IteratorStartPrefix":              TestIteratorStartPrefix,
@@ -664,6 +665,84 @@ func TestIterator(t *testing.T, db database.Database) {
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
 	require.NoError(iterator.Error())
+}
+
+// TestIteratorPrev tests the backward-iteration contract of
+// [database.Iterator.Prev], or that unsupporting iterators report
+// [database.ErrPrevNotSupported].
+func TestIteratorPrev(t *testing.T, db database.Database) {
+	require := require.New(t)
+
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
+	key3 := []byte("hello3")
+	value3 := []byte("world3")
+
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
+	require.NoError(db.Put(key3, value3))
+
+	{
+		iterator := db.NewIterator()
+		require.NotNil(iterator)
+		defer iterator.Release()
+
+		if !iterator.Prev() {
+			// Backward iteration is optional.
+			require.ErrorIs(iterator.Error(), database.ErrPrevNotSupported)
+			return
+		}
+		// An iterator without a start key positions at the last key.
+		require.Equal(key3, iterator.Key())
+		require.Equal(value3, iterator.Value())
+
+		require.True(iterator.Prev())
+		require.Equal(key2, iterator.Key())
+		require.Equal(value2, iterator.Value())
+
+		require.True(iterator.Prev())
+		require.Equal(key1, iterator.Key())
+		require.Equal(value1, iterator.Value())
+
+		require.False(iterator.Prev())
+		require.Nil(iterator.Key())
+		require.Nil(iterator.Value())
+		require.NoError(iterator.Error())
+	}
+
+	{
+		// An iterator with a start key positions strictly below it.
+		iterator := db.NewIteratorWithStart(key3)
+		require.NotNil(iterator)
+		defer iterator.Release()
+
+		require.True(iterator.Prev())
+		require.Equal(key2, iterator.Key())
+		require.Equal(value2, iterator.Value())
+	}
+
+	{
+		// Prev reverses direction after Next, and returns to the last key
+		// after Next has exhausted the iterator.
+		iterator := db.NewIterator()
+		require.NotNil(iterator)
+		defer iterator.Release()
+
+		require.True(iterator.Next())
+		require.True(iterator.Next())
+		require.True(iterator.Prev())
+		require.Equal(key1, iterator.Key())
+		require.Equal(value1, iterator.Value())
+
+		require.True(iterator.Next())
+		require.True(iterator.Next())
+		require.False(iterator.Next())
+		require.True(iterator.Prev())
+		require.Equal(key3, iterator.Key())
+		require.Equal(value3, iterator.Value())
+	}
 }
 
 // TestIteratorStart tests to make sure the iterator can be configured to

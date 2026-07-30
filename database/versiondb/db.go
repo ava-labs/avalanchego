@@ -315,6 +315,17 @@ type iterator struct {
 	initialized, exhausted bool
 }
 
+// Prev is not supported, the iterator merges two forward streams, the in
+// memory changes and the underlying database's iterator, and cannot reverse
+// them. Without this override the embedded iterator's Prev would be promoted
+// and silently desynchronise the merge.
+func (it *iterator) Prev() bool {
+	it.key = nil
+	it.value = nil
+	it.err = database.ErrPrevNotSupported
+	return false
+}
+
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted. We must pay careful attention to set the proper values
 // based on if the in memory db or the underlying db should be read next

@@ -418,6 +418,16 @@ func (it *iterator) Next() bool {
 	return true
 }
 
+// Prev is not supported, the underlying linked list only anchors its head, so
+// a backward walk has no starting point.
+func (it *iterator) Prev() bool {
+	it.key = nil
+	it.value = nil
+	it.exhausted = true
+	it.err = database.ErrPrevNotSupported
+	return false
+}
+
 func (it *iterator) Error() error {
 	return it.err
 }

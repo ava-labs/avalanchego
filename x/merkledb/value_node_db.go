@@ -134,12 +134,26 @@ func (i *iterator) Value() []byte {
 }
 
 func (i *iterator) Next() bool {
+	return i.move(true)
+}
+
+func (i *iterator) Prev() bool {
+	return i.move(false)
+}
+
+func (i *iterator) move(forward bool) bool {
 	i.key = nil
 	i.value = nil
 	if i.Error() != nil || i.db.closed.Get() {
 		return false
 	}
-	if !i.nodeIter.Next() {
+	var hasValue bool
+	if forward {
+		hasValue = i.nodeIter.Next()
+	} else {
+		hasValue = i.nodeIter.Prev()
+	}
+	if !hasValue {
 		return false
 	}
 

@@ -26,6 +26,22 @@ type Iterator interface {
 	// must return [ErrClosed].
 	Next() bool
 
+	// Prev moves the iterator to the previous key/value pair. It returns
+	// whether the iterator successfully moved to a new key/value pair.
+	//
+	// The first movement of an iterator determines its position. Where Next
+	// positions it at the smallest covered key that is at least the
+	// iterator's start, Prev positions it at the largest covered key that is
+	// strictly below the start, or at the last covered key when there is no
+	// start. After Next has returned false, Prev moves back to the last
+	// covered key.
+	//
+	// Implementations MAY not support backward iteration, in which case Prev
+	// returns false and Error() returns [ErrPrevNotSupported]. Prev support
+	// otherwise matches Next, including the behavior when the underlying
+	// database is closed mid iteration.
+	Prev() bool
+
 	// Error returns any accumulated error. Exhausting all the key/value pairs
 	// is not considered to be an error.
 	// Error should be called after all key/value pairs have been exhausted i.e.
@@ -73,6 +89,10 @@ type IteratorError struct {
 }
 
 func (*IteratorError) Next() bool {
+	return false
+}
+
+func (*IteratorError) Prev() bool {
 	return false
 }
 

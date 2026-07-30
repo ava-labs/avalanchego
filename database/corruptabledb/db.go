@@ -182,6 +182,15 @@ func (it *iterator) Next() bool {
 	return val
 }
 
+func (it *iterator) Prev() bool {
+	if err := it.db.corrupted(); err != nil {
+		return false
+	}
+	val := it.Iterator.Prev()
+	_ = it.db.handleError(it.Iterator.Error())
+	return val
+}
+
 func (it *iterator) Error() error {
 	if err := it.db.corrupted(); err != nil {
 		return err
