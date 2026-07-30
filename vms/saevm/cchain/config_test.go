@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -133,6 +134,23 @@ func TestParseConfig(t *testing.T) {
 
 		// APIs
 		{
+			name: "api/apis",
+			json: `{"apis":["subscriptions","db","net","web3"]}`,
+			want: with(func(c *config) {
+				c.APIs = set.Of(rpc.APISubscriptions, rpc.APIDB, rpc.APINet, rpc.APIWeb3)
+			}),
+		},
+		{
+			name: "api/apis_explicit_empty",
+			json: `{"apis":[]}`,
+			want: with(func(c *config) { c.APIs.Clear() }),
+		},
+		{
+			name:    "api/apis_unknown_name",
+			json:    `{"apis":["eth"]}`,
+			wantErr: testerr.Is(rpc.ErrUnknownAPI),
+		},
+		{
 			name: "api/allow_unprotected_txs",
 			json: `{"allow-unprotected-txs":true}`,
 			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
@@ -178,6 +196,7 @@ func TestParseConfig(t *testing.T) {
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
+				"apis":["chain","trace"],
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
 				"warp-off-chain-messages":["0x1234"]
@@ -195,6 +214,7 @@ func TestParseConfig(t *testing.T) {
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
+				APIs:                 set.Of(rpc.APIChain, rpc.APITrace),
 				AllowUnprotectedTxs:  true,
 				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},

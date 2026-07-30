@@ -27,6 +27,7 @@ go_library(
     deps = [
         "//network/p2p",
         "//utils/logging",
+        "//utils/set",
         "//version",
         "//vms/saevm/blocks",
         "//vms/saevm/gasprice",
@@ -69,6 +70,7 @@ go_test(
     deps = [
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rpc",
         "@com_github_stretchr_testify//require",
     ],
 )
