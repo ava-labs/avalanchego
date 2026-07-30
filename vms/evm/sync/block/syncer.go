@@ -12,8 +12,10 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -31,6 +33,7 @@ var (
 // and writes them to db. It skips any suffix already on disk, verifies every
 // response links tip-to-parent, and re-requests on failure.
 type Syncer struct {
+	log           logging.Logger
 	client        *Client
 	db            ethdb.Database
 	fromHash      common.Hash
@@ -40,7 +43,7 @@ type Syncer struct {
 
 // NewSyncer returns a [Syncer] that fetches blocksToFetch blocks ending at
 // (fromHash, fromHeight) and writes them into db, fetching from peers through c.
-func NewSyncer(c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, blocksToFetch uint64) (*Syncer, error) {
+func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, blocksToFetch uint64) (*Syncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
 	}
@@ -48,6 +51,7 @@ func NewSyncer(c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, b
 		return nil, errFromHashRequired
 	}
 	return &Syncer{
+		log:           log,
 		client:        c,
 		db:            db,
 		fromHash:      fromHash,
@@ -81,8 +85,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			return err
 		}
 
-		parents := uint16(min(toFetch, uint64(MaxParentsPerRequest)))
-		blocks, err := getBlocks(ctx, s.client, nextHash, nextHeight, parents)
+		parents := uint16(min(toFetch, uint64(maxParentsPerRequest)))
+		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, parents)
 		if err != nil {
 			return fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
 		}
@@ -102,7 +106,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // getBlocks requests up to numParents blocks ending at (hash, height), verifies
 // the returned chain links back from hash, scores the peer, and re-requests on
 // any network or verification failure until ctx ends.
-func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
+func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
 	req := &syncpb.GetBlockRequest{Height: height, NumParents: uint32(numParents)}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -119,7 +123,7 @@ func getBlocks(ctx context.Context, c *Client, hash common.Hash, height uint64, 
 		blocks, err := verifyBlocks(hash, numParents, resp.GetBlocks())
 		if err != nil {
 			outcome.Failure()
-			log.Debug("invalid block response, re-requesting", "err", err)
+			log.Debug("invalid block response, re-requesting", zap.Error(err))
 			continue
 		}
 

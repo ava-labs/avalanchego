@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -41,9 +42,9 @@ func TestResponder(t *testing.T) {
 		},
 		{
 			name:       "caps parents at max",
-			chainLen:   int(MaxParentsPerRequest) + 10,
-			numParents: uint32(MaxParentsPerRequest) + 50,
-			wantBlocks: int(MaxParentsPerRequest),
+			chainLen:   int(maxParentsPerRequest) + 10,
+			numParents: uint32(maxParentsPerRequest) + 50,
+			wantBlocks: int(maxParentsPerRequest),
 		},
 		{
 			name:       "missing block drops",
@@ -66,7 +67,7 @@ func TestResponder(t *testing.T) {
 			if !tt.noBlocks {
 				blocks = synctest.MakeChain(t, tt.chainLen)
 			}
-			r := newResponder(synctest.NewBlockMap(blocks))
+			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks))
 
 			ctx := t.Context()
 			if tt.cancelCtx {

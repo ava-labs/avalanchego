@@ -148,7 +148,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			// blocksToFetch exceeds MaxParentsPerRequest, so this drives more
+			// blocksToFetch exceeds maxParentsPerRequest, so this drives more
 			// than one request through the re-request loop.
 			name:          "batches across requests",
 			numBlocks:     80,
@@ -184,7 +184,7 @@ func TestSyncer(t *testing.T) {
 			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
 			tip := blocks[tt.fromHeight]
-			syncer, err := NewSyncer(NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch)
+			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch)
 			require.NoError(t, err)
 			require.NoError(t, syncer.Sync(ctx))
 
@@ -200,10 +200,10 @@ func TestSyncer(t *testing.T) {
 
 func TestNewSyncer_Validation(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	_, err := NewSyncer(nil, db, common.Hash{}, 0, 0)
+	_, err := NewSyncer(logging.NoLog{}, nil, db, common.Hash{}, 0, 0)
 	require.ErrorIs(t, err, errBlocksToFetchRequired)
 
-	_, err = NewSyncer(nil, db, common.Hash{}, 5, 3)
+	_, err = NewSyncer(logging.NoLog{}, nil, db, common.Hash{}, 5, 3)
 	require.ErrorIs(t, err, errFromHashRequired)
 }
 
@@ -213,10 +213,10 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, RegisterHandler(net, logging.NoLog{}, synctest.NewBlockMap(blocks)))
+	require.NoError(t, RegisterHandler(logging.NoLog{}, net, synctest.NewBlockMap(blocks)))
 
 	tip := blocks[5]
-	syncer, err := NewSyncer(NewClient(net, tracker), rawdb.NewMemoryDatabase(), tip.Hash(), 5, 3)
+	syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), rawdb.NewMemoryDatabase(), tip.Hash(), 5, 3)
 	require.NoError(t, err)
 
 	cancel() // cancel before Sync runs
@@ -234,7 +234,7 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 	require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, tamperingHandler(t, blocks[0])))
 
-	got, err := getBlocks(ctx, NewClient(net, tracker), tip.Hash(), tip.NumberU64(), 3)
+	got, err := getBlocks(ctx, logging.NoLog{}, NewClient(net, tracker), tip.Hash(), tip.NumberU64(), 3)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, got, "tampered blocks must never be accepted")
 }
@@ -267,7 +267,7 @@ func countingHandler(blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
 	inner := handlers.NewHandler(
 		logging.NoLog{},
 		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(synctest.NewBlockMap(blocks)),
+		newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks)),
 	)
 	var requests atomic.Int32
 	h := p2p.TestHandler{
