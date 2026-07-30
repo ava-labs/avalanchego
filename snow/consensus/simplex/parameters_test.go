@@ -28,6 +28,33 @@ func TestParametersVerify(t *testing.T) {
 			expectedError: nil,
 		},
 		{
+			name: "exactly minimum durations",
+			params: Parameters{
+				MaxNetworkDelay:    MinWaitDuration,
+				MaxRebroadcastWait: MinWaitDuration,
+				InitialValidators:  validValidators,
+			},
+			expectedError: nil,
+		},
+		{
+			name: "MaxNetworkDelay below minimum",
+			params: Parameters{
+				MaxNetworkDelay:    MinWaitDuration - time.Millisecond,
+				MaxRebroadcastWait: time.Second,
+				InitialValidators:  validValidators,
+			},
+			expectedError: ErrInvalidParameters,
+		},
+		{
+			name: "MaxRebroadcastWait below minimum",
+			params: Parameters{
+				MaxNetworkDelay:    time.Second,
+				MaxRebroadcastWait: MinWaitDuration - time.Millisecond,
+				InitialValidators:  validValidators,
+			},
+			expectedError: ErrInvalidParameters,
+		},
+		{
 			name: "zero MaxNetworkDelay",
 			params: Parameters{
 				MaxNetworkDelay:    0,

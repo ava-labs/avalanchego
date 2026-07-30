@@ -484,8 +484,8 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			{
 				"validatorOnly": true,
 				"simplexParameters": {
-						"maxNetworkDelay":1000,
-						"maxRebroadcastWait":1000,
+						"maxNetworkDelay":500000000,
+						"maxRebroadcastWait":500000000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
@@ -504,8 +504,8 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxRebroadcastWait)
 
 				pkBytes, err := base64.StdEncoding.DecodeString(
 					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",
@@ -591,8 +591,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"simplexParameters": {
-						"maxNetworkDelay":1000,
-						"maxRebroadcastWait":1000,
+						"maxNetworkDelay":500000000,
+						"maxRebroadcastWait":500000000,
 						"initialValidators": [
 								{
 										"nodeID": "NodeID-6ZmBHXTqjknJoZtXbnJ6x7af863rXDTwx",
@@ -613,8 +613,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxNetworkDelay)
-				require.Equal(time.Duration(1000), config.SimplexParameters.MaxRebroadcastWait)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxNetworkDelay)
+				require.Equal(500*time.Millisecond, config.SimplexParameters.MaxRebroadcastWait)
 
 				pkBytes, err := base64.StdEncoding.DecodeString(
 					"qPujvBf1geRDb3xIQ3TzVFP5PU+yCgWIS8XlQG7HtA8+QQPpk8XNeYu6TgAxHLYM",

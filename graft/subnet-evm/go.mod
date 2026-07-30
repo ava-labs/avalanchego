@@ -48,6 +48,7 @@ require (
 	github.com/StephenButtolph/canoto v0.18.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2 // indirect
+	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect

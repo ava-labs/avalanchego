@@ -28,6 +28,7 @@ go_library(
         "//ids",
         "//message",
         "//proto/pb/p2p",
+        "//snow",
         "//snow/consensus/simplex",
         "//snow/consensus/snowman",
         "//snow/engine/common",
