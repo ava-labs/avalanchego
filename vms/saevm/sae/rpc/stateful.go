@@ -240,8 +240,7 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, fmt.Errorf("decoding block: %v", err)
 	}
 	if block.NumberU64() == 0 {
-		// Copied from [tracers.TraceBlock] for want of a sentinel error.
-		return nil, errors.New("genesis is not traceable")
+		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 
 	parent, err := a.b.restoreExecutedParent(ctx, block)
@@ -360,7 +359,7 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, parent *types
 func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
 	hash := rawdb.ReadCanonicalHash(b.DB(), block.NumberU64())
 	if hash == (common.Hash{}) {
-		b.Logger().Error("No canonical hash for already-served block",
+		b.Logger().Error("missing canonical hash override for block",
 			zap.Uint64("block_height", block.NumberU64()),
 		)
 		return block.Hash()
