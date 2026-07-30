@@ -25,12 +25,12 @@ below vary:
 | | The provided block's post-execution state with the **canonical child's** before-block changes applied, allowing transaction tracing on the child to include these operations. | `tracerBackend` |
 | | The post-execution state of the provided block. `debug_traceCall` is expected to be executed as if it was the last transaction. | `traceCallBackend` |
 | | The provided block's post-execution state with the **caller-supplied block** before-block changes. | `suppliedHashBackend` |
-| `StateAtTransaction` | Replays the block's earlier transactions to reach the state just before the target transaction — the only method here that executes anything. Never overridden, so `debug_traceTransaction` and `debug_traceCall` with a transaction index always resolve here. | `backend` |
-| `BlockByHash`, `BlockByNumber` | The stored block: worst-case base fee, no post-execution root. | `backend` |
-| | Faked to carry the executed base fee and post-execution state root. Both other wrappers inherit this. | `tracerBackend` |
-| `BlockHash` | Not implemented; only the wrappers below override block hashes. | `backend` |
-| | The block's canonical hash, which its faked header does not hash to. | `tracerBackend` |
-| | The hash as supplied, for the one block re-sealed with the executed base fee; any other block falls through to `tracerBackend`. | `suppliedHashBackend` |
+| `StateAtTransaction` | Replays the provided block's transactions up to the target index to reach the state just before it — the only method in this table that executes anything. No wrapper overrides it. | `backend` |
+| `BlockByHash`, `BlockByNumber` | The stored block: worst-case base fee, no post-execution state root. | `backend` |
+| | The stored block with a faked header carrying the executed base fee and post-execution state root. | `tracerBackend` |
+| `BlockHash` | Not implemented; the stored blocks it serves hash to their own headers. | `backend` |
+| | The provided block's canonical hash, needed because its faked header hashes to something else. | `tracerBackend` |
+| | The caller-supplied hash for the single block `debug_traceBlock` re-sealed with the executed base fee, and the canonical hash for every other block. | `suppliedHashBackend` |
 
 So two of the four apply before-block changes — `tracerBackend` from the
 canonical child and `suppliedHashBackend` from the supplied block — and all

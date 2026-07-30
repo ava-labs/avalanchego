@@ -265,8 +265,8 @@ func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config 
 // before-block changes.
 type suppliedHashBackend struct {
 	*tracerBackend
-	block    *types.Block // re-sealed with the executed base fee
-	supplied common.Hash  // hash of the block as supplied by the caller
+	block    *types.Block // MUST be the block passed to [tracers.TraceBlock]
+	supplied common.Hash  // its hash as the caller supplied it, before re-sealing
 }
 
 func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
