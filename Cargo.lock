@@ -164,6 +164,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "arity-arrays"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5574da89b2ecbde68d766fbac79a9de407a20011cf066de81d0505e0d2dc2470"
+dependencies = [
+ "arity-bitmap",
+ "arity-index",
+ "hybrid-array",
+]
+
+[[package]]
+name = "arity-bitmap"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11018ea8adbac8911a096ed54ae3f6fb20fd3121d52c51251818dfa28c05ee17"
+dependencies = [
+ "arity-index",
+]
+
+[[package]]
+name = "arity-index"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71631c8ed27eee08eb5ecfdb120d06c7ef5f4538efe5630a66705800fa6a939e"
+dependencies = [
+ "seq-macro",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +1957,7 @@ version = "0.8.0"
 dependencies = [
  "aquamarine",
  "arc-swap",
+ "arity-arrays",
  "bitfield",
  "bumpalo",
  "bytemuck",
@@ -4402,6 +4432,12 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+
+[[package]]
+name = "seq-macro"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
 
 [[package]]
 name = "serde"

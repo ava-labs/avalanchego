@@ -431,3 +431,23 @@ jobs:
         run: cargo install cargo-machete
       - name: Check for stale dependencies
         run: cargo machete --with-metadata
+
+  miri:
+    name: miri (path::component slice casts)
+    # NB: this uses macos and not linux intentionally. miri fails due to a dependency
+    # that uses inline assembly (fastrace → fastant → small_ctor) which is not supported
+    # by the Miri interpreter.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
+        with:
+          toolchain: nightly-2026-07-05
+          components: miri
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2
+        with:
+          shared-key: "miri"
+      - name: Miri (slice reinterpret round-trip)
+        run: cargo miri test --locked -p firewood-storage path::component
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"

@@ -191,7 +191,7 @@ pub use firewood_storage::NodeHashAlgorithm;
 /// This is the same type exposed as [`api::HashKey`] in the database API.
 pub use firewood_storage::TrieHash;
 
-#[cfg(all(test, feature = "logger"))]
+#[cfg(all(not(miri), test, feature = "logger"))]
 // SAFETY: Called pre-main in test builds only. Does not panic (try_init + ok),
 // uses thread-safe logger initialization, and only reads env vars (safe pre-main).
 #[ctor::ctor(unsafe)]

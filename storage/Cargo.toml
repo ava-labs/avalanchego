@@ -50,6 +50,7 @@ log = { version = "0.4.33", optional = true }
 sha3 = "0.12.0"
 bumpalo = { version = "3.20.3", features = ["collections", "std"] }
 arc-swap = "1.9.2"
+arity-arrays = { version = "0.2.0", default-features = false, features = ["16"] }
 
 [dev-dependencies]
 cfg-if = "1.0.4"

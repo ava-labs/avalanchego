@@ -4,10 +4,18 @@
 use smallvec::SmallVec;
 
 use super::{PartialPath, TriePath, TriePathFromUnpackedBytes};
+use bytemuck::TransparentWrapper;
+use bytemuck_derive::TransparentWrapper;
 
 /// A path component in a hexary trie; which is only 4 bits (aka a nibble).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, TransparentWrapper)]
+#[repr(transparent)]
 pub struct PathComponent(pub crate::u4::U4);
+
+// These compile-time assertions ensure that `PathComponent` and `Option<PathComponent>`
+// are both the same size as a u8.
+const _: () = assert!(size_of::<PathComponent>() == 1);
+const _: () = assert!(size_of::<Option<PathComponent>>() == 1);
 
 /// An iterator over path components.
 pub type ComponentIter<'a> = std::iter::Copied<std::slice::Iter<'a, PathComponent>>;
@@ -91,8 +99,12 @@ impl PathComponent {
     /// second component.
     #[must_use]
     pub const fn new_pair(v: u8) -> (Self, Self) {
-        let (upper, lower) = crate::u4::U4::new_pair(v);
-        (Self(upper), Self(lower))
+        // `new_masked` keeps only the low 4 bits, so shift the high nibble down
+        // before masking. (arity's `U4` provides no `new_pair`/`new_shifted`.)
+        (
+            Self(crate::u4::U4::new_masked(v >> 4)),
+            Self(crate::u4::U4::new_masked(v)),
+        )
     }
 
     /// Joins this [`PathComponent`] with another to create a single [`u8`] where
@@ -100,7 +112,8 @@ impl PathComponent {
     /// lower 4 bits.
     #[must_use]
     pub const fn join(self, other: Self) -> u8 {
-        self.0.join(other.0)
+        // arity's `U4` provides no `join`; compute it directly.
+        (self.0.as_u8() << 4) | other.0.as_u8()
     }
 
     pub(crate) const fn wrapping_next(self) -> Self {
@@ -259,14 +272,19 @@ impl<'input> TriePathFromUnpackedBytes<'input> for &'input [PathComponent] {
     type Error = crate::u4::TryFromIntError;
 
     fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
-        if bytes.iter().all(|&b| b <= 0x0F) {
-            #[expect(unsafe_code)]
-            // SAFETY: we have verified that all bytes are in the valid range for
-            // `U4` (0x00 to 0x0F inclusive); therefore, it is now safe for us
-            // to reinterpret a &[u8] as a &[PathComponent].
-            Ok(unsafe { byte_slice_as_path_components_unchecked(bytes) })
-        } else {
-            Err(crate::u4::TryFromIntError)
+        // `U4::try_from_slice` validates every byte is `< 16` and returns the bytes
+        // reinterpreted as `&[U4]` (validation + cast are Miri-tested in
+        // arity-index). Reinterpret that `&[U4]` as `&[PathComponent]`.
+        match crate::u4::U4::try_from_slice(bytes) {
+            Some(u4s) => Ok(u4_slice_as_path_components(u4s)),
+            // `None` ⇒ some byte is `>= 16`. arity's `TryFromIntError` is
+            // `#[non_exhaustive]`, so obtain it from the failing `U4::try_from`
+            // rather than constructing a literal.
+            None => Err(bytes
+                .iter()
+                .copied()
+                .find_map(|b| crate::u4::U4::try_from(b).err())
+                .expect("try_from_slice returned None, so some byte is out of range")),
         }
     }
 }
@@ -367,49 +385,31 @@ impl<T: std::ops::Deref<Target = [PathComponent]>> PathComponentSliceExt for T {
     }
 }
 
+/// Reinterprets a `&[U4]` as a `&[PathComponent]`.
+///
+/// `PathComponent` is `#[repr(transparent)]` over `U4`, so `[U4]` and
+/// `[PathComponent]` have identical layout.
 #[inline]
-const unsafe fn byte_slice_as_path_components_unchecked(bytes: &[u8]) -> &[PathComponent] {
-    #![expect(unsafe_code)]
-
-    // SAFETY: The caller must ensure that all bytes are valid for `PathComponent`,
-    // which is trivially true for 256-ary tries. For hexary tries, the caller must
-    // ensure that each byte is in the range 0x00 to 0x0F inclusive.
-    //
-    // We also rely on the fact that `PathComponent` is a single element type
-    // over `u8` (or `u4` which looks like a `u8` for this purpose).
-    //
-    // borrow rules ensure that the pointer for `bytes` is not null and
-    // `bytes.len()` is always valid. The returned reference will have the same
-    // lifetime as `bytes` so it cannot outlive the original slice.
-    unsafe {
-        &*(std::ptr::slice_from_raw_parts(bytes.as_ptr().cast::<PathComponent>(), bytes.len()))
-    }
+fn u4_slice_as_path_components(u4s: &[crate::u4::U4]) -> &[PathComponent] {
+    PathComponent::wrap_slice(u4s)
 }
 
+/// Reinterprets a `&[PathComponent]` as a `&[u8]`.
 #[inline]
-const fn path_components_as_byte_slice(components: &[PathComponent]) -> &[u8] {
-    #![expect(unsafe_code)]
-
-    // SAFETY: We rely on the fact that `PathComponent` is a single element type
-    // over `u8` (or `u4` which looks like a `u8` for this purpose).
-    //
-    // borrow rules ensure that the pointer for `components` is not null and
-    // `components.len()` is always valid. The returned reference will have the same
-    // lifetime as `components` so it cannot outlive the original slice.
-    unsafe {
-        &*(std::ptr::slice_from_raw_parts(components.as_ptr().cast::<u8>(), components.len()))
-    }
+fn path_components_as_byte_slice(components: &[PathComponent]) -> &[u8] {
+    crate::u4::U4::as_u8_slice(PathComponent::peel_slice(components))
 }
 
 #[inline]
 fn try_from_maybe_u4<I: FromIterator<PathComponent>>(
     bytes: impl IntoIterator<Item = u8>,
 ) -> Result<I, crate::u4::TryFromIntError> {
+    // `U4::try_from` yields arity's `TryFromIntError` on an out-of-range byte;
+    // map each `U4` to a `PathComponent` and collect into `Result<I, _>`.
     bytes
         .into_iter()
-        .map(PathComponent::try_new)
-        .collect::<Option<I>>()
-        .ok_or(crate::u4::TryFromIntError)
+        .map(|b| crate::u4::U4::try_from(b).map(PathComponent))
+        .collect()
 }
 
 #[cfg(test)]
@@ -453,6 +453,39 @@ mod tests {
     {
         let input: &[u8; _] = &[0x00, 0x10, 0x0A, 0x0F];
         let _ = <T>::path_from_unpacked_bytes(input).expect_err("invalid input");
+    }
+
+    #[test_case(0x00, (0x0, 0x0); "0x00")]
+    #[test_case(0x0F, (0x0, 0xF); "0x0F low nibble")]
+    #[test_case(0xF0, (0xF, 0x0); "0xF0 high nibble")]
+    #[test_case(0xAB, (0xA, 0xB); "0xAB")]
+    #[test_case(0xFF, (0xF, 0xF); "0xFF")]
+    fn test_path_component_new_pair_join(input: u8, expected: (u8, u8)) {
+        let (upper, lower) = PathComponent::new_pair(input);
+        assert_eq!((upper.as_u8(), lower.as_u8()), expected);
+        // join is the inverse of new_pair.
+        assert_eq!(upper.join(lower), input);
+    }
+
+    #[test]
+    fn test_slice_reinterpret_roundtrip() {
+        // Forward (checked) then reverse is the identity on valid nibbles.
+        let bytes: &[u8] = &[0x00, 0x01, 0x0A, 0x0F, 0x07, 0x0C];
+        let components =
+            <&[PathComponent]>::path_from_unpacked_bytes(bytes).expect("all nibbles < 16");
+        assert_eq!(components.len(), bytes.len());
+        assert_eq!(components.as_byte_slice(), bytes);
+
+        // An out-of-range byte is rejected.
+        let bad: &[u8] = &[0x00, 0x10];
+        assert!(<&[PathComponent]>::path_from_unpacked_bytes(bad).is_err());
+
+        // The empty slice round-trips (the reinterpret must be null-safe).
+        let empty: &[u8] = &[];
+        let empty_components =
+            <&[PathComponent]>::path_from_unpacked_bytes(empty).expect("empty is valid");
+        assert!(empty_components.is_empty());
+        assert_eq!(empty_components.as_byte_slice(), empty);
     }
 
     #[test]
