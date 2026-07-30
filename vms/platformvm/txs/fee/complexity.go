@@ -204,7 +204,6 @@ var (
 	}
 	IntrinsicCreateL1TxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
-			ids.IDLen + // vmID
 			wrappers.IntLen + // genesis length
 			ids.IDLen + // managerChainID
 			wrappers.IntLen + // address length

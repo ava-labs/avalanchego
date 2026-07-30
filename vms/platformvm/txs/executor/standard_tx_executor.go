@@ -1620,8 +1620,11 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
 	e.onAccept = func() {
-		e.backend.Config.CreateL1Chain(subnetID, tx)
+		if !e.backend.Config.CreateL1Chain(subnetID, tx) {
+			e.backend.Ctx.Log.Warn("tracked subnet has no VMID configured; skipping L1 chain creation",
+				zap.Stringer("subnetID", subnetID),
+			)
+		}
 	}
-
 	return nil
 }

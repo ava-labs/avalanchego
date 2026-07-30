@@ -1192,6 +1192,15 @@ func (n *Node) initVMs() error {
 	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 	}
+	// Map each tracked subnet to the VM its L1 chain runs, as declared in the
+	// node's subnet configs. Used to create chains for L1s created by CreateL1Tx,
+	// which doesn't include a VMID
+	subnetVMIDs := make(map[ids.ID]ids.ID, len(n.Config.SubnetConfigs))
+	for subnetID, subnetConfig := range n.Config.SubnetConfigs {
+		if subnetConfig.VMID != ids.Empty {
+			subnetVMIDs[subnetID] = subnetConfig.VMID
+		}
+	}
 
 	// Register the VMs that Avalanche supports
 	err := errors.Join(
@@ -1203,6 +1212,7 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
+				SubnetVMIDs:               subnetVMIDs,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,

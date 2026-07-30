@@ -337,7 +337,11 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		case *txs.CreateChainTx:
 			vm.Internal.CreateChain(chain.ID(), tx)
 		case *txs.CreateL1Tx:
-			vm.Internal.CreateL1Chain(subnetID, tx)
+			if !vm.Internal.CreateL1Chain(subnetID, tx) {
+				vm.ctx.Log.Warn("tracked subnet has no VMID configured; skipping L1 chain creation",
+					zap.Stringer("subnetID", subnetID),
+				)
+			}
 		default:
 			return fmt.Errorf("%w: got %T", errUnknownChainType, chain.Unsigned)
 		}

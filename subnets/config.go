@@ -52,6 +52,9 @@ type Config struct {
 	// TODO: Move this flag once the proposervm is configurable on a per-chain
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
+
+	// this is the VM binary that the chain runs on
+	VMID ids.ID `json:"vmID" yaml:"vmID"`
 }
 
 func boolToInt(b bool) int {

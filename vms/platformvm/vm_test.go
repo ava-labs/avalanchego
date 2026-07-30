@@ -832,13 +832,11 @@ func TestCreateL1Chain(t *testing.T) {
 
 	var (
 		nodeID      = ids.GenerateTestNodeID()
-		vmID        = ids.GenerateTestID()
 		genesisData = []byte("genesis")
 	)
 
 	wallet := newWallet(t, vm, walletConfig{})
 	tx, err := wallet.IssueCreateL1Tx(
-		vmID,
 		genesisData,
 		txs.SelfManagerChainID,
 		nil,
@@ -878,7 +876,6 @@ func TestCreateL1Chain(t *testing.T) {
 	require.Equal(txID, chains[0].ID())
 	chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
 	require.True(ok)
-	require.Equal(vmID, chainTx.VMID)
 	require.Equal(genesisData, chainTx.GenesisData)
 
 	// Verify createSubnet handles a CreateL1Tx without error

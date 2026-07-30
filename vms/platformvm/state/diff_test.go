@@ -616,7 +616,7 @@ func TestDiffAddL1Chain(t *testing.T) {
 
 	// Initialize parent state with one CreateL1Tx chain
 	parentCreateL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
-		VMID: ids.GenerateTestID(),
+		GenesisData: []byte("parent"),
 	}, txs.Codec, nil)
 	require.NoError(err)
 	parentSubnetID := parentCreateL1Tx.ID()
@@ -631,7 +631,7 @@ func TestDiffAddL1Chain(t *testing.T) {
 
 	// Add another CreateL1Tx chain via the diff
 	diffCreateL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
-		VMID: ids.GenerateTestID(),
+		GenesisData: []byte("diff"),
 	}, txs.Codec, nil)
 	require.NoError(err)
 	diffSubnetID := diffCreateL1Tx.ID()

@@ -4413,7 +4413,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	managerChainID := ids.GenerateTestID()
 	managerAddress := utils.RandomBytes(32)
-	vmID := ids.GenerateTestID()
 	genesisData := []byte("genesis")
 
 	const weight = 1
@@ -4436,7 +4435,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 	}
 
 	createL1Tx, err := wallet.IssueCreateL1Tx(
-		vmID,
 		genesisData,
 		managerChainID,
 		managerAddress,
@@ -4474,7 +4472,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			name: "invalid memo length",
 			tx: func() *txs.Tx {
 				tx, err := wallet.IssueCreateL1Tx(
-					vmID,
 					genesisData,
 					managerChainID,
 					managerAddress,
@@ -4559,7 +4556,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 							},
 						},
 					},
-					VMID:           vmID,
 					GenesisData:    genesisData,
 					ManagerChainID: managerChainID,
 					ManagerAddress: managerAddress,
@@ -4697,7 +4693,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			require.Equal(test.tx.ID(), chains[0].ID())
 			chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
 			require.True(ok)
-			require.Equal(vmID, chainTx.VMID)
+
 			require.Equal(genesisData, chainTx.GenesisData)
 		})
 	}
@@ -4747,7 +4743,6 @@ func TestStandardExecutorCreateL1TxSelfManagerChainID(t *testing.T) {
 	var (
 		nodeID         = ids.GenerateTestNodeID()
 		managerAddress = utils.RandomBytes(32)
-		vmID           = ids.GenerateTestID()
 		genesisData    = []byte("genesis")
 		ownerAddrs     = []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}
 	)
@@ -4767,7 +4762,6 @@ func TestStandardExecutorCreateL1TxSelfManagerChainID(t *testing.T) {
 		},
 	}
 	createL1Tx, err := wallet.IssueCreateL1Tx(
-		vmID,
 		genesisData,
 		txs.SelfManagerChainID,
 		managerAddress,

@@ -5,6 +5,8 @@ package p
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"math"
 	"slices"
@@ -888,7 +890,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var createL1Tx *txs.Tx
 		tc.By("issuing a CreateL1Tx", func() {
 			tx, err := pWallet.IssueCreateL1Tx(
-				constants.XSVMID,
 				genesisBytes,
 				managerChainID,
 				address,
@@ -1041,7 +1042,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var createL1Tx *txs.Tx
 		tc.By("issuing a CreateL1Tx", func() {
 			tx, err := pWallet.IssueCreateL1Tx(
-				constants.XSVMID,
 				genesisBytes,
 				txs.SelfManagerChainID,
 				address,
@@ -1088,7 +1088,12 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		tc.By("restarting the genesis validator with the L1 tracked", func() {
+			subnetConfigs, err := json.Marshal(map[string]map[string]string{
+				subnetID.String(): {"vmID": constants.XSVMID.String()},
+			})
+			require.NoError(err)
 			subnetGenesisNode.Flags[config.TrackSubnetsKey] = subnetID.String()
+			subnetGenesisNode.Flags[config.SubnetConfigContentKey] = base64.StdEncoding.EncodeToString(subnetConfigs)
 			require.NoError(subnetGenesisNode.Restart(tc.DefaultContext()))
 			e2e.WaitForHealthy(tc, subnetGenesisNode)
 		})
@@ -1375,7 +1380,25 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				},
 			})
 		})
-
+		tc.By("issuing a DisableL1ValidatorTx", func() {
+			_, err := pWallet.IssueDisableL1ValidatorTx(
+				registerValidationID,
+			)
+			require.NoError(err)
+		})
+		tc.By("verifying the validator was deactivated", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+				ids.EmptyNodeID: {
+					NodeID: ids.EmptyNodeID,
+					Weight: updatedWeight,
+				},
+			})
+		})
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("removing the registered validator", func() {

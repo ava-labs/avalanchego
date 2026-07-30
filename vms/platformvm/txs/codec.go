@@ -49,7 +49,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
-			RegisterCreateL1TxTypes(c),
+			RegisterIglooTypes(c),
 		)
 	}
 

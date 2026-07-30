@@ -86,6 +86,9 @@ type Internal struct {
 	// on recently created subnets (without this, users need to wait for
 	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
 	UseCurrentHeight bool
+	// SubnetVMIDs maps a tracked subnet's ID to the VMID of the chain it
+	// validates, as declared in the node's subnet configs.
+	SubnetVMIDs map[ids.ID]ids.ID
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of
@@ -112,16 +115,21 @@ func (c *Internal) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 // is a member of the subnet that validates the chain. Unlike CreateChain, the
 // subnetID is passed explicitly because CreateL1Tx derives it as the txID
 // rather than storing it as a field on the transaction.
-func (c *Internal) CreateL1Chain(subnetID ids.ID, tx *txs.CreateL1Tx) {
+func (c *Internal) CreateL1Chain(subnetID ids.ID, tx *txs.CreateL1Tx) bool {
 	if c.SybilProtectionEnabled &&
 		!c.TrackedSubnets.Contains(subnetID) {
-		return
+		return true
 	}
 
+	vmID, ok := c.SubnetVMIDs[subnetID]
+	if !ok {
+		return false
+	}
 	c.Chains.QueueChainCreation(chains.ChainParameters{
 		ID:          subnetID,
 		SubnetID:    subnetID,
 		GenesisData: tx.GenesisData,
-		VMID:        tx.VMID,
+		VMID:        vmID,
 	})
+	return true
 }

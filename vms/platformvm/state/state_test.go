@@ -1223,7 +1223,7 @@ func TestStateAddL1Chain(t *testing.T) {
 
 	// Create a CreateL1Tx to get the subnetID.
 	createL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
-		VMID: ids.GenerateTestID(),
+		GenesisData: []byte("parent"),
 	}, txs.Codec, nil)
 	require.NoError(err)
 	subnetID := createL1Tx.ID()
@@ -1292,7 +1292,7 @@ func TestStateAddL1ChainAndAddChain(t *testing.T) {
 
 	// Create a CreateL1Tx to get the subnetID.
 	createL1Tx, err := txs.NewSigned(&txs.CreateL1Tx{
-		VMID: ids.GenerateTestID(),
+		GenesisData: []byte("parent"),
 	}, txs.Codec, nil)
 	require.NoError(err)
 	subnetID = createL1Tx.ID()

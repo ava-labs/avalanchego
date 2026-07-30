@@ -1420,7 +1420,6 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 				response.Blockchains = append(response.Blockchains, APIBlockchain{
 					ID:       chainID,
 					SubnetID: subnetID,
-					VMID:     chain.VMID,
 				})
 			default:
 				return fmt.Errorf("expected a chain-creating tx type but got %T", chainTx.Unsigned)
