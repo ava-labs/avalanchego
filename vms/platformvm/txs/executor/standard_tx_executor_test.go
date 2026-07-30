@@ -4633,6 +4633,8 @@ func TestStandardExecutorReaddAutoRenewedValidatorTx(t *testing.T) {
 
 	_, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(t, err, database.ErrNotFound)
+	_, err = env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	// Re-add the same node with a different BLS key and different parameters
 	// so every field of the resulting staker is distinguishable from the old
