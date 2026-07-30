@@ -1743,7 +1743,7 @@ func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, startTime, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), validatorTx, startTime, validatorTx.EndTime(), validatorTx.Weight(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1948,7 +1948,7 @@ func (s *State) loadCurrentValidators() error {
 				return fmt.Errorf("adding accrued delegatee rewards: %w", err)
 			}
 
-			staker, err = NewStaker(
+			staker, err = NewCurrentStaker(
 				txID,
 				stakerTx,
 				time.Unix(int64(metadata.StakerStartTime), 0),
@@ -1964,6 +1964,8 @@ func (s *State) loadCurrentValidators() error {
 				txID,
 				stakerTx,
 				time.Unix(int64(metadata.StakerStartTime), 0),
+				stakerTx.EndTime(),
+				stakerTx.Weight(),
 				metadata.PotentialReward,
 			)
 			if err != nil {
@@ -2018,6 +2020,8 @@ func (s *State) loadCurrentValidators() error {
 			txID,
 			stakerTx,
 			time.Unix(int64(metadata.StakerStartTime), 0),
+			stakerTx.EndTime(),
+			stakerTx.Weight(),
 			metadata.PotentialReward,
 		)
 		if err != nil {
@@ -2073,6 +2077,8 @@ func (s *State) loadCurrentValidators() error {
 				txID,
 				stakerTx,
 				time.Unix(int64(metadata.StakerStartTime), 0),
+				stakerTx.EndTime(),
+				stakerTx.Weight(),
 				metadata.PotentialReward,
 			)
 			if err != nil {
