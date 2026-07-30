@@ -312,8 +312,8 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 
-		// The genesis block is synchronous and thus self-settling, so its settlement
-		// markers are never read.
+		// The genesis block is synchronous and thus self-settling, as its zero
+		// markers denote.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)

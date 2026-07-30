@@ -68,7 +68,9 @@ type Points interface {
 	BlockTime(h *types.Header) time.Time
 	// SettledBy returns the extra information for the settled block of the
 	// provided header. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock].
+	// [BlockBuilder.BuildBlock] and MUST be the zero value only for a
+	// synchronously executed (pre-SAE) header, by which [Synchronous] detects
+	// them.
 	SettledBy(*types.Header) Settled
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
@@ -133,6 +135,8 @@ type BlockBuilder[T Transaction] interface {
 // [Op].
 type Transaction interface {
 	AsOp() Op
+	// Size returns the transaction's serialized size.
+	Size() uint64
 }
 
 // AccountDebit includes an amount that an account should have debited,
@@ -214,6 +218,13 @@ type Settled struct {
 	GasUnix      uint64
 	GasNumerator gas.Gas
 	Excess       gas.Gas
+}
+
+// Synchronous reports whether the header is that of a synchronously executed
+// (pre-SAE) block. Unlike `blocks.Block.Synchronous`, which is only set on
+// restoration from the database, it holds for any block.
+func Synchronous(h Points, hdr *types.Header) bool {
+	return h.SettledBy(hdr) == (Settled{})
 }
 
 // SettledGasTime is a helper that given a header and its settler, returns the

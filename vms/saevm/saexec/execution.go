@@ -175,8 +175,12 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
 //
-// `baseFee`, if non-nil, overrides the gas-clock derivation; replays MUST
-// pass the block's recorded [blocks.Block.ExecutedBaseFee].
+// Both the base fee and the gas clock come from the parent's post-execution gas
+// clock. If [hook.Synchronous] reports the block as synchronous (pre-SAE), its
+// own header carries both instead. A non-nil `baseFee` overrides the fee from
+// either source, and replays MUST pass the block's recorded
+// [blocks.Block.ExecutedBaseFee] so they price transactions as history did, not
+// as a recomputation would.
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
@@ -198,8 +202,26 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	gasClock := parent.ExecutedByGasTime().Clone()
-	gasClock.BeforeBlock(hooks.BlockTime(header))
+	var gasClock *gastime.Time
+	if hook.Synchronous(hooks, header) {
+		// Pre-SAE blocks predate the gas clock, so theirs is reconstructed from
+		// their header.
+		var err error
+		if gasClock, err = b.WorstCaseGasTime(hooks); err != nil {
+			return nil, fmt.Errorf("gas time of synchronous block: %w", err)
+		}
+		if baseFee == nil {
+			baseFee = new(uint256.Int).SetUint64(b.HeaderBaseFee())
+		}
+	} else {
+		gasClock = parent.ExecutedByGasTime()
+		gasClock.BeforeBlock(hooks.BlockTime(header))
+		if baseFee == nil {
+			baseFee = gasClock.BaseFee()
+			b.CheckBaseFeeBound(baseFee)
+		}
+	}
+	header.BaseFee = baseFee.ToBig()
 	perTxClock := gasClock.Time.Clone()
 
 	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
@@ -211,12 +233,6 @@ func Execute(
 	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
-
-	if baseFee == nil {
-		baseFee = gasClock.BaseFee()
-		b.CheckBaseFeeBound(baseFee)
-	}
-	header.BaseFee = baseFee.ToBig()
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
