@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -71,7 +72,7 @@ func TestResponder_ValidationDrops(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newResponder(trieDB, common.HashLength, nil)
+			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.NoError(t, err)
 			require.Nil(t, resp)
@@ -98,7 +99,7 @@ func TestResponder_Serves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
 
-			r := newResponder(trieDB, common.HashLength, nil)
+			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: tt.limit,
@@ -159,7 +160,7 @@ func TestResponder_Drops(t *testing.T) {
 				cancel()
 			}
 
-			r := newResponder(trieDB, common.HashLength, nil)
+			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: rootHash,
 				KeyLimit: tt.limit,
@@ -175,7 +176,7 @@ func TestResponder_BoundedRange(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
-	r := newResponder(trieDB, common.HashLength, nil)
+	r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		StartKey: keys[10],
@@ -222,7 +223,7 @@ func TestResponder_Snapshot(t *testing.T) {
 				snap.Err = errors.New("snapshot unavailable")
 			}
 
-			r := newResponder(trieDB, common.HashLength, snap)
+			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, snap)
 			requireServesWholeTrie(t, r, root, keys, vals)
 		})
 	}

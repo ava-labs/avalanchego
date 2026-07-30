@@ -13,8 +13,10 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -31,6 +33,7 @@ var (
 // Syncer reconstructs the trie at root, rebuilding range-proof-verified leaves
 // into db with a [trie.StackTrie] and checking the committed root matches.
 type Syncer struct {
+	log     logging.Logger
 	client  *Client
 	db      ethdb.KeyValueStore
 	root    common.Hash
@@ -39,11 +42,11 @@ type Syncer struct {
 
 // NewSyncer returns a [Syncer] for the trie at root. account is empty for the
 // account trie, non-empty for a storage trie.
-func NewSyncer(c *Client, db ethdb.KeyValueStore, root, account common.Hash) (*Syncer, error) {
+func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, root, account common.Hash) (*Syncer, error) {
 	if root == (common.Hash{}) {
 		return nil, errRootRequired
 	}
-	return &Syncer{client: c, db: db, root: root, account: account}, nil
+	return &Syncer{log: log, client: c, db: db, root: root, account: account}, nil
 }
 
 // Sync walks the key range left to right into a StackTrie, then commits and
@@ -63,7 +66,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			return err
 		}
 
-		keys, vals, more, err := getLeafs(ctx, s.client, s.root, s.account, start)
+		keys, vals, more, err := getLeafs(ctx, s.log, s.client, s.root, s.account, start)
 		if err != nil {
 			return fmt.Errorf("could not get leaves from %x: %w", start, err)
 		}
@@ -100,7 +103,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // getLeafs requests the range starting at start, verifies the range proof,
 // scores the peer, and re-requests on any network or verification failure until
 // ctx ends. It returns the leaves and whether more remain to the right.
-func getLeafs(ctx context.Context, c *Client, root, account common.Hash, start []byte) ([][]byte, [][]byte, bool, error) {
+func getLeafs(ctx context.Context, log logging.Logger, c *Client, root, account common.Hash, start []byte) ([][]byte, [][]byte, bool, error) {
 	req := &syncpb.GetLeafRequest{
 		RootHash:    root.Bytes(),
 		AccountHash: accountBytes(account),
@@ -122,7 +125,7 @@ func getLeafs(ctx context.Context, c *Client, root, account common.Hash, start [
 		more, err := verifyLeafs(root, start, resp)
 		if err != nil {
 			outcome.Failure()
-			log.Debug("invalid leaf response, re-requesting", "err", err)
+			log.Debug("invalid leaf response, re-requesting", zap.Error(err))
 			continue
 		}
 

@@ -13,9 +13,9 @@ import (
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -40,11 +40,11 @@ const (
 )
 
 // RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
-func RegisterHandler(net *p2p.Network, log logging.Logger, trieDB *triedb.Database, trieKeyLength int, snapshot SnapshotReader) error {
+func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, snapshot SnapshotReader) error {
 	h := handlers.NewHandler(
 		log,
 		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
-		newResponder(trieDB, trieKeyLength, snapshot),
+		newResponder(log, trieDB, trieKeyLength, snapshot),
 	)
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
@@ -62,17 +62,20 @@ var (
 
 // responder is bound to one (trieDB, key-length, snapshot) tuple.
 type responder struct {
+	log           logging.Logger
 	trieDB        *triedb.Database
 	snapshot      SnapshotReader // optional
 	trieKeyLength int
 }
 
 func newResponder(
+	log logging.Logger,
 	trieDB *triedb.Database,
 	trieKeyLength int,
 	snapshot SnapshotReader,
 ) *responder {
 	return &responder{
+		log:           log,
 		trieDB:        trieDB,
 		snapshot:      snapshot,
 		trieKeyLength: trieKeyLength,
@@ -81,7 +84,10 @@ func newResponder(
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, error) {
 	if !validateRequest(req, r.trieKeyLength) {
-		log.Debug("invalid leaf request, dropping", "nodeID", nodeID, "request", req)
+		r.log.Debug("invalid leaf request, dropping",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("request", req),
+		)
 		return nil, nil
 	}
 	q := newQuery(r, nodeID, req)
@@ -113,6 +119,7 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
 
 // query holds one in-flight leaf request.
 type query struct {
+	log      logging.Logger
 	startKey []byte
 	endKey   []byte
 	rootHash common.Hash
@@ -135,12 +142,17 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *quer
 	root := common.BytesToHash(req.GetRootHash())
 	t, err := trie.New(trie.TrieID(root), r.trieDB)
 	if err != nil {
-		log.Debug("error opening trie when processing request, dropping", "nodeID", nodeID, "root", root, "err", err)
+		r.log.Debug("error opening trie when processing request, dropping",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("root", root),
+			zap.Error(err),
+		)
 		return nil
 	}
 
 	limit := min(uint16(req.GetKeyLimit()), MaxLeavesLimit)
 	return &query{
+		log:      r.log,
 		startKey: req.GetStartKey(),
 		endKey:   req.GetEndKey(),
 		rootHash: root,
@@ -200,11 +212,17 @@ func (q *query) collect(ctx context.Context) error {
 // (pipeline error or ctx cancelled before any leaves were read).
 func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
 	if err := q.collect(ctx); err != nil {
-		log.Debug("failed to serve leaf request", "nodeID", nodeID, "err", err)
+		q.log.Debug("failed to serve leaf request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
+		)
 		return nil, nil
 	}
 	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
-		log.Debug("context err set before any leaves were iterated", "nodeID", nodeID, "ctxErr", ctx.Err())
+		q.log.Debug("context err set before any leaves were iterated",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(ctx.Err()),
+		)
 		return nil, nil //nolint:nilerr // a cancelled context with no leaves read drops the request rather than faulting the peer
 	}
 	return q.resp, nil
