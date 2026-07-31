@@ -124,10 +124,18 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	// The tracers API passes back blocks carrying a faked [executedHeader],
-	// whose hashes match no stored block, so look up by number instead.
-	num := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
+	sdb, _, err := b.stateAtBlock(ctx, block.NumberU64())
+	if err != nil {
+		return nil, nil, err
+	}
+	return sdb, noopRelease, nil
+}
+
+// stateAtBlock returns the state after executing block num, along with the
+// stored block it was restored from.
+func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
+	n := rpc.BlockNumber(num) // #nosec G115 -- won't overflow for a while.
+	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(n))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -136,7 +144,7 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 	if err != nil {
 		return nil, nil, err
 	}
-	return sdb, noopRelease, nil
+	return sdb, bl, nil
 }
 
 // StateAtTransaction returns the execution environment of a particular
@@ -193,20 +201,20 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
 // [tracers.API] over whichever backend supplies the state that endpoint
-// expects. See this package's README for full mapping and what each backend
-// exists for.
+// expects. See this package's README for the full mapping and each backend's
+// purpose.
 type tracerAPI struct {
 	*tracers.API
-	canonical *tracerBackend
-	traceCall *tracers.API
+	tracerBackend *tracerBackend
+	traceCall     *tracers.API
 }
 
 func newTracerAPI(b *backend) *tracerAPI {
 	tb := &tracerBackend{b}
 	return &tracerAPI{
-		API:       tracers.NewAPI(tb),
-		canonical: tb,
-		traceCall: tracers.NewAPI(&traceCallBackend{tb}),
+		API:           tracers.NewAPI(tb),
+		tracerBackend: tb,
+		traceCall:     tracers.NewAPI(&traceCallBackend{tb}),
 	}
 }
 
@@ -228,69 +236,34 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 
-	parent, err := a.canonical.restoreExecutedParent(ctx, block)
+	parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
 	if err != nil {
 		return nil, fmt.Errorf("restoring parent block: %w", err)
 	}
-	supplied := block.Hash()
 	hdr := block.Header()
 	// The parent's gas clock, advanced to the start of the block, determines
 	// the executed base fee, so the supplied one is discarded.
 	gasClock := parent.ExecutedByGasTime()
-	gasClock.BeforeBlock(a.canonical.Hooks().BlockTime(hdr))
+	gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
 	hdr.BaseFee = gasClock.BaseFee().ToBig()
-	block = block.WithSeal(hdr)
+	resealed := block.WithSeal(hdr)
 
 	api := tracers.NewAPI(&suppliedHashBackend{
-		tracerBackend: a.canonical,
-		block:         block,
-		supplied:      supplied,
+		tracerBackend: a.tracerBackend,
+		supplied:      block,
+		resealed:      resealed,
 	})
-	return tracers.TraceBlock(ctx, api, block, config)
+	return tracers.TraceBlock(ctx, api, resealed, config)
 }
 
 // TraceBlockFromFile shadows [tracers.API.TraceBlockFromFile], which would
-// otherwise dispatch to the embedded API's TraceBlock instead of the shadow.
+// otherwise call [tracers.API.TraceBlock] rather than [tracerAPI.TraceBlock].
 func (a *tracerAPI) TraceBlockFromFile(ctx context.Context, file string, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	blob, err := os.ReadFile(file) //#nosec G304 -- Reading a caller-supplied file is the whole point.
 	if err != nil {
 		return nil, fmt.Errorf("reading file: %v", err)
 	}
 	return a.TraceBlock(ctx, blob, config)
-}
-
-// suppliedHashBackend is a per-trace [tracerBackend] for the caller-supplied
-// block re-sealed by [tracerAPI.TraceBlock], which MAY be non-canonical: it
-// reports the block's hash as supplied and applies the block's own
-// before-block changes.
-type suppliedHashBackend struct {
-	*tracerBackend
-	block    *types.Block // MUST be the block passed to [tracers.TraceBlock]
-	supplied common.Hash  // its hash as the caller supplied it, before re-sealing
-}
-
-func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
-	if block.Hash() == b.block.Hash() {
-		return b.supplied
-	}
-	return b.tracerBackend.BlockHash(block)
-}
-
-// StateAtBlock returns the parent's post-execution state with the supplied
-// block's before-block changes applied.
-func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	return b.stateAtBlockWithChild(ctx, parent, reexec, base, readOnly, preferDisk, b.block)
-}
-
-// traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
-// child block's before-block changes: debug_traceCall requests the state as
-// of the block itself, not a base state for re-executing its child.
-type traceCallBackend struct {
-	*tracerBackend
-}
-
-func (b *traceCallBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	return b.backend.StateAtBlock(ctx, block, reexec, base, readOnly, preferDisk)
 }
 
 var _ tracers.BlockHashOverrider = (*tracerBackend)(nil)
@@ -322,25 +295,26 @@ func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 // stateAtBlockWithChild returns the parent's post-execution state with the
 // child block's pre-transaction state changes applied.
 func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool, child *types.Block) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	sdb, release, err := b.backend.StateAtBlock(ctx, parent, reexec, base, readOnly, preferDisk)
+	sdb, parentBlock, err := b.backend.stateAtBlock(ctx, parent.NumberU64())
 	if err != nil {
 		return nil, nil, err
 	}
 	rules := b.ChainConfig().Rules(child.Number(), true /*isMerge*/, child.Time())
+	// All parameters passed to [saexec.BeforeExecutingBlock] MUST exactly match
+	// those that [saexec.Execute] pass, so that the hooks see the same state.
+	// Parent will have a faked header, so we pass the restored parent block.
+	//
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
-	if err := saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parent.Header(), child); err != nil {
-		release()
+	if err := saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parentBlock.Header(), child); err != nil {
 		return nil, nil, err
 	}
-	return sdb, release, nil
+	return sdb, noopRelease, nil
 }
 
 // BlockHash returns the block's canonical hash, which differs from
 // block.Hash() because the blocks served by this backend carry faked headers.
-// Caller-supplied blocks, which MAY not be canonical, are instead handled by
-// [suppliedHashBackend].
 func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
 	num := block.NumberU64()
 	hash := rawdb.ReadCanonicalHash(b.DB(), num)
@@ -353,19 +327,19 @@ func (b *tracerBackend) BlockHash(block *types.Block) common.Hash {
 	return hash
 }
 
-// BlockByHash is the same as [backend.BlockByHash] but returns a faked header
-// with post-execution results.
+// BlockByHash is the same as [backend.BlockByHash] but with a faked header
+// carrying post-execution results.
 func (b *tracerBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return b.getBlockModified(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
+	return b.blockWithExecutedHeader(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 }
 
-// BlockByNumber is the same as [backend.BlockByNumber] but returns a faked
-// header with post-execution results.
+// BlockByNumber is the same as [backend.BlockByNumber] but with a faked header
+// carrying post-execution results.
 func (b *tracerBackend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
-	return b.getBlockModified(ctx, rpc.BlockNumberOrHashWithNumber(n))
+	return b.blockWithExecutedHeader(ctx, rpc.BlockNumberOrHashWithNumber(n))
 }
 
-func (b *tracerBackend) getBlockModified(ctx context.Context, nOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
+func (b *tracerBackend) blockWithExecutedHeader(ctx context.Context, nOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
 	bl, err := b.restoreExecutedBlock(ctx, nOrHash)
 	if err != nil {
 		return nil, err
@@ -374,14 +348,48 @@ func (b *tracerBackend) getBlockModified(ctx context.Context, nOrHash rpc.BlockN
 }
 
 // executedHeader returns the block's header faked to carry post-execution
-// results (state root and base fee), mimicking a synchronous block.
-//
-// The API implementations expect this to be synchronous, sourcing the state
-// root and the base fee from fields. The faked header's hash is wrong; the
-// tracers API reports canonical hashes via [tracerBackend.BlockHash].
+// results, mimicking a synchronous block. The API implementations can then
+// source the state root and base fee from header fields. The faked header
+// hashes to the wrong value, which [tracerBackend.BlockHash] corrects.
 func executedHeader(bl *blocks.Block) *types.Header {
 	hdr := bl.Header()
 	hdr.Root = bl.PostExecutionStateRoot()
 	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
 	return hdr
+}
+
+// suppliedHashBackend is a per-trace [tracerBackend] for the caller-supplied
+// block re-sealed by [tracerAPI.TraceBlock]. The block MAY be non-canonical.
+type suppliedHashBackend struct {
+	*tracerBackend
+	supplied *types.Block
+	resealed *types.Block
+}
+
+// BlockHash returns the hash the caller supplied for the re-sealed block and
+// the canonical hash for every other block.
+func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
+	if block.Hash() == b.resealed.Hash() {
+		return b.supplied.Hash()
+	}
+	return b.tracerBackend.BlockHash(block)
+}
+
+// StateAtBlock returns the parent's post-execution state with the supplied
+// block's before-block changes applied. The hooks see the block as supplied,
+// not as re-sealed, so tracing a canonical block by RLP matches tracing it by
+// number.
+func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	return b.stateAtBlockWithChild(ctx, parent, reexec, base, readOnly, preferDisk, b.supplied)
+}
+
+// traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
+// child block's before-block changes. debug_traceCall is expected to behave as
+// if it is executing immediately after the requested block.
+type traceCallBackend struct {
+	*tracerBackend
+}
+
+func (b *traceCallBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	return b.tracerBackend.backend.StateAtBlock(ctx, block, reexec, base, readOnly, preferDisk)
 }

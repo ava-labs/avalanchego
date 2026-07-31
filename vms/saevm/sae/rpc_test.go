@@ -1398,15 +1398,18 @@ func TestDebugRPCs(t *testing.T) {
 	})
 }
 
+// encodeRLP returns the value's RLP encoding.
+func encodeRLP(tb testing.TB, v any) hexutil.Bytes {
+	tb.Helper()
+	b, err := rlp.EncodeToBytes(v)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%T)", v)
+	return b
+}
+
 func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block) {
 	t.Helper()
 
 	testRPCGetter(ctx, t, "eth_getBlockByHash", s.BlockByHash, want.Hash(), want)
-
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
 
 	s.testRPC(ctx, t, []rpcTest{
 		{
@@ -1432,12 +1435,12 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		{
 			method: "debug_getRawBlock",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
@@ -1554,11 +1557,6 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	t.Helper()
 	testRPCGetter(ctx, t, "eth_getBlockByNumber", s.BlockByNumber, big.NewInt(n.Int64()), want)
 
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
-
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getBlockByNumber",
@@ -1583,12 +1581,12 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		{
 			method: "debug_getRawBlock",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
