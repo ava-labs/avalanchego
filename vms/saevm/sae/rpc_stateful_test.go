@@ -37,6 +37,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
@@ -498,42 +499,83 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("reported_block_hash", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts([]rpcTest{
-			{
-				name:   "canonical_by_hash",
-				method: "debug_traceBlockByHash",
-				args:   []any{ethBlock.Hash(), flatCallTracer},
-				want:   wantBlockHash(ethBlock),
+		sut.testRPC(ctx, t, withCmpOpts(
+			[]rpcTest{
+				{
+					name:   "canonical_by_hash",
+					method: "debug_traceBlockByHash",
+					args:   []any{ethBlock.Hash(), flatCallTracer},
+					want:   wantBlockHash(ethBlock),
+				},
+				{
+					name:   "canonical_by_number",
+					method: "debug_traceBlockByNumber",
+					args:   []any{hexutil.Uint64(ethBlock.NumberU64()), flatCallTracer},
+					want:   wantBlockHash(ethBlock),
+				},
+				{
+					name:   "supplied_sibling_of_canonical",
+					method: "debug_traceBlock",
+					args:   []any{encodeRLP(t, sibling), flatCallTracer},
+					want:   wantBlockHash(sibling),
+				},
+				{
+					name:   "supplied_unaccepted",
+					method: "debug_traceBlock",
+					args:   []any{unacceptedRLP, flatCallTracer},
+					want:   wantBlockHash(unaccepted),
+				},
+				{
+					name:   "supplied_unaccepted_from_file",
+					method: "debug_traceBlockFromFile",
+					args:   []any{unacceptedFile, flatCallTracer},
+					want:   wantBlockHash(unaccepted),
+				},
 			},
-			{
-				name:   "canonical_by_number",
-				method: "debug_traceBlockByNumber",
-				args:   []any{hexutil.Uint64(ethBlock.NumberU64()), flatCallTracer},
-				want:   wantBlockHash(ethBlock),
-			},
-			{
-				name:   "supplied_sibling_of_canonical",
-				method: "debug_traceBlock",
-				args:   []any{encodeRLP(t, sibling), flatCallTracer},
-				want:   wantBlockHash(sibling),
-			},
-			{
-				name:   "supplied_unaccepted",
-				method: "debug_traceBlock",
-				args:   []any{unacceptedRLP, flatCallTracer},
-				want:   wantBlockHash(unaccepted),
-			},
-			{
-				name:   "supplied_unaccepted_from_file",
-				method: "debug_traceBlockFromFile",
-				args:   []any{unacceptedFile, flatCallTracer},
-				want:   wantBlockHash(unaccepted),
-			},
-		}, cmp.Options{
 			cmp.Transformer("onlyBlockHash", func(f native.FlatCallFrame) *common.Hash {
 				return f.BlockHash
 			}),
-		})...)
+		)...)
+	})
+
+	// TODO(StephenButtolph): convert these to e2e tests, which exercise the
+	// built binary. This file imports the native tracer package for its own
+	// types, so it registers "callTracer" itself and would pass were the rpc
+	// package's force-load deleted. Nothing here imports the JavaScript
+	// evaluator, so that row does depend on the force-load, but is fragile.
+	t.Run("named_tracers", func(t *testing.T) {
+		sut.testRPC(ctx, t, []rpcTest{
+			{
+				name:   "call_tracer",
+				method: "debug_traceTransaction",
+				args: []any{precompileTx.Hash(), tracers.TraceConfig{
+					Tracer: utils.PointerTo("callTracer"),
+				}},
+				want: native.CallFrame{
+					From:    sender,
+					To:      &precompile,
+					Gas:     precompileTx.Gas(),
+					GasUsed: b.Receipts()[0].GasUsed,
+					Value:   big.NewInt(0),
+				},
+				extraCmpOpts: cmp.Options{
+					cmputils.BigInts(),
+					// Output belongs to the hook subtest.
+					cmpopts.IgnoreFields(native.CallFrame{}, "Output"),
+				},
+			},
+			{
+				name:   "javascript",
+				method: "debug_traceTransaction",
+				args: []any{precompileTx.Hash(), tracers.TraceConfig{
+					Tracer: utils.PointerTo(`{
+						fault: function() {},
+						result: function() { return "ok" }
+					}`),
+				}},
+				want: "ok",
+			},
+		}...)
 	})
 }
 
