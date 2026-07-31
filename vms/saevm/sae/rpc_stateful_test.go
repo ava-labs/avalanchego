@@ -366,12 +366,19 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	})
 }
 
-func TestContractBindings(t *testing.T) {
-	ctx, sut := newSUT(t, 2, options.Func[sutConfig](func(c *sutConfig) {
-		// The [bind] package makes extensive use of [rpc.PendingBlockNumber],
-		// which breaks when resolved as the last-accepted block.
-		c.vmConfig.RPCConfig.MapPendingToLastExecuted = true
-	}))
+func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
+	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
+	opt, unblock := withBlockingPrecompile(blocking)
+	defer unblock()
+
+	ctx, sut := newSUT(
+		t, 3, opt,
+		options.Func[sutConfig](func(c *sutConfig) {
+			// The [bind] package makes extensive use of [rpc.PendingBlockNumber],
+			// which breaks when resolved as the last-accepted block.
+			c.vmConfig.RPCConfig.ResolvePendingToLastExecuted = true
+		}),
+	)
 
 	chainID, err := sut.ChainID(ctx)
 	require.NoErrorf(t, err, "%T.ChainID()", sut.Client)
@@ -421,5 +428,18 @@ func TestContractBindings(t *testing.T) {
 				"GasUsed",
 			),
 		},
+	})
+
+	t.Run("pending_resolves_to_last_executed", func(t *testing.T) {
+		sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 2, &types.LegacyTx{
+			To:       &blocking, // Won't become last-executed
+			GasPrice: big.NewInt(1),
+			Gas:      1e6,
+		}))
+
+		got, err := sut.Client.HeaderByNumber(ctx, big.NewInt(rpc.PendingBlockNumber.Int64()))
+		if want := b.Number(); err != nil || got.Number.Cmp(want) != 0 {
+			t.Errorf("%T.HeaderByNumber(%s) got (%v, %v); want (%v, nil)", sut.Client, rpc.PendingBlockNumber, got.Number, err, want)
+		}
 	})
 }
