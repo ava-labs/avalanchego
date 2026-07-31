@@ -14,10 +14,10 @@ import (
 	// Force-load tracer engines to trigger registration of the JS and native
 	// (e.g. "callTracer") tracers available to debug_trace* APIs.
 	//
-	// TODO(StephenButtolph): Testing of these should be added in the e2e tests.
-	// Integration tests are brittle because the tests could then perform the
-	// registration without intending to. Allowing these imports to be removed
-	// without breaking the tests.
+	// TODO(StephenButtolph): cover these in the e2e tests, which exercise the
+	// built binary. A test in this module can import the same packages for its
+	// own types, registering the tracers itself, so it would keep passing were
+	// these imports deleted.
 	_ "github.com/ava-labs/libevm/eth/tracers/js"
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
