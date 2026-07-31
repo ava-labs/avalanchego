@@ -25,9 +25,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -78,8 +78,10 @@ type Points interface {
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
-	// BeforeExecutingBlock is called immediately prior to executing the block.
-	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
+	// BeforeExecutingBlock is called immediately prior to executing the block;
+	// rules are those of the block and parent is the header of the block's
+	// parent.
+	BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
@@ -131,6 +133,8 @@ type BlockBuilder[T Transaction] interface {
 // [Op].
 type Transaction interface {
 	AsOp() Op
+	// Size returns the transaction's serialized size.
+	Size() uint64
 }
 
 // AccountDebit includes an amount that an account should have debited,

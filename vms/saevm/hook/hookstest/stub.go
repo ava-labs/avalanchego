@@ -242,7 +242,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 }
 
 // BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Header, *types.Block) error {
 	return nil
 }
 
@@ -299,6 +299,12 @@ type Op struct {
 	Mint      []AccountCredit `canoto:"repeated value,5"`
 
 	canotoData canotoData_Op
+}
+
+// Size returns the op's serialized size
+func (o Op) Size() uint64 {
+	o.CalculateCanotoCache()
+	return o.CachedCanotoSize()
 }
 
 // AsOp converts the op into a representation that SAE can use directly.

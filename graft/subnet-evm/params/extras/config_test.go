@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestChainConfigDescription(t *testing.T) {
@@ -103,6 +104,26 @@ func TestChainConfigVerify(t *testing.T) {
 		BlockGasCostStep:         big.NewInt(1),
 	}
 
+	validConfig := func(initialMinDelayMS uint64) ChainConfig {
+		return ChainConfig{
+			FeeConfig: validFeeConfig,
+			NetworkUpgrades: NetworkUpgrades{
+				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+				DurangoTimestamp:   utils.PointerTo[uint64](2),
+				EtnaTimestamp:      utils.PointerTo[uint64](3),
+				FortunaTimestamp:   utils.PointerTo[uint64](4),
+			},
+			AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
+				NetworkUpgrades: upgrade.Config{
+					DurangoTime: time.Unix(2, 0),
+					EtnaTime:    time.Unix(3, 0),
+					FortunaTime: time.Unix(4, 0),
+				},
+			}},
+			InitialMinDelayMS: initialMinDelayMS,
+		}
+	}
+
 	tests := map[string]struct {
 		config    ChainConfig
 		wantError error
@@ -151,22 +172,19 @@ func TestChainConfigVerify(t *testing.T) {
 			wantError: errCannotBeNil,
 		},
 		"valid": {
-			config: ChainConfig{
-				FeeConfig: validFeeConfig,
-				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-					DurangoTimestamp:   utils.PointerTo[uint64](2),
-					EtnaTimestamp:      utils.PointerTo[uint64](3),
-					FortunaTimestamp:   utils.PointerTo[uint64](4),
-				},
-				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
-					NetworkUpgrades: upgrade.Config{
-						DurangoTime: time.Unix(2, 0),
-						EtnaTime:    time.Unix(3, 0),
-						FortunaTime: time.Unix(4, 0),
-					},
-				}},
-			},
+			config:    validConfig(0),
+			wantError: nil,
+		},
+		"valid_initial_min_delay": {
+			config:    validConfig(5),
+			wantError: nil,
+		},
+		"initial_min_delay_too_high": {
+			config:    validConfig(acp226.InitialDelayExcess.Delay() + 1), // one past the inclusive ceiling
+			wantError: errInitialMinDelayTooLarge,
+		},
+		"initial_min_delay_at_ceiling": {
+			config:    validConfig(acp226.InitialDelayExcess.Delay()), // ceiling is inclusive
 			wantError: nil,
 		},
 	}

@@ -449,7 +449,7 @@ func NewBlockChain(
 		quit:                make(chan struct{}),
 		acceptedLogsCache:   NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
 	}
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -547,6 +547,7 @@ func (bc *BlockChain) batchBlockAcceptedIndices(batch ethdb.Batch, b *types.Bloc
 	if err := customrawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
 		return fmt.Errorf("%w: failed to write acceptor tip key", err)
 	}
+	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
 	return nil
 }
 
@@ -777,6 +778,21 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return fmt.Errorf("could not load last accepted block")
 	}
 
+	// SAE requires these values to be set to the last accepted hash on
+	// transition. Nodes that do not accept any blocks after upgrading before
+	// transition wouldn't otherwise correctly set these values.
+	{
+		lastAcceptedHash := bc.lastAccepted.Hash()
+		if finalized := rawdb.ReadFinalizedBlockHash(bc.db); finalized != lastAcceptedHash {
+			log.Info("Repairing finalized block hash", "from", finalized, "to", lastAcceptedHash)
+			rawdb.WriteFinalizedBlockHash(bc.db, lastAcceptedHash)
+		}
+		if headFast := rawdb.ReadHeadFastBlockHash(bc.db); headFast != lastAcceptedHash {
+			log.Info("Repairing head fast block hash", "from", headFast, "to", lastAcceptedHash)
+			rawdb.WriteHeadFastBlockHash(bc.db, lastAcceptedHash)
+		}
+	}
+
 	// This ensures that the head block is updated to the last accepted block on startup
 	if err := bc.setPreference(bc.lastAccepted); err != nil {
 		return fmt.Errorf("failed to set preference to last accepted block while loading last state: %w", err)
@@ -859,7 +875,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 
@@ -2230,6 +2246,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	}
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	customrawdb.WriteSnapshotBlockHash(batch, block.Hash())
 	rawdb.WriteSnapshotRoot(batch, block.Root())
 	if err := customrawdb.WriteSyncPerformed(batch, block.NumberU64()); err != nil {
@@ -2252,7 +2269,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	bc.hc.SetCurrentHeader(block.Header())
 
 	lastAcceptedHash := block.Hash()
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
 		return err

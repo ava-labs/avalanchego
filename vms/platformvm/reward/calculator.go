@@ -7,13 +7,14 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ Calculator = (*calculator)(nil)
 
 type Calculator interface {
-	Calculate(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
+	Calculate(stakeStartTime time.Time, stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64
 }
 
 type calculator struct {
@@ -23,6 +24,8 @@ type calculator struct {
 	supplyCap                uint64
 }
 
+// NewCalculator returns a calculator for the provided reward config as-is.
+// It does not account for reward changes introduced by network upgrades.
 func NewCalculator(c Config) Calculator {
 	return &calculator{
 		maxSubMinConsumptionRate: new(big.Int).SetUint64(c.MaxConsumptionRate - c.MinConsumptionRate),
@@ -39,7 +42,7 @@ func NewCalculator(c Config) Calculator {
 // PortionOfStakingDuration = StakingDuration / MaximumStakingDuration
 // MintingRate = MinMintingRate + MaxSubMinMintingRate * PortionOfStakingDuration
 // Reward = RemainingSupply * PortionOfExistingSupply * MintingRate * PortionOfStakingDuration
-func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
+func (c *calculator) Calculate(_ time.Time, stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
 	bigStakedDuration := new(big.Int).SetUint64(uint64(stakedDuration))
 	bigStakedAmount := new(big.Int).SetUint64(stakedAmount)
 	bigCurrentSupply := new(big.Int).SetUint64(currentSupply)
@@ -64,6 +67,72 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 
 	finalReward := reward.Uint64()
 	return min(remainingSupply, finalReward)
+}
+
+type primaryNetworkCalculator struct {
+	config        Config
+	upgradeConfig upgrade.Config
+}
+
+var _ Calculator = (*primaryNetworkCalculator)(nil)
+
+// NewPrimaryNetworkCalculator returns a calculator for primary network staking
+// rewards. It applies primary network reward upgrades.
+func NewPrimaryNetworkCalculator(c Config, upgradeConfig upgrade.Config) Calculator {
+	return &primaryNetworkCalculator{
+		config:        c,
+		upgradeConfig: upgradeConfig,
+	}
+}
+
+func (c *primaryNetworkCalculator) Calculate(stakeStartTime time.Time, stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64 {
+	cfg := configForStakeStart(c.config, c.upgradeConfig, stakeStartTime)
+	return NewCalculator(cfg).Calculate(stakeStartTime, stakedDuration, stakedAmount, currentSupply)
+}
+
+func configForStakeStart(
+	rewardConfig Config,
+	upgradeConfig upgrade.Config,
+	stakeStartTime time.Time,
+) Config {
+	const (
+		// ACP-285 lowers primary network MinConsumptionRate to 7.5%.
+		heliconMinConsumptionRateTarget          uint64 = 75_000
+		heliconMinConsumptionRateReductionPeriod        = 90 * 24 * time.Hour
+	)
+
+	if !upgradeConfig.IsHeliconActivated(stakeStartTime) ||
+		rewardConfig.MinConsumptionRate == heliconMinConsumptionRateTarget {
+		return rewardConfig
+	}
+
+	// Custom networks may configure a maximum below the Helicon target. Do not
+	// increase the minimum above their configured maximum.
+	if rewardConfig.MaxConsumptionRate < heliconMinConsumptionRateTarget {
+		return rewardConfig
+	}
+
+	fullChange := math.AbsDiff(
+		rewardConfig.MinConsumptionRate,
+		heliconMinConsumptionRateTarget,
+	)
+
+	change := fullChange
+	reductionEndTime := upgradeConfig.HeliconTime.Add(heliconMinConsumptionRateReductionPeriod)
+	if stakeStartTime.Before(reductionEndTime) {
+		elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
+		rampedChange := new(big.Int).SetUint64(fullChange)
+		rampedChange.Mul(rampedChange, big.NewInt(int64(elapsed)))
+		rampedChange.Div(rampedChange, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
+		change = rampedChange.Uint64()
+	}
+
+	if rewardConfig.MinConsumptionRate < heliconMinConsumptionRateTarget {
+		rewardConfig.MinConsumptionRate += change
+	} else {
+		rewardConfig.MinConsumptionRate -= change
+	}
+	return rewardConfig
 }
 
 // Split [totalAmount] into [totalAmount * shares percentage] and the remainder.

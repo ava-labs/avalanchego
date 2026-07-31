@@ -87,6 +87,48 @@ func TestOf(t *testing.T) {
 	}
 }
 
+func TestUnionOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []Set[int]
+		expected Set[int]
+	}{
+		{
+			name:     "nil",
+			elements: nil,
+			expected: nil,
+		},
+		{
+			name: "empty",
+			elements: []Set[int]{
+				{},
+			},
+			expected: Set[int]{},
+		},
+		{
+			name: "single_set",
+			elements: []Set[int]{
+				Of(1, 2, 3),
+			},
+			expected: Of(1, 2, 3),
+		},
+		{
+			name: "multiple_sets",
+			elements: []Set[int]{
+				Of(1, 2),
+				Of(2, 3),
+			},
+			expected: Of(1, 2, 3),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := UnionOf(tt.elements...)
+			require.Equalf(t, tt.expected, s, "UnionOf(%v)", tt.elements)
+		})
+	}
+}
+
 func TestSetClear(t *testing.T) {
 	require := require.New(t)
 

@@ -46,7 +46,6 @@ type SUT struct {
 
 const (
 	initialGasTarget = 1_000_000
-	initialExcess    = 60_303_807 // Maximum excess that results in gas price of 1
 )
 
 func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
@@ -58,11 +57,10 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 	genesis := blockstest.NewGenesis(
 		tb,
 		db,
-		saetest.NewExecutionResultsDB(),
 		config,
 		alloc,
 		blockstest.WithGasTarget(initialGasTarget),
-		blockstest.WithGasExcess(initialExcess),
+		blockstest.WithBaseFee(params.Wei),
 	)
 	hooks := hookstest.NewStub(initialGasTarget)
 	s, err := NewState(hooks, config, genesis, saetest.NewStateDBOpener(cache, nil))
@@ -88,6 +86,38 @@ type (
 	AccountDebit = hook.AccountDebit
 )
 
+func TestSafeMaxBlockSize(t *testing.T) {
+	// ω_B = R·τ·λ = 20T, so the limit is 20x the target.
+	tests := []struct {
+		name   string
+		target gas.Gas
+		want   gas.Gas
+	}{
+		{
+			name:   "floorTarget", // ACP-176 target floor (1M gas/s)
+			target: 1_000_000,
+			want:   20_000_000,
+		},
+		{
+			name:   "doubleFloorTarget",
+			target: 2_000_000,
+			want:   40_000_000,
+		},
+		{
+			name:   "liveTarget", // initial live C-Chain target (~4M gas/s)
+			target: 4_000_000,
+			want:   80_000_000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rate := gastime.SafeRateOfTarget(tt.target)
+			require.Equal(t, tt.want, SafeMaxBlockSize(rate), "SafeMaxBlockSize(rate of target=%d)", tt.target)
+		})
+	}
+}
+
 func TestMultipleBlocks(t *testing.T) {
 	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	var (
@@ -107,7 +137,15 @@ func TestMultipleBlocks(t *testing.T) {
 
 	state := sut.State
 	lastHash := sut.genesis.Hash()
-	wantLatestEndTime := sut.genesis.ExecutedByGasTime().Clone()
+
+	const maxExcessForPrice1 = 60_303_807
+	tm := state.clock
+	tm.TestOnlySetExcess(maxExcessForPrice1 + 1)
+	require.Equal(t, gas.Price(2), tm.Price())
+	tm.TestOnlySetExcess(maxExcessForPrice1)
+	require.Equal(t, gas.Price(1), tm.Price())
+
+	wantLatestEndTime := tm.Clone()
 
 	const importedAmount = 10
 	type op struct {

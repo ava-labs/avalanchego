@@ -27,14 +27,23 @@ import (
 var noopRelease tracers.StateReleaseFunc = func() {}
 
 // noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps], used by the tracer to skip end-of-block
-// operations during partial replay.
+// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
+// the tracer to skip end-of-block operations during partial replay.
+//
+// TODO(StephenButtolph): Properly abstract execution to not rely on method
+// suppression. It is fragile and could result in accidentially modifying the
+// block state or even disk state during tracing.
 type noEndOfBlockOps struct {
 	hook.Points
 }
 
 // EndOfBlockOps always returns nil.
 func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
+
+// AfterExecutingBlock always returns nil.
+func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -169,21 +178,10 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
 	}
-	parent, err := b.NewBlock(
-		// The I(E) check above guarantees D(A) of the same block; see
-		// ../docs/invariants.md for details.
-		rawdb.ReadBlock(b.DB(), ethB.ParentHash(), ethB.NumberU64()-1),
-		// Ancestry is irrelevant for the parent as we just want its
-		// post-execution artefacts.
-		nil, nil,
-	)
+	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
-	}
-
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
@@ -195,7 +193,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		block,
 		b,
 		txIndex,
-		noEndOfBlockOps{Points: b.Hooks()},
+		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),
 		&saexec.NullReceiptStore{},

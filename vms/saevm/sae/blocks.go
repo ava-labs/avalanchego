@@ -22,8 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -38,6 +40,7 @@ const (
 var (
 	errBlockHeightNotUint64 = errors.New("block height not uint64")
 	errBlockTooFarInFuture  = errors.New("block too far in the future")
+	errBlockTooLarge        = errors.New("block size exceeds maximum")
 
 	errTxHashMismatch         = errors.New("transaction hash mismatch")
 	errUncleHashMismatch      = errors.New("uncle hash mismatch")
@@ -108,6 +111,9 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 	return vm.blockBuilder.build(ctx, bCtx, vm.preference.Load())
 }
 
+// saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
+
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
@@ -129,6 +135,10 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 
 	if vm.consensusState.Get() == snow.Bootstrapping {
 		return vm.verifyWhenBootstrapping(b, parent)
+	}
+
+	if size := b.EthBlock().Size(); size > saeparams.MaxBlockBytes {
+		return fmt.Errorf("%w: %d > %d bytes", errBlockTooLarge, size, saeparams.MaxBlockBytes)
 	}
 
 	rebuilt, err := vm.blockBuilder.rebuild(ctx, bCtx, parent, b)
@@ -212,27 +222,18 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	}
 
 	ethB := rawdb.ReadBlock(db, hash, num)
-	if num > vm.last.synchronous {
-		return blocks.RestoreSettledBlock(
-			ethB,
-			vm.log(),
-			vm.db,
-			vm.xdb,
-			vm.exec.ChainConfig(),
-		)
+	if ethB == nil {
+		return nil, database.ErrNotFound
 	}
 
-	b, err := vm.blockBuilder.new(ethB, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	// Excess is only used for executing the next block, which can never
-	// be the case if `b` isn't actually the last synchronous block, so
-	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
-		return nil, err
-	}
-	return b, nil
+	return blocks.RestoreSettledBlock(
+		ethB,
+		vm.hooks,
+		vm.log(),
+		vm.db,
+		vm.xdb,
+		vm.exec.ChainConfig(),
+	)
 }
 
 // GetBlock returns the block with the given ID, or [database.ErrNotFound].
@@ -257,7 +258,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	if errors.Is(err, blocks.ErrNotFound) {
 		return nil, database.ErrNotFound
 	}
-	return b, nil
+	return b, err
 }
 
 // GetBlockIDAtHeight returns the accepted block at the given height, or

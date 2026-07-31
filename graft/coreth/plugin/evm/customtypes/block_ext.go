@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -105,6 +106,14 @@ func (b *BlockBodyExtra) BlockRLPFieldPointersForDecoding(block *ethtypes.BlockR
 	}
 }
 
+func (b *BlockBodyExtra) PostRPCMarshal(_ *ethtypes.Block, m map[string]any) {
+	var extData hexutil.Bytes
+	if b.ExtData != nil {
+		extData = *b.ExtData
+	}
+	m["blockExtraData"] = extData
+}
+
 func BlockExtData(b *ethtypes.Block) []byte {
 	if data := extras.Block.Get(b).ExtData; data != nil {
 		return *data
@@ -164,6 +173,11 @@ func BlockTime(eth *ethtypes.Header) time.Time {
 	return time.Unix(int64(eth.Time), 0)
 }
 
+// TODO(JonathanOppenheimer): take options instead of the positional
+// arguments, most of which are frequently nil/zero at call sites.
+//
+// Note: this code will get deleted but we may bring a simiar helper into
+// SAE.
 func NewBlockWithExtData(
 	header *ethtypes.Header, txs []*ethtypes.Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt,
 	hasher ethtypes.TrieHasher, extdata []byte, recalc bool,

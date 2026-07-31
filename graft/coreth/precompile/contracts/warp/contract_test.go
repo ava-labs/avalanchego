@@ -29,7 +29,7 @@ import (
 
 var forks = []upgradetest.Fork{
 	upgradetest.Fortuna,
-	upgradetest.Latest,
+	upgradetest.Granite,
 }
 
 func runTests(

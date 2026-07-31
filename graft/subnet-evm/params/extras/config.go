@@ -5,6 +5,7 @@ package extras
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -111,6 +113,7 @@ type ChainConfig struct {
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // Seeds the ACP-226 min block delay at genesis, for benchmarking.
 }
 
 func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
@@ -312,6 +315,8 @@ func checkForks(forks []fork) error {
 	return nil
 }
 
+var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
+
 // Verify verifies chain config.
 func (c *ChainConfig) Verify() error {
 	if err := c.FeeConfig.Verify(); err != nil {
@@ -330,6 +335,10 @@ func (c *ChainConfig) Verify() error {
 	// Verify the network upgrades are internally consistent given the existing chainConfig.
 	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkUpgrades); err != nil {
 		return fmt.Errorf("invalid network upgrades: %w", err)
+	}
+
+	if maxDelayMS := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > maxDelayMS {
+		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, maxDelayMS)
 	}
 
 	return nil

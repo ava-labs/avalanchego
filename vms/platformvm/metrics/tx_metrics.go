@@ -173,3 +173,24 @@ func (m *txMetrics) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "add_auto_renewed_validator",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "set_auto_renewed_validator_config",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "reward_auto_renewed_validator",
+	}).Inc()
+	return nil
+}

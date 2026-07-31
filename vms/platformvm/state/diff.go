@@ -43,9 +43,9 @@ type Diff struct {
 	expiryDiff       *expiryDiff
 	l1ValidatorsDiff *l1ValidatorsDiff
 
-	currentStakerDiffs diffStakers
 	// map of subnetID -> nodeID -> staking info
 	modifiedStakingInfo map[ids.ID]map[ids.NodeID]StakingInfo
+	currentStakerDiffs  diffStakers
 	pendingStakerDiffs  diffStakers
 
 	addedSubnetIDs []ids.ID
@@ -78,6 +78,7 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &Diff{
+		modifiedStakingInfo: make(map[ids.ID]map[ids.NodeID]StakingInfo),
 		currentStakerDiffs: diffStakers{
 			isAdditionAfterDeletionAllowed: allowAddingStakerAfterDeletion,
 		},
@@ -291,30 +292,36 @@ func (d *Diff) SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo St
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
-	if d.modifiedStakingInfo == nil {
-		d.modifiedStakingInfo = make(map[ids.ID]map[ids.NodeID]StakingInfo)
-	}
+	d.setStakingInfo(subnetID, nodeID, stakingInfo)
+	return nil
+}
+
+func (d *Diff) setStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) {
 	nodes, ok := d.modifiedStakingInfo[subnetID]
 	if !ok {
 		nodes = make(map[ids.NodeID]StakingInfo)
 		d.modifiedStakingInfo[subnetID] = nodes
 	}
 	nodes[nodeID] = stakingInfo
-	return nil
 }
 
 func (d *Diff) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error) {
+	// Defensive check to guarantee we are only being called for a validator that we know about.
 	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
 		return StakingInfo{}, err
 	}
 
+	// See if this was set in the current [Diff].
 	if stakingInfo, ok := d.modifiedStakingInfo[subnetID][nodeID]; ok {
 		return stakingInfo, nil
 	}
+
+	// We do not have this validator -- ask the parent.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return StakingInfo{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
+
 	return parentState.GetStakingInfo(subnetID, nodeID)
 }
 
@@ -329,6 +336,8 @@ func (d *Diff) PutCurrentValidator(staker *Staker) error {
 		return fmt.Errorf("putting validator: %w", err)
 	}
 
+	d.setStakingInfo(staker.SubnetID, staker.NodeID, StakingInfo{})
+
 	return nil
 }
 
@@ -342,6 +351,8 @@ func (d *Diff) DeleteCurrentValidator(staker *Staker) error {
 	}
 
 	d.currentStakerDiffs.DeleteValidator(staker)
+	delete(d.modifiedStakingInfo[staker.SubnetID], staker.NodeID)
+
 	return nil
 }
 
@@ -664,7 +675,7 @@ func (d *Diff) Apply(baseState Chain) error {
 	for subnetID, nodes := range d.modifiedStakingInfo {
 		for nodeID, stakingInfo := range nodes {
 			if err := baseState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
-				return err
+				return fmt.Errorf("setting staking info: %w", err)
 			}
 		}
 	}

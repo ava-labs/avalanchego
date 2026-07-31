@@ -48,6 +48,15 @@ func CallDataForBalance(beneficiary common.Address) []byte {
 	return callDataWithAddr("balance(address)", beneficiary)
 }
 
+// StorageKeyForBalance returns the storage slot holding balances[beneficiary],
+// the mapping at slot 0: keccak256(abi.encode(beneficiary, uint256(0))).
+func StorageKeyForBalance(beneficiary common.Address) common.Hash {
+	return crypto.Keccak256Hash(
+		common.LeftPadBytes(beneficiary.Bytes(), 32),
+		common.Hash{}.Bytes(),
+	)
+}
+
 func callDataWithAddr(sig string, addr common.Address) []byte {
 	return slices.Concat(
 		crypto.Keccak256([]byte(sig))[:4],

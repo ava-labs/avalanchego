@@ -167,7 +167,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		signerKey := node.Flags[config.StakingSignerKeyContentKey]
 
 		env := types.Mapping{
-			config.NetworkNameKey:             constants.LocalName,
+			config.NetworkNameKey:             constants.NetworkName(network.GetNetworkID()),
 			config.LogLevelKey:                logging.Debug.String(),
 			config.LogDisplayLevelKey:         logging.Trace.String(),
 			config.LogFormatKey:               logging.JSONString,
@@ -178,9 +178,19 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingSignerKeyContentKey: signerKey,
 			config.ChainConfigContentKey:      chainConfigContent,
 		}
+		if network.Genesis != nil {
+			content, err := network.GetGenesisFileContent()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get genesis file content: %w", err)
+			}
+			env[config.GenesisFileContentKey] = content
+		}
 
 		// Apply configuration appropriate to a test network
 		maps.Copy(env, tmpnet.DefaultTmpnetFlags())
+
+		// Apply the network's default flags (e.g. upgrade configuration)
+		maps.Copy(env, network.DefaultFlags)
 
 		serviceName := getServiceName(i)
 
@@ -298,4 +308,23 @@ func getServiceName(index int) string {
 		return baseName + "-bootstrap-node"
 	}
 	return fmt.Sprintf("%s-node-%d", baseName, index)
+}
+
+// WriteGuestScript writes an executable guest script to the root of the config
+// image. Antithesis's environment will execute this script on the host before
+// bringing the network up with `docker-compose up`. This provides a hook to
+// configure the host prior to network start.
+//
+// Configuration of the target path is set via env vars to simplify usage by
+// main entrypoints.
+func WriteGuestScript(content string) error {
+	targetPath := os.Getenv(targetPathEnvName)
+	if len(targetPath) == 0 {
+		return errTargetPathEnvVarNotSet
+	}
+	scriptPath := filepath.Join(targetPath, "guest.sh")
+	if err := os.WriteFile(scriptPath, []byte(content), perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("writing guest script: %w", err)
+	}
+	return nil
 }

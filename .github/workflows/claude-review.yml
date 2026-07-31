@@ -35,6 +35,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
         with:
+          # Needed to fetch the PR head commit since we are using pull_request_target
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
       - uses: anthropics/claude-code-action@v1
         with:
@@ -44,8 +46,23 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
+            The PR head commit is checked out in the current working directory.
+
+            Review the PR using:
+            - `gh pr view ${{ github.event.pull_request.number }}` for the PR title, description, and file list.
+            - `gh pr diff ${{ github.event.pull_request.number }}` as the source of truth for changed lines.
+            - `Read`, `Grep`, `Glob`, and `LS` for local code context.
+
+            Requirements:
+            - Use `mcp__github_inline_comment__create_inline_comment` for every finding.
+            - Anchor every inline comment to a changed line from `gh pr diff`; the issue may reference related surrounding code.
+            - Do not post top-level PR comments.
+            - Do not run tests, install dependencies, execute scripts, or modify files.
+            - If there are no high-confidence issues, do not comment.
+
+            Review policy:
             ${{ steps.prompt.outputs.content }}
           claude_args: |
-            --model claude-opus-4-6
-            --max-turns 10
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --model claude-opus-4-8
+            --max-turns 100
+            --allowedTools "Read,Grep,Glob,LS,mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"

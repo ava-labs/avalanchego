@@ -86,8 +86,21 @@ type PermissionlessValidator struct {
 	Staked                 []UTXO                    `json:"staked,omitempty"`
 	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
+	// Auto-renewed validator config fields; nil for non-auto-renewed validators.
+	*AutoRenewedConfig
+
 	// The delegators delegating to this validator
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
 	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
+}
+
+// AutoRenewedConfig holds the config fields specific to auto-renewed validators.
+type AutoRenewedConfig struct {
+	// The owner authorized to modify this validator's config.
+	ValidatorAuthority *Owner `json:"validatorAuthority"`
+	// The duration of the next validation cycle, in seconds.
+	NextPeriod json.Uint64 `json:"nextPeriod"`
+	// Percentage of rewards to auto-compound.
+	AutoCompoundRewardShares json.Uint32 `json:"autoCompoundRewardShares"`
 }

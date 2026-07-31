@@ -5,25 +5,23 @@ package blocks
 
 import (
 	"math/big"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
 	hdr := &types.Header{
-		Number: new(big.Int).SetUint64(num),
-		Time:   time,
+		Number:  new(big.Int).SetUint64(num),
+		BaseFee: big.NewInt(1),
+		Time:    time,
 	}
 	if parent != nil {
 		hdr.ParentHash = parent.Hash()
@@ -38,7 +36,7 @@ func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Bloc
 	return b
 }
 
-func newChain(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
+func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
 	var (
@@ -69,11 +67,9 @@ func newChain(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, s
 		byNum[n] = b
 		blocks = append(blocks, b)
 		if synchronous {
-			// The target and excess are irrelevant for the purposes of
-			// [newChain], and non-zero sub-second time for genesis is
-			// unnecessary.
-			h := hookstest.NewStub(1)
-			require.NoError(tb, b.MarkSynchronous(h, db, xdb, 0), "MarkSynchronous()")
+			var lastSettledPtr atomic.Pointer[Block]
+			require.NoErrorf(tb, b.MarkSettled(&lastSettledPtr), "MarkSettled()")
+			b.synchronous = true // avoid requiring hooks and DB to mark as synchronous
 		}
 
 		parent = byNum[n]

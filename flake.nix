@@ -9,11 +9,15 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    # promtail is deprecated and is not provided by 26.05. Source promtail from 25.11
+    # pending a switch to Grafana Alloy.
+    # Tracking issue: https://github.com/ava-labs/avalanchego/issues/5550
+    nixpkgs-promtail.url = "github:NixOS/nixpkgs/nixos-25.11";
   };
 
   # Flake outputs
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, nixpkgs-promtail }:
     let
       # Systems supported
       allSystems = [
@@ -26,11 +30,12 @@
       # Helper to provide system-specific attributes
       forAllSystems = f: nixpkgs.lib.genAttrs allSystems (system: f {
         pkgs = import nixpkgs { inherit system; };
+        pkgsPromtail = import nixpkgs-promtail { inherit system; };
       });
     in
     {
       # Development environment output
-      devShells = forAllSystems ({ pkgs }: {
+      devShells = forAllSystems ({ pkgs, pkgsPromtail }: {
         default = pkgs.mkShell {
           # The Nix packages provided in the environment
           packages = with pkgs; [
@@ -46,7 +51,7 @@
             (import ./nix/go { inherit pkgs; })
 
             # Monitoring tools
-            promtail                                   # Loki log shipper
+            pkgsPromtail.promtail                      # Loki log shipper
             prometheus                                 # Metrics collector
 
             # Kube tools

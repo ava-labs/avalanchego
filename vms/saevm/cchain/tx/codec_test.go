@@ -5,6 +5,7 @@ package tx_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -16,6 +17,7 @@ import (
 	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -139,6 +141,10 @@ func FuzzParseCompatibility(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, oldErr := txtest.ParseOld(data)
+		// The new codec intentionally has no size limit.
+		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
+			t.Skip("input exceeds legacy codec size limit")
+		}
 		oldOk := oldErr == nil
 
 		_, newErr := Parse(data)
@@ -267,6 +273,10 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, oldErr := txtest.ParseOlds(data)
+		// The new codec intentionally has no size limit.
+		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
+			t.Skip("input exceeds legacy codec size limit")
+		}
 		oldOk := oldErr == nil
 
 		_, newErr := ParseSlice(data)

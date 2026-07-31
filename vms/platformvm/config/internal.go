@@ -72,6 +72,10 @@ type Internal struct {
 	// Maximum amount of time to allow a staker to stake
 	MaxStakeDuration time.Duration
 
+	// HeliconMinStakeDuration is the minimum staking duration for the primary
+	// network after the Helicon upgrade (ACP-273).
+	HeliconMinStakeDuration time.Duration
+
 	// Config for the minting function
 	RewardConfig reward.Config
 

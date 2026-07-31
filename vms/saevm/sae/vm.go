@@ -16,14 +16,12 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
-	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -32,30 +30,30 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
-// provide a last-synchronous block, which MAY be the genesis.
+// ensure that the last-synchronous block (which MAY be the genesis) is
+// canonical on disk with its post-execution state committed before [NewVM] is
+// called.
 type VM struct {
-	*p2p.Network
-	Peers          *p2p.Peers
-	ValidatorPeers *p2p.Validators
-
+	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
-	metrics *prometheus.Registry
+	metrics *metrics
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -65,7 +63,6 @@ type VM struct {
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted, settled atomic.Pointer[blocks.Block]
-		synchronous       uint64
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -94,14 +91,17 @@ var _ io.Closer = (*closerFunc)(nil)
 func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
+//
+// TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
+// (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
+// assume its caller validated the config.
 type Config struct {
 	MempoolConfig legacypool.Config
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
-	ExcessAfterLastSynchronous gas.Gas
-
-	Now func() time.Time // defaults to [time.Now] if nil
+	// Now defaults to [time.Now] if nil
+	Now func() time.Time `json:"-"`
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
@@ -117,17 +117,29 @@ func NewVM[T hook.Transaction](
 	snowCtx *snow.Context,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
-	lastSynchronous *types.Block,
-	sender snowcommon.AppSender,
+	network *network.Network,
 ) (_ *VM, retErr error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	snowCtx.Log.Info("creating VM",
+		zap.Reflect("config", cfg),
+	)
+
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
 	vm := &VM{
+		network: network,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
-		metrics: prometheus.NewRegistry(),
+		metrics: m,
 		db:      db,
 	}
 	defer func() {
@@ -135,10 +147,6 @@ func NewVM[T hook.Transaction](
 			retErr = errors.Join(retErr, vm.close())
 		}
 	}()
-
-	if err := snowCtx.Metrics.Register("sae", vm.metrics); err != nil {
-		return nil, err
-	}
 
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
@@ -149,26 +157,11 @@ func NewVM[T hook.Transaction](
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
 
-	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
-	if err != nil {
-		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
-	}
-	vm.last.synchronous = lastSync.Height()
-
-	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
-			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
-		}
-		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
-			return nil, err
-		}
-	}
-
-	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}
 	{ // ==========  Block State  ==========
+		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding last committed state: %w", err)
 		}
 
 		exec, err := saexec.New(
@@ -179,7 +172,8 @@ func NewVM[T hook.Transaction](
 			xdb,
 			cfg.DBConfig,
 			hooks,
-			snowCtx.Log,
+			snowCtx,
+			reg,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
@@ -188,12 +182,12 @@ func NewVM[T hook.Transaction](
 		vm.toClose = append(vm.toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
 		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
 		vm.consensusCritical = bMap
 
@@ -201,6 +195,7 @@ func NewVM[T hook.Transaction](
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
+		vm.metrics.markSettled(lastSettled.Height())
 	}
 
 	{ // ==========  Mempool  ==========
@@ -214,12 +209,12 @@ func NewVM[T hook.Transaction](
 		}
 		vm.toClose = append(vm.toClose, txPool)
 
-		metrics, err := bloom.NewMetrics("mempool", vm.metrics)
+		bloomMetrics, err := bloom.NewMetrics("mempool", reg)
 		if err != nil {
 			return nil, err
 		}
-		conf := gossip.BloomSetConfig{Metrics: metrics}
-		pool, err := txgossip.NewSet(txPool, conf)
+		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
+		pool, err := txgossip.NewSet(vm.exec, txPool, conf)
 		if err != nil {
 			return nil, err
 		}
@@ -239,21 +234,16 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, vm.metrics)
-		if err != nil {
-			return nil, fmt.Errorf("newNetwork(...): %v", err)
-		}
-
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
-			network,
-			validatorPeers,
+			network.Network,
+			network.ValidatorPeers,
 			vm.mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
 				Log:           snowCtx.Log,
-				Registry:      vm.metrics,
+				Registry:      reg,
 				Namespace:     "gossip",
 				RequestPeriod: pullGossipPeriod,
 			},
@@ -280,9 +270,6 @@ func NewVM[T hook.Transaction](
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.Network = network
-		vm.Peers = peers
-		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()
@@ -292,7 +279,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  RPC Provider  ==========
-		r, err := rpc.New(chain{vm, vm.exec}, cfg.RPCConfig)
+		r, err := rpc.New(vm.chain(), cfg.RPCConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -301,30 +288,6 @@ func NewVM[T hook.Transaction](
 	}
 
 	return vm, nil
-}
-
-// canonicaliseLastSynchronous writes all necessary information to the database
-// to have the block be considered accepted/canonical by SAE. If there are any
-// canonical blocks at a height greater than the provided block then this
-// function is a no-op, which makes it effectively idempotent with respect to
-// the rest of SAE processing.
-func canonicaliseLastSynchronous(db ethdb.Database, block *blocks.Block) error {
-	if !block.Synchronous() {
-		return fmt.Errorf("only synchronous block can be canonicalised: %d / %#x is async", block.NumberU64(), block.Hash())
-	}
-	num := block.NumberU64()
-	if rawdb.ReadCanonicalHash(db, num+1) != (common.Hash{}) {
-		// If any other block has been accepted then the last synchronous block
-		// must have been canonicalised in a previous initialisation.
-		return nil
-	}
-
-	h := block.Hash()
-	b := db.NewBatch()
-	rawdb.WriteCanonicalHash(b, h, num)
-	block.SetAsHeadBlock(b)
-	rawdb.WriteFinalizedBlockHash(b, h)
-	return b.Write()
 }
 
 // signalNewTxsToEngine subscribes to the [txpool.TxPool] to unblock

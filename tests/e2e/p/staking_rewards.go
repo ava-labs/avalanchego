@@ -270,14 +270,30 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		tc.By("checking expected rewards against actual rewards", func() {
+			upgrades, err := alphaInfoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
 			var (
 				adminClient  = admin.NewClient(nodeURI.URI)
-				rewardConfig = getRewardConfig(tc, adminClient)
-				calculator   = reward.NewCalculator(rewardConfig)
+				rewardConfig = GetRewardConfig(tc, adminClient)
+				calculator   = reward.NewPrimaryNetworkCalculator(rewardConfig, *upgrades)
+			)
 
-				expectedValidationReward = calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+			// ACP-285 selects the primary-network rate from each staker's start time.
+			var (
+				expectedValidationReward = calculator.Calculate(
+					time.Unix(int64(alphaValidator.StartTime), 0),
+					actualAlphaValidationPeriod,
+					weight,
+					supplyAtAlphaNodeStart,
+				)
 
-				potentialDelegationReward                      = calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				potentialDelegationReward = calculator.Calculate(
+					time.Unix(int64(gammaDelegator.StartTime), 0),
+					actualGammaDelegationPeriod,
+					weight,
+					supplyAtGammaDelegatorStart,
+				)
 				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
 			)
 
@@ -319,7 +335,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
 // to a circular dependency issue, a map-based equivalent is used for which
 // manual unmarshaling is required.
-func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
+func GetRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 	require := require.New(tc)
 
 	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())

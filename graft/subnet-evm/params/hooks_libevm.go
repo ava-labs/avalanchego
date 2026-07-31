@@ -62,9 +62,18 @@ func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.
 	return nil
 }
 
+func (r RulesExtra) ShouldRefundGas() bool {
+	return !r.IsSubnetEVM
+}
+
 // MinimumGasConsumption is a no-op.
 func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+}
+
+// AfterExecutingTransaction is a no-op.
+func (RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, bf *big.Int, gasUsed uint64) {
+	(ethparams.NOOPHooks{}).AfterExecutingTransaction(sdb, bf, gasUsed)
 }
 
 // AccessListGas computes the intrinsic gas for an access list.

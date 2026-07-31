@@ -105,6 +105,26 @@ func (r *reconstructedAccountTrie) Commit(bool) (common.Hash, *trienode.NodeSet,
 	return hash, trienode.NewNodeSet(common.Hash{}), nil
 }
 
+// Copy returns an independent copy of the reconstructed trie backed by a cloned
+// [ffi.Reconstructed] handle.
+func (r *reconstructedAccountTrie) Copy() (*reconstructedAccountTrie, error) {
+	clonedRecon, err := r.recon.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	base := r.baseTrie.copy()
+	// The copied baseTrie inherits the original's reader (pointing at the
+	// original's Reconstructed); rebind it to the clone so reads on the copy
+	// observe the clone's view rather than the original's.
+	base.reader = &reconstructedReader{reconstructed: clonedRecon}
+	return &reconstructedAccountTrie{
+		baseTrie:          *base,
+		recon:             clonedRecon,
+		computeRootOnHash: r.computeRootOnHash,
+	}, nil
+}
+
 var _ database.Reader = (*reconstructedReader)(nil)
 
 // reconstructedReader adapts an [ffi.Reconstructed] to the [database.Reader] interface.

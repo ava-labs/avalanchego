@@ -3,10 +3,14 @@
 
 // Package params declares [Streaming Asynchronous Execution] (SAE) parameters.
 //
-// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution
+// [Streaming Asynchronous Execution]: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution
 package params
 
-import "time"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/utils/units"
+)
 
 // Lambda is the denominator for computing the minimum gas consumed per
 // transaction. For a transaction with gas limit `g`, the minimum consumption is
@@ -36,3 +40,18 @@ const MaxFullBlocksInClosedQueue = MaxFullBlocksInOpenQueue + 1
 // the execution queue before execution finishes. This assumes the executor
 // drains the queue at least as fast as the gas capacity rate R.
 const MaxQueueWallTime = MaxFullBlocksInClosedQueue * Tau * Lambda
+
+// MaxBlockBytes is the hard maximum block size allowed during verification.
+//
+// The 2 MiB value matches the constants.DefaultMaxMessageSize, while the
+// 256 KiB subtraction is a safety margin to allow things like the proto
+// serialization overhead and the proposervm block header.
+const MaxBlockBytes = 2*units.MiB - 256*units.KiB
+
+// TargetBlockBytes is the target block size used during block building.
+//
+// The 256 KiB subtraction allows for minor inaccuracies while calculating
+// intermediate block sizes while building.
+//
+// Changing this value IS NOT a consensus-breaking change.
+const TargetBlockBytes = MaxBlockBytes - 256*units.KiB

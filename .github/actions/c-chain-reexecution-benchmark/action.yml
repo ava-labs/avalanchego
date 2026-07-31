@@ -84,9 +84,24 @@ runs:
   using: composite
   steps:
     # Nix installation is idempotent skipped if already installed by the calling workflow.
+    #
+    # TODO(marun) Switch to ./.github/actions/install-nix once this action is no
+    # longer used from outside this repo.
+    # Reference: https://github.com/ava-labs/avalanchego/issues/5599
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
       with:
         github_access_token: ${{ inputs.github-token }}
+    # Mirror the repo install-nix cache here so jobs do not need to fetch the
+    # same flake inputs on every run.
+    - name: Restore and save Nix store cache
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+      uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
+      with:
+        primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
+        restore-prefixes-first-match: |
+          nix-${{ runner.os }}-${{ runner.arch }}-
+        gc-max-store-size-linux: 5G
+        gc-max-store-size-macos: 5G
     - run: echo "dependencies installed"
       shell: nix develop --command bash {0}
     # Cache Go modules (architecture-independent)

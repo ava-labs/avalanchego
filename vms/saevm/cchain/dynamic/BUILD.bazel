@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "dynamic",
+    srcs = [
+        "delay.go",
+        "doc.go",
+        "math.go",
+        "price.go",
+        "target.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+    ],
+)
+
+go_test(
+    name = "dynamic_test",
+    srcs = [
+        "delay_test.go",
+        "math_test.go",
+        "price_test.go",
+        "target_test.go",
+    ],
+    embed = [":dynamic"],
+    deps = [
+        "//utils",
+        "//vms/components/gas",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

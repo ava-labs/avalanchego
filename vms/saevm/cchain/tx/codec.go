@@ -5,10 +5,12 @@ package tx
 
 import (
 	"errors"
+	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -17,7 +19,10 @@ const codecVersion uint16 = 0
 var c codec.Manager
 
 func init() {
-	c = codec.NewDefaultManager()
+	// The codec marshals both individual transactions and transaction slices,
+	// so size is enforced by the p2p layer, mempool, and block builder rather
+	// than by the codec itself.
+	c = codec.NewManager(math.MaxInt)
 
 	// Registration order impacts the typeID included in the canonical format.
 	// We skip registrations in specific locations so that UTXOs in shared
@@ -72,4 +77,18 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 		return nil, errInefficientSlicePacking
 	}
 	return txs, nil
+}
+
+// MarshalUTXO serializes an [avax.UTXO] to its canonical binary format.
+func MarshalUTXO(utxo *avax.UTXO) ([]byte, error) {
+	return c.Marshal(codecVersion, utxo)
+}
+
+// ParseUTXO deserializes an [avax.UTXO] from its canonical binary format.
+func ParseUTXO(b []byte) (*avax.UTXO, error) {
+	utxo := new(avax.UTXO)
+	if _, err := c.Unmarshal(b, utxo); err != nil {
+		return nil, err
+	}
+	return utxo, nil
 }
