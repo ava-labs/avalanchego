@@ -121,11 +121,11 @@ func TestSyncer(t *testing.T) {
 			}
 			close(ch)
 
-			var opts []SyncerOption
+			s := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch)
 			if tt.perReq > 0 {
-				opts = append(opts, WithCodeHashesPerRequest(tt.perReq))
+				s.codeHashesPerReq = tt.perReq
 			}
-			require.NoError(t, NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch, opts...).Sync(ctx))
+			require.NoError(t, s.Sync(ctx))
 
 			for hash, code := range want {
 				require.Equal(t, code, rawdb.ReadCode(target, hash))

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -49,49 +48,16 @@ type Syncer struct {
 	inFlight sync.Map
 }
 
-type syncerConfig struct {
-	numWorkers       int
-	codeHashesPerReq int
-}
-
-// SyncerOption configures a [Syncer] at construction time.
-type SyncerOption = options.Option[syncerConfig]
-
-// WithNumWorkers overrides the number of concurrent fetch workers.
-func WithNumWorkers(n int) SyncerOption {
-	return options.Func[syncerConfig](func(c *syncerConfig) {
-		if n > 0 {
-			c.numWorkers = n
-		}
-	})
-}
-
-// WithCodeHashesPerRequest overrides the best-effort batch size per request. It
-// is capped at [maxHashesPerRequest], the largest batch the handler accepts.
-func WithCodeHashesPerRequest(n int) SyncerOption {
-	return options.Func[syncerConfig](func(c *syncerConfig) {
-		if n > 0 && n <= maxHashesPerRequest {
-			c.codeHashesPerReq = n
-		}
-	})
-}
-
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
 // verified code into db, fetching from peers through c.
-func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash, opts ...SyncerOption) *Syncer {
-	cfg := syncerConfig{
-		numWorkers:       defaultNumWorkers,
-		codeHashesPerReq: maxHashesPerRequest,
-	}
-	options.ApplyTo(&cfg, opts...)
-
+func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash) *Syncer {
 	return &Syncer{
 		log:              log,
 		client:           c,
 		db:               db,
 		codeHashes:       codeHashes,
-		numWorkers:       cfg.numWorkers,
-		codeHashesPerReq: cfg.codeHashesPerReq,
+		numWorkers:       defaultNumWorkers,
+		codeHashesPerReq: maxHashesPerRequest,
 	}
 }
 
@@ -120,8 +86,8 @@ func (s *Syncer) work(ctx context.Context) error {
 
 			// Slow path: code already on disk, just clear its marker.
 			if rawdb.HasCode(s.db, codeHash) {
-				if err := s.clearMarker(codeHash); err != nil {
-					return err
+				if err := customrawdb.DeleteCodeToFetch(s.db, codeHash); err != nil {
+					return fmt.Errorf("failed to delete stale code marker: %w", err)
 				}
 				continue
 			}
@@ -162,21 +128,10 @@ func (s *Syncer) fulfill(ctx context.Context, hashes []common.Hash) error {
 		return fmt.Errorf("failed to write fetched code: %w", err)
 	}
 
-	// Release ownership only after the write commits.
+	// Released after the commit so a worker that pulls the same hash next finds
+	// it on disk and skips it instead of re-fetching.
 	for _, codeHash := range hashes {
 		s.inFlight.Delete(codeHash)
-	}
-	return nil
-}
-
-// clearMarker deletes the to-fetch marker for a hash whose code is already local.
-func (s *Syncer) clearMarker(codeHash common.Hash) error {
-	batch := s.db.NewBatch()
-	if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
-		return fmt.Errorf("failed to delete stale code marker: %w", err)
-	}
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("failed to write batch for stale code marker: %w", err)
 	}
 	return nil
 }
