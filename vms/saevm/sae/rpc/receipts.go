@@ -18,7 +18,7 @@ import (
 )
 
 func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	receipts, _, err := b.getReceipts(ctx, rpc.BlockNumberOrHashWithHash(hash, false))
+	receipts, _, err := b.getReceipts(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 	if err != nil {
 		return nil, nil //nolint:nilerr // This follows geth behavior for [ethapi.Backend.GetReceipts]
 	}

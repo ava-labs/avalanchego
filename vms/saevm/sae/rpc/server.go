@@ -181,7 +181,9 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		apis = append(apis, api{
 			// geth-specific APIs:
 			// - debug_intermediateRoots
+			// - debug_standardTraceBadBlockToFile
 			// - debug_standardTraceBlockToFile
+			// - debug_traceBadBlock
 			// - debug_traceBlock
 			// - debug_traceBlockByHash
 			// - debug_traceBlockByNumber
