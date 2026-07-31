@@ -77,6 +77,14 @@ const (
 		wrappers.IntLen + // deactivation owner threshold
 		wrappers.IntLen // deactivation owner num addresses
 
+	intrinsicCreateL1ValidatorBandwidth = wrappers.IntLen + // nodeID length
+		wrappers.LongLen + // weight
+		wrappers.LongLen + // balance
+		wrappers.IntLen + // remaining balance owner threshold
+		wrappers.IntLen + // remaining balance owner num addresses
+		wrappers.IntLen + // deactivation owner threshold
+		wrappers.IntLen // deactivation owner num addresses
+
 	intrinsicBLSAggregateCompute           = 5     // BLS public key aggregation time is around 5us
 	intrinsicBLSVerifyCompute              = 1_000 // BLS verification time is around 1000us
 	intrinsicBLSPublicKeyValidationCompute = 50    // BLS public key validation time is around 50us
@@ -92,6 +100,8 @@ const (
 	intrinsicInputDBWrite                      = 1
 	intrinsicOutputDBWrite                     = 1
 	intrinsicConvertSubnetToL1ValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
+
+	intrinsicCreateL1ValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
 )
 
 var (
@@ -192,6 +202,16 @@ var (
 		gas.DBRead:  3, // subnet auth + transformation lookup + conversion lookup
 		gas.DBWrite: 2, // write conversion manager + total weight
 	}
+	IntrinsicCreateL1TxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // vmID
+			wrappers.IntLen + // genesis length
+			ids.IDLen + // managerChainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen, // validators length
+		gas.DBRead:  0, // no subnet auth, no transformation/conversion lookup
+		gas.DBWrite: 3, // put subnet + put chain + put conversion
+	}
 	IntrinsicRegisterL1ValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
@@ -246,12 +266,11 @@ var (
 		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
-	errUnsupportedOutput      = errors.New("unsupported output type")
-	errUnsupportedInput       = errors.New("unsupported input type")
-	errUnsupportedOwner       = errors.New("unsupported owner type")
-	errUnsupportedAuth        = errors.New("unsupported auth type")
-	errUnsupportedSigner      = errors.New("unsupported signer type")
-	errCreateL1TxNotSupported = errors.New("CreateL1Tx is not yet supported")
+	errUnsupportedOutput = errors.New("unsupported output type")
+	errUnsupportedInput  = errors.New("unsupported input type")
+	errUnsupportedOwner  = errors.New("unsupported owner type")
+	errUnsupportedAuth   = errors.New("unsupported auth type")
+	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
 func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
@@ -394,6 +413,51 @@ func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Vali
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,
 		gas.DBWrite:   intrinsicConvertSubnetToL1ValidatorDBWrite,
+	}
+
+	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	numAddresses := uint64(len(l1Validator.RemainingBalanceOwner.Addresses) + len(l1Validator.DeactivationOwner.Addresses))
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	return complexity.Add(
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(l1Validator.NodeID)),
+		},
+		&signerComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: addressBandwidth,
+		},
+	)
+}
+
+// CreateL1ValidatorComplexity returns the complexity the validators
+// add to a transaction.
+func CreateL1ValidatorComplexity(l1Validators ...*txs.CreateL1Validator) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, l1Validator := range l1Validators {
+		l1ValidatorComplexity, err := createL1ValidatorComplexity(l1Validator)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&l1ValidatorComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func createL1ValidatorComplexity(l1Validator *txs.CreateL1Validator) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: intrinsicCreateL1ValidatorBandwidth,
+		gas.DBWrite:   intrinsicCreateL1ValidatorDBWrite,
 	}
 
 	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
@@ -760,9 +824,32 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return err
 }
 
-func (*complexityVisitor) CreateL1Tx(*txs.CreateL1Tx) error {
-	// CreateL1Tx is implemented in a follow-up PR. Until then, this transaction is rejected.
-	return errCreateL1TxNotSupported
+func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	bandwidth, err := math.Add(uint64(0), uint64(len(tx.GenesisData)))
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ManagerAddress)))
+	if err != nil {
+		return err
+	}
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+	}
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	validatorComplexity, err := CreateL1ValidatorComplexity(tx.Validators...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCreateL1TxComplexities.Add(
+		&dynamicComplexity,
+		&baseTxComplexity,
+		&validatorComplexity,
+	)
+	return err
 }
 
 func (c *complexityVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
