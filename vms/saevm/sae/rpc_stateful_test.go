@@ -201,13 +201,7 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 
 // TestDebugTrace covers the debug namespace's tracing endpoints. Blocks execute
 // after acceptance, so every endpoint replays against a faked header carrying
-// post-execution results. Each subtest pins one consequence.
-//
-//   - the base fee the replay runs with, which MUST be the executed fee, not the
-//     worst-case bound the header stores.
-//   - the before-block hook's inputs, which MUST be the stored values, and
-//     its state changes, which MUST come from the block being traced.
-//   - the block hash reported, which MUST be the caller's, not the faked one.
+// post-execution results.
 func TestDebugTrace(t *testing.T) {
 	// A fixed clock keeps the executed base fees reproducible.
 	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
