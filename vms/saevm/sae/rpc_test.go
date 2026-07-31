@@ -63,11 +63,13 @@ type rpcTest struct {
 	extraCmpOpts []cmp.Option
 }
 
-// withCmpOpts sets opts as the [rpcTest.extraCmpOpts] of every test, for tables
-// whose rows all compare their results the same way.
+// withCmpOpts appends opts to the [rpcTest.extraCmpOpts] of every test, for
+// tables whose rows compare their results the same way. A row MAY carry its own
+// options too.
 func withCmpOpts(tests []rpcTest, opts ...cmp.Option) []rpcTest {
 	for i := range tests {
-		tests[i].extraCmpOpts = opts
+		test := &tests[i]
+		test.extraCmpOpts = append(test.extraCmpOpts, opts...)
 	}
 	return tests
 }
