@@ -51,6 +51,10 @@ func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 	return c.consensusCritical.Load(h)
 }
 
+func (c chain) MapPendingToLastExecuted() bool {
+	return c.VM.config.RPCConfig.MapPendingToLastExecuted
+}
+
 func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
 	return c.blockBuilder.new(eth, parent, lastSettled)
 }

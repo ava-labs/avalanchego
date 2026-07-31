@@ -370,7 +370,7 @@ func TestContractBindings(t *testing.T) {
 	ctx, sut := newSUT(t, 2, options.Func[sutConfig](func(c *sutConfig) {
 		// The [bind] package makes extensive use of [rpc.PendingBlockNumber],
 		// which breaks when resolved as the last-accepted block.
-		c.vmConfig.RPCConfig.MapPendingStateToLatest = true
+		c.vmConfig.RPCConfig.MapPendingToLastExecuted = true
 	}))
 
 	chainID, err := sut.ChainID(ctx)

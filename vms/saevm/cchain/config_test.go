@@ -157,14 +157,14 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
-			name: "api/enable_map_pending_state_to_latest",
-			json: `{"api-map-pending-state-to-latest":true}`,
-			want: with(func(c *config) { c.MapPendingStateToLatest = true }),
+			name: "api/enable_map_pending_to_last_executed",
+			json: `{"api-map-pending-to-last-executed":true}`,
+			want: with(func(c *config) { c.MapPendingToLastExecuted = true }),
 		},
 		{
-			name: "api/disable_map_pending_state_to_latest",
-			json: `{"api-map-pending-state-to-latest":false}`,
-			want: with(func(c *config) { c.MapPendingStateToLatest = false }),
+			name: "api/disable_map_pending_to_last_executed",
+			json: `{"api-map-pending-to-last-executed":false}`,
+			want: with(func(c *config) { c.MapPendingToLastExecuted = false }),
 		},
 
 		// Warp
@@ -197,22 +197,22 @@ func TestParseConfig(t *testing.T) {
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
-				PriceTarget:             utils.PointerTo(gas.Price(500)),
-				GasTarget:               utils.PointerTo(gas.Gas(1500)),
-				MinDelayTarget:          utils.PointerTo[uint64](3000),
-				Pruning:                 false,
-				StateScheme:             customrawdb.FirewoodScheme,
-				CommitInterval:          256,
-				TrieCleanCache:          256,
-				SnapshotCache:           128,
-				AllowMissingTries:       true,
-				LocalTxsEnabled:         true,
-				TxPoolAccountSlots:      8,
-				TxPoolGlobalSlots:       2048,
-				AllowUnprotectedTxs:     true,
-				BatchRequestLimit:       50,
-				WarpOffChainMessages:    []hexutil.Bytes{{0x12, 0x34}},
-				MapPendingStateToLatest: true,
+				PriceTarget:              utils.PointerTo(gas.Price(500)),
+				GasTarget:                utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:           utils.PointerTo[uint64](3000),
+				Pruning:                  false,
+				StateScheme:              customrawdb.FirewoodScheme,
+				CommitInterval:           256,
+				TrieCleanCache:           256,
+				SnapshotCache:            128,
+				AllowMissingTries:        true,
+				LocalTxsEnabled:          true,
+				TxPoolAccountSlots:       8,
+				TxPoolGlobalSlots:        2048,
+				AllowUnprotectedTxs:      true,
+				BatchRequestLimit:        50,
+				WarpOffChainMessages:     []hexutil.Bytes{{0x12, 0x34}},
+				MapPendingToLastExecuted: true,
 			},
 		},
 	}
@@ -277,7 +277,7 @@ func TestConfig_WarpMessages(t *testing.T) {
 	}
 }
 
-func TestConfigMapPendingStateToLatest(t *testing.T) {
+func TestConfigMapPendingToLastExecuted(t *testing.T) {
 	// This test only exercises plumbing of the config. A full test of
 	// functionality is performed in the SAE code.
 
@@ -293,13 +293,13 @@ func TestConfigMapPendingStateToLatest(t *testing.T) {
 		{
 			name: "explicitly_enable_mapping",
 			opt: func(c *sutConfig) {
-				c.vmConfig.MapPendingStateToLatest = true
+				c.vmConfig.MapPendingToLastExecuted = true
 			},
 		},
 		{
 			name: "explicitly_disable_mapping",
 			opt: func(c *sutConfig) {
-				c.vmConfig.MapPendingStateToLatest = false
+				c.vmConfig.MapPendingToLastExecuted = false
 			},
 			wantErr: testerr.Contains("pending"),
 		},

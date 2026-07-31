@@ -77,7 +77,7 @@ type Config struct {
 	TxFeeCap            float64 // 0 = no cap
 	AllowUnprotectedTxs bool
 
-	MapPendingStateToLatest bool
+	MapPendingToLastExecuted bool
 }
 
 // ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
