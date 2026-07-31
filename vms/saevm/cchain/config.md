@@ -62,7 +62,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
-| `api-map-pending-state-to-latest` | bool | Silently change requests for state at the "pending" (last-accepted) block to return that of the "latest" (last-executed), otherwise return an error as said state isn't necessarily available yet. | `true` |
+| `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
 
 ## State Sync
 

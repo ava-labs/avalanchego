@@ -23,12 +23,13 @@ type (
 		DB() ethdb.Database
 		XDB() types.ExecutionResults
 
-		// MapPendingToLastExecuted allows overriding of the default behaviour
-		// of [ResolveRPCNumber], which is to map [rpc.PendingBlockNumber] to
-		// the last-accepted block. This allows for compatibility with
-		// EVM-ecosystem tools that expect post-execution artefacts from the
-		// pending block, which is only possible in a synchronous paradigm.
-		MapPendingToLastExecuted() bool
+		// ResolvePendingToLastExecuted allows overriding of the default
+		// behaviour of [ResolveRPCNumber], which is to resolve
+		// [rpc.PendingBlockNumber] to the last-accepted block. This allows for
+		// compatibility with EVM-ecosystem tools that expect post-execution
+		// artefacts from the pending block, which is only possible in a
+		// synchronous paradigm.
+		ResolvePendingToLastExecuted() bool
 	}
 
 	// ConsensusCritical blocks are currently in use by a consensus mechanism,
@@ -95,7 +96,7 @@ var ErrNonCanonicalBlock = fmt.Errorf("%w: canonical block required", ErrFutureB
 //
 //   - [rpc.PendingBlockNumber] is that returned by the [AcceptanceFrontier],
 //     its execution status being unknown but eventually guaranteed. However,
-//     if [Chain.MapPendingToLastExecuted] returns true, then the
+//     if [Chain.ResolvePendingToLastExecuted] returns true, then the
 //     [ExecutionFrontier] is used instead. See said method for rationale.
 //   - [rpc.LatestBlockNumber] is that returned by the [ExecutionFrontier].
 //   - [rpc.SafeBlockNumber] and [rpc.FinalizedBlockNumber] are both that
@@ -121,7 +122,7 @@ var ErrNonCanonicalBlock = fmt.Errorf("%w: canonical block required", ErrFutureB
 // maintain monotonicity of the labels, and no further guarantees are possible
 // after settlement.
 func ResolveRPCNumber(c Chain, bn rpc.BlockNumber) (uint64, error) {
-	if bn == rpc.PendingBlockNumber && c.MapPendingToLastExecuted() {
+	if bn == rpc.PendingBlockNumber && c.ResolvePendingToLastExecuted() {
 		bn = rpc.LatestBlockNumber
 	}
 	tip := c.LastAccepted().Height()

@@ -84,7 +84,7 @@ func (b *backend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumbe
 // post-execution results, mimicking a synchronous block. The [state.StateDB] is
 // opened at the post-execution root, as carried by the faked header.
 func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
-	if !b.config.MapPendingToLastExecuted {
+	if !b.config.ResolvePendingToLastExecuted {
 		if n, ok := numOrHash.Number(); ok && n == rpc.PendingBlockNumber {
 			return nil, nil, errors.New("state not available for pending block")
 		}
