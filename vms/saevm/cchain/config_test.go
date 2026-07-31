@@ -152,6 +152,16 @@ func TestParseConfig(t *testing.T) {
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
+		{
+			name: "api/enable_map_pending_state_to_latest",
+			json: `{"api-map-pending-state-to-latest":true}`,
+			want: with(func(c *config) { c.MapPendingStateToLatest = true }),
+		},
+		{
+			name: "api/disable_map_pending_state_to_latest",
+			json: `{"api-map-pending-state-to-latest":false}`,
+			want: with(func(c *config) { c.MapPendingStateToLatest = false }),
+		},
 
 		// Warp
 		{
@@ -183,21 +193,22 @@ func TestParseConfig(t *testing.T) {
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
-				PriceTarget:          utils.PointerTo(gas.Price(500)),
-				GasTarget:            utils.PointerTo(gas.Gas(1500)),
-				MinDelayTarget:       utils.PointerTo[uint64](3000),
-				Pruning:              false,
-				StateScheme:          customrawdb.FirewoodScheme,
-				CommitInterval:       256,
-				TrieCleanCache:       256,
-				SnapshotCache:        128,
-				AllowMissingTries:    true,
-				LocalTxsEnabled:      true,
-				TxPoolAccountSlots:   8,
-				TxPoolGlobalSlots:    2048,
-				AllowUnprotectedTxs:  true,
-				BatchRequestLimit:    50,
-				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
+				PriceTarget:             utils.PointerTo(gas.Price(500)),
+				GasTarget:               utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:          utils.PointerTo[uint64](3000),
+				Pruning:                 false,
+				StateScheme:             customrawdb.FirewoodScheme,
+				CommitInterval:          256,
+				TrieCleanCache:          256,
+				SnapshotCache:           128,
+				AllowMissingTries:       true,
+				LocalTxsEnabled:         true,
+				TxPoolAccountSlots:      8,
+				TxPoolGlobalSlots:       2048,
+				AllowUnprotectedTxs:     true,
+				BatchRequestLimit:       50,
+				WarpOffChainMessages:    []hexutil.Bytes{{0x12, 0x34}},
+				MapPendingStateToLatest: true,
 			},
 		},
 	}
