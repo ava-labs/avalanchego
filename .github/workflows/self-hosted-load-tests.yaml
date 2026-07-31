@@ -39,6 +39,10 @@ jobs:
       - name: Run load test
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
+          # This task invocation is an exception to the usual "named task without
+          # extra flags" rule because it is only triggerable by workflow_dispatch.
+          # The task still works with its defaults, and the forwarded flags can also
+          # be used when running test-load-kube locally.
           run: >-
             ./scripts/run_task.sh test-load-kube --
             ${{ inputs.avalanchego_image && format('--kube-image {0}', inputs.avalanchego_image) || '' }}

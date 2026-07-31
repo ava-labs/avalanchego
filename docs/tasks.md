@@ -40,15 +40,6 @@ What matters is less the specific tool than what it enables. The repo needs a wa
 define stable, discoverable command names for builds, tests, linting, code generation,
 and similar work. Task was a reasonable fit for that need.
 
-### The double dash delimiter
-
-Task has one quirk worth noting: task arguments come after `--` (for example,
-`task task-name -- arg1 arg2`). Without that delimiter, Task treats additional
-words as more task names rather than arguments.
-
-This repo generally prefers tasks that can be run without extra arguments, so
-that tradeoff was considered acceptable.
-
 ### Why not Make or just?
 
 Make is most useful when a repo needs build rules and dependency tracking, but this
@@ -61,6 +52,15 @@ like Make or shell scripting, which some people may prefer to Task's YAML style.
 was chosen over just because the existing dependency on Go tooling made adoption
 simpler and the repo's use of GitHub Actions also meant that YAML was already a
 familiar format.
+
+### The double dash delimiter
+
+Task has one quirk worth noting: task arguments come after `--` (for example,
+`task task-name -- arg1 arg2`). Without that delimiter, Task treats additional
+words as more task names rather than arguments.
+
+This repo generally prefers tasks that can be run without extra arguments, so
+that tradeoff was considered acceptable.
 
 ## How tasks should work in this repo
 

@@ -328,7 +328,9 @@ looking for.
 
 Start simple. A single document is often enough.
 
-A good document is complete, but usability matters just as much. Write so a future reader can skim the document and quickly find what they need. In practice, that usually means:
+A good document is complete, but usability matters just as much. Write so a future
+reader can skim the document and quickly find what they need. In practice, that
+usually means:
 
 - front-load the principles or mental model
 - use headings that clearly describe what a section is doing
