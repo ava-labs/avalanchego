@@ -224,8 +224,8 @@ func TestDebugTrace(t *testing.T) {
 		gasPrice = big.NewInt(2 * params.GWei)
 	)
 
-	// Over-declared gas inflates the worstcase fee, so two blocks give the
-	// traced block a parent whose worstcase and executed fees differ.
+	// Issuing two blocks with over-declared gas ensures that the parent's
+	// worstcase and executed base fees differ.
 	burnGas := func() *types.Transaction {
 		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			GasFeeCap: gasPrice,
