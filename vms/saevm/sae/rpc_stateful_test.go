@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/eth/tracers/native"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
@@ -361,5 +363,63 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		msg := callMsg
 		msg.AccessList = *accessList
 		requireCallSucceedsWithGas(t, msg, gas)
+	})
+}
+
+func TestContractBindings(t *testing.T) {
+	ctx, sut := newSUT(t, 2, options.Func[sutConfig](func(c *sutConfig) {
+		// The [bind] package makes extensive use of [rpc.PendingBlockNumber],
+		// which breaks when resolved as the last-accepted block.
+		c.vmConfig.RPCConfig.MapPendingStateToLatest = true
+	}))
+
+	chainID, err := sut.ChainID(ctx)
+	require.NoErrorf(t, err, "%T.ChainID()", sut.Client)
+	opts, err := bind.NewKeyedTransactorWithChainID(sut.wallet.PrivateKey(0), chainID)
+	require.NoError(t, err, "bind.NewKeyedTransactorWithChainID(...)")
+
+	_, addr, _ := sut.deployEscrow(t)
+	contract := bind.NewBoundContract(addr, escrow.ABI(t), sut.Client, sut.Client, sut.Client)
+
+	deposit := uint256.NewInt(42)
+	recipient := sut.wallet.Addresses()[1]
+	opts.Value = deposit.ToBig()
+	tx, err := contract.Transact(opts, "deposit", recipient)
+	require.NoErrorf(t, err, "%T.Transact(..., %q, %v)", contract, "deposit", recipient)
+
+	sut.waitUntilTxsPending(t, tx)
+	b := sut.runConsensusLoop(t)
+
+	// No need to wait until executed! #LiveReceipts
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_getTransactionReceipt",
+		args:   []any{tx.Hash()},
+		want: &types.Receipt{
+			Type:        tx.Type(),
+			Status:      types.ReceiptStatusSuccessful,
+			BlockHash:   b.Hash(),
+			BlockNumber: b.Number(),
+			TxHash:      tx.Hash(),
+			Logs: []*types.Log{escrow.WithDepositTopicsAndData(
+				&types.Log{
+					Address:     addr,
+					BlockNumber: b.NumberU64(),
+					BlockHash:   b.Hash(),
+					TxHash:      tx.Hash(),
+				},
+				recipient,
+				deposit,
+			)},
+		},
+		extraCmpOpts: []cmp.Option{
+			cmpopts.IgnoreFields(
+				types.Receipt{},
+				"Bloom",
+				"EffectiveGasPrice",
+				"CumulativeGasUsed",
+				"GasUsed",
+			),
+		},
 	})
 }
