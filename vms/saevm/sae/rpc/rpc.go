@@ -105,7 +105,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		return nil, err
 	}
 
-	price, err := gasprice.NewEstimator(&estimatorBackend{chain}, chain.Logger(), gasprice.DefaultConfig())
+	price, err := gasprice.NewEstimator(&estimatorBackend{chain, config.MapPendingStateToLatest}, chain.Logger(), gasprice.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
 	}

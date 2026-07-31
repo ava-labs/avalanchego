@@ -14,13 +14,14 @@ import (
 )
 
 type estimatorBackend struct {
-	chain Chain
+	chain              Chain
+	mapPendingToLatest bool
 }
 
 var _ gasprice.Backend = (*estimatorBackend)(nil)
 
 func (e *estimatorBackend) BlockByNumber(n rpc.BlockNumber) (*types.Block, error) {
-	return readByNumber(e.chain, n, rawdb.ReadBlock)
+	return readByNumber(e.chain, n, e.mapPendingToLatest, rawdb.ReadBlock)
 }
 
 func (e *estimatorBackend) LastAcceptedBlock() *blocks.Block {
@@ -28,7 +29,7 @@ func (e *estimatorBackend) LastAcceptedBlock() *blocks.Block {
 }
 
 func (e *estimatorBackend) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
-	return blocks.ResolveRPCNumber(e.chain, bn)
+	return blocks.ResolveRPCNumber(e.chain, bn, e.mapPendingToLatest)
 }
 
 func (e *estimatorBackend) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {

@@ -20,11 +20,11 @@ func (b *backend) CurrentBlock() *types.Header {
 }
 
 func (b *backend) HeaderByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Header, error) {
-	return readByNumber(b, n, rawdb.ReadHeader)
+	return readByNumber(b, n, b.config.MapPendingStateToLatest, rawdb.ReadHeader)
 }
 
 func (b *backend) BlockByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Block, error) {
-	return readByNumber(b, n, rawdb.ReadBlock)
+	return readByNumber(b, n, b.config.MapPendingStateToLatest, rawdb.ReadBlock)
 }
 
 func (b *backend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
@@ -36,11 +36,11 @@ func (b *backend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Blo
 }
 
 func (b *backend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error) {
-	return readByNumberOrHash(b, blockNrOrHash, (*blocks.Block).Header, neverErrs(rawdb.ReadHeader))
+	return readByNumberOrHash(b, blockNrOrHash, b.config.MapPendingStateToLatest, (*blocks.Block).Header, neverErrs(rawdb.ReadHeader))
 }
 
 func (b *backend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
-	return readByNumberOrHash(b, blockNrOrHash, (*blocks.Block).EthBlock, neverErrs(rawdb.ReadBlock))
+	return readByNumberOrHash(b, blockNrOrHash, b.config.MapPendingStateToLatest, (*blocks.Block).EthBlock, neverErrs(rawdb.ReadBlock))
 }
 
 func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
@@ -53,6 +53,7 @@ func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, 
 	return readByNumberOrHash(
 		b,
 		numOrHash,
+		b.config.MapPendingStateToLatest,
 		func(b *blocks.Block) *blocks.Block {
 			return b
 		},

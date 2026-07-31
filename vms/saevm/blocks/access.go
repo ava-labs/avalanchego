@@ -111,7 +111,10 @@ var ErrNonCanonicalBlock = fmt.Errorf("%w: canonical block required", ErrFutureB
 // of the word. The "finalized" block is defined identically because we wish to
 // maintain monotonicity of the labels, and no further guarantees are possible
 // after settlement.
-func ResolveRPCNumber(f Frontier, bn rpc.BlockNumber) (uint64, error) {
+func ResolveRPCNumber(f Frontier, bn rpc.BlockNumber, mapPendingToLatest bool) (uint64, error) {
+	if bn == rpc.PendingBlockNumber && mapPendingToLatest {
+		bn = rpc.LatestBlockNumber
+	}
 	tip := f.LastAccepted().Height()
 
 	switch bn {
@@ -147,7 +150,7 @@ var (
 // returned number but is only guaranteed to be the canonical block of said
 // number if (a) it was specified by [rpc.BlockNumberOrHash.Number], or (b) the
 // [rpc.BlockNumberOrHash.RequireCanonical] field is `true`.
-func ResolveRPCNumberOrHash(c Chain, numOrHash rpc.BlockNumberOrHash) (uint64, common.Hash, error) {
+func ResolveRPCNumberOrHash(c Chain, numOrHash rpc.BlockNumberOrHash, mapPendingToLatest bool) (uint64, common.Hash, error) {
 	rpcNum, isNum := numOrHash.Number()
 	hash, isHash := numOrHash.Hash()
 
@@ -156,7 +159,7 @@ func ResolveRPCNumberOrHash(c Chain, numOrHash rpc.BlockNumberOrHash) (uint64, c
 		return 0, common.Hash{}, ErrBothNumberAndHash
 
 	case isNum:
-		num, err := ResolveRPCNumber(c, rpcNum)
+		num, err := ResolveRPCNumber(c, rpcNum, mapPendingToLatest)
 		if err != nil {
 			return 0, common.Hash{}, err
 		}
@@ -209,8 +212,8 @@ func (r DBReader[T]) WithNilErr() DBReaderWithErr[T] {
 
 // FromNumber resolves the canonical [Block] for the given [rpc.BlockNumber]
 // and returns the result of calling `fromDB` with its number and hash.
-func FromNumber[T any](c Chain, n rpc.BlockNumber, fromDB DBReaderWithErr[T]) (*T, error) {
-	num, err := ResolveRPCNumber(c, n)
+func FromNumber[T any](c Chain, n rpc.BlockNumber, mapPendingToLatest bool, fromDB DBReaderWithErr[T]) (*T, error) {
+	num, err := ResolveRPCNumber(c, n, mapPendingToLatest)
 	if err != nil {
 		return nil, err
 	}
@@ -239,8 +242,8 @@ func FromHash[T any](c Chain, hash common.Hash, requireCanonical bool, fromConse
 // FromNumberOrHash resolves the [Block] for the given [rpc.BlockNumberOrHash]
 // and returns the result of `fromConsensus` or `fromDB`, preferring the former.
 // See [ResolveRPCNumberOrHash] for canonicality guarantees.
-func FromNumberOrHash[T any](c Chain, blockNrOrHash rpc.BlockNumberOrHash, fromConsensus Extractor[T], fromDB DBReaderWithErr[T]) (*T, error) {
-	n, hash, err := ResolveRPCNumberOrHash(c, blockNrOrHash)
+func FromNumberOrHash[T any](c Chain, blockNrOrHash rpc.BlockNumberOrHash, mapPendingToLatest bool, fromConsensus Extractor[T], fromDB DBReaderWithErr[T]) (*T, error) {
+	n, hash, err := ResolveRPCNumberOrHash(c, blockNrOrHash, mapPendingToLatest)
 	if err != nil {
 		return nil, err
 	}

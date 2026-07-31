@@ -32,17 +32,17 @@ func notFoundIsNil[T any](x *T, err error) (*T, error) {
 // to be executed) to ensure that every block will eventually have post-execution artefacts.
 // Non-canonical blocks are rejected with [blocks.ErrNonCanonicalBlock].
 
-func readByNumber[T any](c Chain, n rpc.BlockNumber, read blocks.DBReader[T]) (*T, error) {
-	return notFoundIsNil(blocks.FromNumber(c, n, read.WithNilErr()))
+func readByNumber[T any](c Chain, n rpc.BlockNumber, mapPendingToLatest bool, read blocks.DBReader[T]) (*T, error) {
+	return notFoundIsNil(blocks.FromNumber(c, n, mapPendingToLatest, read.WithNilErr()))
 }
 
 func readByHash[T any](c Chain, hash common.Hash, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, error) {
 	return notFoundIsNil(blocks.FromHash(c, hash, true, fromMem, fromDB.WithNilErr()))
 }
 
-func readByNumberOrHash[T any](c Chain, blockNrOrHash rpc.BlockNumberOrHash, fromMem blocks.Extractor[T], fromDB blocks.DBReaderWithErr[T]) (*T, error) {
+func readByNumberOrHash[T any](c Chain, blockNrOrHash rpc.BlockNumberOrHash, mapPendingToLatest bool, fromMem blocks.Extractor[T], fromDB blocks.DBReaderWithErr[T]) (*T, error) {
 	blockNrOrHash.RequireCanonical = true
-	return notFoundIsNil(blocks.FromNumberOrHash(c, blockNrOrHash, fromMem, fromDB))
+	return notFoundIsNil(blocks.FromNumberOrHash(c, blockNrOrHash, mapPendingToLatest, fromMem, fromDB))
 }
 
 func readByNumberAndHash[T any](c Chain, h common.Hash, num rpc.BlockNumber, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, error) {
