@@ -203,8 +203,8 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 // after acceptance, so every endpoint replays against a faked header carrying
 // post-execution results.
 func TestDebugTrace(t *testing.T) {
-	// A fixed clock keeps the executed base fees reproducible.
-	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	// A controlled clock keeps the executed base fees reproducible.
+	timeOpt, clock := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompile := common.Address{'p', 'r', 'e', 'c', 'o', 'm', 'p'}
 	ctx, sut := newSUT(t, 1,
 		timeOpt,
@@ -240,6 +240,10 @@ func TestDebugTrace(t *testing.T) {
 		})
 	}
 
+	// Time passing between the parent and the traced block means the gas clock
+	// MUST be fast-forwarded to the traced block's time to reach its base fee.
+	clock.Advance(time.Second)
+
 	// The traced block reports what its before-block hook saw at index 0 and
 	// logs the base fee it replayed with at index 1.
 	precompileTx := callPrecompile()
@@ -250,6 +254,8 @@ func TestDebugTrace(t *testing.T) {
 		Data:      logBaseFeeCode,
 	})
 	b := sut.runConsensusLoop(t, precompileTx, baseFeeTx)
+	require.NotEqual(t, parent.BuildTime(), b.BuildTime(), "Parent and traced block build times MUST differ")
+
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 	require.Lenf(t, b.Transactions(), 2, "%T.Transactions()", b)
 
