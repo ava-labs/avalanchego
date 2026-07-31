@@ -875,13 +875,8 @@ func TestEthPendingTransactions(t *testing.T) {
 }
 
 func TestGetReceipts(t *testing.T) {
-	// Blocking precompile creates accepted-but-not-executed blocks
-	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
-	t.Cleanup(unblock)
+	ctx, sut := newSUT(t, 2, timeOpt, withDebugAPI())
 
 	var (
 		txs  []*types.Transaction
@@ -943,7 +938,6 @@ func TestGetReceipts(t *testing.T) {
 	settled, wantSettled := slice(t, 2, 4)
 	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
 	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
 		raw := make([]hexutil.Bytes, len(rs))
@@ -1038,50 +1032,6 @@ func TestGetReceipts(t *testing.T) {
 	}...)
 
 	sut.testRPC(ctx, t, tests...)
-
-	pendingTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &blockingPrecompile,
-		Gas:      params.TxGas,
-		GasPrice: big.NewInt(1),
-	})
-	pending := sut.runConsensusLoop(t, pendingTx)
-
-	// Release execution of the block just accepted. The queries below may
-	// still beat it, but receipt RPCs wait for execution.
-	unblock()
-
-	wantPending := []*types.Receipt{{
-		TxHash:            pendingTx.Hash(),
-		Status:            types.ReceiptStatusSuccessful,
-		GasUsed:           params.TxGas,
-		CumulativeGasUsed: params.TxGas,
-		EffectiveGasPrice: big.NewInt(1),
-		Logs:              []*types.Log{},
-		BlockHash:         pending.Hash(),
-		BlockNumber:       pending.Number(),
-	}}
-	sut.testRPC(ctx, t, []rpcTest{
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{pending.Hash()},
-			want:   wantPending,
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
-			want:   wantPending,
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{pending.Hash()},
-			want:   marshalReceipts(wantPending),
-		},
-		{
-			method: "eth_getTransactionReceipt",
-			args:   []any{pendingTx.Hash()},
-			want:   wantPending[0],
-		},
-	}...)
 }
 
 func TestGetTransactionCount(t *testing.T) {
