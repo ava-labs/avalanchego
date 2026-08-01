@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785515904520,
+  "lastUpdate": 1785582176654,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -43427,6 +43427,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 744.0640646724911,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "6d4554e8db3670bf36de652dbe81ab90592d9d69",
+          "message": "fix(sae/rpc): restore evicted blocks for state, receipt, and tracing RPCs (#5721)\n\nSigned-off-by: Jonathan Oppenheimer <jonathan.oppenheimer@avalabs.org>\nSigned-off-by: Jonathan Oppenheimer <147infiniti@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Austin Larson <78000745+alarso16@users.noreply.github.com>",
+          "timestamp": "2026-08-01T00:44:41Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/6d4554e8db3670bf36de652dbe81ab90592d9d69"
+        },
+        "date": 1785582174889,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 82.40995253770463,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 12134.456691289497,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 70.19672610306641,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 11445.466798381543,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 616.5837634784152,
             "unit": "block_accept_ms/ggas"
           }
         ]
