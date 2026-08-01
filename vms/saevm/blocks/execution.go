@@ -262,6 +262,10 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if errors.Is(err, database.ErrNotFound) {
+		// TODO(JonathanOppenheimer): missing results result in us assuming
+		// "synchronous" here, so once state sync exist and the database can be
+		// pruned, this would result in async blocks being restored incorrectly.
+		// We can ask [hook.Synchronous] instead?
 		e, err = b.synchronousExecutionResults(hooks)
 		b.synchronous = true
 	}
@@ -304,7 +308,7 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(b.headerBaseFee())
+	e.baseFee.SetUint64(b.HeaderBaseFee())
 	return e, nil
 }
 
@@ -316,15 +320,15 @@ func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
 	return gastime.New(
 		hooks.BlockTime(hdr),
 		target,
-		gas.Price(b.headerBaseFee()),
+		gas.Price(b.HeaderBaseFee()),
 		cfg,
 	)
 }
 
-// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee is capped at [math.MaxUint64] but any reasonable
-// implementation has a base fee much less than [math.MaxUint64].
-func (b *Block) headerBaseFee() uint64 {
+// HeaderBaseFee returns the header's base fee, zero if absen. The base fee
+// is capped at [math.MaxUint64] but any reasonable implementation has a base
+// fee much less than [math.MaxUint64].
+func (b *Block) HeaderBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
 		return 0

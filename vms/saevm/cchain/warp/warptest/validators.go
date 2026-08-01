@@ -39,10 +39,11 @@ type Option = options.Option[config]
 type config struct {
 	n       int
 	nodeIDs []ids.NodeID
+	signers []bls.Signer
 }
 
 // WithMinimum sets a lower bound on the number of validators. The set grows
-// beyond n when more NodeIDs are supplied.
+// beyond n when more NodeIDs or signers are supplied.
 func WithMinimum(n int) Option {
 	return options.Func[config](func(c *config) {
 		c.n = n
@@ -57,17 +58,30 @@ func WithNodeIDs(nodeIDs ...ids.NodeID) Option {
 	})
 }
 
-// NewValidators creates a BLS warp validator set, each validator with weight 1
-// and a freshly generated BLS key. The number of validators is the larger of
-// the count set by [WithMinimum] and the number of NodeIDs. Any unspecified
-// NodeIDs are freshly generated.
+// WithSigners assigns BLS signers to the validators. Validators without an
+// assigned signer get a freshly generated key.
+func WithSigners(signers ...bls.Signer) Option {
+	return options.Func[config](func(c *config) {
+		c.signers = signers
+	})
+}
+
+// NewValidators creates a BLS warp validator set, each validator with weight 1.
+// The number of validators is the largest of the count set by [WithMinimum],
+// the number of NodeIDs, and the number of signers. Any unspecified NodeIDs and
+// signers are freshly generated.
 func NewValidators(tb testing.TB, opts ...Option) *Validators {
 	tb.Helper()
 
 	c := options.As[config](opts...)
-	n := max(c.n, len(c.nodeIDs))
+	n := max(c.n, len(c.nodeIDs), len(c.signers))
 	for len(c.nodeIDs) < n {
 		c.nodeIDs = append(c.nodeIDs, ids.GenerateTestNodeID())
+	}
+	for len(c.signers) < n {
+		sk, err := localsigner.New()
+		require.NoError(tb, err, "localsigner.New()")
+		c.signers = append(c.signers, sk)
 	}
 
 	var (
@@ -75,9 +89,7 @@ func NewValidators(tb testing.TB, opts ...Option) *Validators {
 		signers = make(map[string]bls.Signer, n)
 	)
 	for i, nodeID := range c.nodeIDs {
-		signer, err := localsigner.New()
-		require.NoError(tb, err, "localsigner.New()")
-
+		signer := c.signers[i]
 		pk := signer.PublicKey()
 		pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 		vdrs[i] = &validators.Warp{

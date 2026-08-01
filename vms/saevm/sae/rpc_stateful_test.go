@@ -211,6 +211,9 @@ func TestDebugTrace(t *testing.T) {
 		// Using an increased base fee allows the fee to change during the test.
 		withGenesisBaseFee(params.GWei),
 		withBeforeExecutingBlockPrecompile(precompile),
+		// Blocks evicted from memory are replayed from disk by the
+		// block_on_disk subtest, which needs their historical state.
+		withArchivalState(),
 	)
 	var (
 		sender = sut.wallet.Addresses()[0]
@@ -263,6 +266,8 @@ func TestDebugTrace(t *testing.T) {
 	// The block's base fees MUST differ to ensure we are asserting that the
 	// correct value is used.
 	require.NotZero(t, b.EthBlock().BaseFee().Cmp(baseFee.ToBig()), "Worst-case and executed base fees MUST differ")
+	t.Logf("base fees: parent executed = %v; consensus header (worst-case bound) = %v; executed = %v",
+		parent.ExecutedBaseFee(), b.EthBlock().BaseFee(), baseFee)
 
 	ethBlock := b.EthBlock()
 	blockRLP, blockFile := writeRLPToFile(t, ethBlock)
@@ -412,70 +417,81 @@ func TestDebugTrace(t *testing.T) {
 		},
 	}
 
-	t.Run("executed_base_fee", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
-			[]rpcTest{
-				{
-					method: "debug_traceBlockByNumber",
-					args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
-					want:   wantBaseFeeBlockResults,
+	baseFeeCmpOpts := cmp.Options{
+		cmpBaseFeeLOG1,
+		// Return values belong to the hook subtest, and the precompile's
+		// transaction has no structured logs to compare.
+		cmpopts.IgnoreFields(logger.ExecutionResult{}, "ReturnValue"),
+		cmpopts.EquateEmpty(),
+	}
+
+	// These address b by number, hash, or RLP, so they hold whether or not b is
+	// still in VM memory and are replayed by the block_on_disk subtest below.
+	baseFeeTests := []rpcTest{
+		{
+			method: "debug_traceBlockByNumber",
+			args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
+			want:   wantBaseFeeBlockResults,
+		},
+		{
+			method: "debug_traceBlockByHash",
+			args:   []any{ethBlock.Hash()},
+			want:   wantBaseFeeBlockResults,
+		},
+		{
+			// The supplied header carries the worst-case bound, so the
+			// executed fee in the result proves it was discarded.
+			method: "debug_traceBlock",
+			args:   []any{blockRLP},
+			want:   wantBaseFeeBlockResults,
+		},
+		{
+			method: "debug_traceBlockFromFile",
+			args:   []any{blockFile},
+			want:   wantBaseFeeBlockResults,
+		},
+		{
+			method: "debug_traceTransaction",
+			args:   []any{baseFeeTx.Hash()},
+			want:   wantBaseFeeTxResult,
+		},
+	}
+
+	// Unlike the above, these resolve "latest", so they only address b while it
+	// is the last accepted block.
+	baseFeeLatestTests := []rpcTest{
+		{
+			name:   "latest_block",
+			method: "debug_traceBlockByNumber",
+			args:   []any{rpc.LatestBlockNumber},
+			want:   wantBaseFeeBlockResults,
+		},
+		{
+			name:   "call_on_latest",
+			method: "debug_traceCall",
+			args: []any{
+				ethapi.TransactionArgs{
+					From: utils.PointerTo(sender),
+					Data: utils.PointerTo(hexutil.Bytes(logBaseFeeCode)),
+					// Traced calls set [vm.Config.NoBaseFee], which
+					// zeroes the base fee unless we pay a gas price.
+					GasPrice: (*hexutil.Big)(gasPrice),
 				},
-				{
-					name:   "latest_block",
-					method: "debug_traceBlockByNumber",
-					args:   []any{rpc.LatestBlockNumber},
-					want:   wantBaseFeeBlockResults,
-				},
-				{
-					method: "debug_traceBlockByHash",
-					args:   []any{ethBlock.Hash()},
-					want:   wantBaseFeeBlockResults,
-				},
-				{
-					// The supplied header carries the worst-case bound, so the
-					// executed fee in the result proves it was discarded.
-					method: "debug_traceBlock",
-					args:   []any{blockRLP},
-					want:   wantBaseFeeBlockResults,
-				},
-				{
-					method: "debug_traceBlockFromFile",
-					args:   []any{blockFile},
-					want:   wantBaseFeeBlockResults,
-				},
-				{
-					method: "debug_traceTransaction",
-					args:   []any{baseFeeTx.Hash()},
-					want:   wantBaseFeeTxResult,
-				},
-				{
-					name:   "call_on_latest",
-					method: "debug_traceCall",
-					args: []any{
-						ethapi.TransactionArgs{
-							From: utils.PointerTo(sender),
-							Data: utils.PointerTo(hexutil.Bytes(logBaseFeeCode)),
-							// Traced calls set [vm.Config.NoBaseFee], which
-							// zeroes the base fee unless we pay a gas price.
-							GasPrice: (*hexutil.Big)(gasPrice),
-						},
-						rpc.LatestBlockNumber,
-					},
-					want: logger.ExecutionResult{
-						StructLogs: wantBaseFeeTxResult.StructLogs,
-					},
-					// A call consumes different gas to the transaction above.
-					extraCmpOpts: cmp.Options{
-						cmpopts.IgnoreFields(logger.ExecutionResult{}, "Gas"),
-					},
-				},
+				rpc.LatestBlockNumber,
 			},
-			cmpBaseFeeLOG1,
-			// Return values belong to the hook subtest, and the precompile's
-			// transaction has no structured logs to compare.
-			cmpopts.IgnoreFields(logger.ExecutionResult{}, "ReturnValue"),
-			cmpopts.EquateEmpty(),
-		)...)
+			want: logger.ExecutionResult{
+				StructLogs: wantBaseFeeTxResult.StructLogs,
+			},
+			// A call consumes different gas to the transaction above.
+			extraCmpOpts: cmp.Options{
+				cmpopts.IgnoreFields(logger.ExecutionResult{}, "Gas"),
+			},
+		},
+	}
+
+	t.Run("executed_base_fee", func(t *testing.T) {
+		tests := append(append([]rpcTest{}, baseFeeTests...), baseFeeLatestTests...)
+		sut.testRPC(ctx, t, withCmpOpts(tests, baseFeeCmpOpts...)...)
 	})
 
 	// wantBlockHash returns the results of tracing the block, ech frame should
@@ -576,6 +592,21 @@ func TestDebugTrace(t *testing.T) {
 				want: "ok",
 			},
 		}...)
+	})
+
+	// Runs last: settling b evicts it from VM memory, which the subtests above
+	// rely on not having happened. Restored from disk, b's header carries only
+	// the worst-case fee bound, so these still pin the executed base fee.
+	t.Run("block_on_disk", func(t *testing.T) {
+		clock.AdvanceToSettle(ctx, t, b)
+		for range 2 {
+			bb := sut.runConsensusLoop(t)
+			clock.AdvanceToSettle(ctx, t, bb)
+		}
+		_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
+		require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
+
+		sut.testRPC(ctx, t, withCmpOpts(baseFeeTests, baseFeeCmpOpts...)...)
 	})
 }
 
