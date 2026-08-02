@@ -19,7 +19,7 @@
   - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
   - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest enqueued block.
   - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest enqueued block.
+  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess predicted for once the latest enqueued block has consumed all of the gas it committed to.
   - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
   - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
 - Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.

@@ -290,8 +290,8 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // database, thus they are extracted from the header.
 func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
-	// [Block.MarkExecuted], as provided by [Block.WorstCaseGasTime].
-	execTime, err := b.WorstCaseGasTime(hooks)
+	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
+	execTime, err := b.synchronousGasTime(hooks)
 	if err != nil {
 		return nil, err
 	}
@@ -308,9 +308,11 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 	return e, nil
 }
 
-// WorstCaseGasTime reconstructs the worst-case gas time that the block
-// committed to, from its base fee and the gas config after the block.
-func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
+// synchronousGasTime derives the gas time of a synchronous block, which has no
+// predecessor clock to advance, from its base fee and the gas config after the
+// block. The excess is recovered by inverting the price curve, so it is only an
+// approximation of the excess that would have produced the base fee.
+func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	hdr := b.Header()
 	target, cfg := hooks.GasConfigAfter(hdr)
 	return gastime.New(
