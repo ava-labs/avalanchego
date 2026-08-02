@@ -308,10 +308,9 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 	return e, nil
 }
 
-// synchronousGasTime derives the gas time of a synchronous block, which has no
-// predecessor clock to advance, from its base fee and the gas config after the
-// block. The excess is recovered by inverting the price curve, so it is only an
-// approximation of the excess that would have produced the base fee.
+// synchronousGasTime derives the gas time of a synchronous block. The excess is
+// recovered by inverting the price curve, so it is only an approximation of the
+// excess that would have produced the base fee.
 func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	hdr := b.Header()
 	target, cfg := hooks.GasConfigAfter(hdr)
