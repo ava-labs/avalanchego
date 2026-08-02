@@ -23,46 +23,42 @@ var executeBlockBuckets = prometheus.ExponentialBuckets(500*time.Microsecond.Sec
 type metrics struct {
 	lastExecutedHeight prometheus.Gauge
 
-	// queueDuration tracks a block's entire lifetime from acceptance into the
-	// queue until its execution completes, so executeBlockDuration is a subset
-	// of it: queueDuration = time spent in the queue + executeBlockDuration.
+	// queueDuration spans acceptance until execution completes, so it contains
+	// executeBlockDuration.
 	queueDuration        prometheus.Histogram
 	executeBlockDuration prometheus.Histogram
 
-	// executionQueueBlocks and executionQueueGasLimit track outstanding work:
-	// blocks accepted but not yet executed (including the one being executed),
-	// and the sum of their transaction gas limits.
+	// Blocks accepted but not yet executed, including the one executing, and
+	// the worst-case gas they may be charged.
 	executionQueueBlocks   prometheus.Gauge
 	executionQueueGasLimit prometheus.Gauge
 
-	// executedGasCharged is the gas charged for executed blocks: transaction
-	// gas used plus end-of-block operation gas. It is not the eth gas used.
-	// executedGasLimit is the sum of the transaction gas limits (worst-case
-	// gas) of those same blocks.
+	// executedGasCharged is the gas that executed blocks consumed, transactions
+	// plus end-of-block ops. executedGasLimit is the worst-case gas they could
+	// have been charged, which is what an SAE header reports as its gas used.
 	executedGasCharged prometheus.Counter
 	executedGasLimit   prometheus.Counter
 
-	// acceptedGasLimit is the sum of the transaction gas limits (worst-case
-	// gas) of blocks entering the execution queue, the acceptance-side
-	// counterpart of executedGasLimit.
+	// acceptedGasLimit is the acceptance-side counterpart of executedGasLimit.
 	acceptedGasLimit prometheus.Counter
 
-	// lastExecutedGasTime is the gas time reached by the latest executed
-	// block; gasTimeWallTimeGap is its gap to the wall time at execution
-	// completion.
+	// lastExecutedGasTime is the latest executed block's gas time.
+	// gasTimeWallTimeGap is its gap to wall time.
 	lastExecutedGasTime prometheus.Gauge
 	gasTimeWallTimeGap  prometheus.Gauge
 
-	// worstCaseBaseFee is the base fee that consensus admitted for the latest
-	// enqueued block, while worstCaseGasExcess is the excess predicted for once
-	// that block has consumed all of the gas it committed to. executed* are the
-	// values realized by execution. gasTarget has no such pair because
-	// execution never moves it.
-	worstCaseBaseFee   prometheus.Gauge
-	executedBaseFee    prometheus.Gauge
+	// worstCaseBaseFee is the base fee consensus required for the latest
+	// enqueued block. executedBaseFee is the fee the executor actually charged.
+	worstCaseBaseFee prometheus.Gauge
+	executedBaseFee  prometheus.Gauge
+
+	// worstCaseGasExcess is the excess after simulating the latest enqueued
+	// block. executedGasExcess is the excess execution actually realized.
 	worstCaseGasExcess prometheus.Gauge
 	executedGasExcess  prometheus.Gauge
-	gasTarget          prometheus.Gauge
+
+	// Execution never moves the target, so there is no executed counterpart.
+	gasTarget prometheus.Gauge
 }
 
 func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics, error) {
@@ -87,7 +83,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		executionQueueGasLimit: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "execution_queue_gas_limit",
-			Help: "Sum of the transaction gas limits of accepted blocks that have not yet completed execution.",
+			Help: "Worst-case gas committed to by accepted blocks that have not yet completed execution.",
 		}),
 		executedGasCharged: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_charged_total",
@@ -95,11 +91,11 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_limit_total",
-			Help: "Cumulative sum of the transaction gas limits (worst-case gas) of executed blocks.",
+			Help: "Cumulative worst-case gas committed to by executed blocks.",
 		}),
 		acceptedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "accepted_gas_limit_total",
-			Help: "Cumulative sum of the transaction gas limits (worst-case gas) of blocks accepted into the execution queue.",
+			Help: "Cumulative worst-case gas committed to by blocks accepted into the execution queue.",
 		}),
 		lastExecutedGasTime: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_executed_gas_time_seconds",
@@ -131,9 +127,8 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 	}
 
-	// Seed the gauges from the last-executed block so startup and steady state
-	// report the same signals. Nothing is queued yet, so the worst case is the
-	// executed value, which is also where the worst-case state starts its clock.
+	// Seed the gauges so startup and steady state report the same signals.
+	// Nothing is queued yet, so the worst case is the executed value.
 	executed := lastExecuted.ExecutedByGasTime()
 	m.lastExecutedHeight.Set(float64(lastExecuted.Height()))
 	m.worstCaseBaseFee.Set(float64(executed.Price()))
@@ -175,17 +170,16 @@ func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.executionQueueGasLimit.Add(worstCaseGas)
 	m.acceptedGasLimit.Add(worstCaseGas)
 
-	// Blocks accepted while bootstrapping, and those replayed during database
-	// recovery, are never predicted so there is nothing to record; the gauges
-	// keep their last value.
+	// Blocks accepted while bootstrapping, and those replayed during recovery,
+	// are never predicted, so the gauges keep their last value.
 	if bounds := block.WorstCaseBounds(); bounds != nil {
 		m.worstCaseBaseFee.Set(bounds.MaxBaseFee.Float64())
 		m.setWorstCaseGasTime(bounds.LatestEndTime)
 	}
 }
 
-// setWorstCaseGasTime records the gas-time state predicted for once the most
-// recently enqueued block has consumed all of the gas it committed to.
+// setWorstCaseGasTime records the gas time expected once the block has consumed
+// everything it committed to.
 func (m *metrics) setWorstCaseGasTime(latestEnd *gastime.Time) {
 	m.worstCaseGasExcess.Set(float64(latestEnd.Excess()))
 	m.gasTarget.Set(float64(latestEnd.Target()))
