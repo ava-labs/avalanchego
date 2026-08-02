@@ -135,6 +135,8 @@ func (r *testRouter) waitForMapCalls(t *testing.T, n int) {
 }
 
 func TestRetryMapPort(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		mapPortErrs  []error
@@ -162,6 +164,8 @@ func TestRetryMapPort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require := require.New(t)
 
 			router := newTestRouter(true, tt.mapPortErrs...)
@@ -175,6 +179,8 @@ func TestRetryMapPort(t *testing.T) {
 }
 
 func TestMapperMapSkipsUnsupportedNAT(t *testing.T) {
+	t.Parallel()
+
 	require := require.New(t)
 
 	router := newTestRouter(false)
@@ -188,6 +194,8 @@ func TestMapperMapSkipsUnsupportedNAT(t *testing.T) {
 }
 
 func TestMapperMapAndUnmapOnClose(t *testing.T) {
+	t.Parallel()
+
 	require := require.New(t)
 
 	router := newTestRouter(true)
@@ -205,6 +213,8 @@ func TestMapperMapAndUnmapOnClose(t *testing.T) {
 }
 
 func TestMapperRenewsMapping(t *testing.T) {
+	t.Parallel()
+
 	require := require.New(t)
 
 	router := newTestRouter(true)
@@ -236,6 +246,8 @@ func TestMapperRenewsMapping(t *testing.T) {
 }
 
 func TestUpdateIP(t *testing.T) {
+	t.Parallel()
+
 	initial := netip.AddrPortFrom(netip.MustParseAddr("1.2.3.4"), testIntPort)
 
 	tests := []struct {
@@ -262,6 +274,8 @@ func TestUpdateIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require := require.New(t)
 
 			router := newTestRouter(true)
@@ -277,6 +291,8 @@ func TestUpdateIP(t *testing.T) {
 }
 
 func TestUpdateIPNil(t *testing.T) {
+	t.Parallel()
+
 	require := require.New(t)
 
 	router := newTestRouter(true)
