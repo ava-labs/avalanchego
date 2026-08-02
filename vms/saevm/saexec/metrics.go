@@ -39,18 +39,20 @@ type metrics struct {
 
 	// executionQueueBlocks and executionQueueGasLimit track outstanding work:
 	// blocks accepted but not yet executed (including the one being executed),
-	// and the sum of their gas limits.
+	// and the sum of their transaction gas limits.
 	executionQueueBlocks   prometheus.Gauge
 	executionQueueGasLimit prometheus.Gauge
 
 	// executedGasCharged is the gas charged for executed blocks: transaction
 	// gas used plus end-of-block operation gas. It is not the eth gas used.
-	// executedGasLimit is the gas limit (worst-case gas) of those same blocks.
+	// executedGasLimit is the sum of the transaction gas limits (worst-case
+	// gas) of those same blocks.
 	executedGasCharged prometheus.Counter
 	executedGasLimit   prometheus.Counter
 
-	// acceptedGasLimit is the gas limit (worst-case gas) of blocks entering
-	// the execution queue, the acceptance-side counterpart of executedGasLimit.
+	// acceptedGasLimit is the sum of the transaction gas limits (worst-case
+	// gas) of blocks entering the execution queue, the acceptance-side
+	// counterpart of executedGasLimit.
 	acceptedGasLimit prometheus.Counter
 
 	// lastExecutedGasTime is the gas time reached by the latest executed
@@ -93,7 +95,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 		}),
 		executionQueueGasLimit: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "execution_queue_gas_limit",
-			Help: "Sum of the gas limits of accepted blocks that have not yet completed execution.",
+			Help: "Sum of the transaction gas limits of accepted blocks that have not yet completed execution.",
 		}),
 		executedGasCharged: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_charged_total",
@@ -101,11 +103,11 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block, hooks hoo
 		}),
 		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_limit_total",
-			Help: "Cumulative gas limit (worst-case gas) of executed blocks.",
+			Help: "Cumulative sum of the transaction gas limits (worst-case gas) of executed blocks.",
 		}),
 		acceptedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "accepted_gas_limit_total",
-			Help: "Cumulative gas limit (worst-case gas) of blocks accepted into the execution queue.",
+			Help: "Cumulative sum of the transaction gas limits (worst-case gas) of blocks accepted into the execution queue.",
 		}),
 		lastExecutedGasTime: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_executed_gas_time_seconds",
@@ -177,10 +179,10 @@ func (m *metrics) observeExecuteDuration(d time.Duration) {
 // markEnqueued records that the block has been accepted into the execution
 // queue.
 func (m *metrics) markEnqueued(block *blocks.Block) {
-	gasLimit := float64(block.EthBlock().GasLimit())
+	worstCaseGas := float64(block.EthBlock().GasUsed())
 	m.executionQueueBlocks.Inc()
-	m.executionQueueGasLimit.Add(gasLimit)
-	m.acceptedGasLimit.Add(gasLimit)
+	m.executionQueueGasLimit.Add(worstCaseGas)
+	m.acceptedGasLimit.Add(worstCaseGas)
 
 	worstCase, err := block.WorstCaseGasTime(m.hooks)
 	if err != nil {
@@ -205,12 +207,12 @@ func (m *metrics) setWorstCasePricing(worstCase *gastime.Time) {
 // markExecuted records that the block has finished executing with the given
 // results.
 func (m *metrics) markExecuted(b *types.Block, results *ExecutionResults) {
-	gasLimit := float64(b.GasLimit())
+	worstCaseGas := float64(b.GasUsed())
 	m.lastExecutedHeight.Set(float64(b.NumberU64()))
 	m.executionQueueBlocks.Dec()
-	m.executionQueueGasLimit.Sub(gasLimit)
+	m.executionQueueGasLimit.Sub(worstCaseGas)
 	m.executedGasCharged.Add(float64(results.GasConsumed))
-	m.executedGasLimit.Add(gasLimit)
+	m.executedGasLimit.Add(worstCaseGas)
 	m.setExecutedGasTime(results.FinishBy.Gas, results.FinishBy.Wall)
 }
 
