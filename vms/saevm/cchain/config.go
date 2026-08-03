@@ -57,7 +57,8 @@ type config struct {
 	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
-	BatchRequestLimit uint64 `json:"batch-request-limit"`
+	BatchRequestLimit            uint64 `json:"batch-request-limit"`
+	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`
@@ -80,13 +81,14 @@ type config struct {
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	return config{
-		Pruning:            true,
-		CommitInterval:     saedb.DefaultCommitInterval,
-		TrieCleanCache:     saedb.DefaultTrieCacheSizeMiB,
-		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
-		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
-		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
-		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
+		Pruning:                      true,
+		CommitInterval:               saedb.DefaultCommitInterval,
+		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
+		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
+		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
+		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
+		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
+		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
 	}
 }
 
@@ -135,8 +137,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
-			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
-			BatchRequestLimit:   c.BatchRequestLimit,
+			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
+			BatchRequestLimit:            c.BatchRequestLimit,
+			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,
 	}

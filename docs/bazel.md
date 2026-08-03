@@ -713,10 +713,24 @@ directory and macOS SDK and writes those values to `.bazelrc.local`.
 The script can also be run directly and is invoked automatically by
 direnv.
 
+Both entrypoints run inside the nix dev shell, whose `DEVELOPER_DIR`
+and `SDKROOT` would make `xcode-select` and `xcrun` report nix's SDK.
+The script clears them and calls those binaries by absolute path, so a
+hand-exported `DEVELOPER_DIR` is ignored — use `sudo xcode-select -s`.
+
 When invoked by direnv, generation is best-effort: failures are shown
 as warnings during shell entry but do not prevent entering the repo.
 When run directly, the script exits non-zero on discovery failures so
 manual setup problems remain actionable.
+
+### The macOS C compiler
+
+`.bazelrc` pins `--repo_env=CC=/usr/bin/clang`. Bazel resolves the
+compiler from `CC` in the client environment, which in the nix dev
+shell is nix's clang wrapper; that wrapper takes its sysroot from
+`NIX_CFLAGS_COMPILE`, which Bazel strips from action environments,
+failing the cgo stdlib build on a missing `resolv.h`. `DEVELOPER_DIR`
+and `SDKROOT` do not help — they select an SDK, not a compiler.
 
 ## Adding a New Go Module
 
