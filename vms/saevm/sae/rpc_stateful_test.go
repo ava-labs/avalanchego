@@ -884,7 +884,12 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 
 	t.Run("pending_resolves_to_last_executed", func(t *testing.T) {
 		sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 2, &types.LegacyTx{
-			To:       &blocking, // Won't become last-executed
+			// The blocking precompile stops this transaction from completing,
+			// ensuring that the block doesn't become the last-executed. It
+			// does, however, increment the last-accepted block thus ensuring
+			// that the test doesn't pass erroneously by having
+			// accepted==executed.
+			To:       &blocking,
 			GasPrice: big.NewInt(1),
 			Gas:      1e6,
 		}))
