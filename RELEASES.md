@@ -7,7 +7,7 @@
 - Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
 - Added SAE execution-pressure metrics:
   - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
-  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, excluding the state commit.
+  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including the state commit and post-execution work.
   - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
   - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet completed execution, being their transaction gas limits plus end-of-block operation gas.
   - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks, transaction gas used plus end-of-block operation gas.

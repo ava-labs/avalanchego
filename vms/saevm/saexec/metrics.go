@@ -72,7 +72,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		executeBlockDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "execute_block_duration_seconds",
-			Help:    "Wall-clock time to execute a single block, excluding the state commit.",
+			Help:    "Wall-clock time to execute a single block, including the state commit and post-execution work.",
 			Buckets: executeBlockBuckets,
 		}),
 		executionQueueBlocks: prometheus.NewGauge(prometheus.GaugeOpts{
