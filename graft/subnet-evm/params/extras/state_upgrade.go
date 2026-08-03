@@ -59,14 +59,7 @@ func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
 func (s StateUpgradeAccount) equal(other StateUpgradeAccount) bool {
 	return bytes.Equal(s.Code, other.Code) &&
 		maps.Equal(s.Storage, other.Storage) &&
-		balanceChangeEqual(s.BalanceChange, other.BalanceChange)
-}
-
-func balanceChangeEqual(a, b *math.HexOrDecimal256) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return (*big.Int)(a).Cmp((*big.Int)(b)) == 0
+		utils.BigEqual((*big.Int)(s.BalanceChange), (*big.Int)(other.BalanceChange))
 }
 
 // verifyStateUpgrades checks [c.StateUpgrades] is well formed:
