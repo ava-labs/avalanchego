@@ -194,7 +194,8 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
-				"warp-off-chain-messages":["0x1234"]
+				"warp-off-chain-messages":["0x1234"],
+				"api-resolve-pending-to-last-executed":true
 			}`,
 			want: config{
 				PriceTarget:                  utils.PointerTo(gas.Price(500)),
