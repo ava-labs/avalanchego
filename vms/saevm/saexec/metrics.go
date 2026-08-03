@@ -27,14 +27,14 @@ type metrics struct {
 	queueDuration        prometheus.Histogram
 	executeBlockDuration prometheus.Histogram
 
-	// Blocks accepted but not yet executed, including the one executing, and
-	// the worst-case gas they may be charged.
+	// executionQueueBlocks are the blocks accepted but not yet executed,
+	// including the one executing. executionQueueGasLimit is the worst-case gas
+	// the blocks on the queue may be charged.
 	executionQueueBlocks   prometheus.Gauge
 	executionQueueGasLimit prometheus.Gauge
 
-	// executedGasCharged is the gas that executed blocks consumed, transactions
-	// plus end-of-block ops. executedGasLimit is the worst-case gas they could
-	// have been charged, which is what an SAE header reports as its gas used.
+	// executedGasCharged is the gas that executed blocks consumed.
+	// executedGasLimit is the worst-case gas they could have been charged.
 	executedGasCharged prometheus.Counter
 	executedGasLimit   prometheus.Counter
 
@@ -46,17 +46,16 @@ type metrics struct {
 	lastExecutedGasTime prometheus.Gauge
 	gasTimeWallTimeGap  prometheus.Gauge
 
-	// worstCaseBaseFee is the base fee consensus required for the latest
-	// enqueued block. executedBaseFee is the fee the executor actually charged.
-	worstCaseBaseFee prometheus.Gauge
-	executedBaseFee  prometheus.Gauge
-
-	// worstCaseGasExcess is the excess after simulating the latest enqueued
-	// block. executedGasExcess is the excess execution actually realized.
+	// Both pairs describe the latest executed block, so each gap is what
+	// consensus over-committed to. The base fee is measured at the start of the
+	// block, while the excess is measured at the end of the block.
+	worstCaseBaseFee   prometheus.Gauge
+	executedBaseFee    prometheus.Gauge
 	worstCaseGasExcess prometheus.Gauge
 	executedGasExcess  prometheus.Gauge
 
-	// Execution never moves the target, so there is no executed counterpart.
+	// The target exactly matches between simulation and execution, so only
+	// one value is reported.
 	gasTarget prometheus.Gauge
 }
 
@@ -73,7 +72,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		executeBlockDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "execute_block_duration_seconds",
-			Help:    "Wall-clock time to execute a single block, including state commit and post-execution work.",
+			Help:    "Wall-clock time to execute a single block, excluding the state commit.",
 			Buckets: executeBlockBuckets,
 		}),
 		executionQueueBlocks: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -82,19 +81,19 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		executionQueueGasLimit: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "execution_queue_gas_limit",
-			Help: "Sum of the transaction gas limits in accepted blocks that have not yet completed execution.",
+			Help: "Worst-case gas of accepted blocks that have not yet completed execution.",
 		}),
 		executedGasCharged: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_charged_total",
-			Help: "Cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas); this is not the eth gas used.",
+			Help: "Cumulative gas charged by executed blocks, transaction gas used plus end-of-block operation gas.",
 		}),
 		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_limit_total",
-			Help: "Cumulative transaction gas limits in executed blocks.",
+			Help: "Cumulative worst-case gas of executed blocks, transaction gas limits plus end-of-block operation gas.",
 		}),
 		acceptedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "accepted_gas_limit_total",
-			Help: "Cumulative transaction gas limits in accepted blocks.",
+			Help: "Cumulative worst-case gas of blocks accepted into the execution queue.",
 		}),
 		lastExecutedGasTime: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_executed_gas_time_seconds",
@@ -106,7 +105,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		worstCaseBaseFee: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "worst_case_base_fee",
-			Help: "Worst-case base fee admitted by consensus for the latest enqueued block.",
+			Help: "Worst-case base fee admitted by consensus for the latest executed block.",
 		}),
 		executedBaseFee: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "executed_base_fee",
@@ -114,7 +113,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		worstCaseGasExcess: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "worst_case_gas_excess",
-			Help: "Worst-case gas excess simulated for the latest enqueued block.",
+			Help: "Worst-case gas excess simulated for the latest executed block.",
 		}),
 		executedGasExcess: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "executed_gas_excess",
@@ -122,7 +121,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 		}),
 		gasTarget: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "gas_target",
-			Help: "ACP-176 gas target in force as of the latest enqueued block.",
+			Help: "ACP-176 gas target in force as of the latest executed block.",
 		}),
 	}
 
@@ -164,11 +163,10 @@ func (m *metrics) observeQueueDuration(d time.Duration) {
 // markExecuted records that the block has finished executing with the given
 // results.
 func (m *metrics) markExecuted(block *blocks.Block, results *ExecutionResults) {
-	m.executeBlockDuration.Observe(results.Consumed.Time.Seconds())
 	m.executionQueueBlocks.Dec()
 	worstCaseGas := float64(block.EthBlock().GasUsed())
 	m.executionQueueGasLimit.Sub(worstCaseGas)
-	m.executedGasCharged.Add(float64(results.Consumed.Gas))
+	m.executedGasCharged.Add(float64(results.GasConsumed))
 	m.executedGasLimit.Add(worstCaseGas)
 	m.setExecuted(block)
 }
@@ -193,4 +191,8 @@ func (m *metrics) setExecuted(block *blocks.Block) {
 	}
 	m.executedGasExcess.Set(float64(gasTime.Excess()))
 	m.gasTarget.Set(float64(gasTime.Target()))
+}
+
+func (m *metrics) observeExecuteDuration(d time.Duration) {
+	m.executeBlockDuration.Observe(d.Seconds())
 }
