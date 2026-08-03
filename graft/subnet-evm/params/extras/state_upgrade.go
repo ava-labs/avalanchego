@@ -4,13 +4,17 @@
 package extras
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
+	"maps"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -38,8 +42,31 @@ type StateUpgradeAccount struct {
 	BalanceChange *math.HexOrDecimal256       `json:"balanceChange,omitempty"`
 }
 
+// Equal reports whether s and other describe the same state modifications.
+// It must treat a config as equal to its own JSON round-trip, since the copy
+// persisted by WriteChainConfig is compared against a fresh parse of the
+// upgrade bytes on every startup: nil and empty code/storage are equivalent
+// (matching their len/range handling in stateupgrade.Configure), and balance
+// changes are compared by value regardless of hex or decimal representation.
 func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
-	return reflect.DeepEqual(s, other)
+	if s == nil || other == nil {
+		return s == other
+	}
+	return utils.Uint64PtrEqual(s.BlockTimestamp, other.BlockTimestamp) &&
+		maps.EqualFunc(s.StateUpgradeAccounts, other.StateUpgradeAccounts, StateUpgradeAccount.equal)
+}
+
+func (s StateUpgradeAccount) equal(other StateUpgradeAccount) bool {
+	return bytes.Equal(s.Code, other.Code) &&
+		maps.Equal(s.Storage, other.Storage) &&
+		balanceChangeEqual(s.BalanceChange, other.BalanceChange)
+}
+
+func balanceChangeEqual(a, b *math.HexOrDecimal256) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return (*big.Int)(a).Cmp((*big.Int)(b)) == 0
 }
 
 // verifyStateUpgrades checks [c.StateUpgrades] is well formed:
