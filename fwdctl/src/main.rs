@@ -16,6 +16,7 @@ pub mod get;
 pub mod graph;
 pub mod import;
 pub mod insert;
+pub mod key;
 #[cfg(feature = "launch")]
 pub mod launch;
 pub mod replay;

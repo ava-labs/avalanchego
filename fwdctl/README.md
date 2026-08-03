@@ -24,6 +24,37 @@ To use
 * `fwdctl dump`: Dump the contents of the key/value store.
 * `fwdctl launch` (requires `--features launch`): Launch and manage AWS benchmark runs.
 
+## Key input modes
+
+The `get`, `insert`, and `delete` commands accept UTF-8 or hexadecimal keys.
+Build with the `ethhash` feature to also derive Firewood keys from Ethereum
+inputs:
+
+```sh
+cargo build --release --bin fwdctl --features ethhash
+```
+
+The `get`, `insert`, and `delete` commands accept the following key modes:
+
+* With no key option, `KEY` remains a UTF-8 string, preserving the default
+  behavior.
+* `--hex` decodes `KEY` as hexadecimal bytes. This mode is available in both
+  default and `ethhash` builds.
+* `--account` decodes `KEY` as an Ethereum address (exactly 20 bytes of hex) and
+  uses `keccak256(address)` as the database key.
+* `--storage SLOT` decodes `KEY` as a 20-byte Ethereum address and `SLOT` as a
+  32-byte storage key, then uses
+  `keccak256(address) || keccak256(slot)` as the database key.
+
+Hex inputs may start with `0x`. For example:
+
+```sh
+fwdctl get --hex 79656172
+fwdctl get --account 0x00112233445566778899aabbccddeeff00112233
+fwdctl get --storage 0x0000000000000000000000000000000000000000000000000000000000000001 \
+  0x00112233445566778899aabbccddeeff00112233
+```
+
 ## Launch command
 
 `fwdctl launch` provisions and manages EC2 instances for benchmark workflows.

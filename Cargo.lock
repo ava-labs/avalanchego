@@ -1913,6 +1913,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha3",
  "tempfile",
  "thiserror",
  "tokio",

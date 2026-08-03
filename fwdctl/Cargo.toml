@@ -32,6 +32,7 @@ firewood-storage.workspace = true
 hex.workspace = true
 log.workspace = true
 nonzero_ext.workspace = true
+sha3 = { workspace = true, optional = true }
 # Regular dependencies
 csv = "1.4.0"
 humantime = "2.4.0"
@@ -53,7 +54,7 @@ thiserror = { version = "2.0", optional = true }
 tokio = { version = "1.52", features = ["rt-multi-thread", "sync", "time"], optional = true }
 
 [features]
-ethhash = ["firewood/ethhash"]
+ethhash = ["firewood/ethhash", "dep:sha3"]
 logger = ["firewood/logger"]
 launch = [
     "dep:aws-config",

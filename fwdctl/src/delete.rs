@@ -5,20 +5,21 @@ use clap::Args;
 use firewood::api::{self, Db as _, Proposal as _};
 use firewood::db::{BatchOp, Db, DbConfig};
 
-use crate::DatabasePath;
+use crate::{DatabasePath, key::KeyArgument};
 
 #[derive(Debug, Args)]
 pub struct Options {
     #[command(flatten)]
     pub database: DatabasePath,
 
-    /// The key to delete
-    #[arg(required = true, value_name = "KEY", help = "Key to delete")]
-    pub key: String,
+    #[command(flatten)]
+    pub key: KeyArgument,
 }
 
 pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("deleting key {opts:?}");
+    let key = opts.key.database_key()?;
+    let hex_key = hex::encode(&key);
     let cfg = DbConfig::builder()
         .node_hash_algorithm(opts.database.node_hash_algorithm.into())
         .create_if_missing(false)
@@ -26,12 +27,10 @@ pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
 
     let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
 
-    let batch: Vec<BatchOp<String, String>> = vec![BatchOp::Delete {
-        key: opts.key.clone(),
-    }];
+    let batch: Vec<BatchOp<Vec<u8>, Vec<u8>>> = vec![BatchOp::Delete { key }];
     let proposal = db.propose(batch)?;
     proposal.commit()?;
 
-    println!("key {} deleted successfully", opts.key);
+    println!("key 0x{hex_key} deleted successfully");
     db.close()
 }
