@@ -47,9 +47,10 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
+		settled: hook.Settled{Height: 1},
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, hook.Settled{})
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
@@ -58,6 +59,15 @@ type ethBlockProperties struct {
 	header   *types.Header
 	receipts types.Receipts
 	ops      []hookstest.Op
+	settled  hook.Settled
+}
+
+// WithSettled overrides the settlement information committed by [NewEthBlock].
+// The zero value makes the block synchronous (pre-SAE).
+func WithSettled(s hook.Settled) EthBlockOption {
+	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
+		p.settled = s
+	})
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by

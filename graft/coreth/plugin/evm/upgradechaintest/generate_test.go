@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/tracers"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
@@ -148,10 +147,9 @@ func generate(t *testing.T) *Fixture {
 		// fixture, is deterministic.
 		warpValidators: warptest.NewValidators(t, warptest.WithSigners(blsSigner(t, 1), blsSigner(t, 2))),
 		fixture: &Fixture{
-			Genesis:    json.RawMessage(genesisJSON),
-			Upgrades:   upgrades,
-			Counter:    crypto.CreateAddress(vmtest.TestEthAddrs[0], 0), // the counter contract, deployed in block 1
-			ANTAssetID: antAssetID,
+			Genesis:  json.RawMessage(genesisJSON),
+			Upgrades: upgrades,
+			Counter:  crypto.CreateAddress(vmtest.TestEthAddrs[0], 0), // the counter contract, deployed in block 1
 		},
 	}
 
@@ -260,7 +258,6 @@ func (g *generator) setClock(now time.Time) {
 // coinbase is watched because coreth burns fees by crediting it, a write that
 // replaying consumers MUST reproduce to reach the recorded roots.
 func (g *generator) watchedState(statedb *state.StateDB) map[common.Address]AccountState {
-	multicoin := extstate.New(statedb)
 	accounts := make(map[common.Address]AccountState)
 	for _, addr := range []common.Address{
 		vmtest.TestEthAddrs[0],
@@ -270,9 +267,8 @@ func (g *generator) watchedState(statedb *state.StateDB) map[common.Address]Acco
 		evmconstants.BlackholeAddr,
 	} {
 		accounts[addr] = AccountState{
-			Balance:    (*hexutil.Big)(statedb.GetBalance(addr).ToBig()),
-			Nonce:      statedb.GetNonce(addr),
-			ANTBalance: (*hexutil.Big)(multicoin.GetBalanceMultiCoin(addr, common.Hash(antAssetID))),
+			Balance: (*hexutil.Big)(statedb.GetBalance(addr).ToBig()),
+			Nonce:   statedb.GetNonce(addr),
 		}
 	}
 	return accounts

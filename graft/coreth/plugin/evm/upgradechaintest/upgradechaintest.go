@@ -30,7 +30,6 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -42,9 +41,6 @@ type Fixture struct {
 	// Upgrades is the [upgrade.Config] the chain was generated with.
 	// Upgrades after the tip's (Helicon onwards) are unscheduled.
 	Upgrades upgrade.Config `json:"upgrades"`
-	// ANTAssetID is the Avalanche-native-token asset ID imported in block 6
-	// and moved by the fixture's nativeAssetCall transactions.
-	ANTAssetID ids.ID `json:"antAssetID"`
 	// Counter is the address of the fixture's counter contract, deployed in
 	// block 1. A transaction (or eth_call) with empty call data increments
 	// its storage slot 0; non-empty call data returns the slot's value as a
@@ -148,8 +144,6 @@ func (b Block) HasNativeAssetCall() bool {
 type AccountState struct {
 	Balance *hexutil.Big `json:"balance"`
 	Nonce   uint64       `json:"nonce"`
-	// ANTBalance is the account's multicoin balance of [Fixture.ANTAssetID].
-	ANTBalance *hexutil.Big `json:"antBalance"`
 }
 
 // Heights ([Block.Number]) of fixture blocks that consuming tests single

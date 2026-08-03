@@ -178,28 +178,12 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
 
-	// ethB's header usually carries the executed base fee already (courtesy
-	// of [tracerBackend]), but we can't guarantee that every caller goes through
-	// there, so we restore the fee ourselves. Restored by number because a faked header's
-	// hash differs from the canonical one.
-	//
-	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
-	// decodes the full block body and receipts but only the executed base fee
-	// is needed here; see the similar TODO in
-	// [backend.StateAndHeaderByNumberOrHash].
-	num := rpc.BlockNumber(ethB.NumberU64()) // #nosec G115 -- won't overflow for a while.
-	executed, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
-	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("restoring traced block: %w", err)
-	}
-
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	result, err := saexec.Execute(
 		block,
 		b,
 		txIndex,
-		executed.ExecutedBaseFee(),
 		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),
@@ -245,6 +229,9 @@ func (a *tracerAPI) TraceCall(ctx context.Context, args ethapi.TransactionArgs, 
 // TraceBlock shadows [tracers.API.TraceBlock] to replace the caller-supplied
 // block's worst-case base fee with the executed base fee before delegating.
 // The block need not be canonical, but its parent MUST be.
+//
+// A synchronous (pre-SAE) block is traced with the base fee as supplied, which
+// is the real fee paid by its transactions.
 func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *tracers.TraceConfig) ([]*tracers.TxTraceResult, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(blob, block); err != nil {
@@ -254,17 +241,21 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 		return nil, errors.New("genesis is not traceable") // Copied from [tracers.TraceBlock]
 	}
 
-	parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
-	if err != nil {
-		return nil, fmt.Errorf("restoring parent block: %w", err)
+	// A synchronous (pre-SAE) block carries the base fee its transactions
+	// actually paid, so it is traced as supplied.
+	resealed := block
+	if hdr := block.Header(); !hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
+		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
+		if err != nil {
+			return nil, fmt.Errorf("restoring parent block: %w", err)
+		}
+		// The parent's gas clock, advanced to the start of the block,
+		// determines the executed base fee, so the supplied one is discarded.
+		gasClock := parent.ExecutedByGasTime()
+		gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
+		hdr.BaseFee = gasClock.BaseFee().ToBig()
+		resealed = block.WithSeal(hdr)
 	}
-	hdr := block.Header()
-	// The parent's gas clock, advanced to the start of the block, determines
-	// the executed base fee, so the supplied one is discarded.
-	gasClock := parent.ExecutedByGasTime()
-	gasClock.BeforeBlock(a.tracerBackend.Hooks().BlockTime(hdr))
-	hdr.BaseFee = gasClock.BaseFee().ToBig()
-	resealed := block.WithSeal(hdr)
 
 	api := tracers.NewAPI(&suppliedHashBackend{
 		tracerBackend: a.tracerBackend,
