@@ -551,7 +551,7 @@ func (s *SUT) deployEscrow(tb testing.TB) common.Address {
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return crypto.CreateAddress(s.wallet.Addresses()[0], 0)
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
