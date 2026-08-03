@@ -18,14 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	_ p2p.Handler = (*Handler[*emptypb.Empty, *emptypb.Empty])(nil)
+var _ p2p.Handler = (*Handler[*emptypb.Empty, *emptypb.Empty])(nil)
 
-	errMalformedRequest = &common.AppError{
+var (
+	ErrMalformedRequest = &common.AppError{
 		Code:    p2p.ErrUnexpected.Code,
 		Message: "malformed proto request",
 	}
-	errMarshalResponse = &common.AppError{
+	ErrMarshalResponse = &common.AppError{
 		Code:    p2p.ErrUnexpected.Code,
 		Message: "failed to marshal proto response",
 	}
@@ -38,19 +38,18 @@ type ProtoMessage interface {
 	comparable
 }
 
-// Responder is the per-RPC contract behind [Handler]. Return values:
+// Responder is the per-RPC contract behind [Handler]:
 //
 //	(resp, nil) deliver resp to the peer
 //	(zero, nil) drop, no response is sent
-//	(zero, err) send err back to the peer. Return a [common.AppError] for a
-//	            request-level rejection such as an unknown block or a missing
-//	            state root. Any other error is treated as a server fault and
-//	            surfaces as [p2p.ErrUnexpected].
+//	(zero, err) a [common.AppError] reaches the peer unchanged, anything else
+//	            is a server fault the peer sees as exactly [p2p.ErrUnexpected]
 type Responder[Req, Resp ProtoMessage] interface {
 	Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, error)
 }
 
-// Handler is a typed [p2p.Handler] for one EVM-sync RPC.
+// Handler is a typed [p2p.Handler] for one EVM-sync RPC. Its own faults reuse
+// [p2p.ErrUnexpected]'s code with a distinct message, so match on code.
 type Handler[Req, Resp ProtoMessage] struct {
 	p2p.NoOpHandler
 	log       logging.Logger
@@ -58,15 +57,14 @@ type Handler[Req, Resp ProtoMessage] struct {
 	responder Responder[Req, Resp]
 }
 
-// NewHandler binds a [Responder] and a request constructor.
-func NewHandler[Req, Resp ProtoMessage](log logging.Logger, newReq func() Req, inner Responder[Req, Resp]) *Handler[Req, Resp] {
-	return &Handler[Req, Resp]{log: log, newReq: newReq, responder: inner}
+func NewHandler[Req, Resp ProtoMessage](log logging.Logger, newReq func() Req, responder Responder[Req, Resp]) *Handler[Req, Resp] {
+	return &Handler[Req, Resp]{log: log, newReq: newReq, responder: responder}
 }
 
 func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := h.newReq()
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
-		return nil, errMalformedRequest
+		return nil, ErrMalformedRequest
 	}
 
 	resp, err := h.responder.Respond(ctx, nodeID, req)
@@ -77,6 +75,7 @@ func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 		}
 		h.log.Error("sync handler server error",
 			zap.Stringer("nodeID", nodeID),
+			zap.Any("request", req),
 			zap.Error(err),
 		)
 		return nil, p2p.ErrUnexpected
@@ -90,9 +89,10 @@ func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 	if err != nil {
 		h.log.Error("failed to marshal proto response",
 			zap.Stringer("nodeID", nodeID),
+			zap.Any("request", req),
 			zap.Error(err),
 		)
-		return nil, errMarshalResponse
+		return nil, ErrMarshalResponse
 	}
 	return respBytes, nil
 }

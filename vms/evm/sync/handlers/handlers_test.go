@@ -8,7 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -20,13 +24,12 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// assertContract runs the full shell contract for one concrete RPC type pair:
-// malformed input, drop, deliver, app-error passthrough, and server-fault
-// collapse. The shell has no type-specific branches, so each RPC type is
-// expected to behave identically.
-func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func() Req, req Req, resp Resp) {
+// assertContract runs the shell contract for one RPC type pair. The shell has
+// no type-specific branches, so every RPC type must behave identically.
+func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, req Req, resp Resp) {
 	nodeID := ids.GenerateTestNodeID()
 	reqBytes := synctest.MustMarshal(t, req)
+	newReq := func() Req { return req.ProtoReflect().New().Interface().(Req) }
 
 	t.Run("malformed request", func(t *testing.T) {
 		t.Parallel()
@@ -36,8 +39,7 @@ func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func()
 
 		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, []byte{0xff, 0xff})
 		require.Nil(t, respBytes)
-		require.Equal(t, p2p.ErrUnexpected.Code, appErr.Code)
-		require.Equal(t, "malformed proto request", appErr.Message)
+		require.Equal(t, handlers.ErrMalformedRequest, appErr)
 		require.Nil(t, r.GotReq, "responder must not be invoked on malformed request")
 	})
 
@@ -50,7 +52,7 @@ func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func()
 		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
 		require.Nil(t, appErr)
 		require.Nil(t, respBytes)
-		require.Equal(t, reqBytes, synctest.MustMarshal(t, r.GotReq), "request decoded and passed to responder")
+		assert.Empty(t, cmp.Diff(req, r.GotReq, protocmp.Transform()), "cmp.Diff(request, responder request)")
 	})
 
 	t.Run("response is marshaled", func(t *testing.T) {
@@ -61,7 +63,10 @@ func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func()
 
 		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
 		require.Nil(t, appErr)
-		require.Equal(t, synctest.MustMarshal(t, resp), respBytes)
+
+		got := resp.ProtoReflect().New().Interface()
+		require.NoError(t, proto.Unmarshal(respBytes, got))
+		assert.Empty(t, cmp.Diff(resp, got, protocmp.Transform()), "cmp.Diff(response, unmarshaled response)")
 	})
 
 	t.Run("app error surfaces unchanged", func(t *testing.T) {
@@ -73,8 +78,7 @@ func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func()
 
 		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
 		require.Nil(t, respBytes)
-		require.Equal(t, requestErr.Code, appErr.Code)
-		require.Equal(t, requestErr.Message, appErr.Message)
+		require.Equal(t, requestErr, appErr)
 	})
 
 	t.Run("server fault becomes ErrUnexpected", func(t *testing.T) {
@@ -85,29 +89,25 @@ func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, newReq func()
 
 		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
 		require.Nil(t, respBytes)
-		require.Equal(t, p2p.ErrUnexpected.Code, appErr.Code)
-		require.Equal(t, p2p.ErrUnexpected.Message, appErr.Message)
+		require.Equal(t, p2p.ErrUnexpected, appErr)
 	})
 }
 
 func TestAppRequest(t *testing.T) {
 	t.Run("GetBlock", func(t *testing.T) {
 		assertContract(t,
-			func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
 			&syncpb.GetBlockRequest{Height: 7, NumParents: 2},
 			&syncpb.GetBlockResponse{Blocks: [][]byte{{0x01}}},
 		)
 	})
 	t.Run("GetCode", func(t *testing.T) {
 		assertContract(t,
-			func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} },
 			&syncpb.GetCodeRequest{Hashes: [][]byte{{0x01}}},
 			&syncpb.GetCodeResponse{Data: [][]byte{{0x02}}},
 		)
 	})
 	t.Run("GetLeaf", func(t *testing.T) {
 		assertContract(t,
-			func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
 			&syncpb.GetLeafRequest{RootHash: []byte{0x01}},
 			&syncpb.GetLeafResponse{Keys: [][]byte{{0x02}}},
 		)

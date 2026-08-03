@@ -14,24 +14,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 )
 
-// FakeResponder is a programmable [handlers.Responder] fake. It
-// returns Resp/Err and records the last request in GotReq.
+// FakeResponder is a programmable [handlers.Responder] that records the last
+// request in GotReq.
 type FakeResponder[Req, Resp handlers.ProtoMessage] struct {
 	Resp   Resp
 	Err    error
 	GotReq Req
 }
 
-// Respond implements [handlers.Responder].
-func (s *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, error) {
-	s.GotReq = req
-	return s.Resp, s.Err
+func (f *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, error) {
+	f.GotReq = req
+	return f.Resp, f.Err
 }
 
-// MustMarshal calls [proto.Marshal] on m and fails the test on error.
-func MustMarshal(t *testing.T, m proto.Message) []byte {
-	t.Helper()
-	b, err := proto.Marshal(m)
-	require.NoError(t, err)
+// MustMarshal marshals m deterministically, so the bytes are stable across
+// calls, and fails the test on error.
+func MustMarshal(tb testing.TB, m proto.Message) []byte {
+	tb.Helper()
+	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(m)
+	require.NoError(tb, err)
 	return b
 }
