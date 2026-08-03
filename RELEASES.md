@@ -76,6 +76,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 
 - `helicon-min-stake-duration` (only on local networks)
 - `min-price-target` for C-Chain
+- `api-resolve-pending-to-last-executed` for C-Chain SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
 
 ### Deprecated in C-Chain
 

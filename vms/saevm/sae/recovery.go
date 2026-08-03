@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -65,6 +65,12 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		return nil, fmt.Errorf("no height for finalized block %s", lastSettledHash)
 	}
 
+	rec.snowCtx.Log.Info(
+		"searching for state from last settled block",
+		zap.Stringer("hash", lastSettledHash),
+		zap.Uint64("height", *lastSettledHeight),
+	)
+
 	// Search for highest settled post-execution state
 	// Invariant: The state is written to disk AFTER the block is written to
 	// disk. Therefore, the state can only lag behind the block read.
@@ -88,6 +94,11 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		}
 
 		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
+			rec.snowCtx.Log.Info(
+				"found most recently executed settled block with available post-execution state",
+				zap.Stringer("hash", b.Hash()),
+				zap.Uint64("height", height),
+			)
 			return b, nil
 		}
 
@@ -99,16 +110,26 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
-		// Old nodes may have written a head fast block hash at genesis, so non-empty is
-		// not sufficient to correct missing the activation.
-		nums, _ := rawdb.ReadAllCanonicalHashes(rec.db, parent.NumberU64()+1, math.MaxUint64, math.MaxInt)
+		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		rec.snowCtx.Log.Info(
+			"finding canonical blocks",
+			zap.Stringer("parent_hash", parent.Hash()),
+			zap.Uint64("parent_height", parent.Height()),
+			zap.Stringer("last_accepted_hash", lastAcceptedHash),
+		)
 
-		for _, num := range nums {
-			b, err := rec.newCanonicalBlock(num, parent)
+		if lastAcceptedHash == (common.Hash{}) {
+			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
+			// asynchronous blocks MUST be empty.
+			return
+		}
+
+		for curr := parent; curr.Hash() != lastAcceptedHash; {
+			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
 				return
 			}
-			parent = b
+			curr = b
 		}
 	}
 }
@@ -128,6 +149,12 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 	if err := last.WaitUntilExecuted(ctx); err != nil {
 		return err
 	}
+
+	rec.snowCtx.Log.Info(
+		"executed all accepted blocks",
+		zap.Uint64("previously_executed_height", after.Height()),
+		zap.Uint64("last_accepted_height", last.Height()),
+	)
 
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.

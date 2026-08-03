@@ -198,7 +198,12 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	gasClock := parent.ExecutedByGasTime().Clone()
+	// TODO(JonathanOppenheimer): synchronous (pre-SAE) blocks carry their real
+	// base fee in the header and their parents have no gas clock. If we modify
+	// the hook.Points.SettledBy hook, we can detect them as
+	// hooks.SettledBy(header) == (hook.Settled{}) and source execution inputs
+	// from the header instead.
+	gasClock := parent.ExecutedByGasTime()
 	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
