@@ -9,10 +9,12 @@ Currently, creating an Avalanche L1 requires three separate P-Chain transactions
 
 - It is complex and requires managing and storing the [authorization credentials](https://github.com/ava-labs/avalanchego/blob/master/vms/platformvm/txs/convert_subnet_to_l1_tx.go#L46)  for the owner(s) of a subnet in a database for verification which become irrelevant after conversion.
 - In the [Builder Hub](https://docs.avax.network/console/create-l1), this three-step flow increases the number of operations DevRel must document and support. The user also has to physically create and sign all three different transactions and wait for each previous transaction to be accepted into the blockchain before building the next transaction. 
+- An L1 created from scratch doesn’t have a single source of truth for its initial simplex validator set. Currently, it is read from subnet config, which two nodes can configure differently, breaking consensus at genesis. 
 
 Therefore, a single atomic transaction provides a better user experience for builders on Avalanche, both internally and externally, by: 
 1. Eliminating the intermediary Subnet Authorization credentials step and their database.
 2. Creating an L1 in one step and signing one transaction, which minimizes the cost and friction to set up a new Simplex L1. 
+3. CreateL1Tx fixes the initial validator issue mentioned above by encoding the initial validator set on-chain, in the P-Chain genesis block for that L1, giving every node the same first validator set to build from.
 
 ![](./create_l1_tx_images/External_builder_story.png)
 
