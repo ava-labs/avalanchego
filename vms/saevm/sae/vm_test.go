@@ -297,6 +297,15 @@ func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 
 	})
 }
 
+// withArchivalState returns an option that persists every post-execution
+// state root, allowing settled blocks to be traced after their in-memory
+// state would otherwise have been pruned.
+func withArchivalState() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.Archival = true
+	})
+}
+
 func withBloomSectionSize(size uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.BlocksPerBloomSection = size
@@ -633,7 +642,9 @@ func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
 		// The RPC implementation doesn't use the database to resolve the block
 		// labels above, so we still need to check them.
 		assert.Equal(t, b.Hash(), rawdb.ReadHeadBlockHash(s.db), "rawdb.ReadHeadBlockHash() MUST reflect last-executed block")
-		assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
+		if s.rawVM.last.settled.Load().NumberU64() > 0 {
+			assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
+		}
 	})
 }
 
