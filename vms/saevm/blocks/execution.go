@@ -304,7 +304,7 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(b.headerBaseFee())
+	e.baseFee.SetUint64(b.HeaderBaseFee())
 	return e, nil
 }
 
@@ -317,15 +317,15 @@ func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	return gastime.New(
 		hooks.BlockTime(hdr),
 		target,
-		gas.Price(b.headerBaseFee()),
+		gas.Price(b.HeaderBaseFee()),
 		cfg,
 	)
 }
 
-// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee is capped at [math.MaxUint64] but any reasonable
-// implementation has a base fee much less than [math.MaxUint64].
-func (b *Block) headerBaseFee() uint64 {
+// HeaderBaseFee returns the block's base fee, as a uint64. If the base fee is
+// nil (a pre-SAE header), 0 is returned. Additionally, the base fee is capped
+// at [math.MaxUint64] which should handle all reasonably possible values.
+func (b *Block) HeaderBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
 		return 0

@@ -119,10 +119,6 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
-	start := time.Now()
-	defer func() {
-		e.metrics.observeExecuteDuration(time.Since(start))
-	}()
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
@@ -140,13 +136,16 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee     *uint256.Int
-		StateDB     *state.StateDB
-		Signer      types.Signer
-		BlockCtx    vm.BlockContext
-		Receipts    types.Receipts
-		GasConsumed gas.Gas
-		FinishBy    struct {
+		BaseFee  *uint256.Int
+		StateDB  *state.StateDB
+		Signer   types.Signer
+		BlockCtx vm.BlockContext
+		Receipts types.Receipts
+		Consumed struct {
+			Gas  gas.Gas
+			Time time.Duration
+		}
+		FinishBy struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
@@ -190,6 +189,8 @@ func Execute(
 	log logging.Logger,
 ) (*ExecutionResults, error) {
 	log.Trace("Executing block")
+
+	start := time.Now()
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -305,13 +306,14 @@ func Execute(
 	)
 
 	r := &ExecutionResults{
-		BaseFee:     baseFee,
-		StateDB:     stateDB,
-		Signer:      signer,
-		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts:    receipts,
-		GasConsumed: blockGasConsumed,
+		BaseFee:  baseFee,
+		StateDB:  stateDB,
+		Signer:   signer,
+		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts: receipts,
 	}
+	r.Consumed.Gas = blockGasConsumed
+	r.Consumed.Time = time.Since(start)
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime
 	return r, nil
@@ -341,7 +343,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.sendPostExecutionEvents(b.EthBlock(), r) // (3)
+	e.sendPostExecutionEvents(b, r) // (3)
 	return nil
 }
 

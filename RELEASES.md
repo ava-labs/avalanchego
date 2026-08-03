@@ -9,17 +9,17 @@
   - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
   - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
   - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
-  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): worst-case gas committed to by accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): sum of the transaction gas limits in accepted blocks that have not yet completed execution.
   - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
-  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative worst-case gas committed to by executed blocks.
+  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative transaction gas limits in executed blocks.
 - Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
-- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative worst-case gas committed to by blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative transaction gas limits in accepted blocks; the acceptance-side counterpart of `executed_gas_limit_total`.
 - Added SAE gas-time and pricing metrics:
   - `avalanche_{vmName}_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
   - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
   - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest enqueued block.
   - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess predicted for once the latest enqueued block has consumed all of the gas it committed to.
+  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess simulated for the latest enqueued block.
   - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
   - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest enqueued block.
 - Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
