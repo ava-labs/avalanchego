@@ -894,9 +894,10 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			Gas:      1e6,
 		}))
 
-		got, err := sut.Client.HeaderByNumber(ctx, big.NewInt(rpc.PendingBlockNumber.Int64()))
-		if want := b.Number(); err != nil || got.Number.Cmp(want) != 0 {
-			t.Errorf("%T.HeaderByNumber(%s) got (%v, %v); want (%v, nil)", sut.Client, rpc.PendingBlockNumber, got.Number, err, want)
-		}
+		sut.testRPC(ctx, t, rpcTest{
+			method: "eth_getHeaderByNumber",
+			args:   []any{rpc.PendingBlockNumber},
+			want:   b.Header(),
+		})
 	})
 }
