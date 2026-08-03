@@ -183,7 +183,10 @@ export DIRENV_LOG_FORMAT=
 ## Running tasks
 
 This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability
-of development tasks. To list available tasks:
+of development tasks. For the repo's task model and maintainer guidance, see
+[docs/tasks.md](./docs/tasks.md).
+
+To list available tasks:
 
 ```bash
 task
