@@ -346,25 +346,3 @@ func loadExecutionResults(xdb saetypes.ExecutionResults, blockNum uint64) (*exec
 	}
 	return e, nil
 }
-
-func persistedExecutionArtefact[T any](xdb saetypes.ExecutionResults, blockNum uint64, get func(*executionResults) T) (T, error) {
-	e, err := loadExecutionResults(xdb, blockNum)
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	return get(e), nil
-}
-
-// PostExecutionStateRoot returns the post-execution state root of a block,
-// without requiring a full [Block].
-func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (common.Hash, error) {
-	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).postExecutionStateRoot)
-}
-
-// ExecutionBaseFee returns the base fee after execution of the block without
-// requiring a full [Block]. It returns the base fee when the block was executed
-// (as against the worst-case prediction).
-func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
-	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
-}

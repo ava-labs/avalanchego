@@ -138,7 +138,7 @@ func TestCallDetailed(t *testing.T) {
 
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	_, escrowAddr, _ := sut.deployEscrow(t)
+	escrowAddr := sut.deployEscrow(t)
 	sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
