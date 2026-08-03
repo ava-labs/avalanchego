@@ -780,28 +780,6 @@ secp256k1), verify that:
 2. The `gazelle_override` with `build_file_generation = "off"` is set
    for packages with custom BUILD files
 
-#### Missing SDK headers on macOS (`resolv.h`)
-
-```
-GoStdlib external/rules_go+/stdlib_/pkg failed: (Exit 1)
-.../net/internal/cgotest/resstate.go:10:10: fatal error: resolv.h: No such file or directory
-```
-
-means Bazel picked a compiler with no usable sysroot — see
-[The macOS C compiler](#the-macos-c-compiler). Check which one:
-
-```bash
-grep -r 'exec ' "$(./scripts/nix_run.sh bazelisk info output_base)"/external/*local_config_cc/cc_wrapper.sh
-```
-
-If that names a `/nix/store/...` binary rather than `/usr/bin/clang`,
-something is overriding `CC`. `local_config_cc` is cached in the output
-base, so force a re-resolve after fixing it:
-
-```bash
-./scripts/nix_run.sh bazelisk sync --configure
-```
-
 ### gnark-crypto assembly errors
 
 If you see errors like:
