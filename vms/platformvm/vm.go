@@ -457,7 +457,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 	err := server.RegisterService(service, "platform")
 	return map[string]http.Handler{
-		"": server,
+		"":     server,
+		"/eth": newEthAPI(vm),
 	}, err
 }
 
