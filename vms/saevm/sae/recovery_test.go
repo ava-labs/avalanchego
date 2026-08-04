@@ -12,6 +12,7 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
@@ -75,6 +76,66 @@ func TestRecoverAfterCrash(t *testing.T) {
 		b := sut.runConsensusLoop(t)
 		require.NoErrorf(t, b.WaitUntilExecuted(sutCtx), "%T.WaitUntilExecuted()", b)
 	})
+}
+
+// TestRecoverWithBLOCKHASH restarts a VM whose accepted-but-uncommitted blocks
+// carry transactions that read historical block hashes via the BLOCKHASH
+// opcode, forcing their re-execution to look headers up through
+// [blockSources.header].
+func TestRecoverWithBLOCKHASH(t *testing.T) {
+	t.Parallel()
+
+	const (
+		commitInterval = 16
+		numBlocks      = commitInterval + 15
+	)
+
+	// A contract executing BLOCKHASH(NUMBER-2).
+	contractAddr := common.Address{'b', 'l', 'o', 'c', 'k', 'h', 'a', 's', 'h'}
+	contractCode := []byte{
+		byte(vm.PUSH1), 2,
+		byte(vm.NUMBER),
+		byte(vm.SUB),
+		byte(vm.BLOCKHASH),
+		byte(vm.POP),
+		byte(vm.STOP),
+	}
+	withContract := options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[contractAddr] = types.Account{
+			Code:    contractCode,
+			Balance: new(big.Int),
+		}
+	})
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var srcDB database.Database
+	srcHDB := saetest.NewHeightIndexDB()
+	ctx, src := newSUT(t, 1, sutOpt, withContract, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		c.logLevel = logging.Warn
+	}))
+
+	for range numBlocks {
+		vmTime.Advance(850 * time.Millisecond)
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &contractAddr,
+			Gas:       params.TxGas + 1_000,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	}
+	src.close()
+
+	newDB := saetest.CopyDB(t, srcDB)
+	// Recreating the VM replays all accepted blocks since the last trie
+	// commit, re-executing the BLOCKHASH transactions.
+	_, sut := newSUT(t, 1, sutOpt, withContract, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = newDB
+		c.logLevel = logging.Warn
+	}))
+
+	requireConsensusCriticalBlocks(t, src, sut)
 }
 
 func TestRecover(t *testing.T) {
