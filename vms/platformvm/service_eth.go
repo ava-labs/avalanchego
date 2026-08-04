@@ -66,12 +66,20 @@ const (
 )
 
 func newEthAPI(vm *VM) *ethAPI {
-	return &ethAPI{
+	a := &ethAPI{
 		vm:         vm,
 		indexDB:    prefixdb.New(ethIndexPrefix, vm.db),
 		pending:    lru.NewCache[ethcommon.Hash, ids.ID](pendingEthTxCacheSize),
 		pendingRLP: lru.NewCache[ids.ID, []byte](pendingEthTxCacheSize),
 	}
+	// Seed the index at the tip so no request can ever trigger a walk of the
+	// whole chain. Called at chain registration, under the chain lock.
+	if _, err := database.GetUInt64(a.indexDB, ethWatermarkKey); err == database.ErrNotFound {
+		if height, err := a.lastAcceptedHeight(); err == nil {
+			_ = database.PutUInt64(a.indexDB, ethWatermarkKey, height)
+		}
+	}
+	return a
 }
 
 func (a *ethAPI) chainID() *big.Int {
@@ -397,13 +405,8 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 	watermark, err := database.GetUInt64(a.indexDB, ethWatermarkKey)
 	switch {
 	case err == database.ErrNotFound:
-		// Start at the tip. Scanning all history on the first request would be
-		// an unauthenticated full-database read; this node can only be asked
-		// about txs it saw, and it sees them from now on.
-		if err := database.PutUInt64(a.indexDB, ethWatermarkKey, last); err != nil {
-			return err
-		}
-		return nil
+		// newEthAPI seeds this at the tip; only reachable if that failed.
+		return database.PutUInt64(a.indexDB, ethWatermarkKey, last)
 	case err != nil:
 		return err
 	}

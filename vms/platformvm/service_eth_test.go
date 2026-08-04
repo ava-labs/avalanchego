@@ -14,6 +14,7 @@ import (
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -306,4 +307,150 @@ func decodeABIString(t *testing.T, s string) string {
 	length := new(big.Int).SetBytes(raw[32:64]).Int64()
 	require.LessOrEqual(t, 64+length, int64(len(raw)))
 	return string(raw[64 : 64+length])
+}
+
+// An unauthenticated receipt lookup must not scan the whole chain. The
+// watermark starts at the tip on first use, so a public node cannot be made to
+// walk its entire block history under the chain lock.
+func TestEthAPIReceiptScanStartsAtTip(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	// Produce history before the API exists, as a node syncing then serving
+	// requests would.
+	bootstrap := newEthAPI(vm)
+	var key *secp256k1.PrivateKey
+	locked(vm, func() { key = fundEthKey(t, vm, 1000*units.Avax) })
+	raw := signedTransferRLP(t, vm, key, 0, ethcommon.Address(ids.GenerateTestShortID()), units.Avax, nil)
+	ethCallAPI(t, bootstrap, "eth_sendRawTransaction", raw)
+	locked(vm, func() { buildAndAccept(t, vm) })
+
+	// Wipe the index to model a node whose API has never run, then construct
+	// the API: it must seed at the tip rather than walk the chain.
+	locked(vm, func() {
+		require.NoError(bootstrap.indexDB.Delete(ethWatermarkKey))
+	})
+	var (
+		api    *ethAPI
+		height uint64
+	)
+	locked(vm, func() {
+		api = newEthAPI(vm)
+		var err error
+		height, err = api.lastAcceptedHeight()
+		require.NoError(err)
+	})
+	watermark, err := database.GetUInt64(api.indexDB, ethWatermarkKey)
+	require.NoError(err)
+	require.Equal(height, watermark, "construction must not walk history")
+
+	// Txs submitted from now on are still indexed and served.
+	raw = signedTransferRLP(t, vm, key, 1, ethcommon.Address(ids.GenerateTestShortID()), units.Avax, nil)
+	hash := ethCallAPI(t, api, "eth_sendRawTransaction", raw).(string)
+	locked(vm, func() { buildAndAccept(t, vm) })
+	require.NotNil(ethCallAPI(t, api, "eth_getTransactionReceipt", hash))
+}
+
+// A failed or spammed submission must not write to disk, or an unauthenticated
+// caller could grow the node's database without limit.
+func TestEthAPIRejectedSubmissionWritesNothing(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	api := newEthAPI(vm)
+	var key *secp256k1.PrivateKey
+	locked(vm, func() { key = fundEthKey(t, vm, 1000*units.Avax) })
+
+	countRows := func() int {
+		it := api.indexDB.NewIterator()
+		defer it.Release()
+		rows := 0
+		for it.Next() {
+			rows++
+		}
+		return rows
+	}
+	before := countRows()
+
+	// A tx to the read-only token address is rejected at admission.
+	raw := signedTransferRLP(t, vm, key, 0, ethcommon.Address(txs.EthStakedAVAXAddress), units.Avax, nil)
+	_, err := api.call(&ethRequest{
+		Method: "eth_sendRawTransaction",
+		Params: []json.RawMessage{mustJSON(t, raw)},
+	})
+	require.ErrorIs(err, txs.ErrTransferToToken)
+	require.Equal(before, countRows(), "a rejected submission persisted index rows")
+}
+
+// eth_getBalance must equal what one tx can actually spend under the selection
+// rule, so a wallet's Max button proposes a tx that executes.
+func TestEthAPIBalanceIsSpendable(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	api := newEthAPI(vm)
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	addr := ids.ShortID(key.PublicKey().EthAddress())
+
+	// MaxEthRLPTxInputs+4 equal UTXOs: only the first MaxEthRLPTxInputs of them
+	// can be spent by one tx, so that is the balance.
+	const each = units.Avax
+	locked(vm, func() {
+		for i := 0; i < txs.MaxEthRLPTxInputs+4; i++ {
+			vm.state.AddUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
+				Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: each,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
+				},
+			})
+		}
+		require.NoError(vm.state.Commit())
+	})
+
+	balance := ethCallAPI(t, api, "eth_getBalance", ethcommon.Address(addr).Hex(), "latest").(string)
+	require.Equal(navaxToWei(txs.MaxEthRLPTxInputs*each), hexToBig(t, balance))
+}
+
+// Token reads walk the staker set at most once per accepted block, so a flood
+// of balanceOf calls cannot be turned into a flood of walks.
+func TestEthAPIStakedBalanceCachedPerBlock(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	api := newEthAPI(vm)
+	addr := ids.GenerateTestShortID()
+
+	locked(vm, func() {
+		_, err := api.stakedNAVAX(&addr)
+		require.NoError(err)
+	})
+	firstBlkID := api.stakedCache.blkID
+	require.NotEqual(ids.Empty, firstBlkID)
+
+	// A second read at the same height reuses the cached walk.
+	locked(vm, func() {
+		api.stakedCache.total = 12345 // poison it: a re-walk would clear this
+		_, err := api.stakedNAVAX(nil)
+		require.NoError(err)
+	})
+	require.Equal(uint64(12345), api.stakedCache.total)
+
+	// A new block invalidates it.
+	var key *secp256k1.PrivateKey
+	locked(vm, func() { key = fundEthKey(t, vm, 100*units.Avax) })
+	raw := signedTransferRLP(t, vm, key, 0, ethcommon.Address(ids.GenerateTestShortID()), units.Avax, nil)
+	ethCallAPI(t, api, "eth_sendRawTransaction", raw)
+	locked(vm, func() {
+		buildAndAccept(t, vm)
+		_, err := api.stakedNAVAX(nil)
+		require.NoError(err)
+	})
+	require.NotEqual(firstBlkID, api.stakedCache.blkID)
+	require.NotEqual(uint64(12345), api.stakedCache.total)
 }
