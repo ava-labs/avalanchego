@@ -84,21 +84,45 @@ func (a *ethAPI) ethCall(to *ethcommon.Address, data []byte) (any, error) {
 	}
 }
 
-// stakedNAVAX sums the weight of active eth-authorized stakers, all of them
-// for a nil owner or only those whose reward owner is [owner]. Eth-authorized
-// staker txs are recognizable by declaring inputs while carrying no
-// credentials: native staker txs always carry credentials, and genesis staker
-// txs carry neither credentials nor inputs.
-// ponytail: O(current staker set) per call; maintain a running index if this
-// ever fronts real traffic.
+// stakedBalances is one block's worth of eth-authorized stake, computed in a
+// single walk of the staker set and reused by every token read at that height.
+type stakedBalances struct {
+	blkID   ids.ID
+	byOwner map[ids.ShortID]uint64
+	total   uint64
+}
+
+// stakedNAVAX returns the eth-authorized stake of [owner], or the total when
+// owner is nil. The staker-set walk happens at most once per accepted block,
+// so a flood of token reads costs one walk rather than one per request.
 func (a *ethAPI) stakedNAVAX(owner *ids.ShortID) (uint64, error) {
+	if lastAccepted := a.vm.state.GetLastAccepted(); a.stakedCache.byOwner == nil ||
+		a.stakedCache.blkID != lastAccepted {
+		balances, err := a.walkStakedBalances()
+		if err != nil {
+			return 0, err
+		}
+		balances.blkID = lastAccepted
+		a.stakedCache = balances
+	}
+	if owner == nil {
+		return a.stakedCache.total, nil
+	}
+	return a.stakedCache.byOwner[*owner], nil
+}
+
+// walkStakedBalances sums the weight of active eth-authorized stakers per
+// reward owner. Eth-authorized staker txs are recognizable by declaring inputs
+// while carrying no credentials: native staker txs always carry credentials,
+// and genesis staker txs carry neither credentials nor inputs.
+func (a *ethAPI) walkStakedBalances() (stakedBalances, error) {
+	balances := stakedBalances{byOwner: make(map[ids.ShortID]uint64)}
 	it, err := a.vm.state.GetCurrentStakerIterator()
 	if err != nil {
-		return 0, err
+		return balances, err
 	}
 	defer it.Release()
 
-	var total uint64
 	for it.Next() {
 		staker := it.Value()
 		tx, _, err := a.vm.state.GetTx(staker.TxID)
@@ -123,16 +147,13 @@ func (a *ethAPI) stakedNAVAX(owner *ids.ShortID) (uint64, error) {
 		default:
 			continue
 		}
-		if rewardsOwner == nil {
+		if rewardsOwner == nil || len(rewardsOwner.Addrs) != 1 {
 			continue
 		}
-		if owner != nil &&
-			(len(rewardsOwner.Addrs) != 1 || rewardsOwner.Addrs[0] != *owner) {
-			continue
-		}
-		total += staker.Weight
+		balances.byOwner[rewardsOwner.Addrs[0]] += staker.Weight
+		balances.total += staker.Weight
 	}
-	return total, nil
+	return balances, nil
 }
 
 // stakeLogs synthesizes the logs of an accepted eth tx: staking calls emit one

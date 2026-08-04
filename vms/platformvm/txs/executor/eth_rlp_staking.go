@@ -6,11 +6,15 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -169,4 +173,96 @@ func (e *standardTxExecutor) putEthStaker(derived *txs.Tx, staker txs.BoundedSta
 	}
 	e.state.AddTx(derived, status.Committed)
 	return e.putStakerWithTxID(txID, staker)
+}
+
+// selectEthInputs picks the UTXOs an eth tx spends: the sender's spendable
+// AVAX UTXOs ordered by amount descending, ties broken by UTXO ID ascending,
+// capped at MaxEthRLPTxInputs, accumulated until [need] is covered.
+//
+// Ordering by amount is what makes the account unbrickable. UTXO IDs are
+// grindable offline, so any ID-first order lets an attacker send the victim a
+// handful of ground low-ID dust UTXOs and permanently displace their real
+// funds from the selection window. Amount-first ordering means dust can never
+// displace value, whoever created it.
+//
+// ponytail: the scan is O(the sender's UTXO count) while complexity prices
+// MaxEthRLPTxInputs reads, because sorting by amount requires reading every
+// candidate. Bounding the scan deterministically without reintroducing
+// grindability needs an amount-ordered index, which is an ACP-level open item.
+func (e *standardTxExecutor) selectEthInputs(
+	sender ids.ShortID,
+	need uint64,
+) ([]*avax.UTXO, uint64, error) {
+	utxoIDs, err := e.state.UTXOIDs(sender.Bytes(), ids.Empty, math.MaxInt)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var (
+		chainTime  = uint64(e.state.GetTimestamp().Unix())
+		seen       = set.NewSet[ids.ID](len(utxoIDs))
+		candidates = make([]*avax.UTXO, 0, len(utxoIDs))
+	)
+	for _, utxoID := range utxoIDs {
+		// UTXOIDs may report the same UTXO twice (the diff merges its own
+		// additions into the parent's index), and consuming a duplicate would
+		// count its amount twice while deleting it once.
+		if seen.Contains(utxoID) {
+			continue
+		}
+		seen.Add(utxoID)
+
+		utxo, err := e.state.GetUTXO(utxoID)
+		if err != nil {
+			return nil, 0, err
+		}
+		if utxo.AssetID() != e.backend.Ctx.AVAXAssetID {
+			continue
+		}
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+		if out.Locktime > chainTime ||
+			out.Threshold != 1 ||
+			len(out.Addrs) != 1 ||
+			out.Addrs[0] != sender {
+			continue
+		}
+		candidates = append(candidates, utxo)
+	}
+
+	sort.Sort(byAmountThenID(candidates))
+
+	var (
+		consumed = make([]*avax.UTXO, 0, txs.MaxEthRLPTxInputs)
+		total    uint64
+	)
+	for _, utxo := range candidates {
+		if total >= need || len(consumed) == txs.MaxEthRLPTxInputs {
+			break
+		}
+		total, err = safemath.Add(total, utxo.Out.(*secp256k1fx.TransferOutput).Amt)
+		if err != nil {
+			return nil, 0, err
+		}
+		consumed = append(consumed, utxo)
+	}
+	return consumed, total, nil
+}
+
+// byAmountThenID sorts UTXOs by amount descending, then by UTXO ID ascending.
+type byAmountThenID []*avax.UTXO
+
+func (u byAmountThenID) Len() int      { return len(u) }
+func (u byAmountThenID) Swap(i, j int) { u[i], u[j] = u[j], u[i] }
+
+func (u byAmountThenID) Less(i, j int) bool {
+	iAmt := u[i].Out.(*secp256k1fx.TransferOutput).Amt
+	jAmt := u[j].Out.(*secp256k1fx.TransferOutput).Amt
+	if iAmt != jAmt {
+		return iAmt > jAmt
+	}
+	iID, jID := u[i].InputID(), u[j].InputID()
+	return iID.Compare(jID) < 0
 }

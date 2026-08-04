@@ -85,6 +85,7 @@ func padRight(b []byte) []byte {
 // newSignedEthStake signs a staking call carrying stakeNAVAX of value.
 func newSignedEthStake(
 	t *testing.T,
+	env *environment,
 	key *secp256k1.PrivateKey,
 	nonce uint64,
 	stakeNAVAX uint64,
@@ -92,7 +93,7 @@ func newSignedEthStake(
 ) *txs.Tx {
 	t.Helper()
 	return newSignedEthCall(t, key, nonce, ids.ShortID(txs.EthStakingAddress),
-		stakeNAVAX, 10*units.Avax, defaultFeeCapWei, txs.EthRLPChainID, 0, calldata)
+		stakeNAVAX, 10*units.Avax, defaultFeeCapWei, ethChainID(env), 0, calldata)
 }
 
 func newBLSKey(t *testing.T) ([]byte, []byte, *signer.ProofOfPossession) {
@@ -119,7 +120,7 @@ func TestEthRLPTxDelegate(t *testing.T) {
 	endTime := genesistest.DefaultValidatorEndTimeUnix
 	const stake = 2 * units.MilliAvax
 
-	tx := newSignedEthStake(t, key, 0, stake, delegateCalldata(nodeID, endTime))
+	tx := newSignedEthStake(t, env, key, 0, stake, delegateCalldata(nodeID, endTime))
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -148,7 +149,7 @@ func TestEthRLPTxDelegate(t *testing.T) {
 	require.NotEmpty(derived.Ins)
 
 	// Staking the same amount to the same node again is a distinct derivation.
-	tx2 := newSignedEthStake(t, key, 1, stake, delegateCalldata(nodeID, endTime))
+	tx2 := newSignedEthStake(t, env, key, 1, stake, delegateCalldata(nodeID, endTime))
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx2, onAcceptState)
 	require.NoError(err)
 }
@@ -220,7 +221,7 @@ func TestEthRLPTxDelegateRules(t *testing.T) {
 			sender := ids.ShortID(key.PublicKey().EthAddress())
 			fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
-			tx := newSignedEthStake(t, key, 0, tt.stake, tt.calldata())
+			tx := newSignedEthStake(t, env, key, 0, tt.stake, tt.calldata())
 			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 			require.ErrorIs(t, err, tt.err)
 		})
@@ -245,7 +246,7 @@ func TestEthRLPTxAddValidator(t *testing.T) {
 	const feeBips = reward.PercentDenominator / 4
 
 	calldata := addValidatorCalldata(nodeID, endTime, publicKey, pop, feeBips)
-	tx := newSignedEthStake(t, key, 0, stake, calldata)
+	tx := newSignedEthStake(t, env, key, 0, stake, calldata)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -268,7 +269,7 @@ func TestEthRLPTxAddValidator(t *testing.T) {
 	// A mismatched proof of possession is rejected.
 	otherKey, _, _ := newBLSKey(t)
 	bad := addValidatorCalldata(ids.GenerateTestNodeID(), endTime, otherKey, pop, feeBips)
-	tx = newSignedEthStake(t, key, 1, stake, bad)
+	tx = newSignedEthStake(t, env, key, 1, stake, bad)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(err, signer.ErrInvalidProofOfPossession)
 }
@@ -329,7 +330,7 @@ func TestEthRLPTxAddValidatorRules(t *testing.T) {
 
 			pk, pop := publicKeyOf(t)
 			calldata := addValidatorCalldata(ids.GenerateTestNodeID(), tt.endTime, pk, pop, tt.feeBips)
-			tx := newSignedEthStake(t, key, 0, tt.stake, calldata)
+			tx := newSignedEthStake(t, env, key, 0, tt.stake, calldata)
 			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 			require.ErrorIs(t, err, tt.err)
 		})
@@ -338,12 +339,13 @@ func TestEthRLPTxAddValidatorRules(t *testing.T) {
 
 // A plain transfer to a non-system address still rejects calldata.
 func TestEthRLPTxCalldataOnlyForSystemAddress(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
 	tx := newSignedEthCall(t, key, 0, ids.GenerateTestShortID(), units.Avax, units.Avax,
-		defaultFeeCapWei, txs.EthRLPChainID, 0, delegateCalldata(ids.GenerateTestNodeID(), 1))
-	require.ErrorIs(t, tx.Unsigned.SyntacticVerify(nil), txs.ErrNonEmptyCalldata)
+		defaultFeeCapWei, ethChainID(env), 0, delegateCalldata(ids.GenerateTestNodeID(), 1))
+	require.ErrorIs(t, tx.Unsigned.SyntacticVerify(env.ctx), txs.ErrNonEmptyCalldata)
 }
 
 func TestEthStakingAddressIsNotAnEOA(t *testing.T) {
@@ -371,7 +373,7 @@ func TestEthRLPTxDelegatorIsRewarded(t *testing.T) {
 	endTime := genesistest.DefaultValidatorEndTimeUnix
 	const stake = 2 * units.MilliAvax
 
-	tx := newSignedEthStake(t, key, 0, stake, delegateCalldata(nodeID, endTime))
+	tx := newSignedEthStake(t, env, key, 0, stake, delegateCalldata(nodeID, endTime))
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 

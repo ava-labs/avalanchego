@@ -78,7 +78,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -463,7 +463,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -537,7 +537,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -611,7 +611,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -684,7 +684,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 				"",
 				gas.Dimensions{},
 				1_000_000,
-				ids.ID{},
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -787,7 +787,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 				"",
 				gas.Dimensions{},
 				1_000_000,
-				ids.ID{},
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -858,7 +858,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -923,7 +923,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

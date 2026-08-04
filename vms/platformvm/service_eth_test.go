@@ -60,9 +60,9 @@ func fundEthKey(t *testing.T, vm *VM, amount uint64) *secp256k1.PrivateKey {
 	return key
 }
 
-func signedTransferRLP(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte) string {
+func signedTransferRLP(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte) string {
 	t.Helper()
-	chainID := big.NewInt(txs.EthRLPChainID)
+	chainID := txs.EthRLPChainID(vm.ctx.NetworkID)
 	signed := ethtypes.MustSignNewTx(
 		key.ToECDSA(),
 		ethtypes.LatestSignerForChainID(chainID),
@@ -106,7 +106,10 @@ func TestEthAPIWalletFlow(t *testing.T) {
 	recipient := ethcommon.Address(ids.GenerateTestShortID())
 
 	// Chain probes.
-	require.Equal(hexUint(txs.EthRLPChainID), ethCallAPI(t, api, "eth_chainId"))
+	require.Equal(
+		"0x"+txs.EthRLPChainID(vm.ctx.NetworkID).Text(16),
+		ethCallAPI(t, api, "eth_chainId"),
+	)
 	require.Equal("0x0", ethCallAPI(t, api, "eth_maxPriorityFeePerGas"))
 	latest := ethCallAPI(t, api, "eth_getBlockByNumber", "latest", false).(map[string]any)
 	require.Contains(latest, "baseFeePerGas") // MetaMask's EIP-1559 probe
@@ -115,7 +118,7 @@ func TestEthAPIWalletFlow(t *testing.T) {
 	require.Len(feeHistory["gasUsedRatio"], 5)
 
 	// Send a plain transfer and accept a block with it.
-	raw := signedTransferRLP(t, key, 0, recipient, 5*units.Avax, nil)
+	raw := signedTransferRLP(t, vm, key, 0, recipient, 5*units.Avax, nil)
 	txHash := ethCallAPI(t, api, "eth_sendRawTransaction", raw).(string)
 
 	// Pending: tx resolves with null block fields.
@@ -159,7 +162,7 @@ func TestEthAPIWalletFlow(t *testing.T) {
 	calldata = append(calldata, endWord...)
 
 	const stake = 4 * units.MilliAvax
-	raw = signedTransferRLP(t, key, 1, txs.EthStakingAddress, stake, calldata)
+	raw = signedTransferRLP(t, vm, key, 1, txs.EthStakingAddress, stake, calldata)
 	stakeHash := ethCallAPI(t, api, "eth_sendRawTransaction", raw).(string)
 	locked(vm, func() { buildAndAccept(t, vm) })
 
@@ -219,7 +222,7 @@ func TestEthAPIWalletFlow(t *testing.T) {
 	}, "latest"))
 
 	// A transfer to the token address is rejected at admission.
-	raw = signedTransferRLP(t, key, 2, txs.EthStakedAVAXAddress, units.Avax, nil)
+	raw = signedTransferRLP(t, vm, key, 2, txs.EthStakedAVAXAddress, units.Avax, nil)
 	_, err := api.call(&ethRequest{Method: "eth_sendRawTransaction", Params: []json.RawMessage{mustJSON(t, raw)}})
 	require.ErrorIs(err, txs.ErrTransferToToken)
 }

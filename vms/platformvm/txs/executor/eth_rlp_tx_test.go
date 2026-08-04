@@ -52,7 +52,7 @@ func newSignedEthTransfer(
 	to ids.ShortID,
 	amountNAVAX uint64,
 	gasLimit uint64,
-	chainID int64,
+	chainID *big.Int,
 	extraWei int64,
 	calldata []byte,
 ) *txs.Tx {
@@ -62,6 +62,11 @@ func newSignedEthTransfer(
 // defaultFeeCapWei covers a 1 nAVAX per gas price.
 const defaultFeeCapWei = 1_000_000_000
 
+// ethChainID is the facade chain ID of the environment's network.
+func ethChainID(env *environment) *big.Int {
+	return txs.EthRLPChainID(env.ctx.NetworkID)
+}
+
 func newSignedEthTx(
 	t *testing.T,
 	key *secp256k1.PrivateKey,
@@ -70,7 +75,7 @@ func newSignedEthTx(
 	amountNAVAX uint64,
 	gasLimit uint64,
 	feeCapWei int64,
-	chainID int64,
+	chainID *big.Int,
 	extraWei int64,
 	calldata []byte,
 ) *txs.Tx {
@@ -85,7 +90,7 @@ func newSignedEthCall(
 	amountNAVAX uint64,
 	gasLimit uint64,
 	feeCapWei int64,
-	chainID int64,
+	chainID *big.Int,
 	extraWei int64,
 	calldata []byte,
 ) *txs.Tx {
@@ -96,9 +101,9 @@ func newSignedEthCall(
 	ethTo := ethcommon.Address(to)
 	signed := ethtypes.MustSignNewTx(
 		key.ToECDSA(),
-		ethtypes.LatestSignerForChainID(big.NewInt(chainID)),
+		ethtypes.LatestSignerForChainID(chainID),
 		&ethtypes.DynamicFeeTx{
-			ChainID:   big.NewInt(chainID),
+			ChainID:   chainID,
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(0),
 			GasFeeCap: big.NewInt(feeCapWei),
@@ -149,7 +154,7 @@ func TestEthRLPTxTransfer(t *testing.T) {
 
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 10*units.Avax)
 
-	tx := newSignedEthTransfer(t, key, 0, recipient, 3*units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, recipient, 3*units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -189,7 +194,7 @@ func TestEthRLPTxNonceRule(t *testing.T) {
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
 	issue := func(nonce uint64) error {
-		tx := newSignedEthTransfer(t, key, nonce, recipient, units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+		tx := newSignedEthTransfer(t, key, nonce, recipient, units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
 		_, _, _, err := StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 		return err
 	}
@@ -228,7 +233,7 @@ func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 		}
 	}
 
-	tx := newSignedEthTransfer(t, key, 0, recipient, 7*units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, recipient, 7*units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -261,27 +266,27 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 	}{
 		{
 			name: "wrong chain ID",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, txs.EthRLPChainID+1, 0, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, new(big.Int).Add(ethChainID(env), big.NewInt(1)), 0, nil),
 			err:  txs.ErrWrongEthChainID,
 		},
 		{
 			name: "dust value",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, txs.EthRLPChainID, 1, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, ethChainID(env), 1, nil),
 			err:  txs.ErrValueDust,
 		},
 		{
 			name: "non-empty calldata",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, []byte{0x01}),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, ethChainID(env), 0, []byte{0x01}),
 			err:  txs.ErrNonEmptyCalldata,
 		},
 		{
 			name: "gas limit below fee",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 1, txs.EthRLPChainID, 0, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 1, ethChainID(env), 0, nil),
 			err:  errEthGasLimitExceeded,
 		},
 		{
 			name: "insufficient funds",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, 1000*units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, 1000*units.Avax, 10*units.Avax, ethChainID(env), 0, nil),
 			err:  errEthInsufficientFunds,
 		},
 	}
@@ -295,14 +300,15 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 
 func TestEthRLPTxSenderRecovery(t *testing.T) {
 	require := require.New(t)
+	env := newEnvironment(t, upgradetest.Latest)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 	recipient := ids.GenerateTestShortID()
 
-	tx := newSignedEthTransfer(t, key, 7, recipient, units.Avax, units.Avax, txs.EthRLPChainID, 0, nil)
+	tx := newSignedEthTransfer(t, key, 7, recipient, units.Avax, units.Avax, ethChainID(env), 0, nil)
 	unsigned := tx.Unsigned.(*txs.EthRLPTx)
-	require.NoError(unsigned.SyntacticVerify(nil))
+	require.NoError(unsigned.SyntacticVerify(env.ctx))
 	require.Equal(ids.ShortID(key.PublicKey().EthAddress()), unsigned.Sender)
 	require.Equal(recipient, unsigned.Recipient)
 	require.Equal(units.Avax, unsigned.AmountNAVAX)
@@ -317,7 +323,7 @@ func TestEthRLPTxPreHelicon(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
-	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(t, err, errHeliconUpgradeNotActive)
 }
@@ -335,13 +341,13 @@ func TestEthRLPTxFeeCapTooLow(t *testing.T) {
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
 	tx := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
-		defaultFeeCapWei, txs.EthRLPChainID, 0, nil)
+		defaultFeeCapWei, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(t, err, errEthFeeCapTooLow)
 
 	// Doubling the fee cap makes the same tx acceptable.
 	tx = newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
-		2*defaultFeeCapWei, txs.EthRLPChainID, 0, nil)
+		2*defaultFeeCapWei, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(t, err)
 }
@@ -365,7 +371,7 @@ func TestEthRLPTxInputBound(t *testing.T) {
 	}
 
 	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(),
-		txs.MaxEthRLPTxInputs*dust, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+		txs.MaxEthRLPTxInputs*dust, 10*units.Avax, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(err, errEthInsufficientFunds)
 }

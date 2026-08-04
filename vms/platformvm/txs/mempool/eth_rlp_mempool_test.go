@@ -13,11 +13,15 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
@@ -25,9 +29,14 @@ import (
 // newEthTx signs a transfer bidding feeCapWei wei per gas.
 func newEthTx(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, feeCapWei int64) *txs.Tx {
 	t.Helper()
+	return newEthTxWithFeeCap(t, key, nonce, big.NewInt(feeCapWei))
+}
+
+func newEthTxWithFeeCap(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, feeCap *big.Int) *txs.Tx {
+	t.Helper()
 
 	to := ethcommon.Address(ids.GenerateTestShortID())
-	chainID := big.NewInt(txs.EthRLPChainID)
+	chainID := txs.EthRLPChainID(testCtx(t).NetworkID)
 	signed := ethtypes.MustSignNewTx(
 		key.ToECDSA(),
 		ethtypes.LatestSignerForChainID(chainID),
@@ -35,7 +44,7 @@ func newEthTx(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, feeCapWei i
 			ChainID:   chainID,
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(0),
-			GasFeeCap: big.NewInt(feeCapWei),
+			GasFeeCap: feeCap,
 			Gas:       1_000_000,
 			To:        &to,
 			Value:     big.NewInt(1e18),
@@ -49,16 +58,28 @@ func newEthTx(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, feeCapWei i
 	return tx
 }
 
-func newEthMempool(t *testing.T, gasCapacity gas.Gas) *Mempool {
+// ethTestGasPrice is the price the test mempool reports, high enough that eth
+// bids below it are not clamped.
+const ethTestGasPrice gas.Price = 1_000_000
+
+func testCtx(t *testing.T) *snow.Context {
+	t.Helper()
+	return snowtest.Context(t, snowtest.PChainID)
+}
+
+// newEthMempool builds a mempool priced at gasPriceNAVAX nAVAX per gas, which
+// is the ceiling an eth tx bid is capped to.
+func newEthMempool(t *testing.T, gasCapacity gas.Gas, gasPriceNAVAX gas.Price) *Mempool {
 	t.Helper()
 	m, err := New(
 		"",
 		gas.Dimensions{gas.Bandwidth: 1, gas.DBRead: 1, gas.DBWrite: 1, gas.Compute: 1},
 		gasCapacity,
-		snowtest.AVAXAssetID,
+		testCtx(t),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
+	m.SetGasPrice(gasPriceNAVAX)
 	return m
 }
 
@@ -66,7 +87,7 @@ func newEthMempool(t *testing.T, gasCapacity gas.Gas) *Mempool {
 // txs rather than sorting at price 0.
 func TestMempoolEthOrdering(t *testing.T) {
 	require := require.New(t)
-	m := newEthMempool(t, 1_000_000)
+	m := newEthMempool(t, 1_000_000, ethTestGasPrice)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -110,14 +131,28 @@ func TestMempoolEthOrdering(t *testing.T) {
 func TestMempoolEthEviction(t *testing.T) {
 	require := require.New(t)
 
-	// Capacity fits exactly one tx of either kind.
-	m := newEthMempool(t, 600)
-
 	cheapTx := newTxWithUTXOs(
 		ids.GenerateTestID(),
 		[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 2)},
 		1,
 	)
+
+	// Size the mempool so the cheap tx fits but adding an eth tx on top of it
+	// does not, forcing the eviction decision.
+	key0, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	probe := newEthTx(t, key0, 0, 1)
+	weights := gas.Dimensions{gas.Bandwidth: 1, gas.DBRead: 1, gas.DBWrite: 1, gas.Compute: 1}
+	cheapComplexity, err := fee.TxComplexity(cheapTx.Unsigned)
+	require.NoError(err)
+	cheapGas, err := cheapComplexity.ToGas(weights)
+	require.NoError(err)
+	ethComplexity, err := fee.TxComplexity(probe.Unsigned)
+	require.NoError(err)
+	ethGas, err := ethComplexity.ToGas(weights)
+	require.NoError(err)
+
+	m := newEthMempool(t, cheapGas+ethGas-1, ethTestGasPrice)
 	require.NoError(m.Add(cheapTx))
 	cheapWei := int64(m.txs[cheapTx.ID()].gasPrice * 1e9)
 	require.Positive(cheapWei)
@@ -144,7 +179,7 @@ func TestMempoolEthEviction(t *testing.T) {
 // below the cap (the wallet cancel path), and frees slots on removal.
 func TestMempoolEthPendingCap(t *testing.T) {
 	require := require.New(t)
-	m := newEthMempool(t, 100_000_000)
+	m := newEthMempool(t, 100_000_000, ethTestGasPrice)
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -170,4 +205,61 @@ func TestMempoolEthPendingCap(t *testing.T) {
 	// Removing one frees a slot for the capped sender.
 	m.Remove(first.ID())
 	require.NoError(m.Add(newEthTx(t, key, 100, 1e9)))
+}
+
+// An eth tx pays exactly gas times the current price, so bidding its raw fee
+// cap would be free: an absurd cap would evict every paying tx in the mempool
+// at no cost, and a cap near 2^256 would even overflow float64 ordering to
+// +Inf. The bid is therefore clamped to the current price.
+func TestMempoolEthBidIsCappedAtCurrentPrice(t *testing.T) {
+	require := require.New(t)
+
+	const price gas.Price = 5
+	m := newEthMempool(t, 100_000_000, price)
+
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+
+	// A tx bidding far above the price is metered at the price, not the bid.
+	absurd := newEthTx(t, key, 0, 1_000_000_000_000)
+	require.NoError(m.Add(absurd))
+	require.Equal(float64(price), m.txs[absurd.ID()].gasPrice)
+
+	// Even a cap that overflows float64 cannot produce an infinite bid.
+	huge := newEthTxWithFeeCap(t, key, 1, new(big.Int).Lsh(big.NewInt(1), 255))
+	require.NoError(m.Add(huge))
+	require.Equal(float64(price), m.txs[huge.ID()].gasPrice)
+
+	// A tx bidding below the price keeps its own lower bid.
+	cheap := newEthTx(t, key, 2, 2_000_000_000) // 2 nAVAX per gas, price is 5
+	require.NoError(m.Add(cheap))
+	require.Equal(2.0, m.txs[cheap.ID()].gasPrice)
+
+	// So the honest higher bidder still wins ordering.
+	gotTx, ok := m.Peek()
+	require.True(ok)
+	require.NotEqual(cheap.ID(), gotTx.ID())
+}
+
+// Credentials on an eth tx are unbounded and unpriced, so admission must reject
+// them: a padded tx would otherwise be gossiped and packed into a block that no
+// proposer can serialize.
+func TestMempoolEthRejectsCredentials(t *testing.T) {
+	require := require.New(t)
+	m := newEthMempool(t, 100_000_000, ethTestGasPrice)
+
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	honest := newEthTx(t, key, 0, 1e9)
+
+	padded := &txs.Tx{
+		Unsigned: &txs.EthRLPTx{RLP: honest.Unsigned.(*txs.EthRLPTx).RLP},
+		Creds: []verify.Verifiable{
+			&secp256k1fx.Credential{Sigs: make([][secp256k1.SignatureLen]byte, 3000)},
+		},
+	}
+	require.NoError(padded.Initialize(txs.Codec))
+
+	require.ErrorIs(m.Add(padded), ErrEthCredentials)
+	require.Zero(m.tree.Len())
 }

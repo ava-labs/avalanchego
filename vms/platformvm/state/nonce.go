@@ -68,7 +68,16 @@ func (d *Diff) SetNextNonce(addr ids.ShortID, nonce uint64) {
 // UTXOIDs merges the parent's address index with this diff's modified UTXOs so
 // the eth facade can auto-select inputs against in-flight state. Only on-chain
 // UTXOs are visible here; shared memory is never consulted.
-// ponytail: previous/limit pagination is ignored, callers pass Empty/MaxInt.
+//
+// The result may contain the same ID twice, when a UTXO exists in the parent
+// and is re-added in this diff. Callers must deduplicate: summing amounts over
+// a duplicate while deleting it once would mint AVAX.
+//
+// [previous] and [limit] are deliberately ignored. Honoring them would make
+// the returned set depend on the parent index's linkeddb insertion order, which
+// is node-local, so two nodes could select different inputs for the same tx and
+// compute different post-states: a consensus split. Callers pass Empty/MaxInt
+// and bound their own work instead.
 func (d *Diff) UTXOIDs(addr []byte, _ ids.ID, _ int) ([]ids.ID, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {

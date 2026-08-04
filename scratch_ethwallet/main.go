@@ -81,7 +81,8 @@ func main() {
 	gasPriceHex := rpcCall(ethRPC, "eth_gasPrice")
 	transferGasHex := rpcCall(ethRPC, "eth_estimateGas",
 		map[string]string{"from": sender.Hex(), "to": recipient.Hex()})
-	fmt.Printf("eth_chainId:               %s\n", rpcCall(ethRPC, "eth_chainId"))
+	fmt.Printf("eth_chainId:               %s (%d)\n",
+		rpcCall(ethRPC, "eth_chainId"), hexBig(rpcCall(ethRPC, "eth_chainId")))
 	fmt.Printf("eth_gasPrice:              %s wei per gas\n", gasPriceHex)
 	fmt.Printf("eth_estimateGas:           %s (%d gas)\n", transferGasHex, hexBig(transferGasHex))
 	fmt.Printf("eth_getBalance(sender):    %s AVAX\n", balanceAVAX(ethRPC, sender))
@@ -188,7 +189,7 @@ type ethTx struct {
 }
 
 func sendAndWait(ethRPC string, key *secp256k1.PrivateKey, t ethTx) (string, map[string]any) {
-	chainID := big.NewInt(txs.EthRLPChainID)
+	chainID := hexBig(rpcCall(ethRPC, "eth_chainId"))
 	signed := ethtypes.MustSignNewTx(
 		key.ToECDSA(),
 		ethtypes.LatestSignerForChainID(chainID),

@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -65,6 +64,7 @@ var (
 	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
 	errStaleNonce                       = errors.New("eth tx nonce is not greater than the last accepted nonce")
+	errEthCredentials                   = errors.New("eth txs must carry no credentials")
 	errEthGasLimitExceeded              = errors.New("eth tx gas limit below the exact gas")
 	errEthFeeCapTooLow                  = errors.New("eth tx max fee per gas below the current gas price")
 	errEthInsufficientFunds             = errors.New("insufficient AVAX to cover eth tx value plus fee")
@@ -1606,6 +1606,13 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		return errHeliconUpgradeNotActive
 	}
 
+	// The eth signature lives inside the RLP, so the outer tx must carry no
+	// credentials. They are otherwise unbounded and unpriced, which would let
+	// a tx grow past the block codec limit for free.
+	if len(e.tx.Creds) != 0 {
+		return fmt.Errorf("%w: got %d", errEthCredentials, len(e.tx.Creds))
+	}
+
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -1651,49 +1658,9 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		return err
 	}
 
-	// Auto-select the sender's unlocked single-key AVAX UTXOs in canonical
-	// (sorted ID) order, considering only the MaxEthRLPTxInputs lowest IDs
-	// (the complexity-priced worst case). Shared memory is never consulted.
-	utxoIDs, err := e.state.UTXOIDs(tx.Sender.Bytes(), ids.Empty, txs.MaxEthRLPTxInputs)
+	consumed, total, err := e.selectEthInputs(tx.Sender, need)
 	if err != nil {
 		return err
-	}
-	utils.Sort(utxoIDs)
-	if len(utxoIDs) > txs.MaxEthRLPTxInputs {
-		utxoIDs = utxoIDs[:txs.MaxEthRLPTxInputs]
-	}
-
-	var (
-		chainTime = uint64(e.state.GetTimestamp().Unix())
-		consumed  = make([]*avax.UTXO, 0, len(utxoIDs))
-		total     uint64
-	)
-	for _, utxoID := range utxoIDs {
-		if total >= need {
-			break
-		}
-		utxo, err := e.state.GetUTXO(utxoID)
-		if err != nil {
-			return err
-		}
-		if utxo.AssetID() != e.backend.Ctx.AVAXAssetID {
-			continue
-		}
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-		if out.Locktime > chainTime ||
-			out.Threshold != 1 ||
-			len(out.Addrs) != 1 ||
-			out.Addrs[0] != tx.Sender {
-			continue
-		}
-		total, err = math.Add(total, out.Amt)
-		if err != nil {
-			return err
-		}
-		consumed = append(consumed, utxo)
 	}
 	if total < need {
 		return fmt.Errorf("%w: have %d nAVAX, need %d", errEthInsufficientFunds, total, need)
@@ -1724,17 +1691,22 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		Addrs:     []ids.ShortID{tx.Sender},
 	}
 	if !tx.IsStakingCall() {
-		e.state.AddUTXO(&avax.UTXO{
-			UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
-			Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: tx.AmountNAVAX,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{tx.Recipient},
+		// A zero-value transfer produces no output. That is how a wallet
+		// cancels a pending tx: it only needs to burn the fee and advance the
+		// nonce.
+		if tx.AmountNAVAX > 0 {
+			e.state.AddUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
+				Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: tx.AmountNAVAX,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{tx.Recipient},
+					},
 				},
-			},
-		})
+			})
+		}
 	} else if err := e.putEthStaker(derivedTx, derivedStake); err != nil {
 		// The stake itself is the output: it returns to the sender when the
 		// staking period ends, and rewards go to the same owner.

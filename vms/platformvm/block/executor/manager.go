@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -198,6 +199,14 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 			return fmt.Errorf("tx exceeds current gas capacity: %d > %d", gas, feeState.Capacity)
 		}
 	}
+
+	// Publish the price the mempool needs to cap eth tx bids. Verification
+	// precedes every admission, so this is always fresh.
+	m.Mempool.SetGasPrice(gas.CalculatePrice(
+		m.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+		stateDiff.GetFeeState().Excess,
+		m.txExecutorBackend.Config.DynamicFeeConfig.ExcessConversionConstant,
+	))
 
 	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
 	_, _, _, err = executor.StandardTx(

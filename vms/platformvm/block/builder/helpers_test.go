@@ -146,7 +146,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		"mempool",
 		res.config.DynamicFeeConfig.Weights,
 		1_000_000,
-		res.ctx.AVAXAssetID,
+		res.ctx,
 		registerer,
 	)
 	require.NoError(err)

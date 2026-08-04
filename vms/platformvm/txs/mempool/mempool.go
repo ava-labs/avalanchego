@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/btree"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -30,6 +32,7 @@ import (
 
 var (
 	ErrNotEnoughGas      = errors.New("not enough gas")
+	ErrEthCredentials    = errors.New("eth txs must carry no credentials")
 	ErrTooManyEthPending = errors.New("too many pending eth txs for this sender")
 	errNoGasUsed         = errors.New("no gas used")
 	errAVAXMinted        = errors.New("AVAX minted")
@@ -51,6 +54,11 @@ type meteredTx struct {
 type Mempool struct {
 	weights     gas.Dimensions
 	avaxAssetID ids.ID
+	ctx         *snow.Context
+
+	// gasPrice is the last price observed by tx verification, used to cap eth
+	// tx bids. Atomic because Add runs both with and without the chain lock.
+	gasPrice atomic.Uint64
 
 	lock               sync.RWMutex
 	cond               *lock.Cond
@@ -68,7 +76,7 @@ func New(
 	namespace string,
 	weights gas.Dimensions,
 	gasCapacity gas.Gas,
-	avaxAssetID ids.ID,
+	ctx *snow.Context,
 	registerer prometheus.Registerer,
 ) (*Mempool, error) {
 	numTxsMetric := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -92,7 +100,8 @@ func New(
 
 	m := &Mempool{
 		weights:     weights,
-		avaxAssetID: avaxAssetID,
+		avaxAssetID: ctx.AVAXAssetID,
+		ctx:         ctx,
 		tree: btree.NewG[meteredTx](2, func(a, b meteredTx) bool {
 			if a.gasPrice != b.gasPrice {
 				return a.gasPrice < b.gasPrice
@@ -124,7 +133,13 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	}
 
 	if ethTx, ok := tx.Unsigned.(*txs.EthRLPTx); ok {
-		if err := ethTx.SyntacticVerify(nil); err != nil {
+		// Credentials are unbounded and unpriced, so a tx carrying them could
+		// be grown past the block codec limit for free. Consensus rejects
+		// them too; this keeps them out of the mempool and out of gossip.
+		if len(tx.Creds) != 0 {
+			return fmt.Errorf("%w: got %d", ErrEthCredentials, len(tx.Creds))
+		}
+		if err := ethTx.SyntacticVerify(m.ctx); err != nil {
 			return err
 		}
 		if m.ethPending[ethTx.Sender] >= maxEthPendingPerSender {
@@ -248,9 +263,14 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 	gasPrice := float64(consumedAVAX-producedAVAX) / float64(gasUsed)
 	if ethTx, ok := tx.Unsigned.(*txs.EthRLPTx); ok {
 		// Eth txs declare no inputs or outputs, so the burn is not derivable
-		// above. Their bid is the signed fee cap (wei per gas -> nAVAX per
-		// gas), the same ordering EVM mempools use.
-		gasPrice = weiPerGasToNAVAXPerGas(ethTx.Parsed.GasFeeCap())
+		// above. Their bid is what they will actually pay per gas: the fee cap
+		// capped by the current price. Bidding the raw fee cap would be free,
+		// since the fee charged is exactly gas * price, and would let a tx
+		// with an absurd cap evict every paying tx in the mempool.
+		gasPrice = min(
+			weiPerGasToNAVAXPerGas(ethTx.Parsed.GasFeeCap()),
+			float64(m.gasPrice.Load()),
+		)
 	}
 
 	return meteredTx{
@@ -258,6 +278,12 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		gasUsed:  gasUsed,
 		gasPrice: gasPrice,
 	}, nil
+}
+
+// SetGasPrice records the current gas price for eth tx bid capping. Called by
+// tx verification, which runs before every mempool admission.
+func (m *Mempool) SetGasPrice(price gas.Price) {
+	m.gasPrice.Store(uint64(price))
 }
 
 func weiPerGasToNAVAXPerGas(feeCap *big.Int) float64 {

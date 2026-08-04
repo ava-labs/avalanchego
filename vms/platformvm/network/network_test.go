@@ -76,7 +76,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -256,7 +256,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					0,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -294,7 +294,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					snowtest.AVAXAssetID,
+					snowtest.Context(t, snowtest.PChainID),
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)

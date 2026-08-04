@@ -37,7 +37,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 		"",
 		gas.Dimensions{},
 		1_000_000,
-		ids.ID{},
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -67,7 +67,7 @@ func TestMempoolDuplicate(t *testing.T) {
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		snowtest.AVAXAssetID,
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -143,7 +143,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		snowtest.AVAXAssetID,
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

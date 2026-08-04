@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -155,7 +154,7 @@ func (a *ethAPI) ethTxObject(unsigned *txs.EthRLPTx, record *ethReceiptRecord) m
 		"maxFeePerGas":         "0x" + parsed.GasFeeCap().Text(16),
 		"maxPriorityFeePerGas": "0x" + parsed.GasTipCap().Text(16),
 		"input":                "0x" + hex.EncodeToString(parsed.Data()),
-		"chainId":              hexUint(txs.EthRLPChainID),
+		"chainId":              "0x" + txs.EthRLPChainID(a.vm.ctx.NetworkID).Text(16),
 		"type":                 "0x2",
 		"accessList":           []any{},
 		"v":                    "0x" + v.Text(16),
@@ -176,19 +175,15 @@ func (a *ethAPI) ethTxObject(unsigned *txs.EthRLPTx, record *ethReceiptRecord) m
 }
 
 func (a *ethAPI) getTransactionByHash(hash ethcommon.Hash) (any, error) {
-	txIDBytes, err := a.indexDB.Get(hashKey(hash))
-	if err == database.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	txID, err := ids.ToID(txIDBytes)
-	if err != nil {
+	txID, ok, err := a.txIDOf(hash)
+	if err != nil || !ok {
 		return nil, err
 	}
 
-	raw, err := a.indexDB.Get(rlpKey(txID))
+	raw, err := a.rlpOf(txID)
+	if err == database.ErrNotFound {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -90,7 +90,7 @@ func TestMempoolOrdering(t *testing.T) {
 		"",
 		weights,
 		1_000_000,
-		snowtest.AVAXAssetID,
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -419,7 +419,7 @@ func TestMempoolAdd(t *testing.T) {
 				"",
 				tt.weights,
 				tt.maxGasCapacity,
-				snowtest.AVAXAssetID,
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -515,7 +515,7 @@ func TestMempool_Remove(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				snowtest.AVAXAssetID,
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -697,7 +697,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				snowtest.AVAXAssetID,
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -761,7 +761,7 @@ func TestMempool_Drop(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				snowtest.AVAXAssetID,
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -787,7 +787,7 @@ func TestMempool_WaitForEvent(t *testing.T) {
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		snowtest.AVAXAssetID,
+		snowtest.Context(t, snowtest.PChainID),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -864,7 +864,7 @@ func TestMempool_Iterate(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				snowtest.AVAXAssetID,
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)

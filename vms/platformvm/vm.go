@@ -167,7 +167,7 @@ func (vm *VM) Initialize(
 		"mempool",
 		vm.Internal.DynamicFeeConfig.Weights,
 		execConfig.MempoolGasCapacity,
-		vm.ctx.AVAXAssetID,
+		vm.ctx,
 		registerer,
 	)
 	if err != nil {

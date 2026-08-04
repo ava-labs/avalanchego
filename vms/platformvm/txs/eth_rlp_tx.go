@@ -6,6 +6,7 @@ package txs
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -17,15 +18,28 @@ import (
 )
 
 const (
-	// EthRLPChainID is the EIP-155 chain ID of the P-chain eth facade.
-	// ponytail: fixed constant; production needs per-network IDs.
-	EthRLPChainID = 43117
+	// ethRLPChainIDBase is offset by the network ID to produce the facade's
+	// EIP-155 chain ID. The network ID is not part of an eth tx's signed
+	// preimage, so the chain ID is the only thing that separates networks: a
+	// tx signed for one network must never be a valid tx on another.
+	ethRLPChainIDBase = 43_110_000
 
-	// MaxEthRLPTxInputs bounds input auto-selection: execution considers only
-	// the sender's MaxEthRLPTxInputs lowest-ID UTXOs. Complexity prices reads
-	// and deletes at this worst case.
+	// MaxEthRLPTxInputs bounds how many UTXOs one tx may consume. Complexity
+	// prices reads and deletes at this worst case.
 	MaxEthRLPTxInputs = 32
+
+	// MaxEthRLPEnvelopeBytes bounds the serialized length of an EthRLPTx
+	// excluding its calldata payload. Every field of a type-2 tx has a fixed
+	// maximum width and access lists are rejected, so this is a hard bound,
+	// pinned by TestEthRLPEnvelopeBound. eth_estimateGas prices with it
+	// because the exact length is unknown before signing.
+	MaxEthRLPEnvelopeBytes = 256
 )
+
+// EthRLPChainID returns the facade's EIP-155 chain ID on [networkID].
+func EthRLPChainID(networkID uint32) *big.Int {
+	return new(big.Int).SetUint64(ethRLPChainIDBase + uint64(networkID))
+}
 
 // WeiPerNAVAX converts the 18-decimal RLP value field to 9-decimal nAVAX.
 var WeiPerNAVAX = big.NewInt(1_000_000_000)
@@ -42,6 +56,9 @@ var (
 	errNonPositiveValue   = errors.New("value must be positive")
 	ErrValueDust          = errors.New("value must be a whole number of nAVAX (multiple of 1e9 wei)")
 	errValueTooLarge      = errors.New("value overflows uint64 nAVAX")
+	ErrMissingContext     = errors.New("eth tx verification requires the chain context")
+	ErrNonceTooLarge      = errors.New("nonce must be less than MaxUint64")
+	ErrStakeValueRequired = errors.New("staking calls must carry a positive value")
 )
 
 // EthRLPTx wraps a signed Ethereum transaction so that stock EVM wallets can
@@ -81,29 +98,38 @@ func (*EthRLPTx) Outputs() []*avax.TransferableOutput {
 	return nil
 }
 
-func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
+// SyntacticVerify verifies everything about the tx that is a function of its
+// own bytes plus [ctx.NetworkID]. A verified result is cached, which is safe
+// because a node serves exactly one network.
+func (tx *EthRLPTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
 	case tx.Parsed != nil: // already passed syntactic verification
 		return nil
+	case ctx == nil:
+		return ErrMissingContext
 	}
 
 	eth := &ethtypes.Transaction{}
 	if err := eth.UnmarshalBinary(tx.RLP); err != nil {
 		return fmt.Errorf("parsing eth tx: %w", err)
 	}
-	chainID := big.NewInt(EthRLPChainID)
+	chainID := EthRLPChainID(ctx.NetworkID)
 	switch {
 	case eth.Type() != ethtypes.DynamicFeeTxType:
 		return ErrNotDynamicFeeTx
 	case len(eth.AccessList()) != 0:
-		// Keeps the envelope size bounded by a constant; see EthRLPTxComplexity.
+		// Keeps MaxEthRLPEnvelopeBytes a hard bound.
 		return ErrNonEmptyAccessList
 	case eth.ChainId().Cmp(chainID) != 0:
-		return fmt.Errorf("%w: got %s, want %d", ErrWrongEthChainID, eth.ChainId(), EthRLPChainID)
+		return fmt.Errorf("%w: got %s, want %s", ErrWrongEthChainID, eth.ChainId(), chainID)
 	case eth.To() == nil:
 		return errNoRecipient
+	case eth.Nonce() == math.MaxUint64:
+		// The accepted nonce is stored as nonce+1, so MaxUint64 would wrap to
+		// zero and reset replay protection.
+		return ErrNonceTooLarge
 	}
 
 	// The stAVAX token is read-only: any tx to it would orphan funds.
@@ -119,7 +145,7 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 		return ErrNonEmptyCalldata
 	case isStakingCall && len(eth.Data()) < 4:
 		return ErrShortCalldata
-	case eth.Value().Sign() <= 0:
+	case eth.Value().Sign() < 0:
 		return errNonPositiveValue
 	}
 
@@ -145,6 +171,12 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 			}
 		default:
 			return fmt.Errorf("%w: %x", ErrUnknownSelector, selector)
+		}
+		// Both current selectors stake the value they carry. Value positivity
+		// is a per-selector rule, not a tx-wide one: a zero-value tx is how a
+		// wallet cancels a pending tx, and future selectors need not be paid.
+		if amount.Sign() == 0 {
+			return ErrStakeValueRequired
 		}
 	}
 

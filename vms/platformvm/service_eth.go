@@ -4,18 +4,23 @@
 package platformvm
 
 import (
+	"cmp"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
+	"slices"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -30,9 +35,17 @@ import (
 type ethAPI struct {
 	vm *VM
 
-	// indexDB persists eth hash -> txID and txID -> inclusion block so
-	// receipts survive restarts. Node-local, not consensus state.
+	// indexDB persists eth hash -> txID, txID -> raw RLP and txID -> inclusion
+	// block for accepted txs. Node-local, not consensus state.
 	indexDB database.Database
+
+	// Submitted but not yet accepted txs, so lookups work before inclusion
+	// without letting unauthenticated submissions write to disk.
+	pending    *lru.Cache[ethcommon.Hash, ids.ID]
+	pendingRLP *lru.Cache[ids.ID, []byte]
+
+	// stakedCache memoizes the staked-balance walk for one block.
+	stakedCache stakedBalances
 }
 
 var (
@@ -45,11 +58,54 @@ var (
 	ethWatermarkKey     = []byte("w") // last scanned block height
 )
 
+const (
+	pendingEthTxCacheSize = 2048
+
+	// maxIndexScanBlocks bounds how many blocks one request may index.
+	maxIndexScanBlocks = 1024
+)
+
 func newEthAPI(vm *VM) *ethAPI {
 	return &ethAPI{
-		vm:      vm,
-		indexDB: prefixdb.New(ethIndexPrefix, vm.db),
+		vm:         vm,
+		indexDB:    prefixdb.New(ethIndexPrefix, vm.db),
+		pending:    lru.NewCache[ethcommon.Hash, ids.ID](pendingEthTxCacheSize),
+		pendingRLP: lru.NewCache[ids.ID, []byte](pendingEthTxCacheSize),
 	}
+}
+
+func (a *ethAPI) chainID() *big.Int {
+	return txs.EthRLPChainID(a.vm.ctx.NetworkID)
+}
+
+// txIDOf resolves an eth tx hash to its platform txID, checking the accepted
+// index first and then the pending cache.
+func (a *ethAPI) txIDOf(hash ethcommon.Hash) (ids.ID, bool, error) {
+	txIDBytes, err := a.indexDB.Get(hashKey(hash))
+	if err == nil {
+		txID, err := ids.ToID(txIDBytes)
+		return txID, true, err
+	}
+	if err != database.ErrNotFound {
+		return ids.Empty, false, err
+	}
+	txID, ok := a.pending.Get(hash)
+	return txID, ok, nil
+}
+
+// rlpOf returns the raw eth tx bytes for an accepted or pending tx.
+func (a *ethAPI) rlpOf(txID ids.ID) ([]byte, error) {
+	raw, err := a.indexDB.Get(rlpKey(txID))
+	if err == nil {
+		return raw, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+	if raw, ok := a.pendingRLP.Get(txID); ok {
+		return raw, nil
+	}
+	return nil, database.ErrNotFound
 }
 
 type ethRequest struct {
@@ -95,10 +151,10 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 
 	switch req.Method {
 	case "eth_chainId":
-		return hexUint(txs.EthRLPChainID), nil
+		return "0x" + a.chainID().Text(16), nil
 
 	case "net_version":
-		return fmt.Sprintf("%d", txs.EthRLPChainID), nil
+		return a.chainID().String(), nil
 
 	case "eth_blockNumber":
 		height, err := a.lastAcceptedHeight()
@@ -167,7 +223,10 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		if err := parseParam(req.Params, 0, &call); err != nil {
 			return nil, err
 		}
-		complexity := fee.EthRLPTxComplexity(len(call.calldata()))
+		// Bandwidth is priced from the serialized length, which is unknown
+		// before signing, so this prices the envelope bound: an upper bound on
+		// what execution will charge, like the EVM's own estimate.
+		complexity := fee.EthRLPTxComplexity(txs.MaxEthRLPEnvelopeBytes + len(call.calldata()))
 		txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
 		if err != nil {
 			return nil, err
@@ -216,18 +275,16 @@ func (a *ethAPI) sendRawTransaction(raw []byte) (any, error) {
 		return nil, err
 	}
 
-	hash := unsigned.Parsed.Hash()
-	txID := tx.ID()
-	if err := errors.Join(
-		a.indexDB.Put(hashKey(hash), txID[:]),
-		a.indexDB.Put(rlpKey(txID), raw),
-	); err != nil {
-		return nil, err
-	}
-
 	if err := a.vm.issueTxFromRPC(tx); err != nil {
 		return nil, err
 	}
+
+	// Only accepted txs are indexed on disk, so a rejected or spammed
+	// submission leaves nothing behind. Pending lookups are served from a
+	// bounded in-memory cache until the tx is accepted and indexed.
+	hash := unsigned.Parsed.Hash()
+	a.pending.Put(hash, tx.ID())
+	a.pendingRLP.Put(tx.ID(), raw)
 	return hash.Hex(), nil
 }
 
@@ -266,16 +323,9 @@ func (r *ethReceiptRecord) unmarshal(data []byte) error {
 }
 
 func (a *ethAPI) getTransactionReceipt(hash ethcommon.Hash) (any, error) {
-	txIDBytes, err := a.indexDB.Get(hashKey(hash))
-	if err == database.ErrNotFound {
-		return nil, nil // unknown to this node
-	}
-	if err != nil {
-		return nil, err
-	}
-	txID, err := ids.ToID(txIDBytes)
-	if err != nil {
-		return nil, err
+	txID, ok, err := a.txIDOf(hash)
+	if err != nil || !ok {
+		return nil, err // unknown to this node
 	}
 
 	record, found, err := a.receiptRecord(txID)
@@ -345,8 +395,23 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 		return err
 	}
 	watermark, err := database.GetUInt64(a.indexDB, ethWatermarkKey)
-	if err != nil && err != database.ErrNotFound {
+	switch {
+	case err == database.ErrNotFound:
+		// Start at the tip. Scanning all history on the first request would be
+		// an unauthenticated full-database read; this node can only be asked
+		// about txs it saw, and it sees them from now on.
+		if err := database.PutUInt64(a.indexDB, ethWatermarkKey, last); err != nil {
+			return err
+		}
+		return nil
+	case err != nil:
 		return err
+	}
+
+	// Bound the work per request. If this node fell behind, later calls catch
+	// up rather than one call scanning arbitrarily far.
+	if last-watermark > maxIndexScanBlocks {
+		last = watermark + maxIndexScanBlocks
 	}
 
 	// The exact gas price at inclusion is not retrievable from state history,
@@ -402,16 +467,23 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 	return nil
 }
 
-// liquidBalance sums the spendable single-key AVAX UTXOs owned by [addr],
-// mirroring the executor's auto-selection filter and its input bound.
+// liquidBalance is the amount [addr] can actually spend in one tx: the sum of
+// the MaxEthRLPTxInputs largest spendable AVAX UTXOs it owns, matching the
+// executor's selection rule. Reporting the full total instead would make a
+// wallet's Max button propose a tx that cannot execute.
 func (a *ethAPI) liquidBalance(addr ids.ShortID) (uint64, error) {
-	utxoIDs, err := a.vm.state.UTXOIDs(addr.Bytes(), ids.Empty, txs.MaxEthRLPTxInputs)
+	utxoIDs, err := a.vm.state.UTXOIDs(addr.Bytes(), ids.Empty, math.MaxInt)
 	if err != nil {
 		return 0, err
 	}
 	chainTime := uint64(a.vm.state.GetTimestamp().Unix())
-	var balance uint64
+	seen := set.NewSet[ids.ID](len(utxoIDs))
+	amounts := make([]uint64, 0, len(utxoIDs))
 	for _, utxoID := range utxoIDs {
+		if seen.Contains(utxoID) {
+			continue
+		}
+		seen.Add(utxoID)
 		utxo, err := a.vm.state.GetUTXO(utxoID)
 		if err != nil {
 			return 0, err
@@ -429,7 +501,18 @@ func (a *ethAPI) liquidBalance(addr ids.ShortID) (uint64, error) {
 			out.Addrs[0] != addr {
 			continue
 		}
-		balance, err = math.Add(balance, out.Amt)
+		amounts = append(amounts, out.Amt)
+	}
+	slices.SortFunc(amounts, func(a, b uint64) int {
+		return cmp.Compare(b, a) // descending
+	})
+
+	var balance uint64
+	for i, amt := range amounts {
+		if i == txs.MaxEthRLPTxInputs {
+			break
+		}
+		balance, err = safemath.Add(balance, amt)
 		if err != nil {
 			return 0, err
 		}

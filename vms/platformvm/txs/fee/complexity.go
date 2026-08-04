@@ -895,28 +895,25 @@ func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 }
 
 func (c *complexityVisitor) EthRLPTx(tx *txs.EthRLPTx) error {
-	// no-op when already verified; populates tx.Parsed otherwise
-	if err := tx.SyntacticVerify(nil); err != nil {
-		return err
-	}
-	c.output = EthRLPTxComplexity(len(tx.Parsed.Data()))
+	c.output = EthRLPTxComplexity(len(tx.RLP))
 	return nil
 }
 
-// EthRLPTx complexity is defined from semantic fields, not serialized length,
-// so it is computable before signing (eth_estimateGas) and identical after:
-//   - Bandwidth: a constant envelope bound plus calldata. The RLP field set is
-//     fixed (SyntacticVerify rejects access lists) so the envelope is bounded
-//     by intrinsicEthRLPTxBandwidth regardless of field widths.
+// EthRLPTx complexity is a function of the serialized tx only, so it needs no
+// parsing and no chain context:
+//   - Bandwidth: the actual RLP length. Credentials are not priced because an
+//     EthRLPTx must carry none (the eth signature is inside the RLP).
 //   - DBRead/DBWrite: the documented worst case of execution: one nonce read
 //     and write, up to MaxEthRLPTxInputs UTXOs read and deleted, and two
 //     outputs written.
 //   - Compute: one signature recovery.
-const intrinsicEthRLPTxBandwidth = 256
-
-func EthRLPTxComplexity(calldataLen int) gas.Dimensions {
+//
+// eth_estimateGas cannot know the exact RLP length before signing, so it
+// prices txs.MaxEthRLPEnvelopeBytes plus calldata, which is an upper bound on
+// what execution charges.
+func EthRLPTxComplexity(rlpLen int) gas.Dimensions {
 	return gas.Dimensions{
-		gas.Bandwidth: intrinsicEthRLPTxBandwidth + uint64(calldataLen),
+		gas.Bandwidth: uint64(rlpLen),
 		gas.DBRead:    1 + txs.MaxEthRLPTxInputs,
 		gas.DBWrite:   1 + txs.MaxEthRLPTxInputs + 2,
 		gas.Compute:   intrinsicSECP256k1FxSignatureCompute,

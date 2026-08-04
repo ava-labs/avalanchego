@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -123,7 +124,7 @@ func TestRejectBlock(t *testing.T) {
 				"",
 				gas.Dimensions{},
 				1_000_000,
-				ids.ID{},
+				snowtest.Context(t, snowtest.PChainID),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
