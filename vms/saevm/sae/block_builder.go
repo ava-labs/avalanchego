@@ -130,7 +130,7 @@ var (
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
-	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block's")
+	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
@@ -356,8 +356,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	if settled == (hook.Settled{}) {
 		// An all-zero marker implies pre-SAE (see [hook.Synchronous]),
 		// executing the block with the worst-case fee in its header.
-		log.Error("Settlement marker is all-zero")
-		return nil, fmt.Errorf("%w: settling block %d", errZeroSettledMarker, settled.Height)
+		log.Error("Settlement marker would indicate synchronous execution")
+		return nil, errZeroSettledMarker
 	}
 
 	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)

@@ -1,44 +1,21 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
-package(
-    default_testonly = True,
-    default_visibility = [
-        "//graft/coreth:__subpackages__",
-        "//graft/coreth:external_consumers",
-    ],
-)
-
-go_library(
-    name = "upgradechaintest",
-    srcs = ["upgradechaintest.go"],
-    embedsrcs = ["testdata/upgradechain_fixture.json"],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgradechaintest",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//database",
-        "//upgrade",
-        "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/hexutil",
-        "@com_github_ava_labs_libevm//core",
-        "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//rlp",
-        "@com_github_stretchr_testify//require",
-    ],
-)
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
 
 graft_go_test(
-    name = "upgradechaintest_test",
+    name = "corethgen_test",
     srcs = [
         "blocks_test.go",
         "generate_test.go",
+        "rpccalls_test.go",
     ],
-    data = glob(["testdata/**"]),
-    embed = [":upgradechaintest"],
     deps = [
         "//chains/atomic",
+        "//database",
         "//graft/coreth/core/extstate",
-        "//graft/coreth/eth/tracers",
         "//graft/coreth/nativeasset",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
@@ -47,13 +24,12 @@ graft_go_test(
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
         "//graft/coreth/plugin/evm/upgrade/ap0",
+        "//graft/coreth/plugin/evm/upgrade/ap1",
         "//graft/coreth/plugin/evm/vmtest",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/constants",
-        "//graft/evm/rpc",
         "//ids",
         "//snow",
-        "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/validators",
@@ -67,12 +43,12 @@ graft_go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "//vms/saevm/cchain/synchronoustest",
         "//vms/saevm/cchain/warp/warptest",
         "//vms/saevm/saetest",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
-        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//crypto",

@@ -189,7 +189,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_traceBlockByNumber
 			// - debug_traceBlockFromFile
 			// - debug_traceCall
-			// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC for async blocks
+			// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
 			// - debug_traceTransaction
 			"debug", newTracerAPI(b),
 		})
