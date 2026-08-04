@@ -36,8 +36,8 @@ var TestFixtureChainID = big.NewInt(43110)
 
 // Berlin and London activation heights of the [TestFixtureChainID] chain.
 const (
-	TestFixtureBerlinBlock uint64 = 3
-	TestFixtureLondonBlock uint64 = 5
+	TestFixtureBerlinBlock = 3
+	TestFixtureLondonBlock = 5
 )
 
 // SetEthUpgrades enables Ethereum network upgrades using the same time as

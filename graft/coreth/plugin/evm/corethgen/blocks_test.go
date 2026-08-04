@@ -72,7 +72,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhase2", "legacy transfer in the Berlin activation block (the pool rejects typed transactions until the head is in Berlin)",
 		g.transferTx(t, 14),
 	)
-	require.Equal(t, params.TestFixtureBerlinBlock, g.tip(), "Berlin (AP2) activation block height")
+	require.Equal(t, uint64(params.TestFixtureBerlinBlock), g.tip(), "Berlin (AP2) activation block height")
 
 	g.advanceClock(originalBlockDelay)
 	g.buildEthBlock(t, "apricotPhase2", "access-list (EIP-2930) transfer, the transaction type Berlin introduces",
@@ -83,7 +83,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhase3", "plain transfer in the London activation block (the atomic mempool prices imports by head rules, so imports wait until the head is in AP3)",
 		g.transferTx(t, 16),
 	)
-	require.Equal(t, params.TestFixtureLondonBlock, g.tip(), "London (AP3) activation block height")
+	require.Equal(t, uint64(params.TestFixtureLondonBlock), g.tip(), "London (AP3) activation block height")
 
 	g.advanceClock(originalBlockDelay)
 	g.buildBlock(t, "apricotPhase3", "single atomic import of AVAX (pre-AP5 extData encoding) under dynamic fees",

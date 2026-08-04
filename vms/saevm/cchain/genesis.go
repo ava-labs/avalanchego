@@ -147,7 +147,7 @@ func berlinBlock(chainID *big.Int) int64 {
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
 	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return int64(corethparams.TestFixtureBerlinBlock)
+		return corethparams.TestFixtureBerlinBlock
 	default:
 		return 0
 	}
@@ -160,7 +160,7 @@ func londonBlock(chainID *big.Int) int64 {
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
 	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return int64(corethparams.TestFixtureLondonBlock)
+		return corethparams.TestFixtureLondonBlock
 	default:
 		return 0
 	}
