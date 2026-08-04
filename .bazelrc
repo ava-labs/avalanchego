@@ -47,6 +47,10 @@ test:norace --@io_bazel_rules_go//go/config:race=false
 build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 build --action_env=CGO_ENABLED=1
 
+# macos: Bazel reads CC from the client environment, which in the nix dev shell is 
+# nix's clang wrapper, whose sysroot comes from the NIX_CFLAGS_COMPILE that Bazel 
+# strips from action environments, failing the cgo stdlib build on a missing resolv.h.
+build:macos --repo_env=CC=/usr/bin/clang
 # macOS: Use the default CommandLineTools location (also used by GitHub Actions
 # runners for CI). Hosts with a different active Apple toolchain can either rely on
 # direnv to create `.bazelrc.local` with appropriate values or run `task

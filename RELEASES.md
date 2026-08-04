@@ -2,6 +2,10 @@
 
 ## Pending (v1.14.3)
 
+### Config
+
+- Added `api-resolve-pending-to-last-executed` for SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
+
 ### Metrics
 
 - Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
