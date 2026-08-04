@@ -20,33 +20,27 @@ import (
 // initiate state sync or skip it, and WaitForEvent matches this behavior.
 func TestStateSyncEnabled(t *testing.T) {
 	tests := []struct {
-		name        string
-		enabled     bool
-		wantEnabled bool
+		name    string
+		enabled bool
 	}{
 		{
-			name:        "disabled is skipped",
-			enabled:     false,
-			wantEnabled: false,
+			name:    "disabled",
+			enabled: false,
 		},
 		{
-			name:        "enabled starts sync",
-			enabled:     true,
-			wantEnabled: true,
+			name:    "enabled",
+			enabled: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sut := newSUT(t,
-				withEnabled(tt.enabled),
-				withNumBlocks(1), // initialization doesn't change result
-			)
+			sut := newSUT(t, withEnabled(tt.enabled))
 
 			gotEnabled, err := sut.StateSyncEnabled(t.Context())
 			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
-			assert.Equalf(t, tt.wantEnabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
 		})
 	}
 }
@@ -61,24 +55,24 @@ func TestAcceptSummary(t *testing.T) {
 		want          block.StateSyncMode
 	}{
 		{
-			name:          "genesis summary is skipped",
+			name:          "genesis_summary_skipped",
 			summaryHeight: 0,
 			want:          block.StateSyncSkipped,
 		},
 		{
-			name:          "non-genesis summary starts sync",
+			name:          "non-genesis_summary_starts_sync",
 			summaryHeight: numBlocks,
 			opts:          []sutOption{withoutInitialization()},
 			want:          block.StateSyncStatic,
 		},
 		{
-			name:          "sync skipped if multiple blocks accepted",
+			name:          "sync_skipped_if_blocks_accepted",
 			summaryHeight: numBlocks,
 			opts:          []sutOption{withNumBlocks(1)},
 			want:          block.StateSyncSkipped,
 		},
 		{
-			name:          "sync started if only genesis is accepted",
+			name:          "sync_started_only_genesis_accepted",
 			summaryHeight: numBlocks,
 			want:          block.StateSyncStatic,
 		},

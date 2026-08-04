@@ -31,11 +31,12 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.S
 	}
 
 	// If any blocks have been accepted, don't state sync.
-	hash, ok := h.lastAcceptedHash()
-	if ok {
-		if height := rawdb.ReadHeaderNumber(h.db, hash); height != nil && *height > 0 {
-			return block.StateSyncSkipped, nil
-		}
+	hash, err := h.lastAcceptedHash()
+	if err != nil {
+		return block.StateSyncSkipped, err
+	}
+	if height := rawdb.ReadHeaderNumber(h.db, hash); height != nil && *height > 0 {
+		return block.StateSyncSkipped, nil
 	}
 
 	go func() {

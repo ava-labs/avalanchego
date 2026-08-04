@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -66,15 +67,17 @@ func (*SummaryHandler) Shutdown(context.Context) error {
 // GetLastStateSummary returns the summary of the last accepted block at
 // multiple of [syncCommitInterval] height.
 func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, error) {
-	hash, ok := h.lastAcceptedHash()
-	if !ok {
-		return h.GetStateSummary(ctx, 0)
+	hash, err := h.lastAcceptedHash()
+	if err != nil {
+		return nil, err
 	}
 
 	lastHeight := rawdb.ReadHeaderNumber(h.db, hash)
 	if lastHeight == nil {
 		// This indicates a database inconsistency, can be considered fatal
-		return nil, fmt.Errorf("%w: header not found for %s", database.ErrNotFound, hash)
+		err := fmt.Errorf("%w: header not found for %s", database.ErrNotFound, hash)
+		h.log.Warn("rawdb.ReadHeaderNumber in GetLastStateSummary", zap.Error(err))
+		return nil, err
 	}
 
 	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.DBConfig.CommitInterval)
@@ -114,7 +117,9 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 	ethB := rawdb.ReadBlock(h.db, common.Hash(id), *height)
 	if ethB == nil {
 		// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
-		return nil, fmt.Errorf("%w: block exists but not on disk %s:%d", database.ErrNotFound, id, *height)
+		err := fmt.Errorf("%w: block not found %s:%d", database.ErrNotFound, id, *height)
+		h.log.Warn("rawdb.ReadBlock in GetBlock", zap.Error(err))
+		return nil, err
 	}
 
 	return blocks.New(ethB, nil, nil, h.log)
@@ -123,9 +128,9 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 // LastAccepted returns the ID of the last accepted block. If no blocks have
 // been accepted, it returns the ID of the genesis block.
 func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
-	hash, ok := h.lastAcceptedHash()
-	if !ok {
-		return ids.Empty, database.ErrNotFound
+	hash, err := h.lastAcceptedHash()
+	if err != nil {
+		return ids.Empty, err
 	}
 	return ids.ID(hash), nil
 }
@@ -142,7 +147,12 @@ func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (i
 
 // lastAcceptedHash returns the hash of the last accepted block, and whether
 // one exists.
-func (h *SummaryHandler) lastAcceptedHash() (common.Hash, bool) {
+func (h *SummaryHandler) lastAcceptedHash() (common.Hash, error) {
+	// The database is guaranteed to have this populated.
 	hash := rawdb.ReadHeadFastBlockHash(h.db)
-	return hash, hash != (common.Hash{})
+	if hash == (common.Hash{}) {
+		h.log.Warn("rawdb.ReadHeadFastBlockHash returned empty")
+		return common.Hash{}, database.ErrNotFound
+	}
+	return hash, nil
 }

@@ -28,6 +28,7 @@ go_library(
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_stephenbuttolph_canoto//:canoto",
+        "@org_uber_go_zap//:zap",
     ],
 )
 

@@ -56,18 +56,24 @@ type (
 	sutOption = options.Option[sutConfig]
 )
 
+// withNumBlocks returns a [sutOption] that sets the number of blocks to build
+// after initialization. If [withoutInitialization] is also used, this option
+// has no effect.
 func withNumBlocks(blocks uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.numBlocks = blocks
 	})
 }
 
+// withoutInitialization returns a [sutOption] that prevents the VM from being
+// initialized. This is useful for testing the [SummaryHandler] in isolation.
 func withoutInitialization() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.initializeVM = false
 	})
 }
 
+// withEnabled returns a [sutOption] that sets [Config.Enabled].
 func withEnabled(e bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.enabled = e
@@ -88,7 +94,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		initializeVM:   true,
 	}, opts...)
 
-	logger := loggingtest.New(t, logging.Info)
+	logger := loggingtest.New(t, logging.Debug)
 
 	chainID := ids.GenerateTestID()
 	snowCtx := snowtest.Context(t, chainID)
@@ -104,17 +110,19 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 
 	genesis := core.Genesis{
 		Config:     saetest.ChainConfig(),
-		Alloc:      saetest.MaxAllocFor(),
+		Alloc:      types.GenesisAlloc{},
 		Timestamp:  saeparams.TauSeconds,
 		BaseFee:    big.NewInt(1),
 		Difficulty: big.NewInt(0), // irrelevant but required
 	}
 
+	// The [SummaryHandler] requires the genesis block to be written to disk,
+	// but we don't want to actually commit the genesis state.
 	db := memdb.New()
 	ethDB := saetypes.NewEthDB(db)
-	dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil) // get around committing the state
+	dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	_, err := genesis.Commit(ethDB, dummyTrieDB)
-	require.NoErrorf(t, err, "%T.Commit()", genesis) // writes all genesis markers to disk
+	require.NoErrorf(t, err, "%T.Commit()", genesis)
 
 	reader, err := New(
 		Config{
@@ -191,15 +199,15 @@ func TestLastAccepted(t *testing.T) {
 		numBlocks uint64
 	}{
 		{
-			name:      "genesis only",
+			name:      "genesis_only",
 			numBlocks: 0,
 		},
 		{
-			name:      "one block",
+			name:      "one_block",
 			numBlocks: 1,
 		},
 		{
-			name:      "past commit boundary",
+			name:      "past_commit_boundary",
 			numBlocks: defaultCommitInterval + 1,
 		},
 	}
@@ -272,7 +280,7 @@ func TestStateSummary(t *testing.T) {
 	})
 }
 
-func TestEmptyStateSummary(t *testing.T) {
+func TestGenesisStateSummary(t *testing.T) {
 	t.Parallel()
 
 	sut := newSUT(t, withoutInitialization())
