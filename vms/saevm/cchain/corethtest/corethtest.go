@@ -2,13 +2,8 @@
 // See the file LICENSE for licensing terms.
 
 // Package corethtest provides a deterministic, pre-generated C-Chain history
-// crossing every scheduled network upgrade, for tests that need realistic
-// synchronous blocks, the database a node would hand to its successor VM, and
-// the JSON-RPC responses the historical chain served.
-//
-// Generating the fixture needs a live coreth VM, so that half lives in coreth's
-// corethgen package. This package only reads the result, so consuming it costs
-// nothing but a decode and pulls in no coreth dependency.
+// crossing every pre-SAE network upgrade, for tests that need realistic
+// synchronous blocks.
 package corethtest
 
 import (

@@ -130,7 +130,7 @@ var (
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
-	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block's")
+	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
