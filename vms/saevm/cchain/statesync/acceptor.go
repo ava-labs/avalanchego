@@ -30,12 +30,6 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, summary *summary) (b
 
 	go func() {
 		defer close(h.stateSyncDone)
-		// must block until initial state sync done
-		// TODO(alarso16): if there's an error in the first state sync, it should bubble up here
-		_, err := h.SummaryHandler.WaitForEvent(ctx)
-		if err != nil {
-			return
-		}
 		// TODO(alarso16): implement state sync
 	}()
 	return mode, nil

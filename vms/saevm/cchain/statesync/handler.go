@@ -34,8 +34,7 @@ type SummaryHandler struct {
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
-// database. The genesis block must be provided to allow the handler to return
-// the summary of the genesis block.
+// database.
 func New(
 	cfg statesync.Config,
 	db ethdb.Database,
@@ -89,7 +88,7 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, err
 	return h.wrap(base)
 }
 
-// GetOngoinSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
+// GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
 	base, err := h.SummaryHandler.GetOngoingSyncStateSummary(ctx)

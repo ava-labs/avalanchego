@@ -19,7 +19,7 @@ var _ adaptor.SummaryProperties = (*summary)(nil)
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
-// summary wraps a [statesync.summary] with the C-Chain atomic trie root at
+// summary wraps a [statesync.Summary] with the C-Chain atomic trie root at
 // the settled height.
 //
 //nolint:revive // struct-tag: canoto allows unexported fields

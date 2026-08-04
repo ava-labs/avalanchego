@@ -51,6 +51,7 @@ go_test(
         "//vms/saevm/cchain/state",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
+        "//vms/saevm/saedb",
         "//vms/saevm/statesync",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
