@@ -67,7 +67,7 @@ func (g *generator) rpcRequests(t *testing.T) []rpcRequest {
 	var reqs []rpcRequest
 	for _, b := range g.fixture.Blocks {
 		at := hexutil.Uint64(b.Number)
-		block := fmt.Sprintf("block_%02d", b.Number)
+		block := fmt.Sprintf("block_%02d_%s", b.Number, b.Fork)
 
 		for _, addr := range g.watchedAddresses() {
 			acc := fmt.Sprintf("%s/%s", block, addr)
@@ -125,9 +125,9 @@ func (g *generator) rpcRequests(t *testing.T) []rpcRequest {
 		// The three debug_traceBlock* methods differ in how they address the
 		// block, by number, by hash, and by its RLP encoding. Each gets both
 		// tracers because the RLP form takes its own path to the executed base
-		// fee, which only the prestate reveals. Genesis and the blocks carrying
-		// a functional nativeAssetCall fail to trace, in coreth and in any
-		// replaying VM, and those failures are recorded like any response.
+		// fee, which only the prestate reveals. Genesis fails to trace, in
+		// coreth and in any replaying VM, and that failure is recorded like any
+		// response.
 		for _, tc := range []struct {
 			name   string
 			config traceConfig

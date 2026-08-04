@@ -97,11 +97,10 @@ var fixtureJSON []byte
 // # Recorded RPC responses
 //
 // How the synchronous VM answered queries about that chain. Every height from
-// genesis to
-// the tip is queried, and the accounts queried at each are the two funded EOAs,
-// the transfer recipient, the counter contract, and the blackhole coinbase that
-// burned fees accrue to. Slot 0 is the counter's only storage slot and is empty
-// in every other account.
+// genesis to the tip is queried, and the accounts queried at each are the two
+// funded EOAs, the transfer recipient, the counter contract, and the blackhole
+// coinbase that burned fees accrue to. Slot 0 is the counter's only storage slot
+// and is empty in every other account.
 //
 //   - eth_getBalance: each account at each height.
 //   - eth_getTransactionCount: each account at each height.
