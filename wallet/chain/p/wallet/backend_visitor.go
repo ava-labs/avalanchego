@@ -195,3 +195,7 @@ func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {
 		tx.InputIDs(),
 	)
 }
+
+func (*backendVisitor) EthRLPTx(*txs.EthRLPTx) error {
+	return ErrUnsupportedTxType
+}

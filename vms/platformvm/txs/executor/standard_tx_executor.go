@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -62,7 +63,14 @@ var (
 	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
 	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
+	errStaleNonce                       = errors.New("eth tx nonce is not greater than the last accepted nonce")
+	errEthGasLimitExceeded              = errors.New("eth tx gas limit below the exact fee")
+	errEthInsufficientFunds             = errors.New("insufficient AVAX to cover eth tx value plus fee")
 )
+
+// maxUTXOsToSelect bounds eth facade input auto-selection.
+// ponytail: flat cap; complexity metering should price selection instead.
+const maxUTXOsToSelect = 1024
 
 // StandardTx executes the standard transaction [tx].
 //
@@ -1585,5 +1593,112 @@ func verifyL1Conversion(
 	if !bytes.Equal(expectedAddress, subnetToL1Conversion.Addr) {
 		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetToL1Conversion.Addr, expectedAddress)
 	}
+	return nil
+}
+
+func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
+	// ponytail: prototype is not gated on an upgrade; a real deployment checks
+	// its activation fork here.
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	nextNonce, err := e.state.GetNextNonce(tx.Sender)
+	if err != nil {
+		return err
+	}
+	if nonce := tx.Parsed.Nonce(); nonce < nextNonce {
+		return fmt.Errorf("%w: got nonce %d, minimum %d", errStaleNonce, nonce, nextNonce)
+	}
+
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	// The facade prices gas at 1 nAVAX per gas unit, so the wallet-approved
+	// budget is the eth tx's gas limit in nAVAX.
+	if fee > tx.Parsed.Gas() {
+		return fmt.Errorf("%w: fee %d nAVAX, gas limit %d", errEthGasLimitExceeded, fee, tx.Parsed.Gas())
+	}
+
+	need, err := math.Add(tx.AmountNAVAX, fee)
+	if err != nil {
+		return err
+	}
+
+	// Auto-select the sender's unlocked single-key AVAX UTXOs in canonical
+	// (sorted ID) order. Shared memory is never consulted here.
+	utxoIDs, err := e.state.UTXOIDs(tx.Sender.Bytes(), ids.Empty, maxUTXOsToSelect)
+	if err != nil {
+		return err
+	}
+	utils.Sort(utxoIDs)
+
+	var (
+		chainTime = uint64(e.state.GetTimestamp().Unix())
+		consumed  = make([]ids.ID, 0, len(utxoIDs))
+		total     uint64
+	)
+	for _, utxoID := range utxoIDs {
+		if total >= need {
+			break
+		}
+		utxo, err := e.state.GetUTXO(utxoID)
+		if err != nil {
+			return err
+		}
+		if utxo.AssetID() != e.backend.Ctx.AVAXAssetID {
+			continue
+		}
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+		if out.Locktime > chainTime ||
+			out.Threshold != 1 ||
+			len(out.Addrs) != 1 ||
+			out.Addrs[0] != tx.Sender {
+			continue
+		}
+		total, err = math.Add(total, out.Amt)
+		if err != nil {
+			return err
+		}
+		consumed = append(consumed, utxoID)
+	}
+	if total < need {
+		return fmt.Errorf("%w: have %d nAVAX, need %d", errEthInsufficientFunds, total, need)
+	}
+
+	for _, utxoID := range consumed {
+		e.state.DeleteUTXO(utxoID)
+	}
+	txID := e.tx.ID()
+	e.state.AddUTXO(&avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
+		Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: tx.AmountNAVAX,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{tx.Recipient},
+			},
+		},
+	})
+	if change := total - need; change > 0 {
+		e.state.AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 1},
+			Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: change,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{tx.Sender},
+				},
+			},
+		})
+	}
+
+	e.state.SetNextNonce(tx.Sender, tx.Parsed.Nonce()+1)
 	return nil
 }

@@ -37,4 +37,7 @@ type Visitor interface {
 	AddAutoRenewedValidatorTx(*AddAutoRenewedValidatorTx) error
 	SetAutoRenewedValidatorConfigTx(*SetAutoRenewedValidatorConfigTx) error
 	RewardAutoRenewedValidatorTx(*RewardAutoRenewedValidatorTx) error
+
+	// Eth facade Transactions:
+	EthRLPTx(*EthRLPTx) error
 }

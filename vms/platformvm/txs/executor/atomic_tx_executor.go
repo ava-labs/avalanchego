@@ -167,3 +167,7 @@ func (e *atomicTxExecutor) atomicTx() error {
 	)
 	return err
 }
+
+func (*atomicTxExecutor) EthRLPTx(*txs.EthRLPTx) error {
+	return ErrWrongTxType
+}

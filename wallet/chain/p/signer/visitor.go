@@ -414,3 +414,7 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }
+
+func (*visitor) EthRLPTx(*txs.EthRLPTx) error {
+	return ErrUnsupportedTxType
+}

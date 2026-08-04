@@ -158,3 +158,7 @@ func (w *warpVerifier) verify(message []byte) error {
 		WarpQuorumDenominator,
 	)
 }
+
+func (*warpVerifier) EthRLPTx(*txs.EthRLPTx) error {
+	return nil
+}

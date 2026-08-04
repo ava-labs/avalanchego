@@ -893,3 +893,16 @@ func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 	)
 	return complexity, err
 }
+
+func (c *complexityVisitor) EthRLPTx(tx *txs.EthRLPTx) error {
+	// ponytail: flat prototype metering: real RLP bytes for bandwidth, fixed
+	// budgets for the auto-selected reads/writes and one signature recovery.
+	// A real spec meters selection at execution time.
+	c.output = gas.Dimensions{
+		gas.Bandwidth: uint64(len(tx.RLP)) + IntrinsicBaseTxComplexities[gas.Bandwidth],
+		gas.DBRead:    8,
+		gas.DBWrite:   8,
+		gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
+	}
+	return nil
+}

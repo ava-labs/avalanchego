@@ -194,3 +194,10 @@ func (m *txMetrics) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidator
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) EthRLPTx(*txs.EthRLPTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "eth_rlp",
+	}).Inc()
+	return nil
+}

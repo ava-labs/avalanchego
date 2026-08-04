@@ -64,6 +64,9 @@ type Diff struct {
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*avax.UTXO
+
+	// eth facade account -> next nonce
+	nonces map[ids.ShortID]uint64
 }
 
 // NewDiff returns a new [Diff] whose parent is identified by parentID within
@@ -610,6 +613,11 @@ func (d *Diff) DeleteUTXO(utxoID ids.ID) {
 }
 
 func (d *Diff) Apply(baseState Chain) error {
+	if nonceState, ok := baseState.(NonceState); ok {
+		for addr, nonce := range d.nonces {
+			nonceState.SetNextNonce(addr, nonce)
+		}
+	}
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
 	baseState.SetL1ValidatorExcess(d.l1ValidatorExcess)

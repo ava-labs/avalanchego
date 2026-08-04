@@ -49,6 +49,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterEthRLPTypes(c),
 		)
 	}
 
@@ -139,4 +140,11 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
+}
+
+// RegisterEthRLPTypes registers the eth facade transaction.
+// ponytail: prototype, not gated on an upgrade; a real deployment gets its own
+// fork group and activation check in the executor.
+func RegisterEthRLPTypes(targetCodec linearcodec.Codec) error {
+	return targetCodec.RegisterType(&EthRLPTx{})
 }

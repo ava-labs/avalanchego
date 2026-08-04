@@ -1037,3 +1037,7 @@ func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *s
 
 	return stakerTx, stakerToReward, nil
 }
+
+func (*proposalTxExecutor) EthRLPTx(*txs.EthRLPTx) error {
+	return ErrWrongTxType
+}

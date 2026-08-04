@@ -533,3 +533,7 @@ func (i *inputOutputGetter) getUTXOs(tx txs.BaseTx) {
 	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)
 }
+
+func (*inputOutputGetter) EthRLPTx(*txs.EthRLPTx) error {
+	return fmt.Errorf("%w: EthRLPTx", ErrUnsupportedTxType)
+}

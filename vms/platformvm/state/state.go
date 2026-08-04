@@ -88,6 +88,7 @@ var (
 	SupplyPrefix                            = []byte("supply")
 	ChainPrefix                             = []byte("chain")
 	ExpiryReplayProtectionPrefix            = []byte("expiryReplayProtection")
+	AccountNoncePrefix                      = []byte("accountNonce")
 	L1Prefix                                = []byte("l1")
 	WeightsPrefix                           = []byte("weights")
 	SubnetIDNodeIDPrefix                    = []byte("subnetIDNodeID")
@@ -258,6 +259,9 @@ type State struct {
 	expiry     *btree.BTreeG[ExpiryEntry]
 	expiryDiff *expiryDiff
 	expiryDB   database.Database
+
+	modifiedNonces map[ids.ShortID]uint64 // eth facade account -> next nonce
+	nonceDB        database.Database
 
 	activeL1Validators  *activeL1Validators
 	l1ValidatorsDiff    *l1ValidatorsDiff
@@ -654,6 +658,9 @@ func New(
 		expiry:     btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
 		expiryDiff: newExpiryDiff(),
 		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
+
+		modifiedNonces: make(map[ids.ShortID]uint64),
+		nonceDB:        prefixdb.New(AccountNoncePrefix, baseDB),
 
 		activeL1Validators:  newActiveL1Validators(),
 		l1ValidatorsDiff:    newL1ValidatorsDiff(),
@@ -2285,6 +2292,7 @@ func (s *State) write(updateValidators bool, height uint64) error {
 	return errors.Join(
 		s.writeBlocks(),
 		s.writeExpiry(),
+		s.writeNonces(),
 		s.updateValidatorManager(updateValidators),
 		s.writeValidatorDiffs(height),
 		s.writeCurrentStakers(codecVersion),
