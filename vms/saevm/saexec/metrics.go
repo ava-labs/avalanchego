@@ -177,7 +177,7 @@ func (m *metrics) setExecuted(block *blocks.Block) {
 	gasTime := block.ExecutedByGasTime()
 	gasClock := gasTime.AsTime()
 	m.lastExecutedGasTime.Set(float64(gasClock.UnixNano()) / 1e9)
-	m.gasTimeWallTimeGap.Set(time.Since(gasClock).Seconds())
+	m.gasTimeWallTimeGap.Set(gasClock.Sub(block.ExecutedByWallTime()).Seconds())
 
 	m.worstCaseBaseFee.Set(float64(block.HeaderBaseFee()))
 	m.executedBaseFee.Set(block.ExecutedBaseFee().Float64())
