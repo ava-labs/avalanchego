@@ -27,21 +27,18 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
           - profile-key: maxperf-ethhash-logger
-            profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -55,14 +52,17 @@ jobs:
       - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
         run: cargo fetch --locked --verbose
       - name: Check
-        run: cargo check --frozen ${{ matrix.profile-args }} --workspace --all-targets
+        run: ./scripts/run-just.sh ci-rust check ${{ matrix.profile-key }}
       - name: Build
-        run: cargo build --frozen ${{ matrix.profile-args }} --workspace --all-targets
+        run: ./scripts/run-just.sh ci-rust build ${{ matrix.profile-key }}
 
   no-rust-cache-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -74,10 +74,10 @@ jobs:
           config: .github/check-license-headers.yaml
           strict: true
       - name: Format
-        run: cargo fmt -- --check
+        run: ./scripts/run-just.sh ci-format
       # Fails on TODO/FIXME markers lacking an owner or issue (see issue #1603).
       - name: Check TODO/FIXME annotations
-        run: ./scripts/check-todos.sh
+        run: ./scripts/run-just.sh ci-check-todos
 
   rust-lint-pr-comments:
     # caveat emptor: actions-rs/clippy-check can only write comments on pull requests
@@ -88,16 +88,11 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
@@ -122,21 +117,18 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
           - profile-key: maxperf-ethhash-logger
-            profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: nightly-2026-07-05
@@ -146,7 +138,7 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Clippy
-        run: cargo clippy --locked ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
+        run: ./scripts/run-just.sh ci-rust clippy ${{ matrix.profile-key }}
 
   test:
     needs: build
@@ -156,21 +148,18 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
           - profile-key: maxperf-ethhash-logger
-            profile-args: "--cargo-profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -180,7 +169,7 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Run tests with cargo-nextest
-        run: cargo nextest run --locked --profile ci --verbose ${{ matrix.profile-args }}
+        run: ./scripts/run-just.sh ci-rust test ${{ matrix.profile-key }}
 
   examples:
     needs: build
@@ -188,21 +177,18 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
           - profile-key: maxperf-ethhash-logger
-            profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -211,15 +197,18 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Run benchmark example
-        run: cargo run --locked ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
+        run: ./scripts/run-just.sh ci-rust benchmark-example ${{ matrix.profile-key }}
       - name: Run insert example
-        run: cargo run --locked ${{ matrix.profile-args }} --example insert
+        run: ./scripts/run-just.sh ci-rust insert-example ${{ matrix.profile-key }}
 
   docs:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -229,30 +218,18 @@ jobs:
           shared-key: "debug-no-features"
       - name: md check
         uses: DavidAnson/markdownlint-cli2-action@ded1f9488f68a970bc66ea5619e13e9b52e601cd # @v23.2.0
-        with:
-          globs: |
-            *.md
-            **/*.md
-            !CHANGELOG.md
-            !target/**
-            !.github/**
-            !.claude/**
       - name: doc generation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
+        run: ./scripts/run-just.sh ci-docs
 
   ffi-check-go-generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - name: Check `go generate` for changes
-        working-directory: ffi
-        run: |
-          go generate
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "go generate resulted in changes to tracked files. Please commit these changes."
-            git --no-pager diff
-            exit 1
-          fi
+        run: ./scripts/run-just.sh ci-check-go-generate
 
   ffi:
     needs: [build, ffi-check-go-generate]
@@ -262,6 +239,9 @@ jobs:
         os: [ubuntu-latest, macos-26]
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -271,7 +251,7 @@ jobs:
           shared-key: "debug-no-features"
       - name: Build Firewood FFI
         working-directory: ffi
-        run: cargo build --locked
+        run: ../scripts/run-just.sh ci-build-ffi firewood
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -280,11 +260,11 @@ jobs:
             ffi/go.sum
             ffi/tools/external/go.sum
       - name: Run golangci-lint
-        run: ./ffi/scripts/lint.sh
+        run: ./scripts/run-just.sh ci-lint-ffi
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
+        run: ../scripts/run-just.sh ci-test-ffi firewood
 
   # Replay recorded C-Chain execution logs against Firewood to catch changes that would break the C-Chain.
   replay-test:
@@ -341,6 +321,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -349,7 +332,7 @@ jobs:
           save-if: "false"
           shared-key: "debug-ethhash-logger"
       - name: Build Firewood FFI (with ethhash)
-        run: cargo build --features ethhash,logger
+        run: ./scripts/run-just.sh ci-build-ffi ethhash
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -358,7 +341,7 @@ jobs:
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test -race ./...
+        run: ../scripts/run-just.sh ci-test-ffi ethhash
       - name: Test Firewood <> Ethereum Differential Fuzz
         working-directory: ffi/tests/eth
         run: |
@@ -383,6 +366,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -391,7 +377,7 @@ jobs:
           save-if: "false"
           shared-key: "debug-no-features"
       - name: Build Firewood FFI
-        run: cargo build -p firewood-ffi
+        run: ./scripts/run-just.sh ci-build-ffi firewood
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -420,6 +406,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: stable
@@ -430,7 +419,7 @@ jobs:
       - name: Install cargo-machete
         run: cargo install cargo-machete
       - name: Check for stale dependencies
-        run: cargo machete --with-metadata
+        run: ./scripts/run-just.sh ci-machete
 
   miri:
     name: miri (path::component slice casts)

@@ -2,6 +2,119 @@
 default:
     ./scripts/run-just.sh --list
 
+# Run a Rust command with a named CI profile.
+ci-rust command profile:
+    ./scripts/run-rust-ci.sh "{{command}}" "{{profile}}"
+
+# Check Rust formatting as CI does.
+ci-format:
+    cargo fmt -- --check
+
+# Check TODO/FIXME annotations as CI does.
+ci-check-todos:
+    ./scripts/check-todos.sh
+
+# Build Rust documentation with CI's warning policy.
+ci-docs:
+    RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
+
+# Lint the Markdown files selected by the shared markdownlint configuration.
+ci-lint-markdown:
+    markdownlint-cli2
+
+# Fix supported Markdown lint errors in the files selected by the shared config.
+fix-markdown:
+    markdownlint-cli2 --fix
+
+# Lint the Go FFI as CI does.
+ci-lint-ffi:
+    ./ffi/scripts/lint.sh
+
+# Check that `go generate` leaves the FFI sources unchanged, as CI does.
+ci-check-go-generate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Compare repository status before and after so pre-existing local
+    # modifications do not count as failures.
+    before=$(git status --porcelain)
+    (cd ffi && go generate)
+    after=$(git status --porcelain)
+    if [[ "$before" != "$after" ]]; then
+        echo "error: go generate resulted in changes to tracked files. Please commit these changes." >&2
+        git --no-pager diff
+        exit 1
+    fi
+
+# Check for unused Rust dependencies as CI does.
+ci-machete:
+    cargo machete --with-metadata
+
+# Build the Go FFI's Rust library for a hash mode.
+ci-build-ffi hash_mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{hash_mode}}" in
+        firewood) features=() ;;
+        ethhash) features=(--features ethhash,logger) ;;
+        *) echo "error: unknown FFI hash mode '{{hash_mode}}'" >&2; exit 2 ;;
+    esac
+    # ${features[@]+…} guard: empty-array expansion errors under `set -u` on
+    # the stock macOS bash 3.2.
+    cargo build --locked -p firewood-ffi ${features[@]+"${features[@]}"}
+
+# Test the Go FFI against a Rust library built for a hash mode.
+ci-test-ffi hash_mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{hash_mode}}" in
+        firewood | ethhash) ;;
+        *) echo "error: unknown FFI hash mode '{{hash_mode}}'" >&2; exit 2 ;;
+    esac
+    cd ffi
+    GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE="{{hash_mode}}" go test -count=1 -race ./...
+
+# Test a Go compatibility suite against the corresponding FFI hash mode.
+ci-test-ffi-compat hash_mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{hash_mode}}" in
+        firewood) test_dir=ffi/tests/firewood ;;
+        ethhash) test_dir=ffi/tests/eth ;;
+        *) echo "error: unknown FFI hash mode '{{hash_mode}}'" >&2; exit 2 ;;
+    esac
+    cd "$test_dir"
+    go test -count=1 -race ./...
+
+# Run macOS-compatible CI lints (all-features/io-uring remains Linux-only).
+lint:
+    ./scripts/run-just.sh ci-format
+    ./scripts/run-just.sh ci-check-todos
+    ./scripts/run-just.sh ci-rust clippy debug-no-default-features
+    ./scripts/run-just.sh ci-rust clippy debug-no-features
+    ./scripts/run-just.sh ci-rust clippy debug-ethhash-logger
+    ./scripts/run-just.sh ci-rust clippy maxperf-ethhash-logger
+    ./scripts/run-just.sh ci-lint-markdown
+    ./scripts/run-just.sh ci-docs
+    ./scripts/run-just.sh ci-lint-ffi
+    ./scripts/run-just.sh ci-check-go-generate
+    ./scripts/run-just.sh ci-machete
+
+# Run macOS-compatible CI unit tests (all-features/fuzz remain Linux-only).
+test:
+    ./scripts/run-just.sh ci-rust test debug-no-default-features
+    ./scripts/run-just.sh ci-rust test debug-no-features
+    ./scripts/run-just.sh ci-rust test debug-ethhash-logger
+    ./scripts/run-just.sh ci-rust test maxperf-ethhash-logger
+    ./scripts/run-just.sh ci-build-ffi firewood
+    ./scripts/run-just.sh ci-test-ffi firewood
+    ./scripts/run-just.sh ci-test-ffi-compat firewood
+    ./scripts/run-just.sh ci-build-ffi ethhash
+    ./scripts/run-just.sh ci-test-ffi ethhash
+    ./scripts/run-just.sh ci-test-ffi-compat ethhash
+
+# Run every macOS-compatible pre-push check, with linting first.
+prepush: lint test
+
 # Regenerate proof wire serialization snapshots for both hash modes.
 #
 # Run this after any intentional change to the proof binary format (ser.rs,

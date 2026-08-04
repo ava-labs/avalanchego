@@ -12,21 +12,18 @@ jobs:
       matrix:
         include:
           - profile-key: debug-no-default-features
-            profile-args: "--no-default-features"
           - profile-key: debug-no-features
-            profile-args: ""
           - profile-key: debug-no-features
-            profile-args: ""
             os: macos-26
           - profile-key: debug-ethhash-logger
-            profile-args: "--features ethhash,logger"
           - profile-key: debug-all-features
-            profile-args: "--all-features"
           - profile-key: maxperf-ethhash-logger
-            profile-args: "--profile maxperf --features ethhash,logger"
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
+        with:
+          tool: just@1.46.0
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
         with:
           toolchain: nightly
@@ -36,4 +33,4 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Clippy
-        run: cargo clippy --locked ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
+        run: ./scripts/run-just.sh ci-rust clippy-nightly ${{ matrix.profile-key }}

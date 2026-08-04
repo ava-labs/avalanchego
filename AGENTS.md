@@ -139,40 +139,77 @@ of the change.
 
 ## PR Strategy
 
-Before submitting/updating a PR, run the following
+Before submitting or updating a PR, run the local pre-push checks:
 
 ```bash
-cargo fmt                                                               # Format code
-cargo nextest run --workspace --features ethhash,logger --all-targets   # Run tests
-cargo +nightly-2026-07-05 clippy --workspace --features ethhash,logger --all-targets                    # Linter
-cargo +nightly-2026-07-05 clippy --profile maxperf --features ethhash,logger --workspace --all-targets  # Linter (maxperf: debug-assertions off)
-cargo doc --no-deps                                                     # Ensure docs build
+just prepush
 ```
+
+This runs `just lint` followed by `just test`. These recipes use the same
+lower-level `ci-*` recipes as GitHub Actions, keeping the local and CI commands
+in sync. Run either phase separately while iterating:
+
+```bash
+just lint
+just test
+```
+
+If `just` is not installed, use `./scripts/run-just.sh prepush`. The wrapper
+uses `just` when available, falls back to Nix when available, and otherwise
+prints installation instructions.
+
+The complete set of Rust profile names and Cargo arguments, including
+Linux-only profiles, is defined in `scripts/run-rust-ci.sh`. The macOS-compatible
+Just recipes select the portable subset, while CI uses the full set. The
+Justfile and CI workflows should pass profile names instead of duplicating Cargo
+feature and profile arguments. When changing a CI Rust matrix, update the shared
+script and both callers as needed.
 
 All tests must pass, and there should be no clippy warnings.
 
 ### Slow Tests
 
-If your PR modifies code that is tested by any test prefixed with `test_slow_`, you should also run the full test suite with the `ci` profile to ensure those tests pass:
+`just test` runs every portable Rust test profile with nextest's `ci` profile,
+so tests prefixed with `test_slow_` are included automatically. Targeted or
+default-profile test commands are useful during development, but do not replace
+`just test` before pushing.
+
+### Linux-only Checks
+
+The local `lint`, `test`, and `prepush` recipes are designed to run on macOS.
+They intentionally omit CI checks that require Linux:
+
+- The `debug-all-features` Rust profile enables `io-uring`.
+- Differential fuzz jobs use Linux-specific resource limits and tooling.
+
+GitHub Actions remains authoritative for these checks. To reproduce the
+all-features Rust checks, use a Linux development environment and run:
 
 ```bash
-cargo nextest run --workspace --features ethhash,logger --all-targets --profile ci
+just ci-rust clippy debug-all-features
+just ci-rust test debug-all-features
 ```
 
-The `ci` profile includes slow tests that are skipped in the default profile for faster local development.
+Do not add Linux-only commands to the macOS-compatible aggregate recipes.
+
+Two further CI checks have no local aggregate equivalent: the license-header
+check (a GitHub Action) and the `examples` job. The examples can be run
+manually with `just ci-rust benchmark-example <profile>` and
+`just ci-rust insert-example <profile>`.
 
 ### Markdown Linter
 
-If your PR touches any Markdown file, run the following:
+`just lint` and `just prepush` run the Markdown checks used by CI. To run only
+the repository-wide Markdown check, use:
 
 ```bash
-markdownlint-cli2 .
+just ci-lint-markdown
 ```
 
 If the linter fails, run the following to fix any lint errors:
 
 ```bash
-markdownlint-cli2 . --fix
+just fix-markdown
 ```
 
 If you don't have `markdownlint-cli2` available on your system, run the
@@ -212,7 +249,8 @@ Key dependencies are centrally managed in workspace `Cargo.toml`:
    blocks without documentation and strong justification. Unsafe code could be
    utilized in the `ffi` crate.
 
-2. **Testing**: Any changes should include appropriate tests. Run `cargo nextest run --release` to verify.
+2. **Testing**: Any changes should include appropriate tests. Run targeted tests
+   while iterating and `./scripts/run-just.sh prepush` before handoff.
 
 3. **Performance Context**: This is a database designed for blockchain state. Performance matters. Consider allocation patterns and hot paths.
 
@@ -220,7 +258,9 @@ Key dependencies are centrally managed in workspace `Cargo.toml`:
 
 5. **Feature Flags**: Be aware of `ethhash` feature flag when discussing Ethereum compatibility vs. default merkledb compatibility.
 
-6. **Documentation**: Public APIs should be well-documented. Run `cargo doc --no-deps` to check.
+6. **Documentation**: Public APIs should be well-documented. The documentation
+   check is included in `./scripts/run-just.sh lint`; run `./scripts/run-just.sh ci-docs` to invoke it
+   separately.
 
 7. **Workspace Awareness**: This is a multi-crate workspace. Changes may affect multiple crates. Check `Cargo.toml` for workspace structure.
 
