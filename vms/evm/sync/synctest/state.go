@@ -67,13 +67,13 @@ func NewStateFixture(t *testing.T, descs []AccountDesc) *StateFixture {
 	require.NoError(t, err)
 
 	for i, d := range descs {
-		accountHash := AccountKey(uint64(i + 1))
+		accountHash := HashedKey(uint64(i + 1))
 
 		storageRoot := types.EmptyRootHash
 		if d.StorageSize > 0 {
 			st, ok := bySize[d.StorageSize]
 			if !ok {
-				root, keys, vals := FillTrie(t, trieDB, d.StorageSize)
+				root, keys, vals := FillTrieDistributed(t, trieDB, d.StorageSize)
 				st = &StorageFixture{Root: root, Keys: keys, Vals: vals}
 				bySize[d.StorageSize] = st
 				f.Storage[root] = st
@@ -122,9 +122,11 @@ func NewStateFixture(t *testing.T, descs []AccountDesc) *StateFixture {
 	return f
 }
 
-// AccountKey returns the 32-byte account trie key for the i-th account.
-func AccountKey(i uint64) []byte {
-	key := make([]byte, common.HashLength)
-	binary.BigEndian.PutUint64(key, i)
-	return key
+// HashedKey returns the 32-byte trie key for the i-th entry. Keys are hashed so they
+// spread across the key space, matching real account and slot keys, which is what
+// makes prefix segmentation meaningful.
+func HashedKey(i uint64) []byte {
+	var idx [8]byte
+	binary.BigEndian.PutUint64(idx[:], i)
+	return crypto.Keccak256(idx[:])
 }
