@@ -4,10 +4,10 @@
 package evmstate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -25,61 +25,86 @@ import (
 const defaultLeafWorkers = 8
 
 var (
-	errRootRequired      = errors.New("root must be non-zero")
 	errEmptyLeafResponse = errors.New("empty leaf response must include a proof")
 	errTooManyLeaves     = errors.New("more leaves returned than requested")
 	errInvalidRangeProof = errors.New("invalid range proof")
 	errMoreWithoutKeys   = errors.New("more leaves reported but none returned")
-	errRootMismatch      = errors.New("reconstructed root does not match target")
 )
 
-// task is one unit of leaf work the pool drives: a contiguous key range of a trie
-// with callbacks for each verified batch and for completion. Implemented by [stateSegment].
+// leafBatch is a verified run of leaves in ascending key order. keys and vals are
+// index-aligned, guaranteed by the range proof that produced them.
+type leafBatch struct {
+	keys [][]byte
+	vals [][]byte
+}
+
+// lastKey returns the highest key, the next request's start. Not valid when empty.
+func (b leafBatch) lastKey() []byte {
+	return b.keys[len(b.keys)-1]
+}
+
+// truncate drops leaves past end and reports whether it cut any, meaning the range is
+// exhausted. An empty end is a no-op.
+func (b *leafBatch) truncate(end []byte) bool {
+	if len(end) == 0 {
+		return false
+	}
+	// Keys ascend, so the first one past end bounds the batch.
+	n := sort.Search(len(b.keys), func(i int) bool { return !withinRange(b.keys[i], end) })
+	if n == len(b.keys) {
+		return false
+	}
+	b.keys, b.vals = b.keys[:n], b.vals[:n]
+	return true
+}
+
+// task is one unit of leaf work the fetcher drives: a contiguous key range of a trie,
+// with callbacks per batch and on completion. Implemented by [stateSegment].
 type task interface {
 	Root() common.Hash
 	Account() common.Hash
 	Start() []byte
 	// End is the inclusive last key of the range, or nil for the whole trie.
 	End() []byte
-	OnLeaves(ctx context.Context, keys, vals [][]byte) error
+	OnLeaves(ctx context.Context, batch leafBatch) error
 	OnFinish(ctx context.Context) error
 }
 
-// callbackSyncer reconstructs tries with a pool of workers pulling tasks from a
-// channel. Each worker walks its task's range left to right, verifying every batch
-// in the fetch path ([getLeaves]) client-side rather than in the transport.
-type callbackSyncer struct {
+// leafFetcher pulls tasks off a channel and fetches each one's leaves with a pool of
+// workers, handing every batch to the task, which is what reconstructs. Batches are
+// verified in the fetch path, not in the transport.
+type leafFetcher struct {
 	log        logging.Logger
 	client     *Client
 	tasks      <-chan task
 	numWorkers int
 }
 
-func newCallbackSyncer(log logging.Logger, client *Client, tasks <-chan task, numWorkers int) *callbackSyncer {
+func newLeafFetcher(log logging.Logger, client *Client, tasks <-chan task, numWorkers int) *leafFetcher {
 	if numWorkers <= 0 {
 		numWorkers = defaultLeafWorkers
 	}
-	return &callbackSyncer{log: log, client: client, tasks: tasks, numWorkers: numWorkers}
+	return &leafFetcher{log: log, client: client, tasks: tasks, numWorkers: numWorkers}
 }
 
 // sync runs the workers until tasks is drained and closed, or ctx ends.
-func (c *callbackSyncer) sync(ctx context.Context) error {
+func (f *leafFetcher) sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
-	for range c.numWorkers {
-		eg.Go(func() error { return c.workerLoop(egCtx) })
+	for range f.numWorkers {
+		eg.Go(func() error { return f.workerLoop(egCtx) })
 	}
 	return eg.Wait()
 }
 
 // workerLoop processes tasks until the channel closes or ctx ends.
-func (c *callbackSyncer) workerLoop(ctx context.Context) error {
+func (f *leafFetcher) workerLoop(ctx context.Context) error {
 	for {
 		select {
-		case t, ok := <-c.tasks:
+		case t, ok := <-f.tasks:
 			if !ok {
 				return nil
 			}
-			if err := c.syncTask(ctx, t); err != nil {
+			if err := f.syncTask(ctx, t); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -88,66 +113,55 @@ func (c *callbackSyncer) workerLoop(ctx context.Context) error {
 	}
 }
 
-// syncTask requests the task's range left to right, truncating anything past End,
-// and finishes when the range is exhausted or End is reached.
-func (c *callbackSyncer) syncTask(ctx context.Context, t task) error {
+// syncTask walks the task's range left to right until it is exhausted or End is reached.
+func (f *leafFetcher) syncTask(ctx context.Context, t task) error {
 	start := t.Start()
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		keys, vals, more, err := getLeaves(ctx, c.log, c.client, t.Root(), t.Account(), start)
+		batch, more, err := f.getLeaves(ctx, t, start)
 		if err != nil {
 			return fmt.Errorf("could not get leaves from %x: %w", start, err)
 		}
 
-		// Truncate keys past End. End is checked client-side, not sent on the wire,
-		// because VerifyRangeProof mishandles an empty response with a non-empty end.
-		done := false
-		if end := t.End(); end != nil && len(keys) > 0 {
-			i := len(keys) - 1
-			for ; i >= 0; i-- {
-				if bytes.Compare(keys[i], end) <= 0 {
-					break
-				}
-				done = true
-			}
-			keys, vals = keys[:i+1], vals[:i+1]
-		}
+		// End is checked client-side, not sent on the wire, because VerifyRangeProof
+		// mishandles an empty response with a non-empty end.
+		exhausted := batch.truncate(t.End())
 
-		if err := t.OnLeaves(ctx, keys, vals); err != nil {
+		if err := t.OnLeaves(ctx, batch); err != nil {
 			return err
 		}
 
-		if done || !more {
+		if exhausted || !more {
 			return t.OnFinish(ctx)
 		}
-		if len(keys) == 0 {
+		if len(batch.keys) == 0 {
 			// more with no keys would loop forever.
 			return errMoreWithoutKeys
 		}
-		start = nextRangeKey(keys[len(keys)-1])
+		start = nextRangeKey(batch.lastKey())
 	}
 }
 
-// getLeaves requests the range at start, verifies the proof, scores the peer, and
-// re-requests on any failure until ctx ends. It returns the leaves and whether more
-// remain to the right.
-func getLeaves(ctx context.Context, log logging.Logger, c *Client, root, account common.Hash, start []byte) ([][]byte, [][]byte, bool, error) {
+// getLeaves requests the range at start, verifies it, scores the peer, and re-requests
+// on any failure until ctx ends. It reports whether more leaves remain to the right.
+func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leafBatch, bool, error) {
+	root := t.Root()
 	req := &syncpb.GetLeafRequest{
 		RootHash:    root.Bytes(),
-		AccountHash: accountBytes(account),
+		AccountHash: accountBytes(t.Account()),
 		StartKey:    start,
 		KeyLimit:    uint32(MaxLeavesLimit),
 	}
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, false, err
+			return leafBatch{}, false, err
 		}
 
 		resp := &syncpb.GetLeafResponse{}
-		outcome, err := c.Send(ctx, req, resp)
+		outcome, err := f.client.Send(ctx, req, resp)
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
 			continue
@@ -156,12 +170,12 @@ func getLeaves(ctx context.Context, log logging.Logger, c *Client, root, account
 		more, err := verifyLeaves(root, start, resp)
 		if err != nil {
 			outcome.Failure()
-			log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+			f.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
 			continue
 		}
 
 		outcome.Success()
-		return resp.GetKeys(), resp.GetValues(), more, nil
+		return leafBatch{keys: resp.GetKeys(), vals: resp.GetValues()}, more, nil
 	}
 }
 
@@ -188,9 +202,10 @@ func verifyLeaves(root common.Hash, start []byte, resp *syncpb.GetLeafResponse) 
 		}
 	}
 
+	// A nil start means the trie's beginning, which VerifyRangeProof wants zero-padded.
 	firstKey := start
 	if firstKey == nil && len(keys) > 0 {
-		firstKey = bytes.Repeat([]byte{0x00}, len(keys[0]))
+		firstKey = make([]byte, len(keys[0]))
 	}
 
 	more, err := trie.VerifyRangeProof(root, firstKey, keys, vals, proof)
@@ -205,11 +220,4 @@ func accountBytes(account common.Hash) []byte {
 		return nil
 	}
 	return account.Bytes()
-}
-
-// nextRangeKey returns the byte-incremented copy of k, the next range's start.
-func nextRangeKey(k []byte) []byte {
-	next := common.CopyBytes(k)
-	incrementBytes(next)
-	return next
 }
