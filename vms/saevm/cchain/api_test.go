@@ -308,26 +308,25 @@ func TestRPCExtras(t *testing.T) {
 }
 
 // TestSynchronousRPCs replays JSON-RPC calls recorded from Coreth and requires
-// an identical response, covering the state, receipt, log, and tracing RPCs at
+// an identical response, covering state, receipt, log, and tracing RPCs at
 // every height for every pre-SAE network upgrade.
 func TestSynchronousRPCs(t *testing.T) {
-	// The fixture was dumped from the database handle the historical C-Chain
-	// VM received, which corresponds to [chainDBPrefix] of the SUT's base
-	// database.
-	fx := corethtest.Load(t)
+	// The fixture's keys are relative to the VM's own database rather than to
+	// the base database that contains it.
+	fixture := corethtest.Load(t)
 	db := memdb.New()
-	fx.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
+	fixture.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
 
 	ctx, sut := newSUT(t,
 		withDB(db),
-		withGenesis(fx.CoreGenesis(t)),
-		withUpgrades(fx.Upgrades),
+		withGenesis(fixture.CoreGenesis(t)),
+		withUpgrades(fixture.Upgrades),
 		// The fixture was generated without pruning, which marked the database
 		// to refuse later pruning runs.
 		withArchival(),
 	)
 
-	for _, call := range fx.RPCCalls {
+	for _, call := range fixture.RPCCalls {
 		t.Run(call.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -353,7 +352,7 @@ func TestSynchronousRPCs(t *testing.T) {
 		cmputils.Headers(),
 		cmpopts.EquateEmpty(),
 	}
-	for _, block := range fx.Blocks {
+	for _, block := range fixture.Blocks {
 		t.Run(fmt.Sprintf("block_%02d_%s", block.Number, block.Fork), func(t *testing.T) {
 			t.Parallel()
 
