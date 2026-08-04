@@ -62,15 +62,14 @@ func TestFixtureUpToDate(t *testing.T) {
 	require.NoError(t, err, "json.MarshalIndent(fixture)")
 
 	if *update {
-		// .editorconfig mandates a final newline in committed files.
-		require.NoError(t, os.WriteFile(fixturePath, append(got, '\n'), 0o644), "os.WriteFile(%s)", fixturePath)
+		require.NoError(t, os.WriteFile(fixturePath, got, 0o644), "os.WriteFile(%s)", fixturePath)
 		return
 	}
 
 	// Both sides are re-encoded from a [synchronoustest.Fixture] so that the
 	// comparison sees content alone, leaving the committed file's formatting to
 	// the write branch above.
-	want, err := json.MarshalIndent(synchronoustest.Load(t), "", "\t")
+	want, err := json.Marshal(synchronoustest.Load(t))
 	require.NoError(t, err, "json.MarshalIndent(committed fixture)")
 	require.JSONEq(t, string(want), string(got), "committed fixture is stale")
 }

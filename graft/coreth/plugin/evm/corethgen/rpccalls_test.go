@@ -44,14 +44,15 @@ func (g *generator) rpcHandler(t *testing.T) http.Handler {
 }
 
 // rpcRequests returns every call to record. It is derived from
-// [synchronoustest.Fixture.Blocks] and [generator.watchedAddresses], so adding a
-// block or a watched account widens the coverage rather than leaving it stale.
+// [synchronoustest.Fixture.Blocks] and [generator.watchedAddresses], so adding
+// a block or a watched account widens the coverage rather than leaving it
+// stale.
 //
 // eth_getBlockByNumber and eth_getBlockByHash are left out on purpose, because
 // SAE doesn't support the totalDifficulty field.
 //
-// eth_feeHistory is left out on purpose too, as it does not matter for historical
-// blocks.
+// eth_feeHistory is left out on purpose too, as it does not matter for
+// historical blocks.
 func (g *generator) rpcRequests(t *testing.T) []rpcRequest {
 	t.Helper()
 

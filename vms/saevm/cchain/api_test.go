@@ -347,6 +347,9 @@ func TestSynchronousRPCs(t *testing.T) {
 
 	// We test block lookups separately because SAE decided not to support
 	// totalDifficulty and always report 0.
+	//
+	// TODO: Once libevm is updated to remove totalDifficulty, we can remove
+	// this special case and test block lookups like any other RPC.
 	opts := cmp.Options{
 		cmputils.Blocks(),
 		cmputils.Headers(),

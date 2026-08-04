@@ -1,8 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package synchronoustest provides a deterministic, pre-generated C-Chain history
-// crossing every pre-SAE network upgrade, for tests that need realistic
+// Package synchronoustest provides a deterministic, pre-generated C-Chain
+// history crossing every pre-SAE network upgrade, for tests that need realistic
 // synchronous blocks.
 package synchronoustest
 
@@ -96,7 +96,7 @@ var fixtureJSON []byte
 //
 // # Recorded RPC responses
 //
-// How the synchronous VM answered queries about that chain. Every height from
+// How the synchronous VM answered queries about the chain. Every height from
 // genesis to the tip is queried, and the accounts queried at each are the two
 // funded EOAs, the transfer recipient, the counter contract, and the blackhole
 // coinbase that burned fees accrue to. Slot 0 is the counter's only storage slot
@@ -143,8 +143,7 @@ func Load(tb testing.TB) *Fixture {
 }
 
 // An RPCCall is a JSON-RPC request and the response the synchronous VM returned
-// for it.
-// Exactly one of Result or Error should be set.
+// for it. Exactly one of Result or Error should be set.
 type RPCCall struct {
 	// Name describes what the call covers and identifies it in test output.
 	Name   string            `json:"name"`
