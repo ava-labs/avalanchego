@@ -12,13 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 func FuzzSummaryRoundTrip(f *testing.F) {
 	f.Add(uint64(0), []byte{})
 	f.Add(uint64(1), []byte{1, 2, 3})
 
-	handler, err := New(Config{}, rawdb.NewMemoryDatabase(), logging.NoLog{})
+	handler, err := New(Config{
+		DBConfig: saedb.Config{CommitInterval: 1},
+	}, rawdb.NewMemoryDatabase(), logging.NoLog{})
 	require.NoError(f, err, "New()")
 	f.Fuzz(func(t *testing.T, height uint64, hashBytes []byte) {
 		summary := NewSummary(common.BytesToHash(hashBytes), height)

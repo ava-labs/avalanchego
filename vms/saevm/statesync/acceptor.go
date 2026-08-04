@@ -22,6 +22,8 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 // called. If this method returns [block.StateSyncSkipped], no state changes
 // were made. Once the state sync is complete, [SummaryHandler.WaitForEvent]
 // will return [common.StateSyncDone].
+//
+// AcceptSummary MUST only be called once.
 func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
 	if s.height == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.

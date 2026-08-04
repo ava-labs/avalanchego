@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -117,8 +118,10 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 
 	reader, err := New(
 		Config{
-			CommitInterval: cfg.commitInterval,
-			Enabled:        cfg.enabled,
+			DBConfig: saedb.Config{
+				CommitInterval: cfg.commitInterval,
+			},
+			Enabled: cfg.enabled,
 		},
 		ethDB,
 		logger,

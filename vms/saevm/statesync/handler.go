@@ -23,8 +23,8 @@ import (
 
 // Config provides all user-configurable information for the [SummaryHandler].
 type Config struct {
-	CommitInterval uint64
-	Enabled        bool
+	DBConfig saedb.Config
+	Enabled  bool
 }
 
 var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
@@ -46,6 +46,9 @@ func New(
 	db ethdb.Database,
 	log logging.Logger,
 ) (*SummaryHandler, error) {
+	if err := cfg.DBConfig.Verify(); err != nil {
+		return nil, err
+	}
 	return &SummaryHandler{
 		cfg:           cfg,
 		db:            db,
@@ -74,7 +77,7 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, err
 		return nil, fmt.Errorf("%w: header not found for %s", database.ErrNotFound, hash)
 	}
 
-	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.CommitInterval)
+	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.DBConfig.CommitInterval)
 	return h.GetStateSummary(ctx, height)
 }
 
@@ -89,7 +92,7 @@ func (*SummaryHandler) GetOngoingSyncStateSummary(context.Context) (*Summary, er
 //
 // TODO(alarso16): don't serve summaries for synchronous blocks.
 func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
-	if height%h.cfg.CommitInterval != 0 {
+	if !saedb.ShouldCommitTrieDB(height, h.cfg.DBConfig.CommitInterval) {
 		// can't serve committed state at this height
 		return nil, database.ErrNotFound
 	}
@@ -137,12 +140,9 @@ func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (i
 	return ids.ID(hash), nil
 }
 
-// lastAcceptedHash returns the hash of the last accepted block.
-// If not found, use in-memory genesis.
+// lastAcceptedHash returns the hash of the last accepted block, and whether
+// one exists.
 func (h *SummaryHandler) lastAcceptedHash() (common.Hash, bool) {
 	hash := rawdb.ReadHeadFastBlockHash(h.db)
-	if hash == (common.Hash{}) {
-		return common.Hash{}, false
-	}
-	return hash, true
+	return hash, hash != (common.Hash{})
 }
