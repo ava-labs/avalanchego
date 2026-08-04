@@ -161,7 +161,7 @@ func NewVM[T hook.Transaction](
 		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding last committed state: %w", err)
 		}
 
 		exec, err := saexec.New(
@@ -182,12 +182,12 @@ func NewVM[T hook.Transaction](
 		vm.toClose = append(vm.toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
 		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
 		vm.consensusCritical = bMap
 

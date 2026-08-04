@@ -130,6 +130,7 @@ var (
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
+	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
@@ -346,19 +347,20 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	// All fields of [hook.Settled] MUST be populated, otherwise state sync
 	// and recovery will not function correctly.
 	settledGasTime := lastSettled.ExecutedByGasTime()
-	ethB, err := builder.BuildBlock(
-		hdr,
-		bCtx,
-		included,
-		receipts,
-		includedOps,
-		hook.Settled{
-			Height:       lastSettled.NumberU64(),
-			GasUnix:      settledGasTime.Unix(),
-			GasNumerator: settledGasTime.Fraction().Numerator,
-			Excess:       settledGasTime.Excess(),
-		},
-	)
+	settled := hook.Settled{
+		Height:       lastSettled.NumberU64(),
+		GasUnix:      settledGasTime.Unix(),
+		GasNumerator: settledGasTime.Fraction().Numerator,
+		Excess:       settledGasTime.Excess(),
+	}
+	if settled == (hook.Settled{}) {
+		// An all-zero marker implies pre-SAE (see [hook.Synchronous]),
+		// executing the block with the worst-case fee in its header.
+		log.Error("Settlement marker would indicate synchronous execution")
+		return nil, errZeroSettledMarker
+	}
+
+	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
 	if err != nil {
 		return nil, err
 	}
