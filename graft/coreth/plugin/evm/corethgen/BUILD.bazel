@@ -1,17 +1,9 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
     "//graft/coreth:__subpackages__",
     "//graft/coreth:external_consumers",
 ])
-
-go_library(
-    name = "corethgen",
-    srcs = ["corethgen.go"],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/corethgen",
-    visibility = ["//visibility:public"],
-)
 
 graft_go_test(
     name = "corethgen_test",
@@ -20,11 +12,10 @@ graft_go_test(
         "generate_test.go",
         "rpccalls_test.go",
     ],
-    embed = [":corethgen"],
     deps = [
         "//chains/atomic",
+        "//database",
         "//graft/coreth/core/extstate",
-        "//graft/coreth/eth/tracers",
         "//graft/coreth/nativeasset",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
@@ -36,10 +27,8 @@ graft_go_test(
         "//graft/coreth/plugin/evm/vmtest",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/constants",
-        "//graft/evm/rpc",
         "//ids",
         "//snow",
-        "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/validators",
