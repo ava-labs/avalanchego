@@ -29,7 +29,7 @@ type metrics struct {
 
 	// executionQueueBlocks are the blocks accepted but not yet executed,
 	// including the one executing. executionQueueGasLimit is the worst-case gas
-	// the blocks on the queue may be charged.
+	// the blocks in the queue may be charged.
 	executionQueueBlocks   prometheus.Gauge
 	executionQueueGasLimit prometheus.Gauge
 
@@ -41,8 +41,9 @@ type metrics struct {
 	// acceptedGasLimit is the acceptance-side counterpart of executedGasLimit.
 	acceptedGasLimit prometheus.Counter
 
-	// lastExecutedGasTime is the latest executed block's gas time.
-	// gasTimeWallTimeGap is its gap to wall time.
+	// lastExecutedGasTime is the latest block's gas time after execution.
+	// gasTimeWallTimeGap is its gap to the wall time immediately after
+	// execution.
 	lastExecutedGasTime prometheus.Gauge
 	gasTimeWallTimeGap  prometheus.Gauge
 
@@ -151,6 +152,11 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 // queue.
 func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.executionQueueBlocks.Inc()
+	// The block's GasUsed is populated during block building as the sum of the
+	// tx gas limits and the end-of-block operations gas.
+	//
+	// TODO(StephenButtolph): Cleanup worst-case bounds tracking on the block to
+	// cleanly expose the worst-case gas usage and base fee.
 	worstCaseGas := float64(block.EthBlock().GasUsed())
 	m.executionQueueGasLimit.Add(worstCaseGas)
 	m.acceptedGasLimit.Add(worstCaseGas)
@@ -164,6 +170,7 @@ func (m *metrics) observeQueueDuration(d time.Duration) {
 // results.
 func (m *metrics) markExecuted(block *blocks.Block, results *ExecutionResults) {
 	m.executionQueueBlocks.Dec()
+	// MUST use the same worst-case gas value as [metrics.markEnqueued].
 	worstCaseGas := float64(block.EthBlock().GasUsed())
 	m.executionQueueGasLimit.Sub(worstCaseGas)
 	m.executedGasCharged.Add(float64(results.GasConsumed))
