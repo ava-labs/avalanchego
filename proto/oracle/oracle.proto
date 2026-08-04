@@ -13,8 +13,8 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/oracle";
 
 // OracleSidecar is implemented by the process that queries the source chain
 // (e.g. a Solana RPC node). The validator calls Verify once per cache miss on
-// the oracle signature handler (p2p handler ID 4). The sidecar must be safe
-// for concurrent calls.
+// the oracle signature handler (see p2p.OracleSignatureRequestHandlerID). The
+// sidecar must be safe for concurrent calls.
 service OracleSidecar {
   // Verify checks that the event described by the OracleMessage actually
   // occurred on the source chain. Returns OK on success, INVALID_ARGUMENT if

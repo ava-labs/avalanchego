@@ -35,8 +35,8 @@ const (
 //
 // OracleSidecar is implemented by the process that queries the source chain
 // (e.g. a Solana RPC node). The validator calls Verify once per cache miss on
-// the oracle signature handler (p2p handler ID 4). The sidecar must be safe
-// for concurrent calls.
+// the oracle signature handler (see p2p.OracleSignatureRequestHandlerID). The
+// sidecar must be safe for concurrent calls.
 type OracleSidecarClient interface {
 	// Verify checks that the event described by the OracleMessage actually
 	// occurred on the source chain. Returns OK on success, INVALID_ARGUMENT if
@@ -69,8 +69,8 @@ func (c *oracleSidecarClient) Verify(ctx context.Context, in *VerifyRequest, opt
 //
 // OracleSidecar is implemented by the process that queries the source chain
 // (e.g. a Solana RPC node). The validator calls Verify once per cache miss on
-// the oracle signature handler (p2p handler ID 4). The sidecar must be safe
-// for concurrent calls.
+// the oracle signature handler (see p2p.OracleSignatureRequestHandlerID). The
+// sidecar must be safe for concurrent calls.
 type OracleSidecarServer interface {
 	// Verify checks that the event described by the OracleMessage actually
 	// occurred on the source chain. Returns OK on success, INVALID_ARGUMENT if
