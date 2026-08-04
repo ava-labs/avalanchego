@@ -35,8 +35,6 @@ var (
 	ErrCalldataNotWordSized = errors.New("calldata arguments are not 32-byte aligned")
 	ErrBadABIPadding        = errors.New("non-zero padding in an ABI argument")
 	ErrBadABIOffset         = errors.New("bad ABI dynamic argument offset")
-	ErrValueNotAllowed      = errors.New("this call must not carry value")
-	ErrValueRequired        = errors.New("this call requires a stake value")
 )
 
 func ethSelector(signature string) [4]byte {
