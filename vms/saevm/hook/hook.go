@@ -221,8 +221,7 @@ type Settled struct {
 }
 
 // Synchronous reports whether the header is that of a synchronously executed
-// (pre-SAE) block. Unlike `blocks.Block.Synchronous`, which is only set on
-// restoration from the database, it holds for any block.
+// (pre-SAE) block.
 func Synchronous(h Points, hdr *types.Header) bool {
 	return h.SettledBy(hdr) == (Settled{})
 }
