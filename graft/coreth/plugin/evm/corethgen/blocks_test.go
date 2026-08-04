@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -41,6 +42,10 @@ import (
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+// sendWarpMessageBlock is the height of the block whose sendWarpMessage logs
+// the warp precompile's SendWarpMessage event.
+const sendWarpMessageBlock uint64 = 16
 
 // buildAllBlocks accepts the fixture's blocks in height order, advancing the
 // VM clock across each upgrade boundary so that each block is built under
@@ -67,7 +72,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhase2", "legacy transfer in the Berlin activation block (the pool rejects typed transactions until the head is in Berlin)",
 		g.transferTx(t, 14),
 	)
-	require.Equal(t, params.TestUpgradechainBerlinBlock, g.tip(), "Berlin (AP2) activation block height")
+	require.Equal(t, params.TestFixtureBerlinBlock, g.tip(), "Berlin (AP2) activation block height")
 
 	g.advanceClock(originalBlockDelay)
 	g.buildEthBlock(t, "apricotPhase2", "access-list (EIP-2930) transfer, the transaction type Berlin introduces",
@@ -78,7 +83,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhase3", "plain transfer in the London activation block (the atomic mempool prices imports by head rules, so imports wait until the head is in AP3)",
 		g.transferTx(t, 16),
 	)
-	require.Equal(t, params.TestUpgradechainLondonBlock, g.tip(), "London (AP3) activation block height")
+	require.Equal(t, params.TestFixtureLondonBlock, g.tip(), "London (AP3) activation block height")
 
 	g.advanceClock(originalBlockDelay)
 	g.buildBlock(t, "apricotPhase3", "single atomic import of AVAX (pre-AP5 extData encoding) under dynamic fees",
@@ -277,12 +282,12 @@ func (g *generator) rules() extras.Rules {
 }
 
 // gasPrice returns the lowest gas price the NEXT block's rules accept, which
-// the fixture's legacy transactions all pay. AP1 lowered the floor from 470 to
-// 225 gwei, and from AP3 the floor is the block's base fee, which starts at 225
-// gwei and only falls while blocks stay empty.
+// the fixture's legacy transactions all pay. The launch rules set a fixed
+// floor, AP1 lowers it, and from AP3 the floor is the block's base fee, which
+// the fixture's near-empty blocks never drive above AP1's value.
 func (g *generator) gasPrice() *big.Int {
 	if g.rules().IsApricotPhase1 {
-		return vmtest.InitialBaseFee
+		return big.NewInt(ap1.MinGasPrice)
 	}
 	return big.NewInt(ap0.MinGasPrice)
 }
@@ -500,7 +505,7 @@ func (g *generator) exportAVAX(t *testing.T, amount uint64) *corethatomic.Tx {
 
 func (g *generator) sendWarpMessageTx(t *testing.T) *types.Transaction {
 	t.Helper()
-	input, err := warpcontract.PackSendWarpMessage([]byte("upgradechain fixture warp payload"))
+	input, err := warpcontract.PackSendWarpMessage([]byte("coreth fixture warp payload"))
 	require.NoError(t, err, "warp.PackSendWarpMessage()")
 	return g.signedTx(t, &types.LegacyTx{
 		Nonce:    g.nonce(),
@@ -518,7 +523,7 @@ func (g *generator) verifiedWarpMessageTx(t *testing.T) *types.Transaction {
 
 	addressedPayload, err := payload.NewAddressedCall(
 		vmtest.TestEthAddrs[0].Bytes(),
-		[]byte("upgradechain fixture verified payload"),
+		[]byte("coreth fixture verified payload"),
 	)
 	require.NoError(t, err, "payload.NewAddressedCall()")
 	unsignedMessage, err := avalanchewarp.NewUnsignedMessage(

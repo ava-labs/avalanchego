@@ -115,7 +115,7 @@ func generate(t *testing.T) *corethtest.Fixture {
 	// The fixture's dedicated chain ID selects the pinned Berlin and London
 	// activation heights that let the chain cross AP2 and AP3 mid-chain.
 	genesis := vmtest.NewTestGenesis(paramstest.ForkToChainConfig[upgradetest.NoUpgrades])
-	genesis.Config.ChainID = params.TestUpgradechainChainID
+	genesis.Config.ChainID = params.TestFixtureChainID
 	genesisJSON, err := json.Marshal(genesis)
 	require.NoError(t, err, "json.Marshal(genesis)")
 
@@ -183,7 +183,7 @@ func (g *generator) configureValidatorState(t *testing.T) {
 	vdrState.GetSubnetIDF = func(context.Context, ids.ID) (ids.ID, error) {
 		return constants.PrimaryNetworkID, nil
 	}
-	vdrState.GetWarpValidatorSetsF = func(_ context.Context, height uint64) (map[ids.ID]validators.WarpSet, error) {
+	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 		return map[ids.ID]validators.WarpSet{
 			constants.PrimaryNetworkID: g.warpValidators.WarpSet(),
 		}, nil

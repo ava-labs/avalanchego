@@ -7,6 +7,7 @@ package(default_visibility = [
 
 go_library(
     name = "corethtest",
+    testonly = True,
     srcs = ["corethtest.go"],
     embedsrcs = ["fixture.json"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest",

@@ -43,10 +43,6 @@ func (g *generator) rpcHandler(t *testing.T) http.Handler {
 	return handler
 }
 
-// sendWarpMessageBlock's sendWarpMessage logs the warp precompile's
-// SendWarpMessage event.
-const sendWarpMessageBlock uint64 = 16
-
 // rpcRequests returns every call to record. It is derived from
 // [corethtest.Fixture.Blocks] and [generator.watchedAddresses], so adding a
 // block or a watched account widens the coverage rather than leaving it stale.

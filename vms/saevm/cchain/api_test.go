@@ -376,7 +376,7 @@ func TestSynchronousRPCs(t *testing.T) {
 
 // decodeRPCResult decodes a JSON-RPC result into its generic Go representation,
 // so that responses are compared by content rather than by encoding. Numbers
-// are preserved as [avajson.Number] to avoid precision loss.
+// are preserved as [json.Number] to avoid precision loss.
 func decodeRPCResult(tb testing.TB, raw json.RawMessage) any {
 	tb.Helper()
 
