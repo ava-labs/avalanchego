@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
