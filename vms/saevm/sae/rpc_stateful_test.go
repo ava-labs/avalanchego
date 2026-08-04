@@ -477,6 +477,7 @@ func TestDebugTrace(t *testing.T) {
 			cmpopts.IgnoreFields(logger.ExecutionResult{}, "ReturnValue"),
 			cmpopts.EquateEmpty(),
 		)...)
+	})
 
 	// wantBlockHash returns the results of tracing the block, ech frame should
 	// report the block's own hash.
