@@ -108,6 +108,13 @@ func (a *ethAPI) ethBlock(blk block.Block, fullTxs bool) (map[string]any, error)
 
 	parentID := blk.Parent()
 	blkID := blk.ID()
+	// geth's ethclient rejects a block whose transactionsRoot says "empty"
+	// while the tx list is not (and vice versa), so mark non-empty blocks with
+	// a synthetic root derived from the block ID.
+	txRoot := ethtypes.EmptyRootHash.Hex()
+	if len(txHashes) > 0 {
+		txRoot = "0x" + hex.EncodeToString(blkID[:])
+	}
 	return map[string]any{
 		"number":           hexUint(blk.Height()),
 		"hash":             "0x" + hex.EncodeToString(blkID[:]),
@@ -125,7 +132,7 @@ func (a *ethAPI) ethBlock(blk block.Block, fullTxs bool) (map[string]any, error)
 		"mixHash":          ethcommon.Hash{}.Hex(),
 		"sha3Uncles":       ethtypes.EmptyUncleHash.Hex(),
 		"stateRoot":        ethtypes.EmptyRootHash.Hex(),
-		"transactionsRoot": ethtypes.EmptyRootHash.Hex(),
+		"transactionsRoot": txRoot,
 		"receiptsRoot":     ethtypes.EmptyRootHash.Hex(),
 		"logsBloom":        logsBloomHex(allLogs),
 		"size":             hexUint(uint64(len(blk.Bytes()))),

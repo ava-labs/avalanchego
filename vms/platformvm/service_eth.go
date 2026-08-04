@@ -147,14 +147,11 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		return a.getTransactionByHash(hash)
 
 	case "eth_call":
-		var call struct {
-			To   *ethcommon.Address `json:"to"`
-			Data hexBytes           `json:"data"`
-		}
+		var call ethCallArgs
 		if err := parseParam(req.Params, 0, &call); err != nil {
 			return nil, err
 		}
-		return a.ethCall(call.To, call.Data)
+		return a.ethCall(call.To, call.calldata())
 
 	case "eth_getLogs":
 		var filter logFilter
@@ -166,13 +163,11 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 	case "eth_estimateGas":
 		// Exact: complexity is defined from semantic fields only, so the gas
 		// a call object implies equals the gas its signed tx will be charged.
-		var call struct {
-			Data hexBytes `json:"data"`
-		}
+		var call ethCallArgs
 		if err := parseParam(req.Params, 0, &call); err != nil {
 			return nil, err
 		}
-		complexity := fee.EthRLPTxComplexity(len(call.Data))
+		complexity := fee.EthRLPTxComplexity(len(call.calldata()))
 		txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
 		if err != nil {
 			return nil, err
@@ -474,6 +469,21 @@ func rlpKey(txID ids.ID) []byte {
 
 func hexUint(v uint64) string {
 	return fmt.Sprintf("0x%x", v)
+}
+
+// ethCallArgs is the eth_call/eth_estimateGas call object. Calldata arrives
+// as "input" from geth-derived clients and as "data" from older ones.
+type ethCallArgs struct {
+	To    *ethcommon.Address `json:"to"`
+	Data  hexBytes           `json:"data"`
+	Input hexBytes           `json:"input"`
+}
+
+func (c *ethCallArgs) calldata() []byte {
+	if len(c.Input) != 0 {
+		return c.Input
+	}
+	return c.Data
 }
 
 // hexBytes json-unmarshals a "0x..." string.

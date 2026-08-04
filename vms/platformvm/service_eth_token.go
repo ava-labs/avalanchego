@@ -86,8 +86,9 @@ func (a *ethAPI) ethCall(to *ethcommon.Address, data []byte) (any, error) {
 
 // stakedNAVAX sums the weight of active eth-authorized stakers, all of them
 // for a nil owner or only those whose reward owner is [owner]. Eth-authorized
-// staker txs are recognizable by having no credentials: every native staker tx
-// carries at least one.
+// staker txs are recognizable by declaring inputs while carrying no
+// credentials: native staker txs always carry credentials, and genesis staker
+// txs carry neither credentials nor inputs.
 // ponytail: O(current staker set) per call; maintain a running index if this
 // ever fronts real traffic.
 func (a *ethAPI) stakedNAVAX(owner *ids.ShortID) (uint64, error) {
@@ -110,8 +111,14 @@ func (a *ethAPI) stakedNAVAX(owner *ids.ShortID) (uint64, error) {
 		var rewardsOwner *secp256k1fx.OutputOwners
 		switch unsigned := tx.Unsigned.(type) {
 		case *txs.AddPermissionlessDelegatorTx:
+			if len(unsigned.Ins) == 0 {
+				continue // genesis staker
+			}
 			rewardsOwner, _ = unsigned.DelegationRewardsOwner.(*secp256k1fx.OutputOwners)
 		case *txs.AddPermissionlessValidatorTx:
+			if len(unsigned.Ins) == 0 {
+				continue // genesis staker
+			}
 			rewardsOwner, _ = unsigned.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
 		default:
 			continue
@@ -133,7 +140,9 @@ func (a *ethAPI) stakedNAVAX(owner *ids.ShortID) (uint64, error) {
 // amount). Plain transfers emit nothing.
 func stakeLogs(unsigned *txs.EthRLPTx, record *ethReceiptRecord, ethHash ethcommon.Hash) []*ethtypes.Log {
 	if !unsigned.IsStakingCall() {
-		return nil
+		// Non-nil so JSON callers get [] rather than null; geth's receipt
+		// decoder requires the field.
+		return []*ethtypes.Log{}
 	}
 	value := navaxToWei(unsigned.AmountNAVAX)
 	return []*ethtypes.Log{{
