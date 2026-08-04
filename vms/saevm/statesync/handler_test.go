@@ -212,7 +212,7 @@ func TestLastAccepted(t *testing.T) {
 
 			got, err := sut.LastAccepted(t.Context())
 			require.NoError(t, err, "LastAccepted()")
-			require.Equal(t, ids.ID(last.Hash()), got)
+			require.Equal(t, last.ID(), got)
 		})
 	}
 }
@@ -227,7 +227,7 @@ func TestBlock(t *testing.T) {
 		for _, b := range sut.blocks {
 			got, err := sut.GetBlockIDAtHeight(t.Context(), b.Height())
 			require.NoErrorf(t, err, "GetBlockIDAtHeight(%d)", b.Height())
-			require.Equalf(t, ids.ID(b.Hash()), got, "GetBlockIDAtHeight(%d)", b.Height())
+			require.Equalf(t, b.ID(), got, "GetBlockIDAtHeight(%d)", b.Height())
 		}
 
 		_, err := sut.GetBlockIDAtHeight(t.Context(), numBlocks+1)
@@ -236,7 +236,7 @@ func TestBlock(t *testing.T) {
 
 	t.Run("GetBlock", func(t *testing.T) {
 		for _, b := range sut.blocks {
-			got, err := sut.GetBlock(t.Context(), ids.ID(b.Hash()))
+			got, err := sut.GetBlock(t.Context(), b.ID())
 			require.NoErrorf(t, err, "GetBlock(%s)", b.ID())
 			require.Equalf(t, b.Hash(), got.Hash(), "GetBlock(%s).Hash()", b.ID())
 			require.Equalf(t, b.Height(), got.Height(), "GetBlock(%s).Height()", b.ID())

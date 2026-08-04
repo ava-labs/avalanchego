@@ -40,7 +40,7 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.S
 
 	go func() {
 		// TODO(alarso16): implement state sync
-		close(h.stateSyncDone)
+		defer close(h.stateSyncDone)
 	}()
 
 	return block.StateSyncStatic, nil

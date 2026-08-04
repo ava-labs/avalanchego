@@ -6,6 +6,8 @@ package statesync
 import (
 	"context"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,40 +87,36 @@ func TestAcceptSummary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// The fully initialized VM spawns goroutines that outlive Shutdown()
+			// so it must be constructed outside the synctest bubble.
 			src := newSUT(t, withNumBlocks(numBlocks))
 			s, err := src.GetStateSummary(t.Context(), tt.summaryHeight)
 			require.NoErrorf(t, err, "%T.GetStateSummary(%d)", src.SummaryHandler, tt.summaryHeight)
 
-			sut := newSUT(t, append(tt.opts, withEnabled(true))...)
+			synctest.Test(t, func(t *testing.T) {
+				// MUST be constructed inside the bubble to ensure durable blocking.
+				sut := newSUT(t, append(tt.opts, withEnabled(true))...)
+				mode, err := sut.AcceptSummary(t.Context(), s)
+				require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
+				require.Equalf(t, tt.want, mode, "%T.AcceptSummary()", sut.SummaryHandler)
 
-			mode, err := sut.AcceptSummary(t.Context(), s)
-			require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
-			require.Equalf(t, tt.want, mode, "%T.AcceptSummary()", sut.SummaryHandler)
+				// The fake clock only advances once all goroutines in the
+				// bubble are durably blocked.
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+				defer cancel()
 
-			type waitResult struct {
-				msg common.Message
-				err error
-			}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			done := make(chan waitResult, 1)
-			go func() {
+				var (
+					wantMsg = common.StateSyncDone
+					wantErr error
+				)
+				if tt.want == block.StateSyncSkipped {
+					wantMsg = 0
+					wantErr = context.DeadlineExceeded
+				}
 				msg, err := sut.WaitForEvent(ctx)
-				done <- waitResult{msg: msg, err: err}
-			}()
-
-			var (
-				wantMsg = common.StateSyncDone
-				wantErr error
-			)
-			if tt.want == block.StateSyncSkipped {
-				cancel()
-				wantMsg = 0
-				wantErr = context.Canceled
-			}
-			r := <-done
-			assert.ErrorIsf(t, r.err, wantErr, "%T.WaitForEvent()", sut.SummaryHandler) //nolint:testifylint // msg is informative
-			assert.Equalf(t, wantMsg, r.msg, "%T.WaitForEvent()", sut.SummaryHandler)
+				assert.ErrorIsf(t, err, wantErr, "%T.WaitForEvent()", sut.SummaryHandler) //nolint:testifylint // msg is informative
+				assert.Equalf(t, wantMsg, msg, "%T.WaitForEvent()", sut.SummaryHandler)
+			})
 		})
 	}
 }
