@@ -68,9 +68,8 @@ type Points interface {
 	BlockTime(h *types.Header) time.Time
 	// SettledBy returns the extra information for the settled block of the
 	// provided header. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock] and MUST be the zero value only for a
-	// synchronously executed (pre-SAE) header, by which [Synchronous] detects
-	// them.
+	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
+	// executed (pre-SAE) headers.
 	SettledBy(*types.Header) Settled
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
