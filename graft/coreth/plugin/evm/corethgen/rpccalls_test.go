@@ -49,6 +49,9 @@ func (g *generator) rpcHandler(t *testing.T) http.Handler {
 //
 // eth_getBlockByNumber and eth_getBlockByHash are left out on purpose, because
 // SAE doesn't support the totalDifficulty field.
+//
+// eth_feeHistory is left out on purpose too, as it does not matter for historical
+// blocks.
 func (g *generator) rpcRequests(t *testing.T) []rpcRequest {
 	t.Helper()
 
