@@ -105,20 +105,30 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
+	tracker, err := saedb.NewTracker(
+		db,
+		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
+		genesis.PostExecutionStateRoot(),
+		snowCtx.ChainDataDir,
+		snowCtx.Log,
+	)
+	require.NoError(t, err, "saedb.NewTracker()")
+
 	exec, err := saexec.New(
 		genesis,
+		tracker,
 		src.AsHeaderSource(),
 		config,
 		db,
 		xdb,
-		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
 		hookstest.NewStub(gasTarget),
-		snowCtx,
+		snowCtx.Log,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
+		require.NoErrorf(t, tracker.Close(exec.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tracker)
 	})
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())

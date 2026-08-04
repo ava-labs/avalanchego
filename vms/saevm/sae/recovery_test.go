@@ -80,8 +80,7 @@ func TestRecoverAfterCrash(t *testing.T) {
 
 // TestRecoverWithBLOCKHASH restarts a VM whose accepted-but-uncommitted blocks
 // carry transactions that read historical block hashes via the BLOCKHASH
-// opcode, forcing their re-execution to look headers up through
-// [blockSources.header].
+// opcode.
 func TestRecoverWithBLOCKHASH(t *testing.T) {
 	t.Parallel()
 

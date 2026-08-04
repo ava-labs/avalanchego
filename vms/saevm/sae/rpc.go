@@ -5,7 +5,6 @@ package sae
 
 import (
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
@@ -28,41 +27,47 @@ func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 	return vm.rpcProvider.GethBackends()
 }
 
-func (vm *VM) chain() saerpc.Chain {
-	return chain{vm, vm.exec, vm.network}
-}
+var _ saerpc.Chain = (*chain)(nil)
 
 type chain struct {
-	*VM
 	*saexec.Executor
-	network *network.Network
+
+	blockBuilder blockBuilder
+	db           ethdb.Database
+	xdb          saetypes.ExecutionResults
+	mempool      *txgossip.Set
+	network      *network.Network
+
+	consensusCritical *syncMap[common.Hash, *blocks.Block]
+	last              *last
+	acceptedBlocks    *event.FeedOf[*blocks.Block]
+
+	hooks     hook.Points
+	rpcConfig saerpc.Config
+	log       logging.Logger
 }
 
-func (c chain) Logger() logging.Logger         { return c.VM.snowCtx.Log }
-func (c chain) Hooks() hook.Points             { return c.hooks }
-func (c chain) DB() ethdb.Database             { return c.db }
-func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
-func (c chain) Mempool() *txgossip.Set         { return c.mempool }
-func (c chain) Peers() *p2p.Peers              { return c.network.Peers }
-func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
-func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
+func (c *chain) Logger() logging.Logger         { return c.log }
+func (c *chain) Hooks() hook.Points             { return c.hooks }
+func (c *chain) DB() ethdb.Database             { return c.db }
+func (c *chain) XDB() saetypes.ExecutionResults { return c.xdb }
+func (c *chain) Mempool() *txgossip.Set         { return c.mempool }
+func (c *chain) Peers() *p2p.Peers              { return c.network.Peers }
+func (c *chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
+func (c *chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
 
-func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
+func (c *chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 	return c.consensusCritical.Load(h)
 }
 
-func (c chain) ResolvePendingToLastExecuted() bool {
-	return c.VM.config.RPCConfig.ResolvePendingToLastExecuted
+func (c *chain) ResolvePendingToLastExecuted() bool {
+	return c.rpcConfig.ResolvePendingToLastExecuted
 }
 
-func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
+func (c *chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
 	return c.blockBuilder.new(eth, parent, lastSettled)
 }
 
-func (c chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
+func (c *chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return c.acceptedBlocks.Subscribe(ch)
-}
-
-func (c chain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return c.Executor.SubscribeChainHeadEvent(ch)
 }

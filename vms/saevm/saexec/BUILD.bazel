@@ -15,7 +15,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
-        "//snow",
         "//utils/logging",
         "//vms/components/gas",
         "//vms/saevm/blocks",

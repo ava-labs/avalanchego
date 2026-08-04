@@ -6,6 +6,7 @@ package saexec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -138,10 +139,18 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
+	tracker, err := saedb.NewTracker(db, saedbConfig, genesis.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
+	require.NoError(tb, err, "saedb.NewTracker()")
+
+	e, err := New(genesis, tracker, src.AsHeaderSource(), config, db, xdb, sutCfg.hooks, snowCtx.Log, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
-	closeOnce := sync.OnceValue(e.Close)
+	closeOnce := sync.OnceValue(func() error {
+		return errors.Join(
+			e.Close(),
+			tracker.Close(e.LastExecuted().PostExecutionStateRoot()),
+		)
+	})
 	tb.Cleanup(func() {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
@@ -924,11 +933,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	last := chain.Last()
 	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
 
-	require.NoErrorf(t, e.Close(), "%T.Close()", e)
-	// [newSUT] creates a cleanup that also calls [Executor.Close], which isn't
-	// valid usage. The simplest workaround is to just replace the quit channel
-	// so it can be closed again.
-	e.quit = make(chan struct{})
+	require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
 
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
@@ -1122,10 +1127,13 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				snowCtx := snowtest.Context(t, ids.GenerateTestID())
 				snowCtx.ChainDataDir = sut.chainDataDir
 				snowCtx.Log = loggingtest.New(t, logging.Debug)
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
+				tracker, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
+				require.NoError(t, err, "saedb.NewTracker()")
+				e, err := New(chain.Last(), tracker, src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, defaultHooks(), snowCtx.Log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+					require.NoErrorf(t, tracker.Close(e.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tracker)
 				})
 
 				for _, b := range chain.AllBlocks() {

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -43,13 +44,16 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
+type last struct {
+	accepted, settled atomic.Pointer[blocks.Block]
+}
+
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
 // ensure that the last-synchronous block (which MAY be the genesis) is
 // canonical on disk with its post-execution state committed before [NewVM] is
 // called.
 type VM struct {
-	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
@@ -60,11 +64,9 @@ type VM struct {
 
 	consensusState utils.Atomic[snow.State]
 
-	preference atomic.Pointer[blocks.Block]
-	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
-	}
-	acceptedBlocks event.FeedOf[*blocks.Block]
+	preference     atomic.Pointer[blocks.Block]
+	last           *last
+	acceptedBlocks *event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
 	// decision; or (b) informing consensus invariants (e.g. artefacts to
 	// settle). The latter is defined as the history of accepted blocks up to,
@@ -76,6 +78,7 @@ type VM struct {
 	blockBuilder blockBuilder
 	rpcProvider  *rpc.Provider
 	newTxs       chan struct{}
+	chain        *chain
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -119,6 +122,13 @@ func NewVM[T hook.Transaction](
 	db ethdb.Database,
 	network *network.Network,
 ) (_ *VM, retErr error) {
+	var toClose []io.Closer
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, closeAll(toClose))
+		}
+	}()
+
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -130,23 +140,6 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
-	m, err := newMetrics(reg)
-	if err != nil {
-		return nil, fmt.Errorf("registering sae metrics: %w", err)
-	}
-	vm := &VM{
-		network: network,
-		hooks:   hooks,
-		config:  cfg,
-		snowCtx: snowCtx,
-		metrics: m,
-		db:      db,
-	}
-	defer func() {
-		if retErr != nil {
-			retErr = errors.Join(retErr, vm.close())
-		}
-	}()
 
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
@@ -154,167 +147,211 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
 	}
-	vm.xdb = xdb
-	vm.toClose = append(vm.toClose, &xdb)
+	toClose = append(toClose, &xdb)
 
-	{ // ==========  Block State  ==========
-		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-		lastCommitted, err := rec.lastCommittedBlock()
-		if err != nil {
-			return nil, fmt.Errorf("finding last committed state: %w", err)
-		}
+	// ==========  Block State  ==========
+	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
+	exec, consensusCritical, execClosers, err := rec.newExecutor(reg)
+	if err != nil {
+		return nil, err
+	}
+	toClose = append(toClose, execClosers...)
 
-		exec, err := saexec.New(
-			lastCommitted,
-			vm.headerSource,
-			chainConfig,
-			db,
-			xdb,
-			cfg.DBConfig,
-			hooks,
-			snowCtx,
-			reg,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("saexec.New(...): %v", err)
-		}
-		vm.exec = exec
-		vm.toClose = append(vm.toClose, exec)
-
-		if err := rec.executeAllAccepted(ctx, exec); err != nil {
-			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
-		}
-
-		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
-		if err != nil {
-			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
-		}
-		vm.consensusCritical = bMap
-
-		head := exec.LastExecuted()
-		vm.last.settled.Store(lastSettled)
-		vm.last.accepted.Store(head)
-		vm.preference.Store(head)
-		vm.metrics.markSettled(lastSettled.Height())
+	if err := rec.executeAllAccepted(ctx, exec); err != nil {
+		return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 	}
 
-	{ // ==========  Mempool  ==========
-		bc := txgossip.NewBlockChain(vm.exec, vm.ethBlockSource)
-		pools := []txpool.SubPool{
-			legacypool.New(cfg.MempoolConfig, bc),
-		}
-		txPool, err := txpool.New(0, bc, pools)
-		if err != nil {
-			return nil, fmt.Errorf("txpool.New(...): %v", err)
-		}
-		vm.toClose = append(vm.toClose, txPool)
-
-		bloomMetrics, err := bloom.NewMetrics("mempool", reg)
-		if err != nil {
-			return nil, err
-		}
-		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		pool, err := txgossip.NewSet(vm.exec, txPool, conf)
-		if err != nil {
-			return nil, err
-		}
-		vm.mempool = pool
-		vm.signalNewTxsToEngine()
+	lastSettled, err := rec.findConsensusCriticalBlocks(exec, consensusCritical)
+	if err != nil {
+		return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
 
-	{ // ==========  Block Builder  ==========
-		vm.blockBuilder = &blockBuilderG[T]{
-			hooks,
-			cfg.Now,
-			snowCtx.Log,
-			vm.exec,
-			vm.mempool,
-			vm.ethBlockSource,
-		}
+	// ==========  Mempool & P2P Gossip  ==========
+	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
+	if err != nil {
+		return nil, err
 	}
+	toClose = append(toClose, mempoolClosers...)
 
-	{ // ==========  P2P Gossip  ==========
-		const pullGossipPeriod = time.Second
-		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
-			snowCtx.NodeID,
-			network.Network,
-			network.ValidatorPeers,
-			vm.mempool,
-			txgossip.Marshaller{},
-			gossip.SystemConfig{
-				Log:           snowCtx.Log,
-				Registry:      reg,
-				Namespace:     "gossip",
-				RequestPeriod: pullGossipPeriod,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("gossip.NewSystem(...): %v", err)
-		}
-		if err := network.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
-			return nil, fmt.Errorf("network.AddHandler(...): %v", err)
-		}
+	newTxs, newTxsCloser := signalNewTxsToEngine(pool)
+	toClose = append(toClose, newTxsCloser)
 
-		var (
-			gossipCtx, cancel = context.WithCancel(context.Background())
-			wg                sync.WaitGroup
-		)
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
-		}()
-		go func() {
-			defer wg.Done()
-			const pushGossipPeriod = 100 * time.Millisecond
-			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
-		}()
-
-		vm.mempool.RegisterPushGossiper(pushGossiper)
-		vm.toClose = append(vm.toClose, closerFunc(func() error {
-			cancel()
-			wg.Wait()
-			return nil
-		}))
+	// ==========  Block Builder ==========
+	blockBuilder := &blockBuilderG[T]{
+		hooks,
+		cfg.Now,
+		snowCtx.Log,
+		exec,
+		pool,
+		ethBlockSource(consensusCritical, db),
 	}
+	acceptedBlocks := &event.FeedOf[*blocks.Block]{}
+	last := &last{}
+	head := exec.LastExecuted()
+	last.settled.Store(lastSettled)
+	last.accepted.Store(head)
 
-	{ // ==========  RPC Provider  ==========
-		r, err := rpc.New(vm.chain(), cfg.RPCConfig)
-		if err != nil {
-			return nil, err
-		}
-		vm.toClose = append(vm.toClose, r)
-		vm.rpcProvider = r
+	// ==========  RPC Provider  ==========
+	chain := &chain{
+		Executor:          exec,
+		network:           network,
+		log:               snowCtx.Log,
+		hooks:             hooks,
+		consensusCritical: consensusCritical,
+		db:                db,
+		xdb:               xdb,
+		mempool:           pool,
+		acceptedBlocks:    acceptedBlocks,
+		rpcConfig:         cfg.RPCConfig,
+		blockBuilder:      blockBuilder,
+		last:              last,
 	}
+	rpcProvider, err := rpc.New(chain, cfg.RPCConfig)
+	if err != nil {
+		return nil, err
+	}
+	toClose = append(toClose, rpcProvider)
 
+	// ==========  Metrics  ==========
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
+	m.markSettled(lastSettled.Height())
+
+	vm := &VM{
+		hooks:             hooks,
+		config:            cfg,
+		snowCtx:           snowCtx,
+		metrics:           m,
+		db:                db,
+		xdb:               xdb,
+		consensusCritical: consensusCritical,
+		exec:              exec,
+		toClose:           toClose,
+		mempool:           pool,
+		newTxs:            newTxs,
+		acceptedBlocks:    acceptedBlocks,
+		last:              last,
+		blockBuilder:      blockBuilder,
+		rpcProvider:       rpcProvider,
+		chain:             chain,
+	}
+	vm.preference.Store(head)
 	return vm, nil
 }
 
-// signalNewTxsToEngine subscribes to the [txpool.TxPool] to unblock
-// [VM.WaitForEvent] when necessary. [VM.Shutdown] MUST be called to release a
-// goroutine started by this method.
-func (vm *VM) signalNewTxsToEngine() {
+// newGossipMempool creates the mempool, registers it with a new p2p gossip
+// system on the network, and starts the pull- and push-gossip loops.
+//
+// The returned closers MUST all be closed, in reverse order, to release the
+// resources and goroutines created by this function; the last closer stops
+// the gossip loops, blocking until they have returned.
+func newGossipMempool(
+	mempoolConfig legacypool.Config,
+	snowCtx *snow.Context,
+	network *network.Network,
+	exec *saexec.Executor,
+	blockSource saetypes.BlockSource,
+	reg prometheus.Registerer,
+) (_ *txgossip.Set, _ []io.Closer, retErr error) {
+	var toClose []io.Closer
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, closeAll(toClose))
+		}
+	}()
+
+	bc := txgossip.NewBlockChain(exec, blockSource)
+	pools := []txpool.SubPool{
+		legacypool.New(mempoolConfig, bc),
+	}
+	txPool, err := txpool.New(0, bc, pools)
+	if err != nil {
+		return nil, nil, fmt.Errorf("txpool.New(...): %v", err)
+	}
+	toClose = append(toClose, txPool)
+
+	bloomMetrics, err := bloom.NewMetrics("mempool", reg)
+	if err != nil {
+		return nil, nil, err
+	}
+	conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
+	mempool, err := txgossip.NewSet(exec, txPool, conf)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	const pullGossipPeriod = time.Second
+	handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
+		snowCtx.NodeID,
+		network.Network,
+		network.ValidatorPeers,
+		mempool,
+		txgossip.Marshaller{},
+		gossip.SystemConfig{
+			Log:           snowCtx.Log,
+			Registry:      reg,
+			Namespace:     "gossip",
+			RequestPeriod: pullGossipPeriod,
+		},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gossip.NewSystem(...): %v", err)
+	}
+	if err := network.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
+		return nil, nil, fmt.Errorf("network.AddHandler(...): %v", err)
+	}
+
+	var (
+		gossipCtx, cancel = context.WithCancel(context.Background())
+		wg                sync.WaitGroup
+	)
+	wg.Go(func() {
+		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
+	})
+	wg.Go(func() {
+		const pushGossipPeriod = 100 * time.Millisecond
+		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
+	})
+
+	mempool.RegisterPushGossiper(pushGossiper)
+	toClose = append(toClose, closerFunc(func() error {
+		cancel()
+		wg.Wait()
+		return nil
+	}))
+	return mempool, toClose, nil
+}
+
+// signalNewTxsToEngine subscribes to the mempool's [txpool.TxPool] to unblock
+// [VM.WaitForEvent] when necessary. The returned channel, on which the
+// subscription's events are signalled, becomes [VM.newTxs]; the returned
+// closer releases the subscription and the goroutine started by this
+// function, and MUST be closed.
+func signalNewTxsToEngine(mempool *txgossip.Set) (chan struct{}, io.Closer) {
 	ch := make(chan core.NewTxsEvent)
-	sub := vm.mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
-	vm.toClose = append(vm.toClose, closerFunc(func() error {
+	sub := mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
+	closer := closerFunc(func() error {
 		defer close(ch)
 		sub.Unsubscribe()
 		return <-sub.Err() // guaranteed to be closed due to unsubscribing
-	}))
+	})
 
 	// See [VM.WaitForEvent] for why this requires a buffer.
-	vm.newTxs = make(chan struct{}, 1)
+	newTxs := make(chan struct{}, 1)
 	go func() {
-		defer close(vm.newTxs)
+		defer close(newTxs)
 		for range ch {
 			select {
-			case vm.newTxs <- struct{}{}:
+			case newTxs <- struct{}{}:
 				_ = 0 // coverage visualisation
 			default:
 				_ = 0 // coverage visualization
 			}
 		}
 	}()
+	return newTxs, closer
 }
 
 // WaitForEvent returns immediately if there are already pending transactions in
@@ -362,12 +399,12 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 
 // Shutdown gracefully closes the VM.
 func (vm *VM) Shutdown(context.Context) error {
-	return vm.close()
+	return closeAll(vm.toClose)
 }
 
-func (vm *VM) close() error {
-	errs := make([]error, len(vm.toClose))
-	for i, c := range slices.Backward(vm.toClose) {
+func closeAll(closers []io.Closer) error {
+	errs := make([]error, len(closers))
+	for i, c := range slices.Backward(closers) {
 		errs[i] = c.Close()
 	}
 	return errors.Join(errs...)
