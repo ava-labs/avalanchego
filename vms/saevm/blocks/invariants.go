@@ -23,7 +23,6 @@ import (
 // WorstCaseBounds define the limits of certain values, predicted by the block
 // builder, that a [Block] will encounter when eventually executed.
 type WorstCaseBounds struct {
-	MaxBaseFee *uint256.Int
 	// LatestEndTime is the worst-case [gastime.Time] after this block's gas has been
 	// consumed and the target updated. Its [gastime.Time.BaseFee] is an upper
 	// bound on the next block's base fee because the next block's
@@ -45,8 +44,8 @@ func (b *Block) WorstCaseBounds() *WorstCaseBounds {
 	return b.bounds
 }
 
-// CheckBaseFeeBound logs at ERROR if the `actual` base fee is greater than the
-// predicted upper bound passed to [Block.SetWorstCaseBounds].
+// CheckBaseFeeBound logs at ERROR if the `actual` base fee is greater than
+// [Block.WorstCaseBaseFee].
 //
 // Such a violation, while potentially critical, might not result in failed
 // execution so no error is returned and execution MUST continue optimistically.
@@ -56,11 +55,12 @@ func (b *Block) CheckBaseFeeBound(actual *uint256.Int) {
 		return
 	}
 
-	switch actual.Cmp(b.bounds.MaxBaseFee) {
+	predicted := b.WorstCaseBaseFee()
+	switch actual.Cmp(predicted) {
 	case 1:
 		b.log.Error("Actual base fee > predicted worst case",
 			zap.Stringer("actual", actual),
-			zap.Stringer("predicted", b.bounds.MaxBaseFee),
+			zap.Stringer("predicted", predicted),
 		)
 
 	case 0: // Coverage visualisation

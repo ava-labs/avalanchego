@@ -326,6 +326,12 @@ func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	)
 }
 
+// WorstCaseBaseFee returns the highest base fee that MAY be in force when the
+// block is executed.
+func (b *Block) WorstCaseBaseFee() *uint256.Int {
+	return uint256.NewInt(b.HeaderBaseFee())
+}
+
 // HeaderBaseFee returns the block's base fee, as a uint64. If the base fee is
 // nil (a pre-SAE header), 0 is returned. Additionally, the base fee is capped
 // at [math.MaxUint64] which should still handle all reasonable values.

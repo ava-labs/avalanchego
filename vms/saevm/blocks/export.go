@@ -55,3 +55,6 @@ func (b *Block) Number() *big.Int { return b.b.Number() }
 
 // Transactions returns [types.Block.Transactions] from the wrapped [types.Block].
 func (b *Block) Transactions() types.Transactions { return b.b.Transactions() }
+
+// WorstCaseGasUsed returns the gas that the block MAY be charged.
+func (b *Block) WorstCaseGasUsed() uint64 { return b.b.GasUsed() }
