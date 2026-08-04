@@ -51,6 +51,10 @@ func (b *Block) WorstCaseBounds() *WorstCaseBounds {
 // execution so no error is returned and execution MUST continue optimistically.
 // Any such log in development will cause tests to fail.
 func (b *Block) CheckBaseFeeBound(actual *uint256.Int) {
+	// TODO(JonathanOppenheimer): I believe the header's bound is valid even
+	// for blocks that we did not verify locally (so blocks we got from
+	// bootstrapping) but our test blocks have a zero base fee, which means
+	// if we get rid of this check, all of the tests fail. fix this in the tests
 	if b.bounds == nil {
 		return
 	}
