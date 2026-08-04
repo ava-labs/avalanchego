@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -49,9 +48,9 @@ import (
 func (g *generator) buildAllBlocks(t *testing.T) {
 	upgrades := g.fixture.Upgrades
 
-	// At least one block per historical upgrade; each description names the behavior
-	// exercised by consuming tests.
-	g.setClock(upgrade.InitiallyActiveTime.Add(10 * time.Second))
+	const originalBlockDelay = 10 * time.Second
+
+	g.setClock(upgrade.InitiallyActiveTime.Add(originalBlockDelay))
 	g.buildEthBlock(t, "noUpgrades", "AVAX transfer and storage set-and-clear whose SSTORE refund the launch rules apply, both paying the launch minimum gas price of 470 gwei, in a header whose gas limit is inherited from genesis",
 		g.transferTx(t, 17),
 		g.storageClearTx(t),
@@ -70,7 +69,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	)
 	require.Equal(t, params.TestUpgradechainBerlinBlock, g.tip(), "Berlin (AP2) activation block height")
 
-	g.advanceClock(10 * time.Second)
+	g.advanceClock(originalBlockDelay)
 	g.buildEthBlock(t, "apricotPhase2", "access-list (EIP-2930) transfer, the transaction type Berlin introduces",
 		g.accessListTransferTx(t, 15),
 	)
@@ -81,21 +80,19 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	)
 	require.Equal(t, params.TestUpgradechainLondonBlock, g.tip(), "London (AP3) activation block height")
 
-	g.advanceClock(10 * time.Second)
+	g.advanceClock(originalBlockDelay)
 	g.buildBlock(t, "apricotPhase3", "single atomic import of AVAX (pre-AP5 extData encoding) under dynamic fees",
 		[]*corethatomic.Tx{g.importAVAX(t, 10*units.Avax)},
 		[]*types.Transaction{g.counterIncrementTx(t)},
-		nil,
 	)
 
-	g.advanceClock(10 * time.Second)
+	g.advanceClock(originalBlockDelay)
 	g.buildBlock(t, "apricotPhase3", "atomic import of a non-AVAX asset, funding a multicoin (ANT) balance, alongside a dynamic-fee (EIP-1559) transfer, the transaction type London introduces",
 		[]*corethatomic.Tx{g.importANT(t, 1_000)},
 		[]*types.Transaction{g.dynamicFeeTransferTx(t, 8)},
-		nil,
 	)
 
-	g.advanceClock(10 * time.Second)
+	g.advanceClock(originalBlockDelay)
 	g.buildEthBlock(t, "apricotPhase3", "nativeAssetCall moving the imported ANT balance (functional precompile era)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
@@ -104,14 +101,12 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildBlock(t, "apricotPhase4", "atomic export of AVAX with AP4 header fields (extDataGasUsed, blockGasCost)",
 		[]*corethatomic.Tx{g.exportAVAX(t, 1*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 2)},
-		nil,
 	)
 
 	g.setClock(upgrades.ApricotPhase5Time)
 	g.buildBlock(t, "apricotPhase5", "two atomic imports batched into one block (post-AP5 extData encoding)",
 		[]*corethatomic.Tx{g.importAVAX(t, 3*units.Avax), g.importAVAX(t, 4*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 9)},
-		nil,
 	)
 
 	g.setClock(upgrades.ApricotPhasePre6Time)
@@ -133,7 +128,6 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildBlock(t, "banff", "atomic AVAX export under Banff's AVAX-only restriction",
 		[]*corethatomic.Tx{g.exportAVAX(t, 1*units.Avax)},
 		[]*types.Transaction{g.transferTx(t, 10)},
-		nil,
 	)
 
 	g.setClock(upgrades.CortinaTime)
@@ -147,11 +141,10 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	)
 	require.Equal(t, sendWarpMessageBlock, g.tip(), "sendWarpMessage block height")
 
-	g.advanceClock(10 * time.Second)
+	g.advanceClock(originalBlockDelay)
 	g.buildBlock(t, "durango", "getVerifiedWarpMessage with an access-list predicate (results in header extra), plus a transfer whose tracing replays the predicate transaction",
 		nil,
 		[]*types.Transaction{g.verifiedWarpMessageTx(t), g.transferTx(t, 11)},
-		&block.Context{},
 	)
 
 	g.setClock(upgrades.EtnaTime)
@@ -203,17 +196,26 @@ func (g *generator) tip() uint64 {
 	return g.fixture.Blocks[len(g.fixture.Blocks)-1].Number
 }
 
-// buildEthBlock is buildBlock for the common case: only EVM transactions and
-// no block context.
-func (g *generator) buildEthBlock(t *testing.T, fork, description string, ethTxs ...*types.Transaction) {
+// buildEthBlock is buildBlock with only EVM transactions.
+func (g *generator) buildEthBlock(
+	t *testing.T,
+	fork string,
+	description string,
+	ethTxs ...*types.Transaction,
+) {
 	t.Helper()
-	g.buildBlock(t, fork, description, nil, ethTxs, nil)
+	g.buildBlock(t, fork, description, nil, ethTxs)
 }
 
 // buildBlock issues the given transactions, builds a block containing them,
-// and accepts it, recording it in the fixture. blockCtx, if non-nil, selects
-// building with a block context (required for predicate transactions).
-func (g *generator) buildBlock(t *testing.T, fork, description string, atomicTxs []*corethatomic.Tx, ethTxs []*types.Transaction, blockCtx *block.Context) {
+// and accepts it, recording it in the fixture.
+func (g *generator) buildBlock(
+	t *testing.T,
+	fork string,
+	description string,
+	atomicTxs []*corethatomic.Tx,
+	ethTxs []*types.Transaction,
+) {
 	t.Helper()
 
 	for _, tx := range atomicTxs {
@@ -230,19 +232,12 @@ func (g *generator) buildBlock(t *testing.T, fork, description string, atomicTxs
 	require.NoError(t, err, "vm.WaitForEvent()")
 	require.Equal(t, commoneng.PendingTxs, msg, "vm.WaitForEvent()")
 
-	var blk snowman.Block
-	if blockCtx != nil {
-		blk, err = g.vm.BuildBlockWithContext(t.Context(), blockCtx)
-		require.NoError(t, err, "vm.BuildBlockWithContext()")
+	blk, err := g.vm.BuildBlockWithContext(t.Context(), &block.Context{})
+	require.NoError(t, err, "vm.BuildBlockWithContext()")
 
-		verifier, ok := blk.(block.WithVerifyContext)
-		require.True(t, ok, "%T does not implement block.WithVerifyContext", blk)
-		require.NoError(t, verifier.VerifyWithContext(t.Context(), blockCtx), "block.VerifyWithContext()")
-	} else {
-		blk, err = g.vm.BuildBlock(t.Context())
-		require.NoError(t, err, "vm.BuildBlock()")
-		require.NoError(t, blk.Verify(t.Context()), "block.Verify()")
-	}
+	verifier, ok := blk.(block.WithVerifyContext)
+	require.True(t, ok, "%T does not implement block.WithVerifyContext", blk)
+	require.NoError(t, verifier.VerifyWithContext(t.Context(), &block.Context{}), "block.VerifyWithContext()")
 
 	require.NoError(t, g.vm.SetPreference(t.Context(), blk.ID()), "vm.SetPreference()")
 	require.NoError(t, blk.Accept(t.Context()), "block.Accept()")
@@ -261,9 +256,7 @@ func (g *generator) buildBlock(t *testing.T, fork, description string, atomicTxs
 	})
 }
 
-// nonce returns the next nonce for the fixture's single EVM sender. A counter
-// is required because a block's transactions are constructed before any of
-// them reaches the transaction pool.
+// nonce returns and consumes the next nonce for the fixture's sender.
 func (g *generator) nonce() uint64 {
 	n := g.ethNonce
 	g.ethNonce++
@@ -275,8 +268,6 @@ func (g *generator) chainID() *big.Int {
 }
 
 // rules returns the chain rules the NEXT block will be built under.
-// [vm.VM.CurrentRules] is unsuitable: it derives rules from the head block,
-// which just after an upgrade boundary still has the previous upgrade's rules.
 func (g *generator) rules() extras.Rules {
 	config := g.vm.Ethereum().BlockChain().Config()
 	head := g.vm.Ethereum().BlockChain().CurrentHeader()
@@ -288,7 +279,7 @@ func (g *generator) rules() extras.Rules {
 // gasPrice returns the lowest gas price the NEXT block's rules accept, which
 // the fixture's legacy transactions all pay. AP1 lowered the floor from 470 to
 // 225 gwei, and from AP3 the floor is the block's base fee, which starts at 225
-// gwei and only falls while blocks stay this empty.
+// gwei and only falls while blocks stay empty.
 func (g *generator) gasPrice() *big.Int {
 	if g.rules().IsApricotPhase1 {
 		return vmtest.InitialBaseFee
@@ -296,8 +287,7 @@ func (g *generator) gasPrice() *big.Int {
 	return big.NewInt(ap0.MinGasPrice)
 }
 
-// signedTx returns tx signed by the fixture's single EVM sender,
-// [vmtest.TestKeys[0]].
+// signedTx returns tx signed by the fixture's sender, [vmtest.TestKeys][0].
 func (g *generator) signedTx(t *testing.T, tx types.TxData) *types.Transaction {
 	t.Helper()
 	signed, err := types.SignTx(types.NewTx(tx), types.LatestSignerForChainID(g.chainID()), vmtest.TestKeys[0].ToECDSA())
@@ -305,8 +295,7 @@ func (g *generator) signedTx(t *testing.T, tx types.TxData) *types.Transaction {
 	return signed
 }
 
-// transferTx returns a legacy transfer of n wei to a fixed recipient. Each
-// transfer moves a distinct amount so per-block states differ.
+// transferTx returns a legacy transfer of n wei to a fixed recipient.
 func (g *generator) transferTx(t *testing.T, n int64) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.LegacyTx{
@@ -319,7 +308,7 @@ func (g *generator) transferTx(t *testing.T, n int64) *types.Transaction {
 }
 
 // accessListTransferTx returns an EIP-2930 access-list transfer of n wei to
-// the fixed recipient — the transaction type introduced by Berlin (AP2).
+// the fixed recipient.
 func (g *generator) accessListTransferTx(t *testing.T, n int64) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.AccessListTx{
@@ -333,6 +322,8 @@ func (g *generator) accessListTransferTx(t *testing.T, n int64) *types.Transacti
 	})
 }
 
+// dynamicFeeTransferTx returns an EIP-1559 dynamic-fee transfer of n wei to
+// the fixed recipient.
 func (g *generator) dynamicFeeTransferTx(t *testing.T, n int64) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.DynamicFeeTx{
@@ -346,8 +337,8 @@ func (g *generator) dynamicFeeTransferTx(t *testing.T, n int64) *types.Transacti
 	})
 }
 
-// counterDeployTx returns a transaction deploying the counter contract: with
-// empty call data it increments its storage slot 0; with any call data it
+// counterDeployTx returns a transaction deploying the counter contract. With
+// empty call data it increments its storage slot 0. With any other call data it
 // returns the slot's value as a 32-byte word.
 func (g *generator) counterDeployTx(t *testing.T) *types.Transaction {
 	t.Helper()
@@ -386,9 +377,7 @@ func (g *generator) counterIncrementTx(t *testing.T) *types.Transaction {
 }
 
 // storageClearTx returns a contract-creation transaction whose init code sets
-// storage slot 0 and clears it again, accruing an SSTORE refund. coreth
-// disables the refund counter from Apricot Phase 1, so the receipt's gasUsed
-// retains the gas that EIP-3529 semantics would refund.
+// storage slot 0 and clears it again, accruing an SSTORE refund.
 func (g *generator) storageClearTx(t *testing.T) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.LegacyTx{
@@ -420,7 +409,7 @@ func (g *generator) nativeAssetCallTx(t *testing.T, to common.Address, amount in
 }
 
 // seedUTXO writes a UTXO owned by the test keychain into the shared memory
-// of the X-chain, from where it can be atomically imported.
+// of the X-chain, from where it can be imported.
 func (g *generator) seedUTXO(t *testing.T, assetID ids.ID, amount uint64) *avax.UTXO {
 	t.Helper()
 	g.utxoTxID++
@@ -450,8 +439,8 @@ func (g *generator) seedUTXO(t *testing.T, assetID ids.ID, amount uint64) *avax.
 	return utxo
 }
 
-// importTx returns an import transaction consuming the given seeded UTXOs
-// from X-chain shared memory, crediting TestEthAddrs[0].
+// importTx returns an import transaction consuming the given UTXOs from X-chain
+// shared memory, crediting [vmtest.TestEthAddrs][0].
 func (g *generator) importTx(t *testing.T, utxos ...*avax.UTXO) *corethatomic.Tx {
 	t.Helper()
 	tx, err := corethatomic.NewImportTx(
@@ -469,7 +458,7 @@ func (g *generator) importTx(t *testing.T, utxos ...*avax.UTXO) *corethatomic.Tx
 }
 
 // importAVAX seeds an AVAX UTXO of the given amount (in nAVAX) and returns an
-// import transaction consuming it, crediting TestEthAddrs[0].
+// import transaction consuming it, crediting [vmtest.TestEthAddrs][0].
 func (g *generator) importAVAX(t *testing.T, amount uint64) *corethatomic.Tx {
 	t.Helper()
 	return g.importTx(t, g.seedUTXO(t, g.ctx.AVAXAssetID, amount))
@@ -477,7 +466,7 @@ func (g *generator) importAVAX(t *testing.T, amount uint64) *corethatomic.Tx {
 
 // importANT seeds one ANT UTXO plus one AVAX UTXO (to pay the fee) and
 // returns an import transaction consuming both, funding a multicoin balance
-// at TestEthAddrs[0].
+// at [vmtest.TestEthAddrs][0].
 func (g *generator) importANT(t *testing.T, amount uint64) *corethatomic.Tx {
 	t.Helper()
 	return g.importTx(t,
@@ -487,9 +476,9 @@ func (g *generator) importANT(t *testing.T, amount uint64) *corethatomic.Tx {
 }
 
 // exportAVAX returns an export transaction moving the given amount (in nAVAX)
-// from TestEthAddrs[1] to the X-chain. The exporter is deliberately NOT the
-// EVM sender: an export spends the exporting account's nonce, which would
-// conflict with the generator's nonce sequence.
+// from [vmtest.TestEthAddrs][1] to the X-chain. The exporter is deliberately
+// NOT the EVM sender. An export spends the exporting account's nonce, which
+// would conflict with the generator's nonce sequence.
 func (g *generator) exportAVAX(t *testing.T, amount uint64) *corethatomic.Tx {
 	t.Helper()
 	statedb, err := g.vm.Ethereum().BlockChain().State()
@@ -522,9 +511,8 @@ func (g *generator) sendWarpMessageTx(t *testing.T) *types.Transaction {
 	})
 }
 
-// verifiedWarpMessageTx returns a getVerifiedWarpMessage call carrying, as an
-// access-list predicate, an incoming warp message signed by the fixture's
-// fixed validator set.
+// verifiedWarpMessageTx returns a getVerifiedWarpMessage call carrying an
+// incoming warp message signed by the validator set.
 func (g *generator) verifiedWarpMessageTx(t *testing.T) *types.Transaction {
 	t.Helper()
 
