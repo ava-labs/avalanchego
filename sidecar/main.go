@@ -24,7 +24,7 @@ import (
 func buildVerifier(sourceType string, body json.RawMessage) (oracleVerifier, error) {
 	switch sourceType {
 	case oracle.SourceTypeSolana:
-		return solanarpc.NewSolanaVerifier(body, nil)
+		return solanarpc.NewSolanaVerifier(body)
 	default:
 		return nil, fmt.Errorf("no verifier implementation for source type %q", sourceType)
 	}

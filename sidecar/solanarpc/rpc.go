@@ -38,6 +38,16 @@ type txResult struct {
 type txMeta struct {
 	InnerInstructions []txInnerInstructionGroup `json:"innerInstructions"`
 	LoadedAddresses   txLoadedAddresses         `json:"loadedAddresses"`
+	// Err is null for transactions that succeeded and a structured error object
+	// for those that failed. Failed transactions are still recorded on-chain
+	// with their full instruction list, but their effects were rolled back, so
+	// their instructions must not be treated as events that occurred.
+	Err json.RawMessage `json:"err"`
+}
+
+// failed reports whether the transaction executed successfully on-chain.
+func (m txMeta) failed() bool {
+	return len(m.Err) > 0 && string(m.Err) != "null"
 }
 
 type txInnerInstructionGroup struct {
@@ -75,13 +85,10 @@ type solanaClient struct {
 	httpClient *http.Client
 }
 
-func newSolanaClient(rpcURL string, httpClient *http.Client) *solanaClient {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
+func newSolanaClient(rpcURL string) *solanaClient {
 	return &solanaClient{
 		rpcURL:     rpcURL,
-		httpClient: httpClient,
+		httpClient: http.DefaultClient,
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/mr-tron/base58"
 
@@ -39,7 +38,7 @@ type SolanaVerifier struct {
 // NewSolanaVerifier parses configBytes as a JSON Config and constructs a
 // SolanaVerifier. configBytes may be nil or empty, in which case defaults
 // apply (mainnet RPC, all programs allowed).
-func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVerifier, error) {
+func NewSolanaVerifier(configBytes []byte) (*SolanaVerifier, error) {
 	cfg := Config{RPCURL: defaultRPCURL}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &cfg); err != nil {
@@ -54,26 +53,42 @@ func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVeri
 		allowed[p] = struct{}{}
 	}
 	return &SolanaVerifier{
-		client:          newSolanaClient(cfg.RPCURL, httpClient),
+		client:          newSolanaClient(cfg.RPCURL),
 		allowedPrograms: allowed,
 	}, nil
 }
 
 // errProgramNotFound is returned by matchInstruction when no instruction in the
-// set invokes msg.SourceAddress. It signals the caller to keep searching (e.g.
-// in inner instructions). Any other non-nil return means the program was found
-// but verification failed — the caller must not continue searching.
+// set invokes msg.SourceAddress.
+//
+// No non-nil result from matchInstruction is decisive on its own: a program can
+// be invoked several times within one transaction, both at the top level and
+// through CPI, so the caller must examine every instruction set before
+// concluding that verification failed. Only a nil return ends the search.
 var errProgramNotFound = errors.New("program not found in instruction set")
+
+// errPayloadMismatch means msg.SourceAddress was invoked in this instruction
+// set, but no invocation of it carried data equal to msg.Payload.
+var errPayloadMismatch = errors.New("payload mismatch: instruction data does not match OracleMessage.Payload")
 
 // ErrInstructionNotFound is returned by Verify when no instruction in the
 // transaction (including CPI inner instructions) invokes msg.SourceAddress.
 var ErrInstructionNotFound = errors.New("no instruction found for program")
 
-// matchInstruction scans instrs for one whose program matches msg.SourceAddress
-// and whose data matches msg.Payload. Returns nil on the first match,
-// errProgramNotFound if the program isn't present, or a descriptive error if
-// the program is present but the data doesn't verify.
+// matchInstruction scans instrs for an instruction whose program matches
+// msg.SourceAddress and whose data matches msg.Payload. Returns nil on the
+// first full match, errProgramNotFound if the program is absent from the set,
+// or errPayloadMismatch if it was invoked but never with the claimed payload.
+//
+// Every invocation of the program is examined, not just the first. A program
+// invoked repeatedly in one transaction — a batch of memos, a multi-hop swap —
+// produces several instructions with the same programId and different data, and
+// each is an independently attestable event. Returning on the first programId
+// hit would make every invocation after the first unverifiable.
 func matchInstruction(instrs []txInstruction, keys []string, msg *oracle.OracleMessage) error {
+	// Least-specific result, upgraded as more is learned about why no match was
+	// found. Never downgraded, so the most informative reason survives.
+	result := errProgramNotFound
 	for _, instr := range instrs {
 		if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
 			continue
@@ -83,14 +98,22 @@ func matchInstruction(instrs []txInstruction, keys []string, msg *oracle.OracleM
 		}
 		data, err := base58.Decode(instr.Data)
 		if err != nil {
-			return fmt.Errorf("failed to base58-decode instruction data: %w", err)
+			// Malformed data from the RPC must not mask a valid invocation
+			// elsewhere in the set, so record it and keep scanning.
+			if errors.Is(result, errProgramNotFound) {
+				result = fmt.Errorf("failed to base58-decode instruction data: %w", err)
+			}
+			continue
 		}
 		if !bytes.Equal(data, msg.Payload) {
-			return errors.New("payload mismatch: instruction data does not match OracleMessage.Payload")
+			if errors.Is(result, errProgramNotFound) {
+				result = errPayloadMismatch
+			}
+			continue
 		}
 		return nil
 	}
-	return errProgramNotFound
+	return result
 }
 
 // Verify checks that the given OracleMessage is backed by a real Solana
@@ -114,7 +137,15 @@ func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, 
 		return fmt.Errorf("transaction not found for signature %s", sig)
 	}
 
-	// 1. Verify the slot matches the claimed source block height.
+	// 1. Reject transactions that failed on-chain. A failed transaction is still
+	// recorded with its full instruction list, but the runtime rolled its effects
+	// back, so nothing it describes actually happened. Attesting to one would
+	// have validators sign for an event that never took effect.
+	if tx.Meta.failed() {
+		return fmt.Errorf("transaction %s failed on-chain and cannot be attested: %s", sig, tx.Meta.Err)
+	}
+
+	// 2. Verify the slot matches the claimed source block height.
 	if tx.Slot != msg.SourceBlockHeight {
 		return fmt.Errorf("slot mismatch: got %d, want %d", tx.Slot, msg.SourceBlockHeight)
 	}
@@ -122,23 +153,38 @@ func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, 
 	// Build the effective account key space. For legacy transactions
 	// loadedAddresses is empty; for v0 transactions it contains accounts
 	// resolved from address lookup tables that programIdIndex may reference.
-	keys := tx.Transaction.Message.AccountKeys
+	// Copied rather than appended onto AccountKeys, whose backing array append
+	// would otherwise write into when its capacity exceeds its length.
+	keys := make([]string, 0, len(tx.Transaction.Message.AccountKeys)+len(tx.Meta.LoadedAddresses.Writable)+len(tx.Meta.LoadedAddresses.Readonly))
+	keys = append(keys, tx.Transaction.Message.AccountKeys...)
 	keys = append(keys, tx.Meta.LoadedAddresses.Writable...)
 	keys = append(keys, tx.Meta.LoadedAddresses.Readonly...)
 
-	// 2. Find an instruction whose programId matches msg.SourceAddress.
-	// 3. For that instruction, verify the decoded data equals msg.Payload.
-	// Check top-level instructions first, then CPI inner instructions.
-	// Only continue to the next set if the program was not found; a
-	// definitive failure (e.g. payload mismatch) stops the search immediately.
-	if err := matchInstruction(tx.Transaction.Message.Instructions, keys, msg); !errors.Is(err, errProgramNotFound) {
-		return err
+	// 3. Find an instruction that invokes msg.SourceAddress with data equal to
+	// msg.Payload, checking top-level instructions and then each CPI inner
+	// instruction group.
+	//
+	// Every set is searched before failing. The same program may be invoked in
+	// more than one set — top-level with one payload, via CPI with another — so
+	// a non-match in one set says nothing about the rest. Only a match ends the
+	// search early.
+	result := matchInstruction(tx.Transaction.Message.Instructions, keys, msg)
+	if result == nil {
+		return nil
 	}
 	for _, group := range tx.Meta.InnerInstructions {
-		if err := matchInstruction(group.Instructions, keys, msg); !errors.Is(err, errProgramNotFound) {
-			return err
+		err := matchInstruction(group.Instructions, keys, msg)
+		if err == nil {
+			return nil
+		}
+		// Upgrade to the more informative reason, never back to "not found".
+		if errors.Is(result, errProgramNotFound) {
+			result = err
 		}
 	}
 
-	return fmt.Errorf("%w %q in transaction", ErrInstructionNotFound, msg.SourceAddress)
+	if errors.Is(result, errProgramNotFound) {
+		return fmt.Errorf("%w %q in transaction", ErrInstructionNotFound, msg.SourceAddress)
+	}
+	return result
 }

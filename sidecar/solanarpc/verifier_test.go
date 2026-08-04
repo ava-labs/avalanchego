@@ -5,6 +5,7 @@ package solanarpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -146,6 +147,78 @@ func TestSolanaVerifier(t *testing.T) {
 				},
 			}},
 			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+		},
+		{
+			// A failed transaction is recorded on-chain with its full instruction
+			// list, but the runtime rolled its effects back, so the event it
+			// describes never took effect and must not be attested.
+			name: "failed transaction rejected",
+			rpc: func() *stubRPC {
+				tx := makeValidTx(testProgram, testSlotV, payload)
+				tx.Meta.Err = json.RawMessage(`{"InstructionError":[0,{"Custom":1}]}`)
+				return &stubRPC{Tx: tx}
+			}(),
+			msg:     func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+			wantErr: "failed on-chain and cannot be attested",
+		},
+		{
+			// The same program invoked twice with different data: both events are
+			// real and independently attestable, so the second must verify rather
+			// than being shadowed by the first invocation's payload.
+			name: "second invocation of same program",
+			rpc: &stubRPC{Tx: &txResult{
+				Slot: testSlotV,
+				Transaction: txData{
+					Message: txMessage{
+						AccountKeys: []string{"payer111", testProgram},
+						Instructions: []txInstruction{
+							{ProgramIDIndex: 1, Data: base58.Encode([]byte("first-invocation"))},
+							{ProgramIDIndex: 1, Data: base58.Encode(payload)},
+						},
+					},
+				},
+			}},
+			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+		},
+		{
+			// Invoked top-level with one payload and via CPI with another. A
+			// non-match among the top-level instructions must not end the search
+			// before the inner instructions are examined.
+			name: "match in CPI after top-level payload mismatch",
+			rpc: &stubRPC{Tx: &txResult{
+				Slot: testSlotV,
+				Transaction: txData{
+					Message: txMessage{
+						AccountKeys:  []string{"payer111", testProgram},
+						Instructions: []txInstruction{{ProgramIDIndex: 1, Data: base58.Encode([]byte("top-level-data"))}},
+					},
+				},
+				Meta: txMeta{
+					InnerInstructions: []txInnerInstructionGroup{
+						{Index: 0, Instructions: []txInstruction{{ProgramIDIndex: 1, Data: base58.Encode(payload)}}},
+					},
+				},
+			}},
+			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+		},
+		{
+			// Invoked several times, never with the claimed payload: the reported
+			// reason should be the specific mismatch, not "no instruction found".
+			name: "invoked repeatedly but never with claimed payload",
+			rpc: &stubRPC{Tx: &txResult{
+				Slot: testSlotV,
+				Transaction: txData{
+					Message: txMessage{
+						AccountKeys: []string{"payer111", testProgram},
+						Instructions: []txInstruction{
+							{ProgramIDIndex: 1, Data: base58.Encode([]byte("aaa"))},
+							{ProgramIDIndex: 1, Data: base58.Encode([]byte("bbb"))},
+						},
+					},
+				},
+			}},
+			msg:     func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+			wantErr: "payload mismatch",
 		},
 	}
 

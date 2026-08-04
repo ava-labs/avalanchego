@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -25,23 +26,47 @@ func newVerifier(t *testing.T, rpcURL string) *SolanaVerifier {
 	t.Helper()
 	cfgBytes, err := json.Marshal(Config{RPCURL: rpcURL})
 	require.NoError(t, err)
-	v, err := NewSolanaVerifier(cfgBytes, nil)
+	v, err := NewSolanaVerifier(cfgBytes)
 	require.NoError(t, err)
 	return v
 }
 
-// memoProgram is the Solana Memo Program v2 address. It exists on both mainnet
-// and devnet and almost always has recent transactions, making it a reliable
-// source of real on-chain data for integration testing.
-const memoProgram = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+// The Solana Memo Program exists in two deployed versions, both live on mainnet
+// and devnet, and both are a reliable source of real on-chain data.
+//
+// Which one is useful depends on the network, so tests accept either. Sampling
+// 30 recent transactions per address on mainnet:
+//
+//	memo v1: invoked as a top-level instruction in 30/30
+//	memo v2: invoked as a top-level instruction in 2/30 — the other 28 merely
+//	         pull v2 into the key space via an address lookup table
+//
+// On devnet v2 is the one that shows up as a top-level instruction. Searching
+// both is what keeps these tests meaningful on mainnet and devnet alike.
+const (
+	memoV1Program = "Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo"
+	memoV2Program = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+)
+
+var memoPrograms = []string{memoV1Program, memoV2Program}
 
 // atokenProgram is the Associated Token Account Program. Almost every DeFi
 // wallet interaction creates ATAs, so it reliably produces CPI transactions
 // (it calls the Token Program and System Program via CPI).
-const atokenProgram = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bXh"
+const atokenProgram = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 
-// fetchSignatures fetches up to limit recent transaction signatures for address
-// from rpcURL. Returns only the signature strings (errors from the RPC are fatal).
+// fetchSignatures fetches up to limit recent transaction signatures that
+// *mention* address, via getSignaturesForAddress.
+//
+// Despite the method name, this has nothing to do with signing authority:
+// programs never sign transactions. The RPC indexes address mentions, so a
+// transaction is returned whenever address appears anywhere in its key space —
+// as an invoked program, as a passive account, or merely as an entry loaded
+// through an address lookup table and never invoked at all. Callers that need
+// the address to have actually been invoked must check the instructions
+// themselves.
+//
+// Returns only the signature strings (errors from the RPC are fatal).
 func fetchSignatures(t *testing.T, rpcURL, address string, limit int) []string {
 	t.Helper()
 
@@ -74,6 +99,11 @@ func fetchSignatures(t *testing.T, rpcURL, address string, limit int) []string {
 	}
 	require.NoError(t, json.Unmarshal(body, &result))
 	if result.Error != nil {
+		// Public endpoints throttle aggressively. That is a property of the
+		// endpoint, not a defect in the verifier, so skip rather than fail.
+		if strings.Contains(strings.ToLower(result.Error.Message), "rate limit") {
+			t.Skipf("SOLANA_RPC_URL is rate limiting (%s) — retry later or use a dedicated endpoint", result.Error.Message)
+		}
 		t.Fatalf("getSignaturesForAddress RPC error: %s", result.Error.Message)
 	}
 
@@ -84,15 +114,52 @@ func fetchSignatures(t *testing.T, rpcURL, address string, limit int) []string {
 	return sigs
 }
 
-// fetchRecentMemoTxSig fetches the most recent transaction signature that
-// involved the Memo Program from the given Solana RPC endpoint.
-func fetchRecentMemoTxSig(t *testing.T, rpcURL string) string {
+// findMemoTxWithTopLevelInstruction scans recent transactions mentioning either
+// Memo Program version and returns the first that actually invokes one as a
+// top-level instruction: the signature, the transaction, the invoked program
+// address, and that instruction's decoded data.
+//
+// Two filters matter here, and dropping either produces a test that fails for
+// reasons unrelated to the verifier:
+//
+//   - Invocation. getSignaturesForAddress returns mere mentions, and on mainnet
+//     memo v2 is usually only pulled in by a lookup table, never invoked. Taking
+//     the newest mention therefore finds no Memo instruction most of the time.
+//   - Success. Roughly half of recent memo transactions failed on-chain. A
+//     failed transaction still lists its instructions, but its effects were
+//     rolled back, so it is not a sound basis for asserting a verifier accepts
+//     a real event.
+func findMemoTxWithTopLevelInstruction(t *testing.T, rpcURL string) (string, *txResult, string, []byte) {
 	t.Helper()
-	sigs := fetchSignatures(t, rpcURL, memoProgram, 1)
-	if len(sigs) == 0 {
-		t.Skip("no recent Memo Program transactions found at SOLANA_RPC_URL — try again later or use a busier endpoint")
+	client := newSolanaClient(rpcURL)
+	for _, memoProgram := range memoPrograms {
+		sigs := fetchSignatures(t, rpcURL, memoProgram, 50)
+		for _, sig := range sigs {
+			tx, err := client.getTransaction(t.Context(), sig)
+			if err != nil || tx == nil {
+				continue
+			}
+			if tx.Meta.failed() {
+				continue
+			}
+			keys := buildEffectiveKeys(tx)
+			for _, instr := range tx.Transaction.Message.Instructions {
+				if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
+					continue
+				}
+				if keys[instr.ProgramIDIndex] != memoProgram {
+					continue
+				}
+				data, decErr := base58.Decode(instr.Data)
+				if decErr != nil {
+					continue
+				}
+				return sig, tx, memoProgram, data
+			}
+		}
 	}
-	return sigs[0]
+	t.Skip("no successful transaction invoking either Memo Program as a top-level instruction found in the 50 most recent mentions of each")
+	return "", nil, "", nil
 }
 
 // buildEffectiveKeys mirrors the key-space construction in verifier.go so that
@@ -106,11 +173,16 @@ func buildEffectiveKeys(tx *txResult) []string {
 }
 
 // findTxWithInnerInstructions searches recent AToken Program transactions for
-// one that has at least one inner instruction group with usable data. Returns
-// the signature and parsed txResult. Skips the test if none found.
+// one that has at least one inner instruction with decodeable data. Returns the
+// signature and parsed txResult. Skips the test if none found.
+//
+// The "has a usable inner instruction" predicate is exactly what
+// findFirstCPIInstruction answers, so this delegates rather than repeating the
+// group/instruction walk — keeping the search and the subsequent extraction in
+// TestSolanaVerifierIntegration_CPI guaranteed to agree.
 func findTxWithInnerInstructions(t *testing.T, rpcURL string) (string, *txResult) {
 	t.Helper()
-	client := newSolanaClient(rpcURL, nil)
+	client := newSolanaClient(rpcURL)
 	sigs := fetchSignatures(t, rpcURL, atokenProgram, 50)
 	if len(sigs) == 0 {
 		t.Skip("no recent AToken Program transactions — try again later or use a busier endpoint")
@@ -120,33 +192,27 @@ func findTxWithInnerInstructions(t *testing.T, rpcURL string) (string, *txResult
 		if err != nil || tx == nil {
 			continue
 		}
-		if len(tx.Meta.InnerInstructions) == 0 {
+		if tx.Meta.failed() {
 			continue
 		}
-		// Require at least one inner instruction with decodeable data.
-		keys := buildEffectiveKeys(tx)
-		for _, group := range tx.Meta.InnerInstructions {
-			for _, instr := range group.Instructions {
-				if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
-					continue
-				}
-				if _, decErr := base58.Decode(instr.Data); decErr == nil {
-					return sig, tx
-				}
-			}
+		if _, _, ok := findFirstCPIInstruction(tx); ok {
+			return sig, tx
 		}
 	}
 	t.Skip("no AToken Program transaction with inner-instruction data found in recent 50 signatures")
 	return "", nil
 }
 
-// findV0TxWithLoadedAddresses searches recent Memo Program transactions for one
-// that has non-empty meta.loadedAddresses. Returns the signature and txResult.
-// Skips the test if none found.
+// findV0TxWithLoadedAddresses searches recent Memo Program transactions for a
+// successful one that has non-empty meta.loadedAddresses. Returns the signature
+// and txResult. Skips the test if none found.
+//
+// Scans memo v2 specifically: on mainnet it is predominantly referenced *by*
+// lookup tables, which is exactly the shape this test needs.
 func findV0TxWithLoadedAddresses(t *testing.T, rpcURL string) (string, *txResult) {
 	t.Helper()
-	client := newSolanaClient(rpcURL, nil)
-	sigs := fetchSignatures(t, rpcURL, memoProgram, 100)
+	client := newSolanaClient(rpcURL)
+	sigs := fetchSignatures(t, rpcURL, memoV2Program, 100)
 	if len(sigs) == 0 {
 		t.Skip("no recent Memo Program transactions — try again later or use a busier endpoint")
 	}
@@ -155,12 +221,107 @@ func findV0TxWithLoadedAddresses(t *testing.T, rpcURL string) (string, *txResult
 		if err != nil || tx == nil {
 			continue
 		}
+		if tx.Meta.failed() {
+			continue
+		}
 		if len(tx.Meta.LoadedAddresses.Writable)+len(tx.Meta.LoadedAddresses.Readonly) > 0 {
 			return sig, tx
 		}
 	}
 	t.Skip("no v0 Memo Program transaction with loadedAddresses found in recent 100 signatures — this is expected on quiet endpoints")
 	return "", nil
+}
+
+// tamperedPayload returns a payload that differs from payload and that no
+// instruction invoking program carries anywhere in tx.
+//
+// Simply flipping a byte is not enough. Programs are frequently invoked several
+// times in one transaction with short payloads — a Token Program instruction
+// discriminator is often a single byte — so a flipped payload can collide with a
+// sibling invocation's real data. Verify would then correctly find that sibling
+// and succeed, and the assertion that tampering is rejected would fail for a
+// reason having nothing to do with tampering.
+func tamperedPayload(tx *txResult, program string, payload []byte) []byte {
+	keys := buildEffectiveKeys(tx)
+	existing := make(map[string]struct{})
+	collect := func(instrs []txInstruction) {
+		for _, instr := range instrs {
+			if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
+				continue
+			}
+			if keys[instr.ProgramIDIndex] != program {
+				continue
+			}
+			data, err := base58.Decode(instr.Data)
+			if err != nil {
+				continue
+			}
+			existing[string(data)] = struct{}{}
+		}
+	}
+	collect(tx.Transaction.Message.Instructions)
+	for _, group := range tx.Meta.InnerInstructions {
+		collect(group.Instructions)
+	}
+
+	tampered := make([]byte, max(len(payload), 1))
+	copy(tampered, payload)
+	tampered[len(tampered)-1] ^= 0xFF
+	for {
+		if _, ok := existing[string(tampered)]; !ok {
+			return tampered
+		}
+		tampered = append(tampered, 0xFF)
+	}
+}
+
+// absentProgramAddress returns a syntactically valid Solana address that does
+// not appear anywhere in tx's key space, so Verify is guaranteed to reach its
+// "no instruction found" path for it.
+func absentProgramAddress(tx *txResult) string {
+	present := make(map[string]struct{})
+	for _, k := range buildEffectiveKeys(tx) {
+		present[k] = struct{}{}
+	}
+	candidate := make([]byte, 32)
+	for i := range candidate {
+		candidate[i] = 0x01
+	}
+	for {
+		addr := base58.Encode(candidate)
+		if _, ok := present[addr]; !ok {
+			return addr
+		}
+		candidate[0]++
+	}
+}
+
+// findUninvokedLoadedAddress returns the first meta.loadedAddresses entry that
+// is not referenced as the program of any instruction, top-level or inner.
+// Returns "" if every loaded address is invoked.
+func findUninvokedLoadedAddress(tx *txResult) string {
+	keys := buildEffectiveKeys(tx)
+	invoked := make(map[string]struct{})
+	markInvoked := func(instrs []txInstruction) {
+		for _, instr := range instrs {
+			if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
+				continue
+			}
+			invoked[keys[instr.ProgramIDIndex]] = struct{}{}
+		}
+	}
+	markInvoked(tx.Transaction.Message.Instructions)
+	for _, group := range tx.Meta.InnerInstructions {
+		markInvoked(group.Instructions)
+	}
+
+	loaded := append(append([]string(nil), tx.Meta.LoadedAddresses.Writable...), tx.Meta.LoadedAddresses.Readonly...)
+	for _, addr := range loaded {
+		if _, ok := invoked[addr]; !ok {
+			return addr
+		}
+	}
+	return ""
 }
 
 // findFirstCPIInstruction returns the program address and decoded payload of the
@@ -197,36 +358,11 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 		t.Skip("SOLANA_RPC_URL not set")
 	}
 
-	txSig := fetchRecentMemoTxSig(t, rpcURL)
+	// The helper guarantees the returned transaction invokes the Memo Program as
+	// a top-level instruction, and returns that instruction's data as the ground
+	// truth payload.
+	txSig, tx, memoProgram, instrData := findMemoTxWithTopLevelInstruction(t, rpcURL)
 	t.Logf("using transaction: %s", txSig)
-
-	// Fetch the full transaction to extract ground truth (slot, program, payload).
-	client := newSolanaClient(rpcURL, nil)
-	tx, err := client.getTransaction(t.Context(), txSig)
-	require.NoError(t, err)
-	require.NotNil(t, tx, "transaction not found — the signature returned by getSignaturesForAddress was not retrievable")
-
-	instrs := tx.Transaction.Message.Instructions
-	keys := tx.Transaction.Message.AccountKeys
-	require.NotEmpty(t, instrs)
-
-	// Find the Memo Program instruction and use its data as ground truth payload.
-	var instrData []byte
-	for _, instr := range instrs {
-		if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
-			continue
-		}
-		if keys[instr.ProgramIDIndex] != memoProgram {
-			continue
-		}
-		data, decodeErr := base58.Decode(instr.Data)
-		if decodeErr != nil {
-			continue
-		}
-		instrData = data
-		break
-	}
-	require.NotNil(t, instrData, "could not find Memo Program instruction in transaction")
 
 	slot := tx.Slot
 	justification, err := base58.Decode(txSig)
@@ -249,9 +385,7 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	})
 
 	t.Run("payload tampered rejected", func(t *testing.T) {
-		tampered := make([]byte, max(len(instrData), 1))
-		copy(tampered, instrData)
-		tampered[len(tampered)-1] ^= 0xFF
+		tampered := tamperedPayload(tx, memoProgram, instrData)
 		msg, err := oracle.NewOracleMessage("solana", memoProgram, common.Address{}, slot, 1, tampered)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
@@ -260,12 +394,17 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	})
 
 	t.Run("wrong program rejected", func(t *testing.T) {
-		const systemProgram = "11111111111111111111111111111111"
-		msg, err := oracle.NewOracleMessage("solana", systemProgram, common.Address{}, slot, 1, instrData)
+		// Derive an address absent from this transaction rather than hardcoding
+		// one. A fixed "obviously unrelated" program does not work: mainnet memo
+		// transactions routinely invoke the System Program too, in which case
+		// Verify finds it and reports a payload mismatch, silently testing a
+		// different code path than the one intended here.
+		absentProgram := absentProgramAddress(tx)
+		msg, err := oracle.NewOracleMessage("solana", absentProgram, common.Address{}, slot, 1, instrData)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
-		require.Errorf(t, verifyErr, "expected program-not-found error")
-		require.Contains(t, verifyErr.Error(), fmt.Sprintf("no instruction found for program %q", systemProgram))
+		require.ErrorIs(t, verifyErr, ErrInstructionNotFound)
+		require.Contains(t, verifyErr.Error(), fmt.Sprintf("no instruction found for program %q", absentProgram))
 	})
 }
 
@@ -311,9 +450,7 @@ func TestSolanaVerifierIntegration_CPI(t *testing.T) {
 	})
 
 	t.Run("payload tampered rejected", func(t *testing.T) {
-		tampered := make([]byte, max(len(payload), 1))
-		copy(tampered, payload)
-		tampered[len(tampered)-1] ^= 0xFF
+		tampered := tamperedPayload(tx, programAddr, payload)
 		msg, err := oracle.NewOracleMessage("solana", programAddr, common.Address{}, slot, 1, tampered)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
@@ -333,10 +470,11 @@ func TestSolanaVerifierIntegration_CPI(t *testing.T) {
 //     programIdIndex in any instruction causes "no instruction found", not a
 //     panic or index-out-of-bounds — confirming the key slice is built right.
 //
-// Note: it is essentially impossible in practice for a program to be IN
-// loadedAddresses (lookup tables hold data accounts, not programs). The test
-// therefore only validates key-space construction, not a full CPI-via-lookup
-// happy path.
+// Note: programs certainly can appear in loadedAddresses — on mainnet the Memo
+// Program itself is frequently loaded through a lookup table (as a readonly
+// entry) without being invoked. What this test does not attempt is a full
+// happy path for a program that is both loaded via a lookup table and invoked;
+// it validates key-space construction only.
 //
 // Requires SOLANA_RPC_URL. Skips automatically if no qualifying v0 transaction
 // is found in the 100 most recent Memo Program transactions.
@@ -364,10 +502,15 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	verifier := newVerifier(t, rpcURL)
 
 	t.Run("loaded address not invoked returns no-instruction-found", func(t *testing.T) {
-		// Use the first loaded address as the claimed program. It is not
-		// referenced by any programIdIndex, so Verify must return the
-		// "no instruction found" error — not panic or index error.
-		uninvokedAddr := loaded[0]
+		// Pick a loaded address that no instruction actually invokes, rather than
+		// assuming loaded[0] qualifies — lookup tables do carry programs, and an
+		// invoked one would make Verify succeed and fail this assertion for the
+		// wrong reason. Verify must return "no instruction found" for it, not
+		// panic or index out of range.
+		uninvokedAddr := findUninvokedLoadedAddress(tx)
+		if uninvokedAddr == "" {
+			t.Skip("every loaded address in this transaction is invoked by some instruction")
+		}
 		msg, err := oracle.NewOracleMessage("solana", uninvokedAddr, common.Address{}, slot, 1, []byte("anything"))
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
