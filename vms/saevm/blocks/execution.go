@@ -290,8 +290,8 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // database, thus they are extracted from the header.
 func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
-	// [Block.MarkExecuted], as provided by [Block.WorstCaseGasTime].
-	execTime, err := b.WorstCaseGasTime(hooks)
+	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
+	execTime, err := b.synchronousGasTime(hooks)
 	if err != nil {
 		return nil, err
 	}
@@ -304,27 +304,28 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(b.headerBaseFee())
+	e.baseFee.SetUint64(b.HeaderBaseFee())
 	return e, nil
 }
 
-// WorstCaseGasTime reconstructs the worst-case gas time that the block
-// committed to, from its base fee and the gas config after the block.
-func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
+// synchronousGasTime derives the gas time of a synchronous block, which has no
+// predecessor clock to advance. Inverting the base fee only approximates the
+// excess.
+func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	hdr := b.Header()
 	target, cfg := hooks.GasConfigAfter(hdr)
 	return gastime.New(
 		hooks.BlockTime(hdr),
 		target,
-		gas.Price(b.headerBaseFee()),
+		gas.Price(b.HeaderBaseFee()),
 		cfg,
 	)
 }
 
-// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee is capped at [math.MaxUint64] but any reasonable
-// implementation has a base fee much less than [math.MaxUint64].
-func (b *Block) headerBaseFee() uint64 {
+// HeaderBaseFee returns the block's base fee, as a uint64. If the base fee is
+// nil (a pre-SAE header), 0 is returned. Additionally, the base fee is capped
+// at [math.MaxUint64] which should still handle all reasonable values.
+func (b *Block) HeaderBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
 		return 0
