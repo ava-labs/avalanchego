@@ -24,73 +24,77 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// assertContract runs the shell contract for one RPC type pair. The shell has
-// no type-specific branches, so every RPC type must behave identically.
-func assertContract[Req, Resp handlers.ProtoMessage](t *testing.T, req Req, resp Resp) {
+func assertContract[Req, Resp proto.Message](t *testing.T, req Req, resp Resp) {
 	nodeID := ids.GenerateTestNodeID()
 	reqBytes := synctest.MustMarshal(t, req)
 	newReq := func() Req { return req.ProtoReflect().New().Interface().(Req) }
 
-	t.Run("malformed request", func(t *testing.T) {
-		t.Parallel()
+	var noResp Resp
+	requestErr := &common.AppError{Code: 7, Message: "unknown request"}
 
-		r := &synctest.FakeResponder[Req, Resp]{}
-		h := handlers.NewHandler(logging.NoLog{}, newReq, r)
+	tests := []struct {
+		name         string
+		respondWith  Resp
+		respondErr   *common.AppError
+		requestBytes []byte
+		wantBytes    []byte
+		wantErr      *common.AppError
+		wantReached  bool
+	}{
+		{
+			name:         "malformed request",
+			requestBytes: []byte{0xff, 0xff},
+			wantErr:      handlers.ErrMalformedRequest,
+			wantReached:  false,
+		},
+		{
+			// A typed nil is invalid, so it marshals to a nil buffer, not an
+			// empty one.
+			name:         "nil response yields a zero-length payload",
+			respondWith:  noResp,
+			requestBytes: reqBytes,
+			wantBytes:    nil,
+			wantReached:  true,
+		},
+		{
+			name:         "response is marshaled",
+			respondWith:  resp,
+			requestBytes: reqBytes,
+			wantBytes:    synctest.MustMarshal(t, resp),
+			wantReached:  true,
+		},
+		{
+			name:         "app error surfaces unchanged",
+			respondErr:   requestErr,
+			requestBytes: reqBytes,
+			wantErr:      requestErr,
+			wantReached:  true,
+		},
+	}
 
-		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, []byte{0xff, 0xff})
-		require.Nil(t, respBytes)
-		require.Equal(t, handlers.ErrMalformedRequest, appErr)
-		require.Nil(t, r.GotReq, "responder must not be invoked on malformed request")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("zero response drops", func(t *testing.T) {
-		t.Parallel()
+			r := &synctest.FakeResponder[Req, Resp]{Resp: tt.respondWith, Err: tt.respondErr}
+			h := handlers.NewHandler(logging.NoLog{}, newReq, r)
 
-		r := &synctest.FakeResponder[Req, Resp]{}
-		h := handlers.NewHandler(logging.NoLog{}, newReq, r)
+			respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, tt.requestBytes)
+			require.Equal(t, tt.wantErr, appErr)
 
-		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
-		require.Nil(t, appErr)
-		require.Nil(t, respBytes)
-		assert.Empty(t, cmp.Diff(req, r.GotReq, protocmp.Transform()), "cmp.Diff(request, responder request)")
-	})
+			if tt.wantErr != nil {
+				require.Nil(t, respBytes)
+			} else {
+				require.Equal(t, tt.wantBytes, respBytes)
+			}
 
-	t.Run("response is marshaled", func(t *testing.T) {
-		t.Parallel()
-
-		r := &synctest.FakeResponder[Req, Resp]{Resp: resp}
-		h := handlers.NewHandler(logging.NoLog{}, newReq, r)
-
-		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
-		require.Nil(t, appErr)
-
-		got := resp.ProtoReflect().New().Interface()
-		require.NoError(t, proto.Unmarshal(respBytes, got))
-		assert.Empty(t, cmp.Diff(resp, got, protocmp.Transform()), "cmp.Diff(response, unmarshaled response)")
-	})
-
-	t.Run("app error surfaces unchanged", func(t *testing.T) {
-		t.Parallel()
-
-		requestErr := &common.AppError{Code: 7, Message: "unknown request"}
-		r := &synctest.FakeResponder[Req, Resp]{Err: requestErr}
-		h := handlers.NewHandler(logging.NoLog{}, newReq, r)
-
-		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
-		require.Nil(t, respBytes)
-		require.Equal(t, requestErr, appErr)
-	})
-
-	t.Run("server fault becomes ErrUnexpected", func(t *testing.T) {
-		t.Parallel()
-
-		r := &synctest.FakeResponder[Req, Resp]{Err: errors.New("boom")}
-		h := handlers.NewHandler(logging.NoLog{}, newReq, r)
-
-		respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, reqBytes)
-		require.Nil(t, respBytes)
-		require.Equal(t, p2p.ErrUnexpected, appErr)
-	})
+			if !tt.wantReached {
+				require.Nil(t, r.GotReq, "responder must not be invoked")
+				return
+			}
+			assert.Empty(t, cmp.Diff(req, r.GotReq, protocmp.Transform()), "cmp.Diff(request, responder request)")
+		})
+	}
 }
 
 func TestAppRequest(t *testing.T) {
@@ -112,4 +116,46 @@ func TestAppRequest(t *testing.T) {
 			&syncpb.GetLeafResponse{Keys: [][]byte{{0x02}}},
 		)
 	})
+}
+
+func TestErrorSentinels(t *testing.T) {
+	// [common.AppError.Is] compares Code and nothing else.
+	sentinels := map[string]*common.AppError{
+		"ErrMalformedRequest": handlers.ErrMalformedRequest,
+		"ErrMarshalResponse":  handlers.ErrMarshalResponse,
+	}
+	framework := []*common.AppError{
+		p2p.ErrUnexpected,
+		p2p.ErrUnregisteredHandler,
+		p2p.ErrNotValidator,
+		p2p.ErrThrottled,
+		common.ErrUndefined,
+		common.ErrTimeout,
+	}
+
+	// A code is the identity, the message is decoration. Each sentinel must:
+	//   - be findable by its code
+	//   - use a positive code, p2p owns the negatives and zero
+	//   - not share a code with a framework error
+	//   - not share a code with another sentinel
+	seen := make(map[int32]string, len(sentinels))
+	for name, sentinel := range sentinels {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, sentinel, &common.AppError{Code: sentinel.Code})
+			require.Positive(t, sentinel.Code, "p2p and the engine own the non-positive codes")
+
+			for _, f := range framework {
+				require.NotErrorIs(t, sentinel, f)
+			}
+		})
+
+		other, dup := seen[sentinel.Code]
+		require.Falsef(t, dup, "%s and %s share code %d", name, other, sentinel.Code)
+		seen[sentinel.Code] = name
+	}
+}
+
+func TestFault(t *testing.T) {
+	appErr := handlers.Fault(logging.NoLog{}, ids.GenerateTestNodeID(), errors.New("boom"))
+	require.Equal(t, p2p.ErrUnexpected, appErr, "the peer learns nothing about the fault")
 }

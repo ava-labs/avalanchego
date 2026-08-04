@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
-        "//vms/evm/sync/handlers",
+        "//snow/engine/common",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
     ],
