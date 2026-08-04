@@ -175,11 +175,8 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
 //
-// The gas clock always comes from the parent's post-execution clock, as does the
-// base fee, except for a block that [hook.Synchronous] reports as synchronous
-// (pre-SAE), which uses the fee committed to by its own header. Both are
-// therefore reproducible, so replaying a block prices its transactions as
-// history did.
+// The gas clock and base fee come from the parent's post-execution clock,
+// except pre-SAE blocks, which use their own header's fee.
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"

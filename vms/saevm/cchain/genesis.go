@@ -307,7 +307,10 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 
-		// The genesis block is synchronous, so the markers must be zero to conform with [hook.Synchronous].
+		// The genesis block is synchronous, so the markers must be zero to
+		// conform with [hook.Synchronous]. Most synchronous blocks omit these
+		// fields entirely. Genesis instead includes them, with values that mark
+		// it as synchronous.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)

@@ -325,7 +325,7 @@ func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
 	)
 }
 
-// HeaderBaseFee returns the header's base fee, zero if absen. The base fee
+// HeaderBaseFee returns the header's base fee, zero if absent. The base fee
 // is capped at [math.MaxUint64] but any reasonable implementation has a base
 // fee much less than [math.MaxUint64].
 func (b *Block) HeaderBaseFee() uint64 {

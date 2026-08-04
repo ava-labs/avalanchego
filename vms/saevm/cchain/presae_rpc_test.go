@@ -359,9 +359,10 @@ func TestPreSAETraceTransactionRPCs(t *testing.T) {
 				require.NoError(t, err, "debug_traceTransaction(%s)", tx.Hash())
 				assert.Equal(t, vmtest.TestEthAddrs[0], trace.From, "traced sender of %s", tx.Hash())
 
-				// Pins historical C-Chain gas accounting; notably the SSTORE refund counter
-				// is disabled from Apricot Phase 1, which EIP-3529 replay
-				// semantics would violate for the storage-clearing transaction.
+				// Pins historical C-Chain gas accounting; notably the SSTORE refund
+				// counter applies before Apricot Phase 1 and is disabled from it,
+				// which uniform EIP-3529 replay semantics would violate for one of
+				// the storage-clearing transactions.
 				assert.Equal(t, receipts[i].GasUsed, trace.GasUsed, "traced gasUsed of %s matches the stored receipt", tx.Hash())
 			}
 		})

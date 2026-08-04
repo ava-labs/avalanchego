@@ -68,29 +68,31 @@ func TestFixtureUpToDate(t *testing.T) {
 		"committed fixture is stale; run `go generate ./plugin/evm/upgradechaintest` and inspect the diff")
 }
 
-// forkSchedule returns the fixture's upgrade config. Upgrades are a day apart,
-// dwarfing the block intervals, so adding blocks to an era never crosses into
-// the next. Caveat: AP2/AP3 activate block-number forks (Berlin/London) whose
-// heights are pinned per chain ID ([params.TestUpgradechainChainID]) and must
-// be updated when a block is added to the AP1 or AP2 era.
+// forkSchedule returns the fixture's upgrade config. The chain starts with no
+// upgrades scheduled, and thereafter they are a day apart, dwarfing the block
+// intervals, so adding blocks to an era never crosses into the next. Caveat:
+// AP2/AP3 activate block-number forks (Berlin/London) whose heights are pinned
+// per chain ID ([params.TestUpgradechainChainID]) and must be updated when a
+// block is added to the launch, AP1, or AP2 era.
 func forkSchedule() upgrade.Config {
-	cfg := upgradetest.GetConfig(upgradetest.ApricotPhase1)
+	cfg := upgradetest.GetConfig(upgradetest.NoUpgrades)
 	at := func(days int) time.Time {
 		return upgrade.InitiallyActiveTime.Add(time.Duration(days) * 24 * time.Hour)
 	}
-	cfg.ApricotPhase2Time = at(1)
-	cfg.ApricotPhase3Time = at(2)
-	cfg.ApricotPhase4Time = at(3)
-	cfg.ApricotPhase5Time = at(4)
-	cfg.ApricotPhasePre6Time = at(5)
-	cfg.ApricotPhase6Time = at(6)
-	cfg.ApricotPhasePost6Time = at(7)
-	cfg.BanffTime = at(8)
-	cfg.CortinaTime = at(9)
-	cfg.DurangoTime = at(10)
-	cfg.EtnaTime = at(11)
-	cfg.FortunaTime = at(12)
-	cfg.GraniteTime = at(13)
+	cfg.ApricotPhase1Time = at(1)
+	cfg.ApricotPhase2Time = at(2)
+	cfg.ApricotPhase3Time = at(3)
+	cfg.ApricotPhase4Time = at(4)
+	cfg.ApricotPhase5Time = at(5)
+	cfg.ApricotPhasePre6Time = at(6)
+	cfg.ApricotPhase6Time = at(7)
+	cfg.ApricotPhasePost6Time = at(8)
+	cfg.BanffTime = at(9)
+	cfg.CortinaTime = at(10)
+	cfg.DurangoTime = at(11)
+	cfg.EtnaTime = at(12)
+	cfg.FortunaTime = at(13)
+	cfg.GraniteTime = at(14)
 	return cfg
 }
 
@@ -134,7 +136,7 @@ func generate(t *testing.T) *Fixture {
 
 	// The fixture's dedicated chain ID selects the pinned Berlin and London
 	// activation heights that let the chain cross AP2 and AP3 mid-chain.
-	genesis := vmtest.NewTestGenesis(paramstest.ForkToChainConfig[upgradetest.ApricotPhase1])
+	genesis := vmtest.NewTestGenesis(paramstest.ForkToChainConfig[upgradetest.NoUpgrades])
 	genesis.Config.ChainID = params.TestUpgradechainChainID
 	genesisBytes, err := json.Marshal(genesis)
 	require.NoError(t, err, "json.Marshal(genesis)")

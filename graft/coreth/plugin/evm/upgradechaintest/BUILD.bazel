@@ -46,6 +46,7 @@ graft_go_test(
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
+        "//graft/coreth/plugin/evm/upgrade/ap0",
         "//graft/coreth/plugin/evm/vmtest",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/constants",

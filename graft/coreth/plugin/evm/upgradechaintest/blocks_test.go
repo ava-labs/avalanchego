@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -49,8 +50,13 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	// At least one block per historical upgrade; each note names the behavior
 	// exercised by consuming tests.
 	g.setClock(upgrade.InitiallyActiveTime.Add(10 * time.Second))
-	g.buildEthBlock(t, "apricotPhase1", "counter-contract deploy, AVAX transfer, and storage set-and-clear accruing an SSTORE refund that AP1 discards, all under AP1's fixed 225 gwei gas price (nil base fee)",
+	g.buildEthBlock(t, "noUpgrades", "counter-contract deploy and a storage set-and-clear whose SSTORE refund is applied, under launch rules: the gas limit inherited from genesis",
 		g.counterDeployTx(t),
+		g.storageClearTx(t),
+	)
+
+	g.setClock(upgrades.ApricotPhase1Time)
+	g.buildEthBlock(t, "apricotPhase1", "AVAX transfer and a repeat of the storage set-and-clear, whose refund AP1 discards, under AP1's fixed 8M gas limit (nil base fee)",
 		g.transferTx(t, 1),
 		g.storageClearTx(t),
 	)
@@ -185,7 +191,7 @@ func (g *generator) recordGenesis(t *testing.T) {
 	statedb, err := g.vm.Ethereum().BlockChain().State()
 	require.NoError(t, err, "BlockChain().State()")
 	g.fixture.Blocks = append(g.fixture.Blocks, Block{
-		Fork:  "apricotPhase1",
+		Fork:  "noUpgrades",
 		Note:  "genesis block allocating the test accounts' funds",
 		Hash:  genesis.Hash(),
 		Time:  genesis.Time(),
@@ -295,6 +301,10 @@ func (g *generator) signedTx(t *testing.T, tx types.TxData) *types.Transaction {
 	return signed
 }
 
+// gasPrice is paid by every legacy transaction in the fixture. The launch era
+// has the highest floor of any era, so its minimum is accepted throughout.
+var gasPrice = big.NewInt(ap0.MinGasPrice)
+
 // transferTx returns a legacy transfer of n wei to a fixed recipient. Each
 // transfer moves a distinct amount so per-block states differ.
 func (g *generator) transferTx(t *testing.T, n int64) *types.Transaction {
@@ -304,7 +314,7 @@ func (g *generator) transferTx(t *testing.T, n int64) *types.Transaction {
 		To:       &transferRecipient,
 		Value:    big.NewInt(n),
 		Gas:      ethparams.TxGas,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 	})
 }
 
@@ -318,7 +328,7 @@ func (g *generator) accessListTransferTx(t *testing.T, n int64) *types.Transacti
 		To:         &transferRecipient,
 		Value:      big.NewInt(n),
 		Gas:        ethparams.TxGas + ethparams.TxAccessListAddressGas,
-		GasPrice:   vmtest.InitialBaseFee,
+		GasPrice:   gasPrice,
 		AccessList: types.AccessList{{Address: transferRecipient}},
 	})
 }
@@ -356,7 +366,7 @@ func (g *generator) counterDeployTx(t *testing.T) *types.Transaction {
 	return g.signedTx(t, &types.LegacyTx{
 		Nonce:    g.nonce(),
 		Gas:      100_000,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 		Data:     creation,
 	})
 }
@@ -367,7 +377,7 @@ func (g *generator) counterIncrementTx(t *testing.T) *types.Transaction {
 		Nonce:    g.nonce(),
 		To:       &g.fixture.Counter,
 		Gas:      50_000,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 	})
 }
 
@@ -380,7 +390,7 @@ func (g *generator) storageClearTx(t *testing.T) *types.Transaction {
 	return g.signedTx(t, &types.LegacyTx{
 		Nonce:    g.nonce(),
 		Gas:      100_000,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 		Data: saetest.Ops(
 			vm.PUSH1, 1, vm.PUSH1, 0, vm.SSTORE, // slot 0: 0 -> 1
 			vm.PUSH1, 0, vm.PUSH1, 0, vm.SSTORE, // slot 0: 1 -> 0, accruing the refund
@@ -395,7 +405,7 @@ func (g *generator) nativeAssetCallTx(t *testing.T, to common.Address, amount in
 		Nonce:    g.nonce(),
 		To:       &nativeasset.NativeAssetCallAddr,
 		Gas:      200_000,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 		Data: nativeasset.PackNativeAssetCallInput(
 			to,
 			common.Hash(antAssetID),
@@ -503,7 +513,7 @@ func (g *generator) sendWarpMessageTx(t *testing.T) *types.Transaction {
 		Nonce:    g.nonce(),
 		To:       &warpcontract.ContractAddress,
 		Gas:      200_000,
-		GasPrice: vmtest.InitialBaseFee,
+		GasPrice: gasPrice,
 		Data:     input,
 	})
 }
