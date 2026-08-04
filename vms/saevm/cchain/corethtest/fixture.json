@@ -6709,7 +6709,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x59b7bead177726148243f9c6fdeef39eb322be226b08e9c66cae93733bccb921",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_08/debug_traceBlockByHash",
@@ -6720,7 +6744,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x59b7bead177726148243f9c6fdeef39eb322be226b08e9c66cae93733bccb921",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_08/debug_traceBlock",
@@ -6731,7 +6779,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x59b7bead177726148243f9c6fdeef39eb322be226b08e9c66cae93733bccb921",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_08/debug_traceBlockByNumber_prestate",
@@ -6883,7 +6955,26 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": {
+				"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+				"gas": "0x30d40",
+				"gasUsed": "0xa2e0",
+				"to": "0x0100000000000000000000000000000000000002",
+				"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+				"calls": [
+					{
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x26a60",
+						"gasUsed": "0x0",
+						"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+						"input": "0x",
+						"value": "0x0",
+						"type": "CALL"
+					}
+				],
+				"value": "0x0",
+				"type": "CALL"
+			}
 		},
 		{
 			"name": "block_08/tx_0/debug_traceTransaction_prestate",
@@ -9466,7 +9557,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x5983bba950bcbb341906c9bc2b2c0314cec686c7de34b25f6d1ca89138c99cff",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_12/debug_traceBlockByHash",
@@ -9477,7 +9592,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x5983bba950bcbb341906c9bc2b2c0314cec686c7de34b25f6d1ca89138c99cff",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_12/debug_traceBlock",
@@ -9488,7 +9627,31 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": [
+				{
+					"txHash": "0x5983bba950bcbb341906c9bc2b2c0314cec686c7de34b25f6d1ca89138c99cff",
+					"result": {
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x30d40",
+						"gasUsed": "0xa2e0",
+						"to": "0x0100000000000000000000000000000000000002",
+						"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+						"calls": [
+							{
+								"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+								"gas": "0x26a60",
+								"gasUsed": "0x0",
+								"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+								"input": "0x",
+								"value": "0x0",
+								"type": "CALL"
+							}
+						],
+						"value": "0x0",
+						"type": "CALL"
+					}
+				}
+			]
 		},
 		{
 			"name": "block_12/debug_traceBlockByNumber_prestate",
@@ -9643,7 +9806,26 @@
 					"tracer": "callTracer"
 				}
 			],
-			"error": "incorrect number of top-level calls"
+			"result": {
+				"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+				"gas": "0x30d40",
+				"gasUsed": "0xa2e0",
+				"to": "0x0100000000000000000000000000000000000002",
+				"input": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce616e742d617373657400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064",
+				"calls": [
+					{
+						"from": "0x99b9dea54c48dfea6aa9a4ca4623633ee04ddbb5",
+						"gas": "0x26a60",
+						"gasUsed": "0x0",
+						"to": "0x7464a61a3cbd2d6bd6a367d3243029f3638246ce",
+						"input": "0x",
+						"value": "0x0",
+						"type": "CALL"
+					}
+				],
+				"value": "0x0",
+				"type": "CALL"
+			}
 		},
 		{
 			"name": "block_12/tx_0/debug_traceTransaction_prestate",

@@ -72,8 +72,7 @@ func TestFixtureUpToDate(t *testing.T) {
 	// the write branch above.
 	want, err := json.MarshalIndent(corethtest.Load(t), "", "\t")
 	require.NoError(t, err, "json.MarshalIndent(committed fixture)")
-	require.True(t, bytes.Equal(want, got),
-		"committed fixture is stale; run `go generate ./plugin/evm/corethgen` and inspect the diff")
+	require.JSONEq(t, string(want), string(got), "committed fixture is stale")
 }
 
 var (
