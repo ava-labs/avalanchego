@@ -41,6 +41,7 @@ var (
 	// index key namespaces
 	ethHashKeyPrefix    = []byte("h") // eth tx hash -> platform txID
 	ethReceiptKeyPrefix = []byte("b") // platform txID -> receipt record
+	ethRLPKeyPrefix     = []byte("r") // platform txID -> raw eth tx RLP
 	ethWatermarkKey     = []byte("w") // last scanned block height
 )
 
@@ -103,8 +104,64 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		height, err := a.lastAcceptedHeight()
 		return hexUint(height), err
 
-	case "eth_gasPrice", "eth_maxPriorityFeePerGas":
+	case "eth_gasPrice":
 		return "0x" + a.gasPriceWei().Text(16), nil
+
+	case "eth_maxPriorityFeePerGas":
+		// The fee charged is exactly gas * price; tips buy nothing.
+		return "0x0", nil
+
+	case "eth_feeHistory":
+		return a.feeHistory(req.Params)
+
+	case "eth_getBlockByNumber":
+		var tag string
+		if err := parseParam(req.Params, 0, &tag); err != nil {
+			return nil, err
+		}
+		height, ok, err := a.resolveBlockTag(tag)
+		if err != nil || !ok {
+			return nil, err
+		}
+		return a.blockByHeight(height, boolParam(req.Params, 1))
+
+	case "eth_getBlockByHash":
+		var hash ethcommon.Hash
+		if err := parseParam(req.Params, 0, &hash); err != nil {
+			return nil, err
+		}
+		blk, err := a.vm.state.GetStatelessBlock(ids.ID(hash))
+		if err == database.ErrNotFound {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return a.ethBlock(blk, boolParam(req.Params, 1))
+
+	case "eth_getTransactionByHash":
+		var hash ethcommon.Hash
+		if err := parseParam(req.Params, 0, &hash); err != nil {
+			return nil, err
+		}
+		return a.getTransactionByHash(hash)
+
+	case "eth_call":
+		var call struct {
+			To   *ethcommon.Address `json:"to"`
+			Data hexBytes           `json:"data"`
+		}
+		if err := parseParam(req.Params, 0, &call); err != nil {
+			return nil, err
+		}
+		return a.ethCall(call.To, call.Data)
+
+	case "eth_getLogs":
+		var filter logFilter
+		if err := parseParam(req.Params, 0, &filter); err != nil {
+			return nil, err
+		}
+		return a.getLogs(&filter)
 
 	case "eth_estimateGas":
 		// Exact: complexity is defined from semantic fields only, so the gas
@@ -166,7 +223,10 @@ func (a *ethAPI) sendRawTransaction(raw []byte) (any, error) {
 
 	hash := unsigned.Parsed.Hash()
 	txID := tx.ID()
-	if err := a.indexDB.Put(hashKey(hash), txID[:]); err != nil {
+	if err := errors.Join(
+		a.indexDB.Put(hashKey(hash), txID[:]),
+		a.indexDB.Put(rlpKey(txID), raw),
+	); err != nil {
 		return nil, err
 	}
 
@@ -176,15 +236,17 @@ func (a *ethAPI) sendRawTransaction(raw []byte) (any, error) {
 	return hash.Hex(), nil
 }
 
-// ethReceiptRecord pins an accepted eth tx to its inclusion block.
+// ethReceiptRecord pins an accepted eth tx to its inclusion block. txIndex is
+// the tx's position among the eth txs of that block.
 type ethReceiptRecord struct {
 	height   uint64
 	blkID    ids.ID
 	gasUsed  uint64
 	priceWei uint64 // effective gas price in wei per gas
+	txIndex  uint32
 }
 
-const ethReceiptRecordLen = 8 + ids.IDLen + 8 + 8
+const ethReceiptRecordLen = 8 + ids.IDLen + 8 + 8 + 4
 
 func (r *ethReceiptRecord) marshal() []byte {
 	data := make([]byte, ethReceiptRecordLen)
@@ -192,6 +254,7 @@ func (r *ethReceiptRecord) marshal() []byte {
 	copy(data[8:], r.blkID[:])
 	binary.BigEndian.PutUint64(data[8+ids.IDLen:], r.gasUsed)
 	binary.BigEndian.PutUint64(data[8+ids.IDLen+8:], r.priceWei)
+	binary.BigEndian.PutUint32(data[8+ids.IDLen+16:], r.txIndex)
 	return data
 }
 
@@ -203,6 +266,7 @@ func (r *ethReceiptRecord) unmarshal(data []byte) error {
 	copy(r.blkID[:], data[8:])
 	r.gasUsed = binary.BigEndian.Uint64(data[8+ids.IDLen:])
 	r.priceWei = binary.BigEndian.Uint64(data[8+ids.IDLen+8:])
+	r.txIndex = binary.BigEndian.Uint32(data[8+ids.IDLen+16:])
 	return nil
 }
 
@@ -247,9 +311,10 @@ func (a *ethAPI) getTransactionReceipt(hash ethcommon.Hash) (any, error) {
 
 	sender := ethcommon.Address(unsigned.Sender)
 	recipient := ethcommon.Address(unsigned.Recipient)
+	logs := stakeLogs(unsigned, &record, hash)
 	return map[string]any{
 		"transactionHash":   hash.Hex(),
-		"transactionIndex":  "0x0",
+		"transactionIndex":  hexUint(uint64(record.txIndex)),
 		"blockHash":         "0x" + hex.EncodeToString(record.blkID[:]),
 		"blockNumber":       hexUint(record.height),
 		"from":              sender.Hex(),
@@ -260,8 +325,8 @@ func (a *ethAPI) getTransactionReceipt(hash ethcommon.Hash) (any, error) {
 		"cumulativeGasUsed": hexUint(record.gasUsed),
 		"effectiveGasPrice": hexUint(record.priceWei),
 		"contractAddress":   nil,
-		"logs":              []any{},
-		"logsBloom":         "0x" + fmt.Sprintf("%0512x", 0),
+		"logs":              logs,
+		"logsBloom":         logsBloomHex(logs),
 	}, nil
 }
 
@@ -304,6 +369,7 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 		if err != nil {
 			return err
 		}
+		txIndex := uint32(0)
 		for _, tx := range blk.Txs() {
 			unsigned, ok := tx.Unsigned.(*txs.EthRLPTx)
 			if !ok {
@@ -323,13 +389,16 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 				blkID:    blkID,
 				gasUsed:  uint64(txGas),
 				priceWei: priceWei.Uint64(),
+				txIndex:  txIndex,
 			}
 			if err := errors.Join(
 				a.indexDB.Put(hashKey(unsigned.Parsed.Hash()), txID[:]),
 				a.indexDB.Put(receiptKey(txID), record.marshal()),
+				a.indexDB.Put(rlpKey(txID), unsigned.RLP),
 			); err != nil {
 				return err
 			}
+			txIndex++
 		}
 		if err := database.PutUInt64(a.indexDB, ethWatermarkKey, h); err != nil {
 			return err
@@ -397,6 +466,10 @@ func hashKey(hash ethcommon.Hash) []byte {
 
 func receiptKey(txID ids.ID) []byte {
 	return append(ethReceiptKeyPrefix, txID[:]...)
+}
+
+func rlpKey(txID ids.ID) []byte {
+	return append(ethRLPKeyPrefix, txID[:]...)
 }
 
 func hexUint(v uint64) string {
