@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package upgradechaintest
+package corethgen
 
 import (
 	"bytes"
@@ -9,14 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -39,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
 )
 
 var update = flag.Bool("update", false, "regenerate the committed fixture")
@@ -48,32 +48,40 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-const fixturePath = "testdata/upgradechain_fixture.json"
+// fixturePath locates the committed fixture, which lives with the
+// [corethtest] package that consumers import rather than with this
+// generator, relative to this package's directory.
+const fixturePath = "../../../../../vms/saevm/cchain/corethtest/fixture.json"
 
 // TestFixtureUpToDate regenerates the fixture from scratch and requires that
-// it matches the committed fixture byte for byte. Under `go test -update` (see
-// the [update] flag) it instead overwrites the committed fixture.
+// it carries the same content as the committed one. Under `go test -update`
+// (see the [update] flag) it instead overwrites the committed fixture.
 func TestFixtureUpToDate(t *testing.T) {
 	fx := generate(t)
 	got, err := json.MarshalIndent(fx, "", "\t")
 	require.NoError(t, err, "json.MarshalIndent(fixture)")
-	// .editorconfig mandates a final newline in committed files.
-	got = append(got, '\n')
 
 	if *update {
-		require.NoError(t, os.WriteFile(fixturePath, got, 0o644), "os.WriteFile(%s)", fixturePath)
+		// .editorconfig mandates a final newline in committed files.
+		require.NoError(t, os.WriteFile(fixturePath, append(got, '\n'), 0o644), "os.WriteFile(%s)", fixturePath)
 		return
 	}
-	require.True(t, bytes.Equal(fixtureJSON, got),
-		"committed fixture is stale; run `go generate ./plugin/evm/upgradechaintest` and inspect the diff")
+
+	// Both sides are re-encoded from a [corethtest.Fixture] so that the
+	// comparison sees content alone, leaving the committed file's formatting to
+	// the write branch above.
+	want, err := json.MarshalIndent(corethtest.Load(t), "", "\t")
+	require.NoError(t, err, "json.MarshalIndent(committed fixture)")
+	require.True(t, bytes.Equal(want, got),
+		"committed fixture is stale; run `go generate ./plugin/evm/corethgen` and inspect the diff")
 }
 
-// forkSchedule returns the fixture's upgrade config. The chain starts with no
-// upgrades scheduled, and thereafter they are a day apart, dwarfing the block
-// intervals, so adding blocks to an era never crosses into the next. Caveat:
-// AP2/AP3 activate block-number forks (Berlin/London) whose heights are pinned
-// per chain ID ([params.TestUpgradechainChainID]) and must be updated when a
-// block is added to the launch, AP1, or AP2 era.
+// forkSchedule returns the fixture's upgrade config. No upgrade is initially
+// active, so the chain starts under the launch rules. Upgrades are then a day
+// apart, dwarfing the block intervals, so adding blocks to an era never crosses
+// into the next. Caveat: AP2/AP3 activate block-number forks (Berlin/London)
+// whose heights are pinned per chain ID ([params.TestUpgradechainChainID]) and
+// must be updated when a block is added to the launch, AP1 or AP2 era.
 func forkSchedule() upgrade.Config {
 	cfg := upgradetest.GetConfig(upgradetest.NoUpgrades)
 	at := func(days int) time.Time {
@@ -120,10 +128,16 @@ type generator struct {
 	kc             *secp256k1fx.Keychain
 	warpValidators *warptest.Validators
 
+	// counter is the address of the counter contract, set by
+	// [generator.counterDeployTx]. With empty call data it increments its
+	// storage slot 0; with any call data it returns the slot's value as a
+	// 32-byte word.
+	counter common.Address
+
 	utxoTxID uint64 // distinct txIDs for seeded shared-memory UTXOs
 	ethNonce uint64 // next nonce for the single EVM sender
 
-	fixture *Fixture
+	fixture *corethtest.Fixture
 }
 
 const minValidPChainHeight = 10
@@ -131,7 +145,7 @@ const minValidPChainHeight = 10
 var errPChainHeightTooLow = errors.New("warp validator set unavailable below the minimum P-chain height")
 
 // generate builds the full fixture: chain, blocks, and database dump.
-func generate(t *testing.T) *Fixture {
+func generate(t *testing.T) *corethtest.Fixture {
 	upgrades := forkSchedule()
 
 	// The fixture's dedicated chain ID selects the pinned Berlin and London
@@ -148,10 +162,9 @@ func generate(t *testing.T) *Fixture {
 		// Fixed BLS keys so the embedded signed warp message, and hence the
 		// fixture, is deterministic.
 		warpValidators: warptest.NewValidators(t, warptest.WithSigners(blsSigner(t, 1), blsSigner(t, 2))),
-		fixture: &Fixture{
+		fixture: &corethtest.Fixture{
 			Genesis:  json.RawMessage(genesisJSON),
 			Upgrades: upgrades,
-			Counter:  crypto.CreateAddress(vmtest.TestEthAddrs[0], 0), // the counter contract, deployed in block 1
 		},
 	}
 
@@ -159,9 +172,7 @@ func generate(t *testing.T) *Fixture {
 	suite := vmtest.SetupTestVM(t, g.vm, vmtest.TestVMConfig{
 		Upgrades:    &upgrades,
 		GenesisJSON: genesisJSON,
-		// Disable pruning so every block's state root remains resolvable, and
-		// snapshot generation, whose async writes would make the dump racy.
-		ConfigJSON: `{"pruning-enabled": false, "snapshot-cache": 0}`,
+		ConfigJSON:  vmConfigJSON(t),
 	})
 	g.ctx = suite.Ctx
 	g.memory = suite.AtomicMemory
@@ -169,8 +180,8 @@ func generate(t *testing.T) *Fixture {
 
 	g.recordGenesis(t)
 	g.buildAllBlocks(t)
-	g.recordIntermediateRoots(t)
 	g.pinNativeAssetCallTraceParity(t)
+	g.recordRPCCalls(t)
 
 	// The dump MUST follow a clean shutdown, matching a real handed-over
 	// database and removing geth's unclean-shutdown marker, whose wall-clock
@@ -180,19 +191,21 @@ func generate(t *testing.T) *Fixture {
 	return g.fixture
 }
 
-// recordIntermediateRoots records the generating VM's own
-// debug_intermediateRoots result on every non-genesis block, for consuming
-// tests to assert replay parity against.
-func (g *generator) recordIntermediateRoots(t *testing.T) {
+// vmConfigJSON returns the generating VM's configuration.
+//
+// Pruning is disabled so every block's state root remains resolvable, as is
+// snapshot generation, whose async writes would make the database dump racy.
+// The enabled APIs are exactly [recordedRPCNamespaces], because coreth
+// attaches only the services it is asked for and rejects unknown names.
+func vmConfigJSON(t *testing.T) string {
 	t.Helper()
 
-	api := tracers.NewAPI(g.vm.Ethereum().APIBackend)
-	for i := range g.fixture.Blocks[1:] {
-		b := &g.fixture.Blocks[i+1]
-		roots, err := api.IntermediateRoots(t.Context(), b.Hash, nil)
-		require.NoError(t, err, "IntermediateRoots(block %d)", b.Number)
-		b.IntermediateRoots = roots
-	}
+	apis, err := json.Marshal(recordedRPCNamespaces)
+	require.NoError(t, err, "json.Marshal(recordedRPCNamespaces)")
+	return fmt.Sprintf(
+		`{"pruning-enabled": false, "snapshot-cache": 0, "eth-apis": %s}`,
+		apis,
+	)
 }
 
 // pinNativeAssetCallTraceParity requires that coreth itself fails to callTrace
@@ -256,22 +269,16 @@ func (g *generator) setClock(now time.Time) {
 	g.vm.Clock().Set(now)
 }
 
-// watchedState reads the watched accounts' balances and nonces. The blackhole
-// coinbase is watched because coreth burns fees by crediting it, a write that
-// replaying consumers MUST reproduce to reach the recorded roots.
-func (g *generator) watchedState(statedb *state.StateDB) map[common.Address]AccountState {
-	accounts := make(map[common.Address]AccountState)
-	for _, addr := range []common.Address{
+// watchedAddresses returns the accounts whose state the recorded RPC calls
+// query, in a fixed order. The blackhole coinbase is watched because coreth
+// burns fees by crediting it, a write that replaying consumers MUST reproduce
+// to reach the recorded roots.
+func (g *generator) watchedAddresses() []common.Address {
+	return []common.Address{
 		vmtest.TestEthAddrs[0],
 		vmtest.TestEthAddrs[1],
 		transferRecipient,
-		g.fixture.Counter,
+		g.counter,
 		evmconstants.BlackholeAddr,
-	} {
-		accounts[addr] = AccountState{
-			Balance: (*hexutil.Big)(statedb.GetBalance(addr).ToBig()),
-			Nonce:   statedb.GetNonce(addr),
-		}
 	}
-	return accounts
 }

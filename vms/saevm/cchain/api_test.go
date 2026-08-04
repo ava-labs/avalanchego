@@ -4,8 +4,12 @@
 package cchain
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"maps"
+	"math/big"
 	"reflect"
 	"sync"
 	"testing"
@@ -14,21 +18,27 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
@@ -180,7 +190,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
 			Status: choices.Accepted,
-			Height: utils.PointerTo(json.Uint64(blk.NumberU64())),
+			Height: utils.PointerTo(avajson.Uint64(blk.NumberU64())),
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})
@@ -295,4 +305,85 @@ func TestRPCExtras(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSynchronousRPCs replays JSON-RPC calls recorded from Coreth and requires
+// an identical response, covering the state, receipt, log, and tracing RPCs at
+// every height for every pre-SAE network upgrade.
+func TestSynchronousRPCs(t *testing.T) {
+	// The fixture was dumped from the database handle the historical C-Chain
+	// VM received, which corresponds to [chainDBPrefix] of the SUT's base
+	// database.
+	fx := corethtest.Load(t)
+	db := memdb.New()
+	fx.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
+
+	ctx, sut := newSUT(t,
+		withDB(db),
+		withGenesis(fx.CoreGenesis(t)),
+		withUpgrades(fx.Upgrades),
+		// The fixture was generated without pruning, which marked the database
+		// to refuse later pruning runs.
+		withArchival(),
+	)
+
+	for _, call := range fx.RPCCalls {
+		t.Run(call.Name, func(t *testing.T) {
+			t.Parallel()
+
+			var got json.RawMessage
+			err := sut.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
+			if call.Error != "" {
+				require.EqualError(t, err, call.Error, "%s(%s)", call.Method, call.Params)
+				return
+			}
+			require.NoError(t, err, "%s(%s)", call.Method, call.Params)
+
+			want := decodeRPCResult(t, call.Result)
+			if diff := cmp.Diff(want, decodeRPCResult(t, got)); diff != "" {
+				t.Errorf("%s(%s) response diff (-coreth +sae):\n%s", call.Method, call.Params, diff)
+			}
+		})
+	}
+
+	// We test block lookups separately because SAE decided not to support
+	// totalDifficulty and always report 0.
+	opts := cmp.Options{
+		cmputils.Blocks(),
+		cmputils.Headers(),
+		cmpopts.EquateEmpty(),
+	}
+	for _, block := range fx.Blocks {
+		t.Run(fmt.Sprintf("block_%02d_%s", block.Number, block.Fork), func(t *testing.T) {
+			t.Parallel()
+
+			t.Logf("%s", block.Description)
+			want := block.EthBlock(t)
+
+			byNumber, err := sut.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			require.NoError(t, err, "BlockByNumber(%d)", block.Number)
+			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
+				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
+			}
+
+			byHash, err := sut.ethclient.BlockByHash(ctx, block.Hash)
+			require.NoError(t, err, "BlockByHash(%s)", block.Hash)
+			if diff := cmp.Diff(want, byHash, opts); diff != "" {
+				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)
+			}
+		})
+	}
+}
+
+// decodeRPCResult decodes a JSON-RPC result into its generic Go representation,
+// so that responses are compared by content rather than by encoding. Numbers
+// are preserved as [avajson.Number] to avoid precision loss.
+func decodeRPCResult(tb testing.TB, raw json.RawMessage) any {
+	tb.Helper()
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var v any
+	require.NoErrorf(tb, dec.Decode(&v), "decoding JSON-RPC result %s", raw)
+	return v
 }

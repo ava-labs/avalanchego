@@ -297,15 +297,6 @@ func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 
 	})
 }
 
-// withArchivalState returns an option that persists every post-execution
-// state root, allowing settled blocks to be traced after their in-memory
-// state would otherwise have been pruned.
-func withArchivalState() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.Archival = true
-	})
-}
-
 func withBloomSectionSize(size uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.BlocksPerBloomSection = size

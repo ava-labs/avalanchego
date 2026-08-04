@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "corethtest",
+    srcs = ["corethtest.go"],
+    embedsrcs = ["fixture.json"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//upgrade",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_stretchr_testify//require",
+    ],
+)

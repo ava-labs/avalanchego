@@ -356,7 +356,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	if settled == (hook.Settled{}) {
 		// An all-zero marker implies pre-SAE (see [hook.Synchronous]),
 		// executing the block with the worst-case fee in its header.
-		log.Error("Settlement marker is all-zero")
+		log.Error("Settlement marker would indicate synchronous execution")
 		return nil, fmt.Errorf("%w: settling block %d", errZeroSettledMarker, settled.Height)
 	}
 

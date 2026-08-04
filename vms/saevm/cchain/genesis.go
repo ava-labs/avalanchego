@@ -309,8 +309,8 @@ func (g *genesis) block() (*types.Block, error) {
 
 		// The genesis block is synchronous, so the markers must be zero to
 		// conform with [hook.Synchronous]. Most synchronous blocks omit these
-		// fields entirely. Genesis instead includes them, with values that mark
-		// it as synchronous.
+		// fields entirely. Genesis needs to include them with values that mark
+		// it as synchronous to allow future upgrade fields to be included.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)

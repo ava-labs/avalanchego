@@ -29,7 +29,7 @@ var (
 	errInvalidUpgradeTime = errors.New("invalid upgrade time")
 )
 
-// TestUpgradechainChainID identifies the plugin/evm/upgradechaintest fixture
+// TestUpgradechainChainID identifies the plugin/evm/corethgen fixture
 // chain. Like Fuji and Mainnet, its Berlin and London heights are pinned so
 // that it can cross AP2 and AP3 mid-chain.
 var TestUpgradechainChainID = big.NewInt(43110)
