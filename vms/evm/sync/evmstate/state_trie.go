@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -26,10 +27,12 @@ const (
 	numStorageTrieSegments = 4
 )
 
-// stateTrie reconstructs one EVM trie (account or storage) from concurrently
-// fetched segments. Segments write verified leaves to the snapshot in any order.
-// As the contiguous prefix completes, segmentFinished re-reads the snapshot in key
-// order to feed a single StackTrie, so out-of-order fetch still reconstructs in order.
+var errRootMismatch = errors.New("reconstructed root does not match target")
+
+// stateTrie reconstructs one EVM trie (account or storage) from concurrently fetched
+// segments. Segments write verified leaves to the snapshot in any order, and the
+// snapshot is then re-read in key order to feed a single StackTrie. That indirection
+// is what lets out-of-order fetch still reconstruct in order.
 type stateTrie struct {
 	db      ethdb.KeyValueStore
 	root    common.Hash
@@ -39,13 +42,13 @@ type stateTrie struct {
 	batch     ethdb.Batch
 	stackTrie *trie.StackTrie
 
-	// tasks is the shared pool channel receiving segments from createSegments.
+	// tasks is the scheduler channel new segments are queued onto.
 	tasks       chan<- task
 	numSegments int
 	threshold   uint64
 
-	// isMainTrie defers this trie's node batch write to the caller, so the account
-	// root is not persisted before its storage tries finish.
+	// isMainTrie defers the node write to the caller, so the account root is not
+	// persisted before its storage tries finish.
 	isMainTrie bool
 
 	// onDone runs after the trie's root is verified and committed.
@@ -102,9 +105,8 @@ func newStateTrie(db ethdb.KeyValueStore, root, account common.Hash, leaves leaf
 	return t, nil
 }
 
-// loadSegments restores segments persisted by a prior run and advances each past
-// the leaves already in the snapshot, so a restart skips completed ranges. A fresh
-// trie loads one whole-range segment.
+// loadSegments restores segments from a prior run and advances each past the leaves
+// already in the snapshot, so a restart skips them. A fresh trie loads one segment.
 func (t *stateTrie) loadSegments() error {
 	it := customrawdb.NewSyncSegmentsIterator(t.db, t.root)
 	defer it.Release()
@@ -138,7 +140,7 @@ func (t *stateTrie) loadSegmentPos(segment *stateSegment) error {
 
 	var lastKey []byte
 	for it.Next() {
-		if len(segment.end) > 0 && bytes.Compare(it.Key(), segment.end) > 0 {
+		if !withinRange(it.Key(), segment.end) {
 			break
 		}
 		lastKey = common.CopyBytes(it.Key())
@@ -153,7 +155,6 @@ func (t *stateTrie) loadSegmentPos(segment *stateSegment) error {
 	return nil
 }
 
-// addSegment appends a segment covering [start, end] and returns it.
 func (t *stateTrie) addSegment(start, end []byte) *stateSegment {
 	segment := &stateSegment{
 		trie:  t,
@@ -166,9 +167,25 @@ func (t *stateTrie) addSegment(start, end []byte) *stateSegment {
 	return segment
 }
 
-// segmentFinished marks the segment at idx done, hashes every contiguous finished
-// segment into the StackTrie in key order, then verifies and commits the root once
-// all segments are done.
+// flushProgress writes each segment's buffered leaves, so an interrupted sync resumes
+// from them. Only safe with no worker running on this trie.
+func (t *stateTrie) flushProgress() error {
+	for _, segment := range t.segments {
+		if err := segment.batch.Write(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// commitNodes writes the StackTrie's buffered nodes, including the root. A main trie
+// defers this to its caller, so the root never lands ahead of the state it commits to.
+func (t *stateTrie) commitNodes() error {
+	return t.batch.Write()
+}
+
+// segmentFinished hashes every contiguous finished segment into the StackTrie in key
+// order, then verifies and commits the root once all segments are done.
 func (t *stateTrie) segmentFinished(ctx context.Context, idx int) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -192,9 +209,7 @@ func (t *stateTrie) segmentFinished(ctx context.Context, idx int) error {
 		return fmt.Errorf("%w: got %x want %x", errRootMismatch, root, t.root)
 	}
 	if !t.isMainTrie {
-		// The main trie's batch is written last, so its root never lands on disk
-		// before the state it references.
-		if err := t.batch.Write(); err != nil {
+		if err := t.commitNodes(); err != nil {
 			return err
 		}
 	}
@@ -207,8 +222,7 @@ func (t *stateTrie) segmentFinished(ctx context.Context, idx int) error {
 	return nil
 }
 
-// hashSegment flushes the segment's snapshot writes, then re-reads them from the
-// segment start to feed the StackTrie in key order.
+// hashSegment flushes the segment's leaves, then re-reads them in key order.
 func (t *stateTrie) hashSegment(ctx context.Context, segment *stateSegment) error {
 	if err := segment.batch.Write(); err != nil {
 		return err
@@ -221,8 +235,8 @@ func (t *stateTrie) hashSegment(ctx context.Context, segment *stateSegment) erro
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if len(segment.end) > 0 && bytes.Compare(it.Key(), segment.end) > 0 {
-			// Past the segment end, belongs to the next segment.
+		if !withinRange(it.Key(), segment.end) {
+			// Belongs to the next segment.
 			break
 		}
 		if err := t.stackTrie.Update(it.Key(), common.CopyBytes(it.Value())); err != nil {
@@ -235,8 +249,8 @@ func (t *stateTrie) hashSegment(ctx context.Context, segment *stateSegment) erro
 	return it.Error()
 }
 
-// createSegmentsIfNeeded splits the trie once its first segment grows past the
-// threshold, so the remaining key space fetches concurrently.
+// createSegmentsIfNeeded splits the trie past the threshold, so the rest of the key
+// space fetches concurrently.
 func (t *stateTrie) createSegmentsIfNeeded(ctx context.Context, segment *stateSegment) error {
 	t.lock.Lock()
 	if len(t.segments) > 1 || segment.estimateSize() < t.threshold {
@@ -247,18 +261,14 @@ func (t *stateTrie) createSegmentsIfNeeded(ctx context.Context, segment *stateSe
 	return t.createSegments(ctx)
 }
 
-// createSegments divides the 2-byte key-prefix space into numSegments ranges,
-// extends the first segment to its range end, and queues the rest. Only one
-// goroutine touches this trie while it runs, so it needs no lock.
+// createSegments splits the prefix space into numSegments ranges, extends the first
+// segment to its range end, and queues the rest. Only one goroutine touches this trie
+// while it runs, so it needs no lock.
 func (t *stateTrie) createSegments(ctx context.Context) error {
 	first := t.segments[0]
-	step := 0x10000 / t.numSegments
 
-	for i := 0; i < t.numSegments; i++ {
-		start := uint16(i * step)
-		end := uint16(i*step + (step - 1))
-		startBytes := addPadding(start, 0x00)
-		endBytes := addPadding(end, 0xff)
+	for i := range t.numSegments {
+		startBytes, endBytes := segmentRange(i, t.numSegments)
 
 		// Skip ranges the first segment already covered.
 		if bytes.Compare(first.pos, endBytes) >= 0 {
@@ -285,8 +295,8 @@ func (t *stateTrie) createSegments(ctx context.Context) error {
 	return nil
 }
 
-// stateSegment is one contiguous key range of a [stateTrie], the unit the pool
-// consumes, each driven by its own goroutine.
+// stateSegment is one contiguous key range of a [stateTrie], the unit the fetcher
+// consumes.
 type stateSegment struct {
 	trie      *stateTrie
 	start     []byte
@@ -308,21 +318,20 @@ func (s *stateSegment) Start() []byte {
 	return s.start
 }
 
-// OnLeaves writes the batch to the snapshot, advances the resume position, and
-// splits the trie if it has grown large enough.
-func (s *stateSegment) OnLeaves(ctx context.Context, keys, vals [][]byte) error {
-	if err := s.trie.leaves.writeLeaves(ctx, s.batch, keys, vals); err != nil {
+// OnLeaves writes the batch, advances the resume position, and splits if grown.
+func (s *stateSegment) OnLeaves(ctx context.Context, batch leafBatch) error {
+	if err := s.trie.leaves.writeLeaves(ctx, s.batch, batch); err != nil {
 		return err
 	}
 	if err := flushIfFull(s.batch); err != nil {
 		return err
 	}
-	s.leafCount += uint64(len(keys))
-	if len(keys) > 0 {
-		s.pos = nextRangeKey(keys[len(keys)-1])
+	s.leafCount += uint64(len(batch.keys))
+	if len(batch.keys) > 0 {
+		s.pos = nextRangeKey(batch.lastKey())
 	}
 	if s.trie.stats != nil {
-		s.trie.stats.incLeaves(s, uint64(len(keys)), s.estimateSize())
+		s.trie.stats.incLeaves(s, uint64(len(batch.keys)), s.estimateSize())
 	}
 	return s.trie.createSegmentsIfNeeded(ctx, s)
 }
@@ -332,8 +341,8 @@ func (s *stateSegment) OnFinish(ctx context.Context) error {
 	return s.trie.segmentFinished(ctx, s.idx)
 }
 
-// estimateSize approximates the trie's total leaf count from the 2-byte prefix
-// density covered so far, assuming uniform keys. It returns 0 before any progress.
+// estimateSize approximates the trie's leaf count from the prefix density covered so
+// far, assuming uniform keys. It returns 0 before any progress.
 func (s *stateSegment) estimateSize() uint64 {
 	start, pos, end := uint16(0), uint16(0), uint16(0xffff)
 	if len(s.start) > 0 {
@@ -353,10 +362,14 @@ func (s *stateSegment) estimateSize() uint64 {
 	return s.leafCount * uint64(left) / uint64(progress)
 }
 
-// addPadding returns a 32-byte key of pos in big-endian followed by padding bytes.
-func addPadding(pos uint16, padding byte) []byte {
-	packer := wrappers.Packer{Bytes: make([]byte, common.HashLength)}
-	packer.PackShort(pos)
-	packer.PackFixedBytes(bytes.Repeat([]byte{padding}, common.HashLength-wrappers.ShortLen))
-	return packer.Bytes
+// flushIfFull writes and resets batch past [ethdb.IdealBatchSize], capping memory.
+func flushIfFull(batch ethdb.Batch) error {
+	if batch.ValueSize() <= ethdb.IdealBatchSize {
+		return nil
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	batch.Reset()
+	return nil
 }

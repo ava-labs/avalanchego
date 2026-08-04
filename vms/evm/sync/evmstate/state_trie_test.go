@@ -4,21 +4,12 @@
 package evmstate
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
-	"slices"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/trie/trienode"
-	"github.com/ava-labs/libevm/triedb"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,7 +25,7 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 
 	account := common.HexToHash("0xac")
 	trieDB := synctest.NewTrieDB()
-	root, keys, vals := fillDistributedStorageTrie(t, trieDB, 3000)
+	root, keys, vals := synctest.FillTrieDistributed(t, trieDB, 3000)
 
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, RegisterHandler(logging.NoLog{}, net, trieDB, common.HashLength, nil))
@@ -52,64 +43,11 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	require.NoError(t, err)
 	tasks <- st.segments[0]
 
-	require.NoError(t, newCallbackSyncer(logging.NoLog{}, NewClient(net, tracker), tasks, 4).sync(ctx))
+	require.NoError(t, newLeafFetcher(logging.NoLog{}, NewClient(net, tracker), tasks, 4).sync(ctx))
 
 	require.Greater(t, len(st.segments), 1, "the storage trie must have split into segments")
 	requireReconstructed(t, target, root, keys, vals)
 	for i, k := range keys {
 		require.Equal(t, vals[i], rawdb.ReadStorageSnapshot(target, account, common.BytesToHash(k)))
 	}
-}
-
-// fillDistributedTrie writes n pairs whose hashed keys spread across the key space,
-// so segmentation by 2-byte prefix has data in every range. Returns the root with keys and values sorted.
-func fillDistributedTrie(t *testing.T, trieDB *triedb.Database, n int, valueOf func(i int) []byte) (common.Hash, [][]byte, [][]byte) {
-	t.Helper()
-	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
-	require.NoError(t, err)
-
-	type row struct{ key, val []byte }
-	rows := make([]row, n)
-	for i := range n {
-		var idx [8]byte
-		binary.BigEndian.PutUint64(idx[:], uint64(i+1))
-		key := crypto.Keccak256(idx[:])
-		val := valueOf(i)
-		tr.MustUpdate(key, val)
-		rows[i] = row{key, val}
-	}
-
-	root, nodes, err := tr.Commit(false)
-	require.NoError(t, err)
-	require.NoError(t, trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil))
-	require.NoError(t, trieDB.Commit(root, false))
-
-	slices.SortFunc(rows, func(a, b row) int { return bytes.Compare(a.key, b.key) })
-	keys := make([][]byte, n)
-	vals := make([][]byte, n)
-	for i, r := range rows {
-		keys[i], vals[i] = r.key, r.val
-	}
-	return root, keys, vals
-}
-
-func fillDistributedStorageTrie(t *testing.T, trieDB *triedb.Database, numSlots int) (common.Hash, [][]byte, [][]byte) {
-	return fillDistributedTrie(t, trieDB, numSlots, func(i int) []byte {
-		val := make([]byte, 8)
-		binary.BigEndian.PutUint64(val, uint64(i+1)*7)
-		return val
-	})
-}
-
-func fillDistributedAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (common.Hash, [][]byte, [][]byte) {
-	return fillDistributedTrie(t, trieDB, numAccounts, func(i int) []byte {
-		full, err := types.FullAccountRLP(types.SlimAccountRLP(types.StateAccount{
-			Nonce:    uint64(i + 1),
-			Balance:  uint256.NewInt(uint64(i+1) * 1000),
-			Root:     types.EmptyRootHash,
-			CodeHash: types.EmptyCodeHash.Bytes(),
-		}))
-		require.NoError(t, err)
-		return full
-	})
 }

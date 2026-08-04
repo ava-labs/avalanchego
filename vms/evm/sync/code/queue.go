@@ -146,6 +146,26 @@ func (q *Queue) Finalize() error {
 	return nil
 }
 
+// FinalizeContext is [Queue.Finalize] bounded by ctx: if ctx ends first it shuts the
+// forwarder down, leaving unsent hashes as disk markers for the next run. Use it when
+// the consumer may stop early, since Finalize alone would block forever.
+func (q *Queue) FinalizeContext(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		q.stop(false)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		q.Shutdown()
+		<-done
+		return ctx.Err()
+	}
+}
+
 // Shutdown cancels the forwarder, waits for exit, then closes out.
 // Unsent hashes are safe as disk markers and will be recovered on restart.
 // Idempotent with [Queue.Finalize].

@@ -4,9 +4,11 @@
 package code
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -111,8 +113,7 @@ func TestCodeQueue(t *testing.T) {
 				<-got.done
 			}
 
-			// Cross-batch ordering is not guaranteed because separate
-			// goroutines race. Compare as sets.
+			// Cross-batch order is not guaranteed, so compare as sets.
 			require.ElementsMatchf(t, tt.want, got.hashes, "values received from %T.CodeHashes()", q)
 
 			t.Run("restart_with_same_db", func(t *testing.T) {
@@ -123,8 +124,7 @@ func TestCodeQueue(t *testing.T) {
 				restart := drainAsync(q.CodeHashes())
 				<-restart.done
 
-				// init checks for existing code when recovering from disk,
-				// so already-present hashes are excluded.
+				// init drops hashes whose code is already on disk.
 				want := set.Of(tt.want...)
 				for hash := range tt.alreadyHave {
 					want.Remove(hash)
@@ -140,9 +140,9 @@ func TestCodeQueue(t *testing.T) {
 	}
 }
 
-// TestFinalizeFlushesAllHashes verifies that AddCode is non-blocking and
-// Finalize waits for the forwarder goroutine to drain all pending hashes.
+// AddCode never blocks, and Finalize drains everything pending.
 func TestFinalizeFlushesAllHashes(t *testing.T) {
+	t.Parallel()
 	const (
 		capacity  = 1
 		numHashes = 50
@@ -164,9 +164,36 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 	require.Equal(t, hashes, got.hashes, "all hashes received in batch order")
 }
 
-// TestShutdownUnblocksGoroutines verifies that Shutdown cancels the stuck
-// forwarder goroutine, is idempotent with Finalize, and rejects later AddCode calls.
+// A full channel with no consumer must not wedge FinalizeContext.
+func TestFinalizeContextAbortsOnCancel(t *testing.T) {
+	t.Parallel()
+	q, err := NewQueue(rawdb.NewMemoryDatabase(), WithCapacity(1))
+	require.NoError(t, err)
+
+	// Fill past capacity with no consumer, so the forwarder blocks on send.
+	require.NoError(t, q.AddCode(t.Context(), makeHashes(3)))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- q.FinalizeContext(ctx) }()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("FinalizeContext hung on a cancelled context with a full queue")
+	}
+
+	// Cancelling shuts the forwarder down, so out closes after the buffered sends.
+	for range q.CodeHashes() {
+	}
+}
+
+// Shutdown frees the stuck forwarder, is idempotent with Finalize, and closes AddCode.
 func TestShutdownUnblocksGoroutines(t *testing.T) {
+	t.Parallel()
 	const capacity = 1
 	db := rawdb.NewMemoryDatabase()
 	q, err := NewQueue(db, WithCapacity(capacity))
@@ -189,8 +216,7 @@ func TestShutdownUnblocksGoroutines(t *testing.T) {
 	require.ErrorIs(t, err, ErrQueueClosed)
 }
 
-// TestShutdownAndAddCodeRace verifies no panic or goroutine leak when
-// Shutdown and AddCode race against each other.
+// Shutdown racing AddCode must not panic or leak.
 func TestShutdownAndAddCodeRace(t *testing.T) {
 	for range 1_000 {
 		t.Run("", func(t *testing.T) {
@@ -228,9 +254,9 @@ func TestShutdownAndAddCodeRace(t *testing.T) {
 	}
 }
 
-// TestConcurrentAddCodeAndConsume stress-tests concurrent producers and a
-// single consumer on a small-capacity channel.
+// Many producers, one consumer, tiny channel.
 func TestConcurrentAddCodeAndConsume(t *testing.T) {
+	t.Parallel()
 	const (
 		numProducers      = 5
 		hashesPerProducer = 100

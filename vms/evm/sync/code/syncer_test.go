@@ -32,6 +32,7 @@ import (
 )
 
 func TestVerifyCode(t *testing.T) {
+	t.Parallel()
 	code := []byte("contract bytecode")
 	hash := crypto.Keccak256Hash(code)
 
@@ -82,15 +83,27 @@ func TestVerifyCode(t *testing.T) {
 }
 
 func TestSyncer(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		numFromSource int
 		numOnDisk     int
 		perReq        int
 	}{
-		{name: "single blob", numFromSource: 1},
-		{name: "batches across requests", numFromSource: 12, perReq: 4},
-		{name: "skips code already on disk", numFromSource: 3, numOnDisk: 2},
+		{
+			name:          "single blob",
+			numFromSource: 1,
+		},
+		{
+			name:          "batches across requests",
+			numFromSource: 12,
+			perReq:        4,
+		},
+		{
+			name:          "skips code already on disk",
+			numFromSource: 3,
+			numOnDisk:     2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -144,9 +157,7 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
-// TestSyncer_DedupesInFlight checks the same code hash enqueued many times is
-// fetched from the network at most once, exercising the in-flight dedup that
-// exists because accounts sharing a code hash enqueue it repeatedly.
+// Accounts sharing a code hash enqueue it repeatedly, so it must be fetched once.
 func TestSyncer_DedupesInFlight(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -188,6 +199,7 @@ func TestSyncer_DedupesInFlight(t *testing.T) {
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 	nodeID := ids.GenerateTestNodeID()
@@ -223,9 +235,8 @@ func tamperingHandler() p2p.Handler {
 	}
 }
 
-// TestSyncer_CleansMarkerRewrittenMidCleanup regresses issue #5353: a to-fetch
-// marker rewritten by a concurrent AddCode mid-cleanup must still be cleared by a
-// sibling worker, which holds only because cleanup runs before the inFlight gate.
+// Regresses #5353: a marker rewritten mid-cleanup must still be cleared, which holds
+// only because cleanup runs before the inFlight gate.
 func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -235,8 +246,7 @@ func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
 	codeBytes := randomCode(t)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 
-	// probeHash is a synchronization barrier. Its code is on disk, so dequeueing
-	// it does not affect codeHash's marker.
+	// probeHash is a barrier. Its code is on disk, so it cannot touch codeHash's marker.
 	probeBytes := randomCode(t)
 	probeHash := crypto.Keccak256Hash(probeBytes)
 
@@ -254,26 +264,21 @@ func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
 	require.NoError(t, RegisterHandler(logging.NoLog{}, net, source))
 
 	ch := make(chan common.Hash)
-	// Exactly two workers, so the probeHash send below can only be received by the
-	// sibling once it is back at the receive. Any spare worker would break that barrier.
+	// Exactly two workers, or a spare one breaks the probeHash barrier below.
 	codeSyncer := NewSyncer(logging.NoLog{}, NewClient(net, tracker), clientDB, ch, WithNumWorkers(2))
 
 	syncErrCh := make(chan error, 1)
 	go func() { syncErrCh <- codeSyncer.Sync(ctx) }()
 
-	// A worker takes codeHash, commits the marker delete, then pauses inside the
-	// wrapped Batch.Write.
+	// A worker deletes the marker, then pauses inside the wrapped commit.
 	ch <- codeHash
 	<-clientDB.blocked
 
-	// Rewrite the marker (modelling a concurrent AddCode) and enqueue a
-	// duplicate for a sibling worker.
+	// Rewrite the marker, as a concurrent AddCode would, and enqueue a duplicate.
 	require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
 	ch <- codeHash
 
-	// Barrier: this send returns only after the sibling has processed the
-	// duplicate and is back at the receive, so its decision is committed before
-	// we release the paused worker.
+	// Returns only once the sibling is back at the receive, so its work is committed.
 	ch <- probeHash
 
 	close(clientDB.release)
@@ -286,17 +291,21 @@ func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
 	require.NoError(t, it.Error())
 }
 
-// TestSyncer_DuplicateAddCodeNoMarkerLeak stresses the same invariant
-// end-to-end: many producers hammer AddCode for one hash and after sync no
-// to-fetch markers may remain.
+// The same invariant end-to-end: no markers may remain after sync.
 func TestSyncer_DuplicateAddCodeNoMarkerLeak(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
 		preWrite bool
 	}{
-		{name: "code already on disk", preWrite: true},
-		{name: "code fetched during sync", preWrite: false},
+		{
+			name:     "code already on disk",
+			preWrite: true,
+		},
+		{
+			name:     "code fetched during sync",
+			preWrite: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -356,8 +365,7 @@ func TestSyncer_DuplicateAddCodeNoMarkerLeak(t *testing.T) {
 	}
 }
 
-// blockingBatchDB pauses inside the first Batch.Write after the commit lands.
-// Subsequent writes are not blocked.
+// blockingBatchDB pauses inside the first marker commit, batch or direct delete.
 type blockingBatchDB struct {
 	ethdb.Database
 	primed  atomic.Bool
@@ -384,11 +392,23 @@ type blockingBatch struct {
 
 func (b *blockingBatch) Write() error {
 	err := b.Batch.Write()
-	if b.db.primed.CompareAndSwap(false, true) {
-		close(b.db.blocked)
-		<-b.db.release
-	}
+	b.db.pause()
 	return err
+}
+
+// Delete is the seam the slow path uses, bypassing batches.
+func (db *blockingBatchDB) Delete(key []byte) error {
+	err := db.Database.Delete(key)
+	db.pause()
+	return err
+}
+
+// pause holds the first caller until release.
+func (db *blockingBatchDB) pause() {
+	if db.primed.CompareAndSwap(false, true) {
+		close(db.blocked)
+		<-db.release
+	}
 }
 
 func writeCode(t *testing.T, db ethdb.KeyValueWriter, code []byte) common.Hash {
