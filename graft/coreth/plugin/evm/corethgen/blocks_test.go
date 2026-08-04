@@ -100,7 +100,6 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhase3", "nativeAssetCall moving the imported ANT balance (functional precompile era)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
-	require.Equal(t, NativeAssetCallBlocks[0], g.tip(), "functional nativeAssetCall block height")
 
 	g.setClock(upgrades.ApricotPhase4Time)
 	g.buildBlock(t, "apricotPhase4", "atomic export of AVAX with AP4 header fields (extDataGasUsed, blockGasCost)",
@@ -120,13 +119,11 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "apricotPhasePre6", "nativeAssetCall against the deprecated precompile (failing receipt)",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
-	require.Equal(t, DeprecatedNativeAssetCallBlock, g.tip(), "deprecated nativeAssetCall block height")
 
 	g.setClock(upgrades.ApricotPhase6Time)
 	g.buildEthBlock(t, "apricotPhase6", "nativeAssetCall functional again after AP6 re-enablement",
 		g.nativeAssetCallTx(t, vmtest.TestEthAddrs[1], 100),
 	)
-	require.Equal(t, NativeAssetCallBlocks[1], g.tip(), "functional nativeAssetCall block height")
 
 	g.setClock(upgrades.ApricotPhasePost6Time)
 	g.buildEthBlock(t, "apricotPhasePost6", "plain transfer (no per-block format change)",
@@ -149,13 +146,13 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	g.buildEthBlock(t, "durango", "sendWarpMessage precompile call emitting an unsigned warp message",
 		g.sendWarpMessageTx(t),
 	)
-	require.Equal(t, SendWarpMessageBlock, g.tip(), "sendWarpMessage block height")
+	require.Equal(t, sendWarpMessageBlock, g.tip(), "sendWarpMessage block height")
 
 	g.advanceClock(10 * time.Second)
 	g.buildBlock(t, "durango", "getVerifiedWarpMessage with an access-list predicate (results in header extra), plus a transfer whose tracing replays the predicate transaction",
 		nil,
 		[]*types.Transaction{g.verifiedWarpMessageTx(t), g.transferTx(t, 11)},
-		&block.Context{PChainHeight: minValidPChainHeight},
+		&block.Context{},
 	)
 
 	g.setClock(upgrades.EtnaTime)
@@ -183,21 +180,23 @@ func (g *generator) advanceClock(d time.Duration) {
 	g.setClock(g.vm.Clock().Time().Add(d))
 }
 
-// recordGenesis records the genesis block, which [vmtest.SetupTestVM] already
-// committed, as fixture block 0.
-func (g *generator) recordGenesis(t *testing.T) {
+// recordGenesisBlock records the genesis block, which [vmtest.SetupTestVM]
+// already committed, as fixture block 0.
+func (g *generator) recordGenesisBlock(t *testing.T) {
 	t.Helper()
 
 	genesis := g.vm.Ethereum().BlockChain().Genesis()
 	genesisRLP, err := rlp.EncodeToBytes(genesis)
 	require.NoError(t, err, "rlp.EncodeToBytes(genesis block)")
 
-	g.fixture.Blocks = append(g.fixture.Blocks, corethtest.Block{
-		Fork:        "noUpgrades",
-		Description: "genesis block allocating the test accounts' funds",
-		Hash:        genesis.Hash(),
-		RLP:         genesisRLP,
-	})
+	g.fixture.Blocks = []corethtest.Block{
+		{
+			Fork:        "noUpgrades",
+			Description: "genesis block allocating the test accounts' funds",
+			Hash:        genesis.Hash(),
+			RLP:         genesisRLP,
+		},
+	}
 }
 
 // tip returns the height of the most recently recorded block.

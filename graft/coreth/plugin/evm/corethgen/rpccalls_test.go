@@ -22,15 +22,6 @@ import (
 // rpcEndpointPath is the path coreth's VM mounts its JSON-RPC handler at.
 const rpcEndpointPath = "/rpc"
 
-// recordedRPCNamespaces are the coreth API service names that together serve
-// every method of [generator.rpcCallMatrix].
-var recordedRPCNamespaces = []string{
-	"internal-blockchain",  // eth_getBalance, eth_getCode, eth_getStorageAt, eth_getProof, eth_call, eth_callDetailed, eth_getBlockReceipts
-	"internal-transaction", // eth_getTransactionCount, eth_getTransactionReceipt, eth_getTransactionByHash
-	"eth-filter",           // eth_getLogs
-	"debug-tracer",         // debug_intermediateRoots, debug_traceBlock*, debug_traceTransaction
-}
-
 // traceConfig selects the tracer of the debug_trace* methods.
 type traceConfig struct {
 	Tracer       string          `json:"tracer"`
@@ -96,6 +87,10 @@ type logFilter struct {
 	BlockHash *common.Hash     `json:"blockHash,omitempty"`
 	Addresses []common.Address `json:"address,omitempty"`
 }
+
+// sendWarpMessageBlock's sendWarpMessage logs the warp precompile's
+// SendWarpMessage event.
+const sendWarpMessageBlock uint64 = 16
 
 // rpcCallMatrix returns every call to record. It is derived from
 // [corethtest.Fixture.Blocks] and [generator.watchedAddresses], so adding a
@@ -178,7 +173,7 @@ func (g *generator) rpcCallMatrix(t *testing.T) []rpcRequest {
 	var (
 		genesis   = hexutil.Uint64(0)
 		tip       = hexutil.Uint64(g.tip())
-		warpBlock = g.fixture.Blocks[SendWarpMessageBlock].Hash
+		warpBlock = g.fixture.Blocks[sendWarpMessageBlock].Hash
 	)
 	add("chain/eth_getLogs_full_range", "eth_getLogs", logFilter{FromBlock: &genesis, ToBlock: &tip})
 	add("chain/eth_getLogs_by_block_hash", "eth_getLogs", logFilter{BlockHash: &warpBlock})
