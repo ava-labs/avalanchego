@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -40,8 +41,6 @@ import (
 	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
-
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
 )
 
 // buildAllBlocks accepts the fixture's blocks in height order, advancing the
