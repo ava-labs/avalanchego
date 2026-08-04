@@ -262,6 +262,10 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if errors.Is(err, database.ErrNotFound) {
+		// TODO(JonathanOppenheimer): missing results result in us assuming
+		// "synchronous" here, so once state sync exist and the database can be
+		// pruned, this would result in async blocks being restored incorrectly.
+		// We can ask [hook.Synchronous] instead?
 		e, err = b.synchronousExecutionResults(hooks)
 		b.synchronous = true
 	}

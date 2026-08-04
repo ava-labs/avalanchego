@@ -146,6 +146,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
+	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+		return corethparams.TestFixtureBerlinBlock
 	default:
 		return 0
 	}
@@ -157,6 +159,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
+	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+		return corethparams.TestFixtureLondonBlock
 	default:
 		return 0
 	}
@@ -303,8 +307,10 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 
-		// The genesis block is synchronous and thus self-settling, so its settlement
-		// markers are never read.
+		// The genesis block is synchronous, so the markers must be zero to
+		// conform with [hook.Synchronous]. Most synchronous blocks omit these
+		// fields entirely. Genesis needs to include them with values that mark
+		// it as synchronous to allow future upgrade fields to be included.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)
