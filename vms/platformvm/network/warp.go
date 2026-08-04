@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/crypto/sha3"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -1024,8 +1025,17 @@ func (s signatureRequestVerifier) verifyValidatorSetMerkleCommitment(
 	return nil
 }
 
+// keccak256 computes the Ethereum-compatible Keccak-256 hash of data.
+func keccak256(data []byte) [32]byte {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(data)
+	var result [32]byte
+	copy(result[:], h.Sum(nil))
+	return result
+}
+
 // merkleValidatorLeafHash computes the Merkle leaf hash for a validator,
-// matching Solidity's sha256Validator: sha256(abi.encodePacked(uint256(1), blsPublicKey, weight)).
+// matching Solidity's keccakValidator: keccak256(abi.encodePacked(uint256(1), blsPublicKey, weight)).
 // The padded key format is [16 zeros][48 bytes X][16 zeros][48 bytes Y] (128 bytes),
 // so the full input is 32 + 128 + 8 = 168 bytes.
 func merkleValidatorLeafHash(pk [96]byte, weight uint64) [32]byte {
@@ -1034,15 +1044,15 @@ func merkleValidatorLeafHash(pk [96]byte, weight uint64) [32]byte {
 	copy(buf[48:96], pk[:48])   // X coordinate → bytes 48-95
 	copy(buf[112:160], pk[48:]) // Y coordinate → bytes 112-159
 	binary.BigEndian.PutUint64(buf[160:], weight)
-	return sha256.Sum256(buf[:])
+	return keccak256(buf[:])
 }
 
-// nullLeafHash matches sha256Validator(Validator{blsPublicKey: zeroes, weight: 0})
-// in ValidatorSets.sol: sha256(uint256(1) ++ 128-zero padded key ++ 8-zero weight).
+// nullLeafHash matches keccakValidator(Validator{blsPublicKey: zeroes, weight: 0})
+// in ValidatorSets.sol: keccak256(uint256(1) ++ 128-zero padded key ++ 8-zero weight).
 var nullLeafHash = func() [32]byte {
 	var buf [168]byte
 	buf[31] = 1 // uint256(1) leaf domain separator
-	return sha256.Sum256(buf[:])
+	return keccak256(buf[:])
 }()
 
 // buildMerkleRoot builds a Merkle root from a slice of leaf hashes using
@@ -1075,7 +1085,7 @@ func buildMerkleRoot(layer [][32]byte) [32]byte {
 }
 
 // merklePairHash hashes two 32-byte values together, matching Solidity's
-// sha256InternalPair: sha256(abi.encodePacked(uint256(0), smaller, larger)).
+// keccakInternalPair: keccak256(abi.encodePacked(uint256(0), smaller, larger)).
 // The uint256(0) prefix is the internal-node domain separator.
 func merklePairHash(a, b [32]byte) [32]byte {
 	if bytes.Compare(a[:], b[:]) > 0 {
@@ -1084,7 +1094,7 @@ func merklePairHash(a, b [32]byte) [32]byte {
 	var buf [96]byte // 32 bytes uint256(0) + 32 bytes smaller + 32 bytes larger
 	copy(buf[32:64], a[:])
 	copy(buf[64:96], b[:])
-	return sha256.Sum256(buf[:])
+	return keccak256(buf[:])
 }
 
 // verifyBlockTimestamp verifies that the block at the given height is a Banff
