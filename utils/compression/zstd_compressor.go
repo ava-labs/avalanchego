@@ -26,7 +26,7 @@ func NewZstdCompressor(maxSize int64) (Compressor, error) {
 }
 
 func NewZstdCompressorWithLevel(maxSize int64, level int) (Compressor, error) {
-	if maxSize == math.MaxInt64 {
+	if maxSize < 0 || maxSize == math.MaxInt64 {
 		// "Decompress" creates "io.LimitReader" with max size + 1:
 		// if the max size + 1 overflows, "io.LimitReader" reads nothing
 		// returning 0 byte for the decompress call
