@@ -123,7 +123,7 @@ function test_import_testing_only_in_tests {
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
   HAVE_TEST_LOGIC=$( printf "%s\n%s\n%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" "${IMPORT_FROM_TESTS}" "${IMPORT_TEST_PKG}" );
 
-  IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/[^/]+\.go$' ) # directory (hence package name) ends in "test"
+  IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/.+\.go$' ) # ancestral directory (hence package name) ends in "test"
 
   # Files in /tests/ are already excluded by the `find ... ! -path`
   INTENDED_FOR_TESTING="${IN_TEST_PKG}"
