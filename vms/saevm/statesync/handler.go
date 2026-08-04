@@ -41,7 +41,7 @@ type SummaryHandler struct {
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
-// database.
+// database. See the README for the guarantees expected of the database.
 func New(
 	cfg Config,
 	db ethdb.Database,
