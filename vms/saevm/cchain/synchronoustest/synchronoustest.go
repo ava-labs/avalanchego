@@ -1,10 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package corethtest provides a deterministic, pre-generated C-Chain history
+// Package synchronoustest provides a deterministic, pre-generated C-Chain history
 // crossing every pre-SAE network upgrade, for tests that need realistic
 // synchronous blocks.
-package corethtest
+package synchronoustest
 
 import (
 	"encoding/json"
@@ -32,7 +32,8 @@ type Fixture struct {
 	// Blocks holds the genesis block followed by every accepted block, in
 	// height order.
 	Blocks []Block `json:"blocks"`
-	// RPCCalls holds JSON-RPC calls and responses Coreth returned.
+	// RPCCalls holds JSON-RPC calls and the responses the synchronous VM
+	// returned.
 	RPCCalls []RPCCall `json:"rpcCalls"`
 	// Database holds every key-value pair of the VM's database after all
 	// Blocks were accepted.
@@ -95,7 +96,8 @@ var fixtureJSON []byte
 //
 // # Recorded RPC responses
 //
-// How Coreth answered queries about that chain. Every height from genesis to
+// How the synchronous VM answered queries about that chain. Every height from
+// genesis to
 // the tip is queried, and the accounts queried at each are the two funded EOAs,
 // the transfer recipient, the counter contract, and the blackhole coinbase that
 // burned fees accrue to. Slot 0 is the counter's only storage slot and is empty
@@ -131,9 +133,8 @@ var fixtureJSON []byte
 // ordering and the executed base fee, because they show the coinbase accruing
 // each transaction's fees in turn.
 //
-// Errors count as responses. Tracing genesis and tracing a block that carries a
-// functional nativeAssetCall both fail in Coreth, so the fixture records the
-// failure and a replaying VM has to reproduce it.
+// Errors count as responses. Tracing genesis fails in the synchronous VM, so
+// the fixture records the failure and a replaying VM has to reproduce it.
 func Load(tb testing.TB) *Fixture {
 	tb.Helper()
 
@@ -142,7 +143,8 @@ func Load(tb testing.TB) *Fixture {
 	return fx
 }
 
-// An RPCCall is a JSON-RPC request and the response Coreth returned for it.
+// An RPCCall is a JSON-RPC request and the response the synchronous VM returned
+// for it.
 // Exactly one of Result or Error should be set.
 type RPCCall struct {
 	// Name describes what the call covers and identifies it in test output.
@@ -175,7 +177,7 @@ func (f *Fixture) CoreGenesis(tb testing.TB) core.Genesis {
 }
 
 // WriteDatabase writes every [Fixture.Database] key-value pair to db,
-// recreating the database a Coreth node would hand to its successor VM.
+// recreating the database a synchronous node would hand to its successor VM.
 func (f *Fixture) WriteDatabase(tb testing.TB, db database.KeyValueWriter) {
 	tb.Helper()
 

@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -82,8 +82,8 @@ func (c *Client) getAllUTXOs(
 		)
 		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
 		utxos = append(utxos, page...)
-		// This termination condition matches the initial API behavior from
-		// coreth. Changing the expected termination condition could
+		// This termination condition matches the original synchronous C-Chain
+		// API behavior. Changing the expected termination condition could
 		// accidentally break legacy users.
 		if uint64(len(page)) < uint64(limit) {
 			return utxos
@@ -307,13 +307,13 @@ func TestRPCExtras(t *testing.T) {
 	}
 }
 
-// TestSynchronousRPCs replays JSON-RPC calls recorded from Coreth and requires
-// an identical response, covering state, receipt, log, and tracing RPCs at
-// every height for every pre-SAE network upgrade.
+// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
+// and requires an identical response, covering state, receipt, log, and tracing
+// RPCs at every height for every pre-SAE network upgrade.
 func TestSynchronousRPCs(t *testing.T) {
 	// The fixture's keys are relative to the VM's own database rather than to
 	// the base database that contains it.
-	fixture := corethtest.Load(t)
+	fixture := synchronoustest.Load(t)
 	db := memdb.New()
 	fixture.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
 
@@ -340,7 +340,7 @@ func TestSynchronousRPCs(t *testing.T) {
 
 			want := decodeRPCResult(t, call.Result)
 			if diff := cmp.Diff(want, decodeRPCResult(t, got)); diff != "" {
-				t.Errorf("%s(%s) response diff (-coreth +sae):\n%s", call.Method, call.Params, diff)
+				t.Errorf("%s(%s) response diff (-want +got):\n%s", call.Method, call.Params, diff)
 			}
 		})
 	}

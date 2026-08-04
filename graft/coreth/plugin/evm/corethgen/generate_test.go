@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package corethgen generates SAE's corethtest fixture.
+// Package corethgen generates SAE's synchronoustest fixture.
 package corethgen
 
 import (
@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -49,9 +49,9 @@ func TestMain(m *testing.M) {
 }
 
 // fixturePath locates the committed fixture, which lives with the
-// [corethtest] package that consumers import rather than with this
+// [synchronoustest] package that consumers import rather than with this
 // generator, relative to this package's directory.
-const fixturePath = "../../../../../vms/saevm/cchain/corethtest/fixture.json"
+const fixturePath = "../../../../../vms/saevm/cchain/synchronoustest/fixture.json"
 
 // TestFixtureUpToDate regenerates the fixture from scratch and requires that
 // it carries the same content as the committed one. Under `go test -update`
@@ -67,10 +67,10 @@ func TestFixtureUpToDate(t *testing.T) {
 		return
 	}
 
-	// Both sides are re-encoded from a [corethtest.Fixture] so that the
+	// Both sides are re-encoded from a [synchronoustest.Fixture] so that the
 	// comparison sees content alone, leaving the committed file's formatting to
 	// the write branch above.
-	want, err := json.MarshalIndent(corethtest.Load(t), "", "\t")
+	want, err := json.MarshalIndent(synchronoustest.Load(t), "", "\t")
 	require.NoError(t, err, "json.MarshalIndent(committed fixture)")
 	require.JSONEq(t, string(want), string(got), "committed fixture is stale")
 }
@@ -106,11 +106,11 @@ type generator struct {
 	utxoTxID uint64 // distinct txIDs for seeded shared-memory UTXOs
 	ethNonce uint64 // next nonce for the single EVM sender
 
-	fixture *corethtest.Fixture
+	fixture *synchronoustest.Fixture
 }
 
 // generate builds the full fixture: chain, blocks, and database dump.
-func generate(t *testing.T) *corethtest.Fixture {
+func generate(t *testing.T) *synchronoustest.Fixture {
 	// The fixture's dedicated chain ID selects the pinned Berlin and London
 	// activation heights that let the chain cross AP2 and AP3 mid-chain.
 	genesis := vmtest.NewTestGenesis(paramstest.ForkToChainConfig[upgradetest.NoUpgrades])
@@ -134,7 +134,7 @@ func generate(t *testing.T) *corethtest.Fixture {
 			blsSigner(t, 1),
 			blsSigner(t, 2),
 		)),
-		fixture: &corethtest.Fixture{
+		fixture: &synchronoustest.Fixture{
 			Genesis:  json.RawMessage(genesisJSON),
 			Upgrades: upgrades,
 		},

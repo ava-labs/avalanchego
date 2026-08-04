@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 )
 
 // recordRPCCalls records coreth's response to every call in
@@ -44,7 +44,7 @@ func (g *generator) rpcHandler(t *testing.T) http.Handler {
 }
 
 // rpcRequests returns every call to record. It is derived from
-// [corethtest.Fixture.Blocks] and [generator.watchedAddresses], so adding a
+// [synchronoustest.Fixture.Blocks] and [generator.watchedAddresses], so adding a
 // block or a watched account widens the coverage rather than leaving it stale.
 //
 // eth_getBlockByNumber and eth_getBlockByHash are left out on purpose, because
@@ -181,7 +181,7 @@ func newRPCRequest(name, method string, params ...any) rpcRequest {
 }
 
 // serve makes the request against handler and returns the recorded call.
-func (r rpcRequest) serve(t *testing.T, handler http.Handler) corethtest.RPCCall {
+func (r rpcRequest) serve(t *testing.T, handler http.Handler) synchronoustest.RPCCall {
 	t.Helper()
 
 	params := make([]json.RawMessage, len(r.params))
@@ -221,7 +221,7 @@ func (r rpcRequest) serve(t *testing.T, handler http.Handler) corethtest.RPCCall
 	var resp jsonRPCResponse
 	require.NoErrorf(t, json.Unmarshal(rec.Body.Bytes(), &resp), "unmarshalling %s response %s", r.name, rec.Body)
 
-	call := corethtest.RPCCall{
+	call := synchronoustest.RPCCall{
 		Name:   r.name,
 		Method: r.method,
 		Params: params,

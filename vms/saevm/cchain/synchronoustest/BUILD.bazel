@@ -6,11 +6,11 @@ package(default_visibility = [
 ])
 
 go_library(
-    name = "corethtest",
+    name = "synchronoustest",
     testonly = True,
-    srcs = ["corethtest.go"],
+    srcs = ["synchronoustest.go"],
     embedsrcs = ["fixture.json"],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest",
     visibility = ["//visibility:public"],
     deps = [
         "//database",

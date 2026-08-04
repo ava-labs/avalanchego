@@ -43,7 +43,7 @@ graft_go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
-        "//vms/saevm/cchain/corethtest",
+        "//vms/saevm/cchain/synchronoustest",
         "//vms/saevm/cchain/warp/warptest",
         "//vms/saevm/saetest",
         "//vms/secp256k1fx",

@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/corethtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -186,7 +186,7 @@ func (g *generator) recordGenesisBlock(t *testing.T) {
 	genesisRLP, err := rlp.EncodeToBytes(genesis)
 	require.NoError(t, err, "rlp.EncodeToBytes(genesis block)")
 
-	g.fixture.Blocks = []corethtest.Block{
+	g.fixture.Blocks = []synchronoustest.Block{
 		{
 			Fork:        "noUpgrades",
 			Description: "genesis block allocating the test accounts' funds",
@@ -252,7 +252,7 @@ func (g *generator) buildBlock(
 	require.NoError(t, rlp.DecodeBytes(blk.Bytes(), ethBlock), "rlp.DecodeBytes(block)")
 	require.Equal(t, common.Hash(blk.ID()), ethBlock.Hash(), "re-decoded block hash")
 
-	g.fixture.Blocks = append(g.fixture.Blocks, corethtest.Block{
+	g.fixture.Blocks = append(g.fixture.Blocks, synchronoustest.Block{
 		Fork:        fork,
 		Description: description,
 		Number:      ethBlock.NumberU64(),
