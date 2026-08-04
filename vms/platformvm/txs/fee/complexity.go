@@ -895,14 +895,30 @@ func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 }
 
 func (c *complexityVisitor) EthRLPTx(tx *txs.EthRLPTx) error {
-	// ponytail: flat prototype metering: real RLP bytes for bandwidth, fixed
-	// budgets for the auto-selected reads/writes and one signature recovery.
-	// A real spec meters selection at execution time.
-	c.output = gas.Dimensions{
-		gas.Bandwidth: uint64(len(tx.RLP)) + IntrinsicBaseTxComplexities[gas.Bandwidth],
-		gas.DBRead:    8,
-		gas.DBWrite:   8,
+	// no-op when already verified; populates tx.Parsed otherwise
+	if err := tx.SyntacticVerify(nil); err != nil {
+		return err
+	}
+	c.output = EthRLPTxComplexity(len(tx.Parsed.Data()))
+	return nil
+}
+
+// EthRLPTx complexity is defined from semantic fields, not serialized length,
+// so it is computable before signing (eth_estimateGas) and identical after:
+//   - Bandwidth: a constant envelope bound plus calldata. The RLP field set is
+//     fixed (SyntacticVerify rejects access lists) so the envelope is bounded
+//     by intrinsicEthRLPTxBandwidth regardless of field widths.
+//   - DBRead/DBWrite: the documented worst case of execution: one nonce read
+//     and write, up to MaxEthRLPTxInputs UTXOs read and deleted, and two
+//     outputs written.
+//   - Compute: one signature recovery.
+const intrinsicEthRLPTxBandwidth = 256
+
+func EthRLPTxComplexity(calldataLen int) gas.Dimensions {
+	return gas.Dimensions{
+		gas.Bandwidth: intrinsicEthRLPTxBandwidth + uint64(calldataLen),
+		gas.DBRead:    1 + txs.MaxEthRLPTxInputs,
+		gas.DBWrite:   1 + txs.MaxEthRLPTxInputs + 2,
 		gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 	}
-	return nil
 }

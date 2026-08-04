@@ -4,40 +4,50 @@
 package platformvm
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
-	"sync"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-// ethAPI is a minimal Ethereum JSON-RPC facade over the P-chain so that stock
-// EVM tooling can read balances and issue EthRLPTxs. Single requests only.
-// ponytail: prototype; no batch requests, no logs, no historical blocks.
+// ethAPI is an Ethereum JSON-RPC facade over the P-chain so that stock EVM
+// tooling can read balances and issue EthRLPTxs. Single requests only.
+// ponytail: no batch requests, no logs, no historical block queries.
 type ethAPI struct {
 	vm *VM
 
-	lock       sync.Mutex
-	txHashToID map[ethcommon.Hash]ids.ID
+	// indexDB persists eth hash -> txID and txID -> inclusion block so
+	// receipts survive restarts. Node-local, not consensus state.
+	indexDB database.Database
 }
 
-// ethGasPriceWei prices one P-chain gas unit at 1 nAVAX, expressed in wei so
-// wallet cost math (gas * price, 18 decimals) is exact.
-var ethGasPriceWei = big.NewInt(1_000_000_000)
+var (
+	ethIndexPrefix = []byte("ethTxIndex")
+
+	// index key namespaces
+	ethHashKeyPrefix    = []byte("h") // eth tx hash -> platform txID
+	ethReceiptKeyPrefix = []byte("b") // platform txID -> receipt record
+	ethWatermarkKey     = []byte("w") // last scanned block height
+)
 
 func newEthAPI(vm *VM) *ethAPI {
 	return &ethAPI{
-		vm:         vm,
-		txHashToID: make(map[ethcommon.Hash]ids.ID),
+		vm:      vm,
+		indexDB: prefixdb.New(ethIndexPrefix, vm.db),
 	}
 }
 
@@ -94,12 +104,23 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		return hexUint(height), err
 
 	case "eth_gasPrice", "eth_maxPriorityFeePerGas":
-		return "0x" + ethGasPriceWei.Text(16), nil
+		return "0x" + a.gasPriceWei().Text(16), nil
 
 	case "eth_estimateGas":
-		// P-chain fees are exact pre-execution; the prototype returns a flat
-		// budget that covers a transfer with change at 1 nAVAX per gas.
-		return hexUint(500_000), nil
+		// Exact: complexity is defined from semantic fields only, so the gas
+		// a call object implies equals the gas its signed tx will be charged.
+		var call struct {
+			Data hexBytes `json:"data"`
+		}
+		if err := parseParam(req.Params, 0, &call); err != nil {
+			return nil, err
+		}
+		complexity := fee.EthRLPTxComplexity(len(call.Data))
+		txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, err
+		}
+		return hexUint(uint64(txGas)), nil
 
 	case "eth_getBalance":
 		var addr ethcommon.Address
@@ -142,28 +163,79 @@ func (a *ethAPI) sendRawTransaction(raw []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := a.vm.issueTxFromRPC(tx); err != nil {
+
+	hash := unsigned.Parsed.Hash()
+	txID := tx.ID()
+	if err := a.indexDB.Put(hashKey(hash), txID[:]); err != nil {
 		return nil, err
 	}
 
-	hash := unsigned.Parsed.Hash()
-	a.lock.Lock()
-	a.txHashToID[hash] = tx.ID()
-	a.lock.Unlock()
+	if err := a.vm.issueTxFromRPC(tx); err != nil {
+		return nil, err
+	}
 	return hash.Hex(), nil
 }
 
+// ethReceiptRecord pins an accepted eth tx to its inclusion block.
+type ethReceiptRecord struct {
+	height   uint64
+	blkID    ids.ID
+	gasUsed  uint64
+	priceWei uint64 // effective gas price in wei per gas
+}
+
+const ethReceiptRecordLen = 8 + ids.IDLen + 8 + 8
+
+func (r *ethReceiptRecord) marshal() []byte {
+	data := make([]byte, ethReceiptRecordLen)
+	binary.BigEndian.PutUint64(data, r.height)
+	copy(data[8:], r.blkID[:])
+	binary.BigEndian.PutUint64(data[8+ids.IDLen:], r.gasUsed)
+	binary.BigEndian.PutUint64(data[8+ids.IDLen+8:], r.priceWei)
+	return data
+}
+
+func (r *ethReceiptRecord) unmarshal(data []byte) error {
+	if len(data) != ethReceiptRecordLen {
+		return fmt.Errorf("bad eth receipt record length %d", len(data))
+	}
+	r.height = binary.BigEndian.Uint64(data)
+	copy(r.blkID[:], data[8:])
+	r.gasUsed = binary.BigEndian.Uint64(data[8+ids.IDLen:])
+	r.priceWei = binary.BigEndian.Uint64(data[8+ids.IDLen+8:])
+	return nil
+}
+
 func (a *ethAPI) getTransactionReceipt(hash ethcommon.Hash) (any, error) {
-	a.lock.Lock()
-	txID, ok := a.txHashToID[hash]
-	a.lock.Unlock()
-	if !ok {
-		return nil, nil
+	txIDBytes, err := a.indexDB.Get(hashKey(hash))
+	if err == database.ErrNotFound {
+		return nil, nil // unknown to this node
+	}
+	if err != nil {
+		return nil, err
+	}
+	txID, err := ids.ToID(txIDBytes)
+	if err != nil {
+		return nil, err
 	}
 
-	tx, txStatus, err := a.vm.state.GetTx(txID)
-	if err != nil || txStatus != status.Committed {
-		return nil, nil // still pending (or dropped): no receipt yet
+	record, found, err := a.receiptRecord(txID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		// Not indexed yet: scan newly accepted blocks, then retry once.
+		if err := a.scanAcceptedBlocks(); err != nil {
+			return nil, err
+		}
+		if record, found, err = a.receiptRecord(txID); err != nil || !found {
+			return nil, err // still pending (or dropped): no receipt
+		}
+	}
+
+	tx, _, err := a.vm.state.GetTx(txID)
+	if err != nil {
+		return nil, err
 	}
 	unsigned, ok := tx.Unsigned.(*txs.EthRLPTx)
 	if !ok {
@@ -173,37 +245,103 @@ func (a *ethAPI) getTransactionReceipt(hash ethcommon.Hash) (any, error) {
 		return nil, err
 	}
 
-	height, err := a.lastAcceptedHeight()
-	if err != nil {
-		return nil, err
-	}
-	blockID := a.vm.state.GetLastAccepted()
 	sender := ethcommon.Address(unsigned.Sender)
 	recipient := ethcommon.Address(unsigned.Recipient)
 	return map[string]any{
-		"transactionHash": hash.Hex(),
-		"transactionIndex": "0x0",
-		// ponytail: the receipt pins the last accepted block, not the true
-		// inclusion block; good enough for tooling that polls for acceptance.
-		"blockHash":         "0x" + hex.EncodeToString(blockID[:]),
-		"blockNumber":       hexUint(height),
+		"transactionHash":   hash.Hex(),
+		"transactionIndex":  "0x0",
+		"blockHash":         "0x" + hex.EncodeToString(record.blkID[:]),
+		"blockNumber":       hexUint(record.height),
 		"from":              sender.Hex(),
 		"to":                recipient.Hex(),
 		"status":            "0x1",
 		"type":              "0x2",
-		"gasUsed":           hexUint(unsigned.Parsed.Gas()),
-		"cumulativeGasUsed": hexUint(unsigned.Parsed.Gas()),
-		"effectiveGasPrice": "0x" + ethGasPriceWei.Text(16),
+		"gasUsed":           hexUint(record.gasUsed),
+		"cumulativeGasUsed": hexUint(record.gasUsed),
+		"effectiveGasPrice": hexUint(record.priceWei),
 		"contractAddress":   nil,
 		"logs":              []any{},
 		"logsBloom":         "0x" + fmt.Sprintf("%0512x", 0),
 	}, nil
 }
 
+func (a *ethAPI) receiptRecord(txID ids.ID) (ethReceiptRecord, bool, error) {
+	var record ethReceiptRecord
+	data, err := a.indexDB.Get(receiptKey(txID))
+	if err == database.ErrNotFound {
+		return record, false, nil
+	}
+	if err != nil {
+		return record, false, err
+	}
+	return record, true, record.unmarshal(data)
+}
+
+// scanAcceptedBlocks indexes every EthRLPTx in blocks accepted since the last
+// scan. Called with the context lock held.
+func (a *ethAPI) scanAcceptedBlocks() error {
+	last, err := a.lastAcceptedHeight()
+	if err != nil {
+		return err
+	}
+	watermark, err := database.GetUInt64(a.indexDB, ethWatermarkKey)
+	if err != nil && err != database.ErrNotFound {
+		return err
+	}
+
+	// The exact gas price at inclusion is not retrievable from state history,
+	// so the record carries the price at index time. This matches whenever
+	// Excess has not moved between inclusion and indexing.
+	// ponytail: exact historical price needs per-height fee state persistence.
+	priceWei := a.gasPriceWei()
+
+	for h := watermark + 1; h <= last; h++ {
+		blkID, err := a.vm.state.GetBlockIDAtHeight(h)
+		if err != nil {
+			return err
+		}
+		blk, err := a.vm.state.GetStatelessBlock(blkID)
+		if err != nil {
+			return err
+		}
+		for _, tx := range blk.Txs() {
+			unsigned, ok := tx.Unsigned.(*txs.EthRLPTx)
+			if !ok {
+				continue
+			}
+			if err := unsigned.SyntacticVerify(a.vm.ctx); err != nil {
+				return err
+			}
+			complexity := fee.EthRLPTxComplexity(len(unsigned.Parsed.Data()))
+			txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
+			if err != nil {
+				return err
+			}
+			txID := tx.ID()
+			record := ethReceiptRecord{
+				height:   h,
+				blkID:    blkID,
+				gasUsed:  uint64(txGas),
+				priceWei: priceWei.Uint64(),
+			}
+			if err := errors.Join(
+				a.indexDB.Put(hashKey(unsigned.Parsed.Hash()), txID[:]),
+				a.indexDB.Put(receiptKey(txID), record.marshal()),
+			); err != nil {
+				return err
+			}
+		}
+		if err := database.PutUInt64(a.indexDB, ethWatermarkKey, h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // liquidBalance sums the spendable single-key AVAX UTXOs owned by [addr],
-// mirroring the executor's auto-selection filter.
+// mirroring the executor's auto-selection filter and its input bound.
 func (a *ethAPI) liquidBalance(addr ids.ShortID) (uint64, error) {
-	utxoIDs, err := a.vm.state.UTXOIDs(addr.Bytes(), ids.Empty, 1024)
+	utxoIDs, err := a.vm.state.UTXOIDs(addr.Bytes(), ids.Empty, txs.MaxEthRLPTxInputs)
 	if err != nil {
 		return 0, err
 	}
@@ -235,12 +373,30 @@ func (a *ethAPI) liquidBalance(addr ids.ShortID) (uint64, error) {
 	return balance, nil
 }
 
+// gasPriceWei is the current P-chain gas price expressed in wei per gas.
+func (a *ethAPI) gasPriceWei() *big.Int {
+	price := gas.CalculatePrice(
+		a.vm.DynamicFeeConfig.MinPrice,
+		a.vm.state.GetFeeState().Excess,
+		a.vm.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	return new(big.Int).Mul(new(big.Int).SetUint64(uint64(price)), txs.WeiPerNAVAX)
+}
+
 func (a *ethAPI) lastAcceptedHeight() (uint64, error) {
 	blk, err := a.vm.state.GetStatelessBlock(a.vm.state.GetLastAccepted())
 	if err != nil {
 		return 0, err
 	}
 	return blk.Height(), nil
+}
+
+func hashKey(hash ethcommon.Hash) []byte {
+	return append(ethHashKeyPrefix, hash[:]...)
+}
+
+func receiptKey(txID ids.ID) []byte {
+	return append(ethReceiptKeyPrefix, txID[:]...)
 }
 
 func hexUint(v uint64) string {

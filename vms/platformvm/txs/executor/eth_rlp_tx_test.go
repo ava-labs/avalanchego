@@ -20,11 +20,30 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
+
+// ethFeeEnv builds an environment whose dynamic fee config is the single source
+// for both the gas weights the executor uses and the fee calculator, matching
+// how PickFeeCalculator pairs them in production. Price is minPrice nAVAX/gas.
+func ethFeeEnv(t *testing.T, fork upgradetest.Fork, minPrice gas.Price) (*environment, *state.Diff, txfee.Calculator) {
+	t.Helper()
+	env := newEnvironment(t, fork)
+	env.config.DynamicFeeConfig = gas.Config{
+		Weights:                  gas.Dimensions{1, 1, 1, 1},
+		MaxCapacity:              1_000_000,
+		MaxPerSecond:             1_000_000,
+		TargetPerSecond:          1_000_000,
+		MinPrice:                 minPrice,
+		ExcessConversionConstant: 1 << 40,
+	}
+	diff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(t, err)
+	return env, diff, state.PickFeeCalculator(env.config, diff)
+}
 
 func newSignedEthTransfer(
 	t *testing.T,
@@ -33,6 +52,24 @@ func newSignedEthTransfer(
 	to ids.ShortID,
 	amountNAVAX uint64,
 	gasLimit uint64,
+	chainID int64,
+	extraWei int64,
+	calldata []byte,
+) *txs.Tx {
+	return newSignedEthTx(t, key, nonce, to, amountNAVAX, gasLimit, defaultFeeCapWei, chainID, extraWei, calldata)
+}
+
+// defaultFeeCapWei covers a 1 nAVAX per gas price.
+const defaultFeeCapWei = 1_000_000_000
+
+func newSignedEthTx(
+	t *testing.T,
+	key *secp256k1.PrivateKey,
+	nonce uint64,
+	to ids.ShortID,
+	amountNAVAX uint64,
+	gasLimit uint64,
+	feeCapWei int64,
 	chainID int64,
 	extraWei int64,
 	calldata []byte,
@@ -49,7 +86,7 @@ func newSignedEthTransfer(
 			ChainID:   big.NewInt(chainID),
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(0),
-			GasFeeCap: big.NewInt(1),
+			GasFeeCap: big.NewInt(feeCapWei),
 			Gas:       gasLimit,
 			To:        &ethTo,
 			Value:     value,
@@ -86,7 +123,7 @@ func fundEthAddress(chain state.Chain, avaxAssetID ids.ID, txID ids.ID, addr ids
 
 func TestEthRLPTxTransfer(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Latest)
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -95,12 +132,9 @@ func TestEthRLPTxTransfer(t *testing.T) {
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 	recipient := ids.GenerateTestShortID()
 
-	onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(err)
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 10*units.Avax)
 
 	tx := newSignedEthTransfer(t, key, 0, recipient, 3*units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
-	feeCalculator := fee.NewDynamicCalculator(gas.Dimensions{1, 1, 1, 1}, 1)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -128,7 +162,7 @@ func TestEthRLPTxTransfer(t *testing.T) {
 
 func TestEthRLPTxNonceRule(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Latest)
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -137,10 +171,7 @@ func TestEthRLPTxNonceRule(t *testing.T) {
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 	recipient := ids.GenerateTestShortID()
 
-	onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(err)
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
-	feeCalculator := fee.NewDynamicCalculator(gas.Dimensions{1, 1, 1, 1}, 1)
 
 	issue := func(nonce uint64) error {
 		tx := newSignedEthTransfer(t, key, nonce, recipient, units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
@@ -158,7 +189,7 @@ func TestEthRLPTxNonceRule(t *testing.T) {
 
 func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Latest)
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -166,9 +197,6 @@ func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 	require.NoError(err)
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 	recipient := ids.GenerateTestShortID()
-
-	onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(err)
 
 	// Three 5-AVAX UTXOs; a 7-AVAX transfer must consume exactly the two with
 	// the lowest input IDs, leaving the highest untouched.
@@ -186,7 +214,6 @@ func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 	}
 
 	tx := newSignedEthTransfer(t, key, 0, recipient, 7*units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
-	feeCalculator := fee.NewDynamicCalculator(gas.Dimensions{1, 1, 1, 1}, 1)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -201,7 +228,7 @@ func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 }
 
 func TestEthRLPTxSyntacticRejections(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Latest)
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -210,10 +237,7 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 	recipient := ids.GenerateTestShortID()
 
-	onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(t, err)
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
-	feeCalculator := fee.NewDynamicCalculator(gas.Dimensions{1, 1, 1, 1}, 1)
 
 	tests := []struct {
 		name string
@@ -268,4 +292,65 @@ func TestEthRLPTxSenderRecovery(t *testing.T) {
 	require.Equal(recipient, unsigned.Recipient)
 	require.Equal(units.Avax, unsigned.AmountNAVAX)
 	require.Equal(uint64(7), unsigned.Parsed.Nonce())
+}
+
+func TestEthRLPTxPreHelicon(t *testing.T) {
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Granite, 1)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
+
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+	require.ErrorIs(t, err, errHeliconUpgradeNotActive)
+}
+
+func TestEthRLPTxFeeCapTooLow(t *testing.T) {
+	// Price is 2 nAVAX per gas; defaultFeeCapWei only offers 1.
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 2)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
+	sender := ids.ShortID(key.PublicKey().EthAddress())
+
+	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
+
+	tx := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
+		defaultFeeCapWei, txs.EthRLPChainID, 0, nil)
+	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+	require.ErrorIs(t, err, errEthFeeCapTooLow)
+
+	// Doubling the fee cap makes the same tx acceptable.
+	tx = newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
+		2*defaultFeeCapWei, txs.EthRLPChainID, 0, nil)
+	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+	require.NoError(t, err)
+}
+
+func TestEthRLPTxInputBound(t *testing.T) {
+	require := require.New(t)
+	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	sender := ids.ShortID(key.PublicKey().EthAddress())
+
+	// MaxEthRLPTxInputs+8 dust UTXOs: only the bounded subset is spendable, so
+	// a transfer needing more than that fails rather than silently exceeding
+	// the complexity that was priced.
+	const dust = units.MilliAvax
+	for i := 0; i < txs.MaxEthRLPTxInputs+8; i++ {
+		fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, dust)
+	}
+
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(),
+		txs.MaxEthRLPTxInputs*dust, 10*units.Avax, txs.EthRLPChainID, 0, nil)
+	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+	require.ErrorIs(err, errEthInsufficientFunds)
 }

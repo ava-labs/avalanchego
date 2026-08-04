@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/google/btree"
@@ -28,10 +29,17 @@ import (
 )
 
 var (
-	ErrNotEnoughGas = errors.New("not enough gas")
-	errNoGasUsed    = errors.New("no gas used")
-	errAVAXMinted   = errors.New("AVAX minted")
+	ErrNotEnoughGas      = errors.New("not enough gas")
+	ErrTooManyEthPending = errors.New("too many pending eth txs for this sender")
+	errNoGasUsed         = errors.New("no gas used")
+	errAVAXMinted        = errors.New("AVAX minted")
 )
+
+// maxEthPendingPerSender is the node-local admission cap on mempool eth txs
+// per sender. Same-nonce txs within the cap are allowed on purpose: a wallet
+// cancel is a same-nonce replacement and both are executable under the
+// strictly-greater nonce rule.
+const maxEthPendingPerSender = 8
 
 type meteredTx struct {
 	*txs.Tx
@@ -50,6 +58,7 @@ type Mempool struct {
 	txs                map[ids.ID]meteredTx
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
 	droppedTxIDs       *lru.Cache[ids.ID, error]
+	ethPending         map[ids.ShortID]int // eth tx sender -> pending count
 	gasAvailable       gas.Gas
 	numTxsMetric       prometheus.Gauge
 	gasAvailableMetric prometheus.Gauge
@@ -94,6 +103,7 @@ func New(
 		}),
 		txs:                make(map[ids.ID]meteredTx),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
+		ethPending:         make(map[ids.ShortID]int),
 		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
 		gasAvailable:       gasCapacity,
 		numTxsMetric:       numTxsMetric,
@@ -113,6 +123,15 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		return txmempool.ErrConflictsWithOtherTx
 	}
 
+	if ethTx, ok := tx.Unsigned.(*txs.EthRLPTx); ok {
+		if err := ethTx.SyntacticVerify(nil); err != nil {
+			return err
+		}
+		if m.ethPending[ethTx.Sender] >= maxEthPendingPerSender {
+			return fmt.Errorf("%w: %s has %d", ErrTooManyEthPending, ethTx.Sender, maxEthPendingPerSender)
+		}
+	}
+
 	meteredTx, err := m.meter(tx)
 	if err != nil {
 		return fmt.Errorf("failed to meter tx: %w", err)
@@ -129,6 +148,9 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	m.consumedUTXOs.Put(meteredTx.TxID, meteredTx.InputIDs())
 	m.droppedTxIDs.Evict(meteredTx.TxID)
 	m.gasAvailable -= meteredTx.gasUsed
+	if ethTx, ok := tx.Unsigned.(*txs.EthRLPTx); ok {
+		m.ethPending[ethTx.Sender]++
+	}
 
 	m.updateMetrics()
 	m.cond.Broadcast()
@@ -223,11 +245,27 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		return meteredTx{}, errNoGasUsed
 	}
 
+	gasPrice := float64(consumedAVAX-producedAVAX) / float64(gasUsed)
+	if ethTx, ok := tx.Unsigned.(*txs.EthRLPTx); ok {
+		// Eth txs declare no inputs or outputs, so the burn is not derivable
+		// above. Their bid is the signed fee cap (wei per gas -> nAVAX per
+		// gas), the same ordering EVM mempools use.
+		gasPrice = weiPerGasToNAVAXPerGas(ethTx.Parsed.GasFeeCap())
+	}
+
 	return meteredTx{
 		Tx:       tx,
 		gasUsed:  gasUsed,
-		gasPrice: float64(consumedAVAX-producedAVAX) / float64(gasUsed),
+		gasPrice: gasPrice,
 	}, nil
+}
+
+func weiPerGasToNAVAXPerGas(feeCap *big.Int) float64 {
+	price, _ := new(big.Float).Quo(
+		new(big.Float).SetInt(feeCap),
+		new(big.Float).SetInt(txs.WeiPerNAVAX),
+	).Float64()
+	return price
 }
 
 func (m *Mempool) updateMetrics() {
@@ -263,6 +301,11 @@ func (m *Mempool) remove(txID ids.ID) {
 	m.consumedUTXOs.DeleteKey(txID)
 
 	m.gasAvailable += removedTx.gasUsed
+	if ethTx, ok := removedTx.Unsigned.(*txs.EthRLPTx); ok {
+		if m.ethPending[ethTx.Sender]--; m.ethPending[ethTx.Sender] <= 0 {
+			delete(m.ethPending, ethTx.Sender)
+		}
+	}
 
 	m.updateMetrics()
 }

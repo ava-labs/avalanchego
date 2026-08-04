@@ -16,9 +16,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-// EthRLPChainID is the EIP-155 chain ID of the P-chain eth facade.
-// ponytail: fixed constant for the prototype; production needs per-network IDs.
-const EthRLPChainID = 43117
+const (
+	// EthRLPChainID is the EIP-155 chain ID of the P-chain eth facade.
+	// ponytail: fixed constant; production needs per-network IDs.
+	EthRLPChainID = 43117
+
+	// MaxEthRLPTxInputs bounds input auto-selection: execution considers only
+	// the sender's MaxEthRLPTxInputs lowest-ID UTXOs. Complexity prices reads
+	// and deletes at this worst case.
+	MaxEthRLPTxInputs = 32
+)
 
 // WeiPerNAVAX converts the 18-decimal RLP value field to 9-decimal nAVAX.
 var WeiPerNAVAX = big.NewInt(1_000_000_000)
@@ -26,13 +33,14 @@ var WeiPerNAVAX = big.NewInt(1_000_000_000)
 var (
 	_ UnsignedTx = (*EthRLPTx)(nil)
 
-	ErrNotDynamicFeeTx  = errors.New("only type-2 (dynamic fee) eth txs are supported")
-	ErrWrongEthChainID  = errors.New("wrong eth chain ID")
-	errNoRecipient      = errors.New("eth tx must have a recipient")
-	ErrNonEmptyCalldata = errors.New("plain transfers must have empty calldata")
-	errNonPositiveValue = errors.New("value must be positive")
-	ErrValueDust        = errors.New("value must be a whole number of nAVAX (multiple of 1e9 wei)")
-	errValueTooLarge    = errors.New("value overflows uint64 nAVAX")
+	ErrNotDynamicFeeTx    = errors.New("only type-2 (dynamic fee) eth txs are supported")
+	ErrNonEmptyAccessList = errors.New("access lists are not supported")
+	ErrWrongEthChainID    = errors.New("wrong eth chain ID")
+	errNoRecipient        = errors.New("eth tx must have a recipient")
+	ErrNonEmptyCalldata   = errors.New("plain transfers must have empty calldata")
+	errNonPositiveValue   = errors.New("value must be positive")
+	ErrValueDust          = errors.New("value must be a whole number of nAVAX (multiple of 1e9 wei)")
+	errValueTooLarge      = errors.New("value overflows uint64 nAVAX")
 )
 
 // EthRLPTx wraps a signed Ethereum transaction so that stock EVM wallets can
@@ -88,6 +96,9 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 	switch {
 	case eth.Type() != ethtypes.DynamicFeeTxType:
 		return ErrNotDynamicFeeTx
+	case len(eth.AccessList()) != 0:
+		// Keeps the envelope size bounded by a constant; see EthRLPTxComplexity.
+		return ErrNonEmptyAccessList
 	case eth.ChainId().Cmp(chainID) != 0:
 		return fmt.Errorf("%w: got %s, want %d", ErrWrongEthChainID, eth.ChainId(), EthRLPChainID)
 	case eth.To() == nil:

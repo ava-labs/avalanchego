@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"go.uber.org/zap"
@@ -64,13 +65,10 @@ var (
 	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
 	errStaleNonce                       = errors.New("eth tx nonce is not greater than the last accepted nonce")
-	errEthGasLimitExceeded              = errors.New("eth tx gas limit below the exact fee")
+	errEthGasLimitExceeded              = errors.New("eth tx gas limit below the exact gas")
+	errEthFeeCapTooLow                  = errors.New("eth tx max fee per gas below the current gas price")
 	errEthInsufficientFunds             = errors.New("insufficient AVAX to cover eth tx value plus fee")
 )
-
-// maxUTXOsToSelect bounds eth facade input auto-selection.
-// ponytail: flat cap; complexity metering should price selection instead.
-const maxUTXOsToSelect = 1024
 
 // StandardTx executes the standard transaction [tx].
 //
@@ -1597,8 +1595,11 @@ func verifyL1Conversion(
 }
 
 func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
-	// ponytail: prototype is not gated on an upgrade; a real deployment checks
-	// its activation fork here.
+	currentTimestamp := e.state.GetTimestamp()
+	if !e.backend.Config.UpgradeConfig.IsHeliconActivated(currentTimestamp) {
+		return errHeliconUpgradeNotActive
+	}
+
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -1611,28 +1612,50 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		return fmt.Errorf("%w: got nonce %d, minimum %d", errStaleNonce, nonce, nextNonce)
 	}
 
-	fee, err := e.feeCalculator.CalculateFee(tx)
+	// Gas semantics mirror the EVM: the tx's gas limit caps the exact
+	// complexity gas, maxFeePerGas (wei per gas) must cover the current gas
+	// price, and the fee charged is exactly gas * price.
+	complexity, err := fee.TxComplexity(tx)
 	if err != nil {
 		return err
 	}
-	// The facade prices gas at 1 nAVAX per gas unit, so the wallet-approved
-	// budget is the eth tx's gas limit in nAVAX.
-	if fee > tx.Parsed.Gas() {
-		return fmt.Errorf("%w: fee %d nAVAX, gas limit %d", errEthGasLimitExceeded, fee, tx.Parsed.Gas())
+	txGas, err := complexity.ToGas(e.backend.Config.DynamicFeeConfig.Weights)
+	if err != nil {
+		return err
+	}
+	if uint64(txGas) > tx.Parsed.Gas() {
+		return fmt.Errorf("%w: needs %d gas, limit %d", errEthGasLimitExceeded, txGas, tx.Parsed.Gas())
 	}
 
-	need, err := math.Add(tx.AmountNAVAX, fee)
+	txFee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	// txFee = txGas * price, so feeCap covers the price iff
+	// feeCap(wei) * txGas >= txFee(nAVAX) * 1e9.
+	weiOffered := new(big.Int).Mul(tx.Parsed.GasFeeCap(), new(big.Int).SetUint64(uint64(txGas)))
+	weiNeeded := new(big.Int).Mul(new(big.Int).SetUint64(txFee), txs.WeiPerNAVAX)
+	if weiOffered.Cmp(weiNeeded) < 0 {
+		return fmt.Errorf("%w: fee cap %s wei per gas, fee %d nAVAX over %d gas",
+			errEthFeeCapTooLow, tx.Parsed.GasFeeCap(), txFee, txGas)
+	}
+
+	need, err := math.Add(tx.AmountNAVAX, txFee)
 	if err != nil {
 		return err
 	}
 
 	// Auto-select the sender's unlocked single-key AVAX UTXOs in canonical
-	// (sorted ID) order. Shared memory is never consulted here.
-	utxoIDs, err := e.state.UTXOIDs(tx.Sender.Bytes(), ids.Empty, maxUTXOsToSelect)
+	// (sorted ID) order, considering only the MaxEthRLPTxInputs lowest IDs
+	// (the complexity-priced worst case). Shared memory is never consulted.
+	utxoIDs, err := e.state.UTXOIDs(tx.Sender.Bytes(), ids.Empty, txs.MaxEthRLPTxInputs)
 	if err != nil {
 		return err
 	}
 	utils.Sort(utxoIDs)
+	if len(utxoIDs) > txs.MaxEthRLPTxInputs {
+		utxoIDs = utxoIDs[:txs.MaxEthRLPTxInputs]
+	}
 
 	var (
 		chainTime = uint64(e.state.GetTimestamp().Unix())
