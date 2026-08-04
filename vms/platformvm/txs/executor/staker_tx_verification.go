@@ -543,6 +543,55 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
+	if err := verifyAddPermissionlessValidatorRules(backend, chainState, tx); err != nil {
+		return err
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos %w", err)
+	}
+
+	// Verify the flowcheck
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+// verifyAddPermissionlessValidatorRules carries out every staking rule for an
+// AddPermissionlessValidatorTx, excluding the flowcheck and syntactic
+// verification. The eth facade shares these rules; see [standardTxExecutor.EthRLPTx].
+func verifyAddPermissionlessValidatorRules(
+	backend *Backend,
+	chainState state.Chain,
+	tx *txs.AddPermissionlessValidatorTx,
+) error {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	)
+
 	startTime := currentTimestamp
 	if !isDurangoActive {
 		startTime = tx.StartTime()
@@ -614,6 +663,39 @@ func verifyAddPermissionlessValidatorTx(
 		}
 	}
 
+	return nil
+}
+
+// verifyAddPermissionlessDelegatorTx carries out the validation for an
+// AddPermissionlessDelegatorTx.
+func verifyAddPermissionlessDelegatorTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddPermissionlessDelegatorTx,
+) error {
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		return nil
+	}
+
+	if err := verifyAddPermissionlessDelegatorRules(backend, chainState, tx); err != nil {
+		return err
+	}
+
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
 		return fmt.Errorf("getting utxos %w", err)
@@ -646,35 +728,19 @@ func verifyAddPermissionlessValidatorTx(
 	return nil
 }
 
-// verifyAddPermissionlessDelegatorTx carries out the validation for an
-// AddPermissionlessDelegatorTx.
-func verifyAddPermissionlessDelegatorTx(
+// verifyAddPermissionlessDelegatorRules carries out every staking rule for an
+// AddPermissionlessDelegatorTx, excluding the flowcheck and syntactic
+// verification. The eth facade shares these rules; see [standardTxExecutor.EthRLPTx].
+func verifyAddPermissionlessDelegatorRules(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
 ) error {
-	// Verify the tx is well-formed
-	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
-	}
-
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
-	}
-
-	if !backend.Bootstrapped.Get() {
-		return nil
-	}
-
-	var (
-		endTime   = tx.EndTime()
-		startTime = currentTimestamp
+		endTime          = tx.EndTime()
+		startTime        = currentTimestamp
 	)
 	if !isDurangoActive {
 		startTime = tx.StartTime()
@@ -766,35 +832,6 @@ func verifyAddPermissionlessDelegatorTx(
 		if validator.Priority.IsPermissionedValidator() {
 			return ErrDelegateToPermissionedValidator
 		}
-	}
-
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return nil

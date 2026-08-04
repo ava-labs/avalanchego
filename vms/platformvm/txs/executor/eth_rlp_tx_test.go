@@ -74,6 +74,21 @@ func newSignedEthTx(
 	extraWei int64,
 	calldata []byte,
 ) *txs.Tx {
+	return newSignedEthCall(t, key, nonce, to, amountNAVAX, gasLimit, feeCapWei, chainID, extraWei, calldata)
+}
+
+func newSignedEthCall(
+	t *testing.T,
+	key *secp256k1.PrivateKey,
+	nonce uint64,
+	to ids.ShortID,
+	amountNAVAX uint64,
+	gasLimit uint64,
+	feeCapWei int64,
+	chainID int64,
+	extraWei int64,
+	calldata []byte,
+) *txs.Tx {
 	t.Helper()
 
 	value := new(big.Int).Mul(new(big.Int).SetUint64(amountNAVAX), txs.WeiPerNAVAX)

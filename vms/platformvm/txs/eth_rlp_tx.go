@@ -103,8 +103,16 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 		return fmt.Errorf("%w: got %s, want %d", ErrWrongEthChainID, eth.ChainId(), EthRLPChainID)
 	case eth.To() == nil:
 		return errNoRecipient
-	case len(eth.Data()) != 0:
+	}
+
+	// Calldata is legal only when targeting the staking system address; every
+	// other recipient is a plain transfer.
+	isStakingCall := *eth.To() == EthStakingAddress
+	switch {
+	case !isStakingCall && len(eth.Data()) != 0:
 		return ErrNonEmptyCalldata
+	case isStakingCall && len(eth.Data()) < 4:
+		return ErrShortCalldata
 	case eth.Value().Sign() <= 0:
 		return errNonPositiveValue
 	}
@@ -115,6 +123,23 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 		return ErrValueDust
 	case !amount.IsUint64():
 		return errValueTooLarge
+	}
+
+	if isStakingCall {
+		var selector [4]byte
+		copy(selector[:], eth.Data())
+		switch selector {
+		case SelectorDelegate:
+			if _, err := ParseEthDelegate(eth.Data()); err != nil {
+				return err
+			}
+		case SelectorAddValidator:
+			if _, err := ParseEthAddValidator(eth.Data()); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%w: %x", ErrUnknownSelector, selector)
+		}
 	}
 
 	sender, err := ethtypes.Sender(ethtypes.LatestSignerForChainID(chainID), eth)
@@ -131,4 +156,17 @@ func (tx *EthRLPTx) SyntacticVerify(*snow.Context) error {
 
 func (tx *EthRLPTx) Visit(visitor Visitor) error {
 	return visitor.EthRLPTx(tx)
+}
+
+// IsStakingCall reports whether this tx targets the staking system address.
+// Only meaningful after SyntacticVerify.
+func (tx *EthRLPTx) IsStakingCall() bool {
+	return tx.Recipient == ids.ShortID(EthStakingAddress)
+}
+
+// Selector returns the 4-byte calldata selector of a staking call.
+func (tx *EthRLPTx) Selector() [4]byte {
+	var selector [4]byte
+	copy(selector[:], tx.Parsed.Data())
+	return selector
 }

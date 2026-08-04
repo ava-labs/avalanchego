@@ -1486,9 +1486,15 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedVa
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
+	return e.putStakerWithTxID(e.tx.ID(), stakerTx)
+}
+
+// putStakerWithTxID registers [stakerTx] under [txID], which is the ID the
+// reward path later resolves the staker tx by. The eth facade passes the ID of
+// the native staker tx it derives, not the ID of the eth tx that authorized it.
+func (e *standardTxExecutor) putStakerWithTxID(txID ids.ID, stakerTx txs.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
-		txID      = e.tx.ID()
 		staker    *state.Staker
 		err       error
 	)
@@ -1659,7 +1665,7 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 
 	var (
 		chainTime = uint64(e.state.GetTimestamp().Unix())
-		consumed  = make([]ids.ID, 0, len(utxoIDs))
+		consumed  = make([]*avax.UTXO, 0, len(utxoIDs))
 		total     uint64
 	)
 	for _, utxoID := range utxoIDs {
@@ -1687,37 +1693,60 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		if err != nil {
 			return err
 		}
-		consumed = append(consumed, utxoID)
+		consumed = append(consumed, utxo)
 	}
 	if total < need {
 		return fmt.Errorf("%w: have %d nAVAX, need %d", errEthInsufficientFunds, total, need)
 	}
 
-	for _, utxoID := range consumed {
-		e.state.DeleteUTXO(utxoID)
+	// A staking call derives its native staker tx and passes the same staker
+	// rules the native txs apply, before any state is touched.
+	var (
+		derivedTx    *txs.Tx
+		derivedStake txs.BoundedStaker
+	)
+	if tx.IsStakingCall() {
+		derivedTx, derivedStake, err = e.ethStakerTx(tx, consumed)
+		if err != nil {
+			return err
+		}
+		if err := e.verifyEthStake(derivedTx); err != nil {
+			return err
+		}
+	}
+
+	for _, utxo := range consumed {
+		e.state.DeleteUTXO(utxo.InputID())
 	}
 	txID := e.tx.ID()
-	e.state.AddUTXO(&avax.UTXO{
-		UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
-		Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: tx.AmountNAVAX,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{tx.Recipient},
+	owner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{tx.Sender},
+	}
+	if !tx.IsStakingCall() {
+		e.state.AddUTXO(&avax.UTXO{
+			UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 0},
+			Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: tx.AmountNAVAX,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{tx.Recipient},
+				},
 			},
-		},
-	})
+		})
+	} else if err := e.putEthStaker(derivedTx, derivedStake); err != nil {
+		// The stake itself is the output: it returns to the sender when the
+		// staking period ends, and rewards go to the same owner.
+		return err
+	}
 	if change := total - need; change > 0 {
 		e.state.AddUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{TxID: txID, OutputIndex: 1},
 			Asset:  avax.Asset{ID: e.backend.Ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: change,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{tx.Sender},
-				},
+				Amt:          change,
+				OutputOwners: *owner,
 			},
 		})
 	}
