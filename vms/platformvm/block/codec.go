@@ -37,6 +37,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterEthRLPTypes(c),
 		)
 	}
 
@@ -92,4 +93,9 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 // valid during the Helicon series of upgrades.
 func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
+}
+
+// RegisterEthRLPTypes registers the eth facade transaction.
+func RegisterEthRLPTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterEthRLPTypes(targetCodec)
 }

@@ -534,6 +534,8 @@ func (i *inputOutputGetter) getUTXOs(tx txs.BaseTx) {
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)
 }
 
+// EthRLPTx declares no explicit inputs or outputs; they are selected and
+// created at execution.
 func (*inputOutputGetter) EthRLPTx(*txs.EthRLPTx) error {
-	return fmt.Errorf("%w: EthRLPTx", ErrUnsupportedTxType)
+	return nil
 }

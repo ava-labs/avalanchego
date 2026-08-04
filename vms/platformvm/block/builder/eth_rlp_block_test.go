@@ -1,0 +1,104 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package builder
+
+import (
+	"math/big"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	ethcommon "github.com/ava-labs/libevm/common"
+)
+
+// TestBuildBlockEthRLPTx drives an eth-signed transfer through the real
+// issue -> mempool -> build -> verify -> accept path.
+func TestBuildBlockEthRLPTx(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	senderKey, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	sender := ids.ShortID(senderKey.PublicKey().EthAddress())
+	recipient := ids.GenerateTestShortID()
+
+	// Fund the sender's eth address directly in state.
+	fundTxID := ids.GenerateTestID()
+	env.state.AddUTXO(&avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: fundTxID, OutputIndex: 0},
+		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 100 * units.Avax,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{sender},
+			},
+		},
+	})
+	require.NoError(env.state.Commit())
+
+	chainID := big.NewInt(txs.EthRLPChainID)
+	ethRecipient := ethcommon.Address(recipient)
+	signed := ethtypes.MustSignNewTx(
+		senderKey.ToECDSA(),
+		ethtypes.LatestSignerForChainID(chainID),
+		&ethtypes.DynamicFeeTx{
+			ChainID:   chainID,
+			Nonce:     0,
+			GasTipCap: big.NewInt(0),
+			GasFeeCap: big.NewInt(1e9),
+			Gas:       500_000,
+			To:        &ethRecipient,
+			Value:     new(big.Int).Mul(big.NewInt(3), big.NewInt(1e18)),
+		},
+	)
+	raw, err := signed.MarshalBinary()
+	require.NoError(err)
+
+	tx, err := txs.NewSigned(&txs.EthRLPTx{RLP: raw}, txs.Codec, nil)
+	require.NoError(err)
+
+	env.ctx.Lock.Unlock()
+	require.NoError(env.network.IssueTxFromRPC(tx))
+	env.ctx.Lock.Lock()
+
+	txID := tx.ID()
+	_, ok := env.mempool.Get(txID)
+	require.True(ok)
+
+	blkIntf, err := env.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+	blk := blkIntf.(*blockexecutor.Block)
+	require.Len(blk.Txs(), 1)
+	require.Equal(txID, blk.Txs()[0].ID())
+
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+
+	// The recipient owns a 3 AVAX UTXO and the sender's nonce advanced.
+	utxoID := avax.UTXOID{TxID: txID, OutputIndex: 0}
+	utxo, err := env.state.GetUTXO(utxoID.InputID())
+	require.NoError(err)
+	out := utxo.Out.(*secp256k1fx.TransferOutput)
+	require.Equal(3*units.Avax, out.Amt)
+	require.Equal([]ids.ShortID{recipient}, out.Addrs)
+
+	nonce, err := env.state.GetNextNonce(sender)
+	require.NoError(err)
+	require.Equal(uint64(1), nonce)
+}

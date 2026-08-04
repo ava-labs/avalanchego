@@ -69,6 +69,16 @@ func (a *ethAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *ethAPI) call(req *ethRequest) (any, error) {
+	// Tx issuance must not hold the context lock: the mempool verifier takes
+	// it itself (see LockedTxVerifier), same reason Service.IssueTx doesn't.
+	if req.Method == "eth_sendRawTransaction" {
+		var raw hexBytes
+		if err := parseParam(req.Params, 0, &raw); err != nil {
+			return nil, err
+		}
+		return a.sendRawTransaction(raw)
+	}
+
 	a.vm.ctx.Lock.Lock()
 	defer a.vm.ctx.Lock.Unlock()
 
@@ -110,13 +120,6 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		}
 		nonce, err := a.vm.state.GetNextNonce(ids.ShortID(addr))
 		return hexUint(nonce), err
-
-	case "eth_sendRawTransaction":
-		var raw hexBytes
-		if err := parseParam(req.Params, 0, &raw); err != nil {
-			return nil, err
-		}
-		return a.sendRawTransaction(raw)
 
 	case "eth_getTransactionReceipt":
 		var hash ethcommon.Hash
