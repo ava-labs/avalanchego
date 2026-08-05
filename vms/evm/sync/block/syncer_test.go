@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
@@ -54,14 +55,14 @@ func TestVerifyBlocks(t *testing.T) {
 			name:       "forged transactions",
 			hash:       tip.Hash(),
 			numParents: 3,
-			raw:        [][]byte{forgeBody(t, tip, withForgedTxs)},
+			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs}))},
 			wantErr:    errTxHashMismatch,
 		},
 		{
 			name:       "forged uncles",
 			hash:       tip.Hash(),
 			numParents: 3,
-			raw:        [][]byte{forgeBody(t, tip, withForgedUncles)},
+			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Uncles: forgedUncles}))},
 			wantErr:    errUncleHashMismatch,
 		},
 		{
@@ -134,6 +135,7 @@ func TestSyncer(t *testing.T) {
 		fromHeight    uint64
 		blocksToFetch uint64
 		wantHeights   []int
+		txsPerBlock   int   // non-zero grows blocks so a long sync crosses the flush threshold
 		wantRequests  int32 // requests the syncer must send to peers
 		wantVerified  int32 // blocks the verifier must see
 	}{
@@ -201,6 +203,17 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
+			// Long enough to cross [ethdb.IdealBatchSize], so the batch flushes
+			// mid-run.
+			name:          "flushes a long sync",
+			numBlocks:     400,
+			txsPerBlock:   4,
+			fromHeight:    400,
+			blocksToFetch: 400,
+			wantHeights:   []int{1, 200, 399, 400},
+			wantRequests:  7,
+		},
+		{
 			name:          "accepting verifier sees every block",
 			numBlocks:     10,
 			fromHeight:    5,
@@ -216,14 +229,14 @@ func TestSyncer(t *testing.T) {
 			ctx := t.Context()
 			nodeID := ids.GenerateTestNodeID()
 
-			blocks := synctest.MakeChain(t, tt.numBlocks)
+			blocks := synctest.MakeChain(t, tt.numBlocks, synctest.WithTxsPerBlock(tt.txsPerBlock))
 			target := rawdb.NewMemoryDatabase()
 			for _, h := range tt.onDisk {
-				writeBlock(target, blocks[h])
+				writeBlock(t, target, blocks[h])
 			}
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			handler, requests := countingHandler(blocks)
+			handler, requests := countingHandler(t, blocks)
 			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
 			var verified atomic.Int32
@@ -292,7 +305,7 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 		},
 		{
 			name:   "body does not match the header",
-			served: forgeBody(t, tip, withForgedTxs),
+			served: encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs})),
 		},
 		{
 			name:   "chain-specific verifier rejects",
@@ -325,8 +338,8 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 	}
 }
 
-// staticBlockHandler serves blockBytes to every request, cancelling once the
-// syncer rejects it.
+// staticBlockHandler serves blockBytes to every request and cancels on the
+// second, which the syncer only sends after rejecting the first.
 func staticBlockHandler(blockBytes []byte, cancel context.CancelFunc) (p2p.Handler, *atomic.Int32) {
 	var served atomic.Int32
 	h := p2p.TestHandler{
@@ -346,23 +359,14 @@ func staticBlockHandler(blockBytes []byte, cancel context.CancelFunc) (p2p.Handl
 
 var errTestVerifier = errors.New("chain-specific verifier rejected the block")
 
-// rlpBlock is the shape [types.Block] encodes to, so a test can pair a real
-// header with a body it never committed to.
-type rlpBlock struct {
-	Header      *types.Header
-	Txs         []*types.Transaction
-	Uncles      []*types.Header
-	Withdrawals []*types.Withdrawal `rlp:"optional"`
-}
+var (
+	forgedTxs    = []*types.Transaction{types.NewTransaction(99, common.Address{0xff}, big.NewInt(1), 21_000, big.NewInt(1), nil)}
+	forgedUncles = []*types.Header{{Number: big.NewInt(1), Extra: []byte{}}}
+)
 
-func withForgedTxs(b *rlpBlock) {
-	b.Txs = []*types.Transaction{
-		types.NewTransaction(99, common.Address{0xff}, big.NewInt(1), 21_000, big.NewInt(1), nil),
-	}
-}
-
-func withForgedUncles(b *rlpBlock) {
-	b.Uncles = []*types.Header{{Number: big.NewInt(1), Extra: []byte{}}}
+// forgeBlock pairs header with a body it never committed to.
+func forgeBlock(header *types.Header, body types.Body) *types.Block {
+	return types.NewBlockWithHeader(header).WithBody(body).WithWithdrawals(body.Withdrawals)
 }
 
 // Driven directly because these cases change the header, which verifyBlocks
@@ -406,45 +410,23 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			raw := forgeBody(t, tip, func(b *rlpBlock) {
-				b.Header.WithdrawalsHash = tt.commits
-				b.Withdrawals = tt.body
-			})
-			block := new(types.Block)
-			require.NoError(t, rlp.DecodeBytes(raw, block))
+			header := tip.Header()
+			header.WithdrawalsHash = tt.commits
 
-			err := verifyBody(block)
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
+			err := verifyBody(forgeBlock(header, types.Body{Withdrawals: tt.body}))
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
 
-// forgeBody re-encodes block with its real header and a tampered body.
-func forgeBody(t *testing.T, block *types.Block, tamper func(*rlpBlock)) []byte {
-	t.Helper()
-	forged := &rlpBlock{
-		Header: block.Header(),
-		Txs:    block.Transactions(),
-		Uncles: block.Uncles(),
-	}
-	tamper(forged)
-
-	raw, err := rlp.EncodeToBytes(forged)
-	require.NoError(t, err)
-	return raw
-}
-
 // countingHandler serves blocks and counts how many requests it receives, so a
 // test can assert the syncer never asked for blocks it already had.
-func countingHandler(blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
+func countingHandler(t *testing.T, blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
+	log := loggingtest.New(t, logging.Debug)
 	inner := handlers.NewHandler(
-		logging.NoLog{},
+		log,
 		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks)),
+		newResponder(log, synctest.NewBlockMap(blocks)),
 	)
 	var requests atomic.Int32
 	h := p2p.TestHandler{
@@ -456,11 +438,12 @@ func countingHandler(blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
 	return h, &requests
 }
 
-func writeBlock(db ethdb.Database, block *types.Block) {
+func writeBlock(t *testing.T, db ethdb.Database, block *types.Block) {
+	t.Helper()
 	batch := db.NewBatch()
 	rawdb.WriteBlock(batch, block)
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-	_ = batch.Write()
+	require.NoError(t, batch.Write())
 }
 
 func encodeBlock(t *testing.T, block *types.Block) []byte {
@@ -474,9 +457,7 @@ func encodeTipFirst(t *testing.T, blocks []*types.Block, n int) [][]byte {
 	t.Helper()
 	raw := make([][]byte, n)
 	for i := range n {
-		b, err := rlp.EncodeToBytes(blocks[len(blocks)-1-i])
-		require.NoError(t, err)
-		raw[i] = b
+		raw[i] = encodeBlock(t, blocks[len(blocks)-1-i])
 	}
 	return raw
 }
