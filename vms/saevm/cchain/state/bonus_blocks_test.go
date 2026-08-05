@@ -36,17 +36,24 @@ func init() {
 	}
 }
 
-// TestBonusBlockUTXOsConsumed asserts that every UTXO referenced by a bonus
-// block is consumed by a non-bonus block in [bonusBlockConsumers].
+// TestBonusBlocks asserts two properties of the mainnet bonus blocks and the
+// blocks in [bonusBlockConsumers].
 //
-// A bonus block credits the EVM without applying its shared memory operations,
-// so the UTXOs its transaction references are left spendable. Each is therefore
-// consumed by some other block, either an earlier block containing the same
-// transaction or an unrelated later import.
+// First, every UTXO referenced by a bonus block is consumed by a non-bonus
+// block. A bonus block credits the EVM without applying its shared memory
+// operations, so the UTXOs its transaction references are left spendable. Each
+// is therefore consumed by some other block, either an earlier block containing
+// the same transaction or an unrelated later import.
 //
 // It's important that all bonus block UTXOs are consumed, as otherwise nodes
 // may have diverged views on the available UTXO set.
-func TestBonusBlockUTXOsConsumed(t *testing.T) {
+//
+// Second, no block after a bonus block includes that bonus block's transaction.
+// Bonus blocks leave an existing index entry untouched, so the height reported
+// for their transaction is the first one to accept it. A later inclusion by a
+// non-bonus block would overwrite that entry and move the reported height
+// forward.
+func TestBonusBlocks(t *testing.T) {
 	const (
 		url = primary.MainnetAPIURI + "/ext/bc/C/rpc"
 		// envVar must be set to run the test.
@@ -62,21 +69,30 @@ func TestBonusBlockUTXOsConsumed(t *testing.T) {
 	require.NoErrorf(t, err, "ethclient.DialContext(ctx, %q)", url)
 	defer client.Close()
 
-	bonusUTXOs := consumedUTXOs(t, client, bonusBlocks)
-	consumedUTXOs := consumedUTXOs(t, client, bonusBlockConsumers)
+	bonusTxs := atomicTxs(t, client, bonusBlocks)
+	consumerTxs := atomicTxs(t, client, bonusBlockConsumers)
 
-	bonusUTXOs.Difference(consumedUTXOs)
+	bonusUTXOs := consumedUTXOs(bonusTxs)
+	bonusUTXOs.Difference(consumedUTXOs(consumerTxs))
 	require.Emptyf(t, bonusUTXOs, "all bonus block UTXOs must be consumed")
+
+	for consumerHeight, consumerTx := range consumerTxs {
+		for bonusHeight, bonusTx := range bonusTxs {
+			if consumerTx.ID() == bonusTx.ID() {
+				require.Lessf(t, consumerHeight, bonusHeight, "%s included after bonus block %d", consumerTx.ID(), bonusHeight)
+			}
+		}
+	}
 }
 
-// consumedUTXOs returns the UTXO IDs consumed by the cross-chain transactions
-// in the blocks at heights.
-func consumedUTXOs(tb testing.TB, client *ethclient.Client, heights set.Set[uint64]) set.Set[ids.ID] {
+// atomicTxs returns the cross-chain transaction in each of the blocks at
+// heights.
+func atomicTxs(tb testing.TB, client *ethclient.Client, heights set.Set[uint64]) map[uint64]*tx.Tx {
 	tb.Helper()
 
 	var (
-		ctx      = tb.Context()
-		consumed set.Set[ids.ID]
+		ctx = tb.Context()
+		txs = make(map[uint64]*tx.Tx, heights.Len())
 	)
 	for height := range heights {
 		block, err := client.BlockByNumber(ctx, new(big.Int).SetUint64(height))
@@ -84,6 +100,15 @@ func consumedUTXOs(tb testing.TB, client *ethclient.Client, heights set.Set[uint
 
 		t, err := tx.Parse(customtypes.BlockExtData(block))
 		require.NoErrorf(tb, err, "tx.Parse(customtypes.BlockExtData(%d))", height)
+		txs[height] = t
+	}
+	return txs
+}
+
+// consumedUTXOs returns the UTXO IDs consumed by txs.
+func consumedUTXOs(txs map[uint64]*tx.Tx) set.Set[ids.ID] {
+	var consumed set.Set[ids.ID]
+	for _, t := range txs {
 		consumed.Union(t.InputIDs())
 	}
 	return consumed
