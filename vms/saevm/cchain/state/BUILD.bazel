@@ -48,7 +48,7 @@ go_test(
         "state_test.go",
     ],
     embed = [":state"],
-    embedsrcs = ["bonus_utxo_consumers.json"],
+    embedsrcs = ["bonus_block_consumers.json"],
     deps = [
         "//chains/atomic",
         "//database",
