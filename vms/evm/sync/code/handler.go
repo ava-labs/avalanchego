@@ -29,11 +29,11 @@ const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
 
 var (
 	errTooManyHashes = &avacommon.AppError{
-		Code:    3,
+		Code:    1000,
 		Message: "too many code hashes requested",
 	}
 	errHashNotFound = &avacommon.AppError{
-		Code:    4,
+		Code:    1001,
 		Message: "requested code not found",
 	}
 )
