@@ -23,6 +23,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
+)
+
+var (
+	errInvalidRequest = &avacommon.AppError{
+		Code:    8,
+		Message: "invalid leaf request",
+	}
+	errRootNotFound = &avacommon.AppError{
+		Code:    9,
+		Message: "requested trie root not found",
+	}
+	errServingCancelled = &avacommon.AppError{
+		Code:    10,
+		Message: "serving cancelled",
+	}
 )
 
 const (
@@ -82,17 +98,17 @@ func newResponder(
 	}
 }
 
-func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, error) {
+func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if !validateRequest(req, r.trieKeyLength) {
-		r.log.Debug("invalid leaf request, dropping",
+		r.log.Debug("rejecting request, invalid leaf request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("request", req),
 		)
-		return nil, nil
+		return nil, errInvalidRequest
 	}
 	q := newQuery(r, nodeID, req)
 	if q == nil {
-		return nil, nil
+		return nil, errRootNotFound
 	}
 	return q.run(ctx, nodeID)
 }
@@ -208,22 +224,18 @@ func (q *query) collect(ctx context.Context) error {
 	return nil
 }
 
-// run executes the collect pipeline. Returns nil to signal a late drop
-// (pipeline error or ctx cancelled before any leaves were read).
-func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
+// run executes the collect pipeline. A pipeline failure is a server fault,
+// a cancellation before any leaves were read tells the peer we gave up.
+func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if err := q.collect(ctx); err != nil {
-		q.log.Debug("failed to serve leaf request",
-			zap.Stringer("nodeID", nodeID),
-			zap.Error(err),
-		)
-		return nil, nil
+		return nil, handlers.Fault(q.log, nodeID, err)
 	}
 	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
-		q.log.Debug("context err set before any leaves were iterated",
+		q.log.Debug("rejecting request, cancelled before any leaves were iterated",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(ctx.Err()),
 		)
-		return nil, nil //nolint:nilerr // a cancelled context with no leaves read drops the request rather than faulting the peer
+		return nil, errServingCancelled
 	}
 	return q.resp, nil
 }

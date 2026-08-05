@@ -33,12 +33,12 @@ func TestVerifyLeafs(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 	r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
 
-	partial, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 20})
-	require.NoError(t, err)
+	partial, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 20})
+	require.Nil(t, appErr)
 	require.NotEmpty(t, partial.ProofVals, "partial range must carry a proof")
 
-	whole, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 50})
-	require.NoError(t, err)
+	whole, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 50})
+	require.Nil(t, appErr)
 	require.Empty(t, whole.ProofVals, "whole trie needs no proof")
 
 	tampered := proto.Clone(partial).(*syncpb.GetLeafResponse)
@@ -217,8 +217,8 @@ func flakyLeafHandler(trieDB *triedb.Database, badResponses int32) p2p.Handler {
 			if err := proto.Unmarshal(requestBytes, req); err != nil {
 				return nil, avacommon.ErrUndefined
 			}
-			resp, err := inner.Respond(ctx, n, req)
-			if err != nil || resp == nil || len(resp.Values) == 0 {
+			resp, appErr := inner.Respond(ctx, n, req)
+			if appErr != nil || resp == nil || len(resp.Values) == 0 {
 				return nil, avacommon.ErrUndefined
 			}
 			if seen := count.Add(1); badResponses < 0 || seen <= badResponses {
