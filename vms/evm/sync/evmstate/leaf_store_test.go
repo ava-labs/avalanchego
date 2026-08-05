@@ -59,7 +59,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
 	reg := &fakeRegistry{}
-	leaves := newAccountLeaves(db, queue, reg)
+	leaves := newAccountLeafStore(db, queue, reg)
 
 	storageRoot := common.HexToHash("0xaa")
 	codeHash := common.HexToHash("0xbb")
@@ -95,7 +95,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
 	reg := &fakeRegistry{}
-	leaves := newAccountLeaves(db, queue, reg)
+	leaves := newAccountLeafStore(db, queue, reg)
 
 	err := leaves.writeLeaves(t.Context(), db.NewBatch(), leafBatch{
 		keys: [][]byte{synctest.HashedKey(1)},

@@ -533,3 +533,9 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 	require.Equal(t, c.keys, resp.Keys)
 	require.Equal(t, c.vals, resp.Values)
 }
+
+// newLeafResponder builds a responder over trieDB with a test logger.
+func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
+	tb.Helper()
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
+}
