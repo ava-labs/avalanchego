@@ -45,9 +45,8 @@ const (
 	// MaxLeavesLimit caps leaves per response.
 	MaxLeavesLimit = uint16(1024)
 
-	// snapshotReadDeadlinePercent reserves the rest of the request
-	// deadline for trie iteration if the snapshot pass returns invalid
-	// data.
+	// snapshotReadDeadlinePercent leaves enough deadline for a full trie
+	// iteration, which only an invalid snapshot range forces.
 	snapshotReadDeadlinePercent = 75
 
 	// snapshotSegmentLen is the per-segment validation granularity for
@@ -65,11 +64,35 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Databa
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 
-// SnapshotReader yields a root-scoped account iterator, satisfied by
-// [*snapshot.Tree]. Storage awaits the state root (see the newQuery TODO).
+// SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather
+// than the requested root, which the tree retires before sync stops asking.
 type SnapshotReader interface {
+	DiskRoot() common.Hash
 	AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error)
+	StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error)
 }
+
+// leafIterator is the shape shared by the account and storage snapshot
+// iterators, yielding trie-encoded values for either.
+type leafIterator interface {
+	Next() bool
+	Hash() common.Hash
+	Error() error
+	Release()
+
+	// leaf returns the trie-encoded value at the cursor.
+	leaf() ([]byte, error)
+}
+
+// accountLeaves converts slim snapshot accounts to full trie leaves.
+type accountLeaves struct{ snapshot.AccountIterator }
+
+func (a accountLeaves) leaf() ([]byte, error) { return types.FullAccountRLP(a.Account()) }
+
+// storageLeaves serves slots, which the snapshot already stores trie-encoded.
+type storageLeaves struct{ snapshot.StorageIterator }
+
+func (s storageLeaves) leaf() ([]byte, error) { return s.Slot(), nil }
 
 var (
 	_ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
@@ -99,10 +122,10 @@ func newResponder(
 }
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if !validateRequest(req, r.trieKeyLength) {
+	if reason := validateRequest(req, r.trieKeyLength); reason != "" {
 		r.log.Debug("rejecting request, invalid leaf request",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("request", req),
+			zap.String("reason", reason),
 		)
 		return nil, errInvalidRequest
 	}
@@ -113,24 +136,31 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	return q.run(ctx, nodeID)
 }
 
-// validateRequest reports whether req has a valid shape.
-func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
-	if req.GetKeyLimit() == 0 || req.GetKeyLimit() > math.MaxUint16 {
-		return false
+// validateRequest returns why req is malformed, empty when it is valid. The
+// reason is logged in place of the request, which may carry megabytes.
+func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
+	switch {
+	case req.GetKeyLimit() == 0:
+		return "zero key limit"
+	case req.GetKeyLimit() > math.MaxUint16:
+		return "key limit overflows uint16"
 	}
+
 	root := common.BytesToHash(req.GetRootHash())
 	if root == (common.Hash{}) || root == types.EmptyRootHash {
-		return false
+		return "empty trie root"
 	}
+
 	startKey, endKey := req.GetStartKey(), req.GetEndKey()
-	if len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0 {
-		return false
+	switch {
+	case len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0:
+		return "start key after end key"
+	case len(startKey) != 0 && len(startKey) != trieKeyLength:
+		return "start key length mismatch"
+	case len(endKey) != 0 && len(endKey) != trieKeyLength:
+		return "end key length mismatch"
 	}
-	if (len(startKey) != 0 && len(startKey) != trieKeyLength) ||
-		(len(endKey) != 0 && len(endKey) != trieKeyLength) {
-		return false
-	}
-	return true
+	return ""
 }
 
 // query holds one in-flight leaf request.
@@ -152,9 +182,6 @@ type query struct {
 // newQuery opens the trie and returns a per-request query, or nil
 // if the trie root is missing.
 func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *query {
-	// TODO(powerslider): We should know the state root that accounts correspond to,
-	// as this information will be necessary to access storage tries
-	// when the trie is path based.
 	root := common.BytesToHash(req.GetRootHash())
 	t, err := trie.New(trie.TrieID(root), r.trieDB)
 	if err != nil {
@@ -184,8 +211,7 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *quer
 	}
 }
 
-// collect runs the response pipeline (snapshot fast path, trie fill-in,
-// range proof) and mutates [query.resp].
+// collect fills [query.resp] with the leaf range and its proof.
 func (q *query) collect(ctx context.Context) error {
 	if q.snapshot != nil {
 		done, err := q.fillFromSnapshot(ctx)
@@ -211,13 +237,12 @@ func (q *query) collect(ctx context.Context) error {
 		}
 	}
 
-	proof, err := q.generateRangeProof(q.startKey, q.resp.Keys)
+	proofDB, err := q.generateRangeProof(q.startKey, q.resp.Keys)
 	if err != nil {
 		return err
 	}
-	defer proof.Close()
 
-	q.resp.ProofVals, err = iteratorValues(proof)
+	q.resp.ProofVals, err = iteratorValues(proofDB)
 	if err != nil {
 		return err
 	}
@@ -240,10 +265,9 @@ func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResp
 	return q.resp, nil
 }
 
-// fillFromSnapshot reads from the snapshot. Returns true if the
-// response is complete.
-func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
-	// Reserve time for the trie fallback.
+// fillFromSnapshot reads from the snapshot. done reports that the response
+// needs nothing further, the inverse of the more returned by [query.fillFromTrie].
+func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	snapCtx := ctx
 	if deadline, ok := ctx.Deadline(); ok {
 		bufferedDeadline := time.Now().Add(time.Until(deadline) * snapshotReadDeadlinePercent / 100)
@@ -259,29 +283,25 @@ func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
-	proof, ok, more, err := q.isRangeValid(snapKeys, snapVals, false)
+	proofDB, valid, more, err := q.isRangeValid(snapKeys, snapVals, false)
 	if err != nil {
 		return false, err
 	}
-	defer proof.Close()
-	if ok {
+	if valid {
 		q.resp.Keys, q.resp.Values = snapKeys, snapVals
 		if len(q.startKey) == 0 && !more {
 			return true, nil
 		}
-		q.resp.ProofVals, err = iteratorValues(proof)
+		q.resp.ProofVals, err = iteratorValues(proofDB)
 		if err != nil {
 			return false, err
 		}
 		return !more, nil
 	}
 
-	// Slow path: walk snapshot keys in fixed-size segments and verify
-	// each against the trie. Valid segments are appended directly.
-	// Invalid segments are bridged from the trie when the next valid
-	// segment arrives: fill the trie up to and including that
-	// segment's first key, drop the trailing key (the segment is
-	// about to append it), then append the segment.
+	// Slow path: validate the snapshot keys in fixed-size segments. A valid
+	// segment appends directly, an invalid one leaves a gap that the next
+	// valid segment bridges from the trie.
 	//
 	// Example with snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] invalid:
 	//   i=0  [A B] valid    append           -> resp=[A B]
@@ -292,21 +312,18 @@ func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
 	hasGap := false
 	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
 		segmentEnd := min(i+snapshotSegmentLen, len(snapKeys))
-		segProof, segOK, _, err := q.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
+		_, segValid, _, err := q.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
 		if err != nil {
 			return false, err
 		}
-		_ = segProof.Close() // verdict only, proof not needed
-		if !segOK {
+		if !segValid {
 			hasGap = true
 			continue
 		}
 
 		if hasGap {
-			// Fill the gap from the trie up to and including
-			// snapKeys[i], then drop the trailing entry. snapKeys[i]
-			// is also the first entry we are about to append from the
-			// snapshot, and it must not be duplicated.
+			// Fill to snapKeys[i] inclusive, then drop it. The segment
+			// append below re-adds it, and it must not be duplicated.
 			if _, err := q.fillFromTrie(ctx, snapKeys[i]); err != nil {
 				return false, err
 			}
@@ -318,7 +335,8 @@ func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
 		}
 		hasGap = false
 
-		// Trim the segment to fit the remaining limit.
+		// Only bites when the gap fill above advanced past the snapshot index,
+		// which needs leaves the trie holds and the snapshot lacks.
 		segmentEnd = min(segmentEnd, i+int(q.limit)-len(q.resp.Keys))
 		q.resp.Keys = append(q.resp.Keys, snapKeys[i:segmentEnd]...)
 		q.resp.Values = append(q.resp.Values, snapVals[i:segmentEnd]...)
@@ -330,15 +348,45 @@ func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-// readFromSnapshot pulls account leaves in [startKey, endKey] up to
-// [query.limit]. Storage uses the trie (snapshot needs the state root, see the
-// newQuery TODO). Any snapshot problem yields no leaves, forcing trie fallback.
-func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
-	if q.account != (common.Hash{}) {
-		return nil, nil
+// snapshotLeaves opens a disk-layer iterator over the account trie, or over
+// [query.account]'s storage trie when the request names one.
+func (q *query) snapshotLeaves() (leafIterator, error) {
+	diskRoot := q.snapshot.DiskRoot()
+	seek := common.BytesToHash(q.startKey)
+
+	if q.account == (common.Hash{}) {
+		it, err := q.snapshot.AccountIterator(diskRoot, seek)
+		if err != nil {
+			return nil, err
+		}
+		return accountLeaves{it}, nil
 	}
-	it, err := q.snapshot.AccountIterator(q.rootHash, common.BytesToHash(q.startKey))
+
+	it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
 	if err != nil {
+		return nil, err
+	}
+	return storageLeaves{it}, nil
+}
+
+// abandonSnapshot gives up the fast path. A snapshot that never serves looks
+// exactly like no snapshot at all, so every way of getting here is reported.
+func (q *query) abandonSnapshot(reason string, err error) {
+	q.log.Debug("snapshot read abandoned, falling back to the trie",
+		zap.String("reason", reason),
+		zap.Stringer("account", q.account),
+		zap.Error(err),
+	)
+}
+
+// readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
+// are unvalidated, the caller range-proves them against the requested root.
+func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
+	it, err := q.snapshotLeaves()
+	if err != nil {
+		// [SnapshotReader.DiskRoot] and the iterator are separate calls, so a
+		// concurrent flatten can retire the root in between and land here.
+		q.abandonSnapshot("iterator unavailable", err)
 		return nil, nil
 	}
 	defer it.Release()
@@ -353,30 +401,30 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 		if len(keys) >= int(q.limit) || ctx.Err() != nil {
 			break
 		}
-		// Slim snapshot account to full-RLP trie leaf.
-		v, err := types.FullAccountRLP(it.Account())
+		v, err := it.leaf()
 		if err != nil {
+			q.abandonSnapshot("leaf encoding failed", err)
 			return nil, nil
 		}
 		keys = append(keys, k)
 		vals = append(vals, v)
 	}
-	if it.Error() != nil {
+	if err := it.Error(); err != nil {
+		q.abandonSnapshot("iteration failed", err)
 		return nil, nil
 	}
 	return keys, vals
 }
 
-// fillFromTrie iterates the trie from [query.nextKey] up to end
-// (exclusive). Returns true if the trie has more keys past the response.
-func (q *query) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
+// fillFromTrie iterates the trie from [query.nextKey] up to end (exclusive).
+// more reports keys past the response, the inverse of fillFromSnapshot's done.
+func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ error) {
 	nodeIt, err := q.trie.NodeIterator(q.nextKey())
 	if err != nil {
 		return false, err
 	}
 	it := trie.NewIterator(nodeIt)
 
-	more := false
 	for it.Next() {
 		if len(end) > 0 && bytes.Compare(it.Key, end) > 0 {
 			more = true
@@ -406,38 +454,35 @@ func (q *query) nextKey() []byte {
 // generateRangeProof returns a Merkle range proof for [start, last].
 // Empty start substitutes the cached zero-key.
 func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
-	proof := memorydb.New()
+	proofDB := memorydb.New()
 	if len(start) == 0 {
 		start = q.zeroKey
 	}
-	if err := q.trie.Prove(start, proof); err != nil {
-		_ = proof.Close()
+	if err := q.trie.Prove(start, proofDB); err != nil {
 		return nil, err
 	}
 	if len(keys) > 0 {
 		end := keys[len(keys)-1]
-		if err := q.trie.Prove(end, proof); err != nil {
-			_ = proof.Close()
+		if err := q.trie.Prove(end, proofDB); err != nil {
 			return nil, err
 		}
 	}
-	return proof, nil
+	return proofDB, nil
 }
 
-// verifyRangeProof returns whether the trie has more keys past the
-// last verified key.
-func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
+// verifyRangeProof reports whether the trie has more keys past the last
+// verified key. more carries the same meaning as in [query.fillFromTrie].
+func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proofDB *memorydb.Database) (more bool, _ error) {
 	if len(start) == 0 {
 		start = q.zeroKey
 	}
-	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proof)
+	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proofDB)
 }
 
-// isRangeValid generates and verifies a range proof for the supplied
-// keys/vals. With hasGap=true the proof validates standalone starting
-// at keys[0]. With hasGap=false the proof starts at nextKey(), so the
-// keys can be appended to the response directly.
-func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
+// isRangeValid range-proves keys/vals against the trie. hasGap starts the proof
+// at keys[0] so it stands alone, otherwise it starts at nextKey() so the keys
+// can be appended to the response directly.
+func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (proofDB *memorydb.Database, valid, more bool, _ error) {
 	var startKey []byte
 	if hasGap {
 		startKey = keys[0]
@@ -445,12 +490,12 @@ func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Databa
 		startKey = q.nextKey()
 	}
 
-	proof, err := q.generateRangeProof(startKey, keys)
+	proofDB, err := q.generateRangeProof(startKey, keys)
 	if err != nil {
 		return nil, false, false, err
 	}
-	more, proofErr := q.verifyRangeProof(keys, vals, startKey, proof)
-	return proof, proofErr == nil, more, nil
+	more, proofErr := q.verifyRangeProof(keys, vals, startKey, proofDB)
+	return proofDB, proofErr == nil, more, nil
 }
 
 // iteratorValues drains a memorydb iterator into a slice of values.
