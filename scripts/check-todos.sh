@@ -8,8 +8,8 @@ set -euo pipefail
 # their context over time and have no backlog/grooming pressure behind them.
 # Requiring each one to name an owner or link an issue keeps that context alive.
 #
-# Rule: a TODO or FIXME marker in a .rs or .go file must be annotated with an
-# owner or GitHub issue inside parentheses immediately after the marker:
+# Rule: a TODO or FIXME marker in any tracked text file must be annotated with
+# an owner or GitHub issue inside parentheses immediately after the marker:
 #
 #   TODO(owner or GH issue) - e.g. TODO(#1603), TODO(@foo), FIXME(rust-lang/rust#143874)
 #
@@ -30,8 +30,10 @@ usage() {
     cat <<'EOF'
 Usage: scripts/check-todos.sh [-h|--help]
 
-Scans tracked .rs and .go files for TODO/FIXME markers and the Rust todo!()
-macro, and reports any that are not annotated with an owner or GitHub issue.
+Scans all tracked text files for TODO/FIXME markers and the Rust todo!() macro,
+and reports any that are not annotated with an owner or GitHub issue. Files
+whose contents intrinsically mention these markers (such as this checker and
+related configuration) are excluded. Binary files are ignored.
 
 A marker is valid when it is immediately followed by a non-empty parenthesized
 annotation:
@@ -74,9 +76,23 @@ valid_re='(^|[^A-Za-z0-9_])(TODO|FIXME)\([^)]*[^)[:space:]][^)]*\)'
 macro_marker_re='(^|[^A-Za-z0-9_])todo!'
 macro_valid_re='(^|[^A-Za-z0-9_])todo![[:space:]]*\([^)]*[^)[:space:]][^)]*\)'
 
-# git grep skips target/, untracked, and gitignored files for us. It exits 1
-# when there are no matches, which is not an error for us.
-candidates=$(git grep -nE 'TODO|FIXME|todo!' -- '*.rs' '*.go' || true)
+# Files that use TODO/FIXME as documentation or refer to APIs such as
+# context.TODO(), rather than containing actionable work items. Git's :! syntax
+# excludes a path from the search; add new exceptions to this list as needed.
+excluded_pathspecs=(
+    ':!scripts/check-todos.sh'          # The checker's own rules and examples.
+    ':!ffi/.golangci.yaml'              # References Go's context.TODO() API.
+    ':!.github/.golangci.yaml.patch'    # Patch containing context.TODO().
+    ':!.github/workflows/ci.yaml'       # Describes the TODO/FIXME CI check.
+    ':!CONTRIBUTING.md'                 # Contributor guidance about code TODOs.
+    ':!CHANGELOG.md'                    # Historical descriptions of changes.
+    ':!docs/**'                         # Documentation and design prose.
+    ':!justfile'                        # Describes the CI check command.
+)
+
+# git grep skips target/, untracked, and gitignored files for us; -I also skips
+# binary files. It exits 1 when there are no matches, which is not an error.
+candidates=$(git grep -nIE 'TODO|FIXME|todo!' -- . "${excluded_pathspecs[@]}" || true)
 
 violations=0
 while IFS= read -r match; do
