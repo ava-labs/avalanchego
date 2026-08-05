@@ -9,9 +9,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -25,6 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
@@ -63,7 +63,7 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	stub.Register(tb)
 
 	hooks := saehookstest.NewStub(100e6)
-	hooks.BeforeExecutingBlockFn = func(r params.Rules, sdb *state.StateDB, h *types.Header, b *types.Block) error {
+	hooks.BeforeExecutingBlockFn = func(r params.Rules, sdb *state.StateDB, _ *types.Header, b *types.Block) error {
 		return par.StartBlock(sdb, r, b)
 	}
 	hooks.AfterExecutingBlockFn = func(sdb *state.StateDB, b *types.Block, rs types.Receipts) error {

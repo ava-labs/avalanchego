@@ -8,8 +8,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -22,6 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -41,7 +41,7 @@ var (
 	_ parallel.PrecompileResult = (*txHashEchoer)(nil)
 )
 
-// handler is a deliberately simple implementatino of [parallel.Handler],
+// handler is a deliberately simple implementation of [parallel.Handler],
 // intended only to demonstrate integration between SAE hooks and the [parallel]
 // package. Full testing of parallel handlers is performed in that package.
 type handler struct {
