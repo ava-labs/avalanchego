@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var emptyBlacklist = simplex.Blacklist{}
+var emptyBlacklist = simplexcommon.Blacklist{}
 
 func TestBlockBuilder(t *testing.T) {
 	ctx := t.Context()
@@ -30,7 +30,7 @@ func TestBlockBuilder(t *testing.T) {
 		name          string
 		block         snowman.Block
 		shouldBuild   bool
-		expectedBlock simplex.VerifiedBlock
+		expectedBlock simplexcommon.VerifiedBlock
 		vmBlockBuildF func(ctx context.Context) (snowman.Block, error)
 	}{
 		{

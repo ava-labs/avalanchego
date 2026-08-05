@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexepoch "github.com/ava-labs/simplex/simplex"
 	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -73,7 +74,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
-			blacklist: simplex.NewBlacklist(uint16(config.numNodes)),
+			blacklist: simplexcommon.NewBlacklist(uint16(config.numNodes)),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,
@@ -102,7 +103,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 			vm:    config.prev.vmBlock.(*wrappedBlock).vm,
 		},
 		blockTracker: config.prev.blockTracker,
-		metadata: simplex.ProtocolMetadata{
+		metadata: simplexcommon.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
 			Round:   config.round,
@@ -254,21 +255,21 @@ func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) [
 
 // newTestFinalization creates a new finalization over the BlockHeader, by collecting a
 // quorum of signatures from the provided configs.
-func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) simplex.Finalization {
-	quorum := simplex.Quorum(len(configs))
-	finalizedVotes := make([]*simplex.FinalizeVote, 0, quorum)
+func newTestFinalization(t *testing.T, configs []*Config, bh simplexcommon.BlockHeader) simplexcommon.Finalization {
+	quorum := simplexepoch.Quorum(len(configs))
+	finalizedVotes := make([]*simplexcommon.FinalizeVote, 0, quorum)
 
 	for _, config := range configs[:quorum] {
-		vote := simplex.ToBeSignedFinalization{
+		vote := simplexcommon.ToBeSignedFinalization{
 			BlockHeader: bh,
 		}
 		signer, _, err := NewBLSAuth(config)
 		require.NoError(t, err)
 		sig, err := vote.Sign(&signer)
 		require.NoError(t, err)
-		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
+		finalizedVotes = append(finalizedVotes, &simplexcommon.FinalizeVote{
 			Finalization: vote,
-			Signature: simplex.Signature{
+			Signature: simplexcommon.Signature{
 				Signer: config.Ctx.NodeID[:],
 				Value:  sig,
 			},
@@ -279,7 +280,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
-	finalization, err := simplex.NewFinalization(sigAgg, finalizedVotes)
+	finalization, err := simplexcommon.NewFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)
 	return finalization
 }

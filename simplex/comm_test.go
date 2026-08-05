@@ -6,7 +6,7 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -17,11 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var testSimplexMessage = simplex.Message{
-	VoteMessage: &simplex.Vote{
-		Vote: simplex.ToBeSignedVote{
-			BlockHeader: simplex.BlockHeader{
-				ProtocolMetadata: simplex.ProtocolMetadata{
+var testSimplexMessage = simplexcommon.Message{
+	VoteMessage: &simplexcommon.Vote{
+		Vote: simplexcommon.ToBeSignedVote{
+			BlockHeader: simplexcommon.BlockHeader{
+				ProtocolMetadata: simplexcommon.ProtocolMetadata{
 					Version: 1,
 					Epoch:   1,
 					Round:   1,
@@ -29,7 +29,7 @@ var testSimplexMessage = simplex.Message{
 				},
 			},
 		},
-		Signature: simplex.Signature{
+		Signature: simplexcommon.Signature{
 			Signer: []byte("dummy_node_id"),
 			Value:  []byte("dummy_signature"),
 		},
@@ -97,15 +97,15 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 	chainID := ids.GenerateTestID()
 	tests := []struct {
 		name string
-		resp *simplex.VerifiedReplicationResponse
+		resp *simplexcommon.VerifiedReplicationResponse
 	}{
 		{
 			name: "nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data: []simplexcommon.VerifiedQuorumRound{
 					{
 						VerifiedBlock: &Block{
-							metadata: simplex.ProtocolMetadata{},
+							metadata: simplexcommon.ProtocolMetadata{},
 							vmBlock:  snowmantest.Genesis,
 						},
 					},
@@ -115,18 +115,18 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 		},
 		{
 			name: "empty seqs",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data:        []simplex.VerifiedQuorumRound{},
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data:        []simplexcommon.VerifiedQuorumRound{},
 				LatestRound: nil,
 			},
 		},
 		{
 			name: "non-nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{},
-				LatestRound: &simplex.VerifiedQuorumRound{
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data: []simplexcommon.VerifiedQuorumRound{},
+				LatestRound: &simplexcommon.VerifiedQuorumRound{
 					VerifiedBlock: &Block{
-						metadata: simplex.ProtocolMetadata{},
+						metadata: simplexcommon.ProtocolMetadata{},
 						vmBlock:  snowmantest.Genesis,
 					},
 				},

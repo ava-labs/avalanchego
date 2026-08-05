@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -21,7 +21,7 @@ var (
 	errFailedToParseSignature      = errors.New("failed to parse signature")
 )
 
-var _ simplex.Signer = (*BLSSigner)(nil)
+var _ simplexcommon.Signer = (*BLSSigner)(nil)
 
 type SignFunc func(msg []byte) (*bls.Signature, error)
 
@@ -88,7 +88,7 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
 
-func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.NodeID) error {
+func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplexcommon.NodeID) error {
 	key, err := ids.ToNodeID(signer)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidNodeID, err)

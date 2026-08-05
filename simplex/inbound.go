@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -21,40 +21,40 @@ var (
 	errInvalidSigner       = errors.New("invalid signer")
 )
 
-func emptyNotarizationMessageFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
+func emptyNotarizationMessageFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplexcommon.Message, error) {
 	notarization, err := emptyNotarizationFromP2P(emptyNotarization, qcDeserializer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert empty notarization: %w", err)
 	}
 
-	return &simplex.Message{
+	return &simplexcommon.Message{
 		EmptyNotarization: notarization,
 	}, nil
 }
 
-func notarizationMessageFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
+func notarizationMessageFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplexcommon.Message, error) {
 	note, err := notarizationFromP2P(notarization, qcDeserializer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert notarization: %w", err)
 	}
 
-	return &simplex.Message{
+	return &simplexcommon.Message{
 		Notarization: note,
 	}, nil
 }
 
-func finalizationMessageFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
+func finalizationMessageFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplexcommon.Message, error) {
 	finalizationMsg, err := finalizationFromP2P(finalization, qcDeserializer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert finalization: %w", err)
 	}
 
-	return &simplex.Message{
+	return &simplexcommon.Message{
 		Finalization: finalizationMsg,
 	}, nil
 }
 
-func blockProposalFromP2P(ctx context.Context, blockProposal *p2p.BlockProposal, deserializer *blockDeserializer) (*simplex.Message, error) {
+func blockProposalFromP2P(ctx context.Context, blockProposal *p2p.BlockProposal, deserializer *blockDeserializer) (*simplexcommon.Message, error) {
 	block, err := deserializer.DeserializeBlock(ctx, blockProposal.Block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize block: %w", err)
@@ -65,25 +65,25 @@ func blockProposalFromP2P(ctx context.Context, blockProposal *p2p.BlockProposal,
 		return nil, fmt.Errorf("failed to deserialize vote: %w", err)
 	}
 
-	return &simplex.Message{
-		BlockMessage: &simplex.BlockMessage{
+	return &simplexcommon.Message{
+		BlockMessage: &simplexcommon.BlockMessage{
 			Block: block,
 			Vote:  vote,
 		},
 	}, nil
 }
 
-func voteFromP2P(vote *p2p.Vote) (*simplex.Message, error) {
+func voteFromP2P(vote *p2p.Vote) (*simplexcommon.Message, error) {
 	simplexVote, err := p2pVoteToSimplexVote(vote)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert p2p vote to simplex vote: %w", err)
 	}
-	return &simplex.Message{
+	return &simplexcommon.Message{
 		VoteMessage: &simplexVote,
 	}, nil
 }
 
-func emptyVoteFromP2P(emptyVote *p2p.EmptyVote) (*simplex.Message, error) {
+func emptyVoteFromP2P(emptyVote *p2p.EmptyVote) (*simplexcommon.Message, error) {
 	vote, err := emptyVoteMetadataFromP2P(emptyVote.Metadata)
 	if err != nil {
 		return nil, err
@@ -94,9 +94,9 @@ func emptyVoteFromP2P(emptyVote *p2p.EmptyVote) (*simplex.Message, error) {
 		return nil, err
 	}
 
-	return &simplex.Message{
-		EmptyVoteMessage: &simplex.EmptyVote{
-			Vote: simplex.ToBeSignedEmptyVote{
+	return &simplexcommon.Message{
+		EmptyVoteMessage: &simplexcommon.EmptyVote{
+			Vote: simplexcommon.ToBeSignedEmptyVote{
 				EmptyVoteMetadata: vote,
 			},
 			Signature: sig,
@@ -104,7 +104,7 @@ func emptyVoteFromP2P(emptyVote *p2p.EmptyVote) (*simplex.Message, error) {
 	}, nil
 }
 
-func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*simplex.Message, error) {
+func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*simplexcommon.Message, error) {
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(finalizeVote.BlockHeader)
 	if err != nil {
 		return nil, err
@@ -115,9 +115,9 @@ func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*simplex.Message, error) {
 		return nil, err
 	}
 
-	return &simplex.Message{
-		FinalizeVote: &simplex.FinalizeVote{
-			Finalization: simplex.ToBeSignedFinalization{
+	return &simplexcommon.Message{
+		FinalizeVote: &simplexcommon.FinalizeVote{
+			Finalization: simplexcommon.ToBeSignedFinalization{
 				BlockHeader: bh,
 			},
 			Signature: sig,
@@ -125,22 +125,22 @@ func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*simplex.Message, error) {
 	}, nil
 }
 
-func replicationRequestFromP2P(replicationRequest *p2p.ReplicationRequest) *simplex.Message {
-	return &simplex.Message{
-		ReplicationRequest: &simplex.ReplicationRequest{
+func replicationRequestFromP2P(replicationRequest *p2p.ReplicationRequest) *simplexcommon.Message {
+	return &simplexcommon.Message{
+		ReplicationRequest: &simplexcommon.ReplicationRequest{
 			Seqs:        replicationRequest.Seqs,
 			LatestRound: replicationRequest.LatestRound,
 		},
 	}
 }
 
-func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.ReplicationResponse, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
+func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.ReplicationResponse, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*simplexcommon.Message, error) {
 	latestRound, err := quorumRoundFromP2P(ctx, replicationResponse.LatestRound, blockDeserializer, qcDeserializer)
 	if err != nil {
 		return nil, err
 	}
 
-	data := make([]simplex.QuorumRound, 0, len(replicationResponse.Data))
+	data := make([]simplexcommon.QuorumRound, 0, len(replicationResponse.Data))
 	for _, qr := range replicationResponse.Data {
 		converted, err := quorumRoundFromP2P(ctx, qr, blockDeserializer, qcDeserializer)
 		if err != nil {
@@ -149,8 +149,8 @@ func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.Re
 		data = append(data, *converted)
 	}
 
-	return &simplex.Message{
-		ReplicationResponse: &simplex.ReplicationResponse{
+	return &simplexcommon.Message{
+		ReplicationResponse: &simplexcommon.ReplicationResponse{
 			LatestRound: latestRound,
 			Data:        data,
 		},
@@ -158,23 +158,23 @@ func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.Re
 }
 
 // HELPERS -----------------
-func p2pVoteToSimplexVote(p2pVote *p2p.Vote) (simplex.Vote, error) {
+func p2pVoteToSimplexVote(p2pVote *p2p.Vote) (simplexcommon.Vote, error) {
 	if p2pVote == nil {
-		return simplex.Vote{}, errNilField
+		return simplexcommon.Vote{}, errNilField
 	}
 
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(p2pVote.BlockHeader)
 	if err != nil {
-		return simplex.Vote{}, err
+		return simplexcommon.Vote{}, err
 	}
 
 	signature, err := p2pSignatureToSimplexSignature(p2pVote.Signature)
 	if err != nil {
-		return simplex.Vote{}, err
+		return simplexcommon.Vote{}, err
 	}
 
-	v := simplex.Vote{
-		Vote: simplex.ToBeSignedVote{
+	v := simplexcommon.Vote{
+		Vote: simplexcommon.ToBeSignedVote{
 			BlockHeader: bh,
 		},
 		Signature: signature,
@@ -183,57 +183,57 @@ func p2pVoteToSimplexVote(p2pVote *p2p.Vote) (simplex.Vote, error) {
 	return v, nil
 }
 
-func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (simplex.Signature, error) {
+func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (simplexcommon.Signature, error) {
 	if p2pSig == nil {
-		return simplex.Signature{}, errNilField
+		return simplexcommon.Signature{}, errNilField
 	}
 
 	nodeID, err := ids.ToNodeID(p2pSig.Signer)
 	if err != nil {
-		return simplex.Signature{}, fmt.Errorf("%w: %w", errInvalidSigner, err)
+		return simplexcommon.Signature{}, fmt.Errorf("%w: %w", errInvalidSigner, err)
 	}
 
-	return simplex.Signature{
+	return simplexcommon.Signature{
 		Signer: nodeID[:],
 		Value:  p2pSig.Value,
 	}, nil
 }
 
-func p2pBlockHeaderToSimplexBlockHeader(p2pHeader *p2p.BlockHeader) (simplex.BlockHeader, error) {
+func p2pBlockHeaderToSimplexBlockHeader(p2pHeader *p2p.BlockHeader) (simplexcommon.BlockHeader, error) {
 	if p2pHeader == nil {
-		return simplex.BlockHeader{}, errNilField
+		return simplexcommon.BlockHeader{}, errNilField
 	}
 
 	md, err := p2pMetadataToSimplexMetadata(p2pHeader.Metadata)
 	if err != nil {
-		return simplex.BlockHeader{}, fmt.Errorf("failed to convert previous metadata: %w", err)
+		return simplexcommon.BlockHeader{}, fmt.Errorf("failed to convert previous metadata: %w", err)
 	}
 
 	digest, err := digestFromP2P(p2pHeader.Digest)
 	if err != nil {
-		return simplex.BlockHeader{}, fmt.Errorf("failed to convert digest: %w", err)
+		return simplexcommon.BlockHeader{}, fmt.Errorf("failed to convert digest: %w", err)
 	}
 
-	return simplex.BlockHeader{
+	return simplexcommon.BlockHeader{
 		ProtocolMetadata: md,
 		Digest:           digest,
 	}, nil
 }
 
-func p2pMetadataToSimplexMetadata(p2pMetadata *p2p.ProtocolMetadata) (simplex.ProtocolMetadata, error) {
+func p2pMetadataToSimplexMetadata(p2pMetadata *p2p.ProtocolMetadata) (simplexcommon.ProtocolMetadata, error) {
 	if p2pMetadata == nil {
-		return simplex.ProtocolMetadata{}, errNilField
+		return simplexcommon.ProtocolMetadata{}, errNilField
 	}
 
 	if p2pMetadata.Version > math.MaxUint8 {
-		return simplex.ProtocolMetadata{}, fmt.Errorf("version %d exceeds maximum value %d", p2pMetadata.Version, math.MaxUint8)
+		return simplexcommon.ProtocolMetadata{}, fmt.Errorf("version %d exceeds maximum value %d", p2pMetadata.Version, math.MaxUint8)
 	}
 	prev, err := digestFromP2P(p2pMetadata.Prev)
 	if err != nil {
-		return simplex.ProtocolMetadata{}, err
+		return simplexcommon.ProtocolMetadata{}, err
 	}
 
-	return simplex.ProtocolMetadata{
+	return simplexcommon.ProtocolMetadata{
 		Version: uint8(p2pMetadata.Version),
 		Epoch:   p2pMetadata.Epoch,
 		Round:   p2pMetadata.Round,
@@ -242,28 +242,28 @@ func p2pMetadataToSimplexMetadata(p2pMetadata *p2p.ProtocolMetadata) (simplex.Pr
 	}, nil
 }
 
-func emptyVoteMetadataFromP2P(emptyVote *p2p.EmptyVoteMetadata) (simplex.EmptyVoteMetadata, error) {
+func emptyVoteMetadataFromP2P(emptyVote *p2p.EmptyVoteMetadata) (simplexcommon.EmptyVoteMetadata, error) {
 	if emptyVote == nil {
-		return simplex.EmptyVoteMetadata{}, errNilField
+		return simplexcommon.EmptyVoteMetadata{}, errNilField
 	}
 
-	return simplex.EmptyVoteMetadata{
+	return simplexcommon.EmptyVoteMetadata{
 		Round: emptyVote.Round,
 		Epoch: emptyVote.Epoch,
 	}, nil
 }
 
-func digestFromP2P(p2pDigest []byte) (simplex.Digest, error) {
+func digestFromP2P(p2pDigest []byte) (simplexcommon.Digest, error) {
 	if len(p2pDigest) != 32 {
-		return simplex.Digest{}, fmt.Errorf("%w: got %d, expected %d", errInvalidDigestLength, len(p2pDigest), 32)
+		return simplexcommon.Digest{}, fmt.Errorf("%w: got %d, expected %d", errInvalidDigestLength, len(p2pDigest), 32)
 	}
 
-	var digest simplex.Digest
+	var digest simplexcommon.Digest
 	copy(digest[:], p2pDigest)
 	return digest, nil
 }
 
-func quorumCertificateFromP2P(qcBytes []byte, qcDeserializer *QCDeserializer) (simplex.QuorumCertificate, error) {
+func quorumCertificateFromP2P(qcBytes []byte, qcDeserializer *QCDeserializer) (simplexcommon.QuorumCertificate, error) {
 	if qcBytes == nil {
 		return nil, errNilField
 	}
@@ -276,7 +276,7 @@ func quorumCertificateFromP2P(qcBytes []byte, qcDeserializer *QCDeserializer) (s
 	return simplexQC, nil
 }
 
-func notarizationFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplex.Notarization, error) {
+func notarizationFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplexcommon.Notarization, error) {
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(notarization.BlockHeader)
 	if err != nil {
 		return nil, err
@@ -287,15 +287,15 @@ func notarizationFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QC
 		return nil, fmt.Errorf("failed to convert quorum certificate: %w", err)
 	}
 
-	return &simplex.Notarization{
-		Vote: simplex.ToBeSignedVote{
+	return &simplexcommon.Notarization{
+		Vote: simplexcommon.ToBeSignedVote{
 			BlockHeader: bh,
 		},
 		QC: qc,
 	}, nil
 }
 
-func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.EmptyNotarization, error) {
+func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplexcommon.EmptyNotarization, error) {
 	if emptyNotarization == nil {
 		return nil, errNilField
 	}
@@ -310,15 +310,15 @@ func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeseri
 		return nil, fmt.Errorf("failed to convert quorum certificate: %w", err)
 	}
 
-	return &simplex.EmptyNotarization{
-		Vote: simplex.ToBeSignedEmptyVote{
+	return &simplexcommon.EmptyNotarization{
+		Vote: simplexcommon.ToBeSignedEmptyVote{
 			EmptyVoteMetadata: md,
 		},
 		QC: qc,
 	}, nil
 }
 
-func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplex.Finalization, error) {
+func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplexcommon.Finalization, error) {
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(finalization.BlockHeader)
 	if err != nil {
 		return nil, err
@@ -329,20 +329,20 @@ func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QC
 		return nil, fmt.Errorf("failed to convert quorum certificate: %w", err)
 	}
 
-	return &simplex.Finalization{
-		Finalization: simplex.ToBeSignedFinalization{
+	return &simplexcommon.Finalization{
+		Finalization: simplexcommon.ToBeSignedFinalization{
 			BlockHeader: bh,
 		},
 		QC: qc,
 	}, nil
 }
 
-func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*simplex.QuorumRound, error) {
+func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*simplexcommon.QuorumRound, error) {
 	if qr == nil {
 		return nil, errNilField
 	}
 
-	var block simplex.Block
+	var block simplexcommon.Block
 	if qr.Block != nil {
 		dBlock, err := blockDeserializer.DeserializeBlock(ctx, qr.Block)
 		if err != nil {
@@ -351,7 +351,7 @@ func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeseriali
 		block = dBlock
 	}
 
-	var emptyNotarization *simplex.EmptyNotarization
+	var emptyNotarization *simplexcommon.EmptyNotarization
 	if qr.EmptyNotarization != nil {
 		eNote, err := emptyNotarizationFromP2P(qr.EmptyNotarization, qcDeserializer)
 		if err != nil {
@@ -360,7 +360,7 @@ func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeseriali
 		emptyNotarization = eNote
 	}
 
-	var notarization *simplex.Notarization
+	var notarization *simplexcommon.Notarization
 	if qr.Notarization != nil {
 		note, err := notarizationFromP2P(qr.Notarization, qcDeserializer)
 		if err != nil {
@@ -369,7 +369,7 @@ func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeseriali
 		notarization = note
 	}
 
-	var finalization *simplex.Finalization
+	var finalization *simplexcommon.Finalization
 	if qr.Finalization != nil {
 		finalize, err := finalizationFromP2P(qr.Finalization, qcDeserializer)
 		if err != nil {
@@ -378,7 +378,7 @@ func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeseriali
 		finalization = finalize
 	}
 
-	return &simplex.QuorumRound{
+	return &simplexcommon.QuorumRound{
 		Block:             block,
 		EmptyNotarization: emptyNotarization,
 		Notarization:      notarization,

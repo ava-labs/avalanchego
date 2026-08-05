@@ -6,7 +6,7 @@ package simplex
 import (
 	"fmt"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -14,7 +14,7 @@ import (
 
 func newBlockProposal(
 	chainID ids.ID,
-	msg *simplex.VerifiedBlockMessage,
+	msg *simplexcommon.VerifiedBlockMessage,
 ) (*p2p.Simplex, error) {
 	bytes, err := msg.VerifiedBlock.Bytes()
 	if err != nil {
@@ -41,7 +41,7 @@ func newBlockProposal(
 
 func newVote(
 	chainID ids.ID,
-	vote *simplex.Vote,
+	vote *simplexcommon.Vote,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -59,7 +59,7 @@ func newVote(
 
 func newEmptyVote(
 	chainID ids.ID,
-	emptyVote *simplex.EmptyVote,
+	emptyVote *simplexcommon.EmptyVote,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -77,7 +77,7 @@ func newEmptyVote(
 
 func newFinalizeVote(
 	chainID ids.ID,
-	finalizeVote *simplex.FinalizeVote,
+	finalizeVote *simplexcommon.FinalizeVote,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -95,7 +95,7 @@ func newFinalizeVote(
 
 func newNotarization(
 	chainID ids.ID,
-	notarization *simplex.Notarization,
+	notarization *simplexcommon.Notarization,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -110,7 +110,7 @@ func newNotarization(
 
 func newEmptyNotarization(
 	chainID ids.ID,
-	emptyNotarization *simplex.EmptyNotarization,
+	emptyNotarization *simplexcommon.EmptyNotarization,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -125,7 +125,7 @@ func newEmptyNotarization(
 
 func newFinalization(
 	chainID ids.ID,
-	finalization *simplex.Finalization,
+	finalization *simplexcommon.Finalization,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -140,7 +140,7 @@ func newFinalization(
 
 func newReplicationRequest(
 	chainID ids.ID,
-	replicationRequest *simplex.ReplicationRequest,
+	replicationRequest *simplexcommon.ReplicationRequest,
 ) *p2p.Simplex {
 	return &p2p.Simplex{
 		ChainId: chainID[:],
@@ -155,7 +155,7 @@ func newReplicationRequest(
 
 func newReplicationResponse(
 	chainID ids.ID,
-	replicationResponse *simplex.VerifiedReplicationResponse,
+	replicationResponse *simplexcommon.VerifiedReplicationResponse,
 ) (*p2p.Simplex, error) {
 	data := replicationResponse.Data
 	latestRound := replicationResponse.LatestRound
@@ -194,14 +194,14 @@ func newReplicationResponse(
 	}, nil
 }
 
-func blockHeaderToP2P(bh simplex.BlockHeader) *p2p.BlockHeader {
+func blockHeaderToP2P(bh simplexcommon.BlockHeader) *p2p.BlockHeader {
 	return &p2p.BlockHeader{
 		Metadata: protocolMetadataToP2P(bh.ProtocolMetadata),
 		Digest:   bh.Digest[:],
 	}
 }
 
-func protocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMetadata {
+func protocolMetadataToP2P(md simplexcommon.ProtocolMetadata) *p2p.ProtocolMetadata {
 	return &p2p.ProtocolMetadata{
 		Version: uint32(md.Version),
 		Epoch:   md.Epoch,
@@ -211,7 +211,7 @@ func protocolMetadataToP2P(md simplex.ProtocolMetadata) *p2p.ProtocolMetadata {
 	}
 }
 
-func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
+func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
 	p2pQR := &p2p.QuorumRound{}
 
 	if qr.VerifiedBlock != nil {
@@ -247,7 +247,7 @@ func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error)
 	return p2pQR, nil
 }
 
-func emptyVoteMetadataToP2P(ev simplex.EmptyVoteMetadata) *p2p.EmptyVoteMetadata {
+func emptyVoteMetadataToP2P(ev simplexcommon.EmptyVoteMetadata) *p2p.EmptyVoteMetadata {
 	return &p2p.EmptyVoteMetadata{
 		Epoch: ev.Epoch,
 		Round: ev.Round,
