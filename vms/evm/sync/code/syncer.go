@@ -13,12 +13,14 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -26,6 +28,8 @@ import (
 const numSyncWorkers = 5
 
 var (
+	_ types.Syncer = (*Syncer)(nil)
+
 	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
 	errCodeSizeExceeded  = errors.New("max code size exceeded")
 	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
@@ -48,18 +52,43 @@ type Syncer struct {
 	inFlight sync.Map
 }
 
+type syncerConfig struct {
+	numWorkers int
+}
+
+// SyncerOption configures a [Syncer] at construction time.
+type SyncerOption = options.Option[syncerConfig]
+
+// WithNumWorkers overrides the number of concurrent fetch workers.
+func WithNumWorkers(n int) SyncerOption {
+	return options.Func[syncerConfig](func(c *syncerConfig) {
+		if n > 0 {
+			c.numWorkers = n
+		}
+	})
+}
+
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
 // verified code into db, fetching from peers through c.
-func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash) *Syncer {
+func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash, opts ...SyncerOption) *Syncer {
+	cfg := syncerConfig{numWorkers: numSyncWorkers}
+	options.ApplyTo(&cfg, opts...)
+
 	return &Syncer{
 		log:              log,
 		client:           c,
 		db:               db,
 		codeHashes:       codeHashes,
-		numWorkers:       numSyncWorkers,
+		numWorkers:       cfg.numWorkers,
 		codeHashesPerReq: maxHashesPerRequest,
 	}
 }
+
+// Name returns a human-readable name for logging.
+func (*Syncer) Name() string { return "Code Syncer" }
+
+// ID returns the stable identifier used for deduplication and metrics.
+func (*Syncer) ID() string { return "state_code_sync" }
 
 // Sync runs the workers until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
@@ -84,7 +113,9 @@ func (s *Syncer) work(ctx context.Context) error {
 				return nil
 			}
 
-			// Slow path: code already on disk, just clear its marker.
+			// Slow path: code already on disk, just clear its marker. Kept ahead
+			// of the inFlight check so a marker a concurrent AddCode rewrote is
+			// always re-cleaned on its next dequeue, never orphaned.
 			if rawdb.HasCode(s.db, codeHash) {
 				if err := customrawdb.DeleteCodeToFetch(s.db, codeHash); err != nil {
 					return fmt.Errorf("failed to delete stale code marker: %w", err)

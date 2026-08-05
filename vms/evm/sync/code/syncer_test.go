@@ -6,6 +6,7 @@ package code
 import (
 	"context"
 	"crypto/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,12 +17,14 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -29,6 +32,7 @@ import (
 )
 
 func TestVerifyCode(t *testing.T) {
+	t.Parallel()
 	code := []byte("contract bytecode")
 	hash := crypto.Keccak256Hash(code)
 
@@ -79,15 +83,27 @@ func TestVerifyCode(t *testing.T) {
 }
 
 func TestSyncer(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		numFromSource int
 		numOnDisk     int
 		perReq        int
 	}{
-		{name: "single blob", numFromSource: 1},
-		{name: "batches across requests", numFromSource: 12, perReq: 4},
-		{name: "skips code already on disk", numFromSource: 3, numOnDisk: 2},
+		{
+			name:          "single blob",
+			numFromSource: 1,
+		},
+		{
+			name:          "batches across requests",
+			numFromSource: 12,
+			perReq:        4,
+		},
+		{
+			name:          "skips code already on disk",
+			numFromSource: 3,
+			numOnDisk:     2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -141,7 +157,48 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
+// Accounts sharing a code hash enqueue it repeatedly, so it must be fetched once.
+func TestSyncer_DedupesInFlight(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	nodeID := ids.GenerateTestNodeID()
+
+	source := memorydb.New()
+	target := memorydb.New()
+	blob := randomCode(t)
+	hash := writeCode(t, source, blob)
+
+	inner := handlers.NewHandler[syncpb.GetCodeRequest](
+		logging.NoLog{},
+		newResponder(logging.NoLog{}, source),
+	)
+	var requests atomic.Int32
+	counting := p2p.TestHandler{
+		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
+			requests.Add(1)
+			return inner.AppRequest(c, n, d, b)
+		},
+	}
+
+	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
+	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, counting))
+
+	require.NoError(t, customrawdb.WriteCodeToFetch(target, hash))
+	ch := make(chan common.Hash, 20)
+	for range 20 {
+		ch <- hash
+	}
+	close(ch)
+
+	require.NoError(t, NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch).Sync(ctx))
+
+	require.Equal(t, blob, rawdb.ReadCode(target, hash))
+	require.Equal(t, int32(1), requests.Load(), "a repeated hash must be fetched exactly once")
+}
+
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
 	nodeID := ids.GenerateTestNodeID()
@@ -174,6 +231,182 @@ func tamperingHandler() p2p.Handler {
 			}
 			return respBytes, nil
 		},
+	}
+}
+
+// Regresses #5353: a marker rewritten mid-cleanup must still be cleared, which holds
+// only because cleanup runs before the inFlight gate.
+func TestSyncer_CleansMarkerRewrittenMidCleanup(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	nodeID := ids.GenerateTestNodeID()
+
+	codeBytes := randomCode(t)
+	codeHash := crypto.Keccak256Hash(codeBytes)
+
+	// probeHash is a barrier. Its code is on disk, so it cannot touch codeHash's marker.
+	probeBytes := randomCode(t)
+	probeHash := crypto.Keccak256Hash(probeBytes)
+
+	rawDB := rawdb.NewMemoryDatabase()
+	clientDB := newBlockingBatchDB(rawDB)
+	rawdb.WriteCode(rawDB, codeHash, codeBytes)
+	require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+	rawdb.WriteCode(rawDB, probeHash, probeBytes)
+
+	source := memorydb.New()
+	rawdb.WriteCode(source, codeHash, codeBytes)
+	rawdb.WriteCode(source, probeHash, probeBytes)
+
+	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
+	require.NoError(t, RegisterHandler(logging.NoLog{}, net, source))
+
+	ch := make(chan common.Hash)
+	// Exactly two workers, or a spare one breaks the probeHash barrier below.
+	codeSyncer := NewSyncer(logging.NoLog{}, NewClient(net, tracker), clientDB, ch, WithNumWorkers(2))
+
+	syncErrCh := make(chan error, 1)
+	go func() { syncErrCh <- codeSyncer.Sync(ctx) }()
+
+	// A worker deletes the marker, then pauses inside the wrapped commit.
+	ch <- codeHash
+	<-clientDB.blocked
+
+	// Rewrite the marker, as a concurrent AddCode would, and enqueue a duplicate.
+	require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+	ch <- codeHash
+
+	// Returns only once the sibling is back at the receive, so its work is committed.
+	ch <- probeHash
+
+	close(clientDB.release)
+	close(ch)
+	require.NoError(t, <-syncErrCh)
+
+	it := customrawdb.NewCodeToFetchIterator(rawDB)
+	defer it.Release()
+	require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+	require.NoError(t, it.Error())
+}
+
+// The same invariant end-to-end: no markers may remain after sync.
+func TestSyncer_DuplicateAddCodeNoMarkerLeak(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		preWrite bool
+	}{
+		{
+			name:     "code already on disk",
+			preWrite: true,
+		},
+		{
+			name:     "code fetched during sync",
+			preWrite: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			nodeID := ids.GenerateTestNodeID()
+
+			codeBytes := randomCode(t)
+			codeHash := crypto.Keccak256Hash(codeBytes)
+
+			clientDB := rawdb.NewMemoryDatabase()
+			if tt.preWrite {
+				rawdb.WriteCode(clientDB, codeHash, codeBytes)
+			}
+
+			source := memorydb.New()
+			rawdb.WriteCode(source, codeHash, codeBytes)
+			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
+			require.NoError(t, RegisterHandler(logging.NoLog{}, net, source))
+
+			codeQueue, err := NewQueue(clientDB)
+			require.NoError(t, err)
+
+			const (
+				numProducers = 8
+				iterations   = 10_000
+			)
+			codeSyncer := NewSyncer(logging.NoLog{}, NewClient(net, tracker), clientDB, codeQueue.CodeHashes())
+
+			syncErrCh := make(chan error, 1)
+			go func() { syncErrCh <- codeSyncer.Sync(ctx) }()
+
+			var producers errgroup.Group
+			for range numProducers {
+				producers.Go(func() error {
+					for range iterations {
+						if err := codeQueue.AddCode(ctx, []common.Hash{codeHash}); err != nil {
+							return err
+						}
+					}
+					return nil
+				})
+			}
+			require.NoError(t, producers.Wait())
+			require.NoError(t, codeQueue.Finalize())
+			require.NoError(t, <-syncErrCh)
+
+			require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
+
+			it := customrawdb.NewCodeToFetchIterator(clientDB)
+			defer it.Release()
+			require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+			require.NoError(t, it.Error())
+		})
+	}
+}
+
+// blockingBatchDB pauses inside the first marker commit, batch or direct delete.
+type blockingBatchDB struct {
+	ethdb.Database
+	primed  atomic.Bool
+	blocked chan struct{}
+	release chan struct{}
+}
+
+func newBlockingBatchDB(inner ethdb.Database) *blockingBatchDB {
+	return &blockingBatchDB{
+		Database: inner,
+		blocked:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+}
+
+func (db *blockingBatchDB) NewBatch() ethdb.Batch {
+	return &blockingBatch{Batch: db.Database.NewBatch(), db: db}
+}
+
+type blockingBatch struct {
+	ethdb.Batch
+	db *blockingBatchDB
+}
+
+func (b *blockingBatch) Write() error {
+	err := b.Batch.Write()
+	b.db.pause()
+	return err
+}
+
+// Delete is the seam the slow path uses, bypassing batches.
+func (db *blockingBatchDB) Delete(key []byte) error {
+	err := db.Database.Delete(key)
+	db.pause()
+	return err
+}
+
+// pause holds the first caller until release.
+func (db *blockingBatchDB) pause() {
+	if db.primed.CompareAndSwap(false, true) {
+		close(db.blocked)
+		<-db.release
 	}
 }
 

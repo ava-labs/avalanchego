@@ -508,16 +508,3 @@ func iteratorValues(db *memorydb.Database) ([][]byte, error) {
 	}
 	return out, it.Error()
 }
-
-// incrementBytes adds 1 to b in place, with carry.
-// Example: [0x01, 0xff] becomes [0x02, 0x00].
-// All-0xff wraps to all-zeros.
-func incrementBytes(b []byte) {
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] < 0xff {
-			b[i]++
-			return
-		}
-		b[i] = 0
-	}
-}
