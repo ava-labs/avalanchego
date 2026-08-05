@@ -158,10 +158,18 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	}
 
 	batch := s.db.NewBatch()
+	isBonus := isBonusBlock(s.snowCtx.NetworkID, height)
 	for _, t := range txs {
-		if s.isBonus(height) {
-			// Must avoid double overriding height index during replay.
-			if _, _, err := s.GetTx(t.ID()); err == nil {
+		if isBonus {
+			// To provide consistent API behavior with databases made by Coreth,
+			// we report the first height a transaction was accepted at as the
+			// canonical height.
+			txID := t.ID()
+			has, err := s.db.Has(txKey(txID))
+			if err != nil {
+				return fmt.Errorf("checking for existing tx %s: %w", txID, err)
+			}
+			if has {
 				continue
 			}
 		}
@@ -176,16 +184,17 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("writing root: %w", err)
 	}
 
-	if s.isBonus(height) {
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("writing bonus block batch: %w", err)
-		}
-	} else {
-		// Committing the batch atomically with shared memory prevents duplicate
-		// shared memory operations in the event of a crash.
-		if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
-			return fmt.Errorf("applying shared memory: %w", err)
-		}
+	// Applying the same operation multiple times to shared memory MAY result in
+	// an error. Since bonus blocks consume the same UTXOs multiple times, we
+	// MUST skip applying their operations to shared memory.
+	if isBonus {
+		ops = nil
+	}
+
+	// Committing the batch atomically with shared memory prevents duplicate
+	// shared memory operations in the event of a crash.
+	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
+		return fmt.Errorf("applying shared memory: %w", err)
 	}
 
 	s.snowCtx.Log.Debug("updated atomic trie",

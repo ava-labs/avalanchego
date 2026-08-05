@@ -9,28 +9,27 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// mainnetBonusBlocks is the set of mainnet bonus block heights. Bonus blocks
-// are indexed in the atomic trie but their shared memory operations MUST NOT be
-// applied.
-var mainnetBonusBlocks = mustParseBonusBlocks()
+var (
+	//go:embed bonus_blocks.json
+	bonusBlocksJSON []byte
 
-//go:embed bonus_blocks.json
-var bonusBlocksJSON []byte
+	// bonusBlocks is the set of mainnet block heights which were accepted
+	// without applying their shared memory operations. This behavior was
+	// canonicalized by Coreth and so MUST be replicated. These blocks only
+	// included Import transactions.
+	bonusBlocks set.Set[uint64]
+)
 
-func mustParseBonusBlocks() map[uint64]struct{} {
-	var heights map[uint64]struct{}
-	if err := json.Unmarshal(bonusBlocksJSON, &heights); err != nil {
+func init() {
+	if err := json.Unmarshal(bonusBlocksJSON, &bonusBlocks); err != nil {
 		panic(err)
 	}
-	return heights
 }
 
-func (s *State) isBonus(height uint64) bool {
-	if s.snowCtx.NetworkID != constants.MainnetID {
-		return false
-	}
-	_, ok := mainnetBonusBlocks[height]
-	return ok
+func isBonusBlock(networkID uint32, height uint64) bool {
+	return networkID == constants.MainnetID &&
+		bonusBlocks.Contains(height)
 }
