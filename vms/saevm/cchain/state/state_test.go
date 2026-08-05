@@ -79,26 +79,28 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	}
 }
 
-// stateImpl is the surface common to [State] and [oldState]. It's used by the
-// [SUT] so the same test helpers can drive either backend.
-type stateImpl interface {
-	Apply(height uint64, txs []*tx.Tx) error
-	GetTx(txID ids.ID) (*tx.Tx, uint64, error)
-	GetRoot(height uint64) (common.Hash, error)
-	CurrentHeight() uint64
-	Close() error
-}
+type (
+	// stateImpl is the surface common to [State] and [oldState]. It's used by the
+	// [SUT] so the same test helpers can drive either backend.
+	stateImpl interface {
+		Apply(height uint64, txs []*tx.Tx) error
+		GetTx(txID ids.ID) (*tx.Tx, uint64, error)
+		GetRoot(height uint64) (common.Hash, error)
+		CurrentHeight() uint64
+		Close() error
+	}
 
-// A sutOption configures the default SUT properties used by [newSUT].
-type sutOption = options.Option[sutProperties]
+	// A sutOption configures the default SUT properties used by [newSUT].
+	sutOption = options.Option[sutProperties]
 
-type constructor = func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
+	constructor = func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
 
-type sutProperties struct {
-	// db is used for both the chain state and shared memory.
-	db  database.Database
-	new constructor
-}
+	sutProperties struct {
+		// db is used for both the chain state and shared memory.
+		db  database.Database
+		new constructor
+	}
+)
 
 // withDB configures the SUT to use the given database.
 func withDB(db database.Database) sutOption {
@@ -433,10 +435,8 @@ func TestApply_BonusBlock(t *testing.T) {
 		bonusHeight    uint64 = 102972
 		nonBonusHeight uint64 = 102971
 	)
-	_, containsBonusHeight := bonusBlocks[bonusHeight]
-	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
-	_, containsNonBonusHeight := bonusBlocks[nonBonusHeight]
-	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+	require.Containsf(t, bonusBlocks, bonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	require.NotContainsf(t, bonusBlocks, nonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
 
 	tests := []struct {
 		name               string
@@ -492,10 +492,8 @@ func TestApply_BonusBlock_Index(t *testing.T) {
 		bonusHeight    uint64 = 102972
 		nonBonusHeight uint64 = 102971
 	)
-	_, containsBonusHeight := bonusBlocks[bonusHeight]
-	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
-	_, containsNonBonusHeight := bonusBlocks[nonBonusHeight]
-	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+	require.Containsf(t, bonusBlocks, bonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	require.NotContainsf(t, bonusBlocks, nonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
 
 	s := newSUT(t, withNetworkID(constants.MainnetID))
 
