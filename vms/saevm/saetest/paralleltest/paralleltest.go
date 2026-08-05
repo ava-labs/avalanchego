@@ -37,6 +37,9 @@ import (
 // registered at the provided address, that sources results from the
 // [parallel.Handler]. The [saexec.Executor] will have a single, genesis block,
 // derived from the provided alloc.
+//
+// This function registers libevm hooks and is therefore not safe for concurrent
+// use across multiple calls, nor with other libevm registrations.
 func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregated any](
 	tb testing.TB,
 	logger logging.Logger,
@@ -49,12 +52,15 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 ) (*saexec.Executor, *blockstest.ChainBuilder) {
 	tb.Helper()
 
+	// Although not used until later, the [libevmhookstest.Stub] needs to be
+	// registered after the call to [core.SetupGenesisBlock].
 	genesis := blockstest.NewGenesis(tb, db, config, alloc)
 
 	par := parallel.New(prefetchers, processors)
-	vm.RegisterHooks(vmHooks{Processor: par})
-
 	precompile := parallel.AddAsPrecompile(par, handler)
+
+	vm.RegisterHooks(vmHooks{Processor: par})
+	tb.Cleanup(vm.TestOnlyClearRegisteredHooks)
 	stub := &libevmhookstest.Stub{
 		PrecompileOverrides: map[common.Address]libevm.PrecompiledContract{
 			precompileAddr: vm.NewStatefulPrecompile(precompile),
