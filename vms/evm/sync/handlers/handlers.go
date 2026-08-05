@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ p2p.Handler = (*Handler[*emptypb.Empty, *emptypb.Empty])(nil)
+var _ p2p.Handler = (*Handler[emptypb.Empty, *emptypb.Empty, *emptypb.Empty])(nil)
 
 // Codes reach the peer, so they are explicit and never renumbered.
 // [common.AppError.Is] matches on Code alone, p2p owns the negatives and zero.
@@ -31,6 +31,13 @@ var (
 		Message: "failed to marshal proto response",
 	}
 )
+
+// ProtoMessage constrains a request to a pointer type, so [Handler] can
+// allocate one with new instead of taking a constructor.
+type ProtoMessage[T any] interface {
+	proto.Message
+	*T
+}
 
 // Responder is the per-RPC contract behind [Handler]:
 //
@@ -53,19 +60,18 @@ func Fault(log logging.Logger, nodeID ids.NodeID, err error) *common.AppError {
 }
 
 // Handler is a typed [p2p.Handler] for one EVM-sync RPC.
-type Handler[Req, Resp proto.Message] struct {
+type Handler[V any, Req ProtoMessage[V], Resp proto.Message] struct {
 	p2p.NoOpHandler
 	log       logging.Logger
-	newReq    func() Req
 	responder Responder[Req, Resp]
 }
 
-func NewHandler[Req, Resp proto.Message](log logging.Logger, newReq func() Req, responder Responder[Req, Resp]) *Handler[Req, Resp] {
-	return &Handler[Req, Resp]{log: log, newReq: newReq, responder: responder}
+func NewHandler[V any, Req ProtoMessage[V], Resp proto.Message](log logging.Logger, responder Responder[Req, Resp]) *Handler[V, Req, Resp] {
+	return &Handler[V, Req, Resp]{log: log, responder: responder}
 }
 
-func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := h.newReq()
+func (h *Handler[V, Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	req := Req(new(V))
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, ErrMalformedRequest
 	}

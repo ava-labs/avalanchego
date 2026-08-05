@@ -24,10 +24,9 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func assertContract[Req, Resp proto.Message](t *testing.T, req Req, resp Resp) {
+func assertContract[V any, Req handlers.ProtoMessage[V], Resp proto.Message](t *testing.T, req Req, resp Resp) {
 	nodeID := ids.GenerateTestNodeID()
 	reqBytes := synctest.MustMarshal(t, req)
-	newReq := func() Req { return req.ProtoReflect().New().Interface().(Req) }
 
 	var noResp Resp
 	requestErr := &common.AppError{Code: 7, Message: "unknown request"}
@@ -77,16 +76,11 @@ func assertContract[Req, Resp proto.Message](t *testing.T, req Req, resp Resp) {
 			t.Parallel()
 
 			r := &synctest.FakeResponder[Req, Resp]{Resp: tt.respondWith, Err: tt.respondErr}
-			h := handlers.NewHandler(logging.NoLog{}, newReq, r)
+			h := handlers.NewHandler(logging.NoLog{}, r)
 
 			respBytes, appErr := h.AppRequest(t.Context(), nodeID, time.Time{}, tt.requestBytes)
 			require.Equal(t, tt.wantErr, appErr)
-
-			if tt.wantErr != nil {
-				require.Nil(t, respBytes)
-			} else {
-				require.Equal(t, tt.wantBytes, respBytes)
-			}
+			require.Equal(t, tt.wantBytes, respBytes)
 
 			if !tt.wantReached {
 				require.Nil(t, r.GotReq, "responder must not be invoked")
