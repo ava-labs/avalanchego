@@ -69,7 +69,11 @@ func main() {
 	teleporterAddr := common.HexToAddress(*teleporterStr)
 
 	// ---- 1. Read the C-Chain tx: warp message + Teleporter struct ----
-	unsigned, teleporterMsg, err := fetchCChainSend(ctx, *avalancheURI, *txHashHex, teleporterAddr)
+	srcRPC := sourceRPCOverride
+	if srcRPC == "" {
+		srcRPC = strings.TrimSuffix(*avalancheURI, "/") + "/ext/bc/C/rpc"
+	}
+	unsigned, teleporterMsg, err := relayer.FetchTeleporterSend(ctx, srcRPC, *txHashHex, teleporterAddr)
 	if err != nil {
 		log.Fatalf("read C-Chain send tx: %v", err)
 	}

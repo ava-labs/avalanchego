@@ -24,9 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
@@ -65,7 +65,7 @@ func main() {
 	teleporterAddr := common.HexToAddress(*teleporterStr)
 
 	// ---- 1. Source tx: unsigned warp message + Teleporter struct ----
-	unsigned, teleporterMsg, err := fetchSourceSend(ctx, *sourceRPC, *txHashHex, teleporterAddr)
+	unsigned, teleporterMsg, err := relayer.FetchTeleporterSend(ctx, *sourceRPC, *txHashHex, teleporterAddr)
 	if err != nil {
 		log.Fatalf("read source send tx: %v", err)
 	}
@@ -103,7 +103,7 @@ func main() {
 	log.Printf("quorum reached: %d/%d validators, %.0f%% weight", signerBits.Len(), len(warpSet.Validators), pct)
 
 	// ---- 5. Deliver with the signed message as a warp predicate ----
-	teleporterABI := loadABI(*teleporterArtifact)
+	teleporterABI := relayer.MustLoadABI(*teleporterArtifact)
 	uint32T, _ := abi.NewType("uint32", "", nil)
 	attestation, _ := abi.Arguments{{Type: uint32T}}.Pack(uint32(0)) // warp index 0 (WarpAdapter format)
 	icm := relayer.TeleporterICMMessage{

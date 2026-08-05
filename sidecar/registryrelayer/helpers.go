@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
-	"os"
 	"strings"
 
 	"github.com/ava-labs/libevm"
@@ -22,7 +20,6 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-// fetchCChainSend reads the C-Chain tx and returns the unsigned warp message
 // (from the precompile's SendWarpMessage log) and the TeleporterMessageV2
 // struct (from the Teleporter's SendCrossChainMessage log).
 func fetchCChainSend(
@@ -164,10 +161,7 @@ func deliver(
 	sourceChainID ids.ID,
 	attestation []byte,
 ) (*types.Receipt, error) {
-	teleporterABI, err := loadABI(teleporterArtifact)
-	if err != nil {
-		return nil, err
-	}
+	teleporterABI := relayer.MustLoadABI(teleporterArtifact)
 	icm := relayer.TeleporterICMMessage{
 		Message:            *msg,
 		SourceNetworkID:    networkID,
@@ -212,20 +206,6 @@ func deliver(
 
 func ethAddress(key *ecdsa.PrivateKey) common.Address {
 	return crypto.PubkeyToAddress(key.PublicKey)
-}
-
-func loadABI(path string) (abi.ABI, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return abi.ABI{}, fmt.Errorf("read %s: %w", path, err)
-	}
-	var a struct {
-		ABI json.RawMessage `json:"abi"`
-	}
-	if err := json.Unmarshal(raw, &a); err != nil {
-		return abi.ABI{}, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return abi.JSON(strings.NewReader(string(a.ABI)))
 }
 
 // sourceRPCOverride, when set via --source-rpc, reads the send tx from a

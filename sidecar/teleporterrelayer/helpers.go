@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
-	"os"
 	"strings"
 
 	"github.com/ava-labs/libevm/accounts/abi"
@@ -32,7 +30,7 @@ func deliver(
 	gatewayChainID ids.ID,
 	signedMsg *avalancheWarp.Message,
 ) error {
-	teleporterABI := loadABI(teleporterArtifactPath)
+	teleporterABI := relayer.MustLoadABI(teleporterArtifactPath)
 
 	// Decode the Teleporter message from the outbox log data to rebuild the
 	// receiveCrossChainMessage calldata. abi.Arguments has no UnpackIntoInterface,
@@ -99,24 +97,6 @@ func deliver(
 	}
 	log.Printf("delivered in C-Chain block %d (tx %s)", receipt.BlockNumber, tx.Hash())
 	return nil
-}
-
-func loadABI(path string) abi.ABI {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalf("read ABI %s: %v", path, err)
-	}
-	var a struct {
-		ABI json.RawMessage `json:"abi"`
-	}
-	if err := json.Unmarshal(raw, &a); err != nil {
-		log.Fatalf("parse artifact %s: %v", path, err)
-	}
-	parsed, err := abi.JSON(strings.NewReader(string(a.ABI)))
-	if err != nil {
-		log.Fatalf("parse ABI %s: %v", path, err)
-	}
-	return parsed
 }
 
 // destRPCOverride, when set via --dest-rpc, redirects delivery to a chain
