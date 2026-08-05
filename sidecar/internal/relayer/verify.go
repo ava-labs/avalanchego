@@ -52,7 +52,21 @@ func VerifyAndAggregate(
 				break
 			}
 		}
-		if idx < 0 || !bls.Verify(warpSet.Validators[idx].PublicKey, sig, unsigned.Bytes()) {
+		if idx >= 0 && !bls.Verify(warpSet.Validators[idx].PublicKey, sig, unsigned.Bytes()) {
+			idx = -1
+		}
+		if idx < 0 {
+			// Key-match fallback: L1-only validators are absent from the
+			// primary-network nodeID map, but a valid signature under a
+			// registered key is itself the authorization.
+			for i, vdr := range warpSet.Validators {
+				if !signerBits.Contains(i) && bls.Verify(vdr.PublicKey, sig, unsigned.Bytes()) {
+					idx = i
+					break
+				}
+			}
+		}
+		if idx < 0 {
 			log.Printf("%s %s: not in set or signature invalid — ignoring", signerNoun, nodeID)
 			continue
 		}
