@@ -15,13 +15,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-func TestResponder_ValidationDrops(t *testing.T) {
+func TestErrorSentinels(t *testing.T) {
+	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
+		"errInvalidRequest":   errInvalidRequest,
+		"errRootNotFound":     errRootNotFound,
+		"errServingCancelled": errServingCancelled,
+	})
+}
+
+func TestResponder_ValidationRejects(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
@@ -73,8 +83,8 @@ func TestResponder_ValidationDrops(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
-			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
-			require.NoError(t, err)
+			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
+			require.ErrorIs(t, appErr, errInvalidRequest)
 			require.Nil(t, resp)
 		})
 	}
@@ -100,11 +110,11 @@ func TestResponder_Serves(t *testing.T) {
 			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
 
 			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
-			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: tt.limit,
 			})
-			require.NoError(t, err)
+			require.Nil(t, appErr)
 			require.NotNil(t, resp)
 
 			n := int(tt.limit)
@@ -120,7 +130,7 @@ func TestResponder_Serves(t *testing.T) {
 	}
 }
 
-func TestResponder_Drops(t *testing.T) {
+func TestResponder_Rejects(t *testing.T) {
 	t.Parallel()
 
 	const numKeys = 50
@@ -131,11 +141,13 @@ func TestResponder_Drops(t *testing.T) {
 		badRoot     bool
 		corruptTrie bool
 		cancelCtx   bool
+		wantErr     *avacommon.AppError
 	}{
-		{name: "missing root", limit: numKeys, badRoot: true},
+		{name: "missing root", limit: numKeys, badRoot: true, wantErr: errRootNotFound},
 		// A partial range reaches the proof step, which the corrupt trie fails.
-		{name: "corrupted trie", limit: numKeys / 2, corruptTrie: true},
-		{name: "cancelled context", limit: numKeys, cancelCtx: true},
+		// That is a server fault, so the peer sees only ErrUnexpected.
+		{name: "corrupted trie", limit: numKeys / 2, corruptTrie: true, wantErr: p2p.ErrUnexpected},
+		{name: "cancelled context", limit: numKeys, cancelCtx: true, wantErr: errServingCancelled},
 	}
 
 	for _, tt := range tests {
@@ -161,11 +173,11 @@ func TestResponder_Drops(t *testing.T) {
 			}
 
 			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
-			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+			resp, appErr := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: rootHash,
 				KeyLimit: tt.limit,
 			})
-			require.NoError(t, err)
+			require.ErrorIs(t, appErr, tt.wantErr)
 			require.Nil(t, resp)
 		})
 	}
@@ -177,13 +189,13 @@ func TestResponder_BoundedRange(t *testing.T) {
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
 	r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		StartKey: keys[10],
 		EndKey:   keys[30],
 		KeyLimit: uint32(len(keys)),
 	})
-	require.NoError(t, err)
+	require.Nil(t, appErr)
 	require.NotNil(t, resp)
 	// EndKey is inclusive.
 	require.Equal(t, keys[10:31], resp.Keys)
@@ -232,11 +244,11 @@ func TestResponder_Snapshot(t *testing.T) {
 // requireServesWholeTrie asserts a whole-trie request to r returns keys/vals.
 func requireServesWholeTrie(t *testing.T, r *responder, root common.Hash, keys, vals [][]byte) {
 	t.Helper()
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(len(keys)),
 	})
-	require.NoError(t, err)
+	require.Nil(t, appErr)
 	require.NotNil(t, resp)
 	require.Equal(t, keys, resp.Keys)
 	require.Equal(t, vals, resp.Values)
