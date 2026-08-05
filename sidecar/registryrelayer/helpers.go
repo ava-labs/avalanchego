@@ -30,9 +30,13 @@ func fetchCChainSend(
 	avalancheURI, txHash string,
 	teleporter common.Address,
 ) (*avalancheWarp.UnsignedMessage, *relayer.TeleporterMessageV2, error) {
-	client, err := ethclient.Dial(strings.TrimSuffix(avalancheURI, "/") + "/ext/bc/C/rpc")
+	rpcURL := sourceRPCOverride
+	if rpcURL == "" {
+		rpcURL = strings.TrimSuffix(avalancheURI, "/") + "/ext/bc/C/rpc"
+	}
+	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("dial C-Chain: %w", err)
+		return nil, nil, fmt.Errorf("dial source chain: %w", err)
 	}
 	receipt, err := client.TransactionReceipt(ctx, common.HexToHash(txHash))
 	if err != nil {
@@ -193,8 +197,8 @@ func deliver(
 	}
 	tx := types.MustSignNewTx(key, types.LatestSignerForChainID(chainID), &types.DynamicFeeTx{
 		ChainID: chainID, Nonce: nonce,
-		GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(20_000_000_000),
-		Gas: 8_000_000, To: &teleporter, Data: callData,
+		GasTipCap: big.NewInt(1_000_000_000), GasFeeCap: big.NewInt(8_000_000_000),
+		Gas: 7_000_000, To: &teleporter, Data: callData,
 	})
 	if err := client.SendTransaction(ctx, tx); err != nil {
 		return nil, fmt.Errorf("send: %w", err)
@@ -223,3 +227,7 @@ func loadABI(path string) (abi.ABI, error) {
 	}
 	return abi.JSON(strings.NewReader(string(a.ABI)))
 }
+
+// sourceRPCOverride, when set via --source-rpc, reads the send tx from a
+// chain other than the C-Chain (e.g. an L1's RPC).
+var sourceRPCOverride string

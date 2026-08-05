@@ -51,7 +51,9 @@ func main() {
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
 	ethKeyStr := flag.String("eth-key", "", "funded destination-chain key, PrivateKey-... CB58 (required)")
 	committeePath := flag.String("committee", "", "gateway.json artifact — source the committee set (nodeID+BLS key+weight) from it instead of the P-Chain (required on public networks where getValidatorsAt is unavailable)")
+	destRPC := flag.String("dest-rpc", "", "destination chain RPC (default <avalanche-uri>/ext/bc/C/rpc)")
 	flag.Parse()
+	destRPCOverride = *destRPC
 
 	if *avalancheURI == "" {
 		log.Fatalf("--avalanche-uri is required")

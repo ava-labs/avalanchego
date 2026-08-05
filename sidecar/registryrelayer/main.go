@@ -46,7 +46,9 @@ func main() {
 	teleporterArtifact := flag.String("teleporter-abi", "", "path to TeleporterMessengerV2.json for the ABI (required)")
 	validatorList := flag.String("validators", "", "comma-separated primary-network validator staking addresses (default: discovered via the info API on --avalanche-uri)")
 	besuKeyHex := flag.String("besu-key", "", "funded external-chain private key, hex (required)")
+	sourceRPC := flag.String("source-rpc", "", "source chain RPC (default <avalanche-uri>/ext/bc/C/rpc)")
 	flag.Parse()
+	sourceRPCOverride = *sourceRPC
 
 	if *avalancheURI == "" {
 		log.Fatalf("--avalanche-uri is required")

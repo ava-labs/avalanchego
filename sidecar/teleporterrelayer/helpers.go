@@ -64,7 +64,11 @@ func deliver(
 		return fmt.Errorf("parse eth key: %w", err)
 	}
 	ethKey := fundedKey.ToECDSA()
-	client, err := ethclient.Dial(strings.TrimSuffix(uri, "/") + "/ext/bc/C/rpc")
+	rpcURL := destRPCOverride
+	if rpcURL == "" {
+		rpcURL = strings.TrimSuffix(uri, "/") + "/ext/bc/C/rpc"
+	}
+	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
 		return err
 	}
@@ -114,3 +118,7 @@ func loadABI(path string) abi.ABI {
 	}
 	return parsed
 }
+
+// destRPCOverride, when set via --dest-rpc, redirects delivery to a chain
+// other than the C-Chain (e.g. an L1's RPC).
+var destRPCOverride string
