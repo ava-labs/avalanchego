@@ -335,7 +335,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/actionlint.sh'
 
   lint-all:
-    desc: Runs all lint checks
+    desc: Runs the full local lint suite; CI uses lint-all-ci for resource-constrained runners
     cmds:
       # Phase 1: Read-only checks that are safe to parallelize.
       - task: _lint-readonly-parallel
@@ -371,7 +371,7 @@ tasks:
       - task: lint-saevm
 
   lint-all-ci:
-    desc: Runs all lint checks one-by-one
+    desc: Runs the CI lint suite sequentially for resource-constrained runners; use lint-all locally
     cmds:
       - task: lint
       - task: lint-saevm
