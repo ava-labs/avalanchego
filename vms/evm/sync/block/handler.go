@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,25 +20,56 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 const (
-	// maxParentsPerRequest bounds the parent walk per request. A block has no
-	// fixed size, so targetResponseBytes bounds the response, and this only
-	// caps how many blocks the handler looks up and encodes for one request.
+	// maxParentsPerRequest caps the parent walk. Blocks vary in size, so
+	// maxResponseBytes bounds the response itself.
 	maxParentsPerRequest = uint16(64)
 
-	// targetResponseBytes caps the total block bytes per response at the usable
-	// p2p message budget.
-	targetResponseBytes = constants.MaxContainersLen
+	// defaultMaxResponseBytes is the conservative p2p budget. A chain with
+	// larger blocks must raise it through [WithMaxResponseBytes].
+	defaultMaxResponseBytes = constants.MaxContainersLen
 )
 
+var (
+	errBlocksNotFound = &avacommon.AppError{
+		Code:    5,
+		Message: "requested blocks not found",
+	}
+	errNoParentsRequested = &avacommon.AppError{
+		Code:    6,
+		Message: "no parents requested",
+	}
+	errServingCancelled = &avacommon.AppError{
+		Code:    7,
+		Message: "serving cancelled",
+	}
+)
+
+type handlerConfig struct {
+	maxResponseBytes int
+}
+
+// HandlerOption configures [RegisterHandler].
+type HandlerOption = options.Option[handlerConfig]
+
+// WithMaxResponseBytes caps response bytes, ideally the chain's max block size.
+func WithMaxResponseBytes(n int) HandlerOption {
+	return options.Func[handlerConfig](func(c *handlerConfig) {
+		if n > 0 {
+			c.maxResponseBytes = n
+		}
+	})
+}
+
 // RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider) error {
+func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider, opts ...HandlerOption) error {
 	h := handlers.NewHandler(
 		log,
 		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(log, blocks),
+		newResponder(log, blocks, opts...),
 	)
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
@@ -54,16 +86,26 @@ var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*
 // responder walks the parent chain from the canonical block at the
 // requested height.
 type responder struct {
-	log    logging.Logger
-	blocks Provider
+	log              logging.Logger
+	blocks           Provider
+	maxResponseBytes int
 }
 
-func newResponder(log logging.Logger, blocks Provider) *responder {
-	return &responder{log: log, blocks: blocks}
+func newResponder(log logging.Logger, blocks Provider, opts ...HandlerOption) *responder {
+	cfg := handlerConfig{maxResponseBytes: defaultMaxResponseBytes}
+	options.ApplyTo(&cfg, opts...)
+
+	return &responder{log: log, blocks: blocks, maxResponseBytes: cfg.maxResponseBytes}
 }
 
-func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, error) {
+func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
 	parents := uint16(min(req.GetNumParents(), uint32(maxParentsPerRequest)))
+	if parents == 0 {
+		r.log.Debug("rejecting request, no parents requested",
+			zap.Stringer("nodeID", nodeID),
+		)
+		return nil, errNoParentsRequested
+	}
 
 	encoded := make([][]byte, 0, parents)
 	totalBytes := 0
@@ -82,14 +124,15 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 
 		buf := new(bytes.Buffer)
 		if err := block.EncodeRLP(buf); err != nil {
-			// A server fault, not a drop.
-			return nil, fmt.Errorf("encoding block %s at height %d: %w", block.Hash(), block.NumberU64(), err)
+			return nil, handlers.Fault(r.log, nodeID,
+				fmt.Errorf("encoding block %s at height %d: %w", block.Hash(), block.NumberU64(), err))
 		}
-		if buf.Len()+totalBytes > targetResponseBytes && len(encoded) > 0 {
+		// Serve an oversized block alone rather than stall.
+		if buf.Len()+totalBytes > r.maxResponseBytes && len(encoded) > 0 {
 			r.log.Debug("skipping block due to max total bytes size",
 				zap.Int("totalBlockDataSize", totalBytes),
 				zap.Int("blockSize", buf.Len()),
-				zap.Int("max", targetResponseBytes),
+				zap.Int("max", r.maxResponseBytes),
 			)
 			break
 		}
@@ -103,12 +146,16 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	}
 
 	if len(encoded) == 0 {
-		r.log.Debug("no requested blocks found, dropping request",
+		// Tell the peer we gave up rather than that the blocks are missing.
+		if ctx.Err() != nil {
+			return nil, errServingCancelled
+		}
+		r.log.Debug("rejecting request, no blocks found",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint64("height", req.GetHeight()),
 			zap.Uint32("parents", req.GetNumParents()),
 		)
-		return nil, nil
+		return nil, errBlocksNotFound
 	}
 	return &syncpb.GetBlockResponse{Blocks: encoded}, nil
 }

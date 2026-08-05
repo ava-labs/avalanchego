@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestResponder(t *testing.T) {
@@ -26,7 +27,7 @@ func TestResponder(t *testing.T) {
 		noBlocks   bool
 		cancelCtx  bool
 		wantBlocks int
-		wantDrop   bool
+		wantErr    *avacommon.AppError
 	}{
 		{
 			name:       "returns requested parents tip-first",
@@ -47,17 +48,23 @@ func TestResponder(t *testing.T) {
 			wantBlocks: int(maxParentsPerRequest),
 		},
 		{
-			name:       "missing block drops",
+			name:       "missing block rejected",
 			noBlocks:   true,
 			numParents: 1,
-			wantDrop:   true,
+			wantErr:    errBlocksNotFound,
 		},
 		{
-			name:       "cancelled context drops",
+			name:       "cancelled context rejected",
 			chainLen:   50,
 			numParents: 10,
 			cancelCtx:  true,
-			wantDrop:   true,
+			wantErr:    errServingCancelled,
+		},
+		{
+			name:       "zero parents rejected",
+			chainLen:   10,
+			numParents: 0,
+			wantErr:    errNoParentsRequested,
 		},
 	}
 
@@ -85,12 +92,12 @@ func TestResponder(t *testing.T) {
 				Height:     height,
 				NumParents: tt.numParents,
 			})
-			require.NoError(t, err)
-
-			if tt.wantDrop {
-				require.Nil(t, resp)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Nil(t, resp, "a rejected request carries no response")
 				return
 			}
+			require.Nil(t, err)
 			require.NotNil(t, resp)
 			require.Len(t, resp.Blocks, tt.wantBlocks)
 
@@ -101,6 +108,50 @@ func TestResponder(t *testing.T) {
 				want := blocks[len(blocks)-1-i]
 				require.Equal(t, want.Hash(), b.Hash())
 			}
+		})
+	}
+}
+
+func TestErrorSentinels(t *testing.T) {
+	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
+		"errBlocksNotFound":     errBlocksNotFound,
+		"errNoParentsRequested": errNoParentsRequested,
+		"errServingCancelled":   errServingCancelled,
+	})
+}
+
+func TestResponder_MaxResponseBytes(t *testing.T) {
+	blocks := synctest.MakeChain(t, 5)
+	tip := blocks[len(blocks)-1]
+	oneBlock := len(encodeBlock(t, tip))
+
+	tests := []struct {
+		name       string
+		budget     int
+		wantBlocks int
+	}{
+		{
+			name:       "budget fits three blocks",
+			budget:     3 * oneBlock,
+			wantBlocks: 3,
+		},
+		{
+			name:       "oversized block served alone",
+			budget:     oneBlock / 2,
+			wantBlocks: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks), WithMaxResponseBytes(tt.budget))
+
+			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
+				Height:     tip.NumberU64(),
+				NumParents: 5,
+			})
+			require.Nil(t, err)
+			require.Len(t, resp.Blocks, tt.wantBlocks)
 		})
 	}
 }
