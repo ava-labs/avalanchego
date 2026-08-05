@@ -54,28 +54,26 @@ func FuzzSummaryRoundTrip(f *testing.F) {
 // FuzzSummaryID ensures the ID is sensitive to any changes in the summary's
 // fields.
 func FuzzSummaryID(f *testing.F) {
-	f.Add(uint64(1), []byte{1, 2, 3}, []byte{4, 5, 6})
-
-	f.Fuzz(func(t *testing.T, height uint64, hashBytes, rootBytes []byte) {
-		if len(hashBytes) == 0 || len(rootBytes) == 0 {
-			t.Skip("hashBytes and rootBytes must be non-empty to test ID sensitivity")
+	f.Add(
+		uint64(1), []byte{1, 2, 3}, []byte{4, 5, 6},
+		uint64(2), []byte{1, 2, 3}, []byte{4, 5, 6},
+	)
+	f.Fuzz(func(t *testing.T,
+		height1 uint64, hashBytes1, rootBytes1 []byte,
+		height2 uint64, hashBytes2, rootBytes2 []byte,
+	) {
+		summary1 := newSummary(
+			common.BytesToHash(hashBytes1),
+			common.BytesToHash(rootBytes1),
+			height1,
+		)
+		summary2 := newSummary(
+			common.BytesToHash(hashBytes2),
+			common.BytesToHash(rootBytes2),
+			height2,
+		)
+		if diff := cmp.Diff(summary1, summary2, summaryCmpOpts); diff != "" {
+			require.NotEqual(t, summary1.ID(), summary2.ID(), "Hash collision!")
 		}
-
-		hash := common.BytesToHash(hashBytes)
-		root := common.BytesToHash(rootBytes)
-		baseID := newSummary(hash, root, height).ID()
-
-		// Changing the blockHash must change the ID.
-		alteredHash := hash
-		alteredHash[0] ^= 1
-		require.NotEqual(t, baseID, newSummary(alteredHash, root, height).ID(), "blockHash changes")
-
-		// Changing the height must change the ID.
-		require.NotEqual(t, baseID, newSummary(hash, root, height^1).ID(), "height changes")
-
-		// Changing the C-Chain trie root must change the ID.
-		alteredRoot := root
-		alteredRoot[0] ^= 1
-		require.NotEqual(t, baseID, newSummary(hash, alteredRoot, height).ID(), "root changes")
 	})
 }

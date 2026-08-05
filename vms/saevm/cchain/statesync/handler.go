@@ -71,38 +71,25 @@ func (h *SummaryHandler) Shutdown(ctx context.Context) error {
 // GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*summary, error) {
-	base, err := h.SummaryHandler.GetStateSummary(ctx, height)
-	if err != nil {
-		return nil, err
-	}
-	return h.wrap(base)
+	return h.wrap(h.SummaryHandler.GetStateSummary(ctx, height))
 }
 
 // GetLastStateSummary is the same as [statesync.SummaryHandler.GetLastStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, error) {
-	base, err := h.SummaryHandler.GetLastStateSummary(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return h.wrap(base)
+	return h.wrap(h.SummaryHandler.GetLastStateSummary(ctx))
 }
 
 // GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
-	base, err := h.SummaryHandler.GetOngoingSyncStateSummary(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return h.wrap(base)
+	return h.wrap(h.SummaryHandler.GetOngoingSyncStateSummary(ctx))
 }
 
 // wrap pairs an SAE summary with the C-Chain atomic trie root at its height.
-func (h *SummaryHandler) wrap(base *statesync.Summary) (*summary, error) {
-	// Genesis block may not be on disk.
-	if base.Height() == 0 {
-		return h.wrapAtHeight(base, 0)
+func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, error) {
+	if err != nil {
+		return nil, err
 	}
 
 	hdr := rawdb.ReadHeader(h.ethDB, base.BlockHash(), base.Height())
@@ -110,10 +97,7 @@ func (h *SummaryHandler) wrap(base *statesync.Summary) (*summary, error) {
 		return nil, fmt.Errorf("can't find header for block %s at height %d", base.BlockHash(), base.Height())
 	}
 	settledHeight := h.hooks.SettledBy(hdr).Height
-	return h.wrapAtHeight(base, settledHeight)
-}
 
-func (h *SummaryHandler) wrapAtHeight(base *statesync.Summary, settledHeight uint64) (*summary, error) {
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
 		return nil, err
