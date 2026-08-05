@@ -91,7 +91,7 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	s.mainTrieDone = make(chan struct{})
 	s.stats = newTrieSyncStats(s.log)
 
-	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeaves(s.db, s.codeSyncer, s.trieQueue), stateTrieConfig{
+	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeafStore(s.db, s.codeSyncer, s.trieQueue), stateTrieConfig{
 		numSegments: numMainTrieSegments,
 		threshold:   s.threshold,
 		tasks:       s.scheduler.tasks,
@@ -178,7 +178,7 @@ func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 			return err
 		}
 
-		storageTrie, err := newStateTrie(s.db, next.root, next.accounts[0], newStorageLeaves(s.db, next.accounts), stateTrieConfig{
+		storageTrie, err := newStateTrie(s.db, next.root, next.accounts[0], newStorageLeafStore(s.db, next.accounts), stateTrieConfig{
 			numSegments: numStorageTrieSegments,
 			threshold:   s.threshold,
 			tasks:       s.scheduler.tasks,
