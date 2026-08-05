@@ -19,12 +19,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // maxHashesPerRequest caps the hashes per request so a response of that many
 // max-size contracts stays within the p2p message limit, with headroom for
 // proto framing and the other message fields.
 const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
+
+var (
+	errTooManyHashes = &avacommon.AppError{
+		Code:    3,
+		Message: "too many code hashes requested",
+	}
+	errHashNotFound = &avacommon.AppError{
+		Code:    4,
+		Message: "requested code not found",
+	}
+)
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, codeReader ethdb.KeyValueReader) error {
@@ -48,14 +60,14 @@ func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responde
 	return &responder{log: log, codeReader: codeReader}
 }
 
-func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, error) {
+func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
 	hashes := req.GetHashes()
 	if len(hashes) > maxHashesPerRequest {
-		r.log.Debug("too many hashes requested, dropping request",
+		r.log.Debug("rejecting request, too many hashes",
 			zap.Stringer("nodeID", nodeID),
 			zap.Int("numHashes", len(hashes)),
 		)
-		return nil, nil
+		return nil, errTooManyHashes
 	}
 
 	data := make([][]byte, len(hashes))
@@ -63,11 +75,11 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 		hash := common.BytesToHash(raw)
 		data[i] = rawdb.ReadCode(r.codeReader, hash)
 		if len(data[i]) == 0 {
-			r.log.Debug("requested code not found, dropping request",
+			r.log.Debug("rejecting request, code not found",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("hash", hash),
 			)
-			return nil, nil
+			return nil, errHashNotFound
 		}
 	}
 
