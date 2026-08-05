@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
@@ -117,10 +118,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*mes
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		msg, err := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create block proposal: %w", err)
-		}
+		msg := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
 		simplexMsg = msg
 	case msg.VoteMessage != nil:
 		simplexMsg = newVote(c.chainID, msg.VoteMessage)
@@ -137,10 +135,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*mes
 	case msg.ReplicationRequest != nil:
 		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
 	case msg.VerifiedReplicationResponse != nil:
-		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create replication response: %w", err)
-		}
+		msg := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
 		simplexMsg = msg
 	default:
 		return nil, fmt.Errorf("unknown message type: %+v", msg)

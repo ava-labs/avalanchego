@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 // TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
@@ -199,7 +199,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+		return newTestBlock(newBlockConfig{round: 1}).vmBlock, nil
 	}
 
 	require.NoError(t, engine.Start(ctx, 1))
@@ -909,7 +909,7 @@ func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+		return newTestBlock(newBlockConfig{round: 1}).vmBlock, nil
 	}
 	return configs
 }

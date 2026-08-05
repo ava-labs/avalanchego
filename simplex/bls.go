@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (

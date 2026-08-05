@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
@@ -69,7 +69,7 @@ type newBlockConfig struct {
 	numNodes uint64
 }
 
-func newTestBlock(t *testing.T, config newBlockConfig) *Block {
+func newTestBlock(config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{

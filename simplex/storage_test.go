@@ -6,7 +6,6 @@ package simplex
 import (
 	"testing"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 func TestStorageNew(t *testing.T) {
@@ -73,7 +74,7 @@ func TestStorageNew(t *testing.T) {
 
 func TestStorageRetrieve(t *testing.T) {
 	numNodes := 4
-	genesis := newTestBlock(t, newBlockConfig{numNodes: uint64(numNodes)})
+	genesis := newTestBlock(newBlockConfig{numNodes: uint64(numNodes)})
 	genesisBytes := genesis.Bytes()
 
 	vm := newTestVM()
@@ -132,9 +133,9 @@ func TestStorageRetrieve(t *testing.T) {
 func TestStorageIndexFails(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2 := newTestBlock(t, newBlockConfig{prev: child1})
+	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	child1 := newTestBlock(newBlockConfig{prev: genesis})
+	child2 := newTestBlock(newBlockConfig{prev: child1})
 
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -220,10 +221,10 @@ func TestIndexMismatchedChild(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
 
-	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2Nephew := newTestBlock(t, newBlockConfig{prev: child1Sibling})
+	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	child1 := newTestBlock(newBlockConfig{prev: genesis})
+	child1Sibling := newTestBlock(newBlockConfig{prev: genesis})
+	child2Nephew := newTestBlock(newBlockConfig{prev: child1Sibling})
 
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -257,7 +258,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 func TestStorageIndexSuccess(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(t, newBlockConfig{numNodes: 4})
+	genesis := newTestBlock(newBlockConfig{numNodes: 4})
 	configs := newNetworkConfigs(t, numNodes)
 
 	_, verifier, err := NewBLSAuth(configs[0])
@@ -277,7 +278,7 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	prev := genesis
 	for i := 0; i < numBlocks; i++ {
-		child := newTestBlock(t, newBlockConfig{prev: prev})
+		child := newTestBlock(newBlockConfig{prev: prev})
 		_, err := child.Verify(ctx)
 		require.NoError(t, err)
 

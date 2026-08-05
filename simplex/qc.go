@@ -10,11 +10,11 @@ import (
 	"errors"
 	"fmt"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
@@ -112,6 +112,7 @@ func (qc *QC) Bytes() []byte {
 
 	return canotoQC.MarshalCanoto()
 }
+
 func (qc *QC) Size() int {
 	return len(qc.Bytes())
 }
@@ -202,6 +203,7 @@ func (a *SignatureAggregator) Aggregate(signatures []simplexcommon.Signature) (s
 		sig:      aggregatedSig,
 	}, nil
 }
+
 func (*SignatureAggregator) AppendSignatures(existing []byte, sigs ...[]byte) ([]byte, error) {
 	blsSigs := make([]*bls.Signature, 0, len(sigs)+1)
 
@@ -229,7 +231,6 @@ func (*SignatureAggregator) AppendSignatures(existing []byte, sigs ...[]byte) ([
 	}
 
 	return bls.SignatureToBytes(aggregated), nil
-
 }
 
 // IsQuorum checks if the provided nodes are a quorum of the membership set.

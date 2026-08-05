@@ -4,16 +4,16 @@
 package simplex
 
 import (
-	simplexcommon "github.com/ava-labs/simplex/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 func newBlockProposal(
 	chainID ids.ID,
 	msg *simplexcommon.VerifiedBlockMessage,
-) (*p2p.Simplex, error) {
+) *p2p.Simplex {
 	bytes := msg.VerifiedBlock.Bytes()
 	vote := msg.Vote
 
@@ -31,7 +31,7 @@ func newBlockProposal(
 				},
 			},
 		},
-	}, nil
+	}
 }
 
 func newVote(
@@ -151,16 +151,13 @@ func newReplicationRequest(
 func newReplicationResponse(
 	chainID ids.ID,
 	replicationResponse *simplexcommon.VerifiedReplicationResponse,
-) (*p2p.Simplex, error) {
+) *p2p.Simplex {
 	data := replicationResponse.Data
 	latestRound := replicationResponse.LatestRound
 
 	qrs := make([]*p2p.QuorumRound, 0, len(data))
 	for _, qr := range data {
-		p2pQR, err := quorumRoundToP2P(&qr)
-		if err != nil {
-			return nil, err
-		}
+		p2pQR := quorumRoundToP2P(&qr)
 		if p2pQR == nil {
 			continue
 		}
@@ -169,12 +166,9 @@ func newReplicationResponse(
 
 	var latestQR *p2p.QuorumRound
 	if latestRound != nil {
-		qr, err := quorumRoundToP2P(latestRound)
-		if err != nil {
-			return nil, err
-		}
+		qr := quorumRoundToP2P(latestRound)
 		if qr == nil {
-			return nil, nil
+			return nil
 		}
 		latestQR = qr
 	}
@@ -186,7 +180,7 @@ func newReplicationResponse(
 				LatestRound: latestQR,
 			},
 		},
-	}, nil
+	}
 }
 
 func blockHeaderToP2P(bh simplexcommon.BlockHeader) *p2p.BlockHeader {
@@ -206,7 +200,7 @@ func protocolMetadataToP2P(md simplexcommon.ProtocolMetadata) *p2p.ProtocolMetad
 	}
 }
 
-func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) (*p2p.QuorumRound, error) {
+func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) *p2p.QuorumRound {
 	p2pQR := &p2p.QuorumRound{}
 
 	if qr.VerifiedBlock != nil {
@@ -222,7 +216,7 @@ func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) (*p2p.QuorumRound, 
 	if qr.Finalization != nil {
 		// This can only happen if the finalization of the genesis block is being sent
 		if qr.Finalization.QC == nil {
-			return nil, nil
+			return nil
 		}
 		p2pQR.Finalization = &p2p.QuorumCertificate{
 			BlockHeader:       blockHeaderToP2P(qr.Finalization.Finalization.BlockHeader),
@@ -235,7 +229,7 @@ func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) (*p2p.QuorumRound, 
 			QuorumCertificate: qr.EmptyNotarization.QC.Bytes(),
 		}
 	}
-	return p2pQR, nil
+	return p2pQR
 }
 
 func emptyVoteMetadataToP2P(ev simplexcommon.EmptyVoteMetadata) *p2p.EmptyVoteMetadata {

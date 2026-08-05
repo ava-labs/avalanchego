@@ -12,13 +12,14 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
@@ -131,11 +132,7 @@ func (s *Storage) Retrieve(seq uint64) (simplexcommon.VerifiedBlock, simplexcomm
 		return nil, simplexcommon.Finalization{}, err
 	}
 
-	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
-	if err != nil {
-		s.log.Error("failed to create simplex block", zap.Uint64("seq", seq), zap.Error(err))
-		return nil, simplexcommon.Finalization{}, err
-	}
+	vb := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
 
 	return vb, finalization, nil
 }

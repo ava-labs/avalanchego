@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/StephenButtolph/canoto"
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,12 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
 	ctx := t.Context()
-	genesisBlock := newTestBlock(t, newBlockConfig{})
+	genesisBlock := newTestBlock(newBlockConfig{})
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
@@ -128,8 +129,8 @@ func TestBlockSerialization(t *testing.T) {
 func TestVerifyPrevNotFound(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
-	b := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	b := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 	b.metadata.Prev[0]++ // Invalid prev digest
@@ -143,8 +144,8 @@ func TestVerifyPrevNotFound(t *testing.T) {
 func TestVerifyTwice(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
-	b := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	b := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 
@@ -162,7 +163,7 @@ func TestVerifyTwice(t *testing.T) {
 func TestVerifyGenesis(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newTestBlock(newBlockConfig{})
 	_, err := genesis.Verify(ctx)
 	require.ErrorIs(t, err, errGenesisVerification)
 }
@@ -170,8 +171,8 @@ func TestVerifyGenesis(t *testing.T) {
 func TestVerify(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
-	b := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	b := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 	preferenceSet := false
@@ -196,11 +197,11 @@ func TestVerify(t *testing.T) {
 func TestVerifyParentAccepted(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
-	seq1Block := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	seq1Block := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
-	seq2Block := newTestBlock(t, newBlockConfig{
+	seq2Block := newTestBlock(newBlockConfig{
 		prev: seq1Block,
 	})
 
@@ -222,15 +223,15 @@ func TestVerifyParentAccepted(t *testing.T) {
 func TestVerifyBlockRejectsSiblings(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newTestBlock(newBlockConfig{})
 	// genesisChild0 and genesisChild1 are siblings, both children of genesis.
 	// This can happen if we verify a block for round 1, but the network
 	// notarizes the dummy block. Then we will verify a sibling block for round
 	// 2 and must reject the round 1 block.
-	genesisChild0 := newTestBlock(t, newBlockConfig{
+	genesisChild0 := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
-	genesisChild1 := newTestBlock(t, newBlockConfig{
+	genesisChild1 := newTestBlock(newBlockConfig{
 		prev:  genesis,
 		round: genesisChild0.metadata.Round + 1,
 	})
@@ -253,8 +254,8 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
-	b := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	b := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 
@@ -269,7 +270,7 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 func TestIndexBlockDigestNotFound(t *testing.T) {
 	ctx := t.Context()
 
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newTestBlock(newBlockConfig{})
 
 	unknownDigest := ids.GenerateTestID()
 	err := genesis.blockTracker.indexBlock(ctx, simplexcommon.Digest(unknownDigest))

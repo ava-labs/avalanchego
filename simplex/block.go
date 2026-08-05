@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"sync"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/tree"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
@@ -45,7 +45,7 @@ type Block struct {
 	blacklist simplexcommon.Blacklist
 }
 
-func newBlock(metadata simplexcommon.ProtocolMetadata, blacklist simplexcommon.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+func newBlock(metadata simplexcommon.ProtocolMetadata, blacklist simplexcommon.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) *Block {
 	block := &Block{
 		metadata:     metadata,
 		vmBlock:      vmBlock,
@@ -54,7 +54,7 @@ func newBlock(metadata simplexcommon.ProtocolMetadata, blacklist simplexcommon.B
 	}
 	bytes := block.Bytes()
 	block.digest = computeDigest(bytes)
-	return block, nil
+	return block
 }
 
 // CanotoSimplexBlock is the Canoto representation of a block
@@ -162,7 +162,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, fmt.Errorf("%w: %w", errFailedToParseBlacklist, err)
 	}
 
-	return newBlock(*md, blacklist, vmblock, d.blockTracker)
+	return newBlock(*md, blacklist, vmblock, d.blockTracker), nil
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.

@@ -9,20 +9,21 @@ import (
 	"testing"
 	"time"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var emptyBlacklist = simplexcommon.Blacklist{}
 
 func TestBlockBuilder(t *testing.T) {
 	ctx := t.Context()
-	genesis := newTestBlock(t, newBlockConfig{})
-	child := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	child := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 
@@ -54,7 +55,7 @@ func TestBlockBuilder(t *testing.T) {
 			name:  "fail to verify block",
 			block: nil,
 			vmBlockBuildF: func(_ context.Context) (snowman.Block, error) {
-				b := newTestBlock(t, newBlockConfig{
+				b := newTestBlock(newBlockConfig{
 					prev: genesis,
 				})
 				b.vmBlock.(*wrappedBlock).VerifyV = errors.New("verification failed")
@@ -97,8 +98,8 @@ func TestBlockBuilder(t *testing.T) {
 func TestBlockBuilderCancelContext(t *testing.T) {
 	ctx := t.Context()
 	vm := newTestVM()
-	genesis := newTestBlock(t, newBlockConfig{})
-	child := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	child := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 	vm.WaitForEventF = func(ctx context.Context) (common.Message, error) {
@@ -122,7 +123,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 func TestWaitForPendingBlock(t *testing.T) {
 	ctx := t.Context()
 	vm := newTestVM()
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newTestBlock(newBlockConfig{})
 	count := 0
 	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
 		if count == 0 {
@@ -145,8 +146,8 @@ func TestWaitForPendingBlock(t *testing.T) {
 func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	ctx := t.Context()
 	vm := newTestVM()
-	genesis := newTestBlock(t, newBlockConfig{})
-	child := newTestBlock(t, newBlockConfig{
+	genesis := newTestBlock(newBlockConfig{})
+	child := newTestBlock(newBlockConfig{
 		prev: genesis,
 	})
 	const (
