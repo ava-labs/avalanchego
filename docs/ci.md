@@ -19,11 +19,10 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 
 ## Principles
 
-- **Keep repository operations reproducible and separate from GitHub Actions
-  mechanics.** Give an operation that developers may run locally a stable local
-  entrypoint. Workflows coordinate repository operations and GitHub-specific
-  setup. Composite actions contain shared GitHub Actions behavior. CI-only helpers
-  contain behavior that runs only in CI.
+- **Minimize work done only in CI.** Put repository operations that contributors
+  can run locally in tasks or scripts. Workflows call those entrypoints and do
+  GitHub-specific setup. Work that can only be validated in CI slows iteration
+  and costs more to implement and maintain.
 - **Make infrastructure changes reviewable.** Use explicit runner labels and immutable
   references for third-party actions so their upgrade is visible in a repository
   change.
@@ -38,10 +37,7 @@ easier to understand or maintain.
 A workflow in [`.github/workflows/`](../.github/workflows/) defines GitHub Actions
 configuration for an operation. It specifies triggers, job dependencies, permissions,
 runners, containers, secrets, artifacts, and CI-only environment variables. Where
-possible, workflows coordinate repository operations rather than implementing them.
-Defining operations outside workflows lets developers run and validate them locally.
-Operations that developers can validate only in CI are harder to implement and
-maintain.
+possible, workflows coordinate repository operations rather than implement them.
 
 Run the operation through its local entrypoint. If the entrypoint is a task, use
 `./scripts/run_task.sh`. See [Tasks](./tasks.md) for this repository's task
@@ -131,8 +127,8 @@ For example:
 A full [commit SHA](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions)
 is immutable. A tag can move.
 
-Add a version comment after every pinned SHA. The comment identifies the release for
-readers and [Dependabot](https://docs.github.com/code-security/dependabot). This
+Add a `# v<version>` comment after every pinned SHA. The comment identifies the
+release for readers and [Dependabot](https://docs.github.com/code-security/dependabot). This
 repository configures Dependabot to open pull requests only for security updates. A
 working action does not need routine version updates. Routine updates can include
 JavaScript dependency changes that would be challenging to qualify.
@@ -161,7 +157,7 @@ and `lint-all-ci` tasks also run `lint-action`. In addition to `actionlint`,
 - direct calls from workflows to `scripts/`, except `run_task.sh` and `workflow-*.sh`
   helpers
 - task calls from workflows that pass option flags after `--`
-- third-party action references without full SHAs
+- third-party action references without full SHAs and version comments
 - floating `ubuntu-latest` and `macos-latest` runner labels
 
 These checks catch common violations, but they do not prove that a workflow is
