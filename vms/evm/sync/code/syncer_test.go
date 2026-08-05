@@ -123,6 +123,9 @@ func TestSyncer(t *testing.T) {
 
 			s := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch)
 			if tt.perReq > 0 {
+				// One worker drains the whole channel, so the batch boundaries
+				// are fixed instead of left to the scheduler.
+				s.numWorkers = 1
 				s.codeHashesPerReq = tt.perReq
 			}
 			require.NoError(t, s.Sync(ctx))

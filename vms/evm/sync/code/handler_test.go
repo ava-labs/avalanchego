@@ -85,8 +85,6 @@ func TestResponder(t *testing.T) {
 	}
 }
 
-// A code is the identity of an [avacommon.AppError], so each sentinel must be
-// positive and must not collide with the framework or with [handlers].
 func TestErrorSentinels(t *testing.T) {
 	t.Parallel()
 

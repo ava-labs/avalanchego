@@ -23,7 +23,7 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const defaultNumWorkers = 5
+const numSyncWorkers = 5
 
 var (
 	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
@@ -56,7 +56,7 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes
 		client:           c,
 		db:               db,
 		codeHashes:       codeHashes,
-		numWorkers:       defaultNumWorkers,
+		numWorkers:       numSyncWorkers,
 		codeHashesPerReq: maxHashesPerRequest,
 	}
 }

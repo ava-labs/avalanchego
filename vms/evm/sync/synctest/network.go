@@ -40,13 +40,11 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 	var wg sync.WaitGroup
 	t.Cleanup(wg.Wait)
 	deliver := func(name string, fn func() error) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := fn(); err != nil {
 				log.Debug(name, zap.Error(err))
 			}
-		}()
+		})
 	}
 
 	// Loop each send back into the same network asynchronously to avoid
