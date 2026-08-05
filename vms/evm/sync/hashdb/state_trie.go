@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -43,7 +43,7 @@ type stateTrie struct {
 	stackTrie *trie.StackTrie
 
 	// tasks is the scheduler channel new segments are queued onto.
-	tasks       chan<- task
+	tasks       chan<- Task
 	numSegments int
 	threshold   uint64
 
@@ -65,7 +65,7 @@ type stateTrie struct {
 type stateTrieConfig struct {
 	numSegments int
 	threshold   uint64
-	tasks       chan<- task
+	tasks       chan<- Task
 	onDone      func(context.Context) error
 	isMainTrie  bool
 	stats       *trieSyncStats
@@ -319,7 +319,7 @@ func (s *stateSegment) Start() []byte {
 }
 
 // OnLeaves writes the batch, advances the resume position, and splits if grown.
-func (s *stateSegment) OnLeaves(ctx context.Context, batch leafBatch) error {
+func (s *stateSegment) OnLeaves(ctx context.Context, batch LeafBatch) error {
 	if err := s.trie.leaves.writeLeaves(ctx, s.batch, batch); err != nil {
 		return err
 	}

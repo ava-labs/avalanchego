@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -72,7 +72,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	}
 
 	batch := db.NewBatch()
-	require.NoError(t, leaves.writeLeaves(t.Context(), batch, leafBatch{keys: keys, vals: vals}))
+	require.NoError(t, leaves.writeLeaves(t.Context(), batch, LeafBatch{keys: keys, vals: vals}))
 
 	// Only the non-empty storage root is registered, keyed to its account.
 	require.Len(t, reg.tries, 1)
@@ -97,7 +97,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	reg := &fakeRegistry{}
 	leaves := newAccountLeafStore(db, queue, reg)
 
-	err := leaves.writeLeaves(t.Context(), db.NewBatch(), leafBatch{
+	err := leaves.writeLeaves(t.Context(), db.NewBatch(), LeafBatch{
 		keys: [][]byte{synctest.HashedKey(1)},
 		vals: [][]byte{[]byte("not-a-valid-rlp-account")},
 	})

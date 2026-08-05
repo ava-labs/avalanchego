@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"context"
@@ -18,17 +18,17 @@ import (
 )
 
 var (
-	_ types.Syncer    = (*HashDBSyncer)(nil)
-	_ types.Finalizer = (*HashDBSyncer)(nil)
+	_ types.Syncer    = (*EVMSyncer)(nil)
+	_ types.Finalizer = (*EVMSyncer)(nil)
 
 	errRootRequired      = errors.New("root must be non-zero")
 	errCodeQueueRequired = errors.New("code queue is required")
 )
 
-// HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
+// EVMSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
 // first, then every storage trie it discovers, each split into concurrently fetched
 // segments. Contract code goes to a [code.Syncer] that must run alongside Sync.
-type HashDBSyncer struct {
+type EVMSyncer struct {
 	log       logging.Logger
 	client    *Client
 	db        ethdb.Database
@@ -38,7 +38,7 @@ type HashDBSyncer struct {
 	stats     *trieSyncStats
 	threshold uint64 // leaf count above which a trie splits into segments
 
-	// scheduler owns the task channel and tracks what needs flushing on failure.
+	// scheduler owns the Task channel and tracks what needs flushing on failure.
 	scheduler *trieScheduler
 
 	mainTrieDone chan struct{}
@@ -46,20 +46,20 @@ type HashDBSyncer struct {
 	completed    atomic.Bool
 }
 
-// NewHashDBSyncer returns a syncer for the account trie at root. codeQueue must be
+// NewEVMSyncer returns a syncer for the account trie at root. codeQueue must be
 // drained by a concurrently running [code.Syncer].
 //
 // The caller must wipe the account and storage snapshots in db unless this run resumes
 // the root already persisted there. Leaves left behind count as resume progress, so
 // another root's leaves would fail the final root check on every attempt.
-func NewHashDBSyncer(log logging.Logger, client *Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue) (*HashDBSyncer, error) {
+func NewEVMSyncer(log logging.Logger, client *Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue) (*EVMSyncer, error) {
 	if root == (common.Hash{}) {
 		return nil, errRootRequired
 	}
 	if codeQueue == nil {
 		return nil, errCodeQueueRequired
 	}
-	return &HashDBSyncer{
+	return &EVMSyncer{
 		log:       log,
 		client:    client,
 		db:        db,
@@ -71,14 +71,14 @@ func NewHashDBSyncer(log logging.Logger, client *Client, db ethdb.Database, root
 }
 
 // Name returns a human-readable name for logging.
-func (*HashDBSyncer) Name() string { return "EVM State Syncer" }
+func (*EVMSyncer) Name() string { return "EVM State Syncer" }
 
 // ID returns the stable identifier for deduplication and metrics.
-func (*HashDBSyncer) ID() string { return "state_evm_state_sync" }
+func (*EVMSyncer) ID() string { return "state_evm_state_sync" }
 
 // Sync reconstructs the account trie, then every discovered storage trie, verifying
 // each root.
-func (s *HashDBSyncer) Sync(ctx context.Context) error {
+func (s *EVMSyncer) Sync(ctx context.Context) error {
 	// Tear the forwarder down on exit so it cannot block on a stopped consumer.
 	defer s.codeQueue.Shutdown()
 
@@ -107,10 +107,10 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 		return err
 	}
 
-	fetcher := newLeafFetcher(s.log, s.client, s.scheduler.tasks, defaultLeafWorkers)
+	fetcher := NewLeafFetcher(s.log, s.client, s.scheduler.tasks, defaultLeafWorkers)
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		if err := fetcher.sync(egCtx); err != nil {
+		if err := fetcher.Sync(egCtx); err != nil {
 			return err
 		}
 		return s.onSyncComplete()
@@ -121,7 +121,7 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 
 // onSyncComplete persists the account trie's nodes only once every storage trie is
 // done, so the state root never lands on disk ahead of the state it commits to.
-func (s *HashDBSyncer) onSyncComplete() error {
+func (s *EVMSyncer) onSyncComplete() error {
 	if err := s.mainTrie.commitNodes(); err != nil {
 		return err
 	}
@@ -132,9 +132,9 @@ func (s *HashDBSyncer) onSyncComplete() error {
 // Finalize flushes in-progress snapshot writes after a failed or cancelled sync, so
 // the next run resumes instead of re-fetching. A no-op once the sync completed.
 //
-// Call it only after [HashDBSyncer.Sync] returns: it writes without synchronizing
+// Call it only after [EVMSyncer.Sync] returns: it writes without synchronizing
 // against the workers.
-func (s *HashDBSyncer) Finalize() error {
+func (s *EVMSyncer) Finalize() error {
 	if s.completed.Load() || s.scheduler == nil {
 		return nil
 	}
@@ -143,7 +143,7 @@ func (s *HashDBSyncer) Finalize() error {
 
 // onMainTrieDone runs when the account trie is verified. No more code is discovered
 // after that, so it drains the code queue and opens the gate for storage tries.
-func (s *HashDBSyncer) onMainTrieDone(ctx context.Context) error {
+func (s *EVMSyncer) onMainTrieDone(ctx context.Context) error {
 	if err := s.codeQueue.FinalizeContext(ctx); err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (s *HashDBSyncer) onMainTrieDone(ctx context.Context) error {
 
 // storageTrieProducer waits for the account trie, then feeds every storage trie it
 // discovers to the scheduler.
-func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
+func (s *EVMSyncer) storageTrieProducer(ctx context.Context) error {
 	select {
 	case <-s.mainTrieDone:
 	case <-ctx.Done():
@@ -194,7 +194,7 @@ func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 }
 
 // storageTrieDone clears a finished trie's markers and hands its slot back.
-func (s *HashDBSyncer) storageTrieDone(root common.Hash) func(context.Context) error {
+func (s *EVMSyncer) storageTrieDone(root common.Hash) func(context.Context) error {
 	return func(context.Context) error {
 		// Deferred so a failed trie still releases, or the scheduler never goes idle.
 		defer s.scheduler.finishStorage(root)

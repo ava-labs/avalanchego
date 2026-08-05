@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -101,7 +101,7 @@ func (*recordingTask) Account() common.Hash { return common.Hash{} }
 func (*recordingTask) Start() []byte        { return nil }
 func (*recordingTask) End() []byte          { return nil }
 
-func (r *recordingTask) OnLeaves(_ context.Context, batch leafBatch) error {
+func (r *recordingTask) OnLeaves(_ context.Context, batch LeafBatch) error {
 	r.keys = append(r.keys, batch.keys...)
 	return nil
 }
@@ -111,16 +111,16 @@ func (r *recordingTask) OnFinish(context.Context) error {
 	return nil
 }
 
-// runLeafTask drives one task through a single worker.
-func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk task) error {
+// runLeafTask drives one Task through a single worker.
+func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk Task) error {
 	t.Helper()
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
 
-	tasks := make(chan task, 1)
+	tasks := make(chan Task, 1)
 	tasks <- tk
 	close(tasks)
-	return newLeafFetcher(logging.NoLog{}, NewClient(net, tracker), tasks, 1).sync(ctx)
+	return NewLeafFetcher(logging.NoLog{}, NewClient(net, tracker, p2p.EVMLeafRequestHandlerID), tasks, 1).Sync(ctx)
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
@@ -167,7 +167,7 @@ func TestLeafFetch_Batching(t *testing.T) {
 
 			require.Equal(t, tt.wantRequests, requests.Load())
 			require.Equal(t, keys, tk.keys, "every leaf must be fetched in key order")
-			require.Equal(t, 1, tk.finished, "the task must finish exactly once")
+			require.Equal(t, 1, tk.finished, "the Task must finish exactly once")
 		})
 	}
 }
@@ -221,7 +221,7 @@ func TestLeafFetch_BadResponses(t *testing.T) {
 			err := runLeafTask(t, ctx, handler, tk)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
-				require.Empty(t, tk.keys, "tampered leaves must not reach the task")
+				require.Empty(t, tk.keys, "tampered leaves must not reach the Task")
 				return
 			}
 			require.NoError(t, err)

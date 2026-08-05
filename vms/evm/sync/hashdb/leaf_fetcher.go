@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"context"
@@ -31,21 +31,27 @@ var (
 	errMoreWithoutKeys   = errors.New("more leaves reported but none returned")
 )
 
-// leafBatch is a verified run of leaves in ascending key order. keys and vals are
+// LeafBatch is a verified run of leaves in ascending key order. keys and vals are
 // index-aligned, guaranteed by the range proof that produced them.
-type leafBatch struct {
+type LeafBatch struct {
 	keys [][]byte
 	vals [][]byte
 }
 
+// Keys returns the batch's keys in ascending order, index-aligned with [LeafBatch.Vals].
+func (b LeafBatch) Keys() [][]byte { return b.keys }
+
+// Vals returns the batch's values, index-aligned with [LeafBatch.Keys].
+func (b LeafBatch) Vals() [][]byte { return b.vals }
+
 // lastKey returns the highest key, the next request's start. Not valid when empty.
-func (b leafBatch) lastKey() []byte {
+func (b LeafBatch) lastKey() []byte {
 	return b.keys[len(b.keys)-1]
 }
 
 // truncate drops leaves past end and reports whether it cut any, meaning the range is
 // exhausted. An empty end is a no-op.
-func (b *leafBatch) truncate(end []byte) bool {
+func (b *LeafBatch) truncate(end []byte) bool {
 	if len(end) == 0 {
 		return false
 	}
@@ -58,37 +64,37 @@ func (b *leafBatch) truncate(end []byte) bool {
 	return true
 }
 
-// task is one unit of leaf work the fetcher drives: a contiguous key range of a trie,
+// Task is one unit of leaf work the fetcher drives: a contiguous key range of a trie,
 // with callbacks per batch and on completion. Implemented by [stateSegment].
-type task interface {
+type Task interface {
 	Root() common.Hash
 	Account() common.Hash
 	Start() []byte
 	// End is the inclusive last key of the range, or nil for the whole trie.
 	End() []byte
-	OnLeaves(ctx context.Context, batch leafBatch) error
+	OnLeaves(ctx context.Context, batch LeafBatch) error
 	OnFinish(ctx context.Context) error
 }
 
-// leafFetcher pulls tasks off a channel and fetches each one's leaves with a pool of
-// workers, handing every batch to the task, which is what reconstructs. Batches are
+// LeafFetcher pulls tasks off a channel and fetches each one's leaves with a pool of
+// workers, handing every batch to the Task, which is what reconstructs. Batches are
 // verified in the fetch path, not in the transport.
-type leafFetcher struct {
+type LeafFetcher struct {
 	log        logging.Logger
 	client     *Client
-	tasks      <-chan task
+	tasks      <-chan Task
 	numWorkers int
 }
 
-func newLeafFetcher(log logging.Logger, client *Client, tasks <-chan task, numWorkers int) *leafFetcher {
+func NewLeafFetcher(log logging.Logger, client *Client, tasks <-chan Task, numWorkers int) *LeafFetcher {
 	if numWorkers <= 0 {
 		numWorkers = defaultLeafWorkers
 	}
-	return &leafFetcher{log: log, client: client, tasks: tasks, numWorkers: numWorkers}
+	return &LeafFetcher{log: log, client: client, tasks: tasks, numWorkers: numWorkers}
 }
 
-// sync runs the workers until tasks is drained and closed, or ctx ends.
-func (f *leafFetcher) sync(ctx context.Context) error {
+// Sync runs the workers until tasks is drained and closed, or ctx ends.
+func (f *LeafFetcher) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 	for range f.numWorkers {
 		eg.Go(func() error { return f.workerLoop(egCtx) })
@@ -97,7 +103,7 @@ func (f *leafFetcher) sync(ctx context.Context) error {
 }
 
 // workerLoop processes tasks until the channel closes or ctx ends.
-func (f *leafFetcher) workerLoop(ctx context.Context) error {
+func (f *LeafFetcher) workerLoop(ctx context.Context) error {
 	for {
 		select {
 		case t, ok := <-f.tasks:
@@ -113,8 +119,8 @@ func (f *leafFetcher) workerLoop(ctx context.Context) error {
 	}
 }
 
-// syncTask walks the task's range left to right until it is exhausted or End is reached.
-func (f *leafFetcher) syncTask(ctx context.Context, t task) error {
+// syncTask walks the Task's range left to right until it is exhausted or End is reached.
+func (f *LeafFetcher) syncTask(ctx context.Context, t Task) error {
 	start := t.Start()
 	for {
 		if err := ctx.Err(); err != nil {
@@ -147,7 +153,7 @@ func (f *leafFetcher) syncTask(ctx context.Context, t task) error {
 
 // getLeaves fetches and proof-verifies the leaf range at start, reporting whether
 // more leaves remain to the right.
-func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leafBatch, bool, error) {
+func (f *LeafFetcher) getLeaves(ctx context.Context, t Task, start []byte) (LeafBatch, bool, error) {
 	root := t.Root()
 	req := &syncpb.GetLeafRequest{
 		RootHash:    root.Bytes(),
@@ -169,9 +175,9 @@ func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leaf
 		},
 	)
 	if err != nil {
-		return leafBatch{}, false, err
+		return LeafBatch{}, false, err
 	}
-	return leafBatch{keys: resp.GetKeys(), vals: resp.GetValues()}, more, nil
+	return LeafBatch{keys: resp.GetKeys(), vals: resp.GetValues()}, more, nil
 }
 
 // verifyLeaves range-proves resp against root and reports whether more leaves remain.
