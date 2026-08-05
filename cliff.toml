@@ -27,9 +27,17 @@ body = """
         - {% if commit.scope %}*({{ commit.scope }})* {% endif -%}
             {%- set_global breaking = commit.breaking -%}
             {%- set_global breaking_scopes = [] -%}
+            {#- Breaking-change labels must stay in sync with .github/labels.yml, which
+                declares bare `breaking-change` as canonical and keeps the per-crate
+                `breaking-change/<crate>` forms as aliases. Handle both: the bare label
+                marks the entry breaking with no scope list, the scoped form additionally
+                names the affected crate. Update this block whenever that label taxonomy
+                changes. -#}
             {%- if commit.remote.pr_labels is defined -%}
               {%- for label in commit.remote.pr_labels -%}
-                {%- if label is starting_with("breaking-change/") -%}
+                {%- if label == "breaking-change" -%}
+                  {%- set_global breaking = true -%}
+                {%- elif label is starting_with("breaking-change/") -%}
                   {%- set_global breaking = true -%}
                   {%- set scope = label | trim_start_matches(pat="breaking-change/") -%}
                   {%- set_global breaking_scopes = breaking_scopes | concat(with=scope) -%}
