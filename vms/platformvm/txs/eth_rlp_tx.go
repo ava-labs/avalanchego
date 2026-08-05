@@ -29,11 +29,33 @@ const (
 	MaxEthRLPTxInputs = 32
 
 	// MaxEthRLPEnvelopeBytes bounds the serialized length of an EthRLPTx
-	// excluding its calldata payload. Every field of a type-2 tx has a fixed
-	// maximum width and access lists are rejected, so this is a hard bound,
-	// pinned by TestEthRLPEnvelopeBound. eth_estimateGas prices with it
-	// because the exact length is unknown before signing.
-	MaxEthRLPEnvelopeBytes = 256
+	// excluding its calldata payload. eth_estimateGas prices with it, because
+	// the exact length is unknown before signing, and under charge-the-limit
+	// the signer pays for what it prices, so the bound is derived rather than
+	// guessed. Every field of a type-2 tx has a fixed maximum width and access
+	// lists are rejected, so summing those widths is a hard bound:
+	//
+	//	  1  tx type byte (0x02)
+	//	  4  RLP list header (0xf7+n, n up to 3 length bytes)
+	//	  9  chainID              (1 prefix + 8, uint64)
+	//	  9  nonce                (1 prefix + 8, uint64)
+	//	 33  maxPriorityFeePerGas (1 prefix + 32, uint256)
+	//	 33  maxFeePerGas         (1 prefix + 32, uint256)
+	//	  9  gas                  (1 prefix + 8, uint64)
+	//	 21  to                   (1 prefix + 20)
+	//	 33  value                (1 prefix + 32, uint256)
+	//	  4  calldata length prefix (payload counted separately)
+	//	  1  accessList (empty list, 0xc0)
+	//	  1  v (0 or 1)
+	//	 33  r                    (1 prefix + 32)
+	//	 33  s                    (1 prefix + 32)
+	//	---
+	//	224
+	//
+	// A tx signed with every field at its maximum measures 222, verified by
+	// TestEthRLPEnvelopeBound, so the derivation is tight to within its two
+	// bytes of length-prefix headroom.
+	MaxEthRLPEnvelopeBytes = 1 + 4 + 9 + 9 + 33 + 33 + 9 + 21 + 33 + 4 + 1 + 1 + 33 + 33
 )
 
 // EthRLPChainID returns the facade's EIP-155 chain ID on [networkID].

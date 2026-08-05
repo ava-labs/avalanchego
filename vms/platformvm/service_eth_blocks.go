@@ -301,8 +301,16 @@ func boolParam(params []json.RawMessage, i int) bool {
 //     bound, which is correct under charge-the-limit rather than an error.
 func (a *ethAPI) estimateGas(call *ethCallArgs) (any, error) {
 	if call.From == nil {
-		// Without a sender there is nothing to select from; price the
-		// single-input case, which is the floor for any send.
+		// A from-less estimate is generic by convention: the true answer
+		// depends on the sender's UTXO set, and there is no account to select
+		// against. Return the cheapest possible real send, one input, rather
+		// than an error, because the JSON-RPC spec marks from optional and geth
+		// defaults it to the zero address, so EVM tooling on a read path may
+		// legitimately omit it (a viem public client with no account, an
+		// ethers Provider.estimateGas the caller did not set from on). Every
+		// wallet-signed flow supplies from: MetaMask rejects a tx without a
+		// valid from before it ever estimates, and ethers and Rabby fill it
+		// from the signer.
 		txGas, err := fee.EthRLPTxComplexity(
 			txs.MaxEthRLPEnvelopeBytes+len(call.calldata()), 1,
 		).ToGas(a.vm.DynamicFeeConfig.Weights)

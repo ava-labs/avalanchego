@@ -565,3 +565,36 @@ func TestEthAPIGetCode(t *testing.T) {
 	require.Equal(t, "0xfe", ethCallAPI(t, api, "eth_getCode",
 		txs.EthStakedAVAXAddress.Hex(), "latest"))
 }
+
+// eth_estimateGas without from must answer, not error: the JSON-RPC spec marks
+// from optional, geth defaults it to the zero address, and read-path tooling
+// (a viem public client with no account, an ethers Provider the caller did not
+// set from on) legitimately omits it. The answer is the generic one-input cost,
+// because the real one depends on a sender's UTXO set.
+func TestEthAPIEstimateGasWithoutFrom(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	api := newEthAPI(vm)
+
+	oneInput, err := fee.EthRLPTxComplexity(txs.MaxEthRLPEnvelopeBytes, 1).
+		ToGas(vm.DynamicFeeConfig.Weights)
+	require.NoError(err)
+
+	// No from at all.
+	estimate := ethCallAPI(t, api, "eth_estimateGas", map[string]any{
+		"to":    ethcommon.Address(ids.GenerateTestShortID()).Hex(),
+		"value": "0x" + navaxToWei(units.Avax).Text(16),
+	})
+	require.Equal(hexUint(uint64(oneInput)), estimate)
+
+	// A staking call without from prices its calldata too.
+	calldata := txs.SelectorDelegate[:]
+	withCalldata, err := fee.EthRLPTxComplexity(txs.MaxEthRLPEnvelopeBytes+len(calldata), 1).
+		ToGas(vm.DynamicFeeConfig.Weights)
+	require.NoError(err)
+	estimate = ethCallAPI(t, api, "eth_estimateGas", map[string]any{
+		"to":   txs.EthStakingAddress.Hex(),
+		"data": fmt.Sprintf("0x%x", calldata),
+	})
+	require.Equal(hexUint(uint64(withCalldata)), estimate)
+}

@@ -10,6 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	ethcommon "github.com/ava-labs/libevm/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -85,24 +88,35 @@ func TestEthRLPTxGasIsTheSignedLimit(t *testing.T) {
 // the gas the executor charges and wallets would produce rejected txs.
 func TestEthRLPEnvelopeBound(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Latest)
-
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	maxWide := newSignedEthTx(t, key, math.MaxUint64-1, ids.GenerateTestShortID(),
-		math.MaxUint64/txs.WeiPerNAVAX.Uint64(), math.MaxUint64, math.MaxInt64,
-		ethChainID(env), 0, nil)
-	envelope := len(maxWide.Unsigned.(*txs.EthRLPTx).RLP)
-	require.LessOrEqual(envelope, txs.MaxEthRLPEnvelopeBytes)
+	// Every field at its maximum width: a uint64 chain ID, nonce and gas, and
+	// uint256 value and fee caps. Nothing valid can serialize larger.
+	maxU256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	maxChainID := new(big.Int).SetUint64(math.MaxUint64)
+	to := ethcommon.Address(ids.GenerateTestShortID())
 
-	// And with calldata, the total stays within bound + calldata.
-	calldata := delegateCalldata(ids.GenerateTestNodeID(), math.MaxUint32)
-	withData := newSignedEthStake(t, env, key, math.MaxUint64-1, units.Avax, calldata)
-	require.LessOrEqual(
-		len(withData.Unsigned.(*txs.EthRLPTx).RLP),
-		txs.MaxEthRLPEnvelopeBytes+len(calldata),
-	)
+	for _, calldataLen := range []int{0, 4, 100, 1_000, 100_000} {
+		signed := ethtypes.MustSignNewTx(
+			key.ToECDSA(),
+			ethtypes.LatestSignerForChainID(maxChainID),
+			&ethtypes.DynamicFeeTx{
+				ChainID:   maxChainID,
+				Nonce:     math.MaxUint64,
+				GasTipCap: maxU256,
+				GasFeeCap: maxU256,
+				Gas:       math.MaxUint64,
+				To:        &to,
+				Value:     maxU256,
+				Data:      make([]byte, calldataLen),
+			},
+		)
+		raw, err := signed.MarshalBinary()
+		require.NoError(err)
+		require.LessOrEqual(len(raw)-calldataLen, txs.MaxEthRLPEnvelopeBytes,
+			"envelope exceeded the derived bound with %d bytes of calldata", calldataLen)
+	}
 }
 
 // A tx at the maximum nonce would store nonce+1 == 0, resetting the account's
