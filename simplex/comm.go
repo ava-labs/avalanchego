@@ -46,8 +46,9 @@ func NewComm(config *Config) (*Comm, error) {
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
 		allNodes = append(allNodes, simplexcommon.Node{
-			Node:   vd.NodeID[:],
+			Id:     vd.NodeID[:],
 			Weight: 1,
+			PK:     vd.PublicKey,
 		})
 		if vd.NodeID == config.Ctx.NodeID {
 			includesOurNodeID = true
@@ -77,7 +78,7 @@ func NewComm(config *Config) (*Comm, error) {
 	}, nil
 }
 
-func (c *Comm) Nodes() simplexcommon.Nodes {
+func (c *Comm) Validators() simplexcommon.Nodes {
 	return c.allNodes
 }
 

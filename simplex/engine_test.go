@@ -217,7 +217,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 					BlockProposal: &p2p.BlockProposal{},
 				},
 			},
-			expectedErr: errFailedToParseMetadata,
+			expectedErr: errNilField,
 		},
 		{
 			name: "BlockProposal missing vote",

@@ -4,8 +4,6 @@
 package simplex
 
 import (
-	"fmt"
-
 	simplexcommon "github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,10 +14,7 @@ func newBlockProposal(
 	chainID ids.ID,
 	msg *simplexcommon.VerifiedBlockMessage,
 ) (*p2p.Simplex, error) {
-	bytes, err := msg.VerifiedBlock.Bytes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize block: %w", err)
-	}
+	bytes := msg.VerifiedBlock.Bytes()
 	vote := msg.Vote
 
 	return &p2p.Simplex{
@@ -215,11 +210,7 @@ func quorumRoundToP2P(qr *simplexcommon.VerifiedQuorumRound) (*p2p.QuorumRound, 
 	p2pQR := &p2p.QuorumRound{}
 
 	if qr.VerifiedBlock != nil {
-		bytes, err := qr.VerifiedBlock.Bytes()
-		if err != nil {
-			return nil, err
-		}
-
+		bytes := qr.VerifiedBlock.Bytes()
 		p2pQR.Block = bytes
 	}
 	if qr.Notarization != nil {

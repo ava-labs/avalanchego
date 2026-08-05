@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	simplexcommon "github.com/ava-labs/simplex/common"
-	simplexepoch "github.com/ava-labs/simplex/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,14 +18,14 @@ import (
 // same signer signs multiple times.
 func TestQCDuplicateSigners(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
-	quorum := simplexepoch.Quorum(len(configs))
+	quorum := simplexcommon.Quorum(len(configs))
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 
 	signer, verifier, err := NewBLSAuth(configs[0])
 	require.NoError(t, err)
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
-	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
+	require.NoError(t, verifier.VerifySignature(msg, sig, configs[0].Params.InitialValidators[0].PublicKey))
 
 	signatures := make([]simplexcommon.Signature, 0, quorum)
 	for range quorum {
@@ -41,7 +40,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	qc, err := signatureAggregator.Aggregate(signatures)
 	require.NoError(t, err)
 
-	err = qc.Verify(msg)
+	err = qc.Verify(msg, nil)
 	require.ErrorIs(t, err, errDuplicateSigner)
 }
 
@@ -186,8 +185,8 @@ func TestSignatureAggregation(t *testing.T) {
 
 			// verify the quorum certificate
 			if tt.expectError == nil {
-				require.Len(t, qc.Signers(), simplexepoch.Quorum(len(configs)))
-				require.NoError(t, qc.Verify(msg))
+				require.Len(t, qc.Signers(), simplexcommon.Quorum(len(configs)))
+				require.NoError(t, qc.Verify(msg, nil))
 
 				d := QCDeserializer{verifier: &verifier}
 				// try to deserialize the quorum certificate
@@ -198,7 +197,7 @@ func TestSignatureAggregation(t *testing.T) {
 					require.Contains(t, deserializedQC.Signers(), signer)
 				}
 				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
-				require.NoError(t, deserializedQC.Verify(msg))
+				require.NoError(t, deserializedQC.Verify(msg, nil))
 			}
 		})
 	}
@@ -228,10 +227,10 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify with original message should succeed
-	require.NoError(t, qc.Verify(originalMsg))
+	require.NoError(t, qc.Verify(originalMsg, nil))
 
 	// Verify with wrong message should fail
-	err = qc.Verify(wrongMsg)
+	err = qc.Verify(wrongMsg, nil)
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
 

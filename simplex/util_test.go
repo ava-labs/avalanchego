@@ -9,7 +9,6 @@ import (
 	"time"
 
 	simplexcommon "github.com/ava-labs/simplex/common"
-	simplexepoch "github.com/ava-labs/simplex/simplex"
 	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -81,8 +80,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 			},
 			metadata: genesisMetadata,
 		}
-		bytes, err := block.Bytes()
-		require.NoError(t, err)
+		bytes := block.Bytes()
 
 		digest := computeDigest(bytes)
 		block.digest = digest
@@ -112,8 +110,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		},
 	}
 
-	bytes, err := block.Bytes()
-	require.NoError(t, err)
+	bytes := block.Bytes()
 
 	digest := computeDigest(bytes)
 	block.digest = digest
@@ -256,7 +253,7 @@ func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) [
 // newTestFinalization creates a new finalization over the BlockHeader, by collecting a
 // quorum of signatures from the provided configs.
 func newTestFinalization(t *testing.T, configs []*Config, bh simplexcommon.BlockHeader) simplexcommon.Finalization {
-	quorum := simplexepoch.Quorum(len(configs))
+	quorum := simplexcommon.Quorum(len(configs))
 	finalizedVotes := make([]*simplexcommon.FinalizeVote, 0, quorum)
 
 	for _, config := range configs[:quorum] {

@@ -95,7 +95,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/simplex v0.0.0-20260612150224-1a092b6d5d5e
+	github.com/ava-labs/simplex v0.0.0-20260805164739-eff78d66755b
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect

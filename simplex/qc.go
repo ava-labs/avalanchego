@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	simplexcommon "github.com/ava-labs/simplex/common"
-	simplexepoch "github.com/ava-labs/simplex/simplex"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -58,8 +57,9 @@ func (qc *QC) Signers() []simplexcommon.NodeID {
 }
 
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
-func (qc *QC) Verify(msg []byte) error {
-	quorum := simplexepoch.Quorum(len(qc.verifier.nodeID2PK))
+func (qc *QC) Verify(msg []byte, _ simplexcommon.Nodes) error {
+	// TODO: derive the quorom size and public key from the passed nodes instead of the verifier's nodeID2PK map.
+	quorum := simplexcommon.Quorum(len(qc.verifier.nodeID2PK))
 	if len(qc.signers) != quorum {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
@@ -112,6 +112,9 @@ func (qc *QC) Bytes() []byte {
 
 	return canotoQC.MarshalCanoto()
 }
+func (qc *QC) Size() int {
+	return len(qc.Bytes())
+}
 
 func (qc *QC) createSignersBitSet() []byte {
 	bitset := set.NewBits()
@@ -161,7 +164,7 @@ type SignatureAggregator struct {
 // It requires at least a quorum of signatures to succeed.
 // If any signature is from a signer not in the membership set, it returns an error.
 func (a *SignatureAggregator) Aggregate(signatures []simplexcommon.Signature) (simplexcommon.QuorumCertificate, error) {
-	quorumSize := simplexepoch.Quorum(len(a.verifier.nodeID2PK))
+	quorumSize := simplexcommon.Quorum(len(a.verifier.nodeID2PK))
 	if len(signatures) < quorumSize {
 		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
 	}
@@ -242,7 +245,7 @@ func (a *SignatureAggregator) IsQuorum(nodes []simplexcommon.NodeID) bool {
 		uniqueNodes.Add(nodeID)
 	}
 
-	quorumSize := simplexepoch.Quorum(len(a.verifier.nodeID2PK))
+	quorumSize := simplexcommon.Quorum(len(a.verifier.nodeID2PK))
 
 	return len(uniqueNodes) >= quorumSize
 }

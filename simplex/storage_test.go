@@ -74,8 +74,7 @@ func TestStorageNew(t *testing.T) {
 func TestStorageRetrieve(t *testing.T) {
 	numNodes := 4
 	genesis := newTestBlock(t, newBlockConfig{numNodes: uint64(numNodes)})
-	genesisBytes, err := genesis.Bytes()
-	require.NoError(t, err)
+	genesisBytes := genesis.Bytes()
 
 	vm := newTestVM()
 	ctx := t.Context()
@@ -119,8 +118,7 @@ func TestStorageRetrieve(t *testing.T) {
 
 			block, finalization, err := s.Retrieve(tt.seq)
 			if tt.expectedErr == nil {
-				bytes, err := block.Bytes()
-				require.NoError(t, err)
+				bytes := block.Bytes()
 
 				require.Equal(t, tt.expectedBytes, bytes)
 			}
@@ -295,14 +293,12 @@ func TestStorageIndexSuccess(t *testing.T) {
 		gotBlock, gotFin, err := s.Retrieve(uint64(i))
 		require.NoError(t, err)
 
-		expectedBytes, err := blocks[i].Bytes()
-		require.NoError(t, err)
+		expectedBytes := blocks[i].Bytes()
 
-		gotBytes, err := gotBlock.Bytes()
-		require.NoError(t, err)
+		gotBytes := gotBlock.Bytes()
 
 		require.Equal(t, expectedBytes, gotBytes)
-		require.Equal(t, finalizations[i].Finalization, gotFin.Finalization)
+		require.Equal(t, finalizations[i].Finalization.Bytes(), gotFin.Finalization.Bytes())
 
 		// verify that the blocks were also accepted in the VM
 		accepted := blocks[i].vmBlock.(*wrappedBlock).Status

@@ -52,10 +52,7 @@ func newBlock(metadata simplexcommon.ProtocolMetadata, blacklist simplexcommon.B
 		blockTracker: blockTracker,
 		blacklist:    blacklist,
 	}
-	bytes, err := block.Bytes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize block: %w", err)
-	}
+	bytes := block.Bytes()
 	block.digest = computeDigest(bytes)
 	return block, nil
 }
@@ -78,14 +75,22 @@ func (b *Block) BlockHeader() simplexcommon.BlockHeader {
 }
 
 // Bytes returns the serialized bytes of the block.
-func (b *Block) Bytes() ([]byte, error) {
+func (b *Block) Bytes() []byte {
 	cBlock := &canotoSimplexBlock{
 		Metadata:   b.metadata.Bytes(),
 		InnerBlock: b.vmBlock.Bytes(),
 		Blacklist:  b.blacklist.Bytes(),
 	}
 
-	return cBlock.MarshalCanoto(), nil
+	return cBlock.MarshalCanoto()
+}
+
+func (b *Block) Size() int {
+	return len(b.Bytes())
+}
+
+func (*Block) SealingBlockInfo() *simplexcommon.SealingBlockInfo {
+	return nil
 }
 
 func (b *Block) Blacklist() simplexcommon.Blacklist {

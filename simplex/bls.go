@@ -19,6 +19,7 @@ var (
 	errSignerNotFound              = errors.New("signer not found in the membership set")
 	errInvalidNodeID               = errors.New("unable to parse node ID")
 	errFailedToParseSignature      = errors.New("failed to parse signature")
+	errFailedToParsePublicKey      = errors.New("failed to parse public key")
 )
 
 var _ simplexcommon.Signer = (*BLSSigner)(nil)
@@ -88,15 +89,10 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
 
-func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplexcommon.NodeID) error {
-	key, err := ids.ToNodeID(signer)
+func (v BLSVerifier) VerifySignature(message []byte, signature []byte, publicKey []byte) error {
+	pk, err := bls.PublicKeyFromCompressedBytes(publicKey)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidNodeID, err)
-	}
-
-	pk, exists := v.nodeID2PK[key]
-	if !exists {
-		return fmt.Errorf("%w: signer %x", errSignerNotFound, key)
+		return fmt.Errorf("%w: %w", errFailedToParsePublicKey, err)
 	}
 
 	sig, err := bls.SignatureFromBytes(signature)
