@@ -10,6 +10,40 @@ env:
   RUST_BACKTRACE: full
 
 jobs:
+  # Keep this as the only CI status required by main's branch protection.
+  # To make another job merge-blocking, add its job key to this list. This
+  # keeps the required checks version-controlled instead of requiring a
+  # corresponding branch-protection update in the GitHub UI.
+  tests-required:
+    if: ${{ always() }}
+    needs:
+      - build
+      - no-rust-cache-lint
+      - rust-lint
+      - test
+      - examples
+      - docs
+      - ffi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless all required jobs succeeded
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
   build:
     # To optimize cargo performance and caching throughout the CI pipeline, we use Swatinem/rust-cache
     # and set up an initial build job that writes the cache for a matrix of joint build profiles and

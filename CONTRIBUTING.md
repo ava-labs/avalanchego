@@ -9,6 +9,7 @@ guidelines for contributing to firewood.
 * [Quick Links](#quick-links)
 * [Testing](#testing)
 * [How to submit changes](#how-to-submit-changes)
+* [Required merge checks](#required-merge-checks)
 * [Signing your commits](#signing-your-commits)
 * [Code Review Process](#code-review-process)
 * [Labels](#labels)
@@ -39,6 +40,17 @@ Also, if you update any versions of packages, notably the MSRV (Minimum Supporte
 
 To create a PR, fork firewood, and use GitHub to create the PR. We typically prioritize reviews in the middle of the next work day,
 so you should expect a response during the week within 24 hours.
+
+## Required merge checks
+
+The `tests-required` job in [the CI workflow](.github/workflows/ci.yaml) is the
+single CI status required by the `main` branch protection. Its `needs` list is
+the version-controlled source of truth for merge-blocking CI jobs.
+
+When adding or removing a merge-blocking job, update the `tests-required.needs`
+list in the same pull request. No corresponding GitHub settings change is
+needed. The aggregate job uses `always()` and fails when any required job fails
+or is skipped, so dependency failures cannot accidentally allow a merge.
 
 ## Signing your commits
 
