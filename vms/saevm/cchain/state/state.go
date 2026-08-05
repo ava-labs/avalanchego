@@ -157,8 +157,10 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
 
-	batch := s.db.NewBatch()
-	isBonus := isBonusBlock(s.snowCtx.NetworkID, height)
+	var (
+		isBonus = isBonusBlock(s.snowCtx.NetworkID, height)
+		batch   = s.db.NewBatch()
+	)
 	for _, t := range txs {
 		if isBonus {
 			// To provide consistent API behavior with databases made by Coreth,
