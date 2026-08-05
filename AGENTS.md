@@ -10,7 +10,8 @@ and EVM-compatible blockchains that store state in Merkle tries.
 
 **Key Characteristics:**
 
-- Written in Rust (edition 2024, MSRV 1.94.0)
+- Written in Rust (edition 2024, MSRV 1.94.0 — but see
+  [Toolchain Floor for `--all-features`](#toolchain-floor-for---all-features))
 - Beta-level software with evolving API
 - Compaction-less database that directly stores trie nodes on-disk
 - Not built on generic KV stores (LevelDB/RocksDB)
@@ -158,14 +159,40 @@ If `just` is not installed, use `./scripts/run-just.sh prepush`. The wrapper
 uses `just` when available, falls back to Nix when available, and otherwise
 prints installation instructions.
 
-The complete set of Rust profile names and Cargo arguments, including
-Linux-only profiles, is defined in `scripts/run-rust-ci.sh`. The macOS-compatible
-Just recipes select the portable subset, while CI uses the full set. The
-Justfile and CI workflows should pass profile names instead of duplicating Cargo
-feature and profile arguments. When changing a CI Rust matrix, update the shared
-script and both callers as needed.
+The complete set of Rust profile names and Cargo arguments is defined in
+`scripts/run-rust-ci.sh`. Every profile there is portable to macOS, so the Just
+recipes and CI run the same set. The Justfile and CI workflows should pass
+profile names instead of duplicating Cargo feature and profile arguments. When
+changing a CI Rust matrix, update the shared script and both callers as needed.
 
 All tests must pass, and there should be no clippy warnings.
+
+### Toolchain Floor for `--all-features`
+
+The workspace declares `rust-version = "1.94.0"`, and that is accurate for the
+default build, `--no-default-features`, and `--features ethhash,logger`.
+`--all-features` needs **1.94.1**.
+
+`--all-features` turns on `fwdctl`'s `launch` feature, which pulls in the AWS SDK
+(`aws-config`, `aws-sdk-ec2`, `aws-sdk-ssm`, `aws-sdk-sts`, and their
+`aws-smithy-*` dependencies). Every one of those crates declares
+`rust-version = "1.94.1"`. Cargo refuses the build before compiling anything:
+
+```text
+error: rustc 1.94.0 is not supported by the following packages:
+  aws-config@1.9.0 requires rustc 1.94.1
+  ...
+```
+
+This is unrelated to the platform gating described under
+[Linux-only Checks](#linux-only-checks) — it applies equally on macOS and Linux.
+
+On exactly 1.94.0, either use a newer toolchain for `debug-all-features` (any
+1.94.1+ release works, and CI is well ahead of the floor), or downgrade the AWS
+crates as the error suggests. The workspace `rust-version` is deliberately left at
+1.94.0 so the floor reflects what the shipped library crates need rather than what
+an optional `fwdctl` feature needs; bumping it to 1.94.1 is the alternative if the
+split proves confusing in practice.
 
 ### Slow Tests
 
@@ -177,18 +204,17 @@ default-profile test commands are useful during development, but do not replace
 ### Linux-only Checks
 
 The local `lint`, `test`, and `prepush` recipes are designed to run on macOS.
-They intentionally omit CI checks that require Linux:
+They intentionally omit CI checks that require Linux: the differential fuzz jobs,
+which use Linux-specific resource limits and tooling. GitHub Actions remains
+authoritative for those.
 
-- The `debug-all-features` Rust profile enables `io-uring`.
-- Differential fuzz jobs use Linux-specific resource limits and tooling.
-
-GitHub Actions remains authoritative for these checks. To reproduce the
-all-features Rust checks, use a Linux development environment and run:
-
-```bash
-just ci-rust clippy debug-all-features
-just ci-rust test debug-all-features
-```
+`--all-features` is *not* in that category. The `io-uring` feature is accepted on
+every platform but only takes effect on Linux, where `storage/build.rs` sets the
+`cfg(io_uring)` alias that gates the ring backend; elsewhere the feature is inert
+and the standard I/O path is used. So `debug-all-features` runs in `just lint`
+and `just test` like any other profile. Note this means the ring code itself is
+compiled only by the Linux CI jobs — a macOS-green `--all-features` run does not
+prove `storage/src/linear/io_uring.rs` builds.
 
 Do not add Linux-only commands to the macOS-compatible aggregate recipes.
 

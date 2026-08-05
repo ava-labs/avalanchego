@@ -3,6 +3,9 @@
 
 //! Build script for `firewood-storage`.
 //!
+//! Emits the `io_uring` cfg that gates the io-uring backend; see
+//! [`emit_io_uring_cfg`].
+//!
 //! Generates `$OUT_DIR/area_sizes.rs`, which is `include!`d by
 //! `src/nodestore/primitives.rs`. The generated file contains:
 //!
@@ -68,10 +71,34 @@ area_sizes![
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    emit_io_uring_cfg();
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
     let dest_path = std::path::Path::new(&out_dir).join("area_sizes.rs");
     let contents = generate_area_sizes_rs().expect("Failed to generate area_sizes.rs");
     std::fs::write(dest_path, contents).expect("Failed to write area_sizes.rs");
+}
+
+/// Emits the `io_uring` cfg when the `io-uring` feature is enabled *and* the
+/// build target is Linux.
+///
+/// The `io-uring` crate only builds on Linux, so the dependency is declared
+/// under `[target.'cfg(target_os = "linux")'.dependencies]`. The Cargo feature
+/// itself stays portable and silently selects the standard I/O path elsewhere,
+/// which keeps `--all-features` usable on every host. Source code branches on
+/// `cfg(io_uring)` rather than `cfg(feature = "io-uring")` so that this policy
+/// is stated in exactly one place.
+fn emit_io_uring_cfg() {
+    // Emitted unconditionally so that the `unexpected_cfgs` lint recognizes the
+    // cfg in the configurations where it is not set.
+    println!("cargo::rustc-check-cfg=cfg(io_uring)");
+
+    // `CARGO_CFG_TARGET_OS` rather than `cfg!(target_os = …)`: the latter
+    // describes the host that compiled this build script, not the target the
+    // crate is being built for.
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS not set");
+    if std::env::var_os("CARGO_FEATURE_IO_URING").is_some() && target_os == "linux" {
+        println!("cargo::rustc-cfg=io_uring");
+    }
 }
 
 /// Generates the contents of `area_sizes.rs`.

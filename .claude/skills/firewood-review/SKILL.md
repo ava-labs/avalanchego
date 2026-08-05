@@ -85,7 +85,7 @@ cargo fetch --locked
 # All subsequent cargo commands: add --frozen --target-dir target/review
 ```
 
-Use `uname -s` to determine which feature sets to test (e.g., skip `io-uring` features on macOS/Darwin).
+Every feature set below builds on both platforms. Note that `io-uring` is inert off Linux, so a green macOS `--all-features` run does not exercise `storage/src/linear/io_uring.rs`; only Linux compiles it.
 
 Use `--frozen` after the initial fetch to ensure we're not accidentally pulling new dependencies that aren't covered by the lockfile.
 
@@ -93,12 +93,14 @@ Use `--target-dir target/review` for ALL cargo commands to avoid conflicting wit
 
 Run `cargo clippy --workspace --all-targets` and `cargo nextest run --workspace --all-targets` for each feature set:
 
-| Feature flags               | macOS               | Linux |
-| --------------------------- | ------------------- | ----- |
-| (none)                      | ✓                   | ✓     |
-| `--no-default-features`     | ✓                   | ✓     |
-| `--features ethhash,logger` | ✓                   | ✓     |
-| `--all-features`            | ✗ (skip `io-uring`) | ✓     |
+| Feature flags               | macOS | Linux |
+| --------------------------- | ----- | ----- |
+| (none)                      | ✓     | ✓     |
+| `--no-default-features`     | ✓     | ✓     |
+| `--features ethhash,logger` | ✓     | ✓     |
+| `--all-features`            | ✓     | ✓     |
+
+`--all-features` requires rustc 1.94.1+, above the 1.94.0 workspace MSRV, because it enables `fwdctl`'s `launch` feature and its AWS SDK dependencies declare that floor. If `cargo` reports `rustc 1.94.0 is not supported by the following packages`, that is this constraint and not a defect in the PR under review.
 
 If the PR adds any new Cargo feature, test with and without it across the applicable matrix rows.
 

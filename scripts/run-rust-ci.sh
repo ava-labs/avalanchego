@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # This is the single source of truth for the Cargo arguments behind the full CI
-# matrix, including Linux-only profiles such as debug-all-features. GitHub
-# Actions uses the full set; the local Just aggregators pass only the profile
-# names that are portable to macOS.
+# matrix. Every profile here is portable to macOS, so GitHub Actions and the
+# local Just aggregators pass the same set. Checks that genuinely require Linux
+# (differential fuzzing) live in the workflows, not here.
 
 usage() {
     cat <<'EOF'
@@ -27,7 +27,9 @@ Profiles:
   debug-no-default-features
   debug-no-features (default features)
   debug-ethhash-logger
-  debug-all-features (Linux-only; enables io-uring)
+  debug-all-features (io-uring is active on Linux only; needs rustc 1.94.1+,
+                      above the 1.94.0 workspace MSRV, because fwdctl's
+                      launch feature pulls in the AWS SDK)
   maxperf-ethhash-logger
 EOF
 }

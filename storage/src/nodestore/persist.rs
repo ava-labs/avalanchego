@@ -8,24 +8,26 @@
 //!
 //! ## I/O Backend Support
 //!
-//! This module supports multiple I/O backends through conditional compilation:
+//! This module contains no conditional compilation of its own. It batches node
+//! writes and hands them to [`WritableStorage::write_batch`], and the backend is
+//! chosen by whichever implementation of that method is compiled in:
 //!
-//! - **Standard I/O** - `#[cfg(not(feature = "io-uring"))]` - Uses standard file operations
-//! - **io-uring** - `#[cfg(feature = "io-uring")]` - Uses Linux io-uring for async I/O
+//! - **Standard I/O** — the trait's default `write_batch`, which issues one
+//!   positioned write per node.
+//! - **io-uring** — an override on
+//!   [`FileBacked`](crate::linear::filebacked::FileBacked) that submits the
+//!   whole batch to a ring, reducing syscall overhead on high-throughput
+//!   workloads.
 //!
-//! This feature flag is automatically enabled when running on Linux, and disabled for all other platforms.
-//!
-//! The io-uring implementation provides:
-//! - Asynchronous batch operations
-//! - Reduced system call overhead
-//! - Better performance for high-throughput workloads
+//! The io-uring override is compiled in only under `cfg(io_uring)`, which
+//! requires both the `io-uring` feature and a Linux target. The feature is not
+//! enabled by default on any platform.
 //!
 //! ## Performance Considerations
 //!
 //! - Nodes are written in batches to minimize I/O overhead
 //! - Metrics are collected for flush operation timing
 //! - Memory-efficient serialization with pre-allocated buffers
-//! - Ring buffer management for io-uring operations
 
 use bumpalo::Bump;
 use std::iter::FusedIterator;

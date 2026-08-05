@@ -45,7 +45,7 @@ use super::{FileIoError, OffsetReader, ReadableStorage, WritableStorage};
 /// Reads and writes go through positioned (`pread`/`pwrite`) syscalls, so they
 /// share no file cursor and take no per-handle lock; the caches absorb most
 /// reads so that the hot path rarely touches disk. The only serialization
-/// points are the two cache mutexes and, on the `io-uring` path, the ring's
+/// points are the two cache mutexes and, on the io-uring path, the ring's
 /// internal lock.
 #[derive(Debug)]
 pub struct FileBacked {
@@ -79,9 +79,12 @@ pub struct FileBacked {
     /// `io_uring` instance, not the descriptor — `fd` is passed by `RawFd` into
     /// each `write_batch` call.
     ///
+    /// Present only under `cfg(io_uring)`, that is on Linux with the `io-uring`
+    /// feature enabled.
+    ///
     /// Declared before `fd` so that it is dropped first (struct fields are
     /// dropped in declaration order).
-    #[cfg(feature = "io-uring")]
+    #[cfg(io_uring)]
     ring: super::io_uring::IoUringProxy,
     /// The open file handle backing this storage, wrapped so that the advisory
     /// lock taken by [`Self::lock`] is released when the handle is dropped.
@@ -125,7 +128,7 @@ impl FileBacked {
                 context: Some("file open".to_owned()),
             })?;
 
-        #[cfg(feature = "io-uring")]
+        #[cfg(io_uring)]
         let ring = super::io_uring::IoUringProxy::new().map_err(|err| FileIoError {
             inner: err,
             filename: Some(path.clone()),
@@ -139,7 +142,7 @@ impl FileBacked {
             cache_read_strategy,
             filename: path,
             node_hash_algorithm,
-            #[cfg(feature = "io-uring")]
+            #[cfg(io_uring)]
             ring,
             fd: UnlockOnDrop(fd),
         })
@@ -237,7 +240,10 @@ impl WritableStorage for FileBacked {
             .map_err(|e| self.file_io_error(e, offset, Some("write".to_owned())))
     }
 
-    #[cfg(feature = "io-uring")]
+    /// Overrides the serial [`WritableStorage::write_batch`] default with a
+    /// single batched ring submission. Compiled in only under `cfg(io_uring)`;
+    /// otherwise the trait default applies.
+    #[cfg(io_uring)]
     fn write_batch<'a, I: IntoIterator<Item = (u64, &'a [u8])> + Clone>(
         &self,
         writes: I,

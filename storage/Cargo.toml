@@ -45,7 +45,6 @@ parking_lot.workspace = true
 triomphe = "0.1.16"
 weak-table = "0.3.2"
 # Optional dependencies
-io-uring = { version = "0.7.13", optional = true }
 log = { version = "0.4.33", optional = true }
 sha3 = "0.12.0"
 bumpalo = { version = "3.20.3", features = ["collections", "std"] }
@@ -67,6 +66,12 @@ test-case.workspace = true
 [build-dependencies]
 bytemuck.workspace = true
 sha2.workspace = true
+
+# The io-uring crate only builds on Linux, so the dependency is declared per
+# target. The `io-uring` feature itself stays portable and is a no-op elsewhere;
+# see build.rs for the `cfg(io_uring)` alias that gates the code on both.
+[target.'cfg(target_os = "linux")'.dependencies]
+io-uring = { version = "0.7.13", optional = true }
 
 [features]
 logger = ["log"]

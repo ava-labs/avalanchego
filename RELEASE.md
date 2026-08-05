@@ -161,13 +161,13 @@ would automatically add the dependency with `workspace = true`).
 [dependencies]
 firewood-macros.workspace = true
 
-# more complex example
-[target.'cfg(target_os = "linux")'.dependencies]
+# inherit path and version from the workspace while adding a feature
 firewood-storage = { workspace = true, features = ["io-uring"] }
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-firewood-storage.workspace = true
 ```
+
+> [!NOTE]
+> `io-uring` needs no per-target dependency table. The feature is accepted on
+> every platform and only takes effect on Linux; see `storage/build.rs`.
 
 Thefefore, after updating the `workspace.package.version` value, we must update
 the dependency versions to match.

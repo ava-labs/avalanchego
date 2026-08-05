@@ -16,9 +16,24 @@ use std::path::PathBuf;
 
 use crate::{CacheReadStrategy, LinearAddress, MaybePersistedNode, SharedNode};
 pub(super) mod filebacked;
-#[cfg(feature = "io-uring")]
+/// Batched-write backend built on Linux `io_uring`.
+///
+/// Gated on `cfg(io_uring)`, which `build.rs` sets only when the `io-uring`
+/// feature is enabled *and* the target is Linux. The `io-uring` crate does not
+/// build on other targets, so the feature is accepted but inert there and
+/// [`FileBacked`](filebacked::FileBacked) falls back to the serial
+/// [`WritableStorage::write_batch`] default.
+#[cfg(io_uring)]
 mod io_uring;
 pub mod memory;
+
+/// Pins the `cfg(io_uring)` policy that `build.rs` implements.
+///
+/// A regression that stopped emitting the cfg would silently fall back to the
+/// serial write path on Linux without failing anything — the ring has no unit
+/// tests of its own. Conversely, emitting it off Linux would fail to compile
+/// with a confusing missing-crate error. This catches both at build time.
+const _: () = assert!(cfg!(io_uring) == (cfg!(feature = "io-uring") && cfg!(target_os = "linux")));
 
 /// An error that occurs when reading or writing to a [`ReadableStorage`] or [`WritableStorage`]
 ///
@@ -213,9 +228,14 @@ pub trait WritableStorage: ReadableStorage {
     /// Write a batch of objects to the storage.
     ///
     /// Implementations may provide a more efficient way to write multiple
-    /// objects at once.
+    /// objects at once. This default writes each object in turn via
+    /// [`Self::write`]; under `cfg(io_uring)`,
+    /// [`FileBacked`](filebacked::FileBacked) overrides it with a single ring
+    /// submission.
     ///
     /// The iterator is expected to be cheap to clone without copying the data.
+    /// The [`Clone`] bound exists for the io-uring override, which re-walks the
+    /// batch when retrying entries.
     fn write_batch<'a, I: IntoIterator<Item = (u64, &'a [u8])> + Clone>(
         &self,
         writes: I,

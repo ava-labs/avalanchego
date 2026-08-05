@@ -177,7 +177,7 @@ High tail latencies indicate write–read contention between concurrent commits 
 | ---------------------------------- | ------- | ------ | ------------------------- |
 | `firewood_rootstore_lookups_total` | counter | —      | Root-store fetch attempts |
 
-#### io_uring (only when `io-uring` feature is enabled)
+#### io_uring (only on Linux with the `io-uring` feature enabled)
 
 | Metric                                          | Type    | Labels | Description                                      |
 | ----------------------------------------------- | ------- | ------ | ------------------------------------------------ |

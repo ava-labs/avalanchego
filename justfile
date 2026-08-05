@@ -85,13 +85,14 @@ ci-test-ffi-compat hash_mode:
     cd "$test_dir"
     go test -count=1 -race ./...
 
-# Run macOS-compatible CI lints (all-features/io-uring remains Linux-only).
+# Run macOS-compatible CI lints.
 lint:
     ./scripts/run-just.sh ci-format
     ./scripts/run-just.sh ci-check-todos
     ./scripts/run-just.sh ci-rust clippy debug-no-default-features
     ./scripts/run-just.sh ci-rust clippy debug-no-features
     ./scripts/run-just.sh ci-rust clippy debug-ethhash-logger
+    ./scripts/run-just.sh ci-rust clippy debug-all-features
     ./scripts/run-just.sh ci-rust clippy maxperf-ethhash-logger
     ./scripts/run-just.sh ci-lint-markdown
     ./scripts/run-just.sh ci-docs
@@ -99,11 +100,12 @@ lint:
     ./scripts/run-just.sh ci-check-go-generate
     ./scripts/run-just.sh ci-machete
 
-# Run macOS-compatible CI unit tests (all-features/fuzz remain Linux-only).
+# Run macOS-compatible CI unit tests (differential fuzzing remains Linux-only).
 test:
     ./scripts/run-just.sh ci-rust test debug-no-default-features
     ./scripts/run-just.sh ci-rust test debug-no-features
     ./scripts/run-just.sh ci-rust test debug-ethhash-logger
+    ./scripts/run-just.sh ci-rust test debug-all-features
     ./scripts/run-just.sh ci-rust test maxperf-ethhash-logger
     ./scripts/run-just.sh ci-build-ffi firewood
     ./scripts/run-just.sh ci-test-ffi firewood

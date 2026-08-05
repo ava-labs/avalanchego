@@ -14,15 +14,20 @@ See [`CODE_REVIEW.md`](../CODE_REVIEW.md) for the complete set of code review ch
 ## Cargo Feature Matrix
 
 The following feature combinations must all pass `cargo clippy` and `cargo nextest`
-before a PR is ready. Skip `--all-features` on macOS (it includes `io-uring` which
-requires Linux):
+before a PR is ready, on either platform. The `io-uring` feature is portable but
+inert off Linux, so `--all-features` builds everywhere — only Linux actually
+compiles the ring backend.
 
 | Feature flags               | macOS | Linux |
 | --------------------------- | ----- | ----- |
 | (none)                      | ✓     | ✓     |
 | `--no-default-features`     | ✓     | ✓     |
 | `--features ethhash,logger` | ✓     | ✓     |
-| `--all-features`            | ✗     | ✓     |
+| `--all-features`            | ✓     | ✓     |
+
+`--all-features` requires rustc 1.94.1 or newer — above the 1.94.0 workspace MSRV
+— because it enables `fwdctl`'s `launch` feature, whose AWS SDK dependencies
+declare that floor. The other three rows build on 1.94.0.
 
 ## Commit and PR Conventions
 
