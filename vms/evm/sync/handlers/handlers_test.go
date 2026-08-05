@@ -119,40 +119,10 @@ func TestAppRequest(t *testing.T) {
 }
 
 func TestErrorSentinels(t *testing.T) {
-	// [common.AppError.Is] compares Code and nothing else.
-	sentinels := map[string]*common.AppError{
+	synctest.RequireDistinctAppErrors(t, map[string]*common.AppError{
 		"ErrMalformedRequest": handlers.ErrMalformedRequest,
 		"ErrMarshalResponse":  handlers.ErrMarshalResponse,
-	}
-	framework := []*common.AppError{
-		p2p.ErrUnexpected,
-		p2p.ErrUnregisteredHandler,
-		p2p.ErrNotValidator,
-		p2p.ErrThrottled,
-		common.ErrUndefined,
-		common.ErrTimeout,
-	}
-
-	// A code is the identity, the message is decoration. Each sentinel must:
-	//   - be findable by its code
-	//   - use a positive code, p2p owns the negatives and zero
-	//   - not share a code with a framework error
-	//   - not share a code with another sentinel
-	seen := make(map[int32]string, len(sentinels))
-	for name, sentinel := range sentinels {
-		t.Run(name, func(t *testing.T) {
-			require.ErrorIs(t, sentinel, &common.AppError{Code: sentinel.Code})
-			require.Positive(t, sentinel.Code, "p2p and the engine own the non-positive codes")
-
-			for _, f := range framework {
-				require.NotErrorIs(t, sentinel, f)
-			}
-		})
-
-		other, dup := seen[sentinel.Code]
-		require.Falsef(t, dup, "%s and %s share code %d", name, other, sentinel.Code)
-		seen[sentinel.Code] = name
-	}
+	})
 }
 
 func TestFault(t *testing.T) {

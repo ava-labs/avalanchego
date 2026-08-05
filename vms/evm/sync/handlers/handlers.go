@@ -19,19 +19,15 @@ import (
 
 var _ p2p.Handler = (*Handler[*emptypb.Empty, *emptypb.Empty])(nil)
 
-// [common.AppError.Is] matches on Code alone. p2p reserves the negatives.
-const (
-	codeMalformedRequest int32 = iota + 1
-	codeMarshalResponse
-)
-
+// Codes reach the peer, so they are explicit and never renumbered.
+// [common.AppError.Is] matches on Code alone, p2p owns the negatives and zero.
 var (
 	ErrMalformedRequest = &common.AppError{
-		Code:    codeMalformedRequest,
+		Code:    1,
 		Message: "malformed proto request",
 	}
 	ErrMarshalResponse = &common.AppError{
-		Code:    codeMarshalResponse,
+		Code:    2,
 		Message: "failed to marshal proto response",
 	}
 )
