@@ -40,11 +40,7 @@ var (
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, codeReader ethdb.KeyValueReader) error {
-	h := handlers.NewHandler(
-		log,
-		func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} },
-		newResponder(log, codeReader),
-	)
+	h := handlers.NewHandler[syncpb.GetCodeRequest](log, newResponder(log, codeReader))
 	return net.AddHandler(p2p.EVMCodeRequestHandlerID, h)
 }
 
