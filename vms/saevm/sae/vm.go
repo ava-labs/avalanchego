@@ -14,12 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -44,41 +42,24 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-type last struct {
-	accepted, settled atomic.Pointer[blocks.Block]
-}
-
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
 // ensure that the last-synchronous block (which MAY be the genesis) is
 // canonical on disk with its post-execution state committed before [NewVM] is
 // called.
 type VM struct {
-	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
 	metrics *metrics
 
-	db  ethdb.Database
-	xdb saetypes.ExecutionResults
+	*chain
 
 	consensusState utils.Atomic[snow.State]
 
-	preference     atomic.Pointer[blocks.Block]
-	last           *last
-	acceptedBlocks *event.FeedOf[*blocks.Block]
-	// Consensus-critical blocks are those either (a) undergoing a consensus
-	// decision; or (b) informing consensus invariants (e.g. artefacts to
-	// settle). The latter is defined as the history of accepted blocks up to,
-	// and including, the last-settled block.
-	consensusCritical *syncMap[common.Hash, *blocks.Block]
+	preference atomic.Pointer[blocks.Block]
 
-	exec         *saexec.Executor
-	mempool      *txgossip.Set
-	blockBuilder blockBuilder
-	rpcProvider  *rpc.Provider
-	newTxs       chan struct{}
-	chain        *chain
+	rpcProvider *rpc.Provider
+	newTxs      chan struct{}
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -185,15 +166,10 @@ func NewVM[T hook.Transaction](
 		pool,
 		ethBlockSource(consensusCritical, db),
 	}
-	acceptedBlocks := &event.FeedOf[*blocks.Block]{}
-	last := &last{}
-	head := exec.LastExecuted()
-	last.settled.Store(lastSettled)
-	last.accepted.Store(head)
 
 	// ==========  RPC Provider  ==========
 	chain := &chain{
-		Executor:          exec,
+		exec:              exec,
 		network:           network,
 		log:               snowCtx.Log,
 		hooks:             hooks,
@@ -201,11 +177,12 @@ func NewVM[T hook.Transaction](
 		db:                db,
 		xdb:               xdb,
 		mempool:           pool,
-		acceptedBlocks:    acceptedBlocks,
 		rpcConfig:         cfg.RPCConfig,
 		blockBuilder:      blockBuilder,
-		last:              last,
 	}
+	chain.last.settled.Store(lastSettled)
+	head := exec.LastExecuted()
+	chain.last.accepted.Store(head)
 	rpcProvider, err := rpc.New(chain, cfg.RPCConfig)
 	if err != nil {
 		return nil, err
@@ -220,22 +197,13 @@ func NewVM[T hook.Transaction](
 	m.markSettled(lastSettled.Height())
 
 	vm := &VM{
-		hooks:             hooks,
-		config:            cfg,
-		snowCtx:           snowCtx,
-		metrics:           m,
-		db:                db,
-		xdb:               xdb,
-		consensusCritical: consensusCritical,
-		exec:              exec,
-		toClose:           toClose,
-		mempool:           pool,
-		newTxs:            newTxs,
-		acceptedBlocks:    acceptedBlocks,
-		last:              last,
-		blockBuilder:      blockBuilder,
-		rpcProvider:       rpcProvider,
-		chain:             chain,
+		config:      cfg,
+		snowCtx:     snowCtx,
+		metrics:     m,
+		toClose:     toClose,
+		newTxs:      newTxs,
+		rpcProvider: rpcProvider,
+		chain:       chain,
 	}
 	vm.preference.Store(head)
 	return vm, nil

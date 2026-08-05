@@ -4,10 +4,16 @@
 package sae
 
 import (
+	"context"
+	"sync/atomic"
+
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -30,7 +36,7 @@ func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 var _ saerpc.Chain = (*chain)(nil)
 
 type chain struct {
-	*saexec.Executor
+	exec *saexec.Executor
 
 	blockBuilder blockBuilder
 	db           ethdb.Database
@@ -38,9 +44,15 @@ type chain struct {
 	mempool      *txgossip.Set
 	network      *network.Network
 
+	// Consensus-critical blocks are those either (a) undergoing a consensus
+	// decision; or (b) informing consensus invariants (e.g. artefacts to
+	// settle). The latter is defined as the history of accepted blocks up to,
+	// and including, the last-settled block.
 	consensusCritical *syncMap[common.Hash, *blocks.Block]
-	last              *last
-	acceptedBlocks    *event.FeedOf[*blocks.Block]
+	last              struct {
+		accepted, settled atomic.Pointer[blocks.Block]
+	}
+	acceptedBlocks event.FeedOf[*blocks.Block]
 
 	hooks     hook.Points
 	rpcConfig saerpc.Config
@@ -70,4 +82,32 @@ func (c *chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*
 
 func (c *chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return c.acceptedBlocks.Subscribe(ch)
+}
+
+// Since [chain] is embedded in [VM] we don't want to embed [saexec.Executor] as
+// it would promote all methods to be exported. Therefore the remaining methods
+// simply proxy to the executor.
+
+func (c *chain) ChainConfig() *params.ChainConfig { return c.exec.ChainConfig() }
+func (c *chain) ChainContext() core.ChainContext  { return c.exec.ChainContext() }
+func (c *chain) LastExecuted() *blocks.Block      { return c.exec.LastExecuted() }
+
+func (c *chain) StateDB(root common.Hash) (*state.StateDB, error) {
+	return c.exec.StateDB(root)
+}
+
+func (c *chain) RecentReceipt(ctx context.Context, tx common.Hash) (*saexec.Receipt, bool, error) {
+	return c.exec.RecentReceipt(ctx, tx)
+}
+
+func (c *chain) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
+	return c.exec.SubscribeChainEvent(ch)
+}
+
+func (c *chain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return c.exec.SubscribeChainHeadEvent(ch)
+}
+
+func (c *chain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
+	return c.exec.SubscribeLogsEvent(ch)
 }
