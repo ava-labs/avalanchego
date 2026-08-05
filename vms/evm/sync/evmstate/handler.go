@@ -28,15 +28,15 @@ import (
 
 var (
 	errInvalidRequest = &avacommon.AppError{
-		Code:    8,
+		Code:    3000,
 		Message: "invalid leaf request",
 	}
 	errRootNotFound = &avacommon.AppError{
-		Code:    9,
+		Code:    3001,
 		Message: "requested trie root not found",
 	}
 	errServingCancelled = &avacommon.AppError{
-		Code:    10,
+		Code:    3002,
 		Message: "serving cancelled",
 	}
 )
@@ -56,11 +56,7 @@ const (
 
 // RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, snapshot SnapshotReader) error {
-	h := handlers.NewHandler(
-		log,
-		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
-		newResponder(log, trieDB, trieKeyLength, snapshot),
-	)
+	h := handlers.NewHandler[syncpb.GetLeafRequest](log, newResponder(log, trieDB, trieKeyLength, snapshot))
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 

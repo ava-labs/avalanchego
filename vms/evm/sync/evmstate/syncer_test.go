@@ -190,9 +190,8 @@ func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash,
 // countingLeafHandler serves leaves and counts how many requests it receives,
 // so a test can assert the syncer's batching.
 func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
-	inner := handlers.NewHandler(
+	inner := handlers.NewHandler[syncpb.GetLeafRequest](
 		logging.NoLog{},
-		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
 		newResponder(logging.NoLog{}, trieDB, common.HashLength, nil),
 	)
 	var requests atomic.Int32
