@@ -49,9 +49,7 @@ type SyncerOption = options.Option[syncerConfig]
 // WithBlockVerifier adds a chain-specific check, such as C-Chain ExtDataHash.
 func WithBlockVerifier(v BlockVerifier) SyncerOption {
 	return options.Func[syncerConfig](func(c *syncerConfig) {
-		if v != nil {
-			c.verifyBlock = v
-		}
+		c.verifyBlock = v
 	})
 }
 
@@ -65,7 +63,7 @@ type Syncer struct {
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
-	verifyBlock   BlockVerifier
+	verifyBlock   BlockVerifier // nil when the caller supplied no chain-specific check
 }
 
 // NewSyncer returns a [Syncer] that fetches blocksToFetch blocks ending at
@@ -100,7 +98,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	nextHeight := s.fromHeight
 	toFetch := s.blocksToFetch
 
-	// Skip any suffix already on disk so we do not re-request it.
+	// Skip any suffix already on disk, whether from the node's own chain or an
+	// interrupted sync.
 	for toFetch > 0 {
 		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
@@ -130,6 +129,14 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			nextHeight--
 			toFetch--
 		}
+
+		if batch.ValueSize() < ethdb.IdealBatchSize {
+			continue
+		}
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("could not write blocks at %s: %w", nextHash, err)
+		}
+		batch.Reset()
 	}
 
 	return batch.Write()
