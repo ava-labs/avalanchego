@@ -26,7 +26,7 @@ var (
 	bonusBlockConsumersJSON []byte
 
 	// bonusBlockConsumers is the set of mainnet block heights which consumed
-	// UTXOs left unconsumed by [mainnetBonusBlocks].
+	// UTXOs left unconsumed by [bonusBlocks].
 	bonusBlockConsumers set.Set[uint64]
 )
 
