@@ -179,7 +179,7 @@ func (e *standardTxExecutor) putEthStaker(derived *txs.Tx, staker txs.BoundedSta
 }
 
 // EthSpend is the outcome of input selection: which UTXOs the tx consumes, how
-// much they hold, and the gas and fee that consuming exactly that many implies.
+// much they hold, and the fee it pays.
 type EthSpend struct {
 	Consumed []*avax.UTXO
 	Total    uint64
@@ -218,63 +218,60 @@ func NewEthSpender(
 	}
 }
 
-// selectEthInputs decides how an eth tx pays for [need] plus its own fee.
+// SelectInputs decides how an eth tx pays for [need] plus its own fee.
 //
-// Gas depends on the number of inputs consumed and the fee depends on gas, so
-// the requirement moves as inputs are added. The walk resolves that directly:
-// candidates are ordered by amount descending (ties by UTXO ID ascending), and
-// for each prefix of length n it tests the requirement computed for exactly n
-// inputs. It stops at the first n that holds, and the fee charged is the fee
-// that n implies, so the stopping condition and the charge can never disagree.
+// The fee is the signed gas limit times the price, so it is a constant here:
+// the target does not move as inputs are added, and the walk is a plain greedy
+// cover. Taking the largest amounts first minimizes the number of inputs needed
+// to reach a fixed target, so the first prefix that covers it is the smallest
+// one, and no other selection of the same size could do better.
 //
-// It terminates and finds the minimum n:
-//   - each added input raises the running total by its amount and raises the
-//     requirement by a constant (one read plus one write, priced), so the test
-//     is not circular, only monotone;
-//   - taking the largest amounts first maximizes the total for every n, so if
-//     any n-subset can cover the requirement for n inputs, the prefix does.
-//     Scanning n upward therefore finds the smallest workable input count.
+// The gas limit does still bound the work: it is converted up front into the
+// most inputs that limit pays for, using the same per-input yardstick the node
+// costs them at. A tx that signs more gas may consume more inputs.
 //
 // Ordering by amount is also what makes accounts unbrickable: UTXO IDs are
 // grindable offline, so any ID-first order lets an attacker plant ground low-ID
 // dust that displaces real funds. Amount-first means dust never displaces
 // value.
 //
-// ponytail: the candidate scan is O(the sender's UTXO count) while gas prices
-// only the inputs consumed, because ordering by amount requires reading every
+// ponytail: the candidate scan is O(the sender's UTXO count) while the input
+// budget is far smaller, because ordering by amount requires reading every
 // candidate. Bounding the scan without reintroducing grindability needs an
 // amount-ordered index, which is an ACP-level open item.
 func (e *EthSpender) SelectInputs(sender ids.ShortID, need uint64, rlpLen int, gasLimit uint64) (EthSpend, error) {
+	txFee, err := e.feeCalculator.CalculateFeeForGas(gas.Gas(gasLimit))
+	if err != nil {
+		return EthSpend{}, err
+	}
+	required, err := safemath.Add(need, txFee)
+	if err != nil {
+		return EthSpend{}, err
+	}
+
+	budget, err := e.inputBudget(rlpLen, gasLimit)
+	if err != nil {
+		return EthSpend{}, err
+	}
+	if budget == 0 {
+		oneInput, err := e.gasFor(rlpLen, 1)
+		if err != nil {
+			return EthSpend{}, err
+		}
+		return EthSpend{}, fmt.Errorf(
+			"%w: one input needs %d gas, limit is %d",
+			errEthGasLimitTooLowForInputs, oneInput, gasLimit,
+		)
+	}
+
 	candidates, err := e.candidates(sender)
 	if err != nil {
 		return EthSpend{}, err
 	}
 
-	maxInputs := min(len(candidates), txs.MaxEthRLPTxInputs)
 	var total uint64
-	for n := 1; n <= maxInputs; n++ {
+	for n := 1; n <= min(len(candidates), budget); n++ {
 		total, err = safemath.Add(total, amountOf(candidates[n-1]))
-		if err != nil {
-			return EthSpend{}, err
-		}
-
-		txGas, err := e.gasFor(rlpLen, n)
-		if err != nil {
-			return EthSpend{}, err
-		}
-		if uint64(txGas) > gasLimit {
-			// Everything from here on costs more gas, so the tx cannot pay for
-			// the inputs this account's fragmentation requires.
-			return EthSpend{}, fmt.Errorf(
-				"%w: %d inputs need %d gas, limit is %d",
-				errEthGasLimitTooLowForInputs, n, txGas, gasLimit,
-			)
-		}
-		txFee, err := e.feeCalculator.CalculateFeeForGas(txGas)
-		if err != nil {
-			return EthSpend{}, err
-		}
-		required, err := safemath.Add(need, txFee)
 		if err != nil {
 			return EthSpend{}, err
 		}
@@ -282,34 +279,58 @@ func (e *EthSpender) SelectInputs(sender ids.ShortID, need uint64, rlpLen int, g
 			return EthSpend{
 				Consumed: candidates[:n],
 				Total:    total,
-				Gas:      txGas,
+				Gas:      gas.Gas(gasLimit),
 				Fee:      txFee,
 			}, nil
 		}
 	}
 
-	// Nothing coverable. Distinguish "not enough AVAX at all" from "enough AVAX
-	// but too fragmented for one tx", because only the second is fixed by
-	// consolidating or raising the gas limit.
-	if len(candidates) > txs.MaxEthRLPTxInputs {
-		fullTotal := total
-		for _, utxo := range candidates[maxInputs:] {
-			fullTotal, err = safemath.Add(fullTotal, amountOf(utxo))
-			if err != nil {
-				return EthSpend{}, err
-			}
-		}
-		if fullTotal > total {
-			return EthSpend{}, fmt.Errorf(
-				"%w: %d UTXOs hold %d nAVAX but one tx may consume only %d of them",
-				errEthTooFragmented, len(candidates), fullTotal, txs.MaxEthRLPTxInputs,
-			)
+	// Not coverable within the budget. Distinguish "not enough AVAX at all"
+	// from "enough AVAX but more inputs than this tx pays to consume", because
+	// only the second is fixed by consolidating or raising the gas limit.
+	reachable := total
+	for _, utxo := range candidates[min(len(candidates), budget):] {
+		reachable, err = safemath.Add(reachable, amountOf(utxo))
+		if err != nil {
+			return EthSpend{}, err
 		}
 	}
-	return EthSpend{}, fmt.Errorf("%w: have %d nAVAX, need %d plus fee", errEthInsufficientFunds, total, need)
+	if reachable >= required {
+		// Raising the gas limit only helps while the budget is what binds. Once
+		// it is the structural ceiling, the only fix is consolidating.
+		if budget >= txs.MaxEthRLPTxInputs {
+			return EthSpend{}, fmt.Errorf(
+				"%w: %d nAVAX is spread over more than the %d inputs one tx may consume",
+				errEthTooFragmented, reachable, txs.MaxEthRLPTxInputs,
+			)
+		}
+		return EthSpend{}, fmt.Errorf(
+			"%w: %d nAVAX is spread over more than the %d inputs this gas limit pays for",
+			errEthGasLimitTooLowForInputs, reachable, budget,
+		)
+	}
+	return EthSpend{}, fmt.Errorf(
+		"%w: have %d nAVAX, need %d including the fee",
+		errEthInsufficientFunds, reachable, required,
+	)
 }
 
-// ethCandidates returns the sender's spendable AVAX UTXOs, deduplicated and
+// inputBudget is how many inputs [gasLimit] pays to consume, never more than
+// the structural ceiling so one tx can never be unbounded.
+func (e *EthSpender) inputBudget(rlpLen int, gasLimit uint64) (int, error) {
+	for n := txs.MaxEthRLPTxInputs; n >= 1; n-- {
+		txGas, err := e.gasFor(rlpLen, n)
+		if err != nil {
+			return 0, err
+		}
+		if uint64(txGas) <= gasLimit {
+			return n, nil
+		}
+	}
+	return 0, nil
+}
+
+// candidates returns the sender's spendable AVAX UTXOs, deduplicated and
 // ordered by amount descending then UTXO ID ascending.
 func (e *EthSpender) candidates(sender ids.ShortID) ([]*avax.UTXO, error) {
 	utxoIDs, err := e.state.UTXOIDs(sender.Bytes(), ids.Empty, math.MaxInt)
@@ -355,8 +376,57 @@ func (e *EthSpender) candidates(sender ids.ShortID) ([]*avax.UTXO, error) {
 	return candidates, nil
 }
 
+// gasFor is what the node charges itself for consuming numInputs, the yardstick
+// that turns a signed gas limit into an input budget.
 func (e *EthSpender) gasFor(rlpLen int, numInputs int) (gas.Gas, error) {
 	return fee.EthRLPTxComplexity(rlpLen, numInputs).ToGas(e.weights)
+}
+
+// MinGasFor is the gas a wallet must sign to spend numInputs UTXOs of a tx of
+// this serialized length.
+func (e *EthSpender) MinGasFor(rlpLen int, numInputs int) (gas.Gas, error) {
+	return e.gasFor(rlpLen, numInputs)
+}
+
+// EstimateGas is the smallest gas limit [sender] can sign and still cover
+// [need] plus the fee that limit costs.
+//
+// This is the question a wallet asks, and it is the one place the circularity
+// is real: a bigger limit buys more inputs but costs more, so the requirement
+// moves with the answer. It resolves by scanning input counts upward, because
+// both the gas for n inputs and the largest-first total for n inputs increase
+// with n, so the first n that covers its own cost is the cheapest one. A tx
+// signed for this result consumes exactly n inputs when it executes, since that
+// limit buys at least n and the target it must cover is the same.
+func (e *EthSpender) EstimateGas(sender ids.ShortID, need uint64, rlpLen int) (gas.Gas, error) {
+	candidates, err := e.candidates(sender)
+	if err != nil {
+		return 0, err
+	}
+
+	var total uint64
+	for n := 1; n <= min(len(candidates), txs.MaxEthRLPTxInputs); n++ {
+		total, err = safemath.Add(total, amountOf(candidates[n-1]))
+		if err != nil {
+			return 0, err
+		}
+		txGas, err := e.gasFor(rlpLen, n)
+		if err != nil {
+			return 0, err
+		}
+		txFee, err := e.feeCalculator.CalculateFeeForGas(txGas)
+		if err != nil {
+			return 0, err
+		}
+		required, err := safemath.Add(need, txFee)
+		if err != nil {
+			return 0, err
+		}
+		if total >= required {
+			return txGas, nil
+		}
+	}
+	return 0, fmt.Errorf("%w: %d nAVAX cannot cover %d plus its fee", errEthInsufficientFunds, total, need)
 }
 
 func amountOf(utxo *avax.UTXO) uint64 {

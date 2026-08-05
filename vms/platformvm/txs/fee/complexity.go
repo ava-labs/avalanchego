@@ -894,26 +894,41 @@ func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 	return complexity, err
 }
 
-func (c *complexityVisitor) EthRLPTx(tx *txs.EthRLPTx) error {
-	// Pre-execution accounting reserves the structural ceiling. How many inputs
-	// a tx really consumes is only known once selection runs against the state,
-	// and block capacity is consumed before execution, so reserving the ceiling
-	// is what keeps the accounted gas from ever falling below the work done.
-	// The fee charged is the real consumed-input gas; see
-	// [standardTxExecutor.EthRLPTx].
-	c.output = EthRLPTxMaxComplexity(len(tx.RLP))
-	return nil
+func (*complexityVisitor) EthRLPTx(*txs.EthRLPTx) error {
+	// An eth tx's gas is the limit it signed, not a function of its complexity
+	// dimensions. Callers must use TxGas, which is the one number every part of
+	// the system charges, accounts and bounds capacity by.
+	return ErrUnsupportedTx
 }
 
-// EthRLPTxComplexity is the cost of an eth tx consuming numInputs UTXOs:
-//   - Bandwidth: the actual serialized length. Credentials are not priced
-//     because an EthRLPTx must carry none (the eth signature is in the RLP).
+// TxGas is the gas [tx] costs: the amount charged, the amount that moves the
+// fee state, and the amount that counts against block capacity. Those are all
+// the same number by construction.
+//
+// An eth tx costs the gas limit it signed, with no refund for gas it did not
+// use, because a refund is exactly what would let it move the fee market for
+// less than it paid. Every other tx type costs its complexity, which is a pure
+// function of its bytes. Either way the number is readable before execution.
+func TxGas(tx txs.UnsignedTx, weights gas.Dimensions) (gas.Gas, error) {
+	if ethTx, ok := tx.(*txs.EthRLPTx); ok {
+		gasLimit, err := ethTx.GasLimit()
+		return gas.Gas(gasLimit), err
+	}
+	complexity, err := TxComplexity(tx)
+	if err != nil {
+		return 0, err
+	}
+	return complexity.ToGas(weights)
+}
+
+// EthRLPTxComplexity is what an eth tx consuming numInputs UTXOs costs the
+// node. It does not decide the fee, which is the signed gas limit; it is the
+// yardstick that turns a gas limit into an input budget, so a tx that signs
+// more gas may consume more inputs:
+//   - Bandwidth: the serialized length.
 //   - DBRead: the consumed UTXOs plus the sender's nonce.
 //   - DBWrite: the consumed UTXOs (deleted), the produced outputs, the nonce.
 //   - Compute: one signature recovery.
-//
-// It is a pure function of the serialized length and the input count, so it
-// needs neither parsing nor chain context.
 func EthRLPTxComplexity(rlpLen int, numInputs int) gas.Dimensions {
 	return gas.Dimensions{
 		gas.Bandwidth: uint64(rlpLen),
@@ -921,10 +936,4 @@ func EthRLPTxComplexity(rlpLen int, numInputs int) gas.Dimensions {
 		gas.DBWrite:   uint64(numInputs) + 3,
 		gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 	}
-}
-
-// EthRLPTxMaxComplexity is the complexity of an eth tx consuming the most
-// inputs any single tx may consume.
-func EthRLPTxMaxComplexity(rlpLen int) gas.Dimensions {
-	return EthRLPTxComplexity(rlpLen, txs.MaxEthRLPTxInputs)
 }

@@ -4,8 +4,6 @@
 package executor
 
 import (
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils"
@@ -16,11 +14,6 @@ import (
 )
 
 type Backend struct {
-	// EthGasUsed, when set, records the gas each eth tx consumed. It is a
-	// node-local convenience for receipts, never read by consensus, and may be
-	// nil in tests.
-	EthGasUsed *lru.Cache[ids.ID, uint64]
-
 	Config       *config.Internal
 	Ctx          *snow.Context
 	Clk          *mockable.Clock

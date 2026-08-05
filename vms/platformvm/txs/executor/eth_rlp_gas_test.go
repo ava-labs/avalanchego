@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -105,12 +104,12 @@ func TestEthRLPTxRespectsEVMTransferGasLimit(t *testing.T) {
 	})
 }
 
-// Adding an input raises the fee, which raises the requirement again. The walk
-// must settle on an input count whose own fee it can still cover, never one
-// chosen against a stale requirement.
-func TestEthRLPTxFeeConvergesOnTheMarginalInput(t *testing.T) {
+// The fee no longer moves with the input count, so the target is fixed: the
+// walk must still take a second input when the first cannot cover value plus
+// that fixed fee, and must charge the same fee either way.
+func TestEthRLPTxTakesASecondInputWhenTheFirstIsShort(t *testing.T) {
 	require := require.New(t)
-	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
+	env, onAcceptState, feeCalculator := ethFeeEnvMainnetWeights(t, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -118,77 +117,66 @@ func TestEthRLPTxFeeConvergesOnTheMarginalInput(t *testing.T) {
 	require.NoError(err)
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 
+	const rlpLen = 132
 	spender := NewEthSpender(
 		onAcceptState,
 		env.config.DynamicFeeConfig.Weights,
 		env.ctx.AVAXAssetID,
 		feeCalculator,
 	)
-	const rlpLen = 132
-	oneGas, err := spender.gasFor(rlpLen, 1)
+	// Sign enough gas for two inputs, so the budget is not what limits this.
+	twoInputGas, err := spender.MinGasFor(rlpLen, 2)
 	require.NoError(err)
-	twoGas, err := spender.gasFor(rlpLen, 2)
+	txFee, err := feeCalculator.CalculateFeeForGas(twoInputGas)
 	require.NoError(err)
-	oneFee, err := feeCalculator.CalculateFeeForGas(oneGas)
-	require.NoError(err)
-	twoFee, err := feeCalculator.CalculateFeeForGas(twoGas)
-	require.NoError(err)
-	require.Greater(twoFee, oneFee)
 
-	// Fund so that one input covers value plus the ONE-input fee exactly minus
-	// one nAVAX: one input is short, and the second input must cover both the
-	// shortfall and the fee increase it causes.
+	// The first input is one nAVAX short of value plus fee; the second covers
+	// the remainder exactly.
 	const value = 10 * units.Avax
-	firstAmount := value + oneFee - 1
+	firstAmount := value + txFee - 1
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, firstAmount)
-	// The second input is worth exactly the shortfall plus the fee delta, the
-	// tightest case that can still succeed.
-	secondAmount := 1 + (twoFee - oneFee)
-	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, secondAmount)
+	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 1)
 
-	spend, err := spender.SelectInputs(sender, value, rlpLen, 1_000_000)
+	spend, err := spender.SelectInputs(sender, value, rlpLen, uint64(twoInputGas))
 	require.NoError(err)
-	require.Len(spend.Consumed, 2, "one input cannot cover its own fee here")
-	require.Equal(twoFee, spend.Fee)
-	require.Equal(firstAmount+secondAmount, spend.Total)
-
-	// The charge is exactly what the stopping condition tested: no off-by-one.
+	require.Len(spend.Consumed, 2)
+	require.Equal(txFee, spend.Fee)
+	require.Equal(firstAmount+1, spend.Total)
 	require.GreaterOrEqual(spend.Total, value+spend.Fee)
 
-	// One nAVAX less in the second input and it cannot converge at all.
-	env2, onAcceptState2, feeCalculator2 := ethFeeEnv(t, upgradetest.Latest, 1)
+	// One nAVAX less and nothing covers it.
+	env2, onAcceptState2, feeCalculator2 := ethFeeEnvMainnetWeights(t, 1)
 	env2.ctx.Lock.Lock()
 	defer env2.ctx.Lock.Unlock()
 	fundEthAddress(onAcceptState2, env2.ctx.AVAXAssetID, ids.GenerateTestID(), sender, firstAmount)
-	fundEthAddress(onAcceptState2, env2.ctx.AVAXAssetID, ids.GenerateTestID(), sender, secondAmount-1)
 	spender2 := NewEthSpender(
 		onAcceptState2,
 		env2.config.DynamicFeeConfig.Weights,
 		env2.ctx.AVAXAssetID,
 		feeCalculator2,
 	)
-	_, err = spender2.SelectInputs(sender, value, rlpLen, 1_000_000)
+	_, err = spender2.SelectInputs(sender, value, rlpLen, uint64(twoInputGas))
 	require.ErrorIs(err, errEthInsufficientFunds)
 }
 
-// The fee charged must equal the fee the selection walk stopped on, which is
-// what makes the fee a pure function of (tx bytes, state).
+// The fee charged is the fee selection computed, so the fee is a pure function
+// of the tx bytes and the price.
 func TestEthRLPTxChargedFeeMatchesSelection(t *testing.T) {
 	require := require.New(t)
-	env, onAcceptState, feeCalculator := ethFeeEnv(t, upgradetest.Latest, 1)
+	env, onAcceptState, feeCalculator := ethFeeEnvMainnetWeights(t, 1)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 	sender := ids.ShortID(key.PublicKey().EthAddress())
-	// Three equal UTXOs, a spend that needs two of them.
 	for i := 0; i < 3; i++ {
 		fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 10*units.Avax)
 	}
 
 	const value = 15 * units.Avax
-	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), value, 100_000, ethChainID(env), 0, nil)
+	tx := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), value, 100_000,
+		defaultFeeCapWei, ethChainID(env), 0, nil)
 	unsigned := tx.Unsigned.(*txs.EthRLPTx)
 	require.NoError(unsigned.SyntacticVerify(env.ctx))
 
@@ -200,36 +188,118 @@ func TestEthRLPTxChargedFeeMatchesSelection(t *testing.T) {
 	)
 	spend, err := spender.SelectInputs(sender, value, len(unsigned.RLP), 100_000)
 	require.NoError(err)
-	require.Len(spend.Consumed, 2)
+	require.Len(spend.Consumed, 2, "two of the three 10 AVAX UTXOs cover 15 plus fee")
 
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
-	// The change output proves the exact fee charged.
 	change, err := onAcceptState.GetUTXO(inputID(tx.ID(), 1))
 	require.NoError(err)
-	charged := spend.Total - value - amountOf(change)
-	require.Equal(spend.Fee, charged)
+	require.Equal(spend.Fee, spend.Total-value-amountOf(change))
 
-	// And that fee is the two-input fee, not the one-input or ceiling fee.
-	twoGas, err := spender.gasFor(len(unsigned.RLP), 2)
+	// And that fee is the signed limit's fee.
+	wantFee, err := feeCalculator.CalculateFeeForGas(gas.Gas(100_000))
 	require.NoError(err)
-	twoFee, err := feeCalculator.CalculateFeeForGas(twoGas)
-	require.NoError(err)
-	require.Equal(twoFee, charged)
+	require.Equal(wantFee, spend.Fee)
 }
 
-// The pre-execution reservation must never be below what execution charges, or
-// a block could consume more gas than it accounted for.
-func TestEthRLPTxReservationCoversAnyExecution(t *testing.T) {
+// The fee is the signed gas limit times the price, so it scales with the limit.
+// That is what removes any leverage over the fee market: an attacker who wants
+// to move Excess pays for every unit of it.
+func TestEthRLPTxFeeScalesWithSignedGasLimit(t *testing.T) {
 	require := require.New(t)
+	env, onAcceptState, feeCalculator := ethFeeEnvMainnetWeights(t, 1)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
 
-	const rlpLen = 200
-	reserved, err := txfee.EthRLPTxMaxComplexity(rlpLen).ToGas(mainnetWeights)
+	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
-	for n := 1; n <= txs.MaxEthRLPTxInputs; n++ {
-		actual, err := txfee.EthRLPTxComplexity(rlpLen, n).ToGas(mainnetWeights)
-		require.NoError(err)
-		require.LessOrEqual(uint64(actual), uint64(reserved))
+	sender := ids.ShortID(key.PublicKey().EthAddress())
+	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
+
+	spender := NewEthSpender(
+		onAcceptState,
+		env.config.DynamicFeeConfig.Weights,
+		env.ctx.AVAXAssetID,
+		feeCalculator,
+	)
+	const rlpLen = 132
+	honest, err := spender.MinGasFor(rlpLen, 1)
+	require.NoError(err)
+
+	// Ten times the gas costs ten times the fee, exactly.
+	honestFee, err := feeCalculator.CalculateFeeForGas(honest)
+	require.NoError(err)
+	greedyFee, err := feeCalculator.CalculateFeeForGas(honest * 10)
+	require.NoError(err)
+	require.Equal(honestFee*10, greedyFee)
+
+	// And what a tx is charged is what its signed limit costs, whatever it
+	// actually needed.
+	padded := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax,
+		uint64(honest)*3/2, defaultFeeCapWei, ethChainID(env), 0, nil)
+	unsigned := padded.Unsigned.(*txs.EthRLPTx)
+	require.NoError(unsigned.SyntacticVerify(env.ctx))
+	txGas, err := txfee.TxGas(unsigned, env.config.DynamicFeeConfig.Weights)
+	require.NoError(err)
+	require.Equal(gas.Gas(unsigned.Parsed.Gas()), txGas)
+
+	expectedFee, err := feeCalculator.CalculateFeeForGas(txGas)
+	require.NoError(err)
+	_, _, _, err = StandardTx(&env.backend, feeCalculator, padded, onAcceptState)
+	require.NoError(err)
+
+	change, err := onAcceptState.GetUTXO(inputID(padded.ID(), 1))
+	require.NoError(err)
+	charged := 100*units.Avax - units.Avax - amountOf(change)
+	require.Equal(expectedFee, charged, "charged the signed limit, not what it used")
+}
+
+// The wallet flows that matter in practice: our exact estimate, a padded limit
+// like Rabby signs, and a dapp hardcoding the EVM transfer constant. All three
+// must land; the padded ones simply overpay.
+func TestEthRLPTxWalletGasLimitFlows(t *testing.T) {
+	const rlpLen = 132
+	for _, tt := range []struct {
+		name     string
+		gasLimit func(exact uint64) uint64
+	}{
+		{name: "exact estimate", gasLimit: func(exact uint64) uint64 { return exact }},
+		{name: "padded 1.5x", gasLimit: func(exact uint64) uint64 { return exact * 3 / 2 }},
+		{name: "hardcoded 21000", gasLimit: func(uint64) uint64 { return 21_000 }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			env, onAcceptState, feeCalculator := ethFeeEnvMainnetWeights(t, 1)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			key, err := secp256k1.NewPrivateKey()
+			require.NoError(err)
+			sender := ids.ShortID(key.PublicKey().EthAddress())
+			fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
+
+			spender := NewEthSpender(
+				onAcceptState,
+				env.config.DynamicFeeConfig.Weights,
+				env.ctx.AVAXAssetID,
+				feeCalculator,
+			)
+			exact, err := spender.MinGasFor(rlpLen, 1)
+			require.NoError(err)
+
+			gasLimit := tt.gasLimit(uint64(exact))
+			tx := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax,
+				gasLimit, defaultFeeCapWei, ethChainID(env), 0, nil)
+			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+			require.NoError(err)
+
+			// Charged exactly the signed limit.
+			wantFee, err := feeCalculator.CalculateFeeForGas(gas.Gas(gasLimit))
+			require.NoError(err)
+			change, err := onAcceptState.GetUTXO(inputID(tx.ID(), 1))
+			require.NoError(err)
+			require.Equal(wantFee, 100*units.Avax-units.Avax-amountOf(change))
+		})
 	}
 }

@@ -65,7 +65,7 @@ func fundEthKey(t *testing.T, vm *VM, amount uint64) *secp256k1.PrivateKey {
 
 func signedTransferRLP(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte) string {
 	t.Helper()
-	return signedTransferRLPWithGas(t, vm, key, nonce, to, amountNAVAX, calldata, 10_000_000)
+	return signedTransferRLPWithGas(t, vm, key, nonce, to, amountNAVAX, calldata, 500)
 }
 
 func signedTransferRLPWithGas(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte, gasLimit uint64) string {
@@ -525,14 +525,21 @@ func TestEthAPIEstimateGasMatchesChargedFee(t *testing.T) {
 			require.Equal("0x1", receipt["status"])
 			gasUsed := hexToBig(t, receipt["gasUsed"].(string))
 
-			// The estimate covers the charge, and the only difference is the
-			// unused envelope slack priced as bandwidth, since the exact
-			// serialized length is unknowable before signing.
-			require.LessOrEqual(gasUsed.Uint64(), estimate.Uint64())
+			// A wallet that signs the estimate is charged exactly it: the tx
+			// pays for the limit it signed, so estimate and gasUsed are the
+			// same number.
+			require.Equal(estimate.Uint64(), gasUsed.Uint64())
+
+			// The estimate prices the envelope bound rather than the tx's real
+			// length, which the wallet cannot know before signing, so the user
+			// pays for the bound. That overshoot is bounded and visible.
 			rlpLen := uint64(len(ethcommon.FromHex(raw)))
-			slack := (uint64(txs.MaxEthRLPEnvelopeBytes) - rlpLen) *
+			overshoot := (uint64(txs.MaxEthRLPEnvelopeBytes) - rlpLen) *
 				uint64(vm.DynamicFeeConfig.Weights[gas.Bandwidth])
-			require.Equal(slack, estimate.Uint64()-gasUsed.Uint64())
+			exactForRealLength, err := fee.EthRLPTxComplexity(int(rlpLen), tt.wantInputs).
+				ToGas(vm.DynamicFeeConfig.Weights)
+			require.NoError(err)
+			require.Equal(uint64(exactForRealLength)+overshoot, estimate.Uint64())
 
 			// And it is the gas for the expected number of inputs.
 			wantGas, err := fee.EthRLPTxComplexity(

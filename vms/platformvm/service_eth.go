@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -449,18 +448,9 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 				return err
 			}
 			txID := tx.ID()
-			txGas, ok := a.vm.ethGasUsed.Get(txID)
-			if !ok {
-				// This node did not execute the tx itself (it was bootstrapped
-				// or restarted), so the consumed input count is not recoverable
-				// and the reservation is the honest upper bound.
-				reserved, err := fee.EthRLPTxMaxComplexity(len(unsigned.RLP)).
-					ToGas(a.vm.DynamicFeeConfig.Weights)
-				if err != nil {
-					return err
-				}
-				txGas = uint64(reserved)
-			}
+			// The tx was charged for the gas limit it signed, so that is its
+			// gasUsed. Readable from the tx itself, on any node.
+			txGas := unsigned.Parsed.Gas()
 			record := ethReceiptRecord{
 				height:   h,
 				blkID:    blkID,

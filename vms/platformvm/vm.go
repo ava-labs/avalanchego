@@ -80,11 +80,6 @@ type VM struct {
 	fx            fx.Fx
 	codecRegistry codec.Registry
 
-	// ethGasUsed records the gas eth txs actually consumed, so receipts report
-	// the fee that was charged rather than the reservation. Node-local and
-	// bounded: a node that did not execute a tx falls back to the reservation.
-	ethGasUsed *lru.Cache[ids.ID, uint64]
-
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.Atomic[bool]
 
@@ -98,9 +93,6 @@ type VM struct {
 
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
-// ethGasUsedCacheSize bounds the receipt gas record.
-const ethGasUsedCacheSize = 4096
-
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
@@ -161,10 +153,7 @@ func (vm *VM) Initialize(
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 
-	vm.ethGasUsed = lru.NewCache[ids.ID, uint64](ethGasUsedCacheSize)
-
 	txExecutorBackend := &txexecutor.Backend{
-		EthGasUsed:   vm.ethGasUsed,
 		Config:       &vm.Internal,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,

@@ -76,8 +76,15 @@ func newSignedEthTransfer(
 	return newSignedEthTx(t, key, nonce, to, amountNAVAX, gasLimit, defaultFeeCapWei, chainID, extraWei, calldata)
 }
 
-// defaultFeeCapWei covers a 1 nAVAX per gas price.
-const defaultFeeCapWei = 1_000_000_000
+const (
+	// defaultFeeCapWei covers a 1 nAVAX per gas price.
+	defaultFeeCapWei = 1_000_000_000
+
+	// defaultEthGasLimit is a realistic wallet gas limit. It matters that this
+	// is small: a tx is charged for the limit it signs, so a test that signed
+	// an absurd limit would be asserting an absurd fee.
+	defaultEthGasLimit = 100_000
+)
 
 // ethChainID is the facade chain ID of the environment's network.
 func ethChainID(env *environment) *big.Int {
@@ -171,7 +178,7 @@ func TestEthRLPTxTransfer(t *testing.T) {
 
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 10*units.Avax)
 
-	tx := newSignedEthTransfer(t, key, 0, recipient, 3*units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, recipient, 3*units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -211,7 +218,7 @@ func TestEthRLPTxNonceRule(t *testing.T) {
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
 	issue := func(nonce uint64) error {
-		tx := newSignedEthTransfer(t, key, nonce, recipient, units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
+		tx := newSignedEthTransfer(t, key, nonce, recipient, units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 		_, _, _, err := StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 		return err
 	}
@@ -250,7 +257,7 @@ func TestEthRLPTxSelectionDeterminism(t *testing.T) {
 		}
 	}
 
-	tx := newSignedEthTransfer(t, key, 0, recipient, 7*units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, recipient, 7*units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
 
@@ -288,12 +295,12 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 		},
 		{
 			name: "dust value",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, ethChainID(env), 1, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, defaultEthGasLimit, ethChainID(env), 1, nil),
 			err:  txs.ErrValueDust,
 		},
 		{
 			name: "non-empty calldata",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, ethChainID(env), 0, []byte{0x01}),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, defaultEthGasLimit, ethChainID(env), 0, []byte{0x01}),
 			err:  txs.ErrNonEmptyCalldata,
 		},
 		{
@@ -303,7 +310,7 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 		},
 		{
 			name: "insufficient funds",
-			tx:   newSignedEthTransfer(t, key, 0, recipient, 1000*units.Avax, 10*units.Avax, ethChainID(env), 0, nil),
+			tx:   newSignedEthTransfer(t, key, 0, recipient, 1000*units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil),
 			err:  errEthInsufficientFunds,
 		},
 	}
@@ -323,7 +330,7 @@ func TestEthRLPTxSenderRecovery(t *testing.T) {
 	require.NoError(err)
 	recipient := ids.GenerateTestShortID()
 
-	tx := newSignedEthTransfer(t, key, 7, recipient, units.Avax, units.Avax, ethChainID(env), 0, nil)
+	tx := newSignedEthTransfer(t, key, 7, recipient, units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 	unsigned := tx.Unsigned.(*txs.EthRLPTx)
 	require.NoError(unsigned.SyntacticVerify(env.ctx))
 	require.Equal(ids.ShortID(key.PublicKey().EthAddress()), unsigned.Sender)
@@ -340,7 +347,7 @@ func TestEthRLPTxPreHelicon(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
-	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(t, err, errHeliconUpgradeNotActive)
 }
@@ -388,7 +395,7 @@ func TestEthRLPTxInputBound(t *testing.T) {
 	}
 
 	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(),
-		txs.MaxEthRLPTxInputs*dust, 10*units.Avax, ethChainID(env), 0, nil)
+		(txs.MaxEthRLPTxInputs+3)*dust, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.ErrorIs(err, errEthTooFragmented)
 }

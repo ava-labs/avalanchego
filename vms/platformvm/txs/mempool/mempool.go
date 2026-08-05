@@ -246,12 +246,9 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		return meteredTx{}, errAVAXMinted
 	}
 
-	c, err := fee.TxComplexity(tx.Unsigned)
-	if err != nil {
-		return meteredTx{}, err
-	}
-
-	gasUsed, err := c.ToGas(m.weights)
+	// The same single number the block accounts and charges for, so mempool
+	// occupancy and ordering cannot be gamed against the fee.
+	gasUsed, err := fee.TxGas(tx.Unsigned, m.weights)
 	if err != nil {
 		return meteredTx{}, err
 	}

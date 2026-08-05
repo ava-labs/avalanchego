@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -529,34 +530,28 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	bool,
 	error,
 ) {
-	// Complexity is limited first to avoid processing too large of a block.
+	// Gas is limited first to avoid processing too large of a block. Every tx
+	// type's gas is readable from its bytes: a complexity for native txs, the
+	// signed gas limit for eth txs.
 	var gasConsumed gas.Gas
 	if timestamp := diff.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		var blockComplexity gas.Dimensions
 		for _, tx := range txs {
-			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
+			txGas, err := txfee.TxGas(tx.Unsigned, v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err)
 				return nil, nil, nil, 0, false, err
 			}
 
-			blockComplexity, err = blockComplexity.Add(&txComplexity)
+			gasConsumed, err = safemath.Add(gasConsumed, txGas)
 			if err != nil {
-				return nil, nil, nil, 0, false, fmt.Errorf("block complexity overflow: %w", err)
+				return nil, nil, nil, 0, false, fmt.Errorf("block gas overflow: %w", err)
 			}
-		}
-
-		var err error
-		gasConsumed, err = blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
-		if err != nil {
-			return nil, nil, nil, 0, false, fmt.Errorf("block gas overflow: %w", err)
 		}
 
 		// If this block exceeds the available capacity, ConsumeGas will return
 		// an error.
-		feeState := diff.GetFeeState()
-		feeState, err = feeState.ConsumeGas(gasConsumed)
+		feeState, err := diff.GetFeeState().ConsumeGas(gasConsumed)
 		if err != nil {
 			return nil, nil, nil, 0, false, err
 		}

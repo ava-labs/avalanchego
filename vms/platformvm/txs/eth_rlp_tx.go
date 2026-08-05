@@ -196,6 +196,20 @@ func (tx *EthRLPTx) Visit(visitor Visitor) error {
 	return visitor.EthRLPTx(tx)
 }
 
+// GasLimit is the tx's gas: the limit it signed. It is readable from the tx
+// bytes with no chain context and no execution, which is what lets block
+// accounting price an eth tx exactly like any other tx type.
+func (tx *EthRLPTx) GasLimit() (uint64, error) {
+	if tx.Parsed != nil {
+		return tx.Parsed.Gas(), nil
+	}
+	eth := new(ethtypes.Transaction)
+	if err := eth.UnmarshalBinary(tx.RLP); err != nil {
+		return 0, fmt.Errorf("parsing eth tx: %w", err)
+	}
+	return eth.Gas(), nil
+}
+
 // IsStakingCall reports whether this tx targets the staking system address.
 // Only meaningful after SyntacticVerify.
 func (tx *EthRLPTx) IsStakingCall() bool {

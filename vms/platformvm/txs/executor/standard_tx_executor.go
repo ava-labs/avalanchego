@@ -1626,11 +1626,10 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		return fmt.Errorf("%w: got nonce %d, minimum %d", errStaleNonce, nonce, nextNonce)
 	}
 
-	// Gas semantics mirror the EVM: the signed gas limit is the budget that
-	// bounds how much work the tx may do, maxFeePerGas must cover the current
-	// price, and the fee charged is exactly the gas consumed times the price.
-	// How much gas that is depends on how many inputs selection consumes, so
-	// the budget and the selection walk are resolved together.
+	// The signed gas limit is the tx's gas: it is what the fee state is charged
+	// and what block capacity is consumed for, and it bounds how many inputs
+	// selection may consume. There is no refund for gas the tx did not use,
+	// which is what keeps the charged amount and the fee-market amount equal.
 	rlpLen := len(tx.RLP)
 	gasLimit := tx.Parsed.Gas()
 
@@ -1715,8 +1714,5 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 	}
 
 	e.state.SetNextNonce(tx.Sender, tx.Parsed.Nonce()+1)
-	if e.backend.EthGasUsed != nil {
-		e.backend.EthGasUsed.Put(txID, uint64(spend.Gas))
-	}
 	return nil
 }

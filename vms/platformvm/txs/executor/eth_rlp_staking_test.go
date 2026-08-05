@@ -93,7 +93,7 @@ func newSignedEthStake(
 ) *txs.Tx {
 	t.Helper()
 	return newSignedEthCall(t, key, nonce, ids.ShortID(txs.EthStakingAddress),
-		stakeNAVAX, 10*units.Avax, defaultFeeCapWei, ethChainID(env), 0, calldata)
+		stakeNAVAX, defaultEthGasLimit, defaultFeeCapWei, ethChainID(env), 0, calldata)
 }
 
 func newBLSKey(t *testing.T) ([]byte, []byte, *signer.ProofOfPossession) {
@@ -343,7 +343,7 @@ func TestEthRLPTxCalldataOnlyForSystemAddress(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
 
-	tx := newSignedEthCall(t, key, 0, ids.GenerateTestShortID(), units.Avax, units.Avax,
+	tx := newSignedEthCall(t, key, 0, ids.GenerateTestShortID(), units.Avax, defaultEthGasLimit,
 		defaultFeeCapWei, ethChainID(env), 0, delegateCalldata(ids.GenerateTestNodeID(), 1))
 	require.ErrorIs(t, tx.Unsigned.SyntacticVerify(env.ctx), txs.ErrNonEmptyCalldata)
 }

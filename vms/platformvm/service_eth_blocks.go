@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 
@@ -290,11 +289,16 @@ func boolParam(params []json.RawMessage, i int) bool {
 	return v
 }
 
-// estimateGas runs the real selection walk against current state, so the answer
-// is the gas execution will charge for that send. It is state-dependent: a UTXO
-// arriving before the tx lands can change how many inputs are needed, which is
-// EVM-normal (a state change between estimate and execution moves gas there
-// too). The result is what the caller should sign as its gas limit.
+// estimateGas runs the real selection walk against current state and returns
+// the gas the send needs, which is what the caller should sign as its limit.
+//
+// It is load-bearing: the tx is charged for the limit it signs, with no refund,
+// so this number is what the user pays. Two consequences worth stating:
+//   - It is state-dependent. A UTXO arriving before the tx lands can change how
+//     many inputs are needed, which is EVM-normal.
+//   - The serialized length is unknown before signing, so bandwidth is priced
+//     at the envelope bound. A tx that ends up shorter simply pays for the
+//     bound, which is correct under charge-the-limit rather than an error.
 func (a *ethAPI) estimateGas(call *ethCallArgs) (any, error) {
 	if call.From == nil {
 		// Without a sender there is nothing to select from; price the
@@ -323,18 +327,11 @@ func (a *ethAPI) estimateGas(call *ethCallArgs) (any, error) {
 		a.vm.ctx.AVAXAssetID,
 		state.PickFeeCalculator(&a.vm.Internal, a.vm.state),
 	)
-	spend, err := spender.SelectInputs(
-		ids.ShortID(*call.From),
-		amount,
-		rlpLen,
-		// Estimating is not spending, so the walk is bounded only by the
-		// structural ceiling here.
-		math.MaxUint64,
-	)
+	txGas, err := spender.EstimateGas(ids.ShortID(*call.From), amount, rlpLen)
 	if err != nil {
 		return nil, err
 	}
-	return hexUint(uint64(spend.Gas)), nil
+	return hexUint(uint64(txGas)), nil
 }
 
 // weiToNAVAX converts a call object's value, rejecting sub-nAVAX dust the same

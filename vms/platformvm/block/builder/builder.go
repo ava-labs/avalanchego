@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -451,7 +452,7 @@ func packEtnaBlockTxs(
 	var (
 		blockTxs        []*txs.Tx
 		inputs          set.Set[ids.ID]
-		blockComplexity gas.Dimensions
+		currentBlockGas gas.Gas
 		feeCalculator   = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
 
@@ -462,11 +463,6 @@ func packEtnaBlockTxs(
 		zap.Int("mempoolLen", mempool.Len()),
 	)
 	for {
-		currentBlockGas, err := blockComplexity.ToGas(backend.Config.DynamicFeeConfig.Weights)
-		if err != nil {
-			return nil, err
-		}
-
 		tx, exists := mempool.Peek()
 		if !exists {
 			backend.Ctx.Log.Debug("mempool is empty",
@@ -477,15 +473,11 @@ func packEtnaBlockTxs(
 			break
 		}
 
-		txComplexity, err := fee.TxComplexity(tx.Unsigned)
+		txGas, err := fee.TxGas(tx.Unsigned, backend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
 			return nil, err
 		}
-		newBlockComplexity, err := blockComplexity.Add(&txComplexity)
-		if err != nil {
-			return nil, err
-		}
-		newBlockGas, err := newBlockComplexity.ToGas(backend.Config.DynamicFeeConfig.Weights)
+		newBlockGas, err := safemath.Add(currentBlockGas, txGas)
 		if err != nil {
 			return nil, err
 		}
@@ -518,7 +510,7 @@ func packEtnaBlockTxs(
 			continue
 		}
 
-		blockComplexity = newBlockComplexity
+		currentBlockGas = newBlockGas
 		blockTxs = append(blockTxs, tx)
 	}
 

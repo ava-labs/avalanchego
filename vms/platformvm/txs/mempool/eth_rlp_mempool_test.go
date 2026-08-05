@@ -45,7 +45,7 @@ func newEthTxWithFeeCap(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, f
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(0),
 			GasFeeCap: feeCap,
-			Gas:       1_000_000,
+			Gas:       ethTestGasLimit,
 			To:        &to,
 			Value:     big.NewInt(1e18),
 		},
@@ -58,9 +58,16 @@ func newEthTxWithFeeCap(t *testing.T, key *secp256k1.PrivateKey, nonce uint64, f
 	return tx
 }
 
-// ethTestGasPrice is the price the test mempool reports, high enough that eth
-// bids below it are not clamped.
-const ethTestGasPrice gas.Price = 1_000_000
+const (
+	// ethTestGasPrice is the price the test mempool reports, high enough that
+	// eth bids below it are not clamped.
+	ethTestGasPrice gas.Price = 1_000_000
+
+	// ethTestGasLimit is what the test txs sign. An eth tx is metered at its
+	// signed limit, the same number it is charged for, so this is also its
+	// mempool footprint.
+	ethTestGasLimit = 1_000
+)
 
 func testCtx(t *testing.T) *snow.Context {
 	t.Helper()
@@ -143,13 +150,9 @@ func TestMempoolEthEviction(t *testing.T) {
 	require.NoError(err)
 	probe := newEthTx(t, key0, 0, 1)
 	weights := gas.Dimensions{gas.Bandwidth: 1, gas.DBRead: 1, gas.DBWrite: 1, gas.Compute: 1}
-	cheapComplexity, err := fee.TxComplexity(cheapTx.Unsigned)
+	cheapGas, err := fee.TxGas(cheapTx.Unsigned, weights)
 	require.NoError(err)
-	cheapGas, err := cheapComplexity.ToGas(weights)
-	require.NoError(err)
-	ethComplexity, err := fee.TxComplexity(probe.Unsigned)
-	require.NoError(err)
-	ethGas, err := ethComplexity.ToGas(weights)
+	ethGas, err := fee.TxGas(probe.Unsigned, weights)
 	require.NoError(err)
 
 	m := newEthMempool(t, cheapGas+ethGas-1, ethTestGasPrice)

@@ -196,8 +196,8 @@ func sendViaClient(
 	}
 	receipt, err := client.TransactionReceipt(ctx, signed.Hash())
 	must(err)
-	fmt.Printf("Receipt:           block %d, status %d, gasUsed %d, fee %s wei\n",
-		receipt.BlockNumber, receipt.Status, receipt.GasUsed,
+	fmt.Printf("Receipt:           block %d, status %d, gasUsed %d (signed %d), fee %s wei\n",
+		receipt.BlockNumber, receipt.Status, receipt.GasUsed, gas,
 		new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), receipt.EffectiveGasPrice))
 	return receipt
 }

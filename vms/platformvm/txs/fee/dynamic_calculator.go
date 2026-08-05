@@ -49,19 +49,9 @@ func (c *dynamicCalculator) CalculateFeeForGas(g gas.Gas) (uint64, error) {
 }
 
 func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
-	complexity, err := TxComplexity(tx)
+	gas, err := TxGas(tx, c.weights)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrCalculatingComplexity, err)
-	}
-	gas, err := complexity.ToGas(c.weights)
-	if err != nil {
-		return 0, fmt.Errorf(
-			"%w with complexity (%v) and weights (%v): %w",
-			ErrCalculatingGas,
-			complexity,
-			c.weights,
-			err,
-		)
+		return 0, fmt.Errorf("%w: %w", ErrCalculatingGas, err)
 	}
 	fee, err := gas.Cost(c.price)
 	if err != nil {

@@ -183,11 +183,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	}
 
 	if timestamp := stateDiff.GetTimestamp(); m.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		complexity, err := fee.TxComplexity(tx.Unsigned)
-		if err != nil {
-			return fmt.Errorf("failed to calculate tx complexity: %w", err)
-		}
-		gas, err := complexity.ToGas(m.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		txGas, err := fee.TxGas(tx.Unsigned, m.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
 			return fmt.Errorf("failed to calculate tx gas: %w", err)
 		}
@@ -195,8 +191,8 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		// TODO: After the mempool is updated, convert this check to use the
 		// maximum mempool capacity.
 		feeState := stateDiff.GetFeeState()
-		if gas > feeState.Capacity {
-			return fmt.Errorf("tx exceeds current gas capacity: %d > %d", gas, feeState.Capacity)
+		if txGas > feeState.Capacity {
+			return fmt.Errorf("tx exceeds current gas capacity: %d > %d", txGas, feeState.Capacity)
 		}
 	}
 

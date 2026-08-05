@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -37,7 +38,7 @@ func TestEthRLPTxRejectsCredentialPadding(t *testing.T) {
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
-	honest := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
+	honest := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, defaultEthGasLimit,
 		ethChainID(env), 0, nil)
 	padded := &txs.Tx{
 		Unsigned: &txs.EthRLPTx{RLP: honest.Unsigned.(*txs.EthRLPTx).RLP},
@@ -52,30 +53,31 @@ func TestEthRLPTxRejectsCredentialPadding(t *testing.T) {
 	require.ErrorIs(err, errEthCredentials)
 }
 
-// Bandwidth is priced from the serialized length, so a bigger tx always costs
-// more. This is what makes size-based padding unprofitable rather than free.
-func TestEthRLPTxBandwidthPricedFromActualSize(t *testing.T) {
+// An eth tx's gas is the limit it signed, and that is the number every part of
+// the system uses. Padding the tx cannot change what it pays, and complexity
+// dimensions are not a second path to a different answer.
+func TestEthRLPTxGasIsTheSignedLimit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.Latest)
+	weights := env.config.DynamicFeeConfig.Weights
 
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	small := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
+	for _, gasLimit := range []uint64{21_000, 100_000, 5_000_000} {
+		tx := newSignedEthTx(t, key, 0, ids.GenerateTestShortID(), units.Avax, gasLimit,
+			defaultFeeCapWei, ethChainID(env), 0, nil)
+		txGas, err := txfee.TxGas(tx.Unsigned, weights)
+		require.NoError(err)
+		require.Equal(gas.Gas(gasLimit), txGas)
+	}
+
+	// The complexity visitor refuses eth txs, so nothing can accidentally
+	// price one by its dimensions instead.
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, defaultEthGasLimit,
 		ethChainID(env), 0, nil)
-	large := newSignedEthStake(t, env, key, 1, units.Avax,
-		delegateCalldata(ids.GenerateTestNodeID(), 1700000000))
-
-	smallComplexity, err := txfee.TxComplexity(small.Unsigned)
-	require.NoError(err)
-	largeComplexity, err := txfee.TxComplexity(large.Unsigned)
-	require.NoError(err)
-
-	smallRLP := len(small.Unsigned.(*txs.EthRLPTx).RLP)
-	largeRLP := len(large.Unsigned.(*txs.EthRLPTx).RLP)
-	require.Equal(uint64(smallRLP), smallComplexity[0])
-	require.Equal(uint64(largeRLP), largeComplexity[0])
-	require.Greater(largeComplexity[0], smallComplexity[0])
+	_, err = txfee.TxComplexity(tx.Unsigned)
+	require.ErrorIs(err, txfee.ErrUnsupportedTx)
 }
 
 // The envelope bound eth_estimateGas prices with must never be below what an
@@ -117,11 +119,11 @@ func TestEthRLPTxRejectsMaxNonce(t *testing.T) {
 	recipient := ids.GenerateTestShortID()
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
-	first := newSignedEthTransfer(t, key, 0, recipient, units.Avax, 10*units.Avax, ethChainID(env), 0, nil)
+	first := newSignedEthTransfer(t, key, 0, recipient, units.Avax, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, first, onAcceptState)
 	require.NoError(err)
 
-	wrap := newSignedEthTransfer(t, key, math.MaxUint64, recipient, units.Avax, 10*units.Avax,
+	wrap := newSignedEthTransfer(t, key, math.MaxUint64, recipient, units.Avax, defaultEthGasLimit,
 		ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, wrap, onAcceptState)
 	require.ErrorIs(err, txs.ErrNonceTooLarge)
@@ -170,7 +172,7 @@ func TestEthRLPTxDustCannotBrickAnAccount(t *testing.T) {
 		planted++
 	}
 
-	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, 10*units.Avax,
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), units.Avax, defaultEthGasLimit,
 		ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err, "dust displaced the victim's real balance")
@@ -204,7 +206,7 @@ func TestEthRLPTxSelectsLargestUTXOsFirst(t *testing.T) {
 		smallIDs = append(smallIDs, inputID(txID, 0))
 	}
 
-	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), 6*units.Avax, 10*units.Avax,
+	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(), 6*units.Avax, defaultEthGasLimit,
 		ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
 	require.NoError(err)
@@ -232,7 +234,7 @@ func TestEthRLPTxZeroValueCancel(t *testing.T) {
 	fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, 100*units.Avax)
 
 	// The cancel: a zero-value self-send at the stuck nonce.
-	cancel := newSignedEthTransfer(t, key, 0, sender, 0, 10*units.Avax, ethChainID(env), 0, nil)
+	cancel := newSignedEthTransfer(t, key, 0, sender, 0, defaultEthGasLimit, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, cancel, onAcceptState)
 	require.NoError(err)
 

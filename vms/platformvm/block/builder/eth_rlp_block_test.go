@@ -16,9 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -169,4 +171,131 @@ func TestBuildBlockRejectsCredentialPaddedEthTx(t *testing.T) {
 	require.False(ok)
 	_, err = env.Builder.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrNoPendingBlocks)
+}
+
+// The fee state must move by the gas the tx signed, and by nothing else. This
+// is what makes the fee market honest: the amount charged, the amount that
+// moves Excess and the amount taken from capacity are one number, so no one can
+// push the price up for less than they paid.
+func TestBlockFeeStateMovesBySignedGas(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	senderKey, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	sender := ids.ShortID(senderKey.PublicKey().EthAddress())
+	env.state.AddUTXO(&avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
+		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 100 * units.Avax,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{sender},
+			},
+		},
+	})
+	require.NoError(env.state.Commit())
+
+	const signedGas = 1_500
+	chainID := txs.EthRLPChainID(env.ctx.NetworkID)
+	to := ethcommon.Address(ids.GenerateTestShortID())
+	signed := ethtypes.MustSignNewTx(
+		senderKey.ToECDSA(),
+		ethtypes.LatestSignerForChainID(chainID),
+		&ethtypes.DynamicFeeTx{
+			ChainID:   chainID,
+			Nonce:     0,
+			GasTipCap: big.NewInt(0),
+			GasFeeCap: big.NewInt(1e9),
+			Gas:       signedGas,
+			To:        &to,
+			Value:     big.NewInt(1e18),
+		},
+	)
+	raw, err := signed.MarshalBinary()
+	require.NoError(err)
+	tx, err := txs.NewSigned(&txs.EthRLPTx{RLP: raw}, txs.Codec, nil)
+	require.NoError(err)
+
+	excessBefore := env.state.GetFeeState().Excess
+
+	env.ctx.Lock.Unlock()
+	require.NoError(env.network.IssueTxFromRPC(tx))
+	env.ctx.Lock.Lock()
+
+	blk, err := env.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+
+	// Excess moved by exactly the signed gas, not by a worst case and not by
+	// what the tx would have used.
+	excessAfter := env.state.GetFeeState().Excess
+	require.Equal(uint64(excessBefore)+signedGas, uint64(excessAfter))
+
+	// And that is the same number the tx was charged for.
+	price := gas.CalculatePrice(
+		env.config.DynamicFeeConfig.MinPrice,
+		excessBefore,
+		env.config.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	expectedFee, err := gas.Gas(signedGas).Cost(price)
+	require.NoError(err)
+	changeID := avax.UTXOID{TxID: tx.ID(), OutputIndex: 1}
+	change, err := env.state.GetUTXO(changeID.InputID())
+	require.NoError(err)
+	changeOut := change.Out.(*secp256k1fx.TransferOutput)
+	require.Equal(expectedFee, 100*units.Avax-units.Avax-changeOut.Amt)
+}
+
+// Native txs must be unaffected: their gas is their complexity, exactly as
+// before the eth facade existed.
+func TestBlockFeeStateUnchangedForNativeTxs(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	wallet := newWallet(t, env, walletConfig{})
+	tx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{{
+		Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: units.Avax,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+		},
+	}})
+	require.NoError(err)
+
+	// The gas a native tx costs is its complexity, and TxGas must agree.
+	complexity, err := fee.TxComplexity(tx.Unsigned)
+	require.NoError(err)
+	fromComplexity, err := complexity.ToGas(env.config.DynamicFeeConfig.Weights)
+	require.NoError(err)
+	fromTxGas, err := fee.TxGas(tx.Unsigned, env.config.DynamicFeeConfig.Weights)
+	require.NoError(err)
+	require.Equal(fromComplexity, fromTxGas)
+
+	excessBefore := env.state.GetFeeState().Excess
+
+	env.ctx.Lock.Unlock()
+	require.NoError(env.network.IssueTxFromRPC(tx))
+	env.ctx.Lock.Lock()
+
+	blk, err := env.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+
+	require.Equal(
+		uint64(excessBefore)+uint64(fromComplexity),
+		uint64(env.state.GetFeeState().Excess),
+	)
 }
