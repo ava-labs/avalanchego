@@ -169,9 +169,8 @@ func TestSyncer_DedupesInFlight(t *testing.T) {
 	blob := randomCode(t)
 	hash := writeCode(t, source, blob)
 
-	inner := handlers.NewHandler(
+	inner := handlers.NewHandler[syncpb.GetCodeRequest](
 		logging.NoLog{},
-		func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} },
 		newResponder(logging.NoLog{}, source),
 	)
 	var requests atomic.Int32

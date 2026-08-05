@@ -35,15 +35,15 @@ type leafStore interface {
 	iterateLeaves(seek common.Hash) ethdb.Iterator
 }
 
-// accountLeaves writes each account's snapshot and discovers its storage trie and code.
-type accountLeaves struct {
+// accountLeafStore writes each account's snapshot and discovers its storage trie and code.
+type accountLeafStore struct {
 	db        ethdb.KeyValueStore
 	codeQueue codeEnqueuer
 	trieQueue storageRegistry
 }
 
-func newAccountLeaves(db ethdb.KeyValueStore, codeQueue codeEnqueuer, trieQueue storageRegistry) *accountLeaves {
-	return &accountLeaves{
+func newAccountLeafStore(db ethdb.KeyValueStore, codeQueue codeEnqueuer, trieQueue storageRegistry) *accountLeafStore {
+	return &accountLeafStore{
 		db:        db,
 		codeQueue: codeQueue,
 		trieQueue: trieQueue,
@@ -52,7 +52,7 @@ func newAccountLeaves(db ethdb.KeyValueStore, codeQueue codeEnqueuer, trieQueue 
 
 // writeLeaves writes account snapshots, discovering storage tries and code as it goes.
 // Batch capping is the segment's job.
-func (s *accountLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
 	var codeHashes []common.Hash
 	for i, key := range batch.keys {
 		accountHash := common.BytesToHash(key)
@@ -78,7 +78,7 @@ func (s *accountLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter
 }
 
 // iterateLeaves re-reads the account snapshot from seek as full-RLP trie leaves.
-func (s *accountLeaves) iterateLeaves(seek common.Hash) ethdb.Iterator {
+func (s *accountLeafStore) iterateLeaves(seek common.Hash) ethdb.Iterator {
 	return newAccountLeafIterator(s.db, seek)
 }
 
@@ -87,14 +87,14 @@ func writeAccountSnapshot(db ethdb.KeyValueWriter, accHash common.Hash, acc type
 	rawdb.WriteAccountSnapshot(db, accHash, types.SlimAccountRLP(acc))
 }
 
-// storageLeaves writes each leaf to every account sharing this trie's root.
-type storageLeaves struct {
+// storageLeafStore writes each leaf to every account sharing this trie's root.
+type storageLeafStore struct {
 	db       ethdb.KeyValueStore
 	accounts []common.Hash
 }
 
-func newStorageLeaves(db ethdb.KeyValueStore, accounts []common.Hash) *storageLeaves {
-	return &storageLeaves{
+func newStorageLeafStore(db ethdb.KeyValueStore, accounts []common.Hash) *storageLeafStore {
+	return &storageLeafStore{
 		db:       db,
 		accounts: accounts,
 	}
@@ -102,7 +102,7 @@ func newStorageLeaves(db ethdb.KeyValueStore, accounts []common.Hash) *storageLe
 
 // writeLeaves writes each leaf once per sharing account. Batch capping is the
 // segment's job.
-func (s *storageLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
 	for _, account := range s.accounts {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -116,7 +116,7 @@ func (s *storageLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter
 
 // iterateLeaves re-reads the storage snapshot from seek. All accounts sharing the
 // root hold identical storage, so the first account's snapshot reconstructs it.
-func (s *storageLeaves) iterateLeaves(seek common.Hash) ethdb.Iterator {
+func (s *storageLeafStore) iterateLeaves(seek common.Hash) ethdb.Iterator {
 	return newStorageLeafIterator(s.db, s.accounts[0], seek)
 }
 

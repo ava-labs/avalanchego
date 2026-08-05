@@ -31,7 +31,7 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	require.NoError(t, RegisterHandler(logging.NoLog{}, net, trieDB, common.HashLength, nil))
 
 	target := rawdb.NewMemoryDatabase()
-	leaves := newStorageLeaves(target, []common.Hash{account})
+	leaves := newStorageLeafStore(target, []common.Hash{account})
 
 	tasks := make(chan task, 64)
 	st, err := newStateTrie(target, root, account, leaves, stateTrieConfig{
