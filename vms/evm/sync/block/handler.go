@@ -35,15 +35,15 @@ const (
 
 var (
 	errBlocksNotFound = &avacommon.AppError{
-		Code:    5,
+		Code:    2000,
 		Message: "requested blocks not found",
 	}
 	errNoParentsRequested = &avacommon.AppError{
-		Code:    6,
+		Code:    2001,
 		Message: "no parents requested",
 	}
 	errServingCancelled = &avacommon.AppError{
-		Code:    7,
+		Code:    2002,
 		Message: "serving cancelled",
 	}
 )
@@ -66,11 +66,7 @@ func WithMaxResponseBytes(n int) HandlerOption {
 
 // RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider, opts ...HandlerOption) error {
-	h := handlers.NewHandler(
-		log,
-		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(log, blocks, opts...),
-	)
+	h := handlers.NewHandler[syncpb.GetBlockRequest](log, newResponder(log, blocks, opts...))
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
 
