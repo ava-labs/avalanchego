@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
@@ -225,21 +226,11 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		return a.getLogs(&filter)
 
 	case "eth_estimateGas":
-		// Exact: complexity is defined from semantic fields only, so the gas
-		// a call object implies equals the gas its signed tx will be charged.
 		var call ethCallArgs
 		if err := parseParam(req.Params, 0, &call); err != nil {
 			return nil, err
 		}
-		// Bandwidth is priced from the serialized length, which is unknown
-		// before signing, so this prices the envelope bound: an upper bound on
-		// what execution will charge, like the EVM's own estimate.
-		complexity := fee.EthRLPTxComplexity(txs.MaxEthRLPEnvelopeBytes + len(call.calldata()))
-		txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
-		if err != nil {
-			return nil, err
-		}
-		return hexUint(uint64(txGas)), nil
+		return a.estimateGas(&call)
 
 	case "eth_getBalance":
 		var addr ethcommon.Address
@@ -260,6 +251,22 @@ func (a *ethAPI) call(req *ethRequest) (any, error) {
 		}
 		nonce, err := a.vm.state.GetNextNonce(ids.ShortID(addr))
 		return hexUint(nonce), err
+
+	case "eth_getCode":
+		var addr ethcommon.Address
+		if err := parseParam(req.Params, 0, &addr); err != nil {
+			return nil, err
+		}
+		// Ordinary accounts hold no code. The two system addresses report a
+		// single INVALID byte: enough for a wallet to treat them as contracts
+		// rather than as accounts that could hold or return funds, without
+		// pretending to expose runtime bytecode that no EVM will execute.
+		switch addr {
+		case txs.EthStakingAddress, txs.EthStakedAVAXAddress:
+			return "0xfe", nil
+		default:
+			return "0x", nil
+		}
 
 	case "eth_getTransactionReceipt":
 		var hash ethcommon.Hash
@@ -441,16 +448,23 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 			if err := unsigned.SyntacticVerify(a.vm.ctx); err != nil {
 				return err
 			}
-			complexity := fee.EthRLPTxComplexity(len(unsigned.Parsed.Data()))
-			txGas, err := complexity.ToGas(a.vm.DynamicFeeConfig.Weights)
-			if err != nil {
-				return err
-			}
 			txID := tx.ID()
+			txGas, ok := a.vm.ethGasUsed.Get(txID)
+			if !ok {
+				// This node did not execute the tx itself (it was bootstrapped
+				// or restarted), so the consumed input count is not recoverable
+				// and the reservation is the honest upper bound.
+				reserved, err := fee.EthRLPTxMaxComplexity(len(unsigned.RLP)).
+					ToGas(a.vm.DynamicFeeConfig.Weights)
+				if err != nil {
+					return err
+				}
+				txGas = uint64(reserved)
+			}
 			record := ethReceiptRecord{
 				height:   h,
 				blkID:    blkID,
-				gasUsed:  uint64(txGas),
+				gasUsed:  txGas,
 				priceWei: priceWei.Uint64(),
 				txIndex:  txIndex,
 			}
@@ -470,10 +484,15 @@ func (a *ethAPI) scanAcceptedBlocks() error {
 	return nil
 }
 
-// liquidBalance is the amount [addr] can actually spend in one tx: the sum of
-// the MaxEthRLPTxInputs largest spendable AVAX UTXOs it owns, matching the
-// executor's selection rule. Reporting the full total instead would make a
-// wallet's Max button propose a tx that cannot execute.
+// liquidBalance is the amount [addr] can spend in one tx at the structural
+// ceiling: the sum of the MaxEthRLPTxInputs largest spendable AVAX UTXOs it
+// owns. Reporting the full total instead would make a wallet's Max button
+// propose a tx that cannot execute.
+//
+// A specific tx may reach less than this, because its signed gas limit also
+// bounds how many of those UTXOs selection may consume. The ceiling is the
+// stable answer: it does not depend on a gas limit the caller has not chosen
+// yet, and eth_estimateGas reports the gas a given send actually needs.
 func (a *ethAPI) liquidBalance(addr ids.ShortID) (uint64, error) {
 	utxoIDs, err := a.vm.state.UTXOIDs(addr.Bytes(), ids.Empty, math.MaxInt)
 	if err != nil {
@@ -560,9 +579,31 @@ func hexUint(v uint64) string {
 // ethCallArgs is the eth_call/eth_estimateGas call object. Calldata arrives
 // as "input" from geth-derived clients and as "data" from older ones.
 type ethCallArgs struct {
+	From  *ethcommon.Address `json:"from"`
 	To    *ethcommon.Address `json:"to"`
+	Value *hexBig            `json:"value"`
 	Data  hexBytes           `json:"data"`
 	Input hexBytes           `json:"input"`
+}
+
+// hexBig json-unmarshals a "0x..." quantity.
+type hexBig big.Int
+
+func (h *hexBig) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	v, ok := new(big.Int).SetString(strings.TrimPrefix(s, "0x"), 16)
+	if !ok {
+		return fmt.Errorf("bad quantity %q", s)
+	}
+	*h = hexBig(*v)
+	return nil
+}
+
+func (h *hexBig) toInt() *big.Int {
+	return (*big.Int)(h)
 }
 
 func (c *ethCallArgs) calldata() []byte {

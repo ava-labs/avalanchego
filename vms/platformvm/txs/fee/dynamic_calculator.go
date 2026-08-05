@@ -34,6 +34,20 @@ type dynamicCalculator struct {
 	price   gas.Price
 }
 
+func (c *dynamicCalculator) CalculateFeeForGas(g gas.Gas) (uint64, error) {
+	fee, err := g.Cost(c.price)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"%w with gas (%d) and price (%d): %w",
+			ErrCalculatingCost,
+			g,
+			c.price,
+			err,
+		)
+	}
+	return fee, nil
+}
+
 func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	complexity, err := TxComplexity(tx)
 	if err != nil {

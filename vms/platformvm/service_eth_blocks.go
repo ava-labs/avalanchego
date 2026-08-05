@@ -7,11 +7,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/big"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -282,4 +288,67 @@ func boolParam(params []json.RawMessage, i int) bool {
 		_ = json.Unmarshal(params[i], &v)
 	}
 	return v
+}
+
+// estimateGas runs the real selection walk against current state, so the answer
+// is the gas execution will charge for that send. It is state-dependent: a UTXO
+// arriving before the tx lands can change how many inputs are needed, which is
+// EVM-normal (a state change between estimate and execution moves gas there
+// too). The result is what the caller should sign as its gas limit.
+func (a *ethAPI) estimateGas(call *ethCallArgs) (any, error) {
+	if call.From == nil {
+		// Without a sender there is nothing to select from; price the
+		// single-input case, which is the floor for any send.
+		txGas, err := fee.EthRLPTxComplexity(
+			txs.MaxEthRLPEnvelopeBytes+len(call.calldata()), 1,
+		).ToGas(a.vm.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, err
+		}
+		return hexUint(uint64(txGas)), nil
+	}
+
+	amount, err := weiToNAVAX(call.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	// The serialized length is unknown before signing, so price the envelope
+	// bound plus calldata. Bandwidth weighs 1 per byte, so this overshoots the
+	// eventual charge by at most the unused envelope slack.
+	rlpLen := txs.MaxEthRLPEnvelopeBytes + len(call.calldata())
+	spender := txexecutor.NewEthSpender(
+		a.vm.state,
+		a.vm.DynamicFeeConfig.Weights,
+		a.vm.ctx.AVAXAssetID,
+		state.PickFeeCalculator(&a.vm.Internal, a.vm.state),
+	)
+	spend, err := spender.SelectInputs(
+		ids.ShortID(*call.From),
+		amount,
+		rlpLen,
+		// Estimating is not spending, so the walk is bounded only by the
+		// structural ceiling here.
+		math.MaxUint64,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return hexUint(uint64(spend.Gas)), nil
+}
+
+// weiToNAVAX converts a call object's value, rejecting sub-nAVAX dust the same
+// way tx verification does.
+func weiToNAVAX(value *hexBig) (uint64, error) {
+	if value == nil {
+		return 0, nil
+	}
+	amount, rem := new(big.Int).QuoRem(value.toInt(), txs.WeiPerNAVAX, new(big.Int))
+	switch {
+	case rem.Sign() != 0:
+		return 0, txs.ErrValueDust
+	case !amount.IsUint64():
+		return 0, fmt.Errorf("value %s overflows uint64 nAVAX", value.toInt())
+	}
+	return amount.Uint64(), nil
 }

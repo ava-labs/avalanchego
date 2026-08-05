@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -16,9 +17,11 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -175,27 +178,143 @@ func (e *standardTxExecutor) putEthStaker(derived *txs.Tx, staker txs.BoundedSta
 	return e.putStakerWithTxID(txID, staker)
 }
 
-// selectEthInputs picks the UTXOs an eth tx spends: the sender's spendable
-// AVAX UTXOs ordered by amount descending, ties broken by UTXO ID ascending,
-// capped at MaxEthRLPTxInputs, accumulated until [need] is covered.
+// EthSpend is the outcome of input selection: which UTXOs the tx consumes, how
+// much they hold, and the gas and fee that consuming exactly that many implies.
+type EthSpend struct {
+	Consumed []*avax.UTXO
+	Total    uint64
+	Gas      gas.Gas
+	Fee      uint64
+}
+
+// EthSpenderState is the chain view input selection reads.
+type EthSpenderState interface {
+	avax.UTXOReader
+
+	GetTimestamp() time.Time
+}
+
+// EthSpender resolves eth input selection. The executor and eth_estimateGas
+// share it, so an estimate is the number execution will charge given the same
+// state.
+type EthSpender struct {
+	state         EthSpenderState
+	weights       gas.Dimensions
+	avaxAssetID   ids.ID
+	feeCalculator fee.Calculator
+}
+
+func NewEthSpender(
+	state EthSpenderState,
+	weights gas.Dimensions,
+	avaxAssetID ids.ID,
+	feeCalculator fee.Calculator,
+) *EthSpender {
+	return &EthSpender{
+		state:         state,
+		weights:       weights,
+		avaxAssetID:   avaxAssetID,
+		feeCalculator: feeCalculator,
+	}
+}
+
+// selectEthInputs decides how an eth tx pays for [need] plus its own fee.
 //
-// Ordering by amount is what makes the account unbrickable. UTXO IDs are
-// grindable offline, so any ID-first order lets an attacker send the victim a
-// handful of ground low-ID dust UTXOs and permanently displace their real
-// funds from the selection window. Amount-first ordering means dust can never
-// displace value, whoever created it.
+// Gas depends on the number of inputs consumed and the fee depends on gas, so
+// the requirement moves as inputs are added. The walk resolves that directly:
+// candidates are ordered by amount descending (ties by UTXO ID ascending), and
+// for each prefix of length n it tests the requirement computed for exactly n
+// inputs. It stops at the first n that holds, and the fee charged is the fee
+// that n implies, so the stopping condition and the charge can never disagree.
 //
-// ponytail: the scan is O(the sender's UTXO count) while complexity prices
-// MaxEthRLPTxInputs reads, because sorting by amount requires reading every
-// candidate. Bounding the scan deterministically without reintroducing
-// grindability needs an amount-ordered index, which is an ACP-level open item.
-func (e *standardTxExecutor) selectEthInputs(
-	sender ids.ShortID,
-	need uint64,
-) ([]*avax.UTXO, uint64, error) {
+// It terminates and finds the minimum n:
+//   - each added input raises the running total by its amount and raises the
+//     requirement by a constant (one read plus one write, priced), so the test
+//     is not circular, only monotone;
+//   - taking the largest amounts first maximizes the total for every n, so if
+//     any n-subset can cover the requirement for n inputs, the prefix does.
+//     Scanning n upward therefore finds the smallest workable input count.
+//
+// Ordering by amount is also what makes accounts unbrickable: UTXO IDs are
+// grindable offline, so any ID-first order lets an attacker plant ground low-ID
+// dust that displaces real funds. Amount-first means dust never displaces
+// value.
+//
+// ponytail: the candidate scan is O(the sender's UTXO count) while gas prices
+// only the inputs consumed, because ordering by amount requires reading every
+// candidate. Bounding the scan without reintroducing grindability needs an
+// amount-ordered index, which is an ACP-level open item.
+func (e *EthSpender) SelectInputs(sender ids.ShortID, need uint64, rlpLen int, gasLimit uint64) (EthSpend, error) {
+	candidates, err := e.candidates(sender)
+	if err != nil {
+		return EthSpend{}, err
+	}
+
+	maxInputs := min(len(candidates), txs.MaxEthRLPTxInputs)
+	var total uint64
+	for n := 1; n <= maxInputs; n++ {
+		total, err = safemath.Add(total, amountOf(candidates[n-1]))
+		if err != nil {
+			return EthSpend{}, err
+		}
+
+		txGas, err := e.gasFor(rlpLen, n)
+		if err != nil {
+			return EthSpend{}, err
+		}
+		if uint64(txGas) > gasLimit {
+			// Everything from here on costs more gas, so the tx cannot pay for
+			// the inputs this account's fragmentation requires.
+			return EthSpend{}, fmt.Errorf(
+				"%w: %d inputs need %d gas, limit is %d",
+				errEthGasLimitTooLowForInputs, n, txGas, gasLimit,
+			)
+		}
+		txFee, err := e.feeCalculator.CalculateFeeForGas(txGas)
+		if err != nil {
+			return EthSpend{}, err
+		}
+		required, err := safemath.Add(need, txFee)
+		if err != nil {
+			return EthSpend{}, err
+		}
+		if total >= required {
+			return EthSpend{
+				Consumed: candidates[:n],
+				Total:    total,
+				Gas:      txGas,
+				Fee:      txFee,
+			}, nil
+		}
+	}
+
+	// Nothing coverable. Distinguish "not enough AVAX at all" from "enough AVAX
+	// but too fragmented for one tx", because only the second is fixed by
+	// consolidating or raising the gas limit.
+	if len(candidates) > txs.MaxEthRLPTxInputs {
+		fullTotal := total
+		for _, utxo := range candidates[maxInputs:] {
+			fullTotal, err = safemath.Add(fullTotal, amountOf(utxo))
+			if err != nil {
+				return EthSpend{}, err
+			}
+		}
+		if fullTotal > total {
+			return EthSpend{}, fmt.Errorf(
+				"%w: %d UTXOs hold %d nAVAX but one tx may consume only %d of them",
+				errEthTooFragmented, len(candidates), fullTotal, txs.MaxEthRLPTxInputs,
+			)
+		}
+	}
+	return EthSpend{}, fmt.Errorf("%w: have %d nAVAX, need %d plus fee", errEthInsufficientFunds, total, need)
+}
+
+// ethCandidates returns the sender's spendable AVAX UTXOs, deduplicated and
+// ordered by amount descending then UTXO ID ascending.
+func (e *EthSpender) candidates(sender ids.ShortID) ([]*avax.UTXO, error) {
 	utxoIDs, err := e.state.UTXOIDs(sender.Bytes(), ids.Empty, math.MaxInt)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	var (
@@ -214,9 +333,9 @@ func (e *standardTxExecutor) selectEthInputs(
 
 		utxo, err := e.state.GetUTXO(utxoID)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
-		if utxo.AssetID() != e.backend.Ctx.AVAXAssetID {
+		if utxo.AssetID() != e.avaxAssetID {
 			continue
 		}
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -233,22 +352,15 @@ func (e *standardTxExecutor) selectEthInputs(
 	}
 
 	sort.Sort(byAmountThenID(candidates))
+	return candidates, nil
+}
 
-	var (
-		consumed = make([]*avax.UTXO, 0, txs.MaxEthRLPTxInputs)
-		total    uint64
-	)
-	for _, utxo := range candidates {
-		if total >= need || len(consumed) == txs.MaxEthRLPTxInputs {
-			break
-		}
-		total, err = safemath.Add(total, utxo.Out.(*secp256k1fx.TransferOutput).Amt)
-		if err != nil {
-			return nil, 0, err
-		}
-		consumed = append(consumed, utxo)
-	}
-	return consumed, total, nil
+func (e *EthSpender) gasFor(rlpLen int, numInputs int) (gas.Gas, error) {
+	return fee.EthRLPTxComplexity(rlpLen, numInputs).ToGas(e.weights)
+}
+
+func amountOf(utxo *avax.UTXO) uint64 {
+	return utxo.Out.(*secp256k1fx.TransferOutput).Amt
 }
 
 // byAmountThenID sorts UTXOs by amount descending, then by UTXO ID ascending.
@@ -265,4 +377,14 @@ func (u byAmountThenID) Less(i, j int) bool {
 	}
 	iID, jID := u[i].InputID(), u[j].InputID()
 	return iID.Compare(jID) < 0
+}
+
+// ethSpender builds the selector for this execution's state and fee schedule.
+func (e *standardTxExecutor) ethSpender() *EthSpender {
+	return NewEthSpender(
+		e.state,
+		e.backend.Config.DynamicFeeConfig.Weights,
+		e.backend.Ctx.AVAXAssetID,
+		e.feeCalculator,
+	)
 }

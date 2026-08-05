@@ -31,9 +31,26 @@ import (
 // how PickFeeCalculator pairs them in production. Price is minPrice nAVAX/gas.
 func ethFeeEnv(t *testing.T, fork upgradetest.Fork, minPrice gas.Price) (*environment, *state.Diff, txfee.Calculator) {
 	t.Helper()
+	return ethFeeEnvWithWeights(t, fork, minPrice, gas.Dimensions{1, 1, 1, 1})
+}
+
+// ethFeeEnvMainnetWeights prices gas exactly as production does, for tests that
+// assert real gas numbers.
+func ethFeeEnvMainnetWeights(t *testing.T, minPrice gas.Price) (*environment, *state.Diff, txfee.Calculator) {
+	t.Helper()
+	return ethFeeEnvWithWeights(t, upgradetest.Latest, minPrice, mainnetWeights)
+}
+
+func ethFeeEnvWithWeights(
+	t *testing.T,
+	fork upgradetest.Fork,
+	minPrice gas.Price,
+	weights gas.Dimensions,
+) (*environment, *state.Diff, txfee.Calculator) {
+	t.Helper()
 	env := newEnvironment(t, fork)
 	env.config.DynamicFeeConfig = gas.Config{
-		Weights:                  gas.Dimensions{1, 1, 1, 1},
+		Weights:                  weights,
 		MaxCapacity:              1_000_000,
 		MaxPerSecond:             1_000_000,
 		TargetPerSecond:          1_000_000,
@@ -282,7 +299,7 @@ func TestEthRLPTxSyntacticRejections(t *testing.T) {
 		{
 			name: "gas limit below fee",
 			tx:   newSignedEthTransfer(t, key, 0, recipient, units.Avax, 1, ethChainID(env), 0, nil),
-			err:  errEthGasLimitExceeded,
+			err:  errEthGasLimitTooLowForInputs,
 		},
 		{
 			name: "insufficient funds",
@@ -362,9 +379,9 @@ func TestEthRLPTxInputBound(t *testing.T) {
 	require.NoError(err)
 	sender := ids.ShortID(key.PublicKey().EthAddress())
 
-	// MaxEthRLPTxInputs+8 dust UTXOs: only the bounded subset is spendable, so
-	// a transfer needing more than that fails rather than silently exceeding
-	// the complexity that was priced.
+	// MaxEthRLPTxInputs+8 dust UTXOs: one tx may consume only the ceiling, so a
+	// transfer needing more reports fragmentation rather than pretending the
+	// funds are missing.
 	const dust = units.MilliAvax
 	for i := 0; i < txs.MaxEthRLPTxInputs+8; i++ {
 		fundEthAddress(onAcceptState, env.ctx.AVAXAssetID, ids.GenerateTestID(), sender, dust)
@@ -373,5 +390,5 @@ func TestEthRLPTxInputBound(t *testing.T) {
 	tx := newSignedEthTransfer(t, key, 0, ids.GenerateTestShortID(),
 		txs.MaxEthRLPTxInputs*dust, 10*units.Avax, ethChainID(env), 0, nil)
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
-	require.ErrorIs(err, errEthInsufficientFunds)
+	require.ErrorIs(err, errEthTooFragmented)
 }

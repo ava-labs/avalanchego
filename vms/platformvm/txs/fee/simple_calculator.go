@@ -3,7 +3,10 @@
 
 package fee
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+import (
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
 
 var _ Calculator = (*SimpleCalculator)(nil)
 
@@ -18,5 +21,10 @@ func NewSimpleCalculator(fee uint64) *SimpleCalculator {
 }
 
 func (c *SimpleCalculator) CalculateFee(txs.UnsignedTx) (uint64, error) {
+	return c.txFee, nil
+}
+
+// CalculateFeeForGas ignores gas: pre-Etna fees are flat.
+func (c *SimpleCalculator) CalculateFeeForGas(gas.Gas) (uint64, error) {
 	return c.txFee, nil
 }

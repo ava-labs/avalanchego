@@ -895,27 +895,36 @@ func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 }
 
 func (c *complexityVisitor) EthRLPTx(tx *txs.EthRLPTx) error {
-	c.output = EthRLPTxComplexity(len(tx.RLP))
+	// Pre-execution accounting reserves the structural ceiling. How many inputs
+	// a tx really consumes is only known once selection runs against the state,
+	// and block capacity is consumed before execution, so reserving the ceiling
+	// is what keeps the accounted gas from ever falling below the work done.
+	// The fee charged is the real consumed-input gas; see
+	// [standardTxExecutor.EthRLPTx].
+	c.output = EthRLPTxMaxComplexity(len(tx.RLP))
 	return nil
 }
 
-// EthRLPTx complexity is a function of the serialized tx only, so it needs no
-// parsing and no chain context:
-//   - Bandwidth: the actual RLP length. Credentials are not priced because an
-//     EthRLPTx must carry none (the eth signature is inside the RLP).
-//   - DBRead/DBWrite: the documented worst case of execution: one nonce read
-//     and write, up to MaxEthRLPTxInputs UTXOs read and deleted, and two
-//     outputs written.
+// EthRLPTxComplexity is the cost of an eth tx consuming numInputs UTXOs:
+//   - Bandwidth: the actual serialized length. Credentials are not priced
+//     because an EthRLPTx must carry none (the eth signature is in the RLP).
+//   - DBRead: the consumed UTXOs plus the sender's nonce.
+//   - DBWrite: the consumed UTXOs (deleted), the produced outputs, the nonce.
 //   - Compute: one signature recovery.
 //
-// eth_estimateGas cannot know the exact RLP length before signing, so it
-// prices txs.MaxEthRLPEnvelopeBytes plus calldata, which is an upper bound on
-// what execution charges.
-func EthRLPTxComplexity(rlpLen int) gas.Dimensions {
+// It is a pure function of the serialized length and the input count, so it
+// needs neither parsing nor chain context.
+func EthRLPTxComplexity(rlpLen int, numInputs int) gas.Dimensions {
 	return gas.Dimensions{
 		gas.Bandwidth: uint64(rlpLen),
-		gas.DBRead:    1 + txs.MaxEthRLPTxInputs,
-		gas.DBWrite:   1 + txs.MaxEthRLPTxInputs + 2,
+		gas.DBRead:    uint64(numInputs) + 1,
+		gas.DBWrite:   uint64(numInputs) + 3,
 		gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 	}
+}
+
+// EthRLPTxMaxComplexity is the complexity of an eth tx consuming the most
+// inputs any single tx may consume.
+func EthRLPTxMaxComplexity(rlpLen int) gas.Dimensions {
+	return EthRLPTxComplexity(rlpLen, txs.MaxEthRLPTxInputs)
 }

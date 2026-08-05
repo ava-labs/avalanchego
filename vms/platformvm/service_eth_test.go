@@ -20,8 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -63,6 +65,11 @@ func fundEthKey(t *testing.T, vm *VM, amount uint64) *secp256k1.PrivateKey {
 
 func signedTransferRLP(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte) string {
 	t.Helper()
+	return signedTransferRLPWithGas(t, vm, key, nonce, to, amountNAVAX, calldata, 10_000_000)
+}
+
+func signedTransferRLPWithGas(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce uint64, to ethcommon.Address, amountNAVAX uint64, calldata []byte, gasLimit uint64) string {
+	t.Helper()
 	chainID := txs.EthRLPChainID(vm.ctx.NetworkID)
 	signed := ethtypes.MustSignNewTx(
 		key.ToECDSA(),
@@ -72,7 +79,7 @@ func signedTransferRLP(t *testing.T, vm *VM, key *secp256k1.PrivateKey, nonce ui
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(0),
 			GasFeeCap: big.NewInt(2_000_000_000),
-			Gas:       10_000_000,
+			Gas:       gasLimit,
 			To:        &to,
 			Value:     new(big.Int).Mul(new(big.Int).SetUint64(amountNAVAX), txs.WeiPerNAVAX),
 			Data:      calldata,
@@ -453,4 +460,101 @@ func TestEthAPIStakedBalanceCachedPerBlock(t *testing.T) {
 	})
 	require.NotEqual(firstBlkID, api.stakedCache.blkID)
 	require.NotEqual(uint64(12345), api.stakedCache.total)
+}
+
+// eth_estimateGas runs the real selection walk, so a wallet that signs the
+// estimate pays exactly it, for both a one-input and a multi-input send.
+func TestEthAPIEstimateGasMatchesChargedFee(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		utxos      []uint64
+		value      uint64
+		wantInputs int
+	}{
+		{
+			name:       "one input",
+			utxos:      []uint64{100 * units.Avax},
+			value:      10 * units.Avax,
+			wantInputs: 1,
+		},
+		{
+			name:       "three inputs",
+			utxos:      []uint64{10 * units.Avax, 10 * units.Avax, 10 * units.Avax},
+			value:      25 * units.Avax,
+			wantInputs: 3,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			api := newEthAPI(vm)
+
+			key, err := secp256k1.NewPrivateKey()
+			require.NoError(err)
+			sender := ethcommon.Address(key.PublicKey().EthAddress())
+			locked(vm, func() {
+				for _, amt := range tt.utxos {
+					vm.state.AddUTXO(&avax.UTXO{
+						UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 0},
+						Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: amt,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ids.ShortID(sender)},
+							},
+						},
+					})
+				}
+				require.NoError(vm.state.Commit())
+			})
+
+			recipient := ethcommon.Address(ids.GenerateTestShortID())
+			estimate := hexToBig(t, ethCallAPI(t, api, "eth_estimateGas", map[string]any{
+				"from":  sender.Hex(),
+				"to":    recipient.Hex(),
+				"value": "0x" + navaxToWei(tt.value).Text(16),
+			}).(string))
+
+			// Sign exactly the estimate and land it.
+			raw := signedTransferRLPWithGas(t, vm, key, 0, recipient, tt.value, nil, estimate.Uint64())
+			hash := ethCallAPI(t, api, "eth_sendRawTransaction", raw).(string)
+			locked(vm, func() { buildAndAccept(t, vm) })
+
+			receipt := ethCallAPI(t, api, "eth_getTransactionReceipt", hash).(map[string]any)
+			require.Equal("0x1", receipt["status"])
+			gasUsed := hexToBig(t, receipt["gasUsed"].(string))
+
+			// The estimate covers the charge, and the only difference is the
+			// unused envelope slack priced as bandwidth, since the exact
+			// serialized length is unknowable before signing.
+			require.LessOrEqual(gasUsed.Uint64(), estimate.Uint64())
+			rlpLen := uint64(len(ethcommon.FromHex(raw)))
+			slack := (uint64(txs.MaxEthRLPEnvelopeBytes) - rlpLen) *
+				uint64(vm.DynamicFeeConfig.Weights[gas.Bandwidth])
+			require.Equal(slack, estimate.Uint64()-gasUsed.Uint64())
+
+			// And it is the gas for the expected number of inputs.
+			wantGas, err := fee.EthRLPTxComplexity(
+				txs.MaxEthRLPEnvelopeBytes, tt.wantInputs,
+			).ToGas(vm.DynamicFeeConfig.Weights)
+			require.NoError(err)
+			require.Equal(uint64(wantGas), estimate.Uint64())
+		})
+	}
+}
+
+// Wallets probe eth_getCode to decide whether an address is a contract. Plain
+// accounts must report no code, and the system addresses must not look like
+// ordinary accounts.
+func TestEthAPIGetCode(t *testing.T) {
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	api := newEthAPI(vm)
+
+	require.Equal(t, "0x", ethCallAPI(t, api, "eth_getCode",
+		ethcommon.Address(ids.GenerateTestShortID()).Hex(), "latest"))
+	require.Equal(t, "0xfe", ethCallAPI(t, api, "eth_getCode",
+		txs.EthStakingAddress.Hex(), "latest"))
+	require.Equal(t, "0xfe", ethCallAPI(t, api, "eth_getCode",
+		txs.EthStakedAVAXAddress.Hex(), "latest"))
 }

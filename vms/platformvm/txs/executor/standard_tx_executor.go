@@ -65,7 +65,8 @@ var (
 	errStateCorruption                  = errors.New("state corruption")
 	errStaleNonce                       = errors.New("eth tx nonce is not greater than the last accepted nonce")
 	errEthCredentials                   = errors.New("eth txs must carry no credentials")
-	errEthGasLimitExceeded              = errors.New("eth tx gas limit below the exact gas")
+	errEthGasLimitTooLowForInputs       = errors.New("eth tx gas limit too low for the number of UTXOs this account must consume, consolidate or raise the limit")
+	errEthTooFragmented                 = errors.New("account is too fragmented for one eth tx, consolidate first")
 	errEthFeeCapTooLow                  = errors.New("eth tx max fee per gas below the current gas price")
 	errEthInsufficientFunds             = errors.New("insufficient AVAX to cover eth tx value plus fee")
 )
@@ -1625,45 +1626,35 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 		return fmt.Errorf("%w: got nonce %d, minimum %d", errStaleNonce, nonce, nextNonce)
 	}
 
-	// Gas semantics mirror the EVM: the tx's gas limit caps the exact
-	// complexity gas, maxFeePerGas (wei per gas) must cover the current gas
-	// price, and the fee charged is exactly gas * price.
-	complexity, err := fee.TxComplexity(tx)
+	// Gas semantics mirror the EVM: the signed gas limit is the budget that
+	// bounds how much work the tx may do, maxFeePerGas must cover the current
+	// price, and the fee charged is exactly the gas consumed times the price.
+	// How much gas that is depends on how many inputs selection consumes, so
+	// the budget and the selection walk are resolved together.
+	rlpLen := len(tx.RLP)
+	gasLimit := tx.Parsed.Gas()
+
+	spend, err := e.ethSpender().SelectInputs(tx.Sender, tx.AmountNAVAX, rlpLen, gasLimit)
 	if err != nil {
 		return err
-	}
-	txGas, err := complexity.ToGas(e.backend.Config.DynamicFeeConfig.Weights)
-	if err != nil {
-		return err
-	}
-	if uint64(txGas) > tx.Parsed.Gas() {
-		return fmt.Errorf("%w: needs %d gas, limit %d", errEthGasLimitExceeded, txGas, tx.Parsed.Gas())
 	}
 
-	txFee, err := e.feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-	// txFee = txGas * price, so feeCap covers the price iff
-	// feeCap(wei) * txGas >= txFee(nAVAX) * 1e9.
-	weiOffered := new(big.Int).Mul(tx.Parsed.GasFeeCap(), new(big.Int).SetUint64(uint64(txGas)))
-	weiNeeded := new(big.Int).Mul(new(big.Int).SetUint64(txFee), txs.WeiPerNAVAX)
+	// txFee = gas * price, so the fee cap covers the price iff
+	// feeCap(wei) * gas >= fee(nAVAX) * 1e9.
+	weiOffered := new(big.Int).Mul(tx.Parsed.GasFeeCap(), new(big.Int).SetUint64(uint64(spend.Gas)))
+	weiNeeded := new(big.Int).Mul(new(big.Int).SetUint64(spend.Fee), txs.WeiPerNAVAX)
 	if weiOffered.Cmp(weiNeeded) < 0 {
 		return fmt.Errorf("%w: fee cap %s wei per gas, fee %d nAVAX over %d gas",
-			errEthFeeCapTooLow, tx.Parsed.GasFeeCap(), txFee, txGas)
+			errEthFeeCapTooLow, tx.Parsed.GasFeeCap(), spend.Fee, spend.Gas)
 	}
 
-	need, err := math.Add(tx.AmountNAVAX, txFee)
+	var (
+		consumed = spend.Consumed
+		total    = spend.Total
+	)
+	need, err := math.Add(tx.AmountNAVAX, spend.Fee)
 	if err != nil {
 		return err
-	}
-
-	consumed, total, err := e.selectEthInputs(tx.Sender, need)
-	if err != nil {
-		return err
-	}
-	if total < need {
-		return fmt.Errorf("%w: have %d nAVAX, need %d", errEthInsufficientFunds, total, need)
 	}
 
 	// A staking call derives its native staker tx and passes the same staker
@@ -1724,5 +1715,8 @@ func (e *standardTxExecutor) EthRLPTx(tx *txs.EthRLPTx) error {
 	}
 
 	e.state.SetNextNonce(tx.Sender, tx.Parsed.Nonce()+1)
+	if e.backend.EthGasUsed != nil {
+		e.backend.EthGasUsed.Put(txID, uint64(spend.Gas))
+	}
 	return nil
 }
