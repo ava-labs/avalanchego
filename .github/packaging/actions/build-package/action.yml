@@ -48,6 +48,8 @@ runs:
     - name: Set up packaging environment
       id: setup
       shell: bash
+      env:
+        FORMAT: ${{ inputs.format }}
       run: ./.github/packaging/scripts/workflow-setup-packaging.sh
       env:
         TAG_INPUT: ${{ inputs.tag-input }}
@@ -56,7 +58,7 @@ runs:
 
     - name: Build and validate ${{ inputs.format }} packages
       shell: bash
-      run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-${{ inputs.format }}s
+      run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml "test-build-${FORMAT}s"
       env:
         PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
         PACKAGE_ARCH: ${{ inputs.package-arch }}

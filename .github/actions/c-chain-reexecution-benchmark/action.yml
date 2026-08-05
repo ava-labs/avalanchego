@@ -143,10 +143,12 @@ runs:
         role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
     - name: Set benchmark output file
       shell: bash
+      env:
+        TEST_FILTER: ${{ inputs.test || '' }}
       run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ inputs.test || '' }}"
+      run: ./scripts/run_task.sh test-cchain-reexecution -- "$TEST_FILTER"
       env:
         # Test configuration overrides
         BLOCK_DIR_SRC: ${{ inputs.block-dir-src }}

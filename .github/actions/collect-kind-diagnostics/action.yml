@@ -14,10 +14,12 @@ runs:
   steps:
     - name: Collect diagnostics
       shell: bash
-      run: ./scripts/collect_kind_diagnostics.sh "${{ inputs.diagnostics_dir }}"
+      run: ./scripts/collect_kind_diagnostics.sh "$DIAGNOSTICS_DIR"
     - name: Upload diagnostics
       uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.diagnostics_dir }}
-        if-no-files-found: warn
+        if-no-files-found: warnenv:
+        DIAGNOSTICS_DIR: ${{ inputs.diagnostics_dir }}
+      
