@@ -21,7 +21,7 @@ var (
 	// by the P-chain executor, not by an EVM.
 	EthStakingAddress = ethcommon.HexToAddress("0x0100000000000000000000000000000000000001")
 
-	// EthStakedAVAXAddress is the read-only virtual ERC-20 ("stAVAX") that
+	// EthStakedAVAXAddress is the read-only virtual ERC-20 ("STAKED") that
 	// reports staked positions via eth_call. It never holds funds: consensus
 	// rejects any tx targeting it.
 	EthStakedAVAXAddress = ethcommon.HexToAddress("0x0100000000000000000000000000000000000002")

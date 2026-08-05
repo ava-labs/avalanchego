@@ -71,7 +71,7 @@ var (
 
 	ErrNotDynamicFeeTx    = errors.New("only type-2 (dynamic fee) eth txs are supported")
 	ErrNonEmptyAccessList = errors.New("access lists are not supported")
-	ErrTransferToToken    = errors.New("the stAVAX token address cannot receive transactions")
+	ErrTransferToToken    = errors.New("the staked-position token address cannot receive transactions")
 	ErrWrongEthChainID    = errors.New("wrong eth chain ID")
 	errNoRecipient        = errors.New("eth tx must have a recipient")
 	ErrNonEmptyCalldata   = errors.New("plain transfers must have empty calldata")
@@ -154,7 +154,7 @@ func (tx *EthRLPTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNonceTooLarge
 	}
 
-	// The stAVAX token is read-only: any tx to it would orphan funds.
+	// The staked-position token is read-only: any tx to it would orphan funds.
 	if *eth.To() == EthStakedAVAXAddress {
 		return ErrTransferToToken
 	}

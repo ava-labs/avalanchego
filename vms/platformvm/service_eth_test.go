@@ -101,7 +101,7 @@ func buildAndAccept(t *testing.T, vm *VM) {
 }
 
 // TestEthAPIWalletFlow drives the RPC sequence a wallet performs: probe chain
-// and fees, send, poll tx/receipt/block, read the stAVAX token and its logs,
+// and fees, send, poll tx/receipt/block, read the staked-position token and its logs,
 // checking that no two views contradict each other.
 func TestEthAPIWalletFlow(t *testing.T) {
 	require := require.New(t)
@@ -198,7 +198,7 @@ func TestEthAPIWalletFlow(t *testing.T) {
 	require.Equal(navaxToWei(stake), hexToBig(t, supply))
 
 	// name, symbol and decimals decode.
-	require.Equal(big.NewInt(stAVAXDecimals), hexToBig(t, ethCallAPI(t, api, "eth_call", map[string]string{
+	require.Equal(big.NewInt(stakedTokenDecimals), hexToBig(t, ethCallAPI(t, api, "eth_call", map[string]string{
 		"to": txs.EthStakedAVAXAddress.Hex(), "data": "0x313ce567",
 	}, "latest").(string)))
 	nameResult := ethCallAPI(t, api, "eth_call", map[string]string{

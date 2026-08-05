@@ -108,7 +108,7 @@ func main() {
 	receipt = sendViaClient(ctx, client, senderKey, txs.EthStakingAddress, navax(stake), calldata)
 	crossCheckBlock(ctx, client, receipt)
 	if len(receipt.Logs) != 1 {
-		log.Fatalf("expected one stAVAX mint log, got %d", len(receipt.Logs))
+		log.Fatalf("expected one staked-token mint log, got %d", len(receipt.Logs))
 	}
 	mint := receipt.Logs[0]
 	fmt.Printf("mint log:          %s Transfer(0x0 -> %s, %s)\n",
@@ -125,8 +125,8 @@ func main() {
 		To: &txs.EthStakedAVAXAddress, Data: ethcommon.FromHex("0x18160ddd"),
 	}, nil)
 	must(err)
-	fmt.Printf("stAVAX balanceOf:  %s wei (staked %s)\n", new(big.Int).SetBytes(stBal), navax(stake))
-	fmt.Printf("stAVAX totalSupply: %s wei\n", new(big.Int).SetBytes(supply))
+	fmt.Printf("staked balanceOf:  %s wei (staked %s)\n", new(big.Int).SetBytes(stBal), navax(stake))
+	fmt.Printf("STAKED totalSupply: %s wei\n", new(big.Int).SetBytes(supply))
 
 	// Log filtering via FilterLogs.
 	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{

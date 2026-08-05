@@ -17,15 +17,15 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// The stAVAX virtual ERC-20. It exists only in this RPC layer: balanceOf
+// The staked-position virtual ERC-20. It exists only in this RPC layer: balanceOf
 // reports the caller's active eth-authorized stake, in the same 18-decimal
 // scale as eth_getBalance (the facade scales nAVAX by 1e9 everywhere, so 1
-// stAVAX unit displays as 1 AVAX staked). Transfers are impossible: consensus
+// staked-token unit displays as 1 AVAX staked). Transfers are impossible: consensus
 // rejects any tx targeting the token address.
 const (
-	stAVAXName     = "Staked AVAX (P-Chain)"
-	stAVAXSymbol   = "stAVAX"
-	stAVAXDecimals = 18
+	stakedTokenName     = "Staked AVAX (P-Chain)"
+	stakedTokenSymbol   = "STAKED"
+	stakedTokenDecimals = 18
 )
 
 // Standard ERC-20 selectors, pinned by TestERC20Selectors.
@@ -55,11 +55,11 @@ func (a *ethAPI) ethCall(to *ethcommon.Address, data []byte) (any, error) {
 
 	switch selector {
 	case selectorName:
-		return abiEncodeString(stAVAXName), nil
+		return abiEncodeString(stakedTokenName), nil
 	case selectorSymbol:
-		return abiEncodeString(stAVAXSymbol), nil
+		return abiEncodeString(stakedTokenSymbol), nil
 	case selectorDecimals:
-		return abiEncodeUint(big.NewInt(stAVAXDecimals)), nil
+		return abiEncodeUint(big.NewInt(stakedTokenDecimals)), nil
 	case selectorTotalSupply:
 		total, err := a.stakedNAVAX(nil)
 		if err != nil {
@@ -157,7 +157,7 @@ func (a *ethAPI) walkStakedBalances() (stakedBalances, error) {
 }
 
 // stakeLogs synthesizes the logs of an accepted eth tx: staking calls emit one
-// stAVAX Transfer mint (from the zero address to the staker, value = staked
+// staked-token Transfer mint (from the zero address to the staker, value = staked
 // amount). Plain transfers emit nothing.
 func stakeLogs(unsigned *txs.EthRLPTx, record *ethReceiptRecord, ethHash ethcommon.Hash) []*ethtypes.Log {
 	if !unsigned.IsStakingCall() {
