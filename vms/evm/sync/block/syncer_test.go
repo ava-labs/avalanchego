@@ -452,11 +452,7 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 // test can assert the syncer never asked for blocks it already had.
 func countingHandler(t *testing.T, blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
 	log := loggingtest.New(t, logging.Debug)
-	inner := handlers.NewHandler(
-		log,
-		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
-		newResponder(log, synctest.NewBlockMap(blocks)),
-	)
+	inner := handlers.NewHandler[syncpb.GetBlockRequest](log, newResponder(log, synctest.NewBlockMap(blocks)))
 	var requests atomic.Int32
 	h := p2p.TestHandler{
 		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
