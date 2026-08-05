@@ -317,5 +317,8 @@ curl -X POST --data '{
 - `isActive`: (boolean) Indicates if the validator is active. This returns true if this is L1 validator and has enough continuous subnet staking fees in P-Chain. It always returns true for subnet validators.
 - `isL1Validator`: (boolean) Indicates if the validator is a L1 validator or a subnet validator.
 - `isConnected`: (boolean) Indicates if the validator node is currently connected to the callee node.
-- `uptimeSeconds`: (integer) The number of seconds the validator has been online.
-- `uptimePercentage`: (float) The percentage of time the validator has been online.
+- `uptimeSeconds`: (integer) The number of seconds the validator has been online, as measured by the node answering this request (the callee node).
+- `uptimePercentage`: (float) The percentage of time the validator has been online, as measured by the node answering this request (the callee node).
+
+> [!NOTE]
+> `uptimeSeconds` and `uptimePercentage` report the **uptime as perceived by the node answering the request** (the callee node), not a network-wide absolute value. Each node independently tracks how long it has observed a validator being connected, so different nodes can report different uptime values for the same validator, and any single node only has a partial view. A validator's uptime is not agreed upon by the network until the end of its validation period, when the uptime measurement is submitted to consensus (for example, to determine staking rewards). Treat the values returned here as this node's local view rather than a definitive, consensus-agreed number.
