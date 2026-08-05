@@ -279,7 +279,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
-	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
+	finalization, err := simplex.NewFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)
 	return finalization
 }

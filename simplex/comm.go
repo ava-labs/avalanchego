@@ -31,7 +31,7 @@ type Comm struct {
 	// broadcastNodes are the nodes that should receive broadcast messages
 	broadcastNodes set.Set[ids.NodeID]
 	// allNodes are the IDs of all the nodes in the subnet
-	allNodes []simplex.NodeID
+	allNodes simplex.Nodes
 
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
@@ -40,12 +40,15 @@ type Comm struct {
 
 func NewComm(config *Config) (*Comm, error) {
 	broadcastNodes := set.NewSet[ids.NodeID](len(config.Params.InitialValidators) - 1)
-	allNodes := make([]simplex.NodeID, 0, len(config.Params.InitialValidators))
+	allNodes := make(simplex.Nodes, 0, len(config.Params.InitialValidators))
 
 	includesOurNodeID := false
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
-		allNodes = append(allNodes, vd.NodeID[:])
+		allNodes = append(allNodes, simplex.Node{
+			Node:   vd.NodeID[:],
+			Weight: 1,
+		})
 		if vd.NodeID == config.Ctx.NodeID {
 			includesOurNodeID = true
 			continue // skip our own node ID
@@ -74,7 +77,7 @@ func NewComm(config *Config) (*Comm, error) {
 	}, nil
 }
 
-func (c *Comm) Nodes() []simplex.NodeID {
+func (c *Comm) Nodes() simplex.Nodes {
 	return c.allNodes
 }
 

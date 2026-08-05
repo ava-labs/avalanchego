@@ -133,7 +133,9 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		Signer:              &signer,
 		Verifier:            &verifier,
 		BlockDeserializer:   blockDeserializer,
-		SignatureAggregator: signatureAggregator,
+		SignatureAggregatorCreator: func(_ []simplex.Node) simplex.SignatureAggregator {
+            return signatureAggregator
+        },
 		Comm:                comm,
 		Storage:             storage,
 		WAL:                 config.WAL,

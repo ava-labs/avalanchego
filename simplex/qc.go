@@ -198,6 +198,35 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 		sig:      aggregatedSig,
 	}, nil
 }
+func (*SignatureAggregator) AppendSignatures(existing []byte, sigs ...[]byte) ([]byte, error) {
+	blsSigs := make([]*bls.Signature, 0, len(sigs)+1)
+
+	if len(existing) > 0 {
+		sig, err := bls.SignatureFromBytes(existing)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
+		}
+		blsSigs = append(blsSigs, sig)
+	}
+	for _, rawSig := range sigs {
+		sig, err := bls.SignatureFromBytes(rawSig)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
+		}
+		blsSigs = append(blsSigs, sig)
+	}
+	if len(blsSigs) == 0 {
+		return nil, errSignatureAggregation
+	}
+
+	aggregated, err := bls.AggregateSignatures(blsSigs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
+	}
+
+	return bls.SignatureToBytes(aggregated), nil
+
+}
 
 // IsQuorum checks if the provided nodes are a quorum of the membership set.
 // For now, this is calculated using one node = one vote, but in the future we can adjust
