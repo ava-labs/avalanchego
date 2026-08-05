@@ -75,7 +75,9 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: nix develop --impure --command bash -x ${{ inputs.run }}
+      env:
+        RUN_CMD: ${{ inputs.run }}
+      run: nix develop --impure --command bash -x "$RUN_CMD"
       working-directory: ${{ inputs.working_directory }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
