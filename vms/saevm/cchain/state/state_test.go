@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"slices"
 	"testing"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -36,6 +38,11 @@ import (
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	oldstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 )
+
+func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+	os.Exit(m.Run())
+}
 
 // SUT bundles the system under test: a state implementation plus both sides
 // of the shared-memory pair.
@@ -53,7 +60,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 
 	props := options.ApplyTo(&sutProperties{
 		db:  memdb.New(),
-		new: newStateWithNetworkID(constants.UnitTestID),
+		new: newState(constants.UnitTestID),
 	}, opts...)
 
 	chainDB := prefixdb.New([]byte("chain"), props.db)
@@ -85,10 +92,12 @@ type stateImpl interface {
 // A sutOption configures the default SUT properties used by [newSUT].
 type sutOption = options.Option[sutProperties]
 
+type constructor = func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
+
 type sutProperties struct {
 	// db is used for both the chain state and shared memory.
 	db  database.Database
-	new func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
+	new constructor
 }
 
 // withDB configures the SUT to use the given database.
@@ -108,11 +117,11 @@ func withLegacyBackend() sutOption {
 // withNetworkID configures the SUT's snow context to use the given network ID.
 func withNetworkID(networkID uint32) sutOption {
 	return options.Func[sutProperties](func(p *sutProperties) {
-		p.new = newStateWithNetworkID(networkID)
+		p.new = newState(networkID)
 	})
 }
 
-func newStateWithNetworkID(networkID uint32) func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl {
+func newState(networkID uint32) constructor {
 	return func(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
 		ctx := snowtest.Context(tb, snowtest.CChainID)
 		ctx.NetworkID = networkID
@@ -424,9 +433,9 @@ func TestApply_BonusBlock(t *testing.T) {
 		bonusHeight    uint64 = 102972
 		nonBonusHeight uint64 = 102971
 	)
-	_, containsBonusHeight := mainnetBonusBlocks[bonusHeight]
+	_, containsBonusHeight := bonusBlocks[bonusHeight]
 	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
-	_, containsNonBonusHeight := mainnetBonusBlocks[nonBonusHeight]
+	_, containsNonBonusHeight := bonusBlocks[nonBonusHeight]
 	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
 
 	tests := []struct {
@@ -483,9 +492,9 @@ func TestApply_BonusBlock_Index(t *testing.T) {
 		bonusHeight    uint64 = 102972
 		nonBonusHeight uint64 = 102971
 	)
-	_, containsBonusHeight := mainnetBonusBlocks[bonusHeight]
+	_, containsBonusHeight := bonusBlocks[bonusHeight]
 	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
-	_, containsNonBonusHeight := mainnetBonusBlocks[nonBonusHeight]
+	_, containsNonBonusHeight := bonusBlocks[nonBonusHeight]
 	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
 
 	s := newSUT(t, withNetworkID(constants.MainnetID))
