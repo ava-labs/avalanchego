@@ -101,6 +101,9 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	// Skip any suffix already on disk, whether from the node's own chain or an
 	// interrupted sync.
 	for toFetch > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
 			break

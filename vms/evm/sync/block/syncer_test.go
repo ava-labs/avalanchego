@@ -239,8 +239,10 @@ func TestSyncer(t *testing.T) {
 			handler, requests := countingHandler(t, blocks)
 			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
-			var verified atomic.Int32
-			var opts []SyncerOption
+			var (
+				verified atomic.Int32
+				opts     []SyncerOption
+			)
 			if tt.wantVerified > 0 {
 				opts = append(opts, WithBlockVerifier(func(*types.Block) error {
 					verified.Add(1)
@@ -274,19 +276,46 @@ func TestNewSyncer_Validation(t *testing.T) {
 }
 
 func TestSyncer_ContextCancelled(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
-	blocks := synctest.MakeChain(t, 10)
+	// Cancelling before Sync stops the skip walk. Cancelling once a batch has
+	// been accepted stops the fetch loop. Each guard sits in a different loop.
+	tests := []struct {
+		name             string
+		cancelAfterBatch bool
+	}{
+		{name: "before the skip walk"},
+		{name: "between batches", cancelAfterBatch: true},
+	}
 
-	ctx, cancel := context.WithCancel(t.Context())
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, RegisterHandler(logging.NoLog{}, net, synctest.NewBlockMap(blocks)))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blocks := synctest.MakeChain(t, 200)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 
-	tip := blocks[5]
-	syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), rawdb.NewMemoryDatabase(), tip.Hash(), 5, 3)
-	require.NoError(t, err)
+			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+			handler, _ := countingHandler(t, blocks)
+			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
-	cancel() // cancel before Sync runs
-	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
+			// Accept the batch, then cancel, so the loop reaches its guard with
+			// blocks already written.
+			var opts []SyncerOption
+			if tt.cancelAfterBatch {
+				opts = append(opts, WithBlockVerifier(func(*types.Block) error {
+					cancel()
+					return nil
+				}))
+			}
+
+			tip := blocks[len(blocks)-1]
+			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), rawdb.NewMemoryDatabase(), tip.Hash(), tip.NumberU64(), 200, opts...)
+			require.NoError(t, err)
+
+			if !tt.cancelAfterBatch {
+				cancel()
+			}
+			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
+		})
+	}
 }
 
 // Every response the syncer rejects must be re-requested and must not reach disk.
