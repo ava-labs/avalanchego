@@ -24,10 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 )
 
-// NewSelfNetwork returns a single-node [p2p.Network] that loops every request
-// back to its own handlers, and a [p2p.PeerTracker] that selects that node.
-// Register handlers on the returned network and build a client against it to
-// drive a full request/response round trip in-process.
+// NewSelfNetwork returns a single-node [p2p.Network] that loops requests back
+// to its own handlers, and a [p2p.PeerTracker] that selects that node.
 func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.Network, *p2p.PeerTracker) {
 	t.Helper()
 

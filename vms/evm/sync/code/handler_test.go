@@ -11,9 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -91,34 +90,8 @@ func TestResponder(t *testing.T) {
 func TestErrorSentinels(t *testing.T) {
 	t.Parallel()
 
-	sentinels := map[string]*avacommon.AppError{
+	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
 		"errTooManyHashes": errTooManyHashes,
 		"errHashNotFound":  errHashNotFound,
-	}
-	foreign := []*avacommon.AppError{
-		handlers.ErrMalformedRequest,
-		handlers.ErrMarshalResponse,
-		p2p.ErrUnexpected,
-		p2p.ErrUnregisteredHandler,
-		p2p.ErrNotValidator,
-		p2p.ErrThrottled,
-		avacommon.ErrUndefined,
-		avacommon.ErrTimeout,
-	}
-
-	seen := make(map[int32]string, len(sentinels))
-	for name, sentinel := range sentinels {
-		t.Run(name, func(t *testing.T) {
-			require.ErrorIs(t, sentinel, &avacommon.AppError{Code: sentinel.Code})
-			require.Positive(t, sentinel.Code, "p2p and the engine own the non-positive codes")
-
-			for _, f := range foreign {
-				require.NotErrorIs(t, sentinel, f)
-			}
-		})
-
-		other, dup := seen[sentinel.Code]
-		require.Falsef(t, dup, "%s and %s share code %d", name, other, sentinel.Code)
-		seen[sentinel.Code] = name
-	}
+	})
 }
