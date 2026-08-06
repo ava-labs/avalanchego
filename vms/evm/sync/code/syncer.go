@@ -89,24 +89,25 @@ func (s *Syncer) manage(ctx context.Context, requests chan<- []common.Hash, resu
 
 	var (
 		batch   = make([]common.Hash, 0, s.codeHashesPerReq)
-		pending int            // batches out with the fetchers
-		src     = s.codeHashes // nil once drained, which disables that case
+		pending int  // batches out with the fetchers
+		drained bool // the queue is closed, so no more hashes are coming
 	)
 	for {
-		drained := src == nil
 		if drained && len(batch) == 0 && pending == 0 {
 			return nil
 		}
 
-		// Hand off a full batch, or the remainder once the source is drained.
-		// Intake pauses until the handoff, so a batch never exceeds the cap the
-		// peer will accept.
+		// Hand a batch off or keep filling one, never both, so a batch cannot
+		// outgrow the cap the peer will accept.
 		var (
 			sendCh chan<- []common.Hash
-			recvCh = src
+			recvCh <-chan common.Hash
 		)
-		if len(batch) > 0 && (len(batch) >= s.codeHashesPerReq || drained) {
-			sendCh, recvCh = requests, nil
+		switch {
+		case len(batch) > 0 && (len(batch) >= s.codeHashesPerReq || drained):
+			sendCh = requests
+		case !drained:
+			recvCh = s.codeHashes
 		}
 
 		select {
@@ -131,7 +132,7 @@ func (s *Syncer) manage(ctx context.Context, requests chan<- []common.Hash, resu
 
 		case codeHash, ok := <-recvCh:
 			if !ok {
-				src = nil
+				drained = true
 				continue
 			}
 			missing, err := s.needsFetch(codeHash)
