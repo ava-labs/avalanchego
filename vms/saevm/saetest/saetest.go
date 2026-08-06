@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
@@ -23,6 +24,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 var _ saedb.StateDBOpener = (*stateDBOpener)(nil)
@@ -61,6 +64,18 @@ func ChainConfig() *params.ChainConfig {
 // zero, and post-merge.
 func Rules() params.Rules {
 	return ChainConfig().Rules(new(big.Int), true, 0)
+}
+
+// Genesis returns the canonical test genesis, using [ChainConfig] and
+// allocating maximum funds to each of addrs.
+func Genesis(addrs ...common.Address) core.Genesis {
+	return core.Genesis{
+		Config:     ChainConfig(),
+		Alloc:      MaxAllocFor(addrs...),
+		Timestamp:  saeparams.TauSeconds,
+		BaseFee:    big.NewInt(1),
+		Difficulty: big.NewInt(0), // irrelevant but required
+	}
 }
 
 // An EventCollector collects all events received from an [event.Subscription].

@@ -157,16 +157,10 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			},
 		},
 		logLevel: logging.Debug,
-		genesis: core.Genesis{
-			Config:     saetest.ChainConfig(),
-			Alloc:      saetest.MaxAllocFor(keys.Addresses()...),
-			Timestamp:  saeparams.TauSeconds,
-			BaseFee:    big.NewInt(1),
-			Difficulty: big.NewInt(0), // irrelevant but required
-		},
-		db:      memdb.New(),
-		dataDir: tb.TempDir(),
-		nodeID:  ids.GenerateTestNodeID(),
+		genesis:  saetest.Genesis(keys.Addresses()...),
+		db:       memdb.New(),
+		dataDir:  tb.TempDir(),
+		nodeID:   ids.GenerateTestNodeID(),
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
@@ -1274,9 +1268,11 @@ func TestSettledGasTime(t *testing.T) {
 
 	for i, b := range bs {
 		if i == 0 {
-			continue // genesis block has no [hook.SettledBy] struct.
+			continue // genesis settles itself, so it has no settled ancestor to compare against.
 		}
-		settledHeight := sut.hooks.SettledBy(b.Header()).Height
+		marker := sut.hooks.SettledBy(b.Header())
+		require.NotEqualf(t, b.Height(), marker.Height, "sut.hooks.SettledBy() must not be self-settling for SAE block %d", b.Height())
+		settledHeight := marker.Height
 		settledBlock := bs[settledHeight]
 
 		want := settledBlock.ExecutedByGasTime()

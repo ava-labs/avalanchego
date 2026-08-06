@@ -6,11 +6,13 @@ package sae
 import (
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
@@ -20,13 +22,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // TestRecoverAfterCrash recovers from a copy of a running VM's database,
@@ -184,7 +191,10 @@ func TestRecover(t *testing.T) {
 					lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
 					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 
-					for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
+					// A markerless block is synchronous and settles itself, so
+					// its self-settling marker yields its own height.
+					lastOnDiskSettledHeight := sut.hooks.SettledBy(lastOnDisk.Header()).Height
+					for i := lastOnDiskSettledHeight + 1; i < lastSettled; i++ {
 						ethB, err := canonicalBlock(sut.rawVM.db, i)
 						require.NoErrorf(t, err, "canonicalBlock(%d)", i)
 						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
@@ -220,6 +230,73 @@ func TestRecover(t *testing.T) {
 			})
 		})
 	}
+}
+
+// requireInitializeIncompatible initializes a fresh [SinceGenesis] VM against
+// db, with xdb as its execution-results database, and asserts that
+// [SinceGenesis.Initialize] fails with wantErr, naming the on-disk
+// execution-results path.
+func requireInitializeIncompatible(t *testing.T, db database.Database, xdb saetypes.ExecutionResults, genesis core.Genesis, wantErr error) {
+	t.Helper()
+
+	hooks := hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		return xdb, nil
+	}))
+	vm := NewSinceGenesis(hooks, Config{
+		DBConfig: saedb.Config{
+			CommitInterval: saedb.DefaultCommitInterval,
+		},
+	})
+	snowCtx := snowtest.Context(t, chainID)
+	snowCtx.Log = loggingtest.New(t, logging.Warn)
+	snowCtx.ChainDataDir = t.TempDir()
+	saetest.SetValidators(t, snowCtx.ValidatorState, nil)
+
+	err := vm.Initialize(
+		t.Context(),
+		snowCtx,
+		db,
+		marshalJSON(t, genesis),
+		nil, // upgrade bytes
+		nil, // config bytes
+		nil, // Fxs
+		saetest.NewSender(t, nil),
+	)
+	require.ErrorIs(t, err, wantErr, "Initialize() with incompatible execution-results DB")
+	require.Contains(t, err.Error(), filepath.Join(snowCtx.ChainDataDir, executionResultsDir), "Initialize() error should name the execution-results path")
+}
+
+func TestNewVMIncompatibleExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var (
+		srcDB      database.Database
+		srcGenesis core.Genesis
+	)
+	ctx, src := newSUT(t, 1, sutOpt, options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		srcGenesis = c.genesis
+		c.logLevel = logging.Warn
+	}))
+
+	b := src.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, b)
+	settler := src.runConsensusLoop(t)
+	require.NoErrorf(t, settler.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settler)
+	require.Equal(t, b.Height(), src.rawVM.last.settled.Load().Height(), "settled height after accepting settler")
+
+	requireInitializeIncompatible(t, saetest.CopyDB(t, srcDB), saetest.NewExecutionResultsDB(), srcGenesis, blocks.ErrMissingExecutionResults)
+}
+
+func TestNewVMUnexpectedExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	xdb := saetest.NewExecutionResultsDB()
+	require.NoError(t, xdb.Put(0, []byte{}), "xdb.Put()")
+
+	requireInitializeIncompatible(t, memdb.New(), xdb, saetest.Genesis(), blocks.ErrUnexpectedExecutionResults)
 }
 
 func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {

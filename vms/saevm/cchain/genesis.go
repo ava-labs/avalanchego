@@ -307,10 +307,12 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 
-		// The genesis block is synchronous, so the markers must be zero to
-		// conform with [hook.Synchronous]. Most synchronous blocks omit these
-		// fields entirely. Genesis needs to include them with values that mark
-		// it as synchronous to allow future upgrade fields to be included.
+		// The genesis block is synchronous, so its markers must be
+		// self-settling (SettledHeight equal to its own height, zero) to
+		// conform with [hook.IsSynchronous]. Most synchronous blocks omit
+		// these fields entirely. Genesis needs to include them with values
+		// that mark it as synchronous to allow future upgrade fields to be
+		// included.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)

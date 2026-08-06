@@ -207,10 +207,16 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
-// SettledBy returns the settled information encoded in the Header by [Stub.BuildBlock]
-// or [BuildBlock].
+// SettledBy returns the settlement marker encoded in the header by
+// [Stub.BuildBlock] or [BuildBlock]. A header built by neither carries no
+// marker and is reported as self-settling: Height equal to the header's own
+// block number and zero gas fields; see [hook.IsSynchronous].
 func (*Stub) SettledBy(hdr *types.Header) hook.Settled {
-	return getHeaderExtra(hdr).settled.toHook()
+	e := getHeaderExtra(hdr)
+	if e.settled == nil {
+		return hook.SelfSettled(hdr)
+	}
+	return e.settled.toHook()
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
@@ -260,9 +266,11 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 
 //nolint:revive // struct-tag: canoto allows unexported fields
 type extra struct {
-	subSec  time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	ops     []Op          `canoto:"repeated value,2"`
-	settled storedSettled `canoto:"value,3"`
+	subSec time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
+	ops    []Op          `canoto:"repeated value,2"`
+	// Nil iff no marker was recorded by [Stub.BuildBlock] or [BuildBlock];
+	// [Stub.SettledBy] then reports the header as self-settling.
+	settled *storedSettled `canoto:"pointer,3"`
 
 	canotoData canotoData_extra
 }
@@ -277,8 +285,8 @@ type storedSettled struct {
 	canotoData canotoData_storedSettled
 }
 
-func fromHook(s hook.Settled) storedSettled {
-	return storedSettled{
+func fromHook(s hook.Settled) *storedSettled {
+	return &storedSettled{
 		height:       s.Height,
 		gasUnix:      s.GasUnix,
 		gasNumerator: s.GasNumerator,

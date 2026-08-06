@@ -64,13 +64,13 @@ func (*extra) CanotoSpec(types ...reflect.Type) *canoto.Spec {
 				/*types:         */ types,
 			),
 			canoto.FieldTypeFromField(
-				/*type inference:*/ (&zero.settled),
+				/*type inference:*/ (zero.settled),
 				/*FieldNumber:   */ canoto__extra__settled,
 				/*Name:          */ "settled",
 				/*FixedLength:   */ 0,
 				/*Repeated:      */ false,
 				/*OneOf:         */ "",
-				/*Pointer:       */ false,
+				/*Pointer:       */ true,
 				/*types:         */ types,
 			),
 		},
@@ -186,15 +186,13 @@ func (c *extra) UnmarshalCanotoFrom(r canoto.Reader) error {
 			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
 				return err
 			}
-			if len(msgBytes) == 0 {
-				return canoto.ErrZeroValue
-			}
 			r.Unsafe = originalUnsafe
 
 			// Unmarshal the field from the bytes.
 			remainingBytes := r.B
 			r.B = msgBytes
-			if err := (&c.settled).UnmarshalCanotoFrom(r); err != nil {
+			c.settled = canoto.MakePointer(c.settled)
+			if err := (c.settled).UnmarshalCanotoFrom(r); err != nil {
 				return err
 			}
 			r.B = remainingBytes
@@ -223,7 +221,7 @@ func (c *extra) ValidCanoto() bool {
 			}
 		}
 	}
-	if !(&c.settled).ValidCanoto() {
+	if c.settled != nil && !(c.settled).ValidCanoto() {
 		return false
 	}
 	return true
@@ -246,8 +244,9 @@ func (c *extra) CalculateCanotoCache() {
 			size += uint64(len(canoto__extra__ops__tag)) + canoto.SizeUint(fieldSize) + fieldSize
 		}
 	}
-	(&c.settled).CalculateCanotoCache()
-	if fieldSize := (&c.settled).CachedCanotoSize(); fieldSize != 0 {
+	if c.settled != nil {
+		(c.settled).CalculateCanotoCache()
+		fieldSize := (c.settled).CachedCanotoSize()
 		size += uint64(len(canoto__extra__settled__tag)) + canoto.SizeUint(fieldSize) + fieldSize
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
@@ -300,10 +299,11 @@ func (c *extra) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 			w = (&field[i]).MarshalCanotoInto(w)
 		}
 	}
-	if fieldSize := (&c.settled).CachedCanotoSize(); fieldSize != 0 {
+	if c.settled != nil {
+		fieldSize := (c.settled).CachedCanotoSize()
 		canoto.Append(&w, canoto__extra__settled__tag)
 		canoto.AppendUint(&w, fieldSize)
-		w = (&c.settled).MarshalCanotoInto(w)
+		w = (c.settled).MarshalCanotoInto(w)
 	}
 	return w
 }

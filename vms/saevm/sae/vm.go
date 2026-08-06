@@ -43,6 +43,10 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
+// executionResultsDir is the directory under [snow.Context.ChainDataDir]
+// holding the execution-results database.
+const executionResultsDir = "sae_execution_results"
+
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
 // ensure that the last-synchronous block (which MAY be the genesis) is
@@ -142,17 +146,16 @@ func NewVM[T hook.Transaction](
 		metrics: m,
 		db:      db,
 	}
+	xdbDir := filepath.Join(snowCtx.ChainDataDir, executionResultsDir)
 	defer func() {
 		if retErr != nil {
-			retErr = errors.Join(retErr, vm.close())
+			retErr = describeIncompatibleDBs(errors.Join(retErr, vm.close()), xdbDir)
 		}
 	}()
 
-	xdb, err := hooks.ExecutionResultsDB(
-		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
-	)
+	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
-		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
+		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
 	}
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
@@ -380,4 +383,17 @@ func (*VM) Version(context.Context) (string, error) {
 
 func (vm *VM) log() logging.Logger {
 	return vm.snowCtx.Log
+}
+
+// describeIncompatibleDBs decorates execution-results/chain-database mismatch
+// errors with a hint at the likely misconfiguration, for operators.
+func describeIncompatibleDBs(err error, xdbDir string) error {
+	if errors.Is(err, blocks.ErrMissingExecutionResults) || errors.Is(err, blocks.ErrUnexpectedExecutionResults) {
+		return fmt.Errorf(
+			"execution results in %q are incompatible with the chain database (is the chain data directory correct?): %w",
+			xdbDir,
+			err,
+		)
+	}
+	return err
 }

@@ -53,7 +53,6 @@ go_test(
         "//utils/set",
         "//vms/saevm/blocks",
         "//vms/saevm/hook/hookstest",
-        "//vms/saevm/params",
         "//vms/saevm/sae",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
