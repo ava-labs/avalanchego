@@ -43,7 +43,9 @@ go_test(
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/evm/sync/customrawdb",
+        "//vms/evm/sync/handlers",
         "//vms/evm/sync/synctest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
@@ -52,6 +54,5 @@ go_test(
         "@com_github_ava_labs_libevm//ethdb/memorydb",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//proto",
     ],
 )

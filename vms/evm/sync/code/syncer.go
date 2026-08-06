@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -32,20 +31,25 @@ var (
 )
 
 // Syncer fetches contract code by hash from the network and persists it to db.
-// It consumes hashes from a channel, batches them, skips code already on disk,
-// dedupes concurrent fetches, and clears the durable to-fetch marker for each
-// hash it satisfies.
+//
+// A single manager goroutine owns every db read and write and the set of hashes
+// being fetched, so batching, deduplication and persistence need no locking and
+// see a consistent view. Only the network fetch runs in parallel, on
+// numSyncWorkers goroutines, which is the part worth overlapping.
 type Syncer struct {
 	log        logging.Logger
 	client     *Client
 	db         ethdb.KeyValueStore
 	codeHashes <-chan common.Hash
 
-	numWorkers       int
 	codeHashesPerReq int // best-effort target size, the final batch may be smaller
+}
 
-	// inFlight ensures only one worker fetches a given hash at a time.
-	inFlight sync.Map
+// fetchResult carries a verified fetch back to the manager. The hashes travel
+// with it because batches complete out of order.
+type fetchResult struct {
+	hashes []common.Hash
+	data   [][]byte
 }
 
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
@@ -56,67 +60,130 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes
 		client:           c,
 		db:               db,
 		codeHashes:       codeHashes,
-		numWorkers:       numSyncWorkers,
 		codeHashesPerReq: maxHashesPerRequest,
 	}
 }
 
-// Sync runs the workers until codeHashes is drained and closed, or ctx ends.
+// Sync runs until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
-	for range s.numWorkers {
-		eg.Go(func() error { return s.work(egCtx) })
+	requests := make(chan []common.Hash)
+	results := make(chan fetchResult)
+
+	for range numSyncWorkers {
+		eg.Go(func() error { return s.fetch(egCtx, requests, results) })
 	}
+	eg.Go(func() error {
+		// Closing releases the fetchers once the manager stops handing out work.
+		defer close(requests)
+		return s.manage(egCtx, requests, results)
+	})
 	return eg.Wait()
 }
 
-func (s *Syncer) work(ctx context.Context) error {
-	batch := make([]common.Hash, 0, s.codeHashesPerReq)
+// manage owns the db and the in-flight set. It batches incoming hashes, hands
+// full batches to the fetchers, and persists what they return.
+func (s *Syncer) manage(ctx context.Context, requests chan<- []common.Hash, results <-chan fetchResult) error {
+	// Manager-local, so it needs no synchronisation.
+	inFlight := make(map[common.Hash]struct{})
+
+	var (
+		batch   = make([]common.Hash, 0, s.codeHashesPerReq)
+		pending int            // batches out with the fetchers
+		src     = s.codeHashes // nil once drained, which disables that case
+	)
 	for {
+		drained := src == nil
+		if drained && len(batch) == 0 && pending == 0 {
+			return nil
+		}
+
+		// Hand off a full batch, or the remainder once the source is drained.
+		// Intake pauses until the handoff, so a batch never exceeds the cap the
+		// peer will accept.
+		var (
+			sendCh chan<- []common.Hash
+			recvCh = src
+		)
+		if len(batch) > 0 && (len(batch) >= s.codeHashesPerReq || drained) {
+			sendCh, recvCh = requests, nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case codeHash, ok := <-s.codeHashes:
-			if !ok {
-				if len(batch) > 0 {
-					return s.fulfill(ctx, batch)
-				}
-				return nil
-			}
 
-			// Slow path: code already on disk, just clear its marker.
-			if rawdb.HasCode(s.db, codeHash) {
-				if err := customrawdb.DeleteCodeToFetch(s.db, codeHash); err != nil {
-					return fmt.Errorf("failed to delete stale code marker: %w", err)
-				}
-				continue
-			}
+		case sendCh <- batch:
+			pending++
+			// The fetcher owns the sent slice, so start a fresh one.
+			batch = make([]common.Hash, 0, s.codeHashesPerReq)
 
-			// Fast path: dedupe concurrent fetches for the same hash.
-			if _, loaded := s.inFlight.LoadOrStore(codeHash, struct{}{}); loaded {
-				continue
-			}
-
-			batch = append(batch, codeHash)
-			if len(batch) < s.codeHashesPerReq {
-				continue
-			}
-			if err := s.fulfill(ctx, batch); err != nil {
+		case res := <-results:
+			pending--
+			if err := s.persist(res.hashes, res.data); err != nil {
 				return err
 			}
-			batch = batch[:0]
+			// Cleared only after the commit, so a hash arriving next is seen on
+			// disk rather than fetched again.
+			for _, codeHash := range res.hashes {
+				delete(inFlight, codeHash)
+			}
+
+		case codeHash, ok := <-recvCh:
+			if !ok {
+				src = nil
+				continue
+			}
+			missing, err := s.needsFetch(codeHash)
+			if err != nil {
+				return err
+			}
+			_, claimed := inFlight[codeHash]
+			if !missing || claimed {
+				continue
+			}
+			inFlight[codeHash] = struct{}{}
+			batch = append(batch, codeHash)
 		}
 	}
 }
 
-// fulfill fetches code for hashes, then writes it and clears the to-fetch
-// markers in one batch.
-func (s *Syncer) fulfill(ctx context.Context, hashes []common.Hash) error {
-	data, err := getCode(ctx, s.log, s.client, hashes)
-	if err != nil {
-		return err
+// needsFetch reports whether codeHash has to come from a peer.
+func (s *Syncer) needsFetch(codeHash common.Hash) (bool, error) {
+	if !rawdb.HasCode(s.db, codeHash) {
+		return true, nil
 	}
+	if err := customrawdb.DeleteCodeToFetch(s.db, codeHash); err != nil {
+		return false, fmt.Errorf("failed to delete stale code marker: %w", err)
+	}
+	return false, nil
+}
 
+// fetch pulls batches, retrieves and verifies them, and reports back.
+func (s *Syncer) fetch(ctx context.Context, requests <-chan []common.Hash, results chan<- fetchResult) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case hashes, ok := <-requests:
+			if !ok {
+				return nil
+			}
+			data, err := getCode(ctx, s.log, s.client, hashes)
+			if err != nil {
+				return err
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case results <- fetchResult{hashes: hashes, data: data}:
+			}
+		}
+	}
+}
+
+// persist writes the code and clears the to-fetch markers in one batch.
+func (s *Syncer) persist(hashes []common.Hash, data [][]byte) error {
 	batch := s.db.NewBatch()
 	for i, codeHash := range hashes {
 		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
@@ -126,12 +193,6 @@ func (s *Syncer) fulfill(ctx context.Context, hashes []common.Hash) error {
 	}
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("failed to write fetched code: %w", err)
-	}
-
-	// Released after the commit so a worker that pulls the same hash next finds
-	// it on disk and skips it instead of re-fetching.
-	for _, codeHash := range hashes {
-		s.inFlight.Delete(codeHash)
 	}
 	return nil
 }
@@ -153,14 +214,18 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 			continue
 		}
 
-		if err := verifyCode(hashes, resp.GetData()); err != nil {
+		data := resp.GetData()
+		if err := verifyCode(hashes, data); err != nil {
 			outcome.Failure()
-			log.Debug("invalid code response, re-requesting", zap.Error(err))
+			log.Debug("invalid code response, re-requesting",
+				zap.Stringer("nodeID", outcome.NodeID()),
+				zap.Error(err),
+			)
 			continue
 		}
 
 		outcome.Success()
-		return resp.GetData(), nil
+		return data, nil
 	}
 }
 
@@ -170,6 +235,8 @@ func verifyCode(hashes []common.Hash, data [][]byte) error {
 		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
 	}
 	for i, code := range data {
+		// Cheaper than hashing, and no valid blob can exceed this, so an
+		// oversized one is rejected without paying for a keccak over it.
 		if len(code) > params.MaxCodeSize {
 			return fmt.Errorf("%w: hash %s size %d", errCodeSizeExceeded, hashes[i], len(code))
 		}

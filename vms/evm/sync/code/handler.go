@@ -40,7 +40,7 @@ var (
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, codeReader ethdb.KeyValueReader) error {
-	h := handlers.NewHandler[syncpb.GetCodeRequest](log, newResponder(log, codeReader))
+	h := handlers.NewHandler(log, newResponder(log, codeReader))
 	return net.AddHandler(p2p.EVMCodeRequestHandlerID, h)
 }
 
@@ -59,8 +59,9 @@ func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responde
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
 	hashes := req.GetHashes()
 	if len(hashes) > maxHashesPerRequest {
-		r.log.Debug("rejecting request, too many hashes",
+		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
+			zap.String("reason", "too many hashes"),
 			zap.Int("numHashes", len(hashes)),
 		)
 		return nil, errTooManyHashes
@@ -71,8 +72,9 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 		hash := common.BytesToHash(raw)
 		data[i] = rawdb.ReadCode(r.codeReader, hash)
 		if len(data[i]) == 0 {
-			r.log.Debug("rejecting request, code not found",
+			r.log.Debug("rejecting request",
 				zap.Stringer("nodeID", nodeID),
+				zap.String("reason", "code not found"),
 				zap.Stringer("hash", hash),
 			)
 			return nil, errHashNotFound

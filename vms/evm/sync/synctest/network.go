@@ -29,11 +29,11 @@ import (
 func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.Network, *p2p.PeerTracker) {
 	t.Helper()
 
-	sender := &enginetest.Sender{}
-	net, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
-	require.NoError(t, err)
-
 	log := loggingtest.New(t, logging.Debug)
+
+	sender := &enginetest.Sender{}
+	net, err := p2p.NewNetwork(log, sender, prometheus.NewRegistry(), "")
+	require.NoError(t, err)
 
 	// Joining the delivery goroutines keeps them from outliving the test,
 	// so their logs can never reach a completed [testing.T].
@@ -70,11 +70,11 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 		return nil
 	}
 
-	require.NoError(t, net.Connected(ctx, nodeID, nil))
+	require.NoError(t, net.Connected(ctx, nodeID, version.Current))
 
-	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "synctest_peer_tracker", prometheus.NewRegistry(), nil, nil)
+	tracker, err := p2p.NewPeerTracker(log, "synctest_peer_tracker", prometheus.NewRegistry(), nil, nil)
 	require.NoError(t, err)
-	tracker.Connected(nodeID, &version.Application{Major: 99})
+	tracker.Connected(nodeID, version.Current)
 
 	return net, tracker
 }

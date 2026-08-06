@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -35,27 +36,27 @@ func TestResponder(t *testing.T) {
 		wantErr  *avacommon.AppError
 	}{
 		{
-			name:     "single hash",
+			name:     "single_hash",
 			hashes:   []common.Hash{codeHash},
 			wantData: [][]byte{codeBytes},
 		},
 		{
-			name:     "multiple hashes preserve order",
+			name:     "multiple_hashes_preserve_order",
 			hashes:   []common.Hash{codeHash, otherHash},
 			wantData: [][]byte{codeBytes, other},
 		},
 		{
-			name:    "missing hash rejected",
+			name:    "missing_hash_rejected",
 			hashes:  []common.Hash{{0xde, 0xad}},
 			wantErr: errHashNotFound,
 		},
 		{
-			name:     "duplicate hashes served",
+			name:     "duplicate_hashes_served",
 			hashes:   []common.Hash{codeHash, codeHash},
 			wantData: [][]byte{codeBytes, codeBytes},
 		},
 		{
-			name:    "too many hashes rejected",
+			name:    "too_many_hashes_rejected",
 			hashes:  make([]common.Hash, maxHashesPerRequest+1),
 			wantErr: errTooManyHashes,
 		},
@@ -65,7 +66,7 @@ func TestResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := newResponder(logging.NoLog{}, db)
+			r := newResponder(loggingtest.New(t, logging.Debug), db)
 
 			rawHashes := make([][]byte, len(tt.hashes))
 			for i, h := range tt.hashes {

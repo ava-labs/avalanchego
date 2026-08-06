@@ -6,6 +6,8 @@ package code
 import (
 	"context"
 	"crypto/rand"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,12 +18,13 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -47,19 +50,19 @@ func TestVerifyCode(t *testing.T) {
 			data:   [][]byte{code},
 		},
 		{
-			name:    "count mismatch",
+			name:    "count_mismatch",
 			hashes:  []common.Hash{hash},
 			data:    [][]byte{},
 			wantErr: errCodeCountMismatch,
 		},
 		{
-			name:    "hash mismatch",
+			name:    "hash_mismatch",
 			hashes:  []common.Hash{hash},
 			data:    [][]byte{[]byte("tampered")},
 			wantErr: errCodeHashMismatch,
 		},
 		{
-			name:    "size exceeded",
+			name:    "size_exceeded",
 			hashes:  []common.Hash{oversizedHash},
 			data:    [][]byte{oversized},
 			wantErr: errCodeSizeExceeded,
@@ -68,12 +71,7 @@ func TestVerifyCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyCode(tt.hashes, tt.data)
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, verifyCode(tt.hashes, tt.data), tt.wantErr)
 		})
 	}
 }
@@ -84,10 +82,11 @@ func TestSyncer(t *testing.T) {
 		numFromSource int
 		numOnDisk     int
 		perReq        int
+		wantRequests  int
 	}{
-		{name: "single blob", numFromSource: 1},
-		{name: "batches across requests", numFromSource: 12, perReq: 4},
-		{name: "skips code already on disk", numFromSource: 3, numOnDisk: 2},
+		{name: "single_blob", numFromSource: 1, wantRequests: 1},
+		{name: "batches_across_requests", numFromSource: 40, perReq: 4, wantRequests: 10},
+		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2, wantRequests: 1},
 	}
 
 	for _, tt := range tests {
@@ -95,8 +94,6 @@ func TestSyncer(t *testing.T) {
 			// A broken skip re-requests forever, so bound the wait.
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			nodeID := ids.GenerateTestNodeID()
-
 			source := memorydb.New()
 			target := memorydb.New()
 			want := map[common.Hash][]byte{}
@@ -111,8 +108,9 @@ func TestSyncer(t *testing.T) {
 				want[writeCode(t, target, code)] = code
 			}
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			require.NoError(t, RegisterHandler(logging.NoLog{}, net, source))
+			log := loggingtest.New(t, logging.Debug)
+			counter := &countingResponder{inner: newResponder(log, source)}
+			client := serve(t, ctx, log, counter)
 
 			ch := make(chan common.Hash, len(want))
 			for hash := range want {
@@ -121,11 +119,8 @@ func TestSyncer(t *testing.T) {
 			}
 			close(ch)
 
-			s := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, ch)
+			s := NewSyncer(log, client, target, ch)
 			if tt.perReq > 0 {
-				// One worker drains the whole channel, so the batch boundaries
-				// are fixed instead of left to the scheduler.
-				s.numWorkers = 1
 				s.codeHashesPerReq = tt.perReq
 			}
 			require.NoError(t, s.Sync(ctx))
@@ -137,44 +132,99 @@ func TestSyncer(t *testing.T) {
 			it := customrawdb.NewCodeToFetchIterator(target)
 			defer it.Release()
 			require.False(t, it.Next(), "all to-fetch markers must be cleared")
+
+			sizes := counter.requests()
+			require.Len(t, sizes, tt.wantRequests,
+				"code already on disk must not be requested, and a full batch must be sent as its own request")
+			requested := 0
+			for _, size := range sizes {
+				// The handler drops a request over the cap, so an overgrown
+				// batch costs the whole request, not just the excess.
+				require.LessOrEqual(t, size, s.codeHashesPerReq, "a request outgrew the batch size")
+				requested += size
+			}
+			require.Equal(t, tt.numFromSource, requested, "every missing hash is requested once")
 		})
 	}
+}
+
+// A batch is only handed off once it holds something, so a non-positive size
+// cannot turn the manager into a spin of empty requests.
+func TestSyncer_NeverSendsEmptyRequest(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	log := loggingtest.New(t, logging.Debug)
+	counter := &countingResponder{inner: newResponder(log, memorydb.New())}
+	client := serve(t, ctx, log, counter)
+
+	// Open and never fed, so the manager has nothing to batch.
+	ch := make(chan common.Hash)
+
+	s := NewSyncer(log, client, memorydb.New(), ch)
+	s.codeHashesPerReq = 0
+
+	require.ErrorIs(t, s.Sync(ctx), context.DeadlineExceeded)
+	require.Empty(t, counter.requests(), "an empty batch must never be sent")
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
-	nodeID := ids.GenerateTestNodeID()
-
 	hash := crypto.Keccak256Hash([]byte("real code"))
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, tamperingHandler()))
+	log := loggingtest.New(t, logging.Debug)
+	responder := &tamperingResponder{}
+	client := serve(t, ctx, log, responder)
 
-	got, err := getCode(ctx, logging.NoLog{}, NewClient(net, tracker), []common.Hash{hash})
+	got, err := getCode(ctx, log, client, []common.Hash{hash})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, got, "tampered code must never be accepted")
+	require.Positive(t, responder.served.Load(), "the deadline must not expire before a tampered response is rejected")
 }
 
-// tamperingHandler returns well-formed but wrong code, so verification always fails.
-func tamperingHandler() p2p.Handler {
-	return p2p.TestHandler{
-		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *avacommon.AppError) {
-			req := &syncpb.GetCodeRequest{}
-			if err := proto.Unmarshal(requestBytes, req); err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			data := make([][]byte, len(req.GetHashes()))
-			for i := range data {
-				data[i] = []byte("tampered")
-			}
-			respBytes, err := proto.Marshal(&syncpb.GetCodeResponse{Data: data})
-			if err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			return respBytes, nil
-		},
+// serve registers r on a single-node in-process network and returns a client
+// bound to it.
+func serve(t *testing.T, ctx context.Context, log logging.Logger, r handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]) *Client {
+	t.Helper()
+
+	nodeID := ids.GenerateTestNodeID()
+	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
+	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, handlers.NewHandler(log, r)))
+	return NewClient(net, tracker)
+}
+
+// countingResponder records the hash count of every request reaching inner, so
+// a test can assert how many round trips the syncer made and how big they were.
+type countingResponder struct {
+	inner handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+	mu    sync.Mutex
+	sizes []int
+}
+
+func (c *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
+	c.mu.Lock()
+	c.sizes = append(c.sizes, len(req.GetHashes()))
+	c.mu.Unlock()
+	return c.inner.Respond(ctx, nodeID, req)
+}
+
+func (c *countingResponder) requests() []int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]int(nil), c.sizes...)
+}
+
+// tamperingResponder returns well-formed but wrong code, so verification always
+// fails. It counts its answers so a test can show the rejection really happened.
+type tamperingResponder struct{ served atomic.Int64 }
+
+func (r *tamperingResponder) Respond(_ context.Context, _ ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
+	r.served.Add(1)
+	data := make([][]byte, len(req.GetHashes()))
+	for i := range data {
+		data[i] = []byte("tampered")
 	}
+	return &syncpb.GetCodeResponse{Data: data}, nil
 }
 
 func writeCode(t *testing.T, db ethdb.KeyValueWriter, code []byte) common.Hash {
