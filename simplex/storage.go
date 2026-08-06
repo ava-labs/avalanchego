@@ -10,6 +10,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"sync/atomic"
 
 	"github.com/ava-labs/simplex"
@@ -265,6 +267,172 @@ func (s *Storage) retrieveBlacklist(seq uint64) (simplex.Blacklist, error) {
 		return simplex.Blacklist{}, fmt.Errorf("failed to parse blacklist: %w", err)
 	}
 	return blacklist, nil
+}
+
+// locateLastNonSimplexBlock returns the highest block that was accepted before Simplex was activated.
+// It returns the block, a boolean indicating if a non-simplex block was found, and an error if any occurred during the search.
+// The parameter numBlocksInChain is the number of blocks in the chain, not the number of blocks on disk.
+func locateLastNonSimplexBlock(
+	ctx context.Context,
+	genesisBlock snowman.Block,
+	proposerVM block.ChainVM,
+	db database.KeyValueReader,
+	log logging.Logger,
+	numBlocksInChain uint64,
+) (snowman.Block, bool, error) {
+	if numBlocksInChain == 0 {
+		// This is a sanity check, as the genesis block should always be present in storage.
+		return nil, false, errors.New("no blocks in storage")
+	}
+
+	if numBlocksInChain == 1 {
+		// If there's only one block in the chain, it must be the genesis block, which is a non-simplex block.
+		return genesisBlock, true, nil
+	}
+
+	// We first check if the last block is a non-simplex block. If it is, we can return it immediately.
+	lastBlock, isNonSimplexBlock, err := isLastBlockNonSimplexBlock(ctx, proposerVM, log, numBlocksInChain)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if isNonSimplexBlock {
+		return lastBlock, true, nil
+	}
+
+	// Else, the last block is a simplex block, so we need to find the lowest simplex block in the chain and then return the block before it,
+	// which is the last non-simplex block.
+
+	if numBlocksInChain > math.MaxInt {
+		// This cannot happen, but we check to avoid potential overflow issues with sort.Search.
+		return nil, false, errors.New("too many blocks in storage")
+	}
+
+	lowestSimplexBlockSeq, simplexBlockExists, err := findLowestSimplexBlockSeq(db, log, int(numBlocksInChain))
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !simplexBlockExists {
+		// This is a sanity check, as we should have found at least one simplex block if the last block was a simplex block.
+		return nil, false, errors.New("no simplex blocks found in storage")
+	}
+
+	if err := validateLowestSimplexBlock(db, log, lowestSimplexBlockSeq); err != nil {
+		return nil, false, err
+	}
+
+	blockBeforeLowestSimplexSeq := lowestSimplexBlockSeq - 1
+
+	if blockBeforeLowestSimplexSeq == 0 {
+		// If the block before the lowest simplex block is the genesis block, we return it as the last non-simplex block.
+		return genesisBlock, true, nil
+	}
+
+	// Retrieve the last non-simplex block from the proposerVM and return it.
+	lastNonSimplexBlock, err := getBlock(ctx, proposerVM, uint64(blockBeforeLowestSimplexSeq))
+	if errors.Is(err, database.ErrNotFound) {
+		// The block before the lowest simplex block isn't in the proposerVM, so we only
+		// have simplex blocks, which can happen if we have bootstrapped with state sync.
+		return nil, false, nil
+	}
+	if err != nil {
+		log.Error("Failed to retrieve last non-simplex block", zap.Int("seq", blockBeforeLowestSimplexSeq), zap.Error(err))
+		return nil, false, fmt.Errorf("failed getting block %d: %w", blockBeforeLowestSimplexSeq, err)
+	}
+
+	return lastNonSimplexBlock, true, nil
+}
+
+// isLastBlockNonSimplexBlock returns the last block of the chain, and whether it was
+// accepted before Simplex was activated. Blocks accepted by Simplex are not retrievable
+// from the proposerVM, so a block that is missing from it is a Simplex block.
+// [numBlocksInChain] is assumed to be positive.
+func isLastBlockNonSimplexBlock(
+	ctx context.Context,
+	proposerVM block.ChainVM,
+	log logging.Logger,
+	numBlocksInChain uint64,
+) (snowman.Block, bool, error) {
+	lastBlockSeq := numBlocksInChain - 1
+
+	// If the last block is not found in the proposerVM, it is a Simplex block, so we return false.
+	lastBlock, err := getBlock(ctx, proposerVM, lastBlockSeq)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		log.Error("Failed to retrieve last block", zap.Uint64("lastBlockSeq", lastBlockSeq), zap.Error(err))
+		return nil, false, fmt.Errorf("failed getting block %d: %w", lastBlockSeq, err)
+	}
+
+	return lastBlock, true, nil
+}
+
+// findLowestSimplexBlockSeq binary searches for the lowest sequence number in
+// [0, searchUpperBound) that has a finalization, which is the first block that was
+// accepted by Simplex. If no such sequence exists, false is returned.
+func findLowestSimplexBlockSeq(db database.KeyValueReader, log logging.Logger, searchUpperBound int) (int, bool, error) {
+	var internalError error
+
+	// The below binary search searches for the lowest sequence number that has a finalization,
+	// which is the first block that was accepted by Simplex.
+	lowestSimplexBlockSeq := sort.Search(searchUpperBound, func(seq int) bool {
+		if internalError != nil {
+			return false
+		}
+		_, err := db.Get(finalizationKey(uint64(seq)))
+		// If the finalization is not found, this block is not a Simplex block, so we return false.
+		if errors.Is(err, database.ErrNotFound) {
+			return false
+		}
+		if err != nil {
+			internalError = err
+			log.Error("Failed to get finalization for block", zap.Int("seq", seq), zap.Error(err))
+			return false
+		}
+		// Else err == nil therefore the finalization exists in the storage, so it's a Simplex block.
+		return true
+	})
+
+	if internalError != nil {
+		return 0, false, internalError
+	}
+
+	// sort.Search returns the upper bound if the predicate is false for every sequence,
+	// which means there are no simplex blocks in the storage.
+	if lowestSimplexBlockSeq == searchUpperBound {
+		return 0, false, nil
+	}
+
+	return lowestSimplexBlockSeq, true, nil
+}
+
+// validateLowestSimplexBlock sanity checks the lowest sequence number that was accepted
+// by Simplex: it must not be the genesis block, and the block preceding it must not have
+// a finalization of its own, which contradicts it being the simplex block with the lowest sequence.
+func validateLowestSimplexBlock(db database.KeyValueReader, log logging.Logger, lowestSimplexBlockSeq int) error {
+	// Sanity check I - make sure lowest simplex block is not the genesis block,
+	// as the genesis block should never be a simplex block.
+	if lowestSimplexBlockSeq == 0 {
+		log.Error("Found simplex block at genesis block sequence number")
+		return errors.New("found simplex block at genesis block sequence number")
+	}
+
+	// Sanity check II - check that the block before the lowest simplex block doesn't have a finalization.
+	blockBeforeLowestSimplexSeq := lowestSimplexBlockSeq - 1
+
+	_, err := db.Get(finalizationKey(uint64(blockBeforeLowestSimplexSeq)))
+	if err == nil {
+		log.Error("Found finalization for block that should be a non-simplex block", zap.Int("seq", blockBeforeLowestSimplexSeq))
+		return fmt.Errorf("found finalization for block %d that should be a non-simplex block", blockBeforeLowestSimplexSeq)
+	}
+	if !errors.Is(err, database.ErrNotFound) {
+		log.Error("Failed to get finalization for block", zap.Int("seq", blockBeforeLowestSimplexSeq), zap.Error(err))
+		return fmt.Errorf("failed getting finalization for block %d: %w", blockBeforeLowestSimplexSeq, err)
+	}
+
+	return nil
 }
 
 func getBlock(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {

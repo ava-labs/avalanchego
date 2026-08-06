@@ -4,6 +4,9 @@
 package simplex
 
 import (
+	"context"
+	"errors"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/simplex"
@@ -11,10 +14,252 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+// putFinalizations marks each of [seqs] as a simplex block by storing a finalization for it in db.
+func putFinalizations(t *testing.T, db database.KeyValueWriter, seqs ...uint64) {
+	for _, seq := range seqs {
+		require.NoError(t, db.Put(finalizationKey(seq), []byte("finalization")))
+	}
+}
+
+func TestLocateLastNonSimplexBlock(t *testing.T) {
+	tests := []struct {
+		name string
+		// numBlocks is the number of blocks indexed in storage.
+		numBlocks uint64
+		// proposerVMMaxHeight is the highest height retrievable from the proposerVM.
+		proposerVMMaxHeight uint64
+		// finalizedSeqs are the sequences that have a finalization, i.e. the
+		// blocks that were accepted by simplex.
+		finalizedSeqs []uint64
+		// closeDB closes the database before the search, making every read fail.
+		closeDB bool
+		// expectedFound is whether a non-simplex block is expected to be located.
+		expectedFound  bool
+		expectedHeight uint64
+		expectedErr    error
+		expectedErrMsg string
+	}{
+		{
+			name:           "no blocks in storage",
+			numBlocks:      0,
+			expectedErrMsg: "no blocks in storage",
+		},
+		{
+			name:                "only genesis, simplex never activated",
+			numBlocks:           1,
+			proposerVMMaxHeight: 0,
+			expectedFound:       true,
+			expectedHeight:      0,
+		},
+		{
+			name:                "simplex never activated",
+			numBlocks:           5,
+			proposerVMMaxHeight: 4,
+			expectedFound:       true,
+			expectedHeight:      4,
+		},
+		{
+			name:                "simplex activated right after genesis",
+			numBlocks:           5,
+			proposerVMMaxHeight: 0,
+			finalizedSeqs:       []uint64{1, 2, 3, 4},
+			expectedFound:       true,
+			expectedHeight:      0,
+		},
+		{
+			name:                "simplex activated mid chain",
+			numBlocks:           8,
+			proposerVMMaxHeight: 3,
+			finalizedSeqs:       []uint64{4, 5, 6, 7},
+			expectedFound:       true,
+			expectedHeight:      3,
+		},
+		{
+			name:                "only the last block is a simplex block",
+			numBlocks:           5,
+			proposerVMMaxHeight: 3,
+			finalizedSeqs:       []uint64{4},
+			expectedFound:       true,
+			expectedHeight:      3,
+		},
+		{
+			// The last block isn't in the proposerVM, so it must be a simplex block,
+			// yet no finalization is stored for any sequence.
+			name:                "no simplex blocks found",
+			numBlocks:           5,
+			proposerVMMaxHeight: 0,
+			expectedErrMsg:      "no simplex blocks found in storage",
+		},
+		{
+			name:                "genesis is a simplex block",
+			numBlocks:           3,
+			proposerVMMaxHeight: 0,
+			finalizedSeqs:       []uint64{0, 1, 2},
+			expectedErrMsg:      "found simplex block at genesis block sequence number",
+		},
+		{
+			// A state synced node may not have the last non-simplex block, as its
+			// height index only covers genesis and a recent window. There is then no
+			// non-simplex block to locate, which is not an error.
+			name:                "last non-simplex block missing from the proposerVM",
+			numBlocks:           8,
+			proposerVMMaxHeight: 2,
+			finalizedSeqs:       []uint64{4, 5, 6, 7},
+			expectedFound:       false,
+		},
+		{
+			name:                "database read fails",
+			numBlocks:           5,
+			proposerVMMaxHeight: 0,
+			closeDB:             true,
+			expectedErr:         database.ErrClosed,
+		},
+		{
+			name:                "more blocks than can be searched",
+			numBlocks:           math.MaxUint64,
+			proposerVMMaxHeight: 0,
+			expectedErrMsg:      "too many blocks in storage",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx := t.Context()
+			// The proposerVM holds a single chain rooted at the genesis block, up to
+			// and including proposerVMMaxHeight.
+			vm := newTestVM()
+			for _, blk := range snowmantest.BuildDescendants(snowmantest.Genesis, int(testCase.proposerVMMaxHeight)) {
+				vm.blocks[blk.ID()] = blk
+			}
+
+			db := memdb.New()
+			putFinalizations(t, db, testCase.finalizedSeqs...)
+			if testCase.closeDB {
+				require.NoError(t, db.Close())
+			}
+
+			blk, found, err := locateLastNonSimplexBlock(ctx, snowmantest.Genesis, vm, db, logging.NoLog{}, testCase.numBlocks)
+
+			if testCase.expectedErr != nil || testCase.expectedErrMsg != "" {
+				if testCase.expectedErr != nil {
+					require.ErrorIs(t, err, testCase.expectedErr)
+				}
+				if testCase.expectedErrMsg != "" {
+					require.ErrorContains(t, err, testCase.expectedErrMsg)
+				}
+				require.False(t, found)
+				require.Nil(t, blk)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, testCase.expectedFound, found)
+			if !testCase.expectedFound {
+				require.Nil(t, blk)
+				return
+			}
+
+			require.Equal(t, testCase.expectedHeight, blk.Height())
+
+			// The returned block must be the one the proposerVM indexes at that height.
+			expectedID, err := vm.GetBlockIDAtHeight(ctx, testCase.expectedHeight)
+			require.NoError(t, err)
+			require.Equal(t, expectedID, blk.ID())
+		})
+	}
+}
+
+// TestLocateLastNonSimplexBlockUnexpectedVMError asserts that an error other than
+// database.ErrNotFound from the proposerVM is reported and is not interpreted as database.ErrNotFound.
+func TestLocateLastNonSimplexBlockUnexpectedVMError(t *testing.T) {
+	errUnexpected := errors.New("unexpected proposerVM failure")
+
+	tests := []struct {
+		name          string
+		finalizedSeqs []uint64
+		// failingHeight is the height the proposerVM fails to retrieve due to an unexpected error.
+		// Every other height reports database.ErrNotFound.
+		failingHeight uint64
+	}{
+		{
+			name:          "retrieving the last block fails",
+			failingHeight: 4,
+		},
+		{
+			// The last non-simplex block must not be the genesis block, as that is
+			// returned without consulting the proposerVM.
+			name:          "retrieving the last non-simplex block fails",
+			finalizedSeqs: []uint64{2, 3, 4},
+			failingHeight: 1,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			vm := &blocktest.VM{
+				GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+					if height == testCase.failingHeight {
+						return ids.Empty, errUnexpected
+					}
+					return ids.Empty, database.ErrNotFound
+				},
+			}
+
+			db := memdb.New()
+			putFinalizations(t, db, testCase.finalizedSeqs...)
+
+			blk, found, err := locateLastNonSimplexBlock(t.Context(), snowmantest.Genesis, vm, db, logging.NoLog{}, 5)
+			require.ErrorIs(t, err, errUnexpected)
+			require.False(t, found)
+			require.Nil(t, blk)
+		})
+	}
+}
+
+func TestLocateLastNonSimplexBlockNoProposerVMBlocks(t *testing.T) {
+	// A proposerVM that holds no blocks at all.
+	vm := &blocktest.VM{
+		GetBlockIDAtHeightF: func(context.Context, uint64) (ids.ID, error) {
+			return ids.Empty, database.ErrNotFound
+		},
+	}
+
+	tests := []struct {
+		name          string
+		numBlocks     uint64
+		finalizedSeqs []uint64
+	}{
+		{
+			name:      "genesis is the only block in the chain",
+			numBlocks: 1,
+		},
+		{
+			name:          "simplex activated right after genesis",
+			numBlocks:     5,
+			finalizedSeqs: []uint64{1, 2, 3, 4},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			db := memdb.New()
+			putFinalizations(t, db, testCase.finalizedSeqs...)
+
+			blk, found, err := locateLastNonSimplexBlock(t.Context(), snowmantest.Genesis, vm, db, logging.NoLog{}, testCase.numBlocks)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Equal(t, snowmantest.Genesis.ID(), blk.ID())
+		})
+	}
+}
 
 func TestStorageNew(t *testing.T) {
 	ctx := t.Context()
