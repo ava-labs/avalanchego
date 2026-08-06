@@ -236,8 +236,9 @@ func verifyCode(hashes []common.Hash, data [][]byte) error {
 		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
 	}
 	for i, code := range data {
-		// Cheaper than hashing, and no valid blob can exceed this, so an
-		// oversized one is rejected without paying for a keccak over it.
+		// Not needed for correctness, since an oversized blob cannot hash to
+		// what was asked for. It bounds the work a peer can force on us to one
+		// keccak over MaxCodeSize rather than one over the whole message.
 		if len(code) > params.MaxCodeSize {
 			return fmt.Errorf("%w: hash %s size %d", errCodeSizeExceeded, hashes[i], len(code))
 		}
