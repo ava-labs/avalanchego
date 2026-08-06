@@ -5,13 +5,12 @@ package synctest
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -35,36 +34,30 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 	net, err := p2p.NewNetwork(log, sender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
-	// Joining the delivery goroutines keeps them from outliving the test,
-	// so their logs can never reach a completed [testing.T].
-	var wg sync.WaitGroup
-	t.Cleanup(wg.Wait)
-	deliver := func(name string, fn func() error) {
-		wg.Go(func() {
-			if err := fn(); err != nil {
-				log.Debug(name, zap.Error(err))
-			}
-		})
-	}
+	// Waiting in cleanup keeps require on the test goroutine, where it is safe.
+	var deliveries errgroup.Group
+	t.Cleanup(func() {
+		require.NoError(t, deliveries.Wait(), "loopback delivery must not fail")
+	})
 
 	// Loop each send back into the same network asynchronously to avoid
 	// deadlocking when the response is delivered on the sending goroutine.
 	sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 		for range nodeIDs {
-			deliver("AppRequest", func() error {
+			deliveries.Go(func() error {
 				return net.AppRequest(ctx, nodeID, requestID, time.Time{}, requestBytes)
 			})
 		}
 		return nil
 	}
 	sender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-		deliver("AppResponse", func() error {
+		deliveries.Go(func() error {
 			return net.AppResponse(ctx, nodeID, requestID, responseBytes)
 		})
 		return nil
 	}
 	sender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, code int32, message string) error {
-		deliver("AppRequestFailed", func() error {
+		deliveries.Go(func() error {
 			return net.AppRequestFailed(ctx, nodeID, requestID, &common.AppError{Code: code, Message: message})
 		})
 		return nil
