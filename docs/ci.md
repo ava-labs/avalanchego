@@ -19,10 +19,10 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 
 ## Principles
 
-- **Minimize work done only in CI.** Put repository operations that contributors
-  can run locally in tasks or scripts. Workflows call those entrypoints and do
-  GitHub-specific setup. Work that can only be validated in CI slows iteration
-  and costs more to implement and maintain.
+- **Define locally runnable operations outside CI.** Put repository operations
+  that contributors can run locally in tasks or scripts. Workflows call those
+  entrypoints and do GitHub-specific setup. Defining locally runnable work only
+  in CI slows iteration and costs more to implement and maintain.
 - **Make infrastructure changes reviewable.** Use explicit runner labels and immutable
   references for third-party actions so their upgrade is visible in a repository
   change.
@@ -127,11 +127,12 @@ For example:
 A full [commit SHA](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions)
 is immutable. A tag can move.
 
-Add a `# v<version>` comment after every pinned SHA. The comment identifies the
-release for readers and [Dependabot](https://docs.github.com/code-security/dependabot). This
-repository configures Dependabot to open pull requests only for security updates. A
-working action does not need routine version updates. Routine updates can include
-JavaScript dependency changes that would be challenging to qualify.
+Add a `# <tag>` comment after every pinned SHA. The comment identifies the tag
+that this repository intends to track for readers and
+[Dependabot](https://docs.github.com/code-security/dependabot). This repository configures
+Dependabot to open pull requests only for security updates. A working action does not need
+routine tag updates. Routine updates can include JavaScript dependency changes that would
+be challenging to qualify.
 
 Review each security update as a third-party action upgrade. Review the pinned
 code, its permissions, and the workflow change.
@@ -157,7 +158,7 @@ and `lint-all-ci` tasks also run `lint-action`. In addition to `actionlint`,
 - direct calls from workflows to `scripts/`, except `run_task.sh` and `workflow-*.sh`
   helpers
 - task calls from workflows that pass option flags after `--`
-- third-party action references without full SHAs and version comments
+- third-party action references without full SHAs and tag comments
 - floating `ubuntu-latest` and `macos-latest` runner labels
 
 These checks catch common violations, but they do not prove that a workflow is
