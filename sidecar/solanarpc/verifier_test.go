@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
-// stubRPC is a test double for rpcClient. Set Tx to return a transaction,
-// Err to simulate an RPC failure, or leave both nil for "not found".
+// stubRPC is a test double for rpcClient. Set Tx to return a transaction.
+// Set Err to simulate an RPC failure. Leave both nil for "not found".
 type stubRPC struct {
 	Tx  *txResult
 	Err error
@@ -100,8 +100,9 @@ func TestSolanaVerifier(t *testing.T) {
 			wantErr: "payload mismatch",
 		},
 		{
-			// Program invoked via CPI: appears in meta.innerInstructions, not
-			// in transaction.message.instructions.
+			// The program is invoked via CPI: it appears in
+			// meta.innerInstructions, not in
+			// transaction.message.instructions.
 			name: "program invoked via CPI",
 			rpc: &stubRPC{Tx: &txResult{
 				Slot: testSlotV,
@@ -128,8 +129,8 @@ func TestSolanaVerifier(t *testing.T) {
 			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
 		},
 		{
-			// Program address is in a v0 lookup table (meta.loadedAddresses),
-			// not in the static message.accountKeys.
+			// The program address is in a v0 lookup table
+			// (meta.loadedAddresses), not in the static message.accountKeys.
 			name: "v0 program address from lookup table",
 			rpc: &stubRPC{Tx: &txResult{
 				Slot: testSlotV,

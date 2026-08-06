@@ -16,10 +16,10 @@ import (
 )
 
 // FetchTeleporterSend reads a Teleporter send transaction on any Avalanche
-// EVM chain and returns the unsigned warp message (from the precompile's
-// SendWarpMessage log) and the TeleporterMessageV2 struct (from the
-// Teleporter's SendCrossChainMessage log). Shared by every relayer whose
-// source is an Avalanche chain.
+// EVM chain. It returns the unsigned warp message, from the SendWarpMessage
+// log of the precompile, and the TeleporterMessageV2 struct, from the
+// SendCrossChainMessage log of the Teleporter. Every relayer whose source is
+// an Avalanche chain shares it.
 func FetchTeleporterSend(
 	ctx context.Context,
 	rpcURL, txHash string,
@@ -79,8 +79,8 @@ func FetchTeleporterSend(
 	return unsigned, msg, nil
 }
 
-// MustLoadABI reads a foundry artifact and returns its ABI, exiting on any
-// error — relayers treat a bad artifact path as fatal configuration.
+// MustLoadABI reads a foundry artifact and returns its ABI. It exits on any
+// error, because relayers treat a bad artifact path as fatal configuration.
 func MustLoadABI(path string) abi.ABI {
 	raw, err := os.ReadFile(path)
 	if err != nil {

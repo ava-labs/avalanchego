@@ -1,12 +1,18 @@
 // Command warprelayer delivers a Teleporter message between two Avalanche
-// chains (e.g. an L1 -> the Fuji C-Chain). Pure stock path: the source L1's
-// own validators sign via ACP-118, and the destination chain's warp precompile
-// verifies against the P-Chain-registered set. No committee, no forks.
+// chains, for example an L1 -> the Fuji C-Chain. The path is pure stock: the
+// own validators of the source L1 sign via ACP-118, and the warp precompile
+// of the destination chain verifies against the P-Chain-registered set.
+// There is no committee and there are no forks.
 //
-// Flow: read the source tx's SendWarpMessage + SendCrossChainMessage logs ->
-// fetch the source subnet's validator set (GetValidatorsAt on a full node) ->
-// collect ACP-118 signatures -> aggregate to quorum -> deliver via stock
-// receiveCrossChainMessage with the signed message as a warp predicate.
+// The flow has these steps:
+//   - Read the SendWarpMessage and SendCrossChainMessage logs of the source
+//     tx.
+//   - Fetch the validator set of the source subnet (GetValidatorsAt on a
+//     full node).
+//   - Collect ACP-118 signatures.
+//   - Aggregate the signatures to quorum.
+//   - Deliver via stock receiveCrossChainMessage with the signed message as
+//     a warp predicate.
 package main
 
 import (

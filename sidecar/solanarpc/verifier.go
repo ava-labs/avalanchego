@@ -18,15 +18,16 @@ import (
 
 const defaultRPCURL = "https://api.mainnet-beta.solana.com"
 
-// Config is the verifier's own configuration, parsed from the sidecar's
-// --config-path file. The sidecar binary treats this as opaque bytes;
+// Config is the configuration of the verifier. The sidecar parses it from
+// the --config-path file. The sidecar binary treats it as opaque bytes.
 // SolanaVerifier is the authority on what fields are valid.
 type Config struct {
-	// RPCURL is the Solana JSON-RPC endpoint.
-	// Defaults to https://api.mainnet-beta.solana.com if omitted.
+	// RPCURL is the Solana JSON-RPC endpoint. It defaults to
+	// https://api.mainnet-beta.solana.com if omitted.
 	RPCURL string `json:"rpc_url"`
-	// AllowedPrograms is an optional list of Solana program addresses this
-	// sidecar will attest to. Omit or leave empty to allow all programs.
+	// AllowedPrograms is an optional list of Solana program addresses that
+	// this sidecar will attest to. Omit or leave empty to allow all
+	// programs.
 	AllowedPrograms []string `json:"allowed_programs"`
 }
 
@@ -37,8 +38,8 @@ type SolanaVerifier struct {
 }
 
 // NewSolanaVerifier parses configBytes as a JSON Config and constructs a
-// SolanaVerifier. configBytes may be nil or empty, in which case defaults
-// apply (mainnet RPC, all programs allowed).
+// SolanaVerifier. configBytes may be nil or empty. In that case, the
+// defaults apply: the mainnet RPC, and all programs allowed.
 func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVerifier, error) {
 	cfg := Config{RPCURL: defaultRPCURL}
 	if len(configBytes) > 0 {
@@ -59,20 +60,22 @@ func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVeri
 	}, nil
 }
 
-// errProgramNotFound is returned by matchInstruction when no instruction in the
-// set invokes msg.SourceAddress. It signals the caller to keep searching (e.g.
-// in inner instructions). Any other non-nil return means the program was found
-// but verification failed — the caller must not continue searching.
+// errProgramNotFound is returned by matchInstruction when no instruction in
+// the set invokes msg.SourceAddress. It tells the caller to continue the
+// search, for example in inner instructions. Any other non-nil return means
+// that the program was found but verification failed. The caller must not
+// continue the search.
 var errProgramNotFound = errors.New("program not found in instruction set")
 
 // ErrInstructionNotFound is returned by Verify when no instruction in the
 // transaction (including CPI inner instructions) invokes msg.SourceAddress.
 var ErrInstructionNotFound = errors.New("no instruction found for program")
 
-// matchInstruction scans instrs for one whose program matches msg.SourceAddress
-// and whose data matches msg.Payload. Returns nil on the first match,
-// errProgramNotFound if the program isn't present, or a descriptive error if
-// the program is present but the data doesn't verify.
+// matchInstruction scans instrs for one whose program matches
+// msg.SourceAddress and whose data matches msg.Payload. It returns nil on
+// the first match. It returns errProgramNotFound if the program is not
+// present. It returns a descriptive error if the program is present but the
+// data does not verify.
 func matchInstruction(instrs []txInstruction, keys []string, msg *oracle.OracleMessage) error {
 	for _, instr := range instrs {
 		if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
@@ -114,23 +117,25 @@ func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, 
 		return fmt.Errorf("transaction not found for signature %s", sig)
 	}
 
-	// 1. Verify the slot matches the claimed source block height.
+	// 1. Verify that the slot matches the claimed source block height.
 	if tx.Slot != msg.SourceBlockHeight {
 		return fmt.Errorf("slot mismatch: got %d, want %d", tx.Slot, msg.SourceBlockHeight)
 	}
 
-	// Build the effective account key space. For legacy transactions
-	// loadedAddresses is empty; for v0 transactions it contains accounts
-	// resolved from address lookup tables that programIdIndex may reference.
+	// Build the effective account key space. For legacy transactions,
+	// loadedAddresses is empty. For v0 transactions, it contains accounts
+	// that are resolved from address lookup tables, which programIdIndex may
+	// reference.
 	keys := tx.Transaction.Message.AccountKeys
 	keys = append(keys, tx.Meta.LoadedAddresses.Writable...)
 	keys = append(keys, tx.Meta.LoadedAddresses.Readonly...)
 
 	// 2. Find an instruction whose programId matches msg.SourceAddress.
-	// 3. For that instruction, verify the decoded data equals msg.Payload.
-	// Check top-level instructions first, then CPI inner instructions.
-	// Only continue to the next set if the program was not found; a
-	// definitive failure (e.g. payload mismatch) stops the search immediately.
+	// 3. For that instruction, verify that the decoded data equals
+	// msg.Payload. Check top-level instructions first, then CPI inner
+	// instructions. Only continue to the next set if the program was not
+	// found. A definitive failure, for example a payload mismatch, stops the
+	// search immediately.
 	if err := matchInstruction(tx.Transaction.Message.Instructions, keys, msg); !errors.Is(err, errProgramNotFound) {
 		return err
 	}

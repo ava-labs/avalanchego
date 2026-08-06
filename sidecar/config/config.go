@@ -1,9 +1,9 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package config defines the on-disk config file shared by the sidecar binary
-// and the AvalancheGo validator. The sidecar consumes verifier bodies; the
-// validator reads only the Verifiers map keys.
+// Package config defines the on-disk config file that the sidecar binary
+// and the AvalancheGo validator share. The sidecar consumes the verifier
+// bodies. The validator reads only the keys of the Verifiers map.
 package config
 
 import (
@@ -39,8 +39,9 @@ func Load(path string) (*SidecarConfig, error) {
 	return &cfg, nil
 }
 
-// SourceTypes returns the Verifiers map keys. Contract with the validator:
-// reshaping Verifiers requires updating graft/subnet-evm/plugin/evm/vm.go's loader.
+// SourceTypes returns the keys of the Verifiers map. This is a contract with
+// the validator: a reshape of Verifiers requires an update of the loader in
+// graft/subnet-evm/plugin/evm/vm.go.
 func (c *SidecarConfig) SourceTypes() []string {
 	out := make([]string, 0, len(c.Verifiers))
 	for k := range c.Verifiers {

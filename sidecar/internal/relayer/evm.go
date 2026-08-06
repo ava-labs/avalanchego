@@ -22,8 +22,8 @@ import (
 // WarpPrecompileAddr is the warp precompile address on subnet-evm chains.
 var WarpPrecompileAddr = common.HexToAddress("0x0200000000000000000000000000000000000005")
 
-// FetchLog fetches the receipt of txHash over raw JSON-RPC and returns the
-// block height and the data of the first log emitted by contract.
+// FetchLog fetches the receipt of txHash over raw JSON-RPC. It returns the
+// block height and the data of the first log that contract emitted.
 func FetchLog(ctx context.Context, rpcURL, txHash string, contract common.Address) (uint64, []byte, error) {
 	body, err := json.Marshal(map[string]any{
 		"jsonrpc": "2.0", "id": 1,
@@ -91,8 +91,8 @@ func WaitReceipt(ctx context.Context, client *ethclient.Client, h common.Hash) (
 }
 
 // BuildPredicate packs a signed warp message into the access-list predicate
-// the warp precompile expects: message || 0xff, zero-padded to a 32-byte
-// multiple, chunked into storage keys on the precompile address.
+// that the warp precompile expects: message || 0xff, zero-padded to a
+// 32-byte multiple, and chunked into storage keys on the precompile address.
 func BuildPredicate(warpMessage []byte) types.AccessList {
 	predicate := append(bytes.Clone(warpMessage), 0xff)
 	if rem := len(predicate) % 32; rem != 0 {

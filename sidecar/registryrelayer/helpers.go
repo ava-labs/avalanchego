@@ -20,8 +20,10 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-// (from the precompile's SendWarpMessage log) and the TeleporterMessageV2
-// struct (from the Teleporter's SendCrossChainMessage log).
+// fetchCChainSend reads a Teleporter send transaction on the C-Chain, or on
+// the --source-rpc chain. It returns the unsigned warp message, from the
+// SendWarpMessage log of the precompile, and the TeleporterMessageV2 struct,
+// from the SendCrossChainMessage log of the Teleporter.
 func fetchCChainSend(
 	ctx context.Context,
 	avalancheURI, txHash string,
@@ -71,9 +73,10 @@ func fetchCChainSend(
 			msg = &m
 		}
 	}
-	// A tx with several sends would silently relay only the last pair — and a
-	// stray warp message from another contract in the call chain would pair the
-	// wrong attestation with the delivered struct. Refuse rather than guess.
+	// A tx with several sends would silently relay only the last pair. A
+	// stray warp message from another contract in the call chain would pair
+	// the wrong attestation with the delivered struct. Refuse rather than
+	// guess.
 	if warpLogs > 1 || sendLogs > 1 {
 		return nil, nil, fmt.Errorf("tx contains %d SendWarpMessage / %d SendCrossChainMessage logs — relay a tx with exactly one send", warpLogs, sendLogs)
 	}
@@ -86,10 +89,10 @@ func fetchCChainSend(
 	return unsigned, msg, nil
 }
 
-// --- Registered validator set (the registry's stored snapshot) ---
+// --- Registered validator set (the stored snapshot of the registry) ---
 
-// registeredValidator is one entry of the registry's stored set: a 96-byte
-// uncompressed BLS public key and its stake weight.
+// registeredValidator is one entry of the stored set of the registry: a
+// 96-byte uncompressed BLS public key and its stake weight.
 type registeredValidator struct {
 	BlsPublicKey []byte
 	Weight       uint64
@@ -103,8 +106,8 @@ type registeredSet struct {
 	PChainTimestamp       uint64
 }
 
-// validatorSetDecoderABI decodes SubsetUpdater.getValidatorSet's ValidatorSet
-// return value.
+// validatorSetDecoderABI decodes the ValidatorSet return value of
+// SubsetUpdater.getValidatorSet.
 var validatorSetDecoderABI = func() abi.ABI {
 	const j = `[{"type":"function","name":"d","inputs":[],"outputs":[{"name":"s","type":"tuple","components":[` +
 		`{"name":"avalancheBlockchainID","type":"bytes32"},` +
@@ -119,11 +122,11 @@ var validatorSetDecoderABI = func() abi.ABI {
 	return parsed
 }()
 
-// fetchRegisteredSet reads the registry's stored validator set for the given
-// source chain. Signature bitset indexes MUST be computed against this array —
-// the contract applies the bitset to its own storage, so deriving indexes from
-// the current P-Chain set diverges as soon as the primary set churns
-// (registration-time snapshot vs now).
+// fetchRegisteredSet reads the stored validator set of the registry for the
+// given source chain. Signature bitset indexes MUST be computed against this
+// array. The contract applies the bitset to its own storage. Thus indexes
+// derived from the current P-Chain set diverge as soon as the primary set
+// churns: the registration-time snapshot differs from the current set.
 func fetchRegisteredSet(
 	ctx context.Context,
 	besuRPC string,
@@ -208,6 +211,6 @@ func ethAddress(key *ecdsa.PrivateKey) common.Address {
 	return crypto.PubkeyToAddress(key.PublicKey)
 }
 
-// sourceRPCOverride, when set via --source-rpc, reads the send tx from a
-// chain other than the C-Chain (e.g. an L1's RPC).
+// sourceRPCOverride, when set via --source-rpc, makes the relayer read the
+// send tx from a chain other than the C-Chain, for example the RPC of an L1.
 var sourceRPCOverride string

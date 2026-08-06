@@ -64,8 +64,9 @@ type txInstruction struct {
 	Data           string `json:"data"` // base58-encoded
 }
 
-// rpcClient is the interface SolanaVerifier uses to fetch Solana transactions.
-// The only production implementation is solanaClient; tests inject a stub.
+// rpcClient is the interface that SolanaVerifier uses to fetch Solana
+// transactions. The only production implementation is solanaClient. Tests
+// inject a stub.
 type rpcClient interface {
 	getTransaction(ctx context.Context, sig string) (*txResult, error)
 }
@@ -85,8 +86,9 @@ func newSolanaClient(rpcURL string, httpClient *http.Client) *solanaClient {
 	}
 }
 
-// getTransaction fetches a Solana transaction by its base58-encoded signature.
-// Returns (nil, nil) when the transaction is not found (result is JSON null).
+// getTransaction fetches a Solana transaction by its base58-encoded
+// signature. It returns (nil, nil) when the transaction is not found, which
+// is when the result is JSON null.
 func (c *solanaClient) getTransaction(ctx context.Context, sig string) (*txResult, error) {
 	req := rpcEnvelope{
 		JSONRPC: "2.0",
@@ -132,7 +134,7 @@ func (c *solanaClient) getTransaction(ctx context.Context, sig string) (*txResul
 		return nil, fmt.Errorf("RPC error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
 	}
 
-	// null result means transaction not found
+	// A null result means that the transaction was not found.
 	if string(rpcResp.Result) == "null" {
 		return nil, nil
 	}

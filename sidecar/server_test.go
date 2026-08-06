@@ -19,8 +19,9 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
-// mockVerifier is a test double for oracleVerifier. It returns the configured
-// error, allowing server_test.go to stay independent of any chain implementation.
+// mockVerifier is a test double for oracleVerifier. It returns the
+// configured error. This lets server_test.go stay independent of any chain
+// implementation.
 type mockVerifier struct {
 	err error
 }
@@ -29,8 +30,9 @@ func (m *mockVerifier) Verify(_ context.Context, _ *oracle.OracleMessage, _ []by
 	return m.err
 }
 
-// validMsgBytes returns ABI-encoded bytes for a well-formed OracleMessage,
-// suitable as pb.VerifyRequest.MessageBytes in tests that reach the verifier.
+// validMsgBytes returns ABI-encoded bytes for a well-formed OracleMessage.
+// The bytes are suitable as pb.VerifyRequest.MessageBytes in tests that
+// reach the verifier.
 func validMsgBytes(t *testing.T) []byte {
 	t.Helper()
 	msg, err := oracle.NewOracleMessage(oracle.SourceTypeSolana, "So11111111111111111111111111111111111111112", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
@@ -39,7 +41,7 @@ func validMsgBytes(t *testing.T) []byte {
 }
 
 // unsupportedMsgBytes returns ABI-encoded bytes for a message with a source
-// type the test server has no verifier for.
+// type that the test server has no verifier for.
 func unsupportedMsgBytes(t *testing.T) []byte {
 	t.Helper()
 	msg, err := oracle.NewOracleMessage("bitcoin", "addr", common.Address{}, 100, 1, []byte("payload"))
@@ -61,8 +63,9 @@ func TestServer_Verify(t *testing.T) {
 			wantCode:  codes.InvalidArgument,
 		},
 		{
-			// Verifier wraps oracle.ErrSourceUnavailable when the source chain RPC
-			// is unreachable; server maps this to codes.Unavailable.
+			// The verifier wraps oracle.ErrSourceUnavailable when the source
+			// chain RPC is unreachable. The server maps this to
+			// codes.Unavailable.
 			name:      "source unavailable returns Unavailable",
 			req:       &pb.VerifyRequest{MessageBytes: validMsgBytes(t), Justification: make([]byte, 64)},
 			verifiers: map[string]oracleVerifier{oracle.SourceTypeSolana: &mockVerifier{err: fmt.Errorf("%w: rpc failed", oracle.ErrSourceUnavailable)}},
@@ -81,7 +84,8 @@ func TestServer_Verify(t *testing.T) {
 			wantCode:  codes.OK,
 		},
 		{
-			// SourceType not registered → InvalidArgument, no verifier call.
+			// A SourceType that is not registered returns InvalidArgument
+			// with no verifier call.
 			name:      "unregistered source type returns InvalidArgument",
 			req:       &pb.VerifyRequest{MessageBytes: unsupportedMsgBytes(t), Justification: make([]byte, 64)},
 			verifiers: map[string]oracleVerifier{oracle.SourceTypeSolana: &mockVerifier{}},

@@ -3,8 +3,8 @@
 
 // Package evmrpc verifies OracleMessages against any Ethereum
 // JSON-RPC-compatible chain (Besu, geth, public testnets, L2s). It is the
-// second source type after solanarpc and follows the same contract: the
-// sidecar binary treats the config as opaque bytes and this package is the
+// second source type after solanarpc. It follows the same contract: the
+// sidecar binary treats the config as opaque bytes, and this package is the
 // authority on what fields are valid.
 package evmrpc
 
@@ -22,31 +22,33 @@ import (
 )
 
 const (
-	// FinalityLatest treats inclusion as final. Correct for chains with
-	// single-slot/instant finality such as QBFT and IBFT networks.
+	// FinalityLatest treats inclusion as final. It is correct for chains
+	// with single-slot or instant finality, such as QBFT and IBFT networks.
 	FinalityLatest = "latest"
-	// FinalityFinalized only attests to blocks at or below the chain's
-	// `finalized` tag. Correct for post-merge Ethereum networks; note the
-	// tag lags the tip by ~two epochs (~13 minutes) on mainnet and Sepolia.
+	// FinalityFinalized only attests to blocks at or below the `finalized`
+	// tag of the chain. It is correct for post-merge Ethereum networks. Note
+	// that the tag lags the tip by ~two epochs (~13 minutes) on mainnet and
+	// Sepolia.
 	FinalityFinalized = "finalized"
 	// FinalitySafe uses the `safe` tag, a weaker but faster Ethereum
 	// finality signal.
 	FinalitySafe = "safe"
 )
 
-// Config is the verifier's own configuration, parsed from the sidecar's
-// --config-path file.
+// Config is the configuration of the verifier. The sidecar parses it from
+// the --config-path file.
 type Config struct {
-	// RPCURL is the Ethereum JSON-RPC endpoint of the source chain.
-	// Required: there is no sensible default chain to attest to.
+	// RPCURL is the Ethereum JSON-RPC endpoint of the source chain. It is
+	// required: there is no sensible default chain to attest to.
 	RPCURL string `json:"rpc_url"`
 	// AllowedContracts is an optional list of contract addresses this
 	// sidecar will attest to. Omit or leave empty to allow all contracts.
 	// Comparison is case-insensitive.
 	AllowedContracts []string `json:"allowed_contracts"`
 	// Finality selects the rule for when an included transaction may be
-	// attested: "latest" (default; inclusion is final — QBFT/IBFT),
-	// "finalized", or "safe" (Ethereum finality tags).
+	// attested. The values are "latest" (the default; inclusion is final,
+	// for QBFT/IBFT networks), "finalized", and "safe" (Ethereum finality
+	// tags).
 	Finality string `json:"finality"`
 }
 
@@ -137,9 +139,9 @@ func (v *EVMVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, jus
 		return err
 	}
 
-	// Find a log emitted by the source contract whose data equals the
-	// attested payload. Topic contents are intentionally not interpreted:
-	// byte-exact data equality is the verification contract, and the
+	// Find a log that the source contract emitted whose data equals the
+	// attested payload. The code intentionally does not interpret topic
+	// contents. Byte-exact data equality is the verification contract. The
 	// relayer must construct msg.Payload as the raw log data.
 	for _, l := range receipt.Logs {
 		if strings.ToLower(l.Address) != sourceAddr {
@@ -157,8 +159,8 @@ func (v *EVMVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, jus
 }
 
 // checkFinality enforces the configured finality rule for a block at the
-// given height. Under FinalityLatest inclusion is sufficient and no RPC call
-// is made.
+// given height. Under FinalityLatest, inclusion is sufficient, and the
+// function makes no RPC call.
 func (v *EVMVerifier) checkFinality(ctx context.Context, blockNumber uint64) error {
 	if v.finality == FinalityLatest {
 		return nil

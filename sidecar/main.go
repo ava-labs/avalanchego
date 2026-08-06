@@ -20,7 +20,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
-// Add a case here when registering a new source type in
+// Add a case here when you register a new source type in
 // network/p2p/oracle/message.go (KnownSourceTypes).
 func buildVerifier(sourceType string, body json.RawMessage) (oracleVerifier, error) {
 	switch sourceType {

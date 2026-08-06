@@ -1,19 +1,24 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Command gatewayrelayer is the attestor-gateway relayer driver: the untrusted
-// transport that turns an event on the external chain into a delivered,
-// natively-verified message on an Avalanche chain.
+// Command gatewayrelayer is the relayer driver for the attestor gateway. It
+// is the untrusted transport. It turns an event on the external chain into a
+// delivered message on an Avalanche chain. The destination chain verifies the
+// message natively.
 //
-// Flow: fetch the event from the external EVM chain -> construct the
-// OracleMessage a verifier expects -> connect to each attestor as a network
-// peer and request a signature over ACP-118 at the oracle handler ID -> verify
-// each returned signature individually -> aggregate to a quorum BitSetSignature
-// -> deliver to the destination chain as a transaction predicate.
+// The flow has these steps:
+//   - Fetch the event from the external EVM chain.
+//   - Construct the OracleMessage that a verifier expects.
+//   - Connect to each attestor as a network peer. Request a signature over
+//     ACP-118 at the oracle handler ID.
+//   - Verify each returned signature individually.
+//   - Aggregate the signatures to a quorum BitSetSignature.
+//   - Deliver the result to the destination chain as a transaction predicate.
 //
 // The relayer holds no signing keys for the Virtual L1. It can censor
-// (liveness) but cannot forge (safety): every signature comes from an attestor
-// that independently verified the event through its own sidecar.
+// messages, which is a liveness risk. It cannot forge messages, so safety
+// holds: every signature comes from an attestor that independently verified
+// the event through its own sidecar.
 package main
 
 import (
@@ -166,9 +171,9 @@ func main() {
 	fmt.Printf("Virtual L1 %s\n", gatewayChainID)
 }
 
-// deliver deploys the WarpProver on the destination C-Chain and submits the
-// signed message as a transaction predicate — the same delivery mechanics
-// proven in Phase A.
+// deliver deploys the WarpProver on the destination C-Chain. It submits the
+// signed message as a transaction predicate. The cmd/prove check proved the
+// same delivery mechanics.
 func deliver(ctx context.Context, uri, proverArtifactPath, ethKeyStr string, signedMsg *avalancheWarp.Message) error {
 	var fundedKey secp256k1.PrivateKey
 	if err := fundedKey.UnmarshalText([]byte(ethKeyStr)); err != nil {

@@ -19,8 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
-// newVerifier is a test helper that constructs a SolanaVerifier from a plain
-// RPC URL, marshaling it into the Config shape the verifier expects.
+// newVerifier is a test helper. It constructs a SolanaVerifier from a plain
+// RPC URL. It marshals the URL into the Config shape that the verifier
+// expects.
 func newVerifier(t *testing.T, rpcURL string) *SolanaVerifier {
 	t.Helper()
 	cfgBytes, err := json.Marshal(Config{RPCURL: rpcURL})
@@ -30,18 +31,19 @@ func newVerifier(t *testing.T, rpcURL string) *SolanaVerifier {
 	return v
 }
 
-// memoProgram is the Solana Memo Program v2 address. It exists on both mainnet
-// and devnet and almost always has recent transactions, making it a reliable
-// source of real on-chain data for integration testing.
+// memoProgram is the Solana Memo Program v2 address. It exists on both
+// mainnet and devnet, and it almost always has recent transactions. Thus it
+// is a reliable source of real on-chain data for integration tests.
 const memoProgram = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 
 // atokenProgram is the Associated Token Account Program. Almost every DeFi
-// wallet interaction creates ATAs, so it reliably produces CPI transactions
-// (it calls the Token Program and System Program via CPI).
+// wallet interaction creates ATAs. Thus the program reliably produces CPI
+// transactions: it calls the Token Program and the System Program via CPI.
 const atokenProgram = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe8bXh"
 
-// fetchSignatures fetches up to limit recent transaction signatures for address
-// from rpcURL. Returns only the signature strings (errors from the RPC are fatal).
+// fetchSignatures fetches up to limit recent transaction signatures for
+// address from rpcURL. It returns only the signature strings. Errors from
+// the RPC are fatal.
 func fetchSignatures(t *testing.T, rpcURL, address string, limit int) []string {
 	t.Helper()
 
@@ -105,9 +107,10 @@ func buildEffectiveKeys(tx *txResult) []string {
 	return keys
 }
 
-// findTxWithInnerInstructions searches recent AToken Program transactions for
-// one that has at least one inner instruction group with usable data. Returns
-// the signature and parsed txResult. Skips the test if none found.
+// findTxWithInnerInstructions searches recent AToken Program transactions
+// for one that has at least one inner instruction group with usable data. It
+// returns the signature and the parsed txResult. It skips the test if it
+// finds none.
 func findTxWithInnerInstructions(t *testing.T, rpcURL string) (string, *txResult) {
 	t.Helper()
 	client := newSolanaClient(rpcURL, nil)
@@ -140,9 +143,9 @@ func findTxWithInnerInstructions(t *testing.T, rpcURL string) (string, *txResult
 	return "", nil
 }
 
-// findV0TxWithLoadedAddresses searches recent Memo Program transactions for one
-// that has non-empty meta.loadedAddresses. Returns the signature and txResult.
-// Skips the test if none found.
+// findV0TxWithLoadedAddresses searches recent Memo Program transactions for
+// one that has non-empty meta.loadedAddresses. It returns the signature and
+// the txResult. It skips the test if it finds none.
 func findV0TxWithLoadedAddresses(t *testing.T, rpcURL string) (string, *txResult) {
 	t.Helper()
 	client := newSolanaClient(rpcURL, nil)
@@ -163,8 +166,9 @@ func findV0TxWithLoadedAddresses(t *testing.T, rpcURL string) (string, *txResult
 	return "", nil
 }
 
-// findFirstCPIInstruction returns the program address and decoded payload of the
-// first inner instruction with decodeable data. ok is false if none found.
+// findFirstCPIInstruction returns the program address and decoded payload of
+// the first inner instruction with decodeable data. ok is false if it finds
+// none.
 func findFirstCPIInstruction(tx *txResult) (programAddr string, payload []byte, ok bool) {
 	keys := buildEffectiveKeys(tx)
 	for _, group := range tx.Meta.InnerInstructions {
@@ -189,8 +193,8 @@ func findFirstCPIInstruction(tx *txResult) (programAddr string, payload []byte, 
 //
 //	SOLANA_RPC_URL — e.g. https://api.devnet.solana.com or https://api.mainnet-beta.solana.com
 //
-// The test auto-discovers a recent Memo Program transaction; no transaction
-// signature needs to be supplied manually.
+// The test discovers a recent Memo Program transaction automatically. You do
+// not need to supply a transaction signature manually.
 func TestSolanaVerifierIntegration(t *testing.T) {
 	rpcURL := os.Getenv("SOLANA_RPC_URL")
 	if rpcURL == "" {
@@ -210,7 +214,8 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	keys := tx.Transaction.Message.AccountKeys
 	require.NotEmpty(t, instrs)
 
-	// Find the Memo Program instruction and use its data as ground truth payload.
+	// Find the Memo Program instruction. Use its data as the ground-truth
+	// payload.
 	var instrData []byte
 	for _, instr := range instrs {
 		if instr.ProgramIDIndex < 0 || instr.ProgramIDIndex >= len(keys) {
@@ -273,11 +278,12 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 // programs invoked via Cross-Program Invocation (CPI), which appear in
 // meta.innerInstructions rather than transaction.message.instructions.
 //
-// Uses the Associated Token Account Program, which reliably produces CPI calls
-// into the Token Program and System Program on every ATA creation.
+// The test uses the Associated Token Account Program, which reliably
+// produces CPI calls into the Token Program and the System Program on every
+// ATA creation.
 //
-// Requires SOLANA_RPC_URL. Skips automatically if no qualifying transaction is
-// found in the 50 most recent AToken Program transactions.
+// The test requires SOLANA_RPC_URL. It skips automatically if it finds no
+// qualifying transaction in the 50 most recent AToken Program transactions.
 func TestSolanaVerifierIntegration_CPI(t *testing.T) {
 	rpcURL := os.Getenv("SOLANA_RPC_URL")
 	if rpcURL == "" {
@@ -326,20 +332,23 @@ func TestSolanaVerifierIntegration_CPI(t *testing.T) {
 // correctly parses meta.loadedAddresses from v0 transactions and builds the
 // combined key space (static accountKeys + loadedAddresses).
 //
-// Two things are validated:
-//  1. The struct parsing works: we can read non-empty loadedAddresses from a
-//     real v0 transaction (proves rpc.go decodes the JSON correctly).
-//  2. Key space correctness: a loaded address that is NOT referenced as a
-//     programIdIndex in any instruction causes "no instruction found", not a
-//     panic or index-out-of-bounds — confirming the key slice is built right.
+// The test validates two things:
+//  1. The struct parsing works: we can read non-empty loadedAddresses from
+//     a real v0 transaction. This proves that rpc.go decodes the JSON
+//     correctly.
+//  2. The key space is correct: a loaded address that is NOT referenced as
+//     a programIdIndex in any instruction causes "no instruction found",
+//     not a panic or an index-out-of-bounds error. This confirms that the
+//     key slice is built correctly.
 //
-// Note: it is essentially impossible in practice for a program to be IN
-// loadedAddresses (lookup tables hold data accounts, not programs). The test
-// therefore only validates key-space construction, not a full CPI-via-lookup
-// happy path.
+// Note: in practice, it is essentially impossible for a program to be IN
+// loadedAddresses, because lookup tables hold data accounts, not programs.
+// Thus the test only validates key-space construction, not a full
+// CPI-via-lookup happy path.
 //
-// Requires SOLANA_RPC_URL. Skips automatically if no qualifying v0 transaction
-// is found in the 100 most recent Memo Program transactions.
+// The test requires SOLANA_RPC_URL. It skips automatically if it finds no
+// qualifying v0 transaction in the 100 most recent Memo Program
+// transactions.
 func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	rpcURL := os.Getenv("SOLANA_RPC_URL")
 	if rpcURL == "" {
@@ -366,7 +375,7 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	t.Run("loaded address not invoked returns no-instruction-found", func(t *testing.T) {
 		// Use the first loaded address as the claimed program. It is not
 		// referenced by any programIdIndex, so Verify must return the
-		// "no instruction found" error — not panic or index error.
+		// "no instruction found" error, not a panic or an index error.
 		uninvokedAddr := loaded[0]
 		msg, err := oracle.NewOracleMessage("solana", uninvokedAddr, common.Address{}, slot, 1, []byte("anything"))
 		require.NoError(t, err)
@@ -376,8 +385,9 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	})
 
 	t.Run("top-level instruction on v0 transaction accepted", func(t *testing.T) {
-		// Find a top-level instruction that we can verify to confirm the verifier
-		// works end-to-end on this v0 transaction (not just for the error case).
+		// Find a top-level instruction that we can verify. This confirms that
+		// the verifier works end-to-end on this v0 transaction, not only for
+		// the error case.
 		keys := buildEffectiveKeys(tx)
 		var foundProgram string
 		var foundPayload []byte

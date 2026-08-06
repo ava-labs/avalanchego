@@ -31,8 +31,9 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-// txReceipt mirrors the fields of eth_getTransactionReceipt this verifier
-// needs. Quantities are 0x-prefixed hex per the Ethereum JSON-RPC spec.
+// txReceipt mirrors the fields of eth_getTransactionReceipt that this
+// verifier needs. Quantities are 0x-prefixed hex per the Ethereum JSON-RPC
+// spec.
 type txReceipt struct {
 	Status      string  `json:"status"`
 	BlockNumber string  `json:"blockNumber"`
@@ -49,8 +50,9 @@ type blockHeader struct {
 	Number string `json:"number"`
 }
 
-// rpcClient is the interface EVMVerifier uses to query the source chain.
-// The only production implementation is evmClient; tests inject a stub.
+// rpcClient is the interface that EVMVerifier uses to query the source
+// chain. The only production implementation is evmClient. Tests inject a
+// stub.
 type rpcClient interface {
 	getTransactionReceipt(ctx context.Context, txHash string) (*txReceipt, error)
 	getBlockNumberByTag(ctx context.Context, tag string) (uint64, error)
@@ -101,8 +103,8 @@ func (c *evmClient) call(ctx context.Context, method string, params []any, resul
 	if envelope.Error != nil {
 		return fmt.Errorf("%s RPC error %d: %s", method, envelope.Error.Code, envelope.Error.Message)
 	}
-	// A null result (e.g. unknown tx hash) unmarshals into the zero value;
-	// callers distinguish it by checking for required fields.
+	// A null result, for example an unknown tx hash, unmarshals into the
+	// zero value. Callers distinguish it by a check for required fields.
 	if bytes.Equal(envelope.Result, []byte("null")) {
 		return nil
 	}

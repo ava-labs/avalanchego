@@ -1,19 +1,20 @@
-// Command subsetprobe plans the validator subset to register on an external
-// chain's registry (the Fuji -> Sepolia outbound direction) and fails fast on
-// the risky assumption: that enough of those validators actually answer our
-// ACP-118 signature requests.
+// Command subsetprobe plans the validator subset to register on the registry
+// of an external chain (the Fuji -> Sepolia outbound direction). It fails
+// fast on the risky assumption: that enough of those validators actually
+// answer our ACP-118 signature requests.
 //
-// Selection: primary-network validators ranked by stake weight, keyless
-// validators excluded, top N taken. Probe: for each selected validator that
-// the queried node is peered with, open a staking-port connection and send a
-// signature request for a throwaway message — a refusal is a GOOD outcome
-// (the node is reachable and its handler responds); only handshake failures
-// and timeouts count against reachability. The report says whether 67% of the
-// subset's weight is answerable before any registration gas is spent.
+// Selection: the primary-network validators are ranked by stake weight,
+// keyless validators are excluded, and the top N are taken. Probe: for each
+// selected validator that the queried node is peered with, open a
+// staking-port connection and send a signature request for a throwaway
+// message. A refusal is a GOOD outcome: the node is reachable and its
+// handler responds. Only handshake failures and timeouts count against
+// reachability. The report says whether 67% of the subset weight is
+// answerable before any registration gas is spent.
 //
-// Run it against a node we operate (info.peers needs real peer data; public
-// API fleets won't do): locally the tmpnet primary, on Fuji one of the
-// committee's own nodes once it has bootstrapped.
+// Run it against a node that we operate, because info.peers needs real peer
+// data and public API fleets will not do. Locally, use the tmpnet primary.
+// On Fuji, use one of the own nodes of the committee after it bootstraps.
 package main
 
 import (
@@ -137,8 +138,9 @@ func main() {
 			}
 		}
 
-		// A throwaway-but-parseable message: the refusal it provokes proves the
-		// handler answered. Only handshake failures/timeouts count as unreachable.
+		// Build a throwaway but parseable message. The refusal that it
+		// provokes proves that the handler answered. Only handshake failures
+		// and timeouts count as unreachable.
 		addressedCall, err := warppayload.NewAddressedCall(nil, []byte("subsetprobe"))
 		if err != nil {
 			log.Fatalf("addressed call: %v", err)
@@ -165,9 +167,9 @@ func main() {
 			probeCtx, probeCancel := context.WithTimeout(ctx, 25*time.Second)
 			_, _, err := relayer.RequestOne(probeCtx, networkID, cChainID, prefixed, addr)
 			probeCancel()
-			// A refusal IS a response: the peer handshook and its ACP-118
-			// handler processed the request. Only transport-level failures
-			// count against reachability.
+			// A refusal IS a response: the peer completed the handshake, and
+			// its ACP-118 handler processed the request. Only transport-level
+			// failures count against reachability.
 			if err == nil || strings.Contains(err.Error(), "signer refused") {
 				c.Reachable = true
 				reachable++

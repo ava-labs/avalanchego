@@ -11,9 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDecodeTeleporterMessage confirms MessageDecoderABI recovers a
-// TeleporterMessageV2 from a bare abi.encode(TeleporterMessageV2) — the outbox
-// log data — so the receiveCrossChainMessage calldata is rebuilt faithfully.
+// TestDecodeTeleporterMessage confirms that MessageDecoderABI recovers a
+// TeleporterMessageV2 from a bare abi.encode(TeleporterMessageV2), which is
+// the outbox log data. Thus the receiveCrossChainMessage calldata is rebuilt
+// faithfully.
 func TestDecodeTeleporterMessage(t *testing.T) {
 	orig := TeleporterMessageV2{
 		MessageNonce:            big.NewInt(7),

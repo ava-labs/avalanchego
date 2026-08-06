@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 )
 
-// --- Teleporter ABI types (mirror the Solidity struct field order) ---
+// --- Teleporter ABI types (they mirror the Solidity struct field order) ---
 
 type TeleporterReceipt struct {
 	ReceivedMessageNonce *big.Int
@@ -44,9 +44,9 @@ type TeleporterICMMessage struct {
 	Attestation        []byte
 }
 
-// MessageDecoderABI decodes a bare abi.encode(TeleporterMessageV2) into the Go
-// struct. A function with the tuple as its single OUTPUT lets us use
-// ABI.UnpackIntoInterface (which abi.Arguments lacks in this libevm version).
+// MessageDecoderABI decodes a bare abi.encode(TeleporterMessageV2) into the
+// Go struct. A function with the tuple as its single OUTPUT lets us use
+// ABI.UnpackIntoInterface, which abi.Arguments lacks in this libevm version.
 var MessageDecoderABI = func() abi.ABI {
 	const j = `[{"type":"function","name":"d","inputs":[],"outputs":[{"name":"m","type":"tuple","components":[` +
 		`{"name":"messageNonce","type":"uint256"},` +
@@ -65,9 +65,10 @@ var MessageDecoderABI = func() abi.ABI {
 	return parsed
 }()
 
-// EventDecoderABI decodes the non-indexed data of the Teleporter's
-// SendCrossChainMessage event: (TeleporterMessageV2 message, TeleporterFeeInfo feeInfo).
-// A function with the tuples as OUTPUTS lets us use ABI.UnpackIntoInterface.
+// EventDecoderABI decodes the non-indexed data of the SendCrossChainMessage
+// event of the Teleporter: (TeleporterMessageV2 message, TeleporterFeeInfo
+// feeInfo). A function with the tuples as OUTPUTS lets us use
+// ABI.UnpackIntoInterface.
 var EventDecoderABI = func() abi.ABI {
 	const j = `[{"type":"function","name":"d","inputs":[],"outputs":[{"name":"m","type":"tuple","components":[` +
 		`{"name":"messageNonce","type":"uint256"},` +

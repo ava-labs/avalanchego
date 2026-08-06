@@ -1,11 +1,11 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package relayer contains the machinery shared by the sidecar relayer
-// commands (gatewayrelayer, teleporterrelayer, registryrelayer) and
-// sidecarcheck: ACP-118 signature collection over the p2p network, signature
-// verification and quorum aggregation, EVM receipt/log helpers, and the
-// Teleporter ABI mirror types.
+// Package relayer contains the machinery that the sidecar relayer commands
+// (gatewayrelayer, teleporterrelayer, registryrelayer) and sidecarcheck
+// share. The machinery includes ACP-118 signature collection over the p2p
+// network, signature verification and quorum aggregation, EVM receipt and
+// log helpers, and the Teleporter ABI mirror types.
 package relayer
 
 import (
@@ -30,15 +30,16 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 )
 
-// CollectSignatures connects to each signer as a network peer, sends an
-// ACP-118 SignatureRequest at the given protocol prefix, and returns the raw
+// CollectSignatures connects to each signer as a network peer. It sends an
+// ACP-118 SignatureRequest at the given protocol prefix. It returns the raw
 // signature bytes per responding signer NodeID. Per-signer failures are
-// logged and skipped — the caller enforces quorum.
+// logged and skipped. The caller enforces quorum.
 //
-// Requests are made sequentially: each signer is a separate peer handshake,
-// and a relayer paces its requests rather than flooding the committee at once.
-// (Concurrent handshakes proved flaky; a production relayer would use a
-// small bounded worker pool — sequential is ample for committee-sized fan-out.)
+// The requests are sequential: each signer is a separate peer handshake,
+// and a relayer paces its requests instead of flooding the committee at
+// once. Concurrent handshakes proved flaky. A production relayer would use
+// a small bounded worker pool. Sequential requests are ample for
+// committee-sized fan-out.
 func CollectSignatures(
 	ctx context.Context,
 	networkID uint32,
@@ -73,8 +74,8 @@ func CollectSignatures(
 	return out
 }
 
-// RequestOne performs the peer handshake with a single signer at addr, sends
-// the prefixed ACP-118 SignatureRequest, and waits for its signature.
+// RequestOne performs the peer handshake with a single signer at addr. It
+// sends the prefixed ACP-118 SignatureRequest and waits for the signature.
 func RequestOne(
 	ctx context.Context,
 	networkID uint32,
@@ -126,7 +127,8 @@ func RequestOne(
 	if err != nil {
 		return ids.EmptyNodeID, nil, err
 	}
-	// requestID pinned to 1: fresh peer per request (the odd-requestID fix).
+	// The requestID is pinned to 1, with a fresh peer per request (the
+	// odd-requestID fix).
 	appRequest, err := mb.AppRequest(chainID, 1, 30*time.Second, prefixedRequest)
 	if err != nil {
 		return ids.EmptyNodeID, nil, err

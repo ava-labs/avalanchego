@@ -19,12 +19,12 @@ import (
 const QuorumNumerator = 67
 
 // VerifyAndAggregate verifies each collected signature against the canonical
-// validator set, deduplicates signers, and aggregates the valid signatures to
-// a quorum BLS aggregate. signerNoun ("attestor"/"validator") is used in the
-// per-signer log lines. It returns the signer bitset (in canonical validator
-// order), the aggregate signature, the signed weight, and the signed
-// percentage of total weight; if quorum is not reached the error is non-nil
-// and the aggregate is nil.
+// validator set. It deduplicates signers. It aggregates the valid signatures
+// to a quorum BLS aggregate. signerNoun ("attestor"/"validator") is used in
+// the per-signer log lines. It returns the signer bitset (in canonical
+// validator order), the aggregate signature, the signed weight, and the
+// signed percentage of total weight. If quorum is not reached, the error is
+// non-nil and the aggregate is nil.
 func VerifyAndAggregate(
 	warpSet validators.WarpSet,
 	sigs map[ids.NodeID][]byte,
@@ -78,8 +78,9 @@ func VerifyAndAggregate(
 		signedWeight += warpSet.Validators[idx].Weight
 		log.Printf("%s %s: verified (index %d)", signerNoun, nodeID, idx)
 	}
-	// big.Int quorum math: primary-network weights at mainnet scale overflow
-	// uint64 when multiplied by 100 (see avalancheWarp.VerifyWeight).
+	// Use big.Int for the quorum math: primary-network weights at mainnet
+	// scale overflow uint64 when they are multiplied by 100 (see
+	// avalancheWarp.VerifyWeight).
 	signedTimes100 := new(big.Int).Mul(new(big.Int).SetUint64(signedWeight), big.NewInt(100))
 	totalTimesQuorum := new(big.Int).Mul(new(big.Int).SetUint64(warpSet.TotalWeight), big.NewInt(QuorumNumerator))
 	pct := float64(signedWeight) / float64(warpSet.TotalWeight) * 100

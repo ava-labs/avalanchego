@@ -33,8 +33,9 @@ func deliver(
 	teleporterABI := relayer.MustLoadABI(teleporterArtifactPath)
 
 	// Decode the Teleporter message from the outbox log data to rebuild the
-	// receiveCrossChainMessage calldata. abi.Arguments has no UnpackIntoInterface,
-	// so use a tiny decoder ABI whose single output is the TeleporterMessageV2 tuple.
+	// receiveCrossChainMessage calldata. abi.Arguments has no
+	// UnpackIntoInterface. Thus use a tiny decoder ABI whose single output is
+	// the TeleporterMessageV2 tuple.
 	var wrap struct{ M relayer.TeleporterMessageV2 }
 	if err := relayer.MessageDecoderABI.UnpackIntoInterface(&wrap, "d", teleporterBytes); err != nil {
 		return fmt.Errorf("decode TeleporterMessageV2: %w", err)
@@ -100,5 +101,5 @@ func deliver(
 }
 
 // destRPCOverride, when set via --dest-rpc, redirects delivery to a chain
-// other than the C-Chain (e.g. an L1's RPC).
+// other than the C-Chain, for example the RPC of an L1.
 var destRPCOverride string

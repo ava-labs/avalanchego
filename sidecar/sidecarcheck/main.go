@@ -1,11 +1,12 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Command sidecarcheck exercises a running oracle sidecar end to end against a
-// real EVM transaction: it fetches the receipt, constructs the OracleMessage a
-// relayer would construct (payload = raw log data from the given contract),
-// and asks the sidecar to verify it over gRPC. With --tamper it corrupts the
-// payload first, which a healthy sidecar must refuse.
+// Command sidecarcheck exercises a running oracle sidecar end to end against
+// a real EVM transaction. It fetches the receipt. It constructs the
+// OracleMessage that a relayer would construct, with payload = the raw log
+// data from the given contract. It asks the sidecar to verify the message
+// over gRPC. With --tamper, it corrupts the payload first. A healthy sidecar
+// must refuse the corrupted payload.
 package main
 
 import (
@@ -48,7 +49,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Fetch the receipt and pull out the log — exactly what the relayer will do.
+	// Fetch the receipt and pull out the log. This is exactly what the
+	// relayer will do.
 	height, payload, err := relayer.FetchLog(ctx, *rpcURL, *txHashHex, common.HexToAddress(*contract))
 	if err != nil {
 		log.Fatalf("failed to fetch source event: %v", err)

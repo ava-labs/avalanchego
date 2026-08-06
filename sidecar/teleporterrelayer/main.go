@@ -1,14 +1,19 @@
-// Command teleporterrelayer is the Phase C step-1b relayer: it turns a real
-// TeleporterOutbox event on the external chain into a message delivered by the
-// LIVE attestor committee through stock TeleporterMessengerV2 + WarpAdapter.
+// Command teleporterrelayer is a relayer: it turns a real TeleporterOutbox
+// event on the external chain into a delivered message. The LIVE attestor
+// committee signs the message. The stock TeleporterMessengerV2 and WarpAdapter
+// contracts accept it.
 //
-// Flow: read the outbox event (log data = abi.encode(TeleporterMessageV2)) ->
-// build the warp UnsignedMessage (AddressedCall{sourceAddress=WarpAdapter,
-// payload=that abi.encode}) as the Virtual L1 -> request ACP-118 signatures
-// from each attestor at the Teleporter handler ID, with the 60-byte
-// justification {txHash, outbox, height} -> verify each vs the canonical
-// committee set, aggregate to quorum -> deliver via stock
-// receiveCrossChainMessage. The relayer holds no keys and cannot forge.
+// The flow has these steps:
+//   - Read the outbox event. The log data is abi.encode(TeleporterMessageV2).
+//   - Build the warp UnsignedMessage as the Virtual L1. The AddressedCall has
+//     sourceAddress=WarpAdapter and payload=that abi.encode output.
+//   - Request ACP-118 signatures from each attestor at the Teleporter handler
+//     ID. Send the 60-byte justification {txHash, outbox, height}.
+//   - Verify each signature against the canonical committee set. Aggregate
+//     the signatures to quorum.
+//   - Deliver the message via stock receiveCrossChainMessage.
+//
+// The relayer holds no keys and cannot forge.
 package main
 
 import (
@@ -101,10 +106,11 @@ func main() {
 	}
 
 	// ---- 3. Canonical committee set ----
-	// The committee is our own registered set, known exactly at registration —
-	// prefer the artifact (--committee) over a P-Chain query, which is both
-	// authoritative and immune to getValidatorsAt being unavailable on public
-	// networks / partial-sync nodes.
+	// The committee is our own registered set. We know it exactly at
+	// registration time. Prefer the artifact (--committee) to a P-Chain
+	// query. The artifact is authoritative. The artifact also works where
+	// getValidatorsAt is unavailable, for example on public networks and
+	// partial-sync nodes.
 	var warpSet validators.WarpSet
 	if *committeePath != "" {
 		warpSet, err = committeeSetFromArtifact(*committeePath)
@@ -168,10 +174,11 @@ func mustID(s, name string) ids.ID {
 	return id
 }
 
-// committeeSetFromArtifact builds the committee WarpSet from cmd/register's
-// gateway.json (blsPublicHex is the 48-byte compressed key; nodeID and weight
-// are as registered). This is the authoritative committee set — no P-Chain
-// query needed.
+// committeeSetFromArtifact builds the committee WarpSet from the gateway.json
+// artifact that cmd/register writes. In the artifact, blsPublicHex is the
+// 48-byte compressed key. The nodeID and weight are the registered values.
+// The result is the authoritative committee set. The function does not need a
+// P-Chain query.
 func committeeSetFromArtifact(path string) (validators.WarpSet, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -212,8 +219,8 @@ func committeeSetFromArtifact(path string) (validators.WarpSet, error) {
 		})
 		ws.TotalWeight += a.Weight
 	}
-	// Canonical order: ascending by uncompressed public key, matching how the
-	// warp precompile builds the set for verification.
+	// Sort into canonical order: ascending by uncompressed public key. The
+	// warp precompile builds the verification set in the same order.
 	utils.Sort(ws.Validators)
 	return ws, nil
 }

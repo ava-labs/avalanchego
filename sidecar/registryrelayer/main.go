@@ -1,18 +1,22 @@
-// Command registryrelayer delivers an Avalanche C-Chain Teleporter message to
-// an external EVM chain, completing the outbound direction of the gateway.
+// Command registryrelayer delivers an Avalanche C-Chain Teleporter message
+// to an external EVM chain. This completes the outbound direction of the
+// gateway.
 //
-// Flow: read the C-Chain tx's SendWarpMessage log (the unsigned warp message
-// the registry adapter submitted to the precompile) and the Teleporter's
-// SendCrossChainMessage event (the TeleporterMessageV2 struct) -> request
-// ACP-118 signatures over the warp message from the primary-network
-// validators (the C-Chain's signers) -> verify each against the canonical
-// primary set and aggregate to quorum -> deliver to the same-address
-// TeleporterMessengerV2 on the external chain, whose SubsetUpdater registry
-// verifies the BLS aggregate on-chain (EIP-2537) against the registered
-// primary validator set.
+// The flow has these steps:
+//   - Read two items from the C-Chain tx: the SendWarpMessage log, which is
+//     the unsigned warp message that the registry adapter submitted to the
+//     precompile, and the SendCrossChainMessage event of the Teleporter,
+//     which is the TeleporterMessageV2 struct.
+//   - Request ACP-118 signatures over the warp message from the
+//     primary-network validators, which are the signers of the C-Chain.
+//   - Verify each signature against the canonical primary set. Aggregate
+//     the signatures to quorum.
+//   - Deliver the message to the same-address TeleporterMessengerV2 on the
+//     external chain. Its SubsetUpdater registry verifies the BLS aggregate
+//     on-chain (EIP-2537) against the registered primary validator set.
 //
-// The relayer holds no signing keys for the message itself — like the inbound
-// relayers, it can censor but not forge.
+// The relayer holds no signing keys for the message itself. Like the inbound
+// relayers, it can censor but cannot forge.
 package main
 
 import (
@@ -83,10 +87,11 @@ func main() {
 		cChainID, len(unsigned.Payload), teleporterMsg.MessageNonce)
 
 	// ---- 2. Current primary-network validators (key -> NodeID map only) ----
-	// getCurrentValidators is served by full nodes (unlike getValidatorsAt,
-	// which the public API rejects and a partial-sync node can't answer); we
-	// only need it to map each registered BLS key to the NodeID(s) serving it,
-	// so signature responses can be credited to the right registered index.
+	// Full nodes serve getCurrentValidators. In contrast, the public API
+	// rejects getValidatorsAt, and a partial-sync node cannot answer it. We
+	// need getCurrentValidators only to map each registered BLS key to the
+	// NodeID(s) that serve it. Then signature responses can be credited to
+	// the right registered index.
 	pClient := platformvm.NewClient(*avalancheURI)
 	curVdrs, err := pClient.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nil)
 	if err != nil {
@@ -94,19 +99,20 @@ func main() {
 	}
 	log.Printf("primary network: %d current validators", len(curVdrs))
 
-	// ---- 2b. The registry's REGISTERED set — the array the contract applies
-	// the signature bitset to. Indexes, weights, and the quorum denominator
-	// must come from here, not the current P-Chain set: primary-set churn
-	// after registration would otherwise shift every index and fail
-	// verification on the external chain (fail-closed, but bricked).
+	// ---- 2b. Read the REGISTERED set of the registry ----
+	// This set is the array that the contract applies the signature bitset
+	// to. The indexes, the weights, and the quorum denominator must come
+	// from here, not from the current P-Chain set. Otherwise, primary-set
+	// churn after registration would shift every index. Verification on the
+	// external chain would then fail (fail-closed, but bricked).
 	reg, err := fetchRegisteredSet(ctx, *besuRPC, common.HexToAddress(*registryStr), [32]byte(cChainID))
 	if err != nil {
 		log.Fatalf("read registered set: %v", err)
 	}
-	// Attribute signature responses to stored indexes by mapping each stored
-	// key to the node IDs currently serving it. Stored validators no longer
-	// in the current set get no node IDs — they cannot sign, and their weight
-	// is the drift the quorum check surfaces.
+	// Attribute signature responses to stored indexes: map each stored key
+	// to the node IDs that currently serve it. Stored validators that are no
+	// longer in the current set get no node IDs. They cannot sign, and their
+	// weight is the drift that the quorum check surfaces.
 	nodeIDsByKey := make(map[string][]ids.NodeID, len(curVdrs))
 	for _, v := range curVdrs {
 		if v.Signer == nil {
@@ -122,9 +128,10 @@ func main() {
 	regSet := validators.WarpSet{TotalWeight: reg.TotalWeight}
 	live := 0
 	for i, v := range reg.Validators {
-		// The contract stores keys in the EIP-2537 padded G1 encoding (two
-		// 64-byte field elements, each left-padded with 16 zero bytes);
-		// convert back to the 96-byte uncompressed form the BLS library uses.
+		// The contract stores keys in the EIP-2537 padded G1 encoding: two
+		// 64-byte field elements, each left-padded with 16 zero bytes.
+		// Convert them back to the 96-byte uncompressed form that the BLS
+		// library uses.
 		if len(v.BlsPublicKey) != 128 {
 			log.Fatalf("registered key %d: unexpected length %d (want 128, EIP-2537 padded)", i, len(v.BlsPublicKey))
 		}
@@ -150,10 +157,11 @@ func main() {
 		len(reg.Validators), reg.PChainHeight, reg.TotalWeight, live)
 
 	// ---- 3. ACP-118 signature requests to the primary validators ----
-	// Staking addresses come from --validators when given; otherwise they are
-	// discovered from the queried node (itself + its peers, filtered to the
-	// primary validator set) — tmpnet assigns them randomly per network, so a
-	// hardcoded default would never be right.
+	// The staking addresses come from --validators when it is given.
+	// Otherwise, they are discovered from the queried node: the node itself
+	// plus its peers, filtered to the primary validator set. tmpnet assigns
+	// the addresses randomly per network, so a hardcoded default would never
+	// be right.
 	var validatorAddrs []string
 	if *validatorList != "" {
 		validatorAddrs = strings.Split(*validatorList, ",")
@@ -165,7 +173,7 @@ func main() {
 		log.Printf("discovered %d staking addresses for the registered set", len(validatorAddrs))
 	}
 	// On-chain warp messages need no justification: each node signs anything
-	// its C-Chain warp backend has stored.
+	// that its C-Chain warp backend stored.
 	prefix := p2p.ProtocolPrefix(acp118.HandlerID)
 	sigs := relayer.CollectSignatures(ctx, networkID, cChainID, prefix, unsigned, nil, validatorAddrs)
 
@@ -196,9 +204,10 @@ func main() {
 	fmt.Printf("and accepted by the same-address stock TeleporterMessengerV2 on the external chain\n")
 }
 
-// discoverPrimaryValidators returns staking addresses for the primary-network
-// validators reachable from the given node: the node itself plus its peers,
-// filtered to the validator set's node IDs.
+// discoverPrimaryValidators returns staking addresses for the
+// primary-network validators that are reachable from the given node: the
+// node itself plus its peers, filtered to the node IDs of the validator
+// set.
 func discoverPrimaryValidators(
 	ctx context.Context,
 	avalancheURI string,
