@@ -64,6 +64,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -1366,18 +1367,23 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	t.Run("tampered_marker_rejected", func(t *testing.T) {
 		// A tampered SettledHeight is caught by the marker cross-check, since
 		// bootstrapping does not rebuild by hash.
-		hdr := settler.Header()
-		extra := customtypes.GetHeaderExtra(hdr)
-		require.NotNil(t, extra.SettledHeight, "settler SettledHeight")
-		extra.SettledHeight = new(uint64)
-		tampered := settler.EthBlock().WithSeal(hdr)
-		tamperedBytes, err := rlp.EncodeToBytes(tampered)
-		require.NoError(t, err, "rlp.EncodeToBytes(tampered settler)")
-
-		parsed, err := restarted.ParseBlock(restartedCtx, tamperedBytes)
-		require.NoErrorf(t, err, "%T.ParseBlock(tampered settler)", restarted.VM)
-		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
+		err := restarted.verifyTampered(restartedCtx, t, settler, tamperExtra(func(e *customtypes.HeaderExtra) {
+			require.NotNil(t, e.SettledHeight, "settler SettledHeight")
+			e.SettledHeight = new(uint64)
+		}))
 		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
+	})
+
+	t.Run("markerless_rejected", func(t *testing.T) {
+		// Stripping the marker entirely must be rejected outright: every block
+		// verified by SAE was built under SAE and MUST carry a marker.
+		err := restarted.verifyTampered(restartedCtx, t, settler, tamperExtra(func(e *customtypes.HeaderExtra) {
+			e.SettledHeight = nil
+			e.SettledGasUnix = nil
+			e.SettledGasNumerator = nil
+			e.SettledExcess = nil
+		}))
+		require.ErrorIsf(t, err, hook.ErrNoSettlementMarker, "%T.VerifyBlock(markerless settler) during bootstrapping", restarted.VM)
 	})
 }
 

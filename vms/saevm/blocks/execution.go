@@ -247,37 +247,51 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }
 
-// RestoreExecutionArtefacts reloads post-execution artefacts persisted by
+var (
+	ErrMissingExecutionResults    = errors.New("missing execution results for asynchronous block")
+	ErrUnexpectedExecutionResults = errors.New("unexpected execution results for synchronous block")
+)
+
+// restoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.  If no execution results are found in
-// the [saetypes.ExecutionResults], they are instead inferred from the
-// block itself, and the block is marked as synchronous.
+// said function was originally called. Synchronous blocks do not persist
+// execution results, so theirs are inferred from the block header instead.
 //
-// This function does NOT restore the block's settlement state, even if the
+// This method does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
-// appropriate. Because this function breaks this invariant, any consumer
-// SHOULD consider using [RestoreSettledBlock] instead, if possible.
+// appropriate.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
-	e, err := loadExecutionResults(xdb, b.NumberU64())
-	if errors.Is(err, database.ErrNotFound) {
-		// TODO(JonathanOppenheimer): missing results result in us assuming
-		// "synchronous" here, so once state sync exist and the database can be
-		// pruned, this would result in async blocks being restored incorrectly.
-		// We can ask [hook.Synchronous] instead?
+func (b *Block) restoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+	num := b.NumberU64()
+	var (
+		e   *executionResults
+		err error
+	)
+	if hook.IsSynchronous(hooks, b.Header()) {
+		switch has, hasErr := xdb.Has(num); {
+		case hasErr != nil:
+			return fmt.Errorf("checking for execution results of block %d: %w", num, hasErr)
+		case has:
+			return fmt.Errorf("%w: block %d (%#x)", ErrUnexpectedExecutionResults, num, b.Hash())
+		}
 		e, err = b.synchronousExecutionResults(hooks)
 		b.synchronous = true
+	} else {
+		e, err = loadExecutionResults(xdb, num)
+		if errors.Is(err, database.ErrNotFound) {
+			err = fmt.Errorf("%w: block %d (%#x)", ErrMissingExecutionResults, num, b.Hash())
+		}
 	}
 	if err != nil {
 		return err
 	}
 
-	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
+	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), num)
 	if err := e.receipts.DeriveFields(
 		chainConfig,
 		b.Hash(),
-		b.NumberU64(),
+		num,
 		b.BuildTime(),
 		e.baseFee.ToBig(),
 		nil, // SAE does not support blob transactions.

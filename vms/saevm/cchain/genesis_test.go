@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -360,6 +361,19 @@ func TestParseGenesis(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHeliconGenesisIsSynchronous(t *testing.T) {
+	ctx := &snow.Context{
+		NetworkUpgrades: upgradetest.GetConfig(upgradetest.Helicon),
+	}
+	g, err := parseGenesis(ctx, []byte(avalanchegenesis.LocalConfig.CChainGenesis))
+	require.NoError(t, err, "parseGenesis()")
+
+	block, err := g.block()
+	require.NoErrorf(t, err, "%T.block()", g)
+
+	require.True(t, hook.IsSynchronous(&hooks{}, block.Header()), "hook.IsSynchronous(genesis header)")
 }
 
 // This test is intentionally a change detector: the genesis hash is part of

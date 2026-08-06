@@ -27,11 +27,16 @@ go_library(
 
 go_test(
     name = "hook_test",
-    srcs = ["hook_test.go"],
+    srcs = [
+        "hook_external_test.go",
+        "hook_test.go",
+    ],
     embed = [":hook"],
     deps = [
+        "//vms/saevm/hook/hookstest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//libevm/ethtest",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//assert",

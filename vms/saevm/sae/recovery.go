@@ -155,7 +155,8 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 	)
 
 	// Consensus only requires post-execution state after and including the
-	// last-settled block.
+	// last-settled block. A block with no effective marker settles itself, so
+	// its self-settling marker yields its own height.
 	keepFrom := rec.hooks.SettledBy(last.Header()).Height
 	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
 		if b.NumberU64() < keepFrom {
@@ -195,11 +196,13 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				return b.MarkSettled(blackhole)
 
 			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+				num := b.Height() - 1
+				ethB, err := canonicalBlock(rec.db, num)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				parent, err := blocks.RestoreExecutedBlock(ethB, rec.hooks, rec.snowCtx.Log, rec.db, rec.xdb, rec.chainConfig)
+				if err != nil {
 					return err
 				}
 				chain = append(chain, parent)
