@@ -81,12 +81,15 @@ func TestSyncer(t *testing.T) {
 		name          string
 		numFromSource int
 		numOnDisk     int
+		copies        int // times each hash is enqueued, zero means once
 		perReq        int
 		wantRequests  int
 	}{
 		{name: "single_blob", numFromSource: 1, wantRequests: 1},
 		{name: "batches_across_requests", numFromSource: 40, perReq: 4, wantRequests: 10},
 		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2, wantRequests: 1},
+		// Shared bytecode puts the same hash on the queue many times.
+		{name: "repeats_fetched_once", numFromSource: 1, copies: 200, perReq: 4, wantRequests: 1},
 	}
 
 	for _, tt := range tests {
@@ -112,10 +115,13 @@ func TestSyncer(t *testing.T) {
 			counter := &countingResponder{inner: newResponder(log, source)}
 			client := serve(t, ctx, log, counter)
 
-			ch := make(chan common.Hash, len(want))
+			copies := max(tt.copies, 1)
+			ch := make(chan common.Hash, len(want)*copies)
 			for hash := range want {
 				require.NoError(t, customrawdb.WriteCodeToFetch(target, hash))
-				ch <- hash
+				for range copies {
+					ch <- hash
+				}
 			}
 			close(ch)
 
@@ -135,7 +141,7 @@ func TestSyncer(t *testing.T) {
 
 			sizes := counter.requests()
 			require.Len(t, sizes, tt.wantRequests,
-				"code already on disk must not be requested, and a full batch must be sent as its own request")
+				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
 			requested := 0
 			for _, size := range sizes {
 				// The handler drops a request over the cap, so an overgrown
@@ -148,23 +154,45 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
-// A batch is only handed off once it holds something, so a non-positive size
-// cannot turn the manager into a spin of empty requests.
+// A batch is only handed off once it holds something, so draining with nothing
+// batched must not cost a request, even at a non-positive batch size.
 func TestSyncer_NeverSendsEmptyRequest(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
-	defer cancel()
+	ctx := t.Context()
 	log := loggingtest.New(t, logging.Debug)
 	counter := &countingResponder{inner: newResponder(log, memorydb.New())}
 	client := serve(t, ctx, log, counter)
 
-	// Open and never fed, so the manager has nothing to batch.
+	// Closed without ever being fed, so the syncer drains with an empty batch.
 	ch := make(chan common.Hash)
+	close(ch)
 
 	s := NewSyncer(log, client, memorydb.New(), ch)
 	s.codeHashesPerReq = 0
 
-	require.ErrorIs(t, s.Sync(ctx), context.DeadlineExceeded)
+	require.NoError(t, s.Sync(ctx))
 	require.Empty(t, counter.requests(), "an empty batch must never be sent")
+}
+
+func TestClaimSet(t *testing.T) {
+	t.Parallel()
+
+	// A distinct hash per claim, so the count must stay under what one byte holds.
+	const claims = 100
+
+	// The set must not grow with the hashes seen, only with what is outstanding.
+	c := newClaimSet()
+	batch := make([]common.Hash, 0, claims)
+	for i := range claims {
+		codeHash := common.Hash{byte(i)}
+		require.True(t, c.claim(codeHash))
+		require.False(t, c.claim(codeHash), "a held hash cannot be claimed again")
+		batch = append(batch, codeHash)
+	}
+	require.Len(t, c.hashes, len(batch))
+
+	c.release(batch)
+	require.Empty(t, c.hashes, "a released batch must leave nothing behind")
+	require.True(t, c.claim(batch[0]), "a released hash can be claimed again")
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {

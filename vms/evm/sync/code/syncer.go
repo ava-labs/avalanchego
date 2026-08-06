@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -32,10 +33,9 @@ var (
 
 // Syncer fetches contract code by hash from the network and persists it to db.
 //
-// A single manager goroutine owns every db read and write and the set of hashes
-// being fetched, so batching, deduplication and persistence need no locking and
-// see a consistent view. Only the network fetch runs in parallel, on
-// numSyncWorkers goroutines, which is the part worth overlapping.
+// One goroutine reads the queue, checks the db and composes batches, so a hash
+// is claimed exactly once. Each full batch is fetched, verified and written by a
+// worker, bounded to numSyncWorkers at a time.
 type Syncer struct {
 	log        logging.Logger
 	client     *Client
@@ -43,13 +43,6 @@ type Syncer struct {
 	codeHashes <-chan common.Hash
 
 	codeHashesPerReq int // best-effort target size, the final batch may be smaller
-}
-
-// fetchResult carries a verified fetch back to the manager. The hashes travel
-// with it because batches complete out of order.
-type fetchResult struct {
-	hashes []common.Hash
-	data   [][]byte
 }
 
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
@@ -66,86 +59,107 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes
 
 // Sync runs until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
-	eg, egCtx := errgroup.WithContext(ctx)
-	requests := make(chan []common.Hash)
-	results := make(chan fetchResult)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	for range numSyncWorkers {
-		eg.Go(func() error { return s.fetch(egCtx, requests, results) })
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.SetLimit(numSyncWorkers)
+
+	claimed := newClaimSet()
+
+	batch, err := s.batchHashes(egCtx, eg, claimed)
+	switch {
+	case err != nil:
+		// batchHashes runs outside the group, so only this stops the workers still
+		// retrying for work that is no longer wanted.
+		cancel()
+	case len(batch) > 0:
+		eg.Go(func() error { return s.fetchAndPersist(egCtx, batch, claimed) })
 	}
-	eg.Go(func() error {
-		// Closing releases the fetchers once the manager stops handing out work.
-		defer close(requests)
-		return s.manage(egCtx, requests, results)
-	})
-	return eg.Wait()
+	return errors.Join(err, eg.Wait())
 }
 
-// manage owns the db and the in-flight set. It batches incoming hashes, hands
-// full batches to the fetchers, and persists what they return.
-func (s *Syncer) manage(ctx context.Context, requests chan<- []common.Hash, results <-chan fetchResult) error {
-	// Manager-local, so it needs no synchronisation.
-	inFlight := make(map[common.Hash]struct{})
-
-	var (
-		batch   = make([]common.Hash, 0, s.codeHashesPerReq)
-		pending int  // batches out with the fetchers
-		drained bool // the queue is closed, so no more hashes are coming
-	)
+// batchHashes drains the queue into full batches, handing each to a worker, and
+// returns the batch it could not fill.
+func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) ([]common.Hash, error) {
+	batch := make([]common.Hash, 0, s.codeHashesPerReq)
 	for {
-		if drained && len(batch) == 0 && pending == 0 {
-			return nil
-		}
-
-		// Hand a batch off or keep filling one, never both, so a batch cannot
-		// outgrow the cap the peer will accept.
-		var (
-			sendCh chan<- []common.Hash
-			recvCh <-chan common.Hash
-		)
-		switch {
-		case len(batch) > 0 && (len(batch) >= s.codeHashesPerReq || drained):
-			sendCh = requests
-		case !drained:
-			recvCh = s.codeHashes
-		}
-
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return batch, ctx.Err()
 
-		case sendCh <- batch:
-			pending++
-			// The fetcher owns the sent slice, so start a fresh one.
-			batch = make([]common.Hash, 0, s.codeHashesPerReq)
-
-		case res := <-results:
-			pending--
-			if err := s.persist(res.hashes, res.data); err != nil {
-				return err
-			}
-			// Cleared only after the commit, so a hash arriving next is seen on
-			// disk rather than fetched again.
-			for _, codeHash := range res.hashes {
-				delete(inFlight, codeHash)
-			}
-
-		case codeHash, ok := <-recvCh:
+		case codeHash, ok := <-s.codeHashes:
 			if !ok {
-				drained = true
-				continue
+				return batch, nil
 			}
 			missing, err := s.needsFetch(codeHash)
 			if err != nil {
-				return err
+				return batch, err
 			}
-			_, claimed := inFlight[codeHash]
-			if !missing || claimed {
+			if !missing || !claimed.claim(codeHash) {
 				continue
 			}
-			inFlight[codeHash] = struct{}{}
+
 			batch = append(batch, codeHash)
+			if len(batch) < s.codeHashesPerReq {
+				continue
+			}
+			full := batch
+			eg.Go(func() error {
+				return s.fetchAndPersist(ctx, full, claimed)
+			})
+			batch = make([]common.Hash, 0, s.codeHashesPerReq)
 		}
+	}
+}
+
+// fetchAndPersist fetches code for hashes from the network and writes it to db.
+func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, claimed *claimSet) error {
+	data, err := getCode(ctx, s.log, s.client, hashes)
+	if err != nil {
+		return err
+	}
+	if err := s.persist(hashes, data); err != nil {
+		return err
+	}
+	// Released only after the commit, so a repeat arriving next is seen on disk
+	// rather than fetched again.
+	claimed.release(hashes)
+	return nil
+}
+
+// claimSet holds the hashes a batch has taken, from the moment batchHashes picks one
+// until its code is committed, so a repeat is not fetched twice. It is bounded by
+// the work outstanding, not by the hashes seen.
+type claimSet struct {
+	mu     sync.Mutex
+	hashes map[common.Hash]struct{}
+}
+
+func newClaimSet() *claimSet {
+	return &claimSet{
+		hashes: make(map[common.Hash]struct{}),
+	}
+}
+
+// claim reports whether codeHash was taken, and false if it was already held.
+func (c *claimSet) claim(codeHash common.Hash) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, dup := c.hashes[codeHash]; dup {
+		return false
+	}
+	c.hashes[codeHash] = struct{}{}
+	return true
+}
+
+func (c *claimSet) release(hashes []common.Hash) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, codeHash := range hashes {
+		delete(c.hashes, codeHash)
 	}
 }
 
@@ -158,29 +172,6 @@ func (s *Syncer) needsFetch(codeHash common.Hash) (bool, error) {
 		return false, fmt.Errorf("failed to delete stale code marker: %w", err)
 	}
 	return false, nil
-}
-
-// fetch pulls batches, retrieves and verifies them, and reports back.
-func (s *Syncer) fetch(ctx context.Context, requests <-chan []common.Hash, results chan<- fetchResult) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case hashes, ok := <-requests:
-			if !ok {
-				return nil
-			}
-			data, err := getCode(ctx, s.log, s.client, hashes)
-			if err != nil {
-				return err
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case results <- fetchResult{hashes: hashes, data: data}:
-			}
-		}
-	}
 }
 
 // persist writes the code and clears the to-fetch markers in one batch.
