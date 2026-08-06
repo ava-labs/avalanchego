@@ -31,11 +31,6 @@ var (
 )
 
 // Syncer fetches contract code by hash from the network and persists it to db.
-//
-// A single manager goroutine owns every db read and write and the set of hashes
-// being fetched, so batching, deduplication and persistence need no locking and
-// see a consistent view. Only the network fetch runs in parallel, on
-// numSyncWorkers goroutines, which is the part worth overlapping.
 type Syncer struct {
 	log        logging.Logger
 	client     *Client
@@ -67,86 +62,61 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes
 // Sync runs until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
-	requests := make(chan []common.Hash)
-	results := make(chan fetchResult)
-
-	for range numSyncWorkers {
-		eg.Go(func() error { return s.fetch(egCtx, requests, results) })
-	}
-	eg.Go(func() error {
-		// Closing releases the fetchers once the manager stops handing out work.
-		defer close(requests)
-		return s.manage(egCtx, requests, results)
-	})
-	return eg.Wait()
-}
-
-// manage owns the db and the in-flight set. It batches incoming hashes, hands
-// full batches to the fetchers, and persists what they return.
-func (s *Syncer) manage(ctx context.Context, requests chan<- []common.Hash, results <-chan fetchResult) error {
-	// Manager-local, so it needs no synchronisation.
-	inFlight := make(map[common.Hash]struct{})
+	eg.SetLimit(numSyncWorkers)
 
 	var (
-		batch   = make([]common.Hash, 0, s.codeHashesPerReq)
-		pending int  // batches out with the fetchers
-		drained bool // the queue is closed, so no more hashes are coming
+		retErr error
+		batch  = make([]common.Hash, 0, s.codeHashesPerReq)
 	)
+loop:
 	for {
-		if drained && len(batch) == 0 && pending == 0 {
-			return nil
-		}
-
-		// Hand a batch off or keep filling one, never both, so a batch cannot
-		// outgrow the cap the peer will accept.
-		var (
-			sendCh chan<- []common.Hash
-			recvCh <-chan common.Hash
-		)
-		switch {
-		case len(batch) > 0 && (len(batch) >= s.codeHashesPerReq || drained):
-			sendCh = requests
-		case !drained:
-			recvCh = s.codeHashes
-		}
-
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-egCtx.Done():
+			retErr = egCtx.Err()
+			break loop
 
-		case sendCh <- batch:
-			pending++
-			// The fetcher owns the sent slice, so start a fresh one.
-			batch = make([]common.Hash, 0, s.codeHashesPerReq)
-
-		case res := <-results:
-			pending--
-			if err := s.persist(res.hashes, res.data); err != nil {
-				return err
-			}
-			// Cleared only after the commit, so a hash arriving next is seen on
-			// disk rather than fetched again.
-			for _, codeHash := range res.hashes {
-				delete(inFlight, codeHash)
-			}
-
-		case codeHash, ok := <-recvCh:
+		case codeHash, ok := <-s.codeHashes:
 			if !ok {
-				drained = true
-				continue
+				break loop
 			}
 			missing, err := s.needsFetch(codeHash)
-			if err != nil {
-				return err
-			}
-			_, claimed := inFlight[codeHash]
-			if !missing || claimed {
+			switch {
+			case err != nil:
+				retErr = err
+				break loop
+			case !missing:
 				continue
 			}
-			inFlight[codeHash] = struct{}{}
 			batch = append(batch, codeHash)
+
+			if len(batch) >= s.codeHashesPerReq {
+				send := batch
+				eg.Go(func() error {
+					return s.fetchAndPersist(egCtx, send)
+				})
+				batch = make([]common.Hash, 0, s.codeHashesPerReq)
+			}
 		}
 	}
+
+	retErr = errors.Join(retErr, eg.Wait())
+	if retErr != nil {
+		return retErr
+	}
+
+	if len(batch) > 0 {
+		return s.fetchAndPersist(ctx, batch)
+	}
+	return nil
+}
+
+// fetchAndPersist fetches code for hashes from the network and writes it to db.
+func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) error {
+	data, err := getCode(ctx, s.log, s.client, hashes)
+	if err != nil {
+		return err
+	}
+	return s.persist(hashes, data)
 }
 
 // needsFetch reports whether codeHash has to come from a peer.
@@ -158,29 +128,6 @@ func (s *Syncer) needsFetch(codeHash common.Hash) (bool, error) {
 		return false, fmt.Errorf("failed to delete stale code marker: %w", err)
 	}
 	return false, nil
-}
-
-// fetch pulls batches, retrieves and verifies them, and reports back.
-func (s *Syncer) fetch(ctx context.Context, requests <-chan []common.Hash, results chan<- fetchResult) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case hashes, ok := <-requests:
-			if !ok {
-				return nil
-			}
-			data, err := getCode(ctx, s.log, s.client, hashes)
-			if err != nil {
-				return err
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case results <- fetchResult{hashes: hashes, data: data}:
-			}
-		}
-	}
 }
 
 // persist writes the code and clears the to-fetch markers in one batch.
