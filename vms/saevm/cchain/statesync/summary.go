@@ -40,6 +40,7 @@ func (*SummaryHandler) ParseStateSummary(_ context.Context, summaryBytes []byte)
 }
 
 func (s *summary) Bytes() []byte {
+	// TODO(alarso16): should we cache this?
 	return s.MarshalCanoto()
 }
 
