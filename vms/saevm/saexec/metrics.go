@@ -152,9 +152,6 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 // queue.
 func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.executionQueueBlocks.Inc()
-
-	// The block's GasUsed is populated during block building as the sum of the
-	// tx gas limits and the end-of-block operations gas.
 	worstCaseGas := float64(block.WorstCaseGasUsed())
 	m.executionQueueGasLimit.Add(worstCaseGas)
 	m.acceptedGasLimit.Add(worstCaseGas)
