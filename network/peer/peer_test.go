@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"net"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -31,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -41,6 +44,7 @@ type testPeer struct {
 
 type rawTestPeer struct {
 	config         *Config
+	stack          MessageStack
 	cert           *staking.Certificate
 	inboundMsgChan <-chan *message.InboundMessage
 }
@@ -52,6 +56,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(t, err)
 
@@ -77,9 +82,7 @@ func newConfig(t *testing.T) *Config {
 		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
 		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
 		Metrics:              metrics,
-		MessageCreator:       newMessageCreator(t),
 		Log:                  logging.NoLog{},
-		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              TestNetwork,
 		Router:               nil,
 		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -123,6 +126,7 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 
 	return &rawTestPeer{
 		config:         config,
+		stack:          NewTestMessageStack(newMessageCreator(t)),
 		cert:           cert,
 		inboundMsgChan: inboundMsgChan,
 	}
@@ -132,6 +136,7 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 	return &testPeer{
 		Peer: Start(
 			self.config,
+			self.stack,
 			conn,
 			peer.cert,
 			peer.config.MyNodeID,
@@ -205,7 +210,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(t.Context(), outboundGetMsg))
@@ -237,7 +242,7 @@ func TestPingUptimes(t *testing.T) {
 		require.NoError(peer0.AwaitClosed(t.Context()))
 		require.NoError(peer1.AwaitClosed(t.Context()))
 	}()
-	pingMsg, err := config0.MessageCreator.Ping(1)
+	pingMsg, err := rawPeer0.stack.MessageCreator.Ping(1)
 	require.NoError(err)
 	require.True(peer0.Send(t.Context(), pingMsg))
 
@@ -683,6 +688,178 @@ func TestShouldDisconnect(t *testing.T) {
 			require.Equal(test.expectedShouldDisconnect, shouldDisconnect)
 		})
 	}
+}
+
+// newLargeMessageCreator returns an uncompressed creator that can build
+// payloads up to maxMessageSize. Compression is disabled so on-wire frame
+// sizes are deterministic regardless of payload contents.
+func newLargeMessageCreator(t *testing.T, maxMessageSize uint32) message.Creator {
+	t.Helper()
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		compression.TypeNone,
+		10*time.Second,
+		int64(maxMessageSize),
+	)
+	require.NoError(t, err)
+	return mc
+}
+
+// largeAppGossip builds an AppGossip message whose on-wire frame exceeds
+// constants.DefaultMaxMessageSize using the supplied creator.
+func largeAppGossip(t *testing.T, mc message.Creator) *message.OutboundMessage {
+	t.Helper()
+	// A payload of exactly the default max size guarantees the framed message
+	// (payload + proto overhead) exceeds the default frame limit.
+	payload := make([]byte, constants.DefaultMaxMessageSize)
+	msg, err := mc.AppGossip(ids.GenerateTestID(), payload)
+	require.NoError(t, err)
+	require.Greater(t, len(msg.Bytes), constants.DefaultMaxMessageSize)
+	return msg
+}
+
+// TestSendLargeMessageElevatedStack verifies that two peers using an elevated
+// stack can exchange a message larger than the default max message size.
+func TestSendLargeMessageElevatedStack(t *testing.T) {
+	require := require.New(t)
+
+	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
+
+	rawPeer0 := newRawTestPeer(t, newConfig(t))
+	rawPeer1 := newRawTestPeer(t, newConfig(t))
+
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
+	for _, p := range []*rawTestPeer{rawPeer0, rawPeer1} {
+		p.stack.MaxFrameSize = elevatedMaxSize
+		p.stack.MessageCreator = largeCreator
+	}
+
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
+	}()
+
+	msg := largeAppGossip(t, largeCreator)
+	require.True(peer0.Send(t.Context(), msg))
+
+	inbound := <-peer1.inboundMsgChan
+	require.Equal(message.AppGossipOp, inbound.Op)
+}
+
+// TestWriteMessageDropsOversizedFrame verifies writeMessage writes nothing when
+// the framed message exceeds the peer stack's MaxFrameSize.
+func TestWriteMessageDropsOversizedFrame(t *testing.T) {
+	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
+	largeMsg := largeAppGossip(t, largeCreator)
+
+	smallMsg, err := newMessageCreator(t).Ping(1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		maxFrameSize uint32
+		msg          *message.OutboundMessage
+		wantWritten  bool
+	}{
+		{
+			name:         "oversized frame dropped at write time",
+			maxFrameSize: constants.DefaultMaxMessageSize,
+			msg:          largeMsg,
+			wantWritten:  false,
+		},
+		{
+			name:         "normal frame written",
+			maxFrameSize: constants.DefaultMaxMessageSize,
+			msg:          smallMsg,
+			wantWritten:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := require.New(t)
+
+			conn, _ := net.Pipe()
+			t.Cleanup(func() { _ = conn.Close() })
+
+			metrics, err := NewMetrics(prometheus.NewRegistry())
+			r.NoError(err)
+
+			p := &Peer{
+				Config: &Config{
+					Log:         logging.NoLog{},
+					Clock:       mockable.Clock{},
+					Metrics:     metrics,
+					PongTimeout: time.Second,
+				},
+				stack: MessageStack{
+					MaxFrameSize: test.maxFrameSize,
+				},
+				conn: conn,
+				id:   ids.GenerateTestNodeID(),
+			}
+
+			var written bytes.Buffer
+			p.writeMessage(&written, test.msg)
+
+			if test.wantWritten {
+				r.NotEmpty(written.Bytes())
+				return
+			}
+			r.Empty(written.Bytes())
+		})
+	}
+}
+
+// TestLargeMessageDroppedByDefaultFrameSize verifies the Send path: an oversized
+// message queued on a default-frame peer is not delivered to the remote peer,
+// while a subsequent normal message is.
+func TestLargeMessageDroppedByDefaultFrameSize(t *testing.T) {
+	require := require.New(t)
+
+	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
+
+	rawPeer0 := newRawTestPeer(t, newConfig(t))
+	rawPeer1 := newRawTestPeer(t, newConfig(t))
+
+	// Sender holds the large creator (as MsgCreator() would return node-wide)
+	// but its per-peer stack keeps the default frame size, mirroring a
+	// non-allowlisted peer.
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
+	rawPeer0.stack.MessageCreator = largeCreator
+	rawPeer0.stack.MaxFrameSize = constants.DefaultMaxMessageSize
+
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
+	}()
+
+	largeMsg := largeAppGossip(t, largeCreator)
+	require.True(peer0.Send(t.Context(), largeMsg))
+
+	// Give the send goroutine time to dequeue and attempt the write.
+	select {
+	case msg := <-peer1.inboundMsgChan:
+		require.FailNowf("unexpected inbound message", "got %v", msg.Op)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	// Connection stays up; a normal follow-up is still delivered.
+	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	require.NoError(err)
+	require.True(peer0.Send(t.Context(), outboundGetMsg))
+
+	inboundGetMsg := <-peer1.inboundMsgChan
+	require.Equal(message.GetOp, inboundGetMsg.Op)
 }
 
 // Helper to send a message from sender to receiver and assert that the

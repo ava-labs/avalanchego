@@ -201,6 +201,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(t, err)
 
@@ -229,7 +230,6 @@ func newFullyConnectedTestNetworkWithConfig(
 		onAllConnected = make(chan struct{})
 	)
 	for i, config := range configs {
-		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
 		beacons := validators.NewManager()
@@ -247,7 +247,6 @@ func newFullyConnectedTestNetworkWithConfig(
 		net, err := NewNetwork(
 			config,
 			upgrade.InitiallyActiveTime,
-			msgCreator,
 			registry,
 			logging.NoLog{},
 			listeners[i],
@@ -571,7 +570,6 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
-		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
 		beacons := validators.NewManager()
@@ -589,7 +587,6 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 		net, err := NewNetwork(
 			config,
 			upgrade.InitiallyActiveTime,
-			msgCreator,
 			registry,
 			logging.NoLog{},
 			listeners[i],
@@ -651,7 +648,6 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
-		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
 		beacons := validators.NewManager()
@@ -664,7 +660,6 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 		net, err := NewNetwork(
 			config,
 			upgrade.InitiallyActiveTime,
-			msgCreator,
 			registry,
 			logging.NoLog{},
 			listeners[i],
@@ -806,7 +801,6 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 
 	networks := make([]Network, len(configs))
 	for i, config := range configs {
-		msgCreator := newMessageCreator(t)
 		registry := prometheus.NewRegistry()
 
 		beacons := validators.NewManager()
@@ -822,7 +816,6 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 		net, err := NewNetwork(
 			config,
 			upgrade.InitiallyActiveTime,
-			msgCreator,
 			registry,
 			logging.NoLog{},
 			listeners[i],
@@ -878,7 +871,6 @@ func TestGetAllPeers(t *testing.T) {
 	nonValidatorNetwork, err := NewNetwork(
 		configs[0],
 		upgrade.InitiallyActiveTime,
-		newMessageCreator(t),
 		prometheus.NewRegistry(),
 		logging.NoLog{},
 		listeners[0],

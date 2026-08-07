@@ -79,6 +79,7 @@ func TestTimeout(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -338,6 +339,7 @@ func TestReliableMessages(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -497,6 +499,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				metrics,
 				constants.DefaultNetworkCompressionType,
 				10*time.Second,
+				int64(constants.DefaultMaxMessageSize),
 			)
 			require.NoError(err)
 
