@@ -314,9 +314,16 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
       - name: Run e2e tests
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
+      - name: Log Docker disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
         if: failure()
         uses: ./.github/actions/collect-kind-diagnostics
@@ -364,10 +371,17 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
       # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
         run: ./scripts/run_task.sh test-robustness
+      - name: Log Docker disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
         if: failure()
         uses: ./.github/actions/collect-kind-diagnostics
