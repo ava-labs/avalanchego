@@ -1264,7 +1264,7 @@ func replayTargets(t *testing.T, e *Executor, all []*blocks.Block) (target, exac
 			if !reconstructable(all[seed]) {
 				continue
 			}
-			if d := uint64(i - seed); d > 1 {
+			if d := b.Height() - all[seed].Height(); d > 1 {
 				target, distance = b, d
 			}
 			break
