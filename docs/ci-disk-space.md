@@ -54,6 +54,7 @@ Use this document when you are:
 Normal repo entrypoints include:
 
 - `task check-ci-disk-space`
+- `task test-ci-disk-space`
 - `task log-ci-disk-state-bazel`
 - `task log-ci-disk-state-docker`
 - `task log-ci-disk-state-generic`
