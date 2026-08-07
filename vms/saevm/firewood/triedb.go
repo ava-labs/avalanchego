@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -114,10 +115,49 @@ type TrieDB struct {
 	// and the latest state can be modified at any time during execution.
 	Firewood *ffi.Database
 
-	pending     *ffi.Proposal
-	committable *linked.Hashmap[common.Hash, *ffi.Proposal]
+	// proposalsLock guards pending and committable. RPCs hold it only for map
+	// lookups. [TrieDB.Commit] can hold it during an FFI call.
+	proposalsLock sync.Mutex
+	pending       *ffi.Proposal
+	committable   *linked.Hashmap[common.Hash, *ffi.Proposal]
 
 	log logging.Logger
+}
+
+// ErrReconstructionNotCommitted means the root is an uncommitted proposal.
+var ErrReconstructionNotCommitted = errors.New("state root is not committed")
+
+// NewReconstructed returns an isolated mutable view at root. It does not
+// persist changes.
+//
+// root MUST identify a committed revision. Callers MAY try an older root only
+// after [ErrReconstructionNotCommitted] or [ffi.ErrRevisionNotFound].
+//
+// The caller owns the view and MUST call [ffi.Reconstructed.Drop].
+func (t *TrieDB) NewReconstructed(root common.Hash) (*ffi.Reconstructed, error) {
+	// Firewood also rejects proposal roots, but it does so with a raw message
+	// from Rust. Callers cannot tell that message from a real failure, and must
+	// know to try an older root.
+	t.proposalsLock.Lock()
+	_, uncommitted := t.committable.Get(root)
+	t.proposalsLock.Unlock()
+	if uncommitted {
+		return nil, fmt.Errorf("%w: %#x", ErrReconstructionNotCommitted, root)
+	}
+
+	rev, err := t.Firewood.Revision(ffi.Hash(root))
+	if err != nil {
+		return nil, fmt.Errorf("opening revision %#x: %w", root, err)
+	}
+
+	recon, err := rev.Reconstruct(nil)
+	if dropErr := rev.Drop(); dropErr != nil {
+		t.log.Warn("dropping revision", zap.Stringer("root", root), zap.Error(dropErr))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reconstructing revision %#x: %w", root, err)
+	}
+	return recon, nil
 }
 
 func New(config Config) (*TrieDB, error) {
@@ -160,8 +200,10 @@ func New(config Config) (*TrieDB, error) {
 func (t *TrieDB) Close() error {
 	// The force close below will iterate through all open handles and free
 	// their Rust-side memory explicitly
+	t.proposalsLock.Lock()
 	t.committable.Clear()
 	t.pending = nil
+	t.proposalsLock.Unlock()
 
 	// Firewood will iterate through all open handles and close them, but this
 	// isn't guaranteed to finish quickly.
@@ -191,6 +233,9 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 //
 //nolint:revive // removing names loses context.
 func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
+	t.proposalsLock.Lock()
+	defer t.proposalsLock.Unlock()
+
 	possible := t.pending
 	if possible == nil {
 		// Update will never be called if no state change is proposed.
@@ -215,6 +260,9 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 //
 // Any error returned from this function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
+	t.proposalsLock.Lock()
+	defer t.proposalsLock.Unlock()
+
 	if _, ok := t.committable.Get(root); !ok {
 		// Ideally, one would check that the root is on disk, since one should
 		// never pass a non-existent root to Commit. However, Firewood loses
@@ -254,8 +302,15 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 }
 
 // newProposal creates a new proposal from either a committable proposal or the tip of the database.
+//
+// It releases proposalsLock before FFI calls. Propose returns an error if
+// Commit drops the parent first.
 func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*ffi.Proposal, error) {
-	switch parent, foundProposal := t.committable.Get(parentRoot); {
+	t.proposalsLock.Lock()
+	parent, foundProposal := t.committable.Get(parentRoot)
+	t.proposalsLock.Unlock()
+
+	switch {
 	case foundProposal:
 		return parent.Propose(batchOps)
 	case parentRoot == common.Hash(t.Firewood.Root()):
@@ -270,6 +325,9 @@ func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*f
 //
 // p MUST not be nil.
 func (t *TrieDB) trieCommit(p *ffi.Proposal) {
+	t.proposalsLock.Lock()
+	defer t.proposalsLock.Unlock()
+
 	t.pending = p
 }
 
@@ -287,6 +345,8 @@ var errReaderNotSupported = errors.New("TrieDB does not support creating a trie 
 
 // Reader satisfies [triedb.Backend]. This is expected to be used by a [trie.Trie],
 // so Firewood does not need to support this.
+//
+// TODO(JonathanOppenheimer): Add a proof reader for eth_getProof.
 func (*TrieDB) Reader(common.Hash) (database.Reader, error) {
 	return nil, errReaderNotSupported
 }

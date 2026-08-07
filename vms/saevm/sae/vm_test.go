@@ -61,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -155,6 +156,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
 			},
+			ExecutionConfig: saexec.DefaultConfig(),
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{

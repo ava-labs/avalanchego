@@ -85,6 +85,10 @@ type Points interface {
 	BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// AfterReexecutingBlock applies only the deterministic state changes from
+	// [Points.AfterExecutingBlock]. It MUST NOT update canonical auxiliary state,
+	// indexes, metrics, or other externally observable data.
+	AfterReexecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
 
 // BlockBuilder constructs a block given its components.

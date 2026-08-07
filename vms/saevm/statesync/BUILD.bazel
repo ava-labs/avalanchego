@@ -57,6 +57,7 @@ go_test(
         "//vms/saevm/sae",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
+        "//vms/saevm/saexec",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",

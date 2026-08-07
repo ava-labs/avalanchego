@@ -96,9 +96,10 @@ func (f closerFunc) Close() error { return f() }
 // (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
 // assume its caller validated the config.
 type Config struct {
-	MempoolConfig legacypool.Config
-	DBConfig      saedb.Config
-	RPCConfig     rpc.Config
+	MempoolConfig   legacypool.Config
+	DBConfig        saedb.Config
+	RPCConfig       rpc.Config
+	ExecutionConfig saexec.Config
 
 	// Now defaults to [time.Now] if nil
 	Now func() time.Time `json:"-"`
@@ -171,6 +172,7 @@ func NewVM[T hook.Transaction](
 			db,
 			xdb,
 			cfg.DBConfig,
+			cfg.ExecutionConfig,
 			hooks,
 			snowCtx,
 			reg,

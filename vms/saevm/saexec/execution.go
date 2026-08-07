@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 var errExecutorClosed = errors.New("saexec.Executor closed")
@@ -123,7 +122,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
+	if err != nil {
+		return err
+	}
+	result, err := Execute(b, stateDB, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
@@ -184,7 +187,7 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // passed directly to [Execute], only to [Executor.Enqueue].
 func Execute(
 	b *blocks.Block,
-	sdbo saedb.StateDBOpener,
+	stateDB *state.StateDB,
 	maxNumTxs int,
 	hooks hook.Points,
 	config *params.ChainConfig,
@@ -200,11 +203,6 @@ func Execute(
 	gasClock := parent.ExecutedByGasTime()
 	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
-
-	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, err
-	}
 
 	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
 	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {

@@ -36,9 +36,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
@@ -900,4 +904,104 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			want:   b.Header(),
 		})
 	})
+}
+
+// TestFirewoodArchivalHistoricalRPCs verifies state reads and traces when
+// archival Firewood reconstructs revisions after restart.
+//
+// The test spans multiple commit intervals and checks every height because
+// Firewood chooses which revisions to persist.
+func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numBlocks = 12
+		// The executor retains one commit interval of results for replay.
+		commitInterval = 6
+		// Allow each block to settle and commit its state.
+		blockTime = 850 * time.Millisecond
+	)
+
+	archivalFirewood := options.Func[sutConfig](func(c *sutConfig) {
+		c.logLevel = logging.Warn
+		c.vmConfig.DBConfig.Archival = true
+		c.vmConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
+		c.vmConfig.DBConfig.CommitInterval = commitInterval
+	})
+
+	var srcDB database.Database
+	srcXDB := saetest.NewHeightIndexDB()
+	dataDir := t.TempDir()
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, src := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(srcXDB), options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		c.dataDir = dataDir
+	}))
+
+	// A nonce equal to the block height makes every state distinguishable.
+	blocksByHeight := make([]*blocks.Block, numBlocks+1)
+	blocksByHeight[0] = src.genesis
+	for h := 1; h <= numBlocks; h++ {
+		vmTime.Advance(blockTime)
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		blocksByHeight[h] = b
+	}
+	src.close()
+
+	ctx, sut := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(srcXDB.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, srcDB)
+		c.dataDir = dataDir
+	}))
+	addr := sut.wallet.Addresses()[0]
+
+	var missingState *blocks.Block
+	for h := 0; h < numBlocks; h++ {
+		candidate := blocksByHeight[h]
+		root := candidate.PostExecutionStateRoot()
+		_, err := sut.rawVM.exec.StateDB(root)
+		if err == nil {
+			continue
+		}
+		require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.StateDB() at height %d", candidate.Height())
+		_, release, err := sut.rawVM.exec.Reconstructing(root)
+		if err == nil {
+			release()
+			continue
+		}
+		require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.Reconstructing() at height %d", candidate.Height())
+		missingState = candidate
+		break
+	}
+	require.NotNil(t, missingState, "a historical state requiring replay")
+
+	for h := range uint64(numBlocks + 1) {
+		height := new(big.Int).SetUint64(h)
+
+		got, err := sut.NonceAt(ctx, addr, height)
+		require.NoErrorf(t, err, "%T.NonceAt(%s, %d)", sut.Client, addr, h)
+		require.Equalf(t, h, got, "nonce of %s at height %d", addr, h)
+	}
+
+	traceTarget := blocksByHeight[missingState.Height()+1]
+
+	want := []traceResult[*logger.ExecutionResult]{
+		{
+			TxHash: traceTarget.Transactions()[0].Hash(),
+			Result: &logger.ExecutionResult{Gas: traceTarget.Receipts()[0].GasUsed},
+		},
+	}
+	sut.testRPC(ctx, t, withCmpOpts(
+		[]rpcTest{{
+			method: "debug_traceBlockByNumber",
+			args:   []any{hexutil.Uint64(traceTarget.Height())},
+			want:   want,
+		}},
+		cmpopts.EquateEmpty(),
+	)...)
 }

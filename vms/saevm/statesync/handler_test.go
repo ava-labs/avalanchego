@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -104,7 +105,8 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	mempoolConf := legacypool.DefaultConfig
 	mempoolConf.Journal = "" // no on-disk journal in tests
 	saeCfg := sae.Config{
-		MempoolConfig: mempoolConf,
+		MempoolConfig:   mempoolConf,
+		ExecutionConfig: saexec.DefaultConfig(),
 	}
 	saeCfg.DBConfig.CommitInterval = cfg.commitInterval
 

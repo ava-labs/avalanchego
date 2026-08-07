@@ -65,7 +65,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_getBlockByHash
 		// - eth_getBlockByNumber
 		// - eth_getCode
-		// - eth_getProof
+		// - eth_getProof // TODO(JonathanOppenheimer): support Firewood state
 		// - eth_getStorageAt
 		// - eth_getUncleByBlockHashAndIndex
 		// - eth_getUncleByBlockNumberAndIndex

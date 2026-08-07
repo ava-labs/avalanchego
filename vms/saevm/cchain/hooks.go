@@ -262,12 +262,8 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
-
-	extstatedb := extstate.New(statedb)
-	for i, t := range txs {
-		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
-			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
-		}
+	if err := h.transferNonAVAX(statedb, txs); err != nil {
+		return err
 	}
 
 	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
@@ -280,6 +276,24 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	}
 	if err := h.warpStorage.Add(messages...); err != nil {
 		return fmt.Errorf("storing warp messages from receipts: %w", err)
+	}
+	return nil
+}
+
+func (h *hooks) AfterReexecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return fmt.Errorf("parsing txs: %w", err)
+	}
+	return h.transferNonAVAX(statedb, txs)
+}
+
+func (h *hooks) transferNonAVAX(statedb *state.StateDB, txs []*tx.Tx) error {
+	extstatedb := extstate.New(statedb)
+	for i, t := range txs {
+		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
+			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
+		}
 	}
 	return nil
 }
