@@ -44,7 +44,6 @@ type Block struct {
 	ancestry atomic.Pointer[ancestry]
 	// Only the genesis block or the last pre-SAE block is synchronous. These
 	// are self-settling by definition so their `ancestry` MUST be nil.
-	// TODO(JonathanOppenheimer): remove this in favor of the settled hook.
 	synchronous bool
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.
@@ -102,16 +101,33 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 	return b, nil
 }
 
-// RestoreSettledBlock constructs a new block with [New] and restores it to an
-// settled state before returning it. By definition of being settled, the
-// returned block also includes post-execution artefacts.
-func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
+// RestoreExecutedBlock constructs a new block with [New] and restores it to
+// an executed state before returning it. The returned block has no ancestry;
+// callers MUST call [Block.SetAncestors] or [Block.CopyAncestorsFrom] and,
+// when appropriate, [Block.MarkSettled]. Prefer [RestoreSettledBlock] when
+// possible.
+//
+// Synchronicity is derived from the header's settlement marker; see
+// [hook.IsSynchronous].
+func RestoreExecutedBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
 	b, err := New(eth, nil, nil, log)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
+	if err := b.restoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
 		return nil, fmt.Errorf("restoring to executed state: %w", err)
+	}
+	return b, nil
+}
+
+// RestoreSettledBlock constructs a new block with [RestoreExecutedBlock] and
+// restores it to a settled state before returning it. By definition of being
+// settled, the returned block also includes post-execution artefacts. See
+// [RestoreExecutedBlock] for how synchronicity is derived.
+func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
+	b, err := RestoreExecutedBlock(eth, hooks, log, db, xdb, config)
+	if err != nil {
+		return nil, err
 	}
 	if err := b.markSettled(nil); err != nil {
 		return nil, fmt.Errorf("restoring to settled state: %w", err)

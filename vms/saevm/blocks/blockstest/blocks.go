@@ -47,7 +47,7 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
-		settled: hook.Settled{Height: 1},
+		settled: hook.Settled{Height: parent.NumberU64()},
 	}
 	props = options.ApplyTo(props, opts...)
 	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
@@ -63,7 +63,8 @@ type ethBlockProperties struct {
 }
 
 // WithSettled overrides the settlement information committed by [NewEthBlock].
-// The zero value makes the block synchronous (pre-SAE).
+// A self-settling marker (Height equal to the block's own height) makes the
+// block synchronous (pre-SAE); see [hook.IsSynchronous].
 func WithSettled(s hook.Settled) EthBlockOption {
 	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
 		p.settled = s

@@ -1274,9 +1274,11 @@ func TestSettledGasTime(t *testing.T) {
 
 	for i, b := range bs {
 		if i == 0 {
-			continue // genesis block has no [hook.SettledBy] struct.
+			continue // genesis settles itself, so it has no settled ancestor to compare against.
 		}
-		settledHeight := sut.hooks.SettledBy(b.Header()).Height
+		marker := sut.hooks.SettledBy(b.Header())
+		require.NotEqualf(t, b.Height(), marker.Height, "sut.hooks.SettledBy() must not be self-settling for SAE block %d", b.Height())
+		settledHeight := marker.Height
 		settledBlock := bs[settledHeight]
 
 		want := settledBlock.ExecutedByGasTime()

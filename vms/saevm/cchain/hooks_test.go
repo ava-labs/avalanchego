@@ -221,7 +221,8 @@ func TestTargetExponent(t *testing.T) {
 }
 
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
-// writes into the header, and returns the zero marker when the header carries none.
+// writes into the header, and reports a header carrying no effective marker as
+// self-settling.
 func TestSettledBy(t *testing.T) {
 	key := txtest.NewKey(t)
 	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
@@ -260,13 +261,57 @@ func TestSettledBy(t *testing.T) {
 	}{
 		{
 			name:   "absent_marker",
-			header: &types.Header{},
-			want:   hook.Settled{},
+			header: &types.Header{Number: big.NewInt(3)},
+			want:   hook.Settled{Height: 3},
 		},
 		{
-			name:   "zero",
-			header: built(t, hook.Settled{}),
-			want:   hook.Settled{},
+			name: "self_settling_marker",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				h.Number = big.NewInt(int64(nonzero.Height)) //#nosec G115 -- nonzero.Height is the hardcoded test fixture 7
+				return h
+			}(),
+			want: nonzero,
+		},
+		{
+			name: "settled_height_nil",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				customtypes.GetHeaderExtra(h).SettledHeight = nil
+				h.Number = big.NewInt(9)
+				return h
+			}(),
+			want: hook.Settled{Height: 9},
+		},
+		{
+			name: "settled_gas_unix_nil",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				customtypes.GetHeaderExtra(h).SettledGasUnix = nil
+				h.Number = big.NewInt(9)
+				return h
+			}(),
+			want: hook.Settled{Height: 9},
+		},
+		{
+			name: "settled_gas_numerator_nil",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				customtypes.GetHeaderExtra(h).SettledGasNumerator = nil
+				h.Number = big.NewInt(9)
+				return h
+			}(),
+			want: hook.Settled{Height: 9},
+		},
+		{
+			name: "settled_excess_nil",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				customtypes.GetHeaderExtra(h).SettledExcess = nil
+				h.Number = big.NewInt(9)
+				return h
+			}(),
+			want: hook.Settled{Height: 9},
 		},
 		{
 			name:   "nonzero",
