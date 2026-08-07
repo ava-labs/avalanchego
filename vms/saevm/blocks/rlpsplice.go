@@ -23,24 +23,23 @@ import (
 // package and in the C-Chain package fail loudly if either stops.
 //
 // [rawdb.WriteBlock]: https://pkg.go.dev/github.com/ava-labs/libevm/core/rawdb#WriteBlock
-func SpliceBlockRLP(header, body rlp.RawValue) ([]byte, error) {
-	if _, rest, err := rlp.SplitList(header); err != nil {
-		return nil, fmt.Errorf("splitting header: %w", err)
-	} else if len(rest) > 0 {
-		return nil, fmt.Errorf("splitting header: %w", errTrailingBytes)
-	}
-	payload, rest, err := rlp.SplitList(body)
+func SpliceBlockRLP(headerBytes, bodyBytes rlp.RawValue) ([]byte, error) {
+	bodyFields, _, err := rlp.SplitList(bodyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("splitting body: %w", err)
 	}
-	if len(rest) > 0 {
-		return nil, fmt.Errorf("splitting body: %w", errTrailingBytes)
-	}
 
-	size := len(header) + len(payload)
-	out := appendListHeader(make([]byte, 0, maxListHeaderLen+size), size)
-	out = append(out, header...)
-	return append(out, payload...), nil
+	w := rlp.NewEncoderBuffer(nil)
+	l := w.List()
+	if _, err := w.Write(headerBytes); err != nil {
+		return nil, fmt.Errorf("writing header: %w", err)
+	}
+	if _, err := w.Write(bodyFields); err != nil {
+		return nil, fmt.Errorf("writing body: %w", err)
+	}
+	w.ListEnd(l)
+	blockBytes := w.ToBytes()
+	return blockBytes, w.Flush() // Flush returns the internal buffer to the pool.
 }
 
 var errTrailingBytes = errors.New("trailing bytes")

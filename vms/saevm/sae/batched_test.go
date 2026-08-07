@@ -18,7 +18,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -186,8 +185,9 @@ func newRawdbTestBlock(height uint64, extra string) *types.Block {
 	})
 }
 
-// TestReadCanonicalRLPRange guards the [rawdb] key-schema assumptions made by
-// [readCanonicalRLPRange] by reading a database populated only via [rawdb].
+// TestReadCanonicalRLPRange exercises [readCanonicalRLPRange] over a database
+// populated only via [rawdb], covering height gaps, hash-only heights and
+// non-canonical siblings.
 func TestReadCanonicalRLPRange(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 
@@ -235,102 +235,12 @@ func TestReadCanonicalRLPRange(t *testing.T) {
 	require.Equalf(t, want, got, "readCanonicalRLPRange(..., %d, %d)", from, to)
 }
 
-func TestAncestorsResponse(t *testing.T) {
+func TestAncestorsDescending(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 
 	const (
-		numBlocks = 40
-		gapHeight = 20 // MUST truncate any response reaching down to it
-	)
-	encoded := make([][]byte, numBlocks) // encoded[i] is the block at height i
-	for height := uint64(0); height < numBlocks; height++ {
-		if height == gapHeight {
-			continue
-		}
-		b := newRawdbTestBlock(height, "canonical")
-		rawdb.WriteBlock(db, b)
-		rawdb.WriteCanonicalHash(db, b.Hash(), height)
-
-		enc, err := rlp.EncodeToBytes(b)
-		require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
-		encoded[height] = enc
-	}
-
-	// wantDescending(hi, n) is the expected response of blocks at heights
-	// (hi-n, hi], highest first.
-	wantDescending := func(hi uint64, n int) [][]byte {
-		want := make([][]byte, 0, n)
-		for i := range n {
-			want = append(want, encoded[hi-uint64(i)])
-		}
-		return want
-	}
-
-	const noSizeLimit = 1e9 // sufficiently large
-	tests := []struct {
-		name     string
-		from, to uint64
-		maxSize  int
-		want     [][]byte
-	}{
-		{
-			name:    "full_range",
-			from:    30,
-			to:      numBlocks - 1,
-			maxSize: noSizeLimit,
-			want:    wantDescending(numBlocks-1, 10),
-		},
-		{
-			name:    "gap_truncates",
-			from:    0,
-			to:      numBlocks - 1,
-			maxSize: noSizeLimit,
-			want:    wantDescending(numBlocks-1, numBlocks-gapHeight-1),
-		},
-		{
-			name: "size_limit_truncates",
-			from: 30,
-			to:   numBlocks - 1,
-			maxSize: len(encoded[numBlocks-1]) + len(encoded[numBlocks-2]) +
-				2*wrappers.IntLen, // inclusive bound; third block exceeds it
-			want: wantDescending(numBlocks-1, 2),
-		},
-		{
-			name:    "size_limit_below_first_block",
-			from:    30,
-			to:      numBlocks - 1,
-			maxSize: len(encoded[numBlocks-1]) + wrappers.IntLen - 1,
-			want:    wantDescending(numBlocks-1, 1), // first block always included
-		},
-		{
-			name:    "down_to_genesis",
-			from:    0,
-			to:      19,
-			maxSize: noSizeLimit,
-			want:    wantDescending(19, 20),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stored, err := readCanonicalRLPRange(t.Context(), db, tt.from, tt.to)
-			require.NoErrorf(t, err, "readCanonicalRLPRange(..., %d, %d)", tt.from, tt.to)
-
-			got, err := ancestorsResponse(stored, tt.maxSize)
-			require.NoErrorf(t, err, "ancestorsResponse(..., %d)", tt.maxSize)
-			require.Equalf(t, tt.want, got, "ancestorsResponse(..., %d)", tt.maxSize)
-		})
-	}
-}
-
-func TestAncestorsDescending(t *testing.T) {
-	// The inner memdb supports backward iteration, unlike the geth memorydb
-	// used by TestAncestorsResponse.
-	db := newEthDB(memdb.New())
-
-	const (
-		numBlocks = 40
-		gapHeight = 20 // MUST truncate any response reaching down to it
+		numBlocks = 300 // spans multiple pages of ancestorsPageSize heights
+		gapHeight = 150 // MUST truncate any response reaching down to it
 	)
 	var (
 		encoded = make([][]byte, numBlocks) // encoded[i] is the block at height i
@@ -369,15 +279,15 @@ func TestAncestorsDescending(t *testing.T) {
 		want     [][]byte
 	}{
 		{
-			name:    "full_range",
-			lo:      30,
+			name:    "single_page",
+			lo:      290,
 			base:    numBlocks - 1,
 			hash:    hashes[numBlocks-1],
 			maxSize: noSizeLimit,
 			want:    wantDescending(numBlocks-1, 10),
 		},
 		{
-			name:    "gap_truncates",
+			name:    "gap_truncates_across_pages",
 			lo:      0,
 			base:    numBlocks - 1,
 			hash:    hashes[numBlocks-1],
@@ -386,7 +296,7 @@ func TestAncestorsDescending(t *testing.T) {
 		},
 		{
 			name: "size_limit_truncates",
-			lo:   30,
+			lo:   200,
 			base: numBlocks - 1,
 			hash: hashes[numBlocks-1],
 			maxSize: len(encoded[numBlocks-1]) + len(encoded[numBlocks-2]) +
@@ -395,25 +305,33 @@ func TestAncestorsDescending(t *testing.T) {
 		},
 		{
 			name:    "size_limit_below_first_block",
-			lo:      30,
+			lo:      200,
 			base:    numBlocks - 1,
 			hash:    hashes[numBlocks-1],
 			maxSize: len(encoded[numBlocks-1]) + wrappers.IntLen - 1,
 			want:    wantDescending(numBlocks-1, 1), // first block always included
 		},
 		{
-			name:    "down_to_genesis",
+			name:    "down_to_genesis_across_pages",
 			lo:      0,
-			base:    19,
-			hash:    hashes[19],
+			base:    gapHeight - 1,
+			hash:    hashes[gapHeight-1],
 			maxSize: noSizeLimit,
-			want:    wantDescending(19, 20),
+			want:    wantDescending(gapHeight-1, gapHeight),
 		},
 		{
 			name:    "base_hash_not_canonical",
-			lo:      30,
+			lo:      200,
 			base:    numBlocks - 1,
-			hash:    hashes[35], // a canonical hash, but not of the base height
+			hash:    hashes[250], // a canonical hash, but not of the base height
+			maxSize: noSizeLimit,
+			want:    nil,
+		},
+		{
+			name:    "base_height_missing",
+			lo:      100,
+			base:    gapHeight,
+			hash:    hashes[gapHeight+1], // nothing is stored at gapHeight
 			maxSize: noSizeLimit,
 			want:    nil,
 		},
@@ -421,18 +339,11 @@ func TestAncestorsDescending(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok, err := ancestorsDescending(db, tt.hash, tt.lo, tt.base, tt.maxSize)
+			got, err := ancestorsDescending(t.Context(), db, tt.hash, tt.lo, tt.base, tt.maxSize)
 			require.NoErrorf(t, err, "ancestorsDescending(..., %d, %d, %d)", tt.lo, tt.base, tt.maxSize)
-			require.Truef(t, ok, "ancestorsDescending(..., %d, %d, %d) support", tt.lo, tt.base, tt.maxSize)
 			require.Equalf(t, tt.want, got, "ancestorsDescending(..., %d, %d, %d)", tt.lo, tt.base, tt.maxSize)
 		})
 	}
-
-	t.Run("unsupported_database", func(t *testing.T) {
-		_, ok, err := ancestorsDescending(rawdb.NewMemoryDatabase(), hashes[numBlocks-1], 30, numBlocks-1, noSizeLimit)
-		require.NoError(t, err, "ancestorsDescending(...)")
-		require.False(t, ok, "ancestorsDescending(...) support without backward iteration")
-	})
 }
 
 func BenchmarkGetAncestors(b *testing.B) {
@@ -498,3 +409,23 @@ func BenchmarkGetAncestors(b *testing.B) {
 		})
 	}
 }
+
+/*
+goos: darwin
+goarch: arm64
+pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
+cpu: Apple M2 Max
+BenchmarkGetAncestors/batched-12         	    1960	    542917 ns/op	      1054 blocks	 4200376 B/op	    8268 allocs/op
+BenchmarkGetAncestors/serial-12          	      20	  54339985 ns/op	      1054 blocks	37979158 B/op	  537176 allocs/op
+PASS
+ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	44.907s
+
+goos: darwin
+goarch: arm64
+pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
+cpu: Apple M2 Max
+BenchmarkGetAncestors/batched-12         	      74	  15920889 ns/op	      1054 blocks	14938205 B/op	  251162 allocs/op
+BenchmarkGetAncestors/serial-12          	      19	  59969941 ns/op	      1054 blocks	37900856 B/op	  537168 allocs/op
+PASS
+ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	45.513s
+*/
