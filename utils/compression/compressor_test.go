@@ -135,19 +135,36 @@ func TestSizeLimiting(t *testing.T) {
 	}
 }
 
-// Attempts to create a compressor with math.MaxInt64
-// which leads to undefined decompress behavior due to integer overflow
-// in limit reader creation.
 func TestNewCompressorWithInvalidLimit(t *testing.T) {
 	for compressionType, compressorFunc := range newCompressorFuncs {
 		if compressionType == TypeNone {
 			continue
 		}
 		t.Run(compressionType.String(), func(t *testing.T) {
-			_, err := compressorFunc(math.MaxInt64)
-			require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
+			for _, maxSize := range []int64{
+				math.MinInt64,
+				-1,
+				math.MaxInt64,
+			} {
+				_, err := compressorFunc(maxSize)
+				require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
+			}
 		})
 	}
+}
+
+func TestZstdCompressorWithZeroLimit(t *testing.T) {
+	require := require.New(t)
+
+	compressor, err := NewZstdCompressor(0)
+	require.NoError(err)
+
+	compressed, err := compressor.Compress(nil)
+	require.NoError(err)
+
+	decompressed, err := compressor.Decompress(compressed)
+	require.NoError(err)
+	require.Empty(decompressed)
 }
 
 func TestNewZstdCompressorWithLevel(t *testing.T) {
