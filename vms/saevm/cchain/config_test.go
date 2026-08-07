@@ -163,6 +163,11 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(saexec.ErrZeroStateReplayConcurrency),
 		},
 		{
+			name:    "api/state_replay_concurrency_too_large",
+			json:    `{"state-replay-concurrency":9223372036854775808}`, // math.MaxInt64 + 1
+			wantErr: testerr.Is(saexec.ErrStateReplayConcurrencyTooLarge),
+		},
+		{
 			name:    "api/batch_request_limit_too_large",
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),

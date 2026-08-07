@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -32,15 +33,16 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-var _ saedb.StateDBOpener = (*Executor)(nil)
+var (
+	_ saedb.StateDBOpener = (*Executor)(nil)
+
+	ErrZeroStateReplayConcurrency     = errors.New("state replay concurrency must be non-zero")
+	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
+)
 
 // DefaultStateReplayConcurrency is the maximum number of historical state
 // requests that may replay blocks concurrently by default.
 const DefaultStateReplayConcurrency uint64 = 1
-
-// ErrZeroStateReplayConcurrency is returned when block replay would have no
-// available concurrency slots.
-var ErrZeroStateReplayConcurrency = errors.New("state replay concurrency must be non-zero")
 
 // Config controls historical state replay resource usage.
 type Config struct {
@@ -58,6 +60,9 @@ func DefaultConfig() Config {
 func (c Config) Verify() error {
 	if c.StateReplayConcurrency == 0 {
 		return ErrZeroStateReplayConcurrency
+	}
+	if c.StateReplayConcurrency > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
 	}
 	return nil
 }
