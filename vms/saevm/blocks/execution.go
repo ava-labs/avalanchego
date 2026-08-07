@@ -273,18 +273,22 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 		return err
 	}
 
+	// Receipts may be empty if the block was state-synced.
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
-	if err := e.receipts.DeriveFields(
-		chainConfig,
-		b.Hash(),
-		b.NumberU64(),
-		b.BuildTime(),
-		e.baseFee.ToBig(),
-		nil, // SAE does not support blob transactions.
-		b.Transactions(),
-	); err != nil {
-		return fmt.Errorf("deriving receipt fields: %v", err)
+	if len(e.receipts) > 0 {
+		if err := e.receipts.DeriveFields(
+			chainConfig,
+			b.Hash(),
+			b.NumberU64(),
+			b.BuildTime(),
+			e.baseFee.ToBig(),
+			nil, // SAE does not support blob transactions.
+			b.Transactions(),
+		); err != nil {
+			return fmt.Errorf("deriving receipt fields: %v", err)
+		}
 	}
+
 	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 
@@ -308,7 +312,7 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
-	e.baseFee.SetUint64(b.HeaderBaseFee())
+	e.baseFee.SetUint64(b.headerBaseFee())
 	return e, nil
 }
 
@@ -321,15 +325,15 @@ func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
 	return gastime.New(
 		hooks.BlockTime(hdr),
 		target,
-		gas.Price(b.HeaderBaseFee()),
+		gas.Price(b.headerBaseFee()),
 		cfg,
 	)
 }
 
-// HeaderBaseFee returns the block's base fee, as a uint64. If the base fee is
+// headerBaseFee returns the block's base fee, as a uint64. If the base fee is
 // nil (a pre-SAE header), 0 is returned. Additionally, the base fee is capped
 // at [math.MaxUint64] which should still handle all reasonable values.
-func (b *Block) HeaderBaseFee() uint64 {
+func (b *Block) headerBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
 		return 0

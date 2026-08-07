@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -24,8 +26,10 @@ var (
 // VM. It should only be constructed with [New].
 type Network struct {
 	*p2p.Network
-	ValidatorPeers *p2p.Validators
-	Peers          *p2p.Peers
+	ValidatorPeers       *p2p.Validators
+	Peers                *p2p.Peers
+	TrieDependentTracker *p2p.PeerTracker
+	PeerTracker          *p2p.PeerTracker
 }
 
 // New creates the P2P network with a registered validator set.
@@ -45,21 +49,54 @@ func New(
 		snowCtx.ValidatorState,
 		maxValidatorSetStaleness,
 	)
-	const namespace = "network"
+	triePeerTracker, err := p2p.NewPeerTracker(
+		snowCtx.Log,
+		"trie_peer_tracker",
+		reg,
+		set.Of(snowCtx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating trie peer tracker: %w", err)
+	}
+	peerTracker, err := p2p.NewPeerTracker(
+		snowCtx.Log,
+		"peer_tracker",
+		reg,
+		set.Of(snowCtx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating peer tracker: %w", err)
+	}
 	network, err := p2p.NewNetwork(
 		snowCtx.Log,
 		sender,
 		reg,
-		namespace,
+		"p2p",
 		peers,
 		validatorPeers,
+		&connectablePeerTracker{peerTracker},
+		&connectablePeerTracker{triePeerTracker},
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Network{
-		Network:        network,
-		Peers:          peers,
-		ValidatorPeers: validatorPeers,
+		Network:              network,
+		Peers:                peers,
+		ValidatorPeers:       validatorPeers,
+		TrieDependentTracker: triePeerTracker,
+		PeerTracker:          peerTracker,
 	}, nil
+}
+
+var _ p2p.ConnectionHandler = (*connectablePeerTracker)(nil)
+
+type connectablePeerTracker struct {
+	*p2p.PeerTracker
+}
+
+func (c *connectablePeerTracker) Connected(nodeID ids.NodeID) {
+	c.PeerTracker.Connected(nodeID, nil)
 }

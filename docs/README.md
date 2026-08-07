@@ -13,6 +13,7 @@ that span multiple areas of the tree.
   what belongs in repository documentation, where it should live, and how it
   should be maintained
 - [Tasks](./tasks.md) - why this repo uses Task and how tasks should be written
+- [CI](./ci.md) - cross-cutting CI conventions for workflows and actions
 - [Bazel](./bazel.md) - Bazel-related repository guidance
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs

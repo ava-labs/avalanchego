@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // runSyncRoundTrip applies blocks to a source state, then leaf-syncs the
@@ -263,17 +264,17 @@ func TestSyncer_Crash(t *testing.T) {
 
 	server := newSyncServer(t, src)
 
-	wantDB := newFlakyDB(memdb.New(), math.MaxInt)
+	wantDB := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
 	require.NoError(t, server.syncInto(t.Context(), newSUT(t, withDB(wantDB)).stateImpl.(*State), target, targetHeight))
 
-	for failAfter := range wantDB.calls {
+	for failAfter := range wantDB.Calls() {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			db := memdb.New()
 
 			// Crash run: either hits the injected fault or (rarely) completes.
-			preCrash := newSUT(t, withDB(newFlakyDB(db, failAfter)))
+			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
 			err := server.syncInto(t.Context(), preCrash.stateImpl.(*State), target, targetHeight)
-			require.ErrorIs(t, err, errInjected, "Sync()")
+			require.ErrorIs(t, err, saetest.ErrInjected, "Sync()")
 
 			// Clean re-run on the same DB must complete and match the source.
 			got := newSUT(t, withDB(db))

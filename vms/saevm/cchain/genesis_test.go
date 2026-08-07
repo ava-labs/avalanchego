@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
@@ -608,15 +607,13 @@ func TestSetupGenesis(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
-			trieConfig := triedb.HashDefaults
-
 			g, err := parseGenesis(
 				&snow.Context{NetworkUpgrades: tt.initial.upgrades},
 				[]byte(tt.initial.genesis),
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.setup(db, trieConfig), "%T.setup(initial)", g)
+			require.NoErrorf(t, g.setup(db), "%T.setup(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
@@ -645,7 +642,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.setup(db, trieConfig)
+			err = g.setup(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
 			}

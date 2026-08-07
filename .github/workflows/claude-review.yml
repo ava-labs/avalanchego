@@ -38,7 +38,7 @@ jobs:
           # Needed to fetch the PR head commit since we are using pull_request_target
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
