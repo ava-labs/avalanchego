@@ -261,14 +261,6 @@ func (it *iterator) fetch() {
 
 // Next attempts to move the iterator to the next element and returns if this
 // succeeded
-// Prev is not supported, the iterator streams batches of key/value pairs from
-// the server and provides no way to request earlier pairs again.
-func (it *iterator) Prev() bool {
-	it.data = nil
-	it.setError(database.ErrPrevNotSupported)
-	return false
-}
-
 func (it *iterator) Next() bool {
 	if it.db.closed.Get() {
 		it.data = nil

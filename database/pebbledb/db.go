@@ -246,7 +246,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
-	it, err := db.pebbleDB.NewIter(keyRange(prefix))
+	it, err := db.pebbleDB.NewIter(keyRange(start, prefix))
 	if err != nil {
 		return &iter{
 			db:     db,
@@ -256,9 +256,8 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 
 	iter := &iter{
-		db:    db,
-		iter:  it,
-		start: slices.Clone(start),
+		db:   db,
+		iter: it,
 	}
 	db.openIterators.Add(iter)
 	return iter
@@ -276,14 +275,15 @@ func updateError(err error) error {
 	}
 }
 
-// keyRange bounds an iterator to the keys with the given prefix. The
-// iterator's start key deliberately does not tighten the lower bound, it is a
-// seek position instead, so that [iter.Prev] can move below it.
-func keyRange(prefix []byte) *pebble.IterOptions {
-	return &pebble.IterOptions{
+func keyRange(start, prefix []byte) *pebble.IterOptions {
+	opt := &pebble.IterOptions{
 		LowerBound: prefix,
 		UpperBound: prefixToUpperBound(prefix),
 	}
+	if pebble.DefaultComparer.Compare(start, prefix) == 1 {
+		opt.LowerBound = start
+	}
+	return opt
 }
 
 // Returns an upper bound that stops after all keys with the given [prefix].

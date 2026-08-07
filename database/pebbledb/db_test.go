@@ -64,6 +64,7 @@ func BenchmarkInterface(b *testing.B) {
 
 func TestKeyRange(t *testing.T) {
 	type test struct {
+		start         []byte
 		prefix        []byte
 		expectedLower []byte
 		expectedUpper []byte
@@ -71,31 +72,73 @@ func TestKeyRange(t *testing.T) {
 
 	tests := []test{
 		{
+			start:         nil,
 			prefix:        nil,
 			expectedLower: nil,
 			expectedUpper: nil,
 		},
 		{
+			start:         nil,
 			prefix:        []byte{},
 			expectedLower: []byte{},
 			expectedUpper: nil,
 		},
 		{
+			start:         nil,
 			prefix:        []byte{0x00},
 			expectedLower: []byte{0x00},
 			expectedUpper: []byte{0x01},
 		},
 		{
+			start:         []byte{0x00, 0x02},
+			prefix:        []byte{0x00},
+			expectedLower: []byte{0x00, 0x02},
+			expectedUpper: []byte{0x01},
+		},
+		{
+			start:         []byte{0x01},
+			prefix:        []byte{0x00},
+			expectedLower: []byte{0x01},
+			expectedUpper: []byte{0x01},
+		},
+		{
+			start:         nil,
+			prefix:        []byte{0x01},
+			expectedLower: []byte{0x01},
+			expectedUpper: []byte{0x02},
+		},
+		{
+			start:         nil,
 			prefix:        []byte{0xFF},
 			expectedLower: []byte{0xFF},
 			expectedUpper: nil,
 		},
 		{
+			start:         []byte{0x00},
+			prefix:        []byte{0xFF},
+			expectedLower: []byte{0xFF},
+			expectedUpper: nil,
+		},
+		{
+			start:         nil,
 			prefix:        []byte{0x01, 0x02},
 			expectedLower: []byte{0x01, 0x02},
 			expectedUpper: []byte{0x01, 0x03},
 		},
 		{
+			start:         []byte{0x01, 0x02},
+			prefix:        []byte{0x01, 0x02},
+			expectedLower: []byte{0x01, 0x02},
+			expectedUpper: []byte{0x01, 0x03},
+		},
+		{
+			start:         []byte{0x01, 0x02, 0x05},
+			prefix:        []byte{0x01, 0x02},
+			expectedLower: []byte{0x01, 0x02, 0x05},
+			expectedUpper: []byte{0x01, 0x03},
+		},
+		{
+			start:         nil,
 			prefix:        []byte{0x01, 0x02, 0xFF},
 			expectedLower: []byte{0x01, 0x02, 0xFF},
 			expectedUpper: []byte{0x01, 0x03},
@@ -103,9 +146,9 @@ func TestKeyRange(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(string(tt.prefix), func(t *testing.T) {
+		t.Run(string(tt.start)+" "+string(tt.prefix), func(t *testing.T) {
 			require := require.New(t)
-			bounds := keyRange(tt.prefix)
+			bounds := keyRange(tt.start, tt.prefix)
 			require.Equal(tt.expectedLower, bounds.LowerBound)
 			require.Equal(tt.expectedUpper, bounds.UpperBound)
 		})

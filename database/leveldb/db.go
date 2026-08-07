@@ -4,6 +4,7 @@
 package leveldb
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -307,7 +308,10 @@ func (db *Database) NewIterator() database.Iterator {
 // NewIteratorWithStart creates a lexicographically ordered iterator over the
 // database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	return db.NewIteratorWithStartAndPrefix(start, nil)
+	return &iter{
+		db:       db,
+		Iterator: db.DB.NewIterator(&util.Range{Start: start}, nil),
+	}
 }
 
 // NewIteratorWithPrefix creates a lexicographically ordered iterator over the
@@ -323,12 +327,13 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 // over the database starting at start and ignoring keys that do not start with
 // the provided prefix
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	// The start key deliberately does not tighten the range, it is a seek
-	// position instead, so that [iter.Prev] can move below it.
+	iterRange := util.BytesPrefix(prefix)
+	if bytes.Compare(start, prefix) == 1 {
+		iterRange.Start = start
+	}
 	return &iter{
 		db:       db,
-		Iterator: db.DB.NewIterator(util.BytesPrefix(prefix), nil),
-		start:    slices.Clone(start),
+		Iterator: db.DB.NewIterator(iterRange, nil),
 	}
 }
 
@@ -438,24 +443,11 @@ type iter struct {
 	db *Database
 	iterator.Iterator
 
-	// start is the key the first movement positions relative to; see
-	// [database.Iterator.Prev].
-	start       []byte
-	initialized bool
-
 	key, val []byte
 	err      error
 }
 
 func (it *iter) Next() bool {
-	return it.move(true)
-}
-
-func (it *iter) Prev() bool {
-	return it.move(false)
-}
-
-func (it *iter) move(forward bool) bool {
 	// Short-circuit and set an error if the underlying database has been closed.
 	if it.db.closed.Get() {
 		it.key = nil
@@ -464,41 +456,15 @@ func (it *iter) move(forward bool) bool {
 		return false
 	}
 
-	var hasValue bool
-	switch {
-	case !it.initialized:
-		it.initialized = true
-		switch {
-		case forward && len(it.start) > 0:
-			hasValue = it.Iterator.Seek(it.start)
-		case forward:
-			hasValue = it.Iterator.Next()
-		case len(it.start) > 0:
-			// Seek finds the smallest key at least start, so the largest key
-			// strictly below start is one step back from it, or the very last
-			// key when no key is at least start.
-			if it.Iterator.Seek(it.start) {
-				hasValue = it.Iterator.Prev()
-			} else {
-				hasValue = it.Iterator.Last()
-			}
-		default:
-			hasValue = it.Iterator.Last()
-		}
-	case forward:
-		hasValue = it.Iterator.Next()
-	default:
-		hasValue = it.Iterator.Prev()
-	}
-
-	if hasValue {
+	hasNext := it.Iterator.Next()
+	if hasNext {
 		it.key = slices.Clone(it.Iterator.Key())
 		it.val = slices.Clone(it.Iterator.Value())
 	} else {
 		it.key = nil
 		it.val = nil
 	}
-	return hasValue
+	return hasNext
 }
 
 func (it *iter) Error() error {

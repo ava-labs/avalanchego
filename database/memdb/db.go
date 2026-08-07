@@ -134,23 +134,21 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		}
 	}
 
+	startString := string(start)
 	prefixString := string(prefix)
 	keys := make([]string, 0, len(db.db))
 	for key := range db.db {
-		// Keys below start stay in the snapshot, they are reachable by
-		// [iterator.Prev].
-		if strings.HasPrefix(key, prefixString) {
+		if strings.HasPrefix(key, prefixString) && key >= startString {
 			keys = append(keys, key)
 		}
 	}
 	slices.Sort(keys) // Keys need to be in sorted order
-	values := make([][]byte, len(keys))
-	for i, key := range keys {
-		values[i] = db.db[key]
+	values := make([][]byte, 0, len(keys))
+	for _, key := range keys {
+		values = append(values, db.db[key])
 	}
 	return &iterator{
 		db:     db,
-		start:  string(start),
 		keys:   keys,
 		values: values,
 	}
@@ -203,23 +201,13 @@ func (b *batch) Inner() database.Batch {
 
 type iterator struct {
 	db          *Database
-	start       string
 	initialized bool
-	pos         int
 	keys        []string
 	values      [][]byte
 	err         error
 }
 
 func (it *iterator) Next() bool {
-	return it.move(true)
-}
-
-func (it *iterator) Prev() bool {
-	return it.move(false)
-}
-
-func (it *iterator) move(forward bool) bool {
 	// Short-circuit and set an error if the underlying database has been closed.
 	if it.db.isClosed() {
 		it.keys = nil
@@ -228,30 +216,19 @@ func (it *iterator) move(forward bool) bool {
 		return false
 	}
 
-	switch {
-	case !it.initialized:
+	// If the iterator was not yet initialized, do it now
+	if !it.initialized {
 		it.initialized = true
-		switch {
-		case forward:
-			// The smallest key that is at least start.
-			it.pos, _ = slices.BinarySearch(it.keys, it.start)
-		case it.start == "":
-			it.pos = len(it.keys) - 1
-		default:
-			// The largest key that is strictly below start.
-			at, _ := slices.BinarySearch(it.keys, it.start)
-			it.pos = at - 1
-		}
-	case forward:
-		if it.pos < len(it.keys) {
-			it.pos++
-		}
-	default:
-		if it.pos >= 0 {
-			it.pos--
-		}
+		return len(it.keys) > 0
 	}
-	return it.pos >= 0 && it.pos < len(it.keys)
+	// Iterator already initialize, advance it
+	if len(it.keys) > 0 {
+		it.keys[0] = ""
+		it.keys = it.keys[1:]
+		it.values[0] = nil
+		it.values = it.values[1:]
+	}
+	return len(it.keys) > 0
 }
 
 func (it *iterator) Error() error {
@@ -259,15 +236,15 @@ func (it *iterator) Error() error {
 }
 
 func (it *iterator) Key() []byte {
-	if it.pos >= 0 && it.pos < len(it.keys) {
-		return []byte(it.keys[it.pos])
+	if len(it.keys) > 0 {
+		return []byte(it.keys[0])
 	}
 	return nil
 }
 
 func (it *iterator) Value() []byte {
-	if it.pos >= 0 && it.pos < len(it.values) {
-		return it.values[it.pos]
+	if len(it.values) > 0 {
+		return it.values[0]
 	}
 	return nil
 }

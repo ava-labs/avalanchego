@@ -72,9 +72,6 @@ var (
 	iteratorNextLabel = prometheus.Labels{
 		methodLabel: "iterator_next",
 	}
-	iteratorPrevLabel = prometheus.Labels{
-		methodLabel: "iterator_prev",
-	}
 	iteratorErrorLabel = prometheus.Labels{
 		methodLabel: "iterator_error",
 	}
@@ -343,18 +340,6 @@ func (it *iterator) Next() bool {
 	it.db.duration.With(iteratorNextLabel).Add(float64(duration))
 	it.db.size.With(iteratorNextLabel).Add(float64(size))
 	return next
-}
-
-func (it *iterator) Prev() bool {
-	start := time.Now()
-	prev := it.iterator.Prev()
-	duration := time.Since(start)
-	size := len(it.iterator.Key()) + len(it.iterator.Value())
-
-	it.db.calls.With(iteratorPrevLabel).Inc()
-	it.db.duration.With(iteratorPrevLabel).Add(float64(duration))
-	it.db.size.With(iteratorPrevLabel).Add(float64(size))
-	return prev
 }
 
 func (it *iterator) Error() error {
