@@ -158,8 +158,19 @@ func TestBatchedParseBlock(t *testing.T) {
 	}
 
 	t.Run("batched_parse", func(t *testing.T) {
-		_, err := batched.BatchedParseBlock(ctx, bytes)
-		require.Equalf(t, block.ErrRemoteVMNotImplemented, err, "%T.BatchedParseBlock()", batched)
+		parsed, err := batched.BatchedParseBlock(ctx, bytes)
+		require.NoErrorf(t, err, "%T.BatchedParseBlock()", batched)
+		require.Lenf(t, parsed, len(chain), "%T.BatchedParseBlock()", batched)
+		for i, b := range parsed {
+			require.Equalf(t, chain[i].ID(), b.ID(), "%T.BatchedParseBlock()[%d].ID()", batched, i)
+			require.Equalf(t, bytes[i], b.Bytes(), "%T.BatchedParseBlock()[%d].Bytes()", batched, i)
+		}
+	})
+
+	t.Run("invalid_block", func(t *testing.T) {
+		bufs := append([][]byte{[]byte("not a block")}, bytes...)
+		_, err := batched.BatchedParseBlock(ctx, bufs)
+		require.ErrorContainsf(t, err, "rlp.DecodeBytes", "%T.BatchedParseBlock()", batched)
 	})
 
 	t.Run("batched_implementer_works", func(t *testing.T) {
@@ -428,4 +439,60 @@ BenchmarkGetAncestors/batched-12         	      74	  15920889 ns/op	      1054 b
 BenchmarkGetAncestors/serial-12          	      19	  59969941 ns/op	      1054 blocks	37900856 B/op	  537168 allocs/op
 PASS
 ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	45.513s
+*/
+
+func BenchmarkBatchedParseBlock(b *testing.B) {
+	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(b, 1, opt)
+
+	// Mirror the largest batch a bootstrapper parses in one call: see
+	// config.BootstrapAncestorsMaxContainersReceivedKey.
+	const (
+		numTxs    = 10
+		numBlocks = 2000
+	)
+
+	bufs := make([][]byte, numBlocks)
+	for i := range bufs {
+		txs := make([]*types.Transaction, numTxs)
+		for j := range txs {
+			txs[j] = sut.wallet.SetNonceAndSign(b, 0, &types.DynamicFeeTx{
+				To:        &zeroAddr,
+				Gas:       params.TxGas,
+				GasFeeCap: big.NewInt(1),
+				Value:     big.NewInt(1),
+			})
+		}
+		tip := sut.runConsensusLoop(b, txs...)
+		vmTime.AdvanceToSettle(ctx, b, tip)
+		bufs[i] = tip.Bytes()
+	}
+
+	type serialParser struct{ block.Parser }
+	for _, bench := range []struct {
+		name string
+		vm   block.Parser
+	}{
+		{"batched", sut.ChainVM},
+		{"serial", serialParser{sut.ChainVM}},
+	} {
+		b.Run(bench.name, func(b *testing.B) {
+			for b.Loop() {
+				parsed, err := block.BatchedParseBlock(ctx, bench.vm, bufs)
+				require.NoError(b, err, "block.BatchedParseBlock()")
+				require.Len(b, parsed, len(bufs), "block.BatchedParseBlock()")
+			}
+		})
+	}
+}
+
+/*
+goos: darwin
+goarch: arm64
+pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
+cpu: Apple M2 Max
+BenchmarkBatchedParseBlock/batched-12         	     100	  10505568 ns/op	31995359 B/op	  625716 allocs/op
+BenchmarkBatchedParseBlock/serial-12          	      24	  49528109 ns/op	31736952 B/op	  622088 allocs/op
+PASS
+ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	8.605s
 */
