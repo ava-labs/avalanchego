@@ -181,15 +181,30 @@ func NewVM[T hook.Transaction](
 		vm.exec = exec
 		vm.toClose = append(vm.toClose, exec)
 
+		tr := exec.Tracker
+		vm.consensusCritical = newSyncMap[common.Hash, *blocks.Block](
+			func(b *blocks.Block) {
+				tr.Track(b.SettledStateRoot())
+				// The post-execution root is tracked by the [saexec.Executor] as
+				// soon as it's known. In the case of database recovery, this
+				// occurred in [recovery.executeAllAccepted].
+			},
+			func(b *blocks.Block) {
+				tr.Untrack(b.SettledStateRoot())
+				if b.Executed() { // i.e. deleted due to settlement not rejection
+					tr.Untrack(b.PostExecutionStateRoot())
+				}
+			},
+		)
+
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
 			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
-		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
+		lastSettled, err := rec.consensusCriticalBlocks(exec, vm.consensusCritical)
 		if err != nil {
 			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
-		vm.consensusCritical = bMap
 
 		head := exec.LastExecuted()
 		vm.last.settled.Store(lastSettled)

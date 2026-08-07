@@ -170,10 +170,10 @@ func lastOf[E any](s []E) E {
 	return s[len(s)-1]
 }
 
-// consensusCriticalBlocks returns a block-hash-keyed map of all blocks from the
-// last executed back to, and including, the block that it settled. Said settled
-// block is returned separately, for convenience.
-func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[common.Hash, *blocks.Block], lastSettled *blocks.Block, _ error) {
+// consensusCriticalBlocks populates the block-hash-keyed map of all blocks from
+// the last executed back to, and including, the block that it settled. Said
+// settled block is returned separately, for convenience.
+func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 
@@ -215,34 +215,19 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	lastSettled = lastOf(chain)
-	tr := exec.Tracker
-	bMap := newSyncMap[common.Hash, *blocks.Block](
-		func(b *blocks.Block) {
-			tr.Track(b.SettledStateRoot())
-			// The post-execution root is tracked by the [saexec.Executor] as
-			// soon as it's known. In the case of database recovery, this
-			// occurred in [recovery.executeAllAccepted].
-		},
-		func(b *blocks.Block) {
-			tr.Untrack(b.SettledStateRoot())
-			if b.Executed() { // i.e. deleted due to settlement not rejection
-				tr.Untrack(b.PostExecutionStateRoot())
-			}
-		},
-	)
 	for _, b := range chain {
 		bMap.Store(b.Hash(), b)
 	}
 
 	for i, b := range chain[:len(chain)-1] {
 		if err := extend(b); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	for _, b := range bMap.m {
@@ -251,8 +236,8 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 			stage = blocks.Settled
 		}
 		if err := b.CheckInvariants(stage); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	return bMap, lastSettled, nil
+	return lastSettled, nil
 }
