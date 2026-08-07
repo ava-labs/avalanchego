@@ -7,7 +7,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20260807010316-a169e02d2375
+	github.com/ava-labs/libevm v1.13.15-0.20260807175325-590de7da649a
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/gorilla/rpc v1.2.0
