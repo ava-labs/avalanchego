@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"golang.org/x/sync/errgroup"
@@ -132,7 +133,7 @@ func ancestorsDescending(ctx context.Context, db ethdb.Database, hash common.Has
 				// not canonical, e.g. beyond an expired deadline.
 				return resp, nil
 			}
-			enc, err := blocks.SpliceBlockRLP(s.header, s.body)
+			enc, err := types.BlockBytes(s.header, s.body)
 			if err != nil {
 				return nil, fmt.Errorf("splicing stored block %#x: %v", s.hash, err)
 			}
