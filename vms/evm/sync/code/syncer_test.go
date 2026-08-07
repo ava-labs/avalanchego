@@ -180,7 +180,7 @@ func TestClaimSet(t *testing.T) {
 	const claims = 100
 
 	// The set must not grow with the hashes seen, only with what is outstanding.
-	c := newClaimSet()
+	var c claimSet
 	batch := make([]common.Hash, 0, claims)
 	for i := range claims {
 		codeHash := common.Hash{byte(i)}
@@ -188,11 +188,21 @@ func TestClaimSet(t *testing.T) {
 		require.False(t, c.claim(codeHash), "a held hash cannot be claimed again")
 		batch = append(batch, codeHash)
 	}
-	require.Len(t, c.hashes, len(batch))
+	require.Equal(t, len(batch), held(&c))
 
 	c.release(batch)
-	require.Empty(t, c.hashes, "a released batch must leave nothing behind")
+	require.Zero(t, held(&c), "a released batch must leave nothing behind")
 	require.True(t, c.claim(batch[0]), "a released hash can be claimed again")
+}
+
+// held counts the claims, which [sync.Map] does not report.
+func held(c *claimSet) int {
+	n := 0
+	c.m.Range(func(_, _ any) bool {
+		n++
+		return true
+	})
+	return n
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {

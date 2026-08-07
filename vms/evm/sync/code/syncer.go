@@ -65,7 +65,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(numSyncWorkers)
 
-	claimed := newClaimSet()
+	claimed := &claimSet{}
 
 	batch, err := s.batchHashes(egCtx, eg, claimed)
 	switch {
@@ -80,13 +80,14 @@ func (s *Syncer) Sync(ctx context.Context) error {
 }
 
 // batchHashes drains the queue into full batches, handing each to a worker, and
-// returns the batch it could not fill.
+// returns the batch it could not fill. An error abandons that batch, since the
+// caller stops the run rather than sending it.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) ([]common.Hash, error) {
 	batch := make([]common.Hash, 0, s.codeHashesPerReq)
 	for {
 		select {
 		case <-ctx.Done():
-			return batch, ctx.Err()
+			return nil, ctx.Err()
 
 		case codeHash, ok := <-s.codeHashes:
 			if !ok {
@@ -94,7 +95,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 			}
 			missing, err := s.needsFetch(codeHash)
 			if err != nil {
-				return batch, err
+				return nil, err
 			}
 			if !missing || !claimed.claim(codeHash) {
 				continue
@@ -132,34 +133,18 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, clai
 // until its code is committed, so a repeat is not fetched twice. It is bounded by
 // the work outstanding, not by the hashes seen.
 type claimSet struct {
-	mu     sync.Mutex
-	hashes map[common.Hash]struct{}
-}
-
-func newClaimSet() *claimSet {
-	return &claimSet{
-		hashes: make(map[common.Hash]struct{}),
-	}
+	m sync.Map
 }
 
 // claim reports whether codeHash was taken, and false if it was already held.
 func (c *claimSet) claim(codeHash common.Hash) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, dup := c.hashes[codeHash]; dup {
-		return false
-	}
-	c.hashes[codeHash] = struct{}{}
-	return true
+	_, held := c.m.LoadOrStore(codeHash, struct{}{})
+	return !held
 }
 
 func (c *claimSet) release(hashes []common.Hash) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	for _, codeHash := range hashes {
-		delete(c.hashes, codeHash)
+		c.m.Delete(codeHash)
 	}
 }
 
