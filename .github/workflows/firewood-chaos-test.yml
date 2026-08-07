@@ -83,6 +83,9 @@ jobs:
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
     runs-on: ${{ matrix.runner || 'ubuntu-24.04' }}
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     permissions:
       id-token: write
       contents: read
@@ -90,7 +93,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
