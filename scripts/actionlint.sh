@@ -51,6 +51,31 @@ if [[ -n "${TASK_CONFIGURATION}" ]]; then
   exit 1
 fi
 
+echo "Checking third-party action refs are pinned and have target tags..."
+# Allow floating major tags only for actions/*, which we already have to trust
+# as part of the GitHub Actions platform. Other third-party actions must use a
+# full commit SHA and a target-tag comment so upgrades are explicit and reviewable.
+#
+# Reject: uses: aws-actions/configure-aws-credentials@v6
+# Accept: uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+FLOATING_ACTION_REFS=
+if FLOATING_ACTION_REFS=$(rg --hidden -n -P '^\s*(?:-\s*)?uses:\s+(?!\.?/)(?!actions/)[^@\s]+@(?!(?:[0-9a-fA-F]{40})\s+#\s+\S+\s*$)' "${AVALANCHE_PATH}/.github" -g '*.yml' -g '*.yaml'); then
+  :
+else
+  RG_EXIT_CODE=$?
+  if [[ ${RG_EXIT_CODE} -ne 1 ]]; then
+    echo "Error: failed to search GitHub Actions configuration for floating action refs."
+    exit "${RG_EXIT_CODE}"
+  fi
+fi
+
+if [[ -n "${FLOATING_ACTION_REFS}" ]]; then
+  echo "${FLOATING_ACTION_REFS}"
+  echo "Error: only actions/* may use floating tags in GitHub Actions configuration."
+  echo "Pin every other third-party action to a full commit SHA with a # <tag> comment."
+  exit 1
+fi
+
 echo "Checking for floating GitHub runner labels..."
 # Floating runner labels (e.g. ubuntu-latest, macos-latest) can change out
 # from under the default branch and break CI without any corresponding change
