@@ -17,6 +17,7 @@ go_library(
         "recovery.go",
         "rpc.go",
         "sae.go",
+        "staged_construction.go",
         "vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/sae",

@@ -58,6 +58,7 @@ linters:
     - durationcheck
     # - embeddedstructfieldcheck
     - errcheck
+    - exhaustruct
     - forbidigo
     - goconst
     - gocheckcompilerdirectives
@@ -104,6 +105,11 @@ linters:
             # in lint.sh to produce warnings instead of errors.
             - pkg: io/ioutil
               desc: io/ioutil is deprecated. Use package io or os instead.
+    exhaustruct:
+      exclude:
+        # TODO(arr4n) when golangci-lint includes exhaustruct_v5, change this to
+        # `explicit-mode: True` and see the TODO in vms/saevm/sae/staged_construction.go.
+        - '.*'
     forbidigo:
       # Forbid the following identifiers (list of regexp).
       forbid:

@@ -60,10 +60,8 @@ type VM struct {
 
 	consensusState utils.Atomic[snow.State]
 
-	preference atomic.Pointer[blocks.Block]
-	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
-	}
+	preference     atomic.Pointer[blocks.Block]
+	last           last
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
 	// decision; or (b) informing consensus invariants (e.g. artefacts to
@@ -130,21 +128,15 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
-	m, err := newMetrics(reg)
+	metrics, err := newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
-	vm := &VM{
-		network: network,
-		hooks:   hooks,
-		config:  cfg,
-		snowCtx: snowCtx,
-		metrics: m,
-		db:      db,
-	}
+
+	var toClose []io.Closer
 	defer func() {
 		if retErr != nil {
-			retErr = errors.Join(retErr, vm.close())
+			retErr = errors.Join(retErr, closeInReverse(toClose))
 		}
 	}()
 
@@ -154,9 +146,9 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
 	}
-	vm.xdb = xdb
-	vm.toClose = append(vm.toClose, &xdb)
+	toClose = append(toClose, &xdb)
 
+	var blockState *blockStateFields
 	{ // ==========  Block State  ==========
 		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
@@ -174,7 +166,7 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, fmt.Errorf("saedb.NewTracker(...): %v", err)
 		}
-		vm.consensusCritical = newSyncMap[common.Hash, *blocks.Block](
+		bMap := newSyncMap[common.Hash, *blocks.Block](
 			func(b *blocks.Block) {
 				tr.Track(b.SettledStateRoot())
 				// The post-execution root is tracked by the [saexec.Executor] as
@@ -191,7 +183,7 @@ func NewVM[T hook.Transaction](
 
 		exec, err := saexec.New(
 			lastCommitted,
-			vm.headerSource,
+			headerSource(bMap, db),
 			chainConfig,
 			db,
 			xdb,
@@ -204,27 +196,34 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
 		}
-		vm.exec = exec
-		vm.toClose = append(vm.toClose, exec)
+		toClose = append(toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
 			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
-		lastSettled, err := rec.populateConsensusCriticalBlocks(exec, vm.consensusCritical)
+		lastSettled, err := rec.populateConsensusCriticalBlocks(exec, bMap)
 		if err != nil {
 			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
 
 		head := exec.LastExecuted()
-		vm.last.settled.Store(lastSettled)
-		vm.last.accepted.Store(head)
-		vm.preference.Store(head)
-		vm.metrics.markSettled(lastSettled.Height())
+		metrics.markSettled(lastSettled.Height())
+
+		blockState = &blockStateFields{
+			exec,
+			bMap,
+			atomicPointerTo(head),
+			last{ //exhaustruct:enforce
+				accepted: atomicPointerTo(head),
+				settled:  atomicPointerTo(lastSettled),
+			},
+		}
 	}
 
+	var mempool *txgossip.Set
 	{ // ==========  Mempool  ==========
-		bc := txgossip.NewBlockChain(vm.exec, vm.ethBlockSource)
+		bc := txgossip.NewBlockChain(blockState.exec, ethBlockSource(blockState.consensusCritical, db))
 		pools := []txpool.SubPool{
 			legacypool.New(cfg.MempoolConfig, bc),
 		}
@@ -232,30 +231,28 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, fmt.Errorf("txpool.New(...): %v", err)
 		}
-		vm.toClose = append(vm.toClose, txPool)
+		toClose = append(toClose, txPool)
 
 		bloomMetrics, err := bloom.NewMetrics("mempool", reg)
 		if err != nil {
 			return nil, err
 		}
 		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		pool, err := txgossip.NewSet(vm.exec, txPool, conf)
+		pool, err := txgossip.NewSet(blockState.exec, txPool, conf)
 		if err != nil {
 			return nil, err
 		}
-		vm.mempool = pool
-		vm.signalNewTxsToEngine()
+		mempool = pool
 	}
 
-	{ // ==========  Block Builder  ==========
-		vm.blockBuilder = &blockBuilderG[T]{
-			hooks,
-			cfg.Now,
-			snowCtx.Log,
-			vm.exec,
-			vm.mempool,
-			vm.ethBlockSource,
-		}
+	// ==========  Block builder  ==========
+	blockBuilder := &blockBuilderG[T]{
+		hooks,
+		cfg.Now,
+		snowCtx.Log,
+		blockState.exec,
+		mempool,
+		ethBlockSource(blockState.consensusCritical, db),
 	}
 
 	{ // ==========  P2P Gossip  ==========
@@ -264,7 +261,7 @@ func NewVM[T hook.Transaction](
 			snowCtx.NodeID,
 			network.Network,
 			network.ValidatorPeers,
-			vm.mempool,
+			mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
 				Log:           snowCtx.Log,
@@ -295,12 +292,41 @@ func NewVM[T hook.Transaction](
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.mempool.RegisterPushGossiper(pushGossiper)
-		vm.toClose = append(vm.toClose, closerFunc(func() error {
+		mempool.RegisterPushGossiper(pushGossiper)
+		toClose = append(toClose, closerFunc(func() error {
 			cancel()
 			wg.Wait()
 			return nil
 		}))
+	}
+
+	newTxs, cleanup := signalNewTxsToEngine(mempool)
+	toClose = append(toClose, cleanup)
+
+	//exhaustruct:enforce
+	vm := &VM{
+		network:           network,
+		hooks:             hooks,
+		config:            cfg,
+		snowCtx:           snowCtx,
+		metrics:           metrics,
+		db:                db,
+		xdb:               xdb,
+		consensusState:    utils.Atomic[snow.State]{},
+		preference:        cloneAtomicPointer(&blockState.preference),
+		last:              blockState.last.clone(),
+		acceptedBlocks:    event.FeedOf[*blocks.Block]{},
+		consensusCritical: blockState.consensusCritical,
+		exec:              blockState.exec,
+		mempool:           mempool,
+		blockBuilder:      blockBuilder,
+		// TODO(arr4n) there is a circular dependency that isn't necessarily
+		// worth untangling: the RPC provider requires the VM as it satisfies
+		// part of [rpc.Chain], but the VM requires the provider for creating
+		// HTTP handlers.
+		rpcProvider: nil,
+		newTxs:      newTxs,
+		toClose:     toClose,
 	}
 
 	{ // ==========  RPC Provider  ==========
@@ -318,28 +344,28 @@ func NewVM[T hook.Transaction](
 // signalNewTxsToEngine subscribes to the [txpool.TxPool] to unblock
 // [VM.WaitForEvent] when necessary. [VM.Shutdown] MUST be called to release a
 // goroutine started by this method.
-func (vm *VM) signalNewTxsToEngine() {
+func signalNewTxsToEngine(mempool *txgossip.Set) (chan struct{}, io.Closer) {
 	ch := make(chan core.NewTxsEvent)
-	sub := vm.mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
-	vm.toClose = append(vm.toClose, closerFunc(func() error {
-		defer close(ch)
-		sub.Unsubscribe()
-		return <-sub.Err() // guaranteed to be closed due to unsubscribing
-	}))
+	sub := mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
 
 	// See [VM.WaitForEvent] for why this requires a buffer.
-	vm.newTxs = make(chan struct{}, 1)
+	newTxs := make(chan struct{}, 1)
 	go func() {
-		defer close(vm.newTxs)
+		defer close(newTxs)
 		for range ch {
 			select {
-			case vm.newTxs <- struct{}{}:
+			case newTxs <- struct{}{}:
 				_ = 0 // coverage visualisation
 			default:
 				_ = 0 // coverage visualization
 			}
 		}
 	}()
+	return newTxs, closerFunc(func() error {
+		defer close(ch)
+		sub.Unsubscribe()
+		return <-sub.Err() // guaranteed to be closed due to unsubscribing
+	})
 }
 
 // WaitForEvent returns immediately if there are already pending transactions in
@@ -390,12 +416,16 @@ func (vm *VM) Shutdown(context.Context) error {
 	return vm.close()
 }
 
-func (vm *VM) close() error {
-	errs := make([]error, len(vm.toClose))
-	for i, c := range slices.Backward(vm.toClose) {
+func closeInReverse(cs []io.Closer) error {
+	errs := make([]error, len(cs))
+	for i, c := range slices.Backward(cs) {
 		errs[i] = c.Close()
 	}
 	return errors.Join(errs...)
+}
+
+func (vm *VM) close() error {
+	return closeInReverse(vm.toClose)
 }
 
 // Version reports the VM's version.

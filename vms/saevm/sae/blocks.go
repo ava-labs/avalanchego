@@ -271,26 +271,33 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	return id, nil
 }
 
-var (
-	_ saetypes.BlockSource  = (*VM)(nil).ethBlockSource
-	_ saetypes.HeaderSource = (*VM)(nil).headerSource
-)
-
-func (vm *VM) ethBlockSource(hash common.Hash, num uint64) (*types.Block, bool) {
-	return source(vm, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+func ethBlockSource(consensusCritical *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.BlockSource {
+	return func(hash common.Hash, num uint64) (*types.Block, bool) {
+		return source(consensusCritical, db, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+	}
 }
 
-func (vm *VM) headerSource(hash common.Hash, num uint64) (*types.Header, bool) {
-	return source(vm, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+func headerSource(consensusCritical *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.HeaderSource {
+	return func(hash common.Hash, num uint64) (*types.Header, bool) {
+		return source(consensusCritical, db, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+	}
 }
 
-func source[T any](vm *VM, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
-	if b, ok := vm.consensusCritical.Load(hash); ok {
+func source[T any](consensusCritical *syncMap[common.Hash, *blocks.Block], db ethdb.Database, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
+	if b, ok := consensusCritical.Load(hash); ok {
 		if b.NumberU64() != num {
 			return nil, false
 		}
 		return fromMem(b), true
 	}
-	x := fromDB(vm.db, hash, num)
+	x := fromDB(db, hash, num)
 	return x, x != nil
+}
+
+func (vm *VM) ethBlockSource() saetypes.BlockSource {
+	return ethBlockSource(vm.consensusCritical, vm.db)
+}
+
+func (vm *VM) headerSource() saetypes.HeaderSource {
+	return headerSource(vm.consensusCritical, vm.db)
 }

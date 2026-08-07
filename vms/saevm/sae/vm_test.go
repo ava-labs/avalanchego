@@ -1226,7 +1226,7 @@ func TestBlockSources(t *testing.T) {
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := sut.rawVM.ethBlockSource()(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
@@ -1236,7 +1236,7 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := sut.rawVM.headerSource()(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
