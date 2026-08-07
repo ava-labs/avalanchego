@@ -119,6 +119,12 @@ type Outcome struct {
 	once      sync.Once
 }
 
+// NodeID is the peer that served the response, so a caller rejecting it can
+// name the peer at fault.
+func (o *Outcome) NodeID() ids.NodeID {
+	return o.nodeID
+}
+
 // Success records the response as semantically valid.
 func (o *Outcome) Success() {
 	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
