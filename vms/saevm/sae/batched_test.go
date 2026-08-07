@@ -381,7 +381,6 @@ func BenchmarkGetAncestors(b *testing.B) {
 		maxBlocksNum  = 2000
 		maxBlocksSize = constants.MaxContainersLen
 	)
-
 	var tip *blocks.Block
 	for range maxBlocksNum {
 		txs := make([]*types.Transaction, numTxs)
@@ -446,13 +445,10 @@ func BenchmarkBatchedParseBlock(b *testing.B) {
 	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(b, 1, opt)
 
-	// Mirror the largest batch a bootstrapper parses in one call: see
-	// config.BootstrapAncestorsMaxContainersReceivedKey.
 	const (
 		numTxs    = 10
 		numBlocks = 2000
 	)
-
 	bufs := make([][]byte, numBlocks)
 	for i := range bufs {
 		txs := make([]*types.Transaction, numTxs)
