@@ -569,7 +569,7 @@ impl PersistLoop {
     fn persist_to_disk(&self, revision: &CommittedRevision) -> Result<(), PersistError> {
         // BLOCKING: mutex lock on the shared `NodeStoreHeader`. Held for the entire duration of
         // the disk flush (serializes all node writes + header write). Any concurrent caller of
-        // `RevisionManager::locked_header()` (e.g. `Db::check`) will stall until this returns.
+        // `RevisionManager::check` will stall until this returns.
         // Under heavy I/O this can take tens to hundreds of milliseconds.
         let mut header = self.shared.header.lock();
         revision.persist(&mut header).map_err(|e| {
@@ -583,7 +583,7 @@ impl PersistLoop {
         // BLOCKING: same header mutex as `persist_to_disk`. Held while writing all freed-node
         // metadata back to the free-list in storage. Contends with any `persist_to_disk` that
         // might be running concurrently (they cannot — both run in the single background thread —
-        // but the lock also blocks external `locked_header()` callers).
+        // but the lock also blocks `RevisionManager::check`).
         nodestore
             .reap_deleted(&mut self.shared.header.lock())
             .map_err(|e| {

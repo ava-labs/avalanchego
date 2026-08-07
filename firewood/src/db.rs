@@ -218,9 +218,7 @@ impl Db {
 
     /// Check the database for consistency
     pub fn check(&self, opt: CheckOpt) -> CheckerReport {
-        let latest_rev_nodestore = self.manager.current_revision();
-        let header = self.manager.locked_header();
-        latest_rev_nodestore.check(&header, opt)
+        self.manager.check(opt)
     }
 
     /// Create a proposal with a specified parent. A proposal is created in parallel if `use_parallel`

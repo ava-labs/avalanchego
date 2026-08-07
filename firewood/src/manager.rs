@@ -7,7 +7,7 @@
 )]
 
 use nonzero_ext::nonzero;
-use parking_lot::{Mutex, MutexGuard, RwLock};
+use parking_lot::{Mutex, RwLock};
 use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::num::{NonZero, NonZeroU64};
@@ -27,9 +27,9 @@ use firewood_metrics::{GaugeExt, firewood_counter, firewood_gauge, firewood_hist
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::RootStore;
 use firewood_storage::{
-    BranchNode, Committed, CommittedId, DeletedNodeTracking, FileBacked, FileIoError,
-    HashedNodeReader, ImmutableProposal, Mutable, MutableKind, NodeHashAlgorithm, NodeStore,
-    NodeStoreHeader, Propose, Recon, TrieHash,
+    BranchNode, CheckOpt, CheckerReport, Committed, CommittedId, DeletedNodeTracking, FileBacked,
+    FileIoError, HashedNodeReader, ImmutableProposal, Mutable, MutableKind, NodeHashAlgorithm,
+    NodeStore, NodeStoreHeader, Propose, Recon, TrieHash,
 };
 
 pub(crate) const DB_FILE_NAME: &str = "firewood.db";
@@ -581,6 +581,12 @@ impl RevisionManager {
         self.current_revision().root_hash()
     }
 
+    pub(crate) fn check(&self, opt: CheckOpt) -> CheckerReport {
+        let current_revision = self.current_revision();
+        let header = self.persist_worker.locked_header();
+        current_revision.check(&header, opt)
+    }
+
     pub fn current_revision(&self) -> CommittedRevision {
         // BLOCKING: read lock on `in_memory_revisions`. Called on every propose() and
         // merge_key_value_range(); blocks while a commit() holds the write lock (steps 1-5).
@@ -592,17 +598,6 @@ impl RevisionManager {
             .back()
             .expect("there is always one revision")
             .clone()
-    }
-
-    /// Acquires a lock on the header and returns a guard.
-    ///
-    /// # Blocking
-    ///
-    /// This contends with the background `PersistLoop`, which holds the header lock for the
-    /// entire duration of a `persist_to_disk` or `reap` call (both of which do disk I/O).
-    /// Callers (e.g. `Db::check`) may stall until the current persistence cycle finishes.
-    pub(crate) fn locked_header(&self) -> MutexGuard<'_, NodeStoreHeader> {
-        self.persist_worker.locked_header()
     }
 
     /// Gets or creates a threadpool associated with the revision manager.
