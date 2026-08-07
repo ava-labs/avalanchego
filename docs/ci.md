@@ -11,6 +11,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
+- [Provision CI job dependencies](#provision-ci-job-dependencies)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
@@ -94,10 +95,30 @@ feature-specific helpers with the feature, such as
 `scripts/actionlint.sh` allows workflow calls to helpers named `workflow-*.sh`. Do
 not use that allowance for an operation that should be a task or normal script.
 
+## Provision CI job dependencies
+
+Nix provides the repository's preferred local development environment. See
+[Using the dev shell](../CONTRIBUTING.md#using-the-dev-shell). GitHub-hosted
+runners are ephemeral, so installing Nix adds setup work to every job that uses
+it.
+
+Because installing Nix is per-job work on hosted runners, `install-nix` is
+reserved for jobs with dependencies that another setup action does not provide.
+
+| Dependency | Provisioning mechanism | Use when |
+| --- | --- | --- |
+| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use Nix or Bazel to provide it. |
+| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel, which also provides Go. |
+| Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency supplied by the Nix dev shell, which also provides Go. |
+
+`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
+provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
+for dependencies that Bazel does not provide.
+
 ## Using Nix in GitHub Actions
 
-Installing Nix makes Nix available. It does not run later commands in the dev
-shell.
+Installing Nix makes Nix available, but does not ensure later commands use the
+Nix development shell.
 
 ### Run `install-nix` jobs in the Nix dev shell
 
