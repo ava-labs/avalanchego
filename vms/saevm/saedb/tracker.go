@@ -205,6 +205,10 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 	}, nil
 }
 
+func (t *Tracker) CommitInterval() uint64 {
+	return t.config.CommitInterval
+}
+
 // Track tracks the root and may commit the trie associated with the root
 // to the database if [Config.ShouldCommitTrieDB] returns true, or the [Config]
 // specifies that the node is archival.
