@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -99,7 +100,8 @@ type Config struct {
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
-	Now func() time.Time // defaults to [time.Now] if nil
+	// Now defaults to [time.Now] if nil
+	Now func() time.Time `json:"-"`
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
@@ -120,6 +122,10 @@ func NewVM[T hook.Transaction](
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	snowCtx.Log.Info("creating VM",
+		zap.Reflect("config", cfg),
+	)
+
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
@@ -155,7 +161,7 @@ func NewVM[T hook.Transaction](
 		rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding last committed state: %w", err)
 		}
 
 		exec, err := saexec.New(
@@ -176,12 +182,12 @@ func NewVM[T hook.Transaction](
 		vm.toClose = append(vm.toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
 		bMap, lastSettled, err := rec.consensusCriticalBlocks(exec)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
 		vm.consensusCritical = bMap
 

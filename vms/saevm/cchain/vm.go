@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core/rawdb"
+	"go.uber.org/zap"
 
 	_ "embed"
 
@@ -29,13 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
@@ -98,6 +98,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
+	vm.ctx.Log.Info("initializing C-Chain",
+		zap.Reflect("config", userConfig),
+	)
+
 	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return fmt.Errorf("parsing warp messages: %w", err)
@@ -106,7 +110,7 @@ func (vm *VM) Initialize(
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
-	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
+	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
