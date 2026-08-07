@@ -152,12 +152,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 // queue.
 func (m *metrics) markEnqueued(block *blocks.Block) {
 	m.executionQueueBlocks.Inc()
-	// The block's GasUsed is populated during block building as the sum of the
-	// tx gas limits and the end-of-block operations gas.
-	//
-	// TODO(StephenButtolph): Cleanup worst-case bounds tracking on the block to
-	// cleanly expose the worst-case gas usage and base fee.
-	worstCaseGas := float64(block.EthBlock().GasUsed())
+	worstCaseGas := float64(block.WorstCaseGasUsed())
 	m.executionQueueGasLimit.Add(worstCaseGas)
 	m.acceptedGasLimit.Add(worstCaseGas)
 }
@@ -171,7 +166,7 @@ func (m *metrics) observeQueueDuration(d time.Duration) {
 func (m *metrics) markExecuted(block *blocks.Block, results *ExecutionResults) {
 	m.executionQueueBlocks.Dec()
 	// MUST use the same worst-case gas value as [metrics.markEnqueued].
-	worstCaseGas := float64(block.EthBlock().GasUsed())
+	worstCaseGas := float64(block.WorstCaseGasUsed())
 	m.executionQueueGasLimit.Sub(worstCaseGas)
 	m.executedGasCharged.Add(float64(results.GasConsumed))
 	m.executedGasLimit.Add(worstCaseGas)
@@ -186,7 +181,7 @@ func (m *metrics) setExecuted(block *blocks.Block) {
 	m.lastExecutedGasTime.Set(float64(gasClock.UnixNano()) / 1e9)
 	m.gasTimeWallTimeGap.Set(gasClock.Sub(block.ExecutedByWallTime()).Seconds())
 
-	m.worstCaseBaseFee.Set(float64(block.HeaderBaseFee()))
+	m.worstCaseBaseFee.Set(block.WorstCaseBaseFee().Float64())
 	m.executedBaseFee.Set(block.ExecutedBaseFee().Float64())
 
 	// Blocks accepted while bootstrapping, and those replayed during recovery,
