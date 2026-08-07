@@ -379,6 +379,7 @@ tasks:
     deps:
       - lint-action
       - lint-shell
+      - test-ci-disk-space
       - check-go-version
       - check-require-directives
 
@@ -397,6 +398,7 @@ tasks:
       - task: lint-saevm
       - task: lint-action
       - task: lint-shell
+      - task: test-ci-disk-space
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -430,6 +432,12 @@ tasks:
       - cmd: '{{.NIX_RUN}} go mod download'
       # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  test-ci-disk-space:
+    desc: Tests CI disk-space check and diagnostics scripts
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/test_check_ci_disk_space.sh'
+      - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
