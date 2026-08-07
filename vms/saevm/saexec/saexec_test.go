@@ -138,7 +138,16 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
+	tr, err := saedb.NewTracker(
+		db,
+		saedbConfig,
+		genesis.PostExecutionStateRoot(),
+		snowCtx.ChainDataDir,
+		snowCtx.Log,
+	)
+	require.NoError(tb, err, "saedb.NewTracker(...)")
+
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -1122,7 +1131,17 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				snowCtx := snowtest.Context(t, ids.GenerateTestID())
 				snowCtx.ChainDataDir = sut.chainDataDir
 				snowCtx.Log = loggingtest.New(t, logging.Debug)
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
+
+				tr, err := saedb.NewTracker(
+					sut.db,
+					sut.saedbConfig,
+					chain.Last().PostExecutionStateRoot(),
+					snowCtx.ChainDataDir,
+					snowCtx.Log,
+				)
+				require.NoError(t, err, "saedb.NewTracker(...)")
+
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)

@@ -67,23 +67,19 @@ func New(
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
+	dbTracker *saedb.Tracker,
 	saedbConfig saedb.Config,
 	hooks hook.Points,
 	snowCtx *snow.Context,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
-	if err != nil {
-		return nil, err
-	}
-
 	m, err := newMetrics(reg, lastExecuted)
 	if err != nil {
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
-		Tracker: t,
+		Tracker: dbTracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
 		log:     snowCtx.Log,

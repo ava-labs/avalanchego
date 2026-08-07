@@ -105,13 +105,24 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
+	cfg := saedb.Config{CommitInterval: saedb.DefaultCommitInterval}
+	tr, err := saedb.NewTracker(
+		db,
+		cfg,
+		genesis.PostExecutionStateRoot(),
+		snowCtx.ChainDataDir,
+		snowCtx.Log,
+	)
+	require.NoError(t, err, "saedb.NewTracker(...)")
+
 	exec, err := saexec.New(
 		genesis,
 		src.AsHeaderSource(),
 		config,
 		db,
 		xdb,
-		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
+		tr,
+		cfg,
 		hookstest.NewStub(gasTarget),
 		snowCtx,
 		prometheus.NewRegistry(),

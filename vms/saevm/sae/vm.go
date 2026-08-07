@@ -164,24 +164,16 @@ func NewVM[T hook.Transaction](
 			return nil, fmt.Errorf("finding last committed state: %w", err)
 		}
 
-		exec, err := saexec.New(
-			lastCommitted,
-			vm.headerSource,
-			chainConfig,
+		tr, err := saedb.NewTracker(
 			db,
-			xdb,
 			cfg.DBConfig,
-			hooks,
-			snowCtx,
-			reg,
+			lastCommitted.PostExecutionStateRoot(),
+			snowCtx.ChainDataDir,
+			snowCtx.Log,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("saexec.New(...): %v", err)
+			return nil, fmt.Errorf("saedb.NewTracker(...): %v", err)
 		}
-		vm.exec = exec
-		vm.toClose = append(vm.toClose, exec)
-
-		tr := exec.Tracker
 		vm.consensusCritical = newSyncMap[common.Hash, *blocks.Block](
 			func(b *blocks.Block) {
 				tr.Track(b.SettledStateRoot())
@@ -196,6 +188,24 @@ func NewVM[T hook.Transaction](
 				}
 			},
 		)
+
+		exec, err := saexec.New(
+			lastCommitted,
+			vm.headerSource,
+			chainConfig,
+			db,
+			xdb,
+			tr,
+			cfg.DBConfig,
+			hooks,
+			snowCtx,
+			reg,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("saexec.New(...): %v", err)
+		}
+		vm.exec = exec
+		vm.toClose = append(vm.toClose, exec)
 
 		if err := rec.executeAllAccepted(ctx, exec); err != nil {
 			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
