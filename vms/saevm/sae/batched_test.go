@@ -376,15 +376,14 @@ func BenchmarkGetAncestors(b *testing.B) {
 		c.db = db
 	}))
 
-	// Mirror the limits used by snow/engine/snowman/getter when serving a
-	// bootstrapper: see config.BootstrapAncestorsMaxContainersSentKey.
 	const (
 		numTxs        = 10
 		maxBlocksNum  = 2000
 		maxBlocksSize = constants.MaxContainersLen
 	)
 
-	buildBlock := func() *blocks.Block {
+	var tip *blocks.Block
+	for range maxBlocksNum {
 		txs := make([]*types.Transaction, numTxs)
 		for i := range txs {
 			txs[i] = sut.wallet.SetNonceAndSign(b, 0, &types.DynamicFeeTx{
@@ -394,14 +393,10 @@ func BenchmarkGetAncestors(b *testing.B) {
 				Value:     big.NewInt(1),
 			})
 		}
-		return sut.runConsensusLoop(b, txs...)
-	}
-
-	var tip *blocks.Block
-	for range maxBlocksNum {
-		tip = buildBlock()
+		tip = sut.runConsensusLoop(b, txs...)
 		vmTime.AdvanceToSettle(ctx, b, tip)
 	}
+	tipID := tip.ID()
 
 	type serialGetter struct{ block.Getter }
 	for _, bench := range []struct {
@@ -413,9 +408,15 @@ func BenchmarkGetAncestors(b *testing.B) {
 	} {
 		b.Run(bench.name, func(b *testing.B) {
 			for b.Loop() {
-				got, err := block.GetAncestors(ctx, logging.NoLog{}, bench.vm, tip.ID(), maxBlocksNum, maxBlocksSize, time.Minute)
-				require.NoError(b, err, "block.GetAncestors()")
-				b.ReportMetric(float64(len(got)), "blocks")
+				_, _ = block.GetAncestors(
+					ctx,
+					sut.logger,
+					bench.vm,
+					tipID,
+					maxBlocksNum,
+					maxBlocksSize,
+					time.Minute,
+				)
 			}
 		})
 	}
