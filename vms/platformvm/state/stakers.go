@@ -201,10 +201,17 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	validator.delegators.ReplaceOrInsert(staker)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.addedDelegators == nil {
-		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+	// Cancel a prior delete only when the re-added staker is identical.
+	// A mismatch (e.g. different weight) must be recorded as a replacement
+	// so the diff captures the field change for the next DB write.
+	if existing, ok := validatorDiff.deletedDelegators[staker.TxID]; ok && existing.Equals(staker) {
+		delete(validatorDiff.deletedDelegators, staker.TxID)
+	} else {
+		if validatorDiff.addedDelegators == nil {
+			validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
+		}
+		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 	}
-	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 
 	v.stakers.ReplaceOrInsert(staker)
 }
@@ -217,6 +224,14 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
+	// An add followed by a delete of the same staker is a no-op.
+	// Undo the addition instead of recording a delete.
+	if validatorDiff.addedDelegators != nil {
+		if _, ok := validatorDiff.addedDelegators.Delete(staker); ok {
+			v.stakers.Delete(staker)
+			return
+		}
+	}
 	if validatorDiff.deletedDelegators == nil {
 		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
 	}
@@ -447,6 +462,15 @@ func (s *diffStakers) GetDelegatorIterator(
 
 func (s *diffStakers) PutDelegator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	// Cancel a prior delete only when the re-added staker is identical.
+	// A mismatch (e.g. different weight) is recorded as a replacement
+	// rather than silently dropping the updated fields.
+	if existing, ok := validatorDiff.deletedDelegators[staker.TxID]; ok && existing.Equals(staker) {
+		delete(validatorDiff.deletedDelegators, staker.TxID)
+		delete(s.deletedStakers, staker.TxID)
+		return
+	}
+
 	if validatorDiff.addedDelegators == nil {
 		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
@@ -460,6 +484,15 @@ func (s *diffStakers) PutDelegator(staker *Staker) {
 
 func (s *diffStakers) DeleteDelegator(staker *Staker) {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	// An add followed by a delete of the same staker is a no-op on the diff.
+	// Undo the addition instead of recording a delete.
+	if validatorDiff.addedDelegators != nil {
+		if _, ok := validatorDiff.addedDelegators.Delete(staker); ok {
+			s.addedStakers.Delete(staker)
+			return
+		}
+	}
+
 	if validatorDiff.deletedDelegators == nil {
 		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
 	}
