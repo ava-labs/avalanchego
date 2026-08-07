@@ -10,17 +10,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
-	_ simplex.QuorumCertificate   = (*QC)(nil)
-	_ simplex.QCDeserializer      = (*QCDeserializer)(nil)
-	_ simplex.SignatureAggregator = (*SignatureAggregator)(nil)
+	_ simplexcommon.QuorumCertificate   = (*QC)(nil)
+	_ simplexcommon.QCDeserializer      = (*QCDeserializer)(nil)
+	_ simplexcommon.SignatureAggregator = (*SignatureAggregator)(nil)
 
 	errFailedToParseQC       = errors.New("failed to parse quorum certificate")
 	errUnexpectedSigners     = errors.New("unexpected number of signers in quorum certificate")
@@ -47,8 +47,8 @@ type canotoQC struct {
 }
 
 // Signers returns the list of signers for the quorum certificate.
-func (qc *QC) Signers() []simplex.NodeID {
-	signers := make([]simplex.NodeID, len(qc.signers))
+func (qc *QC) Signers() []simplexcommon.NodeID {
+	signers := make([]simplexcommon.NodeID, len(qc.signers))
 	for i, signer := range qc.signers {
 		signers[i] = signer[:]
 	}
@@ -57,8 +57,9 @@ func (qc *QC) Signers() []simplex.NodeID {
 }
 
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
-func (qc *QC) Verify(msg []byte) error {
-	quorum := simplex.Quorum(len(qc.verifier.nodeID2PK))
+func (qc *QC) Verify(msg []byte, _ simplexcommon.Nodes) error {
+	// TODO: derive the quorom size and public key from the passed nodes instead of the verifier's nodeID2PK map.
+	quorum := simplexcommon.Quorum(len(qc.verifier.nodeID2PK))
 	if len(qc.signers) != quorum {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
 	}
@@ -112,6 +113,10 @@ func (qc *QC) Bytes() []byte {
 	return canotoQC.MarshalCanoto()
 }
 
+func (qc *QC) Size() int {
+	return len(qc.Bytes())
+}
+
 func (qc *QC) createSignersBitSet() []byte {
 	bitset := set.NewBits()
 	for _, signer := range qc.signers {
@@ -128,7 +133,7 @@ type QCDeserializer struct {
 }
 
 // DeserializeQuorumCertificate deserializes a quorum certificate from bytes.
-func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplex.QuorumCertificate, error) {
+func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (simplexcommon.QuorumCertificate, error) {
 	var canotoQC canotoQC
 	if err := canotoQC.UnmarshalCanoto(bytes); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
@@ -159,8 +164,8 @@ type SignatureAggregator struct {
 // Aggregate aggregates the provided signatures into a quorum certificate.
 // It requires at least a quorum of signatures to succeed.
 // If any signature is from a signer not in the membership set, it returns an error.
-func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex.QuorumCertificate, error) {
-	quorumSize := simplex.Quorum(len(a.verifier.nodeID2PK))
+func (a *SignatureAggregator) Aggregate(signatures []simplexcommon.Signature) (simplexcommon.QuorumCertificate, error) {
+	quorumSize := simplexcommon.Quorum(len(a.verifier.nodeID2PK))
 	if len(signatures) < quorumSize {
 		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
 	}
@@ -199,10 +204,39 @@ func (a *SignatureAggregator) Aggregate(signatures []simplex.Signature) (simplex
 	}, nil
 }
 
+func (*SignatureAggregator) AppendSignatures(existing []byte, sigs ...[]byte) ([]byte, error) {
+	blsSigs := make([]*bls.Signature, 0, len(sigs)+1)
+
+	if len(existing) > 0 {
+		sig, err := bls.SignatureFromBytes(existing)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
+		}
+		blsSigs = append(blsSigs, sig)
+	}
+	for _, rawSig := range sigs {
+		sig, err := bls.SignatureFromBytes(rawSig)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
+		}
+		blsSigs = append(blsSigs, sig)
+	}
+	if len(blsSigs) == 0 {
+		return nil, errSignatureAggregation
+	}
+
+	aggregated, err := bls.AggregateSignatures(blsSigs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
+	}
+
+	return bls.SignatureToBytes(aggregated), nil
+}
+
 // IsQuorum checks if the provided nodes are a quorum of the membership set.
 // For now, this is calculated using one node = one vote, but in the future we can adjust
 // this calculation to cross reference validator weights if we want to support PoS.
-func (a *SignatureAggregator) IsQuorum(nodes []simplex.NodeID) bool {
+func (a *SignatureAggregator) IsQuorum(nodes []simplexcommon.NodeID) bool {
 	uniqueNodes := set.NewSet[ids.NodeID](len(nodes))
 	for _, node := range nodes {
 		nodeID := ids.NodeID(node)
@@ -212,7 +246,7 @@ func (a *SignatureAggregator) IsQuorum(nodes []simplex.NodeID) bool {
 		uniqueNodes.Add(nodeID)
 	}
 
-	quorumSize := simplex.Quorum(len(a.verifier.nodeID2PK))
+	quorumSize := simplexcommon.Quorum(len(a.verifier.nodeID2PK))
 
 	return len(uniqueNodes) >= quorumSize
 }

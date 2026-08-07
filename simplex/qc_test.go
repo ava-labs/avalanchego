@@ -6,30 +6,31 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 // TestQCDuplicateSigners tests verification fails if the
 // same signer signs multiple times.
 func TestQCDuplicateSigners(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
-	quorum := simplex.Quorum(len(configs))
+	quorum := simplexcommon.Quorum(len(configs))
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 
 	signer, verifier, err := NewBLSAuth(configs[0])
 	require.NoError(t, err)
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
-	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
+	require.NoError(t, verifier.VerifySignature(msg, sig, configs[0].Params.InitialValidators[0].PublicKey))
 
-	signatures := make([]simplex.Signature, 0, quorum)
+	signatures := make([]simplexcommon.Signature, 0, quorum)
 	for range quorum {
-		signatures = append(signatures, simplex.Signature{
+		signatures = append(signatures, simplexcommon.Signature{
 			Signer: configs[0].Ctx.NodeID[:],
 			Value:  sig,
 		})
@@ -40,7 +41,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	qc, err := signatureAggregator.Aggregate(signatures)
 	require.NoError(t, err)
 
-	err = qc.Verify(msg)
+	err = qc.Verify(msg, nil)
 	require.ErrorIs(t, err, errDuplicateSigner)
 }
 
@@ -103,12 +104,12 @@ func TestSignatureAggregation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		signers     []simplex.Signature
+		signers     []simplexcommon.Signature
 		expectError error
 	}{
 		{
 			name: "invalid signature bytes",
-			signers: []simplex.Signature{
+			signers: []simplexcommon.Signature{
 				{Signer: configs[0].Ctx.NodeID[:], Value: []byte("invalid signature")},
 				{Signer: configs[1].Ctx.NodeID[:], Value: []byte("another invalid signature")},
 				{Signer: configs[2].Ctx.NodeID[:], Value: []byte("another invalid signature")},
@@ -117,14 +118,14 @@ func TestSignatureAggregation(t *testing.T) {
 		},
 		{
 			name: "excess signatures",
-			signers: func() []simplex.Signature {
-				sigs := make([]simplex.Signature, 0, 4)
+			signers: func() []simplexcommon.Signature {
+				sigs := make([]simplexcommon.Signature, 0, 4)
 				for _, config := range configs {
 					signer, _, err := NewBLSAuth(config)
 					require.NoError(t, err)
 					sig, err := signer.Sign(msg)
 					require.NoError(t, err)
-					sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+					sigs = append(sigs, simplexcommon.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
 				}
 				return sigs
 			}(),
@@ -132,15 +133,15 @@ func TestSignatureAggregation(t *testing.T) {
 		},
 		{
 			name: "insufficient signatures",
-			signers: func() []simplex.Signature {
-				sigs := make([]simplex.Signature, 0, 2)
+			signers: func() []simplexcommon.Signature {
+				sigs := make([]simplexcommon.Signature, 0, 2)
 				for i, config := range configs {
 					signer, _, err := NewBLSAuth(config)
 					require.NoError(t, err)
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
-						sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+						sigs = append(sigs, simplexcommon.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
 					}
 				}
 				return sigs
@@ -149,15 +150,15 @@ func TestSignatureAggregation(t *testing.T) {
 		},
 		{
 			name: "not in membership set",
-			signers: func() []simplex.Signature {
-				sigs := make([]simplex.Signature, 0, 3)
+			signers: func() []simplexcommon.Signature {
+				sigs := make([]simplexcommon.Signature, 0, 3)
 				for i, config := range configs {
 					signer, _, err := NewBLSAuth(config)
 					require.NoError(t, err)
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
-						sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+						sigs = append(sigs, simplexcommon.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
 					}
 				}
 
@@ -167,7 +168,7 @@ func TestSignatureAggregation(t *testing.T) {
 				require.NoError(t, err)
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
-				sigs = append(sigs, simplex.Signature{Signer: newConfig[0].Ctx.NodeID[:], Value: sig})
+				sigs = append(sigs, simplexcommon.Signature{Signer: newConfig[0].Ctx.NodeID[:], Value: sig})
 
 				return sigs
 			}(),
@@ -185,8 +186,8 @@ func TestSignatureAggregation(t *testing.T) {
 
 			// verify the quorum certificate
 			if tt.expectError == nil {
-				require.Len(t, qc.Signers(), simplex.Quorum(len(configs)))
-				require.NoError(t, qc.Verify(msg))
+				require.Len(t, qc.Signers(), simplexcommon.Quorum(len(configs)))
+				require.NoError(t, qc.Verify(msg, nil))
 
 				d := QCDeserializer{verifier: &verifier}
 				// try to deserialize the quorum certificate
@@ -197,7 +198,7 @@ func TestSignatureAggregation(t *testing.T) {
 					require.Contains(t, deserializedQC.Signers(), signer)
 				}
 				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
-				require.NoError(t, deserializedQC.Verify(msg))
+				require.NoError(t, deserializedQC.Verify(msg, nil))
 			}
 		})
 	}
@@ -207,14 +208,14 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	originalMsg := []byte("original message")
 	wrongMsg := []byte("wrong message")
-	sigs := make([]simplex.Signature, 0, len(configs))
+	sigs := make([]simplexcommon.Signature, 0, len(configs))
 
 	for i := range 3 {
 		signer, _, err := NewBLSAuth(configs[i])
 		require.NoError(t, err)
 		sig, err := signer.Sign(originalMsg)
 		require.NoError(t, err)
-		sigs = append(sigs, simplex.Signature{
+		sigs = append(sigs, simplexcommon.Signature{
 			Signer: configs[i].Ctx.NodeID[:],
 			Value:  sig,
 		})
@@ -227,10 +228,10 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify with original message should succeed
-	require.NoError(t, qc.Verify(originalMsg))
+	require.NoError(t, qc.Verify(originalMsg, nil))
 
 	// Verify with wrong message should fail
-	err = qc.Verify(wrongMsg)
+	err = qc.Verify(wrongMsg, nil)
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
 
@@ -240,7 +241,7 @@ func TestIsQuorum(t *testing.T) {
 	require.NoError(t, err)
 	aggregator := SignatureAggregator{verifier: &verifier}
 
-	nodeIDs := make([]simplex.NodeID, len(configs))
+	nodeIDs := make([]simplexcommon.NodeID, len(configs))
 	for i, config := range configs {
 		nodeIDs[i] = config.Ctx.NodeID[:]
 	}
@@ -248,32 +249,32 @@ func TestIsQuorum(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		nodes    []simplex.NodeID
+		nodes    []simplexcommon.NodeID
 		expected bool
 	}{
 		{
 			name:     "below quorum",
-			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1]},
+			nodes:    []simplexcommon.NodeID{nodeIDs[0], nodeIDs[1]},
 			expected: false,
 		},
 		{
 			name:     "exact quorum",
-			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1], nodeIDs[2]},
+			nodes:    []simplexcommon.NodeID{nodeIDs[0], nodeIDs[1], nodeIDs[2]},
 			expected: true,
 		},
 		{
 			name:     "unknown node",
-			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1], unknownNodeID[:]},
+			nodes:    []simplexcommon.NodeID{nodeIDs[0], nodeIDs[1], unknownNodeID[:]},
 			expected: false,
 		},
 		{
 			name:     "duplicates still meet quorum",
-			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1], nodeIDs[2]},
+			nodes:    []simplexcommon.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1], nodeIDs[2]},
 			expected: true,
 		},
 		{
 			name:     "duplicates do not meet quorum",
-			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1]},
+			nodes:    []simplexcommon.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1]},
 			expected: false,
 		},
 	}

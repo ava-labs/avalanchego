@@ -6,7 +6,6 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 func TestStorageNew(t *testing.T) {
@@ -40,8 +41,8 @@ func TestStorageNew(t *testing.T) {
 			}(),
 			db: func() database.KeyValueReaderWriter {
 				db := memdb.New()
-				finalization := newTestFinalization(t, newNetworkConfigs(t, 1), simplex.BlockHeader{
-					ProtocolMetadata: simplex.ProtocolMetadata{
+				finalization := newTestFinalization(t, newNetworkConfigs(t, 1), simplexcommon.BlockHeader{
+					ProtocolMetadata: simplexcommon.ProtocolMetadata{
 						Round: 1,
 						Seq:   1,
 					},
@@ -73,9 +74,8 @@ func TestStorageNew(t *testing.T) {
 
 func TestStorageRetrieve(t *testing.T) {
 	numNodes := 4
-	genesis := newTestBlock(t, newBlockConfig{numNodes: uint64(numNodes)})
-	genesisBytes, err := genesis.Bytes()
-	require.NoError(t, err)
+	genesis := newTestBlock(newBlockConfig{numNodes: uint64(numNodes)})
+	genesisBytes := genesis.Bytes()
 
 	vm := newTestVM()
 	ctx := t.Context()
@@ -92,7 +92,7 @@ func TestStorageRetrieve(t *testing.T) {
 		seq                  uint64
 		expectedBlock        *Block
 		expectedBytes        []byte
-		expectedFinalization simplex.Finalization
+		expectedFinalization simplexcommon.Finalization
 		expectedErr          error
 	}{
 		{
@@ -100,15 +100,15 @@ func TestStorageRetrieve(t *testing.T) {
 			seq:                  0,
 			expectedBlock:        genesis,
 			expectedBytes:        genesisBytes,
-			expectedFinalization: simplex.Finalization{},
+			expectedFinalization: simplexcommon.Finalization{},
 			expectedErr:          nil,
 		},
 		{
 			name:                 "seq not found",
 			seq:                  1,
 			expectedBlock:        nil,
-			expectedFinalization: simplex.Finalization{},
-			expectedErr:          simplex.ErrBlockNotFound,
+			expectedFinalization: simplexcommon.Finalization{},
+			expectedErr:          simplexcommon.ErrBlockNotFound,
 		},
 	}
 
@@ -119,8 +119,7 @@ func TestStorageRetrieve(t *testing.T) {
 
 			block, finalization, err := s.Retrieve(tt.seq)
 			if tt.expectedErr == nil {
-				bytes, err := block.Bytes()
-				require.NoError(t, err)
+				bytes := block.Bytes()
 
 				require.Equal(t, tt.expectedBytes, bytes)
 			}
@@ -134,9 +133,9 @@ func TestStorageRetrieve(t *testing.T) {
 func TestStorageIndexFails(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2 := newTestBlock(t, newBlockConfig{prev: child1})
+	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	child1 := newTestBlock(newBlockConfig{prev: genesis})
+	child2 := newTestBlock(newBlockConfig{prev: child1})
 
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -150,22 +149,22 @@ func TestStorageIndexFails(t *testing.T) {
 	tests := []struct {
 		name          string
 		expectedError error
-		finalization  simplex.Finalization
+		finalization  simplexcommon.Finalization
 		block         *Block
 	}{
 		{
 			name:          "index genesis block",
 			expectedError: errUnexpectedSeq,
 			block:         genesis,
-			finalization:  simplex.Finalization{},
+			finalization:  simplexcommon.Finalization{},
 		},
 		{
 			name:          "index invalid qc",
 			expectedError: errInvalidQC,
 			block:         child1,
-			finalization: simplex.Finalization{
+			finalization: simplexcommon.Finalization{
 				QC: nil, // no quorum certificate
-				Finalization: simplex.ToBeSignedFinalization{
+				Finalization: simplexcommon.ToBeSignedFinalization{
 					BlockHeader: child1.BlockHeader(),
 				},
 			},
@@ -174,7 +173,7 @@ func TestStorageIndexFails(t *testing.T) {
 			name:          "mismatched digest",
 			expectedError: errMismatchedDigest,
 			block:         child1,
-			finalization: func() simplex.Finalization {
+			finalization: func() simplexcommon.Finalization {
 				f := newTestFinalization(t, configs, child1.BlockHeader())
 				f.Finalization.Digest = [32]byte{1, 2, 3} // set an invalid digest
 				return f
@@ -205,9 +204,9 @@ func TestStorageIndexFails(t *testing.T) {
 			if tt.block.metadata.Seq != 0 {
 				// ensure that the block is not retrievable
 				block, finalization, err := s.Retrieve(tt.block.BlockHeader().Seq)
-				require.ErrorIs(t, err, simplex.ErrBlockNotFound)
+				require.ErrorIs(t, err, simplexcommon.ErrBlockNotFound)
 				require.Nil(t, block)
-				require.Equal(t, simplex.Finalization{}, finalization)
+				require.Equal(t, simplexcommon.Finalization{}, finalization)
 			}
 
 			// ensure that we haven't indexed any blocks
@@ -222,10 +221,10 @@ func TestIndexMismatchedChild(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
 
-	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2Nephew := newTestBlock(t, newBlockConfig{prev: child1Sibling})
+	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	child1 := newTestBlock(newBlockConfig{prev: genesis})
+	child1Sibling := newTestBlock(newBlockConfig{prev: genesis})
+	child2Nephew := newTestBlock(newBlockConfig{prev: child1Sibling})
 
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -259,7 +258,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 func TestStorageIndexSuccess(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(t, newBlockConfig{numNodes: 4})
+	genesis := newTestBlock(newBlockConfig{numNodes: 4})
 	configs := newNetworkConfigs(t, numNodes)
 
 	_, verifier, err := NewBLSAuth(configs[0])
@@ -272,14 +271,14 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	numBlocks := 10
 	blocks := make([]*Block, 0, numBlocks+1)
-	finalizations := make([]simplex.Finalization, 0, numBlocks+1)
+	finalizations := make([]simplexcommon.Finalization, 0, numBlocks+1)
 
 	blocks = append(blocks, genesis)
-	finalizations = append(finalizations, simplex.Finalization{})
+	finalizations = append(finalizations, simplexcommon.Finalization{})
 
 	prev := genesis
 	for i := 0; i < numBlocks; i++ {
-		child := newTestBlock(t, newBlockConfig{prev: prev})
+		child := newTestBlock(newBlockConfig{prev: prev})
 		_, err := child.Verify(ctx)
 		require.NoError(t, err)
 
@@ -295,14 +294,12 @@ func TestStorageIndexSuccess(t *testing.T) {
 		gotBlock, gotFin, err := s.Retrieve(uint64(i))
 		require.NoError(t, err)
 
-		expectedBytes, err := blocks[i].Bytes()
-		require.NoError(t, err)
+		expectedBytes := blocks[i].Bytes()
 
-		gotBytes, err := gotBlock.Bytes()
-		require.NoError(t, err)
+		gotBytes := gotBlock.Bytes()
 
 		require.Equal(t, expectedBytes, gotBytes)
-		require.Equal(t, finalizations[i].Finalization, gotFin.Finalization)
+		require.Equal(t, finalizations[i].Finalization.Bytes(), gotFin.Finalization.Bytes())
 
 		// verify that the blocks were also accepted in the VM
 		accepted := blocks[i].vmBlock.(*wrappedBlock).Status

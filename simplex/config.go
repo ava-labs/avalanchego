@@ -4,8 +4,6 @@
 package simplex
 
 import (
-	"github.com/ava-labs/simplex"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -14,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 // Config wraps all the parameters needed for a simplex engine
@@ -29,7 +28,7 @@ type Config struct {
 	DB database.KeyValueReaderWriter
 
 	// In the case of a crash, Simplex uses the WAL to recover its state and resume consensus.
-	WAL simplex.WriteAheadLog
+	WAL simplexcommon.WriteAheadLog
 
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
