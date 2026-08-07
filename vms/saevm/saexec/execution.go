@@ -175,6 +175,9 @@ func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
 //
+// The gas clock and base fee come from the parent's post-execution clock,
+// except pre-SAE blocks, which use their own header's fee.
+//
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
 // accepted block (as against one recovered from the database) MUST NOT be
@@ -194,11 +197,6 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	// TODO(JonathanOppenheimer): synchronous (pre-SAE) blocks carry their real
-	// base fee in the header and their parents have no gas clock. If we modify
-	// the hook.Points.SettledBy hook, we can detect them as
-	// hooks.SettledBy(header) == (hook.Settled{}) and source execution inputs
-	// from the header instead.
 	gasClock := parent.ExecutedByGasTime()
 	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
@@ -214,7 +212,11 @@ func Execute(
 	}
 
 	baseFee := gasClock.BaseFee()
-	b.CheckBaseFeeBound(baseFee)
+	if hook.Synchronous(hooks, header) {
+		baseFee = uint256.NewInt(b.HeaderBaseFee())
+	} else {
+		b.CheckBaseFeeBound(baseFee)
+	}
 	header.BaseFee = baseFee.ToBig()
 
 	signer := b.Signer(config)
@@ -341,7 +343,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.sendPostExecutionEvents(b.EthBlock(), r) // (3)
+	e.sendPostExecutionEvents(b, r) // (3)
 	return nil
 }
 

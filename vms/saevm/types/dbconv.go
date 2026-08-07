@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package types
 
 // This single function is in a standalone file to reduce confusion because
 // every required import has something to do with a database!
@@ -15,6 +15,6 @@ import (
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
-func newEthDB(db database.Database) ethdb.Database {
+func NewEthDB(db database.Database) ethdb.Database {
 	return rawdb.NewDatabase(evmdb.New(db))
 }
