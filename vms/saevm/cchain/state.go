@@ -24,6 +24,13 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.onBootstrappingOnce.Do(func() {
+			oldState := vm.mode.Get()
+			if oldState == snow.StateSyncing {
+				err = vm.SummaryHandler.Error(ctx)
+				if err != nil {
+					return
+				}
+			}
 			err = vm.onBootstrapping(ctx)
 		})
 		if err != nil {
