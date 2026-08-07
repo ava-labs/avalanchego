@@ -289,7 +289,7 @@ func (d *Diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 
 func (d *Diff) SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error {
 	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
-		return fmt.Errorf("getting current validator: %w", err)
+		return fmt.Errorf("getting current validator with subnet id %s and node id %s: %w", subnetID, nodeID, err)
 	}
 
 	d.setStakingInfo(subnetID, nodeID, stakingInfo)
@@ -308,7 +308,7 @@ func (d *Diff) setStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo St
 func (d *Diff) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error) {
 	// Defensive check to guarantee we are only being called for a validator that we know about.
 	if _, err := d.GetCurrentValidator(subnetID, nodeID); err != nil {
-		return StakingInfo{}, err
+		return StakingInfo{}, fmt.Errorf("getting current validator with subnet id %s and node id %s: %w", subnetID, nodeID, err)
 	}
 
 	// See if this was set in the current [Diff].
@@ -327,13 +327,13 @@ func (d *Diff) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, 
 
 func (d *Diff) PutCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil && !errors.Is(err, database.ErrNotFound) {
-		return fmt.Errorf("getting current validator: %w", err)
+		return fmt.Errorf("getting current validator with tx id %s: %w", staker.TxID, err)
 	} else if err == nil {
 		return fmt.Errorf("%w: %s", errUnexpectedStaker, staker.NodeID)
 	}
 
 	if err := d.currentStakerDiffs.PutValidator(staker); err != nil {
-		return fmt.Errorf("putting validator: %w", err)
+		return fmt.Errorf("putting validator with tx id %s: %w", staker.TxID, err)
 	}
 
 	d.setStakingInfo(staker.SubnetID, staker.NodeID, StakingInfo{})
@@ -343,10 +343,10 @@ func (d *Diff) PutCurrentValidator(staker *Staker) error {
 
 func (d *Diff) DeleteCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
-		return fmt.Errorf("getting current validator: %w", err)
+		return fmt.Errorf("getting current validator with tx id %s: %w", staker.TxID, err)
 	}
 
-	if err := verifyNoDelegators(d, staker.SubnetID, staker.NodeID); err != nil {
+	if err := verifyNoDelegators(d, staker); err != nil {
 		return err
 	}
 
@@ -372,7 +372,7 @@ func (d *Diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 
 func (d *Diff) PutCurrentDelegator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
-		return fmt.Errorf("getting current validator: %w", err)
+		return fmt.Errorf("getting current validator with tx id %s: %w", staker.TxID, err)
 	}
 
 	d.currentStakerDiffs.PutDelegator(staker)
@@ -381,7 +381,7 @@ func (d *Diff) PutCurrentDelegator(staker *Staker) error {
 
 func (d *Diff) DeleteCurrentDelegator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
-		return fmt.Errorf("getting current validator: %w", err)
+		return fmt.Errorf("getting current validator with tx id %s: %w", staker.TxID, err)
 	}
 
 	d.currentStakerDiffs.DeleteDelegator(staker)
@@ -649,7 +649,7 @@ func (d *Diff) Apply(baseState Chain) error {
 			// Delegators must be removed before their respective validators
 			for _, delegator := range validatorDiff.deletedDelegators {
 				if err := baseState.DeleteCurrentDelegator(delegator); err != nil {
-					return fmt.Errorf("deleting current delegator: %w", err)
+					return fmt.Errorf("deleting current delegator with tx id %s: %w", delegator.TxID, err)
 				}
 			}
 
@@ -657,12 +657,12 @@ func (d *Diff) Apply(baseState Chain) error {
 			// We therefore first delete and then only after add it.
 			if validatorDiff.removed != nil {
 				if err := baseState.DeleteCurrentValidator(validatorDiff.removed); err != nil {
-					return fmt.Errorf("deleting current validator: %w", err)
+					return fmt.Errorf("deleting current validator with tx id %s: %w", validatorDiff.removed.TxID, err)
 				}
 			}
 			if validatorDiff.added != nil {
 				if err := baseState.PutCurrentValidator(validatorDiff.added); err != nil {
-					return err
+					return fmt.Errorf("putting current validator with tx id %s: %w", validatorDiff.added.TxID, err)
 				}
 			}
 
@@ -745,7 +745,7 @@ func addCurrentDelegators(state Chain, validator *diffValidator) error {
 
 	for addedDelegatorIterator.Next() {
 		if err := state.PutCurrentDelegator(addedDelegatorIterator.Value()); err != nil {
-			return fmt.Errorf("putting current delegator: %w", err)
+			return fmt.Errorf("putting current delegator with tx id %s: %w", addedDelegatorIterator.Value().TxID, err)
 		}
 	}
 
