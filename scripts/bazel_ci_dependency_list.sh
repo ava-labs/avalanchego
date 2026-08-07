@@ -24,8 +24,8 @@ EOF
 bazel_ci_target_patterns() {
   cat <<'EOF'
 //main:avalanchego
-//... -- -//graft/...
-//graft/coreth/... //graft/evm/...
-//graft/subnet-evm/...
+//:main_unit_tests
+//:coreth_unit_tests
+//:subnet_evm_unit_tests
 EOF
 }
