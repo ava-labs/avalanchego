@@ -256,6 +256,11 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 	return nil
 }
 
+// AfterReexecutingBlock is a no-op that always returns nil.
+func (*Stub) AfterReexecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
+
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 //nolint:revive // struct-tag: canoto allows unexported fields

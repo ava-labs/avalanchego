@@ -89,6 +89,7 @@ go_library(
         "//vms/saevm/sae",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
+        "//vms/saevm/saexec",
         "//vms/saevm/types",
         "//x/blockdb",
         "@com_github_ava_labs_libevm//common",

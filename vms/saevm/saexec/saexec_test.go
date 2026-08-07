@@ -6,6 +6,7 @@ package saexec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -13,11 +14,13 @@ import (
 	"math/rand/v2"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -46,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -138,7 +142,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, DefaultConfig(), sutCfg.hooks, snowCtx, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -159,6 +163,55 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 func (s *SUT) Close() error {
 	return s.closeOnce()
+}
+
+// enqueueBlock appends a single-transaction block that settles the previous one,
+// and enqueues it for execution.
+func (s *SUT) enqueueBlock(ctx context.Context, t *testing.T) *blocks.Block {
+	t.Helper()
+
+	b := s.chain.NewBlock(t, types.Transactions{
+		s.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &common.Address{},
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+	}, blockstest.WithEthBlockOptions(
+		blockstest.ModifyHeader(func(h *types.Header) {
+			h.Root = s.chain.Last().PostExecutionStateRoot() // settles previous block
+		}),
+	))
+	require.NoErrorf(t, s.Enqueue(ctx, b), "%T.Enqueue()", s.Executor)
+	return b
+}
+
+// writeCanonicalBlocks stores every block built so far under its canonical
+// height, which [Executor.StateAt] requires to restore blocks for replay.
+func (s *SUT) writeCanonicalBlocks() {
+	for _, b := range s.chain.AllBlocks() {
+		rawdb.WriteBlock(s.db, b.EthBlock())
+		rawdb.WriteCanonicalHash(s.db, b.Hash(), b.Height())
+	}
+}
+
+// restart closes the SUT and returns a new [Executor] over the same chain data
+// directory, dropping the TrieDB cache as a node restart would.
+func (s *SUT) restart(t *testing.T, hooks hook.Points, config Config) *Executor {
+	t.Helper()
+
+	require.NoErrorf(t, s.Close(), "%T.Close()", s)
+
+	src := blocks.Source(s.chain.GetBlock)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	snowCtx.ChainDataDir = s.chainDataDir
+	snowCtx.Log = loggingtest.New(t, logging.Debug)
+
+	e, err := New(s.chain.Last(), src.AsHeaderSource(), s.chainConfig, s.db, s.xdb, s.saedbConfig, config, hooks, snowCtx, prometheus.NewRegistry())
+	require.NoError(t, err, "New() after restart")
+	t.Cleanup(func() {
+		require.NoErrorf(t, e.Close(), "%T.Close()", e)
+	})
+	return e
 }
 
 func defaultHooks() *saehookstest.Stub {
@@ -1051,17 +1104,6 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			},
 		},
 		{
-			name:     "firewood_archival",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available.
-				// The last executed state MUST NOT be available, since
-				// Firewood guarantees recovery from the last committed proposal.
-				return height < numBlocks
-			},
-		},
-		{
 			name:     "firewood",
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,
@@ -1095,38 +1137,17 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				c.commitInterval = commitInterval
 				c.dbScheme = tt.scheme
 			}))
-			e, chain := sut.Executor, sut.chain
+			chain := sut.chain
 
 			for range numBlocks {
-				b := chain.NewBlock(t, types.Transactions{
-					sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-						To:       &common.Address{},
-						Gas:      params.TxGas,
-						GasPrice: big.NewInt(1),
-					}),
-				}, blockstest.WithEthBlockOptions(
-					blockstest.ModifyHeader(func(h *types.Header) {
-						h.Root = chain.Last().PostExecutionStateRoot() // settles previous block
-					}),
-				))
-				require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+				sut.enqueueBlock(ctx, t)
 			}
 
 			final := chain.Last()
 			require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
-			require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
 
 			t.Run("recover", func(t *testing.T) {
-				// Restart the chain to remove the TrieDB cache.
-				src := blocks.Source(chain.GetBlock)
-				snowCtx := snowtest.Context(t, ids.GenerateTestID())
-				snowCtx.ChainDataDir = sut.chainDataDir
-				snowCtx.Log = loggingtest.New(t, logging.Debug)
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
-				require.NoError(t, err, "New()")
-				t.Cleanup(func() {
-					require.NoErrorf(t, e.Close(), "%T.Close()", e)
-				})
+				e := sut.restart(t, defaultHooks(), DefaultConfig())
 
 				for _, b := range chain.AllBlocks() {
 					var wantErr testerr.Want
@@ -1142,6 +1163,248 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			})
 		})
 	}
+}
+
+var errCanonicalAfterBlockDuringReplay = errors.New("canonical after-block hook called during replay")
+
+// replayRecordingHooks counts after-block hook calls, and optionally cancels a
+// request from within the replay hook to stop replay at a deterministic point.
+type replayRecordingHooks struct {
+	hook.Points
+	canonicalCalls int
+	replayCalls    int
+	cancel         context.CancelFunc
+}
+
+func (h *replayRecordingHooks) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	h.canonicalCalls++
+	return errCanonicalAfterBlockDuringReplay
+}
+
+func (h *replayRecordingHooks) AfterReexecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	h.replayCalls++
+	if h.cancel != nil {
+		h.cancel()
+		h.cancel = nil
+	}
+	return nil
+}
+
+// fillReplaySlots takes every replay slot for the duration of the test, so that
+// a request needing one has to wait.
+func fillReplaySlots(t *testing.T, e *Executor) {
+	t.Helper()
+
+	for range cap(e.replaySlots) {
+		e.replaySlots <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for range cap(e.replaySlots) {
+			<-e.replaySlots
+		}
+	})
+}
+
+func TestStateAtIsolatesUncommittedProposal(t *testing.T) {
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.dbScheme = customrawdb.FirewoodScheme
+	}))
+
+	target := sut.enqueueBlock(ctx, t)
+	require.NoErrorf(t, target.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", target)
+	sut.writeCanonicalBlocks()
+
+	// The target's root is still an uncommitted proposal, so it can only be
+	// served by replaying onto an earlier committed revision.
+	held, heldRelease, err := sut.StateAt(ctx, target, 0)
+	require.NoError(t, err, "Executor.StateAt() on proposal-only root")
+	defer heldRelease()
+
+	child := sut.enqueueBlock(ctx, t)
+	require.NoErrorf(t, child.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() settling proposal target", child)
+
+	// The target's revision is now committed, so this state is reconstructed
+	// exactly rather than replayed.
+	fresh, freshRelease, err := sut.StateAt(ctx, target, 0)
+	require.NoError(t, err, "Executor.StateAt() after proposal target is committed")
+	defer freshRelease()
+
+	addr := common.Address{0xff}
+	balance := uint256.NewInt(123)
+	held.SetBalance(addr, balance)
+	fresh.SetBalance(addr, balance)
+	require.Equal(t, fresh.IntermediateRoot(true), held.IntermediateRoot(true), "held query state after canonical proposal commit")
+}
+
+// replayTargets returns a block whose state e must replay from a seed more than
+// one block earlier, a block whose state e can reconstruct exactly, and the
+// replay distance of the former.
+func replayTargets(t *testing.T, e *Executor, all []*blocks.Block) (target, exact *blocks.Block, distance uint64) {
+	t.Helper()
+
+	reconstructable := func(b *blocks.Block) bool {
+		_, release, err := e.Reconstructing(b.PostExecutionStateRoot())
+		if err != nil {
+			return false
+		}
+		release()
+		return true
+	}
+
+	for i, b := range all {
+		if reconstructable(b) {
+			exact = b
+			continue
+		}
+		if _, err := e.StateDB(b.PostExecutionStateRoot()); err == nil {
+			continue // the ordinary state opens; no reconstruction needed
+		}
+
+		for seed := i - 1; seed >= 0; seed-- {
+			if !reconstructable(all[seed]) {
+				continue
+			}
+			if d := b.Height() - all[seed].Height(); d > 1 {
+				target, distance = b, d
+			}
+			break
+		}
+		if target != nil {
+			break
+		}
+	}
+
+	require.NotNil(t, exact, "block whose state can be reconstructed exactly after restart")
+	require.NotNil(t, target, "block whose state must be replayed from a seed more than one block earlier")
+	return target, exact, distance
+}
+
+func TestStateAtReconstructsMissingState(t *testing.T) {
+	const (
+		commitInterval         = 8
+		numBlocks              = commitInterval + 2
+		stateReplayConcurrency = 2
+	)
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.archival = true
+		c.commitInterval = commitInterval
+		c.dbScheme = customrawdb.FirewoodScheme
+	}))
+	for range numBlocks {
+		sut.enqueueBlock(ctx, t)
+	}
+	last := sut.chain.Last()
+	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", last)
+	sut.writeCanonicalBlocks()
+	allBlocks := sut.chain.AllBlocks()
+
+	hooks := &replayRecordingHooks{Points: defaultHooks()}
+	e := sut.restart(t, hooks, Config{StateReplayConcurrency: stateReplayConcurrency})
+	target, exact, distance := replayTargets(t, e, allBlocks)
+
+	t.Run("replay_uses_reexecution_hooks_and_stops_on_cancellation", func(t *testing.T) {
+		requestCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		hooks.cancel = cancel // cancels once the first replayed block finishes
+
+		_, _, err := e.StateAt(requestCtx, target, 0)
+		require.ErrorIsf(t, err, context.Canceled, "%T.StateAt(block %d)", e, target.Height())
+		require.Zero(t, hooks.canonicalCalls, "canonical after-block hook calls during replay")
+		require.Equal(t, 1, hooks.replayCalls, "replay after-block hook calls")
+	})
+
+	t.Run("canceled_while_waiting_for_a_replay_slot", func(t *testing.T) {
+		fillReplaySlots(t, e)
+
+		requestCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		// [Executor.StateAt] checks the context before anything else, so closing
+		// entered on that first check means the request is past the point where
+		// it could return early and has only the slot wait left to reach.
+		entered := make(chan struct{})
+		errCh := make(chan error, 1)
+		go func() {
+			_, _, err := e.StateAt(&notifyOnFirstErrContext{Context: requestCtx, entered: entered}, target, 0)
+			errCh <- err
+		}()
+		<-entered
+		cancel()
+
+		select {
+		case err := <-errCh:
+			require.ErrorIs(t, err, context.Canceled, "Executor.StateAt() while waiting for a replay slot")
+		case <-time.After(time.Second):
+			t.Fatal("Executor.StateAt() did not stop after cancellation")
+		}
+	})
+
+	tests := []struct {
+		name string
+		// target defaults to the block requiring replay.
+		target *blocks.Block
+		reexec uint64
+		// fillSlots takes every replay slot before the request is made.
+		fillSlots bool
+		// reRequest repeats the request, without releasing the returned states,
+		// once per replay slot.
+		reRequest bool
+	}{
+		{
+			// The commit interval is the floor: a smaller caller allowance MUST
+			// NOT make a state inside a persistence gap unavailable.
+			name:   "caller_reexec_below_persistence_floor",
+			reexec: distance - 1,
+		},
+		{
+			name:      "returned_state_does_not_hold_replay_slot",
+			reRequest: true,
+		},
+		{
+			name:      "exact_state_bypasses_replay_slot",
+			target:    exact,
+			fillSlots: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestTarget := target
+			if tt.target != nil {
+				requestTarget = tt.target
+			}
+			if tt.fillSlots {
+				fillReplaySlots(t, e)
+			}
+
+			stateDB, release, err := e.StateAt(ctx, requestTarget, tt.reexec)
+			require.NoErrorf(t, err, "%T.StateAt(block %d)", e, requestTarget.Height())
+			t.Cleanup(release)
+			require.NotNil(t, stateDB, "Executor.StateAt() state")
+
+			if !tt.reRequest {
+				return
+			}
+			for range cap(e.replaySlots) {
+				requestCtx, cancel := context.WithTimeout(ctx, time.Second)
+				_, nextRelease, err := e.StateAt(requestCtx, requestTarget, tt.reexec)
+				cancel()
+				require.NoError(t, err, "Executor.StateAt() while earlier returned states remain open")
+				t.Cleanup(nextRelease)
+			}
+		})
+	}
+}
+
+// notifyOnFirstErrContext closes entered on the first call to Err.
+type notifyOnFirstErrContext struct {
+	context.Context
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (c *notifyOnFirstErrContext) Err() error {
+	err := c.Context.Err()
+	c.once.Do(func() { close(c.entered) })
+	return err
 }
 
 // TestProcessBeaconBlockRoot verifies that block execution performs the

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -59,6 +60,7 @@ type config struct {
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit            uint64 `json:"batch-request-limit"`
 	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
+	StateReplayConcurrency       uint64 `json:"state-replay-concurrency"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`
@@ -89,6 +91,7 @@ func defaultConfig() config {
 		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
 		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
 		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
+		StateReplayConcurrency:       saexec.DefaultStateReplayConcurrency,
 	}
 }
 
@@ -106,6 +109,9 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
 	saeCfg := c.saeConfig(nil)
+	if err := saeCfg.ExecutionConfig.Verify(); err != nil {
+		return config{}, err
+	}
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
 		return config{}, err
 	}
@@ -140,6 +146,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
 			BatchRequestLimit:            c.BatchRequestLimit,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
+		},
+		ExecutionConfig: saexec.Config{
+			StateReplayConcurrency: c.StateReplayConcurrency,
 		},
 		Now: now,
 	}

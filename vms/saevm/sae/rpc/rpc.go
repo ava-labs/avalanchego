@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/event"
@@ -49,6 +50,7 @@ type Chain interface {
 
 	// Execution results and replay
 	saedb.StateDBOpener
+	StateAt(context.Context, *blocks.Block, uint64) (*state.StateDB, func(), error)
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
 

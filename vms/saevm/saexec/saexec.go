@@ -8,8 +8,10 @@
 package saexec
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -31,7 +33,39 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-var _ saedb.StateDBOpener = (*Executor)(nil)
+var (
+	_ saedb.StateDBOpener = (*Executor)(nil)
+
+	ErrZeroStateReplayConcurrency     = errors.New("state replay concurrency must be non-zero")
+	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
+)
+
+// DefaultStateReplayConcurrency is the maximum number of historical state
+// requests that may replay blocks concurrently by default.
+const DefaultStateReplayConcurrency uint64 = 1
+
+// Config controls historical state replay resource usage.
+type Config struct {
+	StateReplayConcurrency uint64
+}
+
+// DefaultConfig returns the [Config] used when an operator configures nothing.
+func DefaultConfig() Config {
+	return Config{
+		StateReplayConcurrency: DefaultStateReplayConcurrency,
+	}
+}
+
+// Verify checks that the configuration can execute historical state replay.
+func (c Config) Verify() error {
+	if c.StateReplayConcurrency == 0 {
+		return ErrZeroStateReplayConcurrency
+	}
+	if c.StateReplayConcurrency > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
+	}
+	return nil
+}
 
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
@@ -53,6 +87,14 @@ type Executor struct {
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
 	metrics      *metrics
+
+	// commitInterval is the minimum distance [Executor.StateAt] searches for a
+	// state to reconstruct from. The caller may request a larger replay horizon.
+	commitInterval uint64
+
+	// replaySlots bounds concurrent block replay and final root calculation for
+	// historical state requests. Exact reconstructed states do not use a slot.
+	replaySlots chan struct{}
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -68,10 +110,15 @@ func New(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
 	saedbConfig saedb.Config,
+	config Config,
 	hooks hook.Points,
 	snowCtx *snow.Context,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
+	if err := config.Verify(); err != nil {
+		return nil, err
+	}
+
 	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
 	if err != nil {
 		return nil, err
@@ -97,11 +144,13 @@ func New(
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
 			snowCtx.Log,
 		},
-		chainConfig: chainConfig,
-		db:          db,
-		xdb:         xdb,
-		metrics:     m,
-		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
+		chainConfig:    chainConfig,
+		db:             db,
+		xdb:            xdb,
+		metrics:        m,
+		receipts:       newSyncMap[common.Hash, eventual.Value[*Receipt]](),
+		commitInterval: saedbConfig.CommitInterval,
+		replaySlots:    make(chan struct{}, config.StateReplayConcurrency),
 	}
 	e.lastExecuted.Store(lastExecuted)
 
