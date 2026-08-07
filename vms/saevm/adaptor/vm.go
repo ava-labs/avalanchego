@@ -84,11 +84,15 @@ type blockWithContext interface {
 	snowman.Block
 }
 
+func (vm adaptor[BP]) wrap(b BP) blockWithContext {
+	return Block[BP]{b, vm.ChainVM}
+}
+
 func (vm adaptor[BP]) newBlock(b BP, err error) (blockWithContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Block[BP]{b, vm.ChainVM}, nil
+	return vm.wrap(b), nil
 }
 
 func (vm adaptor[BP]) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -100,16 +104,16 @@ func (vm adaptor[BP]) ParseBlock(ctx context.Context, blockBytes []byte) (snowma
 }
 
 func (vm adaptor[BP]) BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]snowman.Block, error) {
-	bps, err := vm.ChainVM.BatchedParseBlock(ctx, blocksBytes)
+	unwrapped, err := vm.ChainVM.BatchedParseBlock(ctx, blocksBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	blocks := make([]snowman.Block, len(bps))
-	for i, bp := range bps {
-		blocks[i] = Block[BP]{bp, vm.ChainVM}
+	wrapped := make([]snowman.Block, len(unwrapped))
+	for i, b := range unwrapped {
+		wrapped[i] = vm.wrap(b)
 	}
-	return blocks, nil
+	return wrapped, nil
 }
 
 func (vm adaptor[BP]) BuildBlock(ctx context.Context) (snowman.Block, error) {
