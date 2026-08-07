@@ -55,21 +55,20 @@ type Executor struct {
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
-// resources created by this constructor. The tracker remains owned by the
-// caller, who MUST NOT close it before [Executor.Close] has returned.
+// resources created by this constructor.
 //
 // The last-executed block MAY be the genesis block for an always-SAE chain, the
 // last pre-SAE synchronous block during transition, or the last asynchronously
 // executed block after shutdown and recovery.
 func New(
 	lastExecuted *blocks.Block,
-	tracker *saedb.Tracker,
 	headerSrc saetypes.HeaderSource,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
+	tracker *saedb.Tracker,
 	hooks hook.Points,
-	log logging.Logger,
+	logger logging.Logger,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
 	m, err := newMetrics(reg, lastExecuted)
@@ -81,16 +80,16 @@ func New(
 		Tracker: tracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
-		log:     log,
+		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan queuedBlock, 2*saedb.DefaultCommitInterval),
+		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			log,
+			logger,
 		},
 		chainConfig: chainConfig,
 		db:          db,
@@ -106,15 +105,13 @@ func New(
 
 var _ io.Closer = (*Executor)(nil)
 
-// Close shuts down the [Executor] and waits for the currently executing block
-// to complete. It does NOT close the tracker passed to [New], which is owned
-// by the caller; said caller SHOULD close it with the last-executed block's
-// post-execution state root once Close has returned.
+// Close shuts down the [Executor], waits for the currently executing block
+// to complete, and then releases all resources.
 func (e *Executor) Close() error {
 	close(e.quit)
 	<-e.done
 
-	return nil
+	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
 }
 
 // ChainConfig returns the config originally passed to [New].

@@ -247,7 +247,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	var _ snowman.Block // protect the input to allow comment linking
 
 	b, err := blocks.FromHash(
-		vm.chain,
+		vm.chain(),
 		common.Hash(id),
 		false, // consensus MAY request verified-but-not-accepted blocks
 		func(b *blocks.Block) *blocks.Block {

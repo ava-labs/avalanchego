@@ -44,16 +44,13 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-type last struct {
-	accepted, settled atomic.Pointer[blocks.Block]
-}
-
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
 // ensure that the last-synchronous block (which MAY be the genesis) is
 // canonical on disk with its post-execution state committed before [NewVM] is
 // called.
 type VM struct {
+	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
@@ -64,9 +61,11 @@ type VM struct {
 
 	consensusState utils.Atomic[snow.State]
 
-	preference     atomic.Pointer[blocks.Block]
-	last           *last
-	acceptedBlocks *event.FeedOf[*blocks.Block]
+	preference atomic.Pointer[blocks.Block]
+	last       struct {
+		accepted, settled atomic.Pointer[blocks.Block]
+	}
+	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
 	// decision; or (b) informing consensus invariants (e.g. artefacts to
 	// settle). The latter is defined as the history of accepted blocks up to,
@@ -78,7 +77,6 @@ type VM struct {
 	blockBuilder blockBuilder
 	rpcProvider  *rpc.Provider
 	newTxs       chan struct{}
-	chain        *chain
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -151,11 +149,54 @@ func NewVM[T hook.Transaction](
 
 	// ==========  Block State  ==========
 	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-	exec, consensusCritical, execClosers, err := rec.newExecutor(reg)
+	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding last committed state: %w", err)
 	}
-	toClose = append(toClose, execClosers...)
+	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
+
+	tracker, err := saedb.NewTracker(
+		db,
+		cfg.DBConfig,
+		lastCommittedRoot,
+		snowCtx.ChainDataDir,
+		snowCtx.Log,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+	}
+	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
+		func(b *blocks.Block) {
+			tracker.Track(b.SettledStateRoot())
+			// The post-execution root is tracked by the [saexec.Executor]
+			// as soon as it's known. In the case of database recovery,
+			// this occurred in [recovery.executeAllAccepted].
+		},
+		func(b *blocks.Block) {
+			tracker.Untrack(b.SettledStateRoot())
+			if b.Executed() { // i.e. deleted due to settlement not rejection
+				tracker.Untrack(b.PostExecutionStateRoot())
+			}
+		},
+	)
+	exec, err := saexec.New(
+		lastCommitted,
+		headerSource(consensusCritical, rec.db),
+		chainConfig,
+		db,
+		xdb,
+		tracker,
+		hooks,
+		snowCtx.Log,
+		reg,
+	)
+	if err != nil {
+		return nil, errors.Join(
+			fmt.Errorf("saexec.New(...): %v", err),
+			tracker.Close(lastCommittedRoot),
+		)
+	}
+	toClose = append(toClose, exec) // also closes tracker
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
 		return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
@@ -176,42 +217,6 @@ func NewVM[T hook.Transaction](
 	newTxs, newTxsCloser := signalNewTxsToEngine(pool)
 	toClose = append(toClose, newTxsCloser)
 
-	// ==========  Block Builder ==========
-	blockBuilder := &blockBuilderG[T]{
-		hooks,
-		cfg.Now,
-		snowCtx.Log,
-		exec,
-		pool,
-		ethBlockSource(consensusCritical, db),
-	}
-	acceptedBlocks := &event.FeedOf[*blocks.Block]{}
-	last := &last{}
-	head := exec.LastExecuted()
-	last.settled.Store(lastSettled)
-	last.accepted.Store(head)
-
-	// ==========  RPC Provider  ==========
-	chain := &chain{
-		Executor:          exec,
-		network:           network,
-		log:               snowCtx.Log,
-		hooks:             hooks,
-		consensusCritical: consensusCritical,
-		db:                db,
-		xdb:               xdb,
-		mempool:           pool,
-		acceptedBlocks:    acceptedBlocks,
-		rpcConfig:         cfg.RPCConfig,
-		blockBuilder:      blockBuilder,
-		last:              last,
-	}
-	rpcProvider, err := rpc.New(chain, cfg.RPCConfig)
-	if err != nil {
-		return nil, err
-	}
-	toClose = append(toClose, rpcProvider)
-
 	// ==========  Metrics  ==========
 	m, err := newMetrics(reg)
 	if err != nil {
@@ -219,25 +224,49 @@ func NewVM[T hook.Transaction](
 	}
 	m.markSettled(lastSettled.Height())
 
-	vm := &VM{
+	vm := &VM{ //exhaustruct:enforce
+		network:           network,
 		hooks:             hooks,
 		config:            cfg,
 		snowCtx:           snowCtx,
 		metrics:           m,
 		db:                db,
 		xdb:               xdb,
+		consensusState:    utils.Atomic[snow.State]{},
+		acceptedBlocks:    event.FeedOf[*blocks.Block]{},
 		consensusCritical: consensusCritical,
 		exec:              exec,
-		toClose:           toClose,
 		mempool:           pool,
-		newTxs:            newTxs,
-		acceptedBlocks:    acceptedBlocks,
-		last:              last,
-		blockBuilder:      blockBuilder,
-		rpcProvider:       rpcProvider,
-		chain:             chain,
+		blockBuilder: &blockBuilderG[T]{
+			hooks,
+			cfg.Now,
+			snowCtx.Log,
+			exec,
+			pool,
+			ethBlockSource(consensusCritical, db),
+		},
+		newTxs:  newTxs,
+		toClose: toClose,
 	}
+
+	head := exec.LastExecuted()
 	vm.preference.Store(head)
+	vm.last.accepted.Store(head)
+	vm.last.settled.Store(lastSettled)
+
+	// ==========  RPC Provider  ==========
+	{
+		// TODO(arr4n) there is a circular dependency that isn't necessarily
+		// worth untangling: the RPC provider requires the VM as it satisfies
+		// part of [rpc.Chain], but the VM requires the provider for creating
+		// HTTP handlers.
+		rpcProvider, err := rpc.New(vm.chain(), cfg.RPCConfig)
+		if err != nil {
+			return nil, err
+		}
+		vm.toClose = append(vm.toClose, rpcProvider)
+		vm.rpcProvider = rpcProvider
+	}
 	return vm, nil
 }
 

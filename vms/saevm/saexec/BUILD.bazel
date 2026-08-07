@@ -44,8 +44,6 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
-        "//ids",
-        "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/gas",
