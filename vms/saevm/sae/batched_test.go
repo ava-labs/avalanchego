@@ -9,12 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -180,183 +177,6 @@ func TestBatchedParseBlock(t *testing.T) {
 	})
 }
 
-// newRawdbTestBlock returns a block with contents unique to the arguments so
-// that blocks at equal heights have distinct hashes, headers and bodies.
-func newRawdbTestBlock(height uint64, extra string) *types.Block {
-	header := &types.Header{
-		Number: new(big.Int).SetUint64(height),
-		Extra:  []byte(extra),
-	}
-	uncle := &types.Header{
-		Number: new(big.Int).SetUint64(height),
-		Extra:  []byte("uncle of " + extra),
-	}
-	return types.NewBlockWithHeader(header).WithBody(types.Body{
-		Uncles: []*types.Header{uncle},
-	})
-}
-
-// TestReadCanonicalRLPRange exercises [readCanonicalRLPRange] over a database
-// populated only via [rawdb], covering height gaps, hash-only heights and
-// non-canonical siblings.
-func TestReadCanonicalRLPRange(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	const (
-		lastHeight     = 12
-		gapHeight      = 4 // nothing stored
-		siblingHeight  = 6 // canonical and non-canonical blocks stored
-		hashOnlyHeight = 8 // canonical hash stored without header or body
-	)
-	for height := uint64(0); height <= lastHeight; height++ {
-		if height == gapHeight {
-			continue
-		}
-		b := newRawdbTestBlock(height, "canonical")
-		rawdb.WriteCanonicalHash(db, b.Hash(), height)
-		if height == hashOnlyHeight {
-			continue
-		}
-		rawdb.WriteBlock(db, b)
-	}
-	// Non-canonical siblings, as written by older versions, MUST NOT leak
-	// into the results even if one sorts after the canonical block within its
-	// height.
-	rawdb.WriteBlock(db, newRawdbTestBlock(siblingHeight, "non-canonical"))
-	rawdb.WriteBlock(db, newRawdbTestBlock(siblingHeight, "another non-canonical"))
-
-	// Excludes stored heights at both ends to test range bounds.
-	const from, to = 2, 10
-	want := make([]storedBlockRLP, to-from+1)
-	for i := range want {
-		num := uint64(from + i)
-		hash := rawdb.ReadCanonicalHash(db, num)
-		if hash == (common.Hash{}) {
-			continue
-		}
-		want[i] = storedBlockRLP{
-			hash:   hash,
-			header: rawdb.ReadHeaderRLP(db, hash, num),
-			body:   rawdb.ReadBodyRLP(db, hash, num),
-		}
-	}
-
-	got, err := readCanonicalRLPRange(t.Context(), db, from, to)
-	require.NoErrorf(t, err, "readCanonicalRLPRange(..., %d, %d)", from, to)
-	require.Equalf(t, want, got, "readCanonicalRLPRange(..., %d, %d)", from, to)
-}
-
-func TestAncestorsDescending(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	const (
-		numBlocks = 300 // spans multiple pages of ancestorsPageSize heights
-		gapHeight = 150 // MUST truncate any response reaching down to it
-	)
-	var (
-		encoded = make([][]byte, numBlocks) // encoded[i] is the block at height i
-		hashes  = make([]common.Hash, numBlocks)
-	)
-	for height := uint64(0); height < numBlocks; height++ {
-		if height == gapHeight {
-			continue
-		}
-		b := newRawdbTestBlock(height, "canonical")
-		rawdb.WriteBlock(db, b)
-		rawdb.WriteCanonicalHash(db, b.Hash(), height)
-		hashes[height] = b.Hash()
-
-		enc, err := rlp.EncodeToBytes(b)
-		require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
-		encoded[height] = enc
-	}
-
-	// wantDescending(hi, n) is the expected response of blocks at heights
-	// (hi-n, hi], highest first.
-	wantDescending := func(hi uint64, n int) [][]byte {
-		want := make([][]byte, 0, n)
-		for i := range n {
-			want = append(want, encoded[hi-uint64(i)])
-		}
-		return want
-	}
-
-	const noSizeLimit = 1e9 // sufficiently large
-	tests := []struct {
-		name     string
-		lo, base uint64
-		hash     common.Hash
-		maxSize  int
-		want     [][]byte
-	}{
-		{
-			name:    "single_page",
-			lo:      290,
-			base:    numBlocks - 1,
-			hash:    hashes[numBlocks-1],
-			maxSize: noSizeLimit,
-			want:    wantDescending(numBlocks-1, 10),
-		},
-		{
-			name:    "gap_truncates_across_pages",
-			lo:      0,
-			base:    numBlocks - 1,
-			hash:    hashes[numBlocks-1],
-			maxSize: noSizeLimit,
-			want:    wantDescending(numBlocks-1, numBlocks-gapHeight-1),
-		},
-		{
-			name: "size_limit_truncates",
-			lo:   200,
-			base: numBlocks - 1,
-			hash: hashes[numBlocks-1],
-			maxSize: len(encoded[numBlocks-1]) + len(encoded[numBlocks-2]) +
-				2*wrappers.IntLen, // inclusive bound; third block exceeds it
-			want: wantDescending(numBlocks-1, 2),
-		},
-		{
-			name:    "size_limit_below_first_block",
-			lo:      200,
-			base:    numBlocks - 1,
-			hash:    hashes[numBlocks-1],
-			maxSize: len(encoded[numBlocks-1]) + wrappers.IntLen - 1,
-			want:    wantDescending(numBlocks-1, 1), // first block always included
-		},
-		{
-			name:    "down_to_genesis_across_pages",
-			lo:      0,
-			base:    gapHeight - 1,
-			hash:    hashes[gapHeight-1],
-			maxSize: noSizeLimit,
-			want:    wantDescending(gapHeight-1, gapHeight),
-		},
-		{
-			name:    "base_hash_not_canonical",
-			lo:      200,
-			base:    numBlocks - 1,
-			hash:    hashes[250], // a canonical hash, but not of the base height
-			maxSize: noSizeLimit,
-			want:    nil,
-		},
-		{
-			name:    "base_height_missing",
-			lo:      100,
-			base:    gapHeight,
-			hash:    hashes[gapHeight+1], // nothing is stored at gapHeight
-			maxSize: noSizeLimit,
-			want:    nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ancestorsDescending(t.Context(), db, tt.hash, tt.lo, tt.base, tt.maxSize)
-			require.NoErrorf(t, err, "ancestorsDescending(..., %d, %d, %d)", tt.lo, tt.base, tt.maxSize)
-			require.Equalf(t, tt.want, got, "ancestorsDescending(..., %d, %d, %d)", tt.lo, tt.base, tt.maxSize)
-		})
-	}
-}
-
 func BenchmarkGetAncestors(b *testing.B) {
 	log := loggingtest.New(b, logging.Info)
 
@@ -421,26 +241,6 @@ func BenchmarkGetAncestors(b *testing.B) {
 	}
 }
 
-/*
-goos: darwin
-goarch: arm64
-pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
-cpu: Apple M2 Max
-BenchmarkGetAncestors/batched-12         	    1960	    542917 ns/op	      1054 blocks	 4200376 B/op	    8268 allocs/op
-BenchmarkGetAncestors/serial-12          	      20	  54339985 ns/op	      1054 blocks	37979158 B/op	  537176 allocs/op
-PASS
-ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	44.907s
-
-goos: darwin
-goarch: arm64
-pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
-cpu: Apple M2 Max
-BenchmarkGetAncestors/batched-12         	      74	  15920889 ns/op	      1054 blocks	14938205 B/op	  251162 allocs/op
-BenchmarkGetAncestors/serial-12          	      19	  59969941 ns/op	      1054 blocks	37900856 B/op	  537168 allocs/op
-PASS
-ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	45.513s
-*/
-
 func BenchmarkBatchedParseBlock(b *testing.B) {
 	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(b, 1, opt)
@@ -480,14 +280,3 @@ func BenchmarkBatchedParseBlock(b *testing.B) {
 		})
 	}
 }
-
-/*
-goos: darwin
-goarch: arm64
-pkg: github.com/ava-labs/avalanchego/vms/saevm/sae
-cpu: Apple M2 Max
-BenchmarkBatchedParseBlock/batched-12         	     100	  10505568 ns/op	31995359 B/op	  625716 allocs/op
-BenchmarkBatchedParseBlock/serial-12          	      24	  49528109 ns/op	31736952 B/op	  622088 allocs/op
-PASS
-ok  	github.com/ava-labs/avalanchego/vms/saevm/sae	8.605s
-*/
