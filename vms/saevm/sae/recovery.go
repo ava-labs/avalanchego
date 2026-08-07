@@ -170,10 +170,10 @@ func lastOf[E any](s []E) E {
 	return s[len(s)-1]
 }
 
-// consensusCriticalBlocks populates the block-hash-keyed map of all blocks from
-// the last executed back to, and including, the block that it settled. Said
-// settled block is returned separately, for convenience.
-func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
+// populateConsensusCriticalBlocks populates the block-hash-keyed map of all
+// blocks from the last executed back to, and including, the block that it
+// settled. Said settled block is returned separately, for convenience.
+func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 

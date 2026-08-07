@@ -211,7 +211,7 @@ func NewVM[T hook.Transaction](
 			return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 		}
 
-		lastSettled, err := rec.consensusCriticalBlocks(exec, vm.consensusCritical)
+		lastSettled, err := rec.populateConsensusCriticalBlocks(exec, vm.consensusCritical)
 		if err != nil {
 			return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 		}
