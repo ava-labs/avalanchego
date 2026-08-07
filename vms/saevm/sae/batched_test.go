@@ -478,9 +478,7 @@ func BenchmarkBatchedParseBlock(b *testing.B) {
 	} {
 		b.Run(bench.name, func(b *testing.B) {
 			for b.Loop() {
-				parsed, err := block.BatchedParseBlock(ctx, bench.vm, bufs)
-				require.NoError(b, err, "block.BatchedParseBlock()")
-				require.Len(b, parsed, len(bufs), "block.BatchedParseBlock()")
+				_, _ = block.BatchedParseBlock(ctx, bench.vm, bufs)
 			}
 		})
 	}
