@@ -5,11 +5,13 @@ package evm
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
@@ -30,11 +32,19 @@ const (
 	RetryDelay = 100 * time.Millisecond
 )
 
+// builderTxPool is the subset of the tx pool used by the block builder.
+type builderTxPool interface {
+	PendingSize(filter txpool.PendingFilter) int
+	GasTip() *big.Int
+	SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription
+	SubscribeNewReorgEvent(ch chan<- core.NewTxPoolReorgEvent) event.Subscription
+}
+
 type blockBuilder struct {
 	clock *mockable.Clock
 	ctx   *snow.Context
 
-	txPool *txpool.TxPool
+	txPool builderTxPool
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -157,8 +167,20 @@ func (b *blockBuilder) waitForNeedToBuild(ctx context.Context) (time.Time, commo
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 	for !b.needToBuild() || b.pendingPoolUpdate() {
-		if err := b.pendingSignal.Wait(ctx); err != nil {
-			return time.Time{}, common.Hash{}, err
+		// Bounded wait: re-check the condition at least every RetryDelay even
+		// if no signal arrives. needToBuild filters pending txs against the tx
+		// pool's cached base fee estimate, which is refreshed periodically
+		// without notifying anyone, so the predicate can flip to true with no
+		// corresponding Broadcast (e.g. the estimate decays back below the gas
+		// price of already-pooled txs). Without a timeout that leaves a
+		// populated-but-quiet mempool stalled forever. A timeout expiry is a
+		// recheck, not an error; only cancellation of the parent context is
+		// propagated.
+		timeoutCtx, cancel := context.WithTimeout(ctx, RetryDelay)
+		err := b.pendingSignal.Wait(timeoutCtx)
+		cancel()
+		if err != nil && ctx.Err() != nil {
+			return time.Time{}, common.Hash{}, ctx.Err()
 		}
 	}
 	return b.lastBuildTime, b.lastBuildParentHash, nil
