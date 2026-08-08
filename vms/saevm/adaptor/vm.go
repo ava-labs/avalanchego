@@ -23,7 +23,9 @@ type ChainVM[BP BlockProperties] interface {
 	common.VM
 
 	GetBlock(context.Context, ids.ID) (BP, error)
+	GetAncestors(context.Context, ids.ID, int, int, time.Duration) ([][]byte, error)
 	ParseBlock(context.Context, []byte) (BP, error)
+	BatchedParseBlock(context.Context, [][]byte) ([]BP, error)
 	BuildBlock(context.Context, *block.Context) (BP, error) // block.Context MAY be nil
 
 	// Transferred from [snowman.Block] and [block.WithVerifyContext].
@@ -53,6 +55,7 @@ type ChainVMWithContext interface {
 	block.ChainVM
 	block.BuildBlockWithContextChainVM
 	block.SetPreferenceWithContextChainVM
+	block.BatchedChainVM
 }
 
 // Convert transforms a generic [ChainVM] into a [chainVMWithContext]. All
@@ -94,6 +97,19 @@ func (vm adaptor[BP]) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block
 
 func (vm adaptor[BP]) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	return vm.newBlock(vm.ChainVM.ParseBlock(ctx, blockBytes))
+}
+
+func (vm adaptor[BP]) BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]snowman.Block, error) {
+	bps, err := vm.ChainVM.BatchedParseBlock(ctx, blocksBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	blocks := make([]snowman.Block, len(bps))
+	for i, bp := range bps {
+		blocks[i] = Block[BP]{bp, vm.ChainVM}
+	}
+	return blocks, nil
 }
 
 func (vm adaptor[BP]) BuildBlock(ctx context.Context) (snowman.Block, error) {
