@@ -1,0 +1,78 @@
+{
+  "name": "Firewood Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USERNAME": "${localEnv:USER:developer}",
+      "UBUNTU_VERSION": "24.04",
+      "GO_VERSION": "1.25.8"
+    }
+  },
+  "remoteUser": "${localEnv:USER:developer}",
+  "workspaceFolder": "/workspaces/firewood",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/firewood,type=bind,consistency=cached",
+  "mounts": [
+    {
+      "source": "firewood-sccache-${localEnv:USER:developer}",
+      "target": "/home/${localEnv:USER:developer}/.cache/sccache",
+      "type": "volume"
+    },
+    {
+      "source": "firewood-cargo-registry-${localEnv:USER:developer}",
+      "target": "/home/${localEnv:USER:developer}/.cargo/registry",
+      "type": "volume"
+    },
+    {
+      "source": "firewood-cargo-git-${localEnv:USER:developer}",
+      "target": "/home/${localEnv:USER:developer}/.cargo/git",
+      "type": "volume"
+    },
+    {
+      "source": "firewood-go-pkg-${localEnv:USER:developer}",
+      "target": "/home/${localEnv:USER:developer}/go/pkg",
+      "type": "volume"
+    }
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Anthropic.claude-code",
+        "DavidAnson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "golang.go",
+        "llvm-vs-code-extensions.lldb-dap",
+        "mhutchie.git-graph",
+        "mk12.better-git-line-blame",
+        "mkhl.shfmt",
+        "ms-vscode.cpptools-extension-pack",
+        "nefrob.vscode-just-syntax",
+        "redhat.vscode-yaml",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "timonwong.shellcheck",
+        "vadimcn.vscode-lldb"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.cargo.features": ["ethhash", "logger"],
+        "[rust]": {
+          "editor.formatOnSave": true
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "postCreateCommand": "rustup show && go version && nix --version && sccache --show-stats",
+  "postStartCommand": "sccache --show-stats",
+  "runArgs": ["--init"],
+  "containerEnv": {
+    "CARGO_HOME": "/home/${localEnv:USER:developer}/.cargo",
+    "GOPATH": "/home/${localEnv:USER:developer}/go",
+    "SCCACHE_DIR": "/home/${localEnv:USER:developer}/.cache/sccache"
+  }
+}

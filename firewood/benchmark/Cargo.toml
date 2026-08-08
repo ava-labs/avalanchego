@@ -1,0 +1,68 @@
+[package]
+name = "firewood-benchmark"
+version = "0.5.0"
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "Benchmarking tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["opentelemetry-proto"]
+
+[[bin]]
+name = "benchmark"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ['string'] }
+env_logger.workspace = true
+fastrace = { workspace = true, features = ["enable"] }
+firewood.workspace = true
+firewood-storage = { workspace = true, features = ["test_utils"] }
+hex.workspace = true
+log.workspace = true
+metrics.workspace = true
+metrics-util = { workspace = true, optional = true }
+rand.workspace = true
+rand_distr.workspace = true
+sha2.workspace = true
+# Regular dependencies
+fastrace-opentelemetry = { version = "0.18.0" }
+metrics-exporter-prometheus = { workspace = true, optional = true, features = ["http-listener"] }
+# These crates are also dependencies of `fastrace-opentelemetry` (pinned to
+# 0.18.0 above), and we must resolve to the same opentelemetry version it
+# requires — currently 0.32. Don't pin an exact version like "=0.32.0": drifting
+# from fastrace-opentelemetry's version pulls in two incompatible copies of
+# opentelemetry and causes build failures. If you bump fastrace-opentelemetry,
+# update these to match its new opentelemetry requirement.
+opentelemetry = "0.32"
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"] }
+opentelemetry-proto = "0.32"
+opentelemetry_sdk = "0.32"
+pretty-duration = "0.1.1"
+tikv-jemallocator = "0.7.0"
+
+[dependencies.tokio]
+optional = true
+version = "1.52.3"
+features = ["mio", "net", "parking_lot", "rt", "time"]
+
+[features]
+default = ["prometheus"]
+logger = ["firewood/logger"]
+prometheus = [
+     "dep:metrics-exporter-prometheus",
+     "dep:metrics-util",
+     "dep:tokio",
+]
+
+[lints]
+workspace = true

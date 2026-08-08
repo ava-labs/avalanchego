@@ -1,0 +1,5 @@
+error: expected a registry constant identifier, e.g., #[metrics(MY_OPERATION)]
+ --> tests/compile_fail/invalid_args.rs:4:11
+  |
+4 | #[metrics(123)]
+  |           ^^^
