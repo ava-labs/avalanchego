@@ -62,6 +62,8 @@ var (
 	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
 	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
+
+	errCreateL1TxNotSupported = errors.New("CreateL1Tx is not yet supported")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -870,6 +872,11 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 		},
 	)
 	return nil
+}
+
+func (*standardTxExecutor) CreateL1Tx(*txs.CreateL1Tx) error {
+	// CreateL1Tx is implemented in a future PR. Until then, the transaction is rejected.
+	return errCreateL1TxNotSupported
 }
 
 func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {

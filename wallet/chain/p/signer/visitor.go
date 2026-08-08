@@ -197,6 +197,11 @@ func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	return sign(s.tx, txSigners)
 }
 
+func (*visitor) CreateL1Tx(*txs.CreateL1Tx) error {
+	// This function will be implemented in a follow up PR. Until then, this transaction is rejected.
+	return ErrUnsupportedTxType
+}
+
 func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

@@ -37,6 +37,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterIglooTypes(c),
 		)
 	}
 
@@ -92,4 +93,10 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 // valid during the Helicon series of upgrades.
 func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
+}
+
+// RegisterIglooTypes registers the type information for blocks that were
+// valid during the Igloo series of upgrades.
+func RegisterIglooTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterIglooTypes(targetCodec)
 }
