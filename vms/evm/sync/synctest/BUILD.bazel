@@ -4,6 +4,7 @@ go_library(
     name = "synctest",
     testonly = True,
     srcs = [
+        "blocks.go",
         "network.go",
         "proto.go",
     ],
@@ -19,6 +20,10 @@ go_library(
         "//utils/set",
         "//version",
         "//vms/evm/sync/handlers",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//trie",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
