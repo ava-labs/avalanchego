@@ -31,9 +31,6 @@ import (
 func TestGetAncestors(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	batched, ok := sut.ChainVM.(block.BatchedChainVM)
-	require.Truef(t, ok, "%T must implement block.BatchedChainVM", sut.ChainVM)
-
 	const numBlocks = 5
 	chain := []*blocks.Block{sut.genesis}
 	for range numBlocks {
@@ -123,7 +120,7 @@ func TestGetAncestors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := batched.GetAncestors(ctx, tt.blkID, tt.maxNum, tt.maxSize, time.Minute)
+			got, err := sut.GetAncestors(ctx, tt.blkID, tt.maxNum, tt.maxSize, time.Minute)
 			require.NoErrorf(t, err, "GetAncestors(%s, %d, %d)", tt.blkID, tt.maxNum, tt.maxSize)
 			require.Equalf(t, tt.want, got, "GetAncestors(%s, %d, %d)", tt.blkID, tt.maxNum, tt.maxSize)
 		})
@@ -133,20 +130,10 @@ func TestGetAncestors(t *testing.T) {
 func TestBatchedParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	batched, ok := sut.ChainVM.(block.BatchedChainVM)
-	require.Truef(t, ok, "%T must implement block.BatchedChainVM", sut.ChainVM)
-
 	const numBlocks = 5
 	chain := []*blocks.Block{sut.genesis}
 	for range numBlocks {
-		chain = append(chain, sut.runConsensusLoop(t,
-			sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-				To:        &zeroAddr,
-				Gas:       params.TxGas,
-				GasFeeCap: big.NewInt(1),
-				Value:     big.NewInt(1),
-			}),
-		))
+		chain = append(chain, sut.runConsensusLoop(t))
 	}
 
 	bytes := make([][]byte, len(chain))
@@ -154,27 +141,39 @@ func TestBatchedParseBlock(t *testing.T) {
 		bytes[i] = b.Bytes()
 	}
 
-	t.Run("batched_parse", func(t *testing.T) {
-		parsed, err := batched.BatchedParseBlock(ctx, bytes)
-		require.NoErrorf(t, err, "%T.BatchedParseBlock()", batched)
-		require.Lenf(t, parsed, len(chain), "%T.BatchedParseBlock()", batched)
-		for i, b := range parsed {
-			require.Equalf(t, chain[i].ID(), b.ID(), "%T.BatchedParseBlock()[%d].ID()", batched, i)
-			require.Equalf(t, bytes[i], b.Bytes(), "%T.BatchedParseBlock()[%d].Bytes()", batched, i)
-		}
-	})
+	tests := []struct {
+		name    string
+		bufs    [][]byte
+		want    []*blocks.Block
+		wantErr string // required substring of the error; empty means no error
+	}{
+		{
+			name: "whole_chain",
+			bufs: bytes,
+			want: chain,
+		},
+		{
+			name:    "invalid_block",
+			bufs:    append([][]byte{[]byte("not a block")}, bytes...),
+			wantErr: "rlp.DecodeBytes",
+		},
+	}
 
-	t.Run("invalid_block", func(t *testing.T) {
-		bufs := append([][]byte{[]byte("not a block")}, bytes...)
-		_, err := batched.BatchedParseBlock(ctx, bufs)
-		require.ErrorContainsf(t, err, "rlp.DecodeBytes", "%T.BatchedParseBlock()", batched)
-	})
-
-	t.Run("batched_implementer_works", func(t *testing.T) {
-		parsed, err := block.BatchedParseBlock(t.Context(), sut, bytes)
-		require.NoError(t, err, "block.BatchedParseBlock()")
-		require.Len(t, parsed, len(chain), "block.BatchedParseBlock()")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed, err := sut.BatchedParseBlock(ctx, tt.bufs)
+			if tt.wantErr != "" {
+				require.ErrorContainsf(t, err, tt.wantErr, "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+				return
+			}
+			require.NoErrorf(t, err, "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+			require.Lenf(t, parsed, len(tt.want), "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+			for i, b := range parsed {
+				require.Equalf(t, tt.want[i].ID(), b.ID(), "%T.BatchedParseBlock()[%d].ID()", sut.ChainVMWithContext, i)
+				require.Equalf(t, tt.bufs[i], b.Bytes(), "%T.BatchedParseBlock()[%d].Bytes()", sut.ChainVMWithContext, i)
+			}
+		})
+	}
 }
 
 func BenchmarkGetAncestors(b *testing.B) {
@@ -222,8 +221,8 @@ func BenchmarkGetAncestors(b *testing.B) {
 		name string
 		vm   block.Getter
 	}{
-		{"batched", sut.ChainVM},
-		{"serial", serialGetter{sut.ChainVM}},
+		{"batched", sut},
+		{"serial", serialGetter{sut}},
 	} {
 		b.Run(bench.name, func(b *testing.B) {
 			for b.Loop() {
@@ -270,8 +269,8 @@ func BenchmarkBatchedParseBlock(b *testing.B) {
 		name string
 		vm   block.Parser
 	}{
-		{"batched", sut.ChainVM},
-		{"serial", serialParser{sut.ChainVM}},
+		{"batched", sut},
+		{"serial", serialParser{sut}},
 	} {
 		b.Run(bench.name, func(b *testing.B) {
 			for b.Loop() {
