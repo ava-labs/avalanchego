@@ -171,7 +171,7 @@ var (
 	errNoHeadHeader        = errors.New("no head header")
 )
 
-// setup configures the database with genesis.
+// setup configures the database with genesis and returns its state root.
 //
 // It verifies that the genesis is compatible with any previously setup genesis
 // state by checking the genesis block hash along with the rules used to execute
@@ -179,10 +179,10 @@ var (
 //
 // Once the chain is ready to be initialized, one must call
 // [genesis.checkAndWriteState] to ensure the genesis state is available.
-func (g *genesis) setup(db ethdb.Database) error {
+func (g *genesis) setup(db ethdb.Database) (common.Hash, error) {
 	block, err := g.block()
 	if err != nil {
-		return fmt.Errorf("constructing genesis block: %w", err)
+		return common.Hash{}, fmt.Errorf("constructing genesis block: %w", err)
 	}
 
 	// We can't exit early here. Even if the genesis block is on disk, the
@@ -190,10 +190,10 @@ func (g *genesis) setup(db ethdb.Database) error {
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
-			return fmt.Errorf("writing block: %w", err)
+			return common.Hash{}, fmt.Errorf("writing block: %w", err)
 		}
 	} else if prev != hash {
-		return &core.GenesisMismatchError{
+		return common.Hash{}, &core.GenesisMismatchError{
 			Stored: prev,
 			New:    hash,
 		}
@@ -204,25 +204,25 @@ func (g *genesis) setup(db ethdb.Database) error {
 	{
 		prev := rawdb.ReadChainConfig(db, hash)
 		if prev == nil {
-			return errNoStoredChainConfig
+			return common.Hash{}, errNoStoredChainConfig
 		}
 		head := rawdb.ReadHeadHeader(db)
 		if head == nil {
-			return errNoHeadHeader
+			return common.Hash{}, errNoHeadHeader
 		}
 		height, timestamp := head.Number.Uint64(), head.Time
 		// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
 		// that bypasses this compatibility check; we need to make such a check
 		// unnecessary for the c-chain.
 		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
-			return fmt.Errorf("incompatible chain config: %w", err)
+			return common.Hash{}, fmt.Errorf("incompatible chain config: %w", err)
 		}
 		// We will be executing new blocks based on the new chain config, so we
 		// need to keep it up-to-date in the database for the next restart.
 		rawdb.WriteChainConfig(db, hash, g.Config)
 	}
 
-	return nil
+	return block.Root(), nil
 }
 
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
@@ -337,21 +337,21 @@ func activatePrecompile(statedb *state.StateDB, addr common.Address) {
 
 // checkAndWriteState commits the genesis allocation to the state database if
 // it is not already present.
-func (g *genesis) checkAndWriteState(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+func (g *genesis) checkAndWriteState(
+	db ethdb.Database,
+	root common.Hash,
+	trieConfig *triedb.Config,
+) (retErr error) {
 	tdb := triedb.NewDatabase(db, trieConfig)
 	defer func() {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 
-	root, err := g.root()
-	if err != nil {
-		return fmt.Errorf("computing genesis root: %w", err)
-	}
 	if tdb.Initialized(root) {
 		return nil
 	}
 
-	_, err = g.writeState(db, tdb)
+	_, err := g.writeState(db, tdb)
 	return err
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -613,10 +614,12 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.setup(db), "%T.setup(initial)", g)
+			root, err := g.setup(db)
+			require.NoErrorf(t, err, "%T.setup(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
+			assert.Equalf(t, block.Root(), root, "%T.setup(initial) root", g)
 			genesisHash := block.Hash()
 			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
 			cmpBaseConfig := cmp.Options{
@@ -642,7 +645,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.setup(db)
+			gotRoot, err := g.setup(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
 			}
@@ -650,6 +653,7 @@ func TestSetupGenesis(t *testing.T) {
 			if tt.wantErr != nil {
 				return
 			}
+			assert.Equalf(t, root, gotRoot, "%T.setup(restart) root", g)
 
 			gotConfig = rawdb.ReadChainConfig(db, genesisHash)
 			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {

@@ -85,6 +85,7 @@ type VM struct {
 
 type deferredInit struct {
 	g           *genesis
+	genesisRoot ethcommon.Hash
 	db          ethdb.Database
 	cfg         sae.Config
 	hooks       *hooks
@@ -172,7 +173,8 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 
-	if err := genesis.setup(ethDB); err != nil {
+	genesisRoot, err := genesis.setup(ethDB)
+	if err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 	vm.SummaryHandler, err = cchainsync.New(userConfig.stateSyncConfig(), ethDB, hooks, vm.state, snowCtx.Log)
@@ -183,6 +185,7 @@ func (vm *VM) Initialize(
 
 	vm.deferredArgs = &deferredInit{
 		g:           genesis,
+		genesisRoot: genesisRoot,
 		db:          ethDB,
 		cfg:         userConfig.saeConfig(vm.now),
 		hooks:       hooks,
@@ -199,6 +202,7 @@ func (vm *VM) Initialize(
 func (vm *VM) onBootstrapping(ctx context.Context) error {
 	var (
 		genesis     = vm.deferredArgs.g
+		genesisRoot = vm.deferredArgs.genesisRoot
 		ethDB       = vm.deferredArgs.db
 		saeConfig   = vm.deferredArgs.cfg
 		snowCtx     = vm.ctx
@@ -210,7 +214,7 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 	vm.deferredArgs = nil
 
 	tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
-	if err := genesis.checkAndWriteState(ethDB, tdbConfig); err != nil {
+	if err := genesis.checkAndWriteState(ethDB, genesisRoot, tdbConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
