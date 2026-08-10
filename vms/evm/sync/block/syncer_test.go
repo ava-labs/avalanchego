@@ -372,7 +372,7 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 			responder := &staticResponder{blocks: [][]byte{tt.served}, cancel: cancel}
 			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID,
-				handlers.NewHandler[syncpb.GetBlockRequest](logging.NoLog{}, responder)))
+				handlers.NewHandler(logging.NoLog{}, responder)))
 
 			var opts []SyncerOption
 			if tt.verify != nil {
@@ -481,7 +481,7 @@ func (r *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req 
 func countingHandler(t *testing.T, blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
 	log := loggingtest.New(t, logging.Debug)
 	r := &countingResponder{inner: newResponder(log, synctest.NewBlockMap(blocks))}
-	return handlers.NewHandler[syncpb.GetBlockRequest](log, r), &r.requests
+	return handlers.NewHandler(log, r), &r.requests
 }
 
 func writeBlock(t *testing.T, db ethdb.Database, block *types.Block) {

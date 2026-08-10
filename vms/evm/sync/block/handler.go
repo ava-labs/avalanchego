@@ -66,7 +66,7 @@ func WithMaxResponseBytes(n int) HandlerOption {
 
 // RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider, opts ...HandlerOption) error {
-	h := handlers.NewHandler[syncpb.GetBlockRequest](log, newResponder(log, blocks, opts...))
+	h := handlers.NewHandler(log, newResponder(log, blocks, opts...))
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
 
