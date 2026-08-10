@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -18,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -372,8 +370,9 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 			defer cancel()
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			handler, served := staticBlockHandler(tt.served, cancel)
-			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+			responder := &staticResponder{blocks: [][]byte{tt.served}, cancel: cancel}
+			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID,
+				handlers.NewHandler[syncpb.GetBlockRequest](logging.NoLog{}, responder)))
 
 			var opts []SyncerOption
 			if tt.verify != nil {
@@ -385,28 +384,24 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
 			require.Nil(t, rawdb.ReadBlock(target, tip.Hash(), tip.NumberU64()))
-			require.Greater(t, served.Load(), int32(1), "the response was never rejected and re-requested")
+			require.Greater(t, responder.served.Load(), int32(1), "the response was never rejected and re-requested")
 		})
 	}
 }
 
-// staticBlockHandler serves blockBytes to every request and cancels on the
-// second, which the syncer only sends after rejecting the first.
-func staticBlockHandler(blockBytes []byte, cancel context.CancelFunc) (p2p.Handler, *atomic.Int32) {
-	var served atomic.Int32
-	h := p2p.TestHandler{
-		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *avacommon.AppError) {
-			respBytes, err := proto.Marshal(&syncpb.GetBlockResponse{Blocks: [][]byte{blockBytes}})
-			if err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			if served.Add(1) > 1 {
-				cancel()
-			}
-			return respBytes, nil
-		},
+// staticResponder answers every request with the same blocks and cancels on
+// the second, which the syncer only sends after rejecting the first.
+type staticResponder struct {
+	blocks [][]byte
+	cancel context.CancelFunc
+	served atomic.Int32
+}
+
+func (r *staticResponder) Respond(context.Context, ids.NodeID, *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
+	if r.served.Add(1) > 1 {
+		r.cancel()
 	}
-	return h, &served
+	return &syncpb.GetBlockResponse{Blocks: r.blocks}, nil
 }
 
 var errTestVerifier = errors.New("chain-specific verifier rejected the block")
@@ -471,19 +466,22 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 	}
 }
 
-// countingHandler serves blocks and counts how many requests it receives, so a
-// test can assert the syncer never asked for blocks it already had.
+// countingResponder counts the requests it serves, so a test can assert the
+// syncer never asked for blocks it already had.
+type countingResponder struct {
+	inner    handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
+	requests atomic.Int32
+}
+
+func (r *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
+	r.requests.Add(1)
+	return r.inner.Respond(ctx, nodeID, req)
+}
+
 func countingHandler(t *testing.T, blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
 	log := loggingtest.New(t, logging.Debug)
-	inner := handlers.NewHandler[syncpb.GetBlockRequest](log, newResponder(log, synctest.NewBlockMap(blocks)))
-	var requests atomic.Int32
-	h := p2p.TestHandler{
-		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
-			requests.Add(1)
-			return inner.AppRequest(c, n, d, b)
-		},
-	}
-	return h, &requests
+	r := &countingResponder{inner: newResponder(log, synctest.NewBlockMap(blocks))}
+	return handlers.NewHandler[syncpb.GetBlockRequest](log, r), &r.requests
 }
 
 func writeBlock(t *testing.T, db ethdb.Database, block *types.Block) {
