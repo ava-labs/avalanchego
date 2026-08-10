@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -86,5 +87,33 @@ func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (smblo
 func (vm *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (smblock.StateSummary, error) {
 	return withLocks(vm, func() (smblock.StateSummary, error) {
 		return vm.current.chain.GetStateSummary(ctx, summaryHeight)
+	})
+}
+
+var _ smblock.BatchedChainVM = (*VM)(nil)
+
+func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
+	return withLocks(vm, func() ([]snowman.Block, error) {
+		return smblock.BatchedParseBlock(ctx, vm.current.chain, blks)
+	})
+}
+
+func (vm *VM) GetAncestors(
+	ctx context.Context,
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	maxBlocksRetrievalTime time.Duration,
+) ([][]byte, error) {
+	return withLocks(vm, func() ([][]byte, error) {
+		return smblock.GetAncestors(
+			ctx,
+			vm.current.chainCtx.Log,
+			vm.current.chain,
+			blkID,
+			maxBlocksNum,
+			maxBlocksSize,
+			maxBlocksRetrievalTime,
+		)
 	})
 }
