@@ -226,6 +226,10 @@ fn key_value_to_string(key: &[u8], value: &[u8], hex: bool) -> (String, String) 
     (key_str, value_str)
 }
 
+fn write_json_string<W: Write>(writer: &mut W, value: &str) -> Result<(), std::io::Error> {
+    write!(writer, "\"{}\"", json_escape::escape_str(value))
+}
+
 fn handle_next_key(next_key: KeyFromStream) {
     match next_key {
         Some(Ok((key, _))) => {
@@ -283,7 +287,10 @@ impl OutputHandler for JsonOutputHandler {
             self.writer.write_all(b",\n")?;
         }
 
-        write!(self.writer, r#"  "{key_str}": "{value_str}""#)?;
+        write!(self.writer, "  ")?;
+        write_json_string(&mut self.writer, &key_str)?;
+        write!(self.writer, ": ")?;
+        write_json_string(&mut self.writer, &value_str)?;
         Ok(())
     }
 

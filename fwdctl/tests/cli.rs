@@ -465,6 +465,36 @@ fn test_slow_fwdctl_dump_with_csv_and_json() {
 }
 
 #[test]
+fn fwdctl_dump_json_escapes_special_characters() {
+    with_tmpdir(|db_path| {
+        create_db(db_path);
+
+        cargo_bin_cmd!()
+            .arg("insert")
+            .arg("--db")
+            .arg(db_path)
+            .args(["say\"hi\\", "line\n\t\u{1}"])
+            .assert()
+            .success();
+
+        cargo_bin_cmd!()
+            .arg("dump")
+            .arg("--db")
+            .arg(db_path)
+            .args(["--output-format", "json"])
+            .assert()
+            .success();
+
+        let contents = fs::read_to_string("dump.json").expect("Should read dump.json file");
+        assert_eq!(
+            contents,
+            "{\n  \"say\\\"hi\\\\\": \"line\\n\\t\\u0001\"\n}\n"
+        );
+        fs::remove_file("dump.json").expect("Should remove dump.json file");
+    });
+}
+
+#[test]
 fn fwdctl_dump_with_file_name() {
     with_tmpdir(|db_path| {
         create_db(db_path);
