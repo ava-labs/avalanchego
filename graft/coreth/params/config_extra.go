@@ -29,6 +29,17 @@ var (
 	errInvalidUpgradeTime = errors.New("invalid upgrade time")
 )
 
+// TestFixtureChainID identifies the pre-SAE fixture chain used for SAE testing
+// of synchronous blocks. Like Fuji and Mainnet, its Berlin and London heights
+// are pinned so that it can cross AP2 and AP3 mid-chain.
+var TestFixtureChainID = big.NewInt(43110)
+
+// Berlin and London activation heights of the [TestFixtureChainID] chain.
+const (
+	TestFixtureBerlinBlock = 3
+	TestFixtureLondonBlock = 5
+)
+
 // SetEthUpgrades enables Ethereum network upgrades using the same time as
 // the Avalanche network upgrade that enables them.
 func SetEthUpgrades(c *ChainConfig) error {
@@ -56,6 +67,9 @@ func SetEthUpgrades(c *ChainConfig) error {
 	case c.ChainID != nil && AvalancheMainnetChainID.Cmp(c.ChainID) == 0:
 		c.BerlinBlock = big.NewInt(1640340) // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 		c.LondonBlock = big.NewInt(3308552) // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
+	case c.ChainID != nil && TestFixtureChainID.Cmp(c.ChainID) == 0:
+		c.BerlinBlock = new(big.Int).SetUint64(TestFixtureBerlinBlock)
+		c.LondonBlock = new(big.Int).SetUint64(TestFixtureLondonBlock)
 	default:
 		// In testing or local networks, we only support enabling Berlin and
 		// London at the initially active time. This corresponds to an intended

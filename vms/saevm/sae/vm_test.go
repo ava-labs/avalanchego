@@ -225,7 +225,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
 		close:  closeOnce,
@@ -537,43 +537,42 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from
-// s.wallet[0], in its own consensus block, returning the block, the deployed
-// contract address, and the deploy tx.
-func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
+// s.wallet[0], in its own consensus block.
+func (s *SUT) deployEscrow(tb testing.TB) common.Address {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
 // balances[recipient] on the escrow contract at escrowAddr, in its own
-// consensus block, returning the block and the deposit tx.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
+// consensus block.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recipient),
-		Value:    depositVal,
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, tx
+	return block
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
