@@ -197,6 +197,13 @@ func TestBatchedParseBlock(t *testing.T) {
 	}
 }
 
+// defaultAncestorsMaxBlockCount is the default maximum number of blocks
+// requested by GetAncestors.
+//
+// TODO(StephenButtolph): This really isn't configurable. We should remove this
+// as a flag and just make it a global constant.
+const defaultAncestorsMaxBlockCount = 2000
+
 func BenchmarkGetAncestors(b *testing.B) {
 	log := loggingtest.New(b, logging.Info)
 
@@ -264,13 +271,6 @@ func BenchmarkGetAncestors(b *testing.B) {
 		})
 	}
 }
-
-// defaultAncestorsMaxBlockCount is the default maximum number of blocks
-// requested by GetAncestors.
-//
-// TODO(StephenButtolph): This really isn't configurable. We should remove this
-// as a flag and just make it a global constant.
-const defaultAncestorsMaxBlockCount = 2000
 
 func BenchmarkBatchedParseBlock(b *testing.B) {
 	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
