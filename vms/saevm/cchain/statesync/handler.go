@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
@@ -22,14 +23,15 @@ import (
 var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 
 // SummaryHandler wraps the SAE [statesync.SummaryHandler] with the C-Chain
-// atomic trie state, so every served summary carries the atomic trie root at
-// its height.
+// atomic trie state at the settled height.
 type SummaryHandler struct {
 	*statesync.SummaryHandler
 
-	hooks         hook.Points
-	state         *state.State
-	ethDB         ethdb.Database
+	hooks hook.Points
+	state *state.State
+	ethDB ethdb.Database
+	log   logging.Logger
+
 	stateSyncDone chan struct{}
 }
 
@@ -55,6 +57,7 @@ func New(
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
+		log:            log,
 		stateSyncDone:  make(chan struct{}),
 	}, nil
 }
@@ -86,7 +89,10 @@ func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summa
 	return h.wrap(h.SummaryHandler.GetOngoingSyncStateSummary(ctx))
 }
 
-// wrap pairs an SAE summary with the C-Chain atomic trie root at its height.
+// wrap pairs an SAE summary with the C-Chain atomic trie root at the
+// corresponding block's settled height.
+//
+// Any database errors are logged at [logging.Error] and returned to the caller.
 func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, error) {
 	if err != nil {
 		return nil, err
@@ -94,12 +100,14 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 
 	hdr := rawdb.ReadHeader(h.ethDB, base.BlockHash(), base.Height())
 	if hdr == nil {
+		h.log.Error("can't find header for block in database", zap.Stringer("blockHash", base.BlockHash()), zap.Uint64("height", base.Height()))
 		return nil, fmt.Errorf("can't find header for block %s at height %d", base.BlockHash(), base.Height())
 	}
 	settledHeight := h.hooks.SettledBy(hdr).Height
 
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
+		h.log.Error("getting settled C-Chain state root for state summary", zap.Uint64("settledHeight", settledHeight), zap.Error(err))
 		return nil, err
 	}
 	return &summary{

@@ -30,6 +30,7 @@ go_library(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_stephenbuttolph_canoto//:canoto",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
