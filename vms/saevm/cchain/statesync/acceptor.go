@@ -30,7 +30,7 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, summary *summary) (b
 
 	go func() {
 		defer close(h.stateSyncDone)
-		// TODO(alarso16): implement state sync
+		// TODO(alarso16): implement state sync with a synchronus statesync.SummaryHandler API.
 	}()
 	return mode, nil
 }
