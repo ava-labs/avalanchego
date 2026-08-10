@@ -54,7 +54,7 @@ func WithBlockVerifier(v BlockVerifier) SyncerOption {
 }
 
 // Syncer fetches a contiguous run of blocks by walking parents from a known tip
-// and writes them to db. It skips any suffix already on disk, verifies every
+// and writes them to db. It skips blocks already on disk, verifies every
 // response links tip-to-parent, and re-requests on failure.
 type Syncer struct {
 	log           logging.Logger
@@ -66,8 +66,8 @@ type Syncer struct {
 	verifyBlock   BlockVerifier // nil when the caller supplied no chain-specific check
 }
 
-// NewSyncer returns a [Syncer] that fetches blocksToFetch blocks ending at
-// (fromHash, fromHeight) and writes them into db, fetching from peers through c.
+// NewSyncer returns a [Syncer] that walks back from (fromHash, fromHeight),
+// which counts as the first of blocksToFetch.
 func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, blocksToFetch uint64, opts ...SyncerOption) (*Syncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
@@ -90,28 +90,12 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, fromHash common
 	}, nil
 }
 
-// Sync walks parents from fromHash, skips blocks already on disk, and fetches
-// the rest from peers in batches. It runs until blocksToFetch are satisfied,
-// the genesis parent is reached, or ctx ends.
+// Sync stops at blocksToFetch, at genesis, or when ctx ends. A chain shorter
+// than blocksToFetch is not an error.
 func (s *Syncer) Sync(ctx context.Context) error {
 	nextHash := s.fromHash
 	nextHeight := s.fromHeight
 	toFetch := s.blocksToFetch
-
-	// Skip any suffix already on disk, whether from the node's own chain or an
-	// interrupted sync.
-	for toFetch > 0 {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
-		if blk == nil {
-			break
-		}
-		nextHash = blk.ParentHash()
-		nextHeight--
-		toFetch--
-	}
 
 	batch := s.db.NewBatch()
 	var fetchErr error
@@ -119,6 +103,15 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		if err := ctx.Err(); err != nil {
 			fetchErr = err
 			break
+		}
+
+		// Skip anything already on disk, from the node's own chain or an
+		// interrupted sync.
+		if blk := rawdb.ReadBlock(s.db, nextHash, nextHeight); blk != nil {
+			nextHash = blk.ParentHash()
+			nextHeight--
+			toFetch--
+			continue
 		}
 
 		parents := uint16(min(toFetch, uint64(maxParentsPerRequest)))
