@@ -96,8 +96,6 @@ func TestRecoverWithBLOCKHASH(t *testing.T) {
 		byte(vm.NUMBER),
 		byte(vm.SUB),
 		byte(vm.BLOCKHASH),
-		byte(vm.POP),
-		byte(vm.STOP),
 	}
 	withContract := options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc[contractAddr] = types.Account{
@@ -106,11 +104,11 @@ func TestRecoverWithBLOCKHASH(t *testing.T) {
 		}
 	})
 
-	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	ctx, src := newSUT(t, 1, sutOpt, withContract, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	ctx, src := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
@@ -126,11 +124,10 @@ func TestRecoverWithBLOCKHASH(t *testing.T) {
 	}
 	src.close()
 
-	newDB := saetest.CopyDB(t, srcDB)
 	// Recreating the VM replays all accepted blocks since the last trie
 	// commit, re-executing the BLOCKHASH transactions.
-	_, sut := newSUT(t, 1, sutOpt, withContract, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
-		c.db = newDB
+	_, sut := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, srcDB)
 		c.logLevel = logging.Warn
 	}))
 

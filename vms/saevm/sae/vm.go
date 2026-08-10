@@ -149,60 +149,17 @@ func NewVM[T hook.Transaction](
 
 	// ==========  Block State  ==========
 	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-	lastCommitted, err := rec.lastCommittedBlock()
+	exec, consensusCritical, err := rec.newExecution(reg)
 	if err != nil {
-		return nil, fmt.Errorf("finding last committed state: %w", err)
+		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
-	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
-
-	tracker, err := saedb.NewTracker(
-		db,
-		cfg.DBConfig,
-		lastCommittedRoot,
-		snowCtx.ChainDataDir,
-		snowCtx.Log,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
-	}
-	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
-		func(b *blocks.Block) {
-			tracker.Track(b.SettledStateRoot())
-			// The post-execution root is tracked by the [saexec.Executor]
-			// as soon as it's known. In the case of database recovery,
-			// this occurred in [recovery.executeAllAccepted].
-		},
-		func(b *blocks.Block) {
-			tracker.Untrack(b.SettledStateRoot())
-			if b.Executed() { // i.e. deleted due to settlement not rejection
-				tracker.Untrack(b.PostExecutionStateRoot())
-			}
-		},
-	)
-	exec, err := saexec.New(
-		lastCommitted,
-		headerSource(consensusCritical, rec.db),
-		chainConfig,
-		db,
-		xdb,
-		tracker,
-		hooks,
-		snowCtx.Log,
-		reg,
-	)
-	if err != nil {
-		return nil, errors.Join(
-			fmt.Errorf("saexec.New(...): %v", err),
-			tracker.Close(lastCommittedRoot),
-		)
-	}
-	toClose = append(toClose, exec) // also closes tracker
+	toClose = append(toClose, exec)
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
 		return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 	}
 
-	lastSettled, err := rec.findConsensusCriticalBlocks(exec, consensusCritical)
+	lastSettled, err := rec.populateConsensusCriticalBlocks(exec, consensusCritical)
 	if err != nil {
 		return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
@@ -218,22 +175,20 @@ func NewVM[T hook.Transaction](
 	toClose = append(toClose, newTxsCloser)
 
 	// ==========  Metrics  ==========
-	m, err := newMetrics(reg)
+	metrics, err := newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
-	m.markSettled(lastSettled.Height())
+	metrics.markSettled(lastSettled.Height())
 
-	vm := &VM{ //exhaustruct:enforce
+	vm := &VM{
 		network:           network,
 		hooks:             hooks,
 		config:            cfg,
 		snowCtx:           snowCtx,
-		metrics:           m,
+		metrics:           metrics,
 		db:                db,
 		xdb:               xdb,
-		consensusState:    utils.Atomic[snow.State]{},
-		acceptedBlocks:    event.FeedOf[*blocks.Block]{},
 		consensusCritical: consensusCritical,
 		exec:              exec,
 		mempool:           pool,
