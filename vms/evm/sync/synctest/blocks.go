@@ -73,20 +73,15 @@ func makeTxs(n int, height uint64) []*types.Transaction {
 	return txs
 }
 
-// BlockMap is an in-memory [block.Provider] keyed by hash and canonical height.
+// BlockMap is an in-memory [block.Provider] keyed by hash.
 type BlockMap struct {
-	byHash   map[common.Hash]*types.Block
-	byHeight map[uint64]*types.Block
+	byHash map[common.Hash]*types.Block
 }
 
 func NewBlockMap(blocks []*types.Block) *BlockMap {
-	m := &BlockMap{
-		byHash:   make(map[common.Hash]*types.Block, len(blocks)),
-		byHeight: make(map[uint64]*types.Block, len(blocks)),
-	}
+	m := &BlockMap{byHash: make(map[common.Hash]*types.Block, len(blocks))}
 	for _, b := range blocks {
 		m.byHash[b.Hash()] = b
-		m.byHeight[b.NumberU64()] = b
 	}
 	return m
 }
@@ -97,8 +92,4 @@ func (m *BlockMap) GetBlock(hash common.Hash, height uint64) *types.Block {
 		return nil
 	}
 	return b
-}
-
-func (m *BlockMap) GetBlockByHeight(height uint64) *types.Block {
-	return m.byHeight[height]
 }

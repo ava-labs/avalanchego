@@ -70,11 +70,10 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider, opts
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
 
-// Provider returns blocks by (hash, height) or by canonical height.
+// Provider returns a block by (hash, height), canonical or not.
 // A nil return stops the parent walk.
 type Provider interface {
 	GetBlock(hash common.Hash, height uint64) *types.Block
-	GetBlockByHeight(height uint64) *types.Block
 }
 
 var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*responder)(nil)
@@ -106,7 +105,7 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	encoded := make([][]byte, 0, parents)
 	totalBytes := 0
 
-	block := r.blocks.GetBlockByHeight(req.GetHeight())
+	block := r.blocks.GetBlock(common.BytesToHash(req.GetHash()), req.GetHeight())
 	for range parents {
 		if ctx.Err() != nil {
 			break

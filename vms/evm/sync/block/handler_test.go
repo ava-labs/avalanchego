@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
@@ -20,12 +21,17 @@ import (
 )
 
 func TestResponder(t *testing.T) {
+	// Every block in a chain encodes to the same size, so a budget can be
+	// stated in whole blocks.
+	blockBytes := len(encodeBlock(t, synctest.MakeChain(t, 1)[1]))
+
 	tests := []struct {
 		name       string
 		chainLen   int
 		numParents uint32
 		noBlocks   bool
 		cancelCtx  bool
+		budget     int // zero leaves the default response budget
 		wantBlocks int
 		wantErr    *avacommon.AppError
 	}{
@@ -66,6 +72,20 @@ func TestResponder(t *testing.T) {
 			numParents: 0,
 			wantErr:    errNoParentsRequested,
 		},
+		{
+			name:       "budget fits three blocks",
+			chainLen:   10,
+			numParents: 5,
+			budget:     3 * blockBytes,
+			wantBlocks: 3,
+		},
+		{
+			name:       "oversized block served alone",
+			chainLen:   10,
+			numParents: 5,
+			budget:     blockBytes / 2,
+			wantBlocks: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -74,7 +94,11 @@ func TestResponder(t *testing.T) {
 			if !tt.noBlocks {
 				blocks = synctest.MakeChain(t, tt.chainLen)
 			}
-			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks))
+			var opts []HandlerOption
+			if tt.budget > 0 {
+				opts = append(opts, WithMaxResponseBytes(tt.budget))
+			}
+			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks), opts...)
 
 			ctx := t.Context()
 			if tt.cancelCtx {
@@ -83,12 +107,17 @@ func TestResponder(t *testing.T) {
 				cancel() // cancel before the responder runs
 			}
 
-			height := uint64(10)
+			var (
+				hash   = common.Hash{0xde, 0xad}
+				height = uint64(10)
+			)
 			if len(blocks) > 0 {
-				height = blocks[len(blocks)-1].NumberU64()
+				tip := blocks[len(blocks)-1]
+				hash, height = tip.Hash(), tip.NumberU64()
 			}
 
 			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
+				Hash:       hash.Bytes(),
 				Height:     height,
 				NumParents: tt.numParents,
 			})
@@ -118,40 +147,4 @@ func TestErrorSentinels(t *testing.T) {
 		"errNoParentsRequested": errNoParentsRequested,
 		"errServingCancelled":   errServingCancelled,
 	})
-}
-
-func TestResponder_MaxResponseBytes(t *testing.T) {
-	blocks := synctest.MakeChain(t, 5)
-	tip := blocks[len(blocks)-1]
-	oneBlock := len(encodeBlock(t, tip))
-
-	tests := []struct {
-		name       string
-		budget     int
-		wantBlocks int
-	}{
-		{
-			name:       "budget fits three blocks",
-			budget:     3 * oneBlock,
-			wantBlocks: 3,
-		},
-		{
-			name:       "oversized block served alone",
-			budget:     oneBlock / 2,
-			wantBlocks: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks), WithMaxResponseBytes(tt.budget))
-
-			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-				Height:     tip.NumberU64(),
-				NumParents: 5,
-			})
-			require.Nil(t, err)
-			require.Len(t, resp.Blocks, tt.wantBlocks)
-		})
-	}
 }
