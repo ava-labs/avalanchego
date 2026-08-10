@@ -114,15 +114,18 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	}
 
 	batch := s.db.NewBatch()
+	var fetchErr error
 	for toFetch > 0 && nextHash != (common.Hash{}) {
 		if err := ctx.Err(); err != nil {
-			return err
+			fetchErr = err
+			break
 		}
 
 		parents := uint16(min(toFetch, uint64(maxParentsPerRequest)))
 		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, parents, s.verifyBlock)
 		if err != nil {
-			return fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
+			fetchErr = fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
+			break
 		}
 
 		for _, block := range blocks {
@@ -136,20 +139,27 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		if batch.ValueSize() < ethdb.IdealBatchSize {
 			continue
 		}
+		// Retrying the flush below would only fail again.
 		if err := batch.Write(); err != nil {
 			return fmt.Errorf("could not write blocks at %s: %w", nextHash, err)
 		}
 		batch.Reset()
 	}
 
-	return batch.Write()
+	// Persist whatever is verified even when the fetch stops early, so a
+	// restart skips it instead of refetching.
+	return errors.Join(fetchErr, batch.Write())
 }
 
 // getBlocks requests up to numParents blocks ending at (hash, height), verifies
 // the returned chain links back from hash, scores the peer, and re-requests on
 // any network or verification failure until ctx ends.
 func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, numParents uint16, verify BlockVerifier) ([]*types.Block, error) {
-	req := &syncpb.GetBlockRequest{Height: height, NumParents: uint32(numParents)}
+	req := &syncpb.GetBlockRequest{
+		Hash:       hash.Bytes(),
+		Height:     height,
+		NumParents: uint32(numParents),
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
