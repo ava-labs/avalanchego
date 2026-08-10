@@ -31,9 +31,6 @@ import (
 func TestGetAncestors(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	batched, ok := sut.ChainVM.(block.BatchedChainVM)
-	require.Truef(t, ok, "%T must implement block.BatchedChainVM", sut.ChainVM)
-
 	const numBlocks = 5
 	chain := []*blocks.Block{sut.genesis}
 	for range numBlocks {
@@ -117,13 +114,13 @@ func TestGetAncestors(t *testing.T) {
 			blkID:   lastVerified.ID(),
 			maxNum:  len(chain),
 			maxSize: noSizeLimit,
-			want:    [][]byte{lastVerified.Bytes()}, // can't resolve parents
+			want:    nil, // only accepted blocks are served
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := batched.GetAncestors(ctx, tt.blkID, tt.maxNum, tt.maxSize, time.Minute)
+			got, err := sut.GetAncestors(ctx, tt.blkID, tt.maxNum, tt.maxSize, time.Minute)
 			require.NoErrorf(t, err, "GetAncestors(%s, %d, %d)", tt.blkID, tt.maxNum, tt.maxSize)
 			require.Equalf(t, tt.want, got, "GetAncestors(%s, %d, %d)", tt.blkID, tt.maxNum, tt.maxSize)
 		})
@@ -133,20 +130,10 @@ func TestGetAncestors(t *testing.T) {
 func TestBatchedParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	batched, ok := sut.ChainVM.(block.BatchedChainVM)
-	require.Truef(t, ok, "%T must implement block.BatchedChainVM", sut.ChainVM)
-
 	const numBlocks = 5
 	chain := []*blocks.Block{sut.genesis}
 	for range numBlocks {
-		chain = append(chain, sut.runConsensusLoop(t,
-			sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-				To:        &zeroAddr,
-				Gas:       params.TxGas,
-				GasFeeCap: big.NewInt(1),
-				Value:     big.NewInt(1),
-			}),
-		))
+		chain = append(chain, sut.runConsensusLoop(t))
 	}
 
 	bytes := make([][]byte, len(chain))
@@ -154,16 +141,39 @@ func TestBatchedParseBlock(t *testing.T) {
 		bytes[i] = b.Bytes()
 	}
 
-	t.Run("batched_parse", func(t *testing.T) {
-		_, err := batched.BatchedParseBlock(ctx, bytes)
-		require.Equalf(t, block.ErrRemoteVMNotImplemented, err, "%T.BatchedParseBlock()", batched)
-	})
+	tests := []struct {
+		name    string
+		bufs    [][]byte
+		want    []*blocks.Block
+		wantErr string // required substring of the error; empty means no error
+	}{
+		{
+			name: "whole_chain",
+			bufs: bytes,
+			want: chain,
+		},
+		{
+			name:    "invalid_block",
+			bufs:    append([][]byte{[]byte("not a block")}, bytes...),
+			wantErr: "rlp.DecodeBytes",
+		},
+	}
 
-	t.Run("batched_implementer_works", func(t *testing.T) {
-		parsed, err := block.BatchedParseBlock(t.Context(), sut, bytes)
-		require.NoError(t, err, "block.BatchedParseBlock()")
-		require.Len(t, parsed, len(chain), "block.BatchedParseBlock()")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed, err := sut.BatchedParseBlock(ctx, tt.bufs)
+			if tt.wantErr != "" {
+				require.ErrorContainsf(t, err, tt.wantErr, "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+				return
+			}
+			require.NoErrorf(t, err, "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+			require.Lenf(t, parsed, len(tt.want), "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+			for i, b := range parsed {
+				require.Equalf(t, tt.want[i].ID(), b.ID(), "%T.BatchedParseBlock()[%d].ID()", sut.ChainVMWithContext, i)
+				require.Equalf(t, tt.bufs[i], b.Bytes(), "%T.BatchedParseBlock()[%d].Bytes()", sut.ChainVMWithContext, i)
+			}
+		})
+	}
 }
 
 func BenchmarkGetAncestors(b *testing.B) {
@@ -185,15 +195,13 @@ func BenchmarkGetAncestors(b *testing.B) {
 		c.db = db
 	}))
 
-	// Mirror the limits used by snow/engine/snowman/getter when serving a
-	// bootstrapper: see config.BootstrapAncestorsMaxContainersSentKey.
 	const (
 		numTxs        = 10
 		maxBlocksNum  = 2000
 		maxBlocksSize = constants.MaxContainersLen
 	)
-
-	buildBlock := func() *blocks.Block {
+	var tip *blocks.Block
+	for range maxBlocksNum {
 		txs := make([]*types.Transaction, numTxs)
 		for i := range txs {
 			txs[i] = sut.wallet.SetNonceAndSign(b, 0, &types.DynamicFeeTx{
@@ -203,28 +211,70 @@ func BenchmarkGetAncestors(b *testing.B) {
 				Value:     big.NewInt(1),
 			})
 		}
-		return sut.runConsensusLoop(b, txs...)
-	}
-
-	var tip *blocks.Block
-	for range maxBlocksNum {
-		tip = buildBlock()
+		tip = sut.runConsensusLoop(b, txs...)
 		vmTime.AdvanceToSettle(ctx, b, tip)
 	}
+	tipID := tip.ID()
 
 	type serialGetter struct{ block.Getter }
 	for _, bench := range []struct {
 		name string
 		vm   block.Getter
 	}{
-		{"batched", sut.ChainVM},
-		{"serial", serialGetter{sut.ChainVM}},
+		{"batched", sut},
+		{"serial", serialGetter{sut}},
 	} {
 		b.Run(bench.name, func(b *testing.B) {
 			for b.Loop() {
-				got, err := block.GetAncestors(ctx, logging.NoLog{}, bench.vm, tip.ID(), maxBlocksNum, maxBlocksSize, time.Minute)
-				require.NoError(b, err, "block.GetAncestors()")
-				b.ReportMetric(float64(len(got)), "blocks")
+				_, _ = block.GetAncestors(
+					ctx,
+					sut.logger,
+					bench.vm,
+					tipID,
+					maxBlocksNum,
+					maxBlocksSize,
+					time.Minute,
+				)
+			}
+		})
+	}
+}
+
+func BenchmarkBatchedParseBlock(b *testing.B) {
+	opt, vmTime := withVMTime(b, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(b, 1, opt)
+
+	const (
+		numTxs    = 10
+		numBlocks = 2000
+	)
+	bufs := make([][]byte, numBlocks)
+	for i := range bufs {
+		txs := make([]*types.Transaction, numTxs)
+		for j := range txs {
+			txs[j] = sut.wallet.SetNonceAndSign(b, 0, &types.DynamicFeeTx{
+				To:        &zeroAddr,
+				Gas:       params.TxGas,
+				GasFeeCap: big.NewInt(1),
+				Value:     big.NewInt(1),
+			})
+		}
+		tip := sut.runConsensusLoop(b, txs...)
+		vmTime.AdvanceToSettle(ctx, b, tip)
+		bufs[i] = tip.Bytes()
+	}
+
+	type serialParser struct{ block.Parser }
+	for _, bench := range []struct {
+		name string
+		vm   block.Parser
+	}{
+		{"batched", sut},
+		{"serial", serialParser{sut}},
+	} {
+		b.Run(bench.name, func(b *testing.B) {
+			for b.Loop() {
+				_, _ = block.BatchedParseBlock(ctx, bench.vm, bufs)
 			}
 		})
 	}
