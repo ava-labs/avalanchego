@@ -47,6 +47,7 @@ type stateDependent interface {
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
 	LastAccepted(context.Context) (ids.ID, error)
+	ParseBlock(context.Context, []byte) (*blocks.Block, error)
 }
 
 func (vm *VM) activeHandler() stateDependent {
@@ -66,6 +67,10 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return vm.activeHandler().LastAccepted(ctx)
+}
+
+func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
+	return vm.activeHandler().ParseBlock(ctx, buf)
 }
 
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred

@@ -48,6 +48,7 @@ func New(
 		cfg,
 		db,
 		log,
+		hooks,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)

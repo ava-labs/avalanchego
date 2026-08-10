@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
@@ -33,9 +34,10 @@ var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
 // SummaryHandler implements [adaptor.SyncableVM] and provides the consensus-
 // critical block getters for [adaptor.ChainVM].
 type SummaryHandler struct {
-	cfg Config
-	db  ethdb.Database
-	log logging.Logger
+	cfg   Config
+	db    ethdb.Database
+	log   logging.Logger
+	hooks hook.Points
 
 	stateSyncDone chan struct{}
 }
@@ -46,6 +48,7 @@ func New(
 	cfg Config,
 	db ethdb.Database,
 	log logging.Logger,
+	hooks hook.Points,
 ) (*SummaryHandler, error) {
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
@@ -54,6 +57,7 @@ func New(
 		cfg:           cfg,
 		db:            db,
 		log:           log,
+		hooks:         hooks,
 		stateSyncDone: make(chan struct{}),
 	}, nil
 }
@@ -105,6 +109,12 @@ func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*S
 		return nil, err
 	}
 	return NewSummary(common.Hash(id), height), nil
+}
+
+// ParseBlock parses the given bytes into a [blocks.Block] via [blocks.Parse]
+// if it is well-formed. It is safe to be used after state sync finishes.
+func (h *SummaryHandler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks.Block, error) {
+	return blocks.Parse(blkBytes, h.hooks, h.log)
 }
 
 // GetBlock returns the block with the given ID. If the block is not found, it

@@ -173,7 +173,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
 	}
-	block, err := b.NewBlock(ethB, parent, nil)
+	block, err := blocks.New(ethB, parent, nil, b.Logger())
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}

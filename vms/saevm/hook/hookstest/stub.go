@@ -37,6 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	VerifyBlockSyntaxFn     func(*types.Block) error
 	BeforeExecutingBlockFn  func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
@@ -238,6 +239,15 @@ func getHeaderExtra(hdr *types.Header) *extra {
 func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
 		return fn(from, to, sr)
+	}
+	return nil
+}
+
+// VerifyBlockSyntax proxies to [Stub.VerifyBlockSyntaxFn] if non-nil,
+// otherwise it accepts all blocks.
+func (s *Stub) VerifyBlockSyntax(b *types.Block) error {
+	if fn := s.VerifyBlockSyntaxFn; fn != nil {
+		return fn(b)
 	}
 	return nil
 }

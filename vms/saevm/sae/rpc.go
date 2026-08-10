@@ -6,7 +6,6 @@ package sae
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 
@@ -53,10 +52,6 @@ func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 
 func (c chain) ResolvePendingToLastExecuted() bool {
 	return c.VM.config.RPCConfig.ResolvePendingToLastExecuted
-}
-
-func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return c.blockBuilder.new(eth, parent, lastSettled)
 }
 
 func (c chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
