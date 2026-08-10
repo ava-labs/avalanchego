@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -84,7 +85,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
+			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.ErrorIs(t, appErr, errInvalidRequest)
 			require.Nil(t, resp)
@@ -111,7 +112,7 @@ func TestResponder_Serves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
 
-			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
+			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: tt.limit,
@@ -172,13 +173,24 @@ func TestResponder_Rejects(t *testing.T) {
 				cancel()
 			}
 
-			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
+			// A server fault logs at ERROR, which loggingtest.New turns into a
+			// failure, so record instead and assert on what was logged.
+			log := loggingtest.NewRecorder(logging.Debug)
+			r := newResponder(log, trieDB, common.HashLength)
 			resp, appErr := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: rootHash,
 				KeyLimit: tt.limit,
 			})
 			require.ErrorIs(t, appErr, tt.wantErr)
 			require.Nil(t, resp)
+
+			// Only a fault is worth an ERROR, a peer's bad request is not.
+			faults := log.AtLeast(logging.Error)
+			if tt.wantErr == p2p.ErrUnexpected {
+				require.Len(t, faults, 1, "a server fault must be logged")
+			} else {
+				require.Empty(t, faults, "rejecting a peer must not log an error")
+			}
 		})
 	}
 }
@@ -212,7 +224,7 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 				c := newAccountCase(t, trieDB, numAccounts)
 				shape.apply(c)
 
-				r := newResponder(logging.NoLog{}, trieDB, common.HashLength, c.snap)
+				r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
 				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 					RootHash: c.root.Bytes(),
 					KeyLimit: limit,
@@ -235,7 +247,7 @@ func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			c := kind.build(t, trieDB, 20)
 
-			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, c.snap)
+			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
 			requireServesWholeTrie(t, r, c)
 
 			reads := c.snap.Reads()
@@ -257,11 +269,11 @@ func TestResponder_BoundedRange(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			c := newAccountCase(t, trieDB, 50)
 
-			var snap SnapshotReader
+			var opts []HandlerOption
 			if withSnapshot {
-				snap = c.snap
+				opts = append(opts, WithSnapshot(c.snap))
 			}
-			r := newResponder(logging.NoLog{}, trieDB, common.HashLength, snap)
+			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, opts...)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: c.root.Bytes(),
 				StartKey: c.keys[10],
@@ -283,7 +295,7 @@ func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, int(MaxLeavesLimit)+200)
 
-	r := newResponder(logging.NoLog{}, trieDB, common.HashLength, nil)
+	r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
 	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(MaxLeavesLimit) + 200,
@@ -379,7 +391,7 @@ func TestResponder_Snapshot(t *testing.T) {
 					c.snap.Err = errors.New("snapshot unavailable")
 				}
 
-				r := newResponder(logging.NoLog{}, trieDB, common.HashLength, c.snap)
+				r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
 				requireServesWholeTrie(t, r, c)
 
 				// The trie fallback serves the same leaves, so this is what
