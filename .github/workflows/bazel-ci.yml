@@ -109,10 +109,11 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e-merkle-sync:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: setup
+    runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
       - name: Run merkle sync e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
