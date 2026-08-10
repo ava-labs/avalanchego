@@ -68,6 +68,8 @@ func (vm *VM) GetAncestors(
 		return nil, nil // requested block is not canonical
 	}
 
+	// TODO(StephenButtolph): Measure the performance impact of iterative
+	// fetching rather than using DB iterators on real databases.
 	var (
 		numBlocks = min(
 			uint64(max(maxBlocksNum, 1)), //#nosec G115 -- non-negative by max()
