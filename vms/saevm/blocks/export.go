@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/holiman/uint256"
 )
 
 // While an argument can be made for embedding the [types.Block] in [Block],
@@ -55,3 +56,12 @@ func (b *Block) Number() *big.Int { return b.b.Number() }
 
 // Transactions returns [types.Block.Transactions] from the wrapped [types.Block].
 func (b *Block) Transactions() types.Transactions { return b.b.Transactions() }
+
+// WorstCaseBaseFee returns the highest base fee that MAY be in force when the
+// block is executed.
+func (b *Block) WorstCaseBaseFee() *uint256.Int {
+	return uint256.NewInt(b.headerBaseFee())
+}
+
+// WorstCaseGasUsed returns the gas that the block MAY be charged.
+func (b *Block) WorstCaseGasUsed() uint64 { return b.b.GasUsed() }
