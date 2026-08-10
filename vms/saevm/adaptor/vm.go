@@ -22,18 +22,26 @@ import (
 type ChainVM[BP BlockProperties] interface {
 	common.VM
 
-	GetBlock(context.Context, ids.ID) (BP, error)
-	ParseBlock(context.Context, []byte) (BP, error)
-	BuildBlock(context.Context, *block.Context) (BP, error) // block.Context MAY be nil
+	GetBlock(ctx context.Context, blkID ids.ID) (BP, error)
+	GetAncestors(
+		ctx context.Context,
+		blkID ids.ID,
+		maxBlocksNum int,
+		maxBlocksSize int,
+		timeout time.Duration,
+	) ([][]byte, error)
+	ParseBlock(ctx context.Context, blockBytes []byte) (BP, error)
+	BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]BP, error)
+	BuildBlock(ctx context.Context, blkCtx *block.Context) (BP, error) // block.Context MAY be nil
 
 	// Transferred from [snowman.Block] and [block.WithVerifyContext].
-	VerifyBlock(context.Context, *block.Context, BP) error // block.Context MAY be nil
-	AcceptBlock(context.Context, BP) error
-	RejectBlock(context.Context, BP) error
+	VerifyBlock(ctx context.Context, blkCtx *block.Context, blk BP) error // block.Context MAY be nil
+	AcceptBlock(ctx context.Context, blk BP) error
+	RejectBlock(ctx context.Context, blk BP) error
 
-	SetPreference(context.Context, ids.ID, *block.Context) error // block.Context MAY be nil
-	LastAccepted(context.Context) (ids.ID, error)
-	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
+	SetPreference(ctx context.Context, blkID ids.ID, blkCtx *block.Context) error // block.Context MAY be nil
+	LastAccepted(ctx context.Context) (ids.ID, error)
+	GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error)
 }
 
 // BlockProperties is a read-only subset of [snowman.Block]. The state-modifying
@@ -53,6 +61,7 @@ type ChainVMWithContext interface {
 	block.ChainVM
 	block.BuildBlockWithContextChainVM
 	block.SetPreferenceWithContextChainVM
+	block.BatchedChainVM
 }
 
 // Convert transforms a generic [ChainVM] into a [chainVMWithContext]. All
@@ -81,11 +90,15 @@ type blockWithContext interface {
 	snowman.Block
 }
 
+func (vm adaptor[BP]) wrap(b BP) blockWithContext {
+	return Block[BP]{b, vm.ChainVM}
+}
+
 func (vm adaptor[BP]) newBlock(b BP, err error) (blockWithContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Block[BP]{b, vm.ChainVM}, nil
+	return vm.wrap(b), nil
 }
 
 func (vm adaptor[BP]) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -94,6 +107,19 @@ func (vm adaptor[BP]) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block
 
 func (vm adaptor[BP]) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	return vm.newBlock(vm.ChainVM.ParseBlock(ctx, blockBytes))
+}
+
+func (vm adaptor[BP]) BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]snowman.Block, error) {
+	unwrapped, err := vm.ChainVM.BatchedParseBlock(ctx, blocksBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	wrapped := make([]snowman.Block, len(unwrapped))
+	for i, b := range unwrapped {
+		wrapped[i] = vm.wrap(b)
+	}
+	return wrapped, nil
 }
 
 func (vm adaptor[BP]) BuildBlock(ctx context.Context) (snowman.Block, error) {
