@@ -61,7 +61,7 @@ func (vm *VM) GetAncestors(
 	hash := common.Hash(blkID)
 	requestedNum := rawdb.ReadHeaderNumber(vm.db, hash)
 	if requestedNum == nil {
-		return nil, nil // height is not accepted
+		return nil, nil // hash is not accepted
 	}
 	num := *requestedNum
 	if rawdb.ReadCanonicalHash(vm.db, *requestedNum) != hash {
@@ -69,11 +69,17 @@ func (vm *VM) GetAncestors(
 	}
 
 	var (
-		numBlocks = min(uint64(max(maxBlocksNum, 1)), num+1) //#nosec G115 -- non-negative by max()
-		blocks    = make([][]byte, 0, numBlocks)
-		size      int
+		numBlocks = min(
+			uint64(max(maxBlocksNum, 1)), //#nosec G115 -- non-negative by max()
+			num+1,
+		)
+		blocks = make([][]byte, 0, numBlocks)
+		size   int
 	)
 	for range numBlocks {
+		// Returning no blocks reports to the caller that we don't have the
+		// requested block. Even if we have exceeded the time limit, we should
+		// still attempt to return at least the requested block if it exists.
 		if len(blocks) > 0 && ctx.Err() != nil {
 			break
 		}
@@ -100,7 +106,7 @@ func (vm *VM) GetAncestors(
 		blocks = append(blocks, block)
 
 		// It is possible for the last iteration to underflow num, but the loop
-		// will exit before reading the result.
+		// will exit before reading num again.
 		num--
 		hash = types.HeaderParentHashFromRLP(header)
 	}
