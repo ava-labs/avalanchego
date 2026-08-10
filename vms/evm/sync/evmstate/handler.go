@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
@@ -54,9 +55,24 @@ const (
 	snapshotSegmentLen = 64
 )
 
+type handlerConfig struct {
+	snapshot SnapshotReader
+}
+
+// HandlerOption configures [RegisterHandler].
+type HandlerOption = options.Option[handlerConfig]
+
+// WithSnapshot serves leaves from the snapshot where it agrees with the trie,
+// falling back to trie iteration everywhere else.
+func WithSnapshot(s SnapshotReader) HandlerOption {
+	return options.Func[handlerConfig](func(c *handlerConfig) {
+		c.snapshot = s
+	})
+}
+
 // RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, snapshot SnapshotReader) error {
-	h := handlers.NewHandler[syncpb.GetLeafRequest](log, newResponder(log, trieDB, trieKeyLength, snapshot))
+func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
+	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 
@@ -103,33 +119,31 @@ type responder struct {
 	trieKeyLength int
 }
 
-func newResponder(
-	log logging.Logger,
-	trieDB *triedb.Database,
-	trieKeyLength int,
-	snapshot SnapshotReader,
-) *responder {
+func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
+	var cfg handlerConfig
+	options.ApplyTo(&cfg, opts...)
+
 	return &responder{
 		log:           log,
 		trieDB:        trieDB,
-		snapshot:      snapshot,
+		snapshot:      cfg.snapshot,
 		trieKeyLength: trieKeyLength,
 	}
 }
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if reason := validateRequest(req, r.trieKeyLength); reason != "" {
-		r.log.Debug("rejecting request, invalid leaf request",
+		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("reason", reason),
 		)
 		return nil, errInvalidRequest
 	}
-	q := newQuery(r, nodeID, req)
-	if q == nil {
-		return nil, errRootNotFound
+	q, appErr := newQuery(r, nodeID, req)
+	if appErr != nil {
+		return nil, appErr
 	}
-	return q.run(ctx, nodeID)
+	return q.run(ctx)
 }
 
 // validateRequest returns why req is malformed, empty when it is valid. The
@@ -162,6 +176,7 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
 // query holds one in-flight leaf request.
 type query struct {
 	log      logging.Logger
+	nodeID   ids.NodeID
 	startKey []byte
 	endKey   []byte
 	rootHash common.Hash
@@ -175,23 +190,24 @@ type query struct {
 	resp *syncpb.GetLeafResponse
 }
 
-// newQuery opens the trie and returns a per-request query, or nil
-// if the trie root is missing.
-func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *query {
+// newQuery opens the trie and returns a per-request query.
+func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*query, *avacommon.AppError) {
 	root := common.BytesToHash(req.GetRootHash())
 	t, err := trie.New(trie.TrieID(root), r.trieDB)
 	if err != nil {
-		r.log.Debug("error opening trie when processing request, dropping",
+		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
+			zap.String("reason", "trie root not found"),
 			zap.Stringer("root", root),
 			zap.Error(err),
 		)
-		return nil
+		return nil, errRootNotFound
 	}
 
 	limit := min(uint16(req.GetKeyLimit()), MaxLeavesLimit)
 	return &query{
 		log:      r.log,
+		nodeID:   nodeID,
 		startKey: req.GetStartKey(),
 		endKey:   req.GetEndKey(),
 		rootHash: root,
@@ -204,7 +220,13 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *quer
 			Keys:   make([][]byte, 0, limit),
 			Values: make([][]byte, 0, limit),
 		},
-	}
+	}, nil
+}
+
+// wholeTrie reports that the response spans the trie end to end, which the root
+// alone attests, so no range proof is needed.
+func (q *query) wholeTrie(more bool) bool {
+	return len(q.startKey) == 0 && !more
 }
 
 // collect fills [query.resp] with the leaf range and its proof.
@@ -227,8 +249,7 @@ func (q *query) collect(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if len(q.startKey) == 0 && !more {
-			// Whole trie. Root suffices, no proof.
+		if q.wholeTrie(more) {
 			return nil
 		}
 	}
@@ -247,13 +268,14 @@ func (q *query) collect(ctx context.Context) error {
 
 // run executes the collect pipeline. A pipeline failure is a server fault,
 // a cancellation before any leaves were read tells the peer we gave up.
-func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+func (q *query) run(ctx context.Context) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if err := q.collect(ctx); err != nil {
-		return nil, handlers.Fault(q.log, nodeID, err)
+		return nil, handlers.Fault(q.log, q.nodeID, err)
 	}
 	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
-		q.log.Debug("rejecting request, cancelled before any leaves were iterated",
-			zap.Stringer("nodeID", nodeID),
+		q.log.Debug("rejecting request",
+			zap.Stringer("nodeID", q.nodeID),
+			zap.String("reason", "cancelled before any leaves were iterated"),
 			zap.Error(ctx.Err()),
 		)
 		return nil, errServingCancelled
@@ -285,7 +307,7 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	}
 	if valid {
 		q.resp.Keys, q.resp.Values = snapKeys, snapVals
-		if len(q.startKey) == 0 && !more {
+		if q.wholeTrie(more) {
 			return true, nil
 		}
 		q.resp.ProofVals, err = iteratorValues(proofDB)
@@ -369,6 +391,7 @@ func (q *query) snapshotLeaves() (leafIterator, error) {
 // exactly like no snapshot at all, so every way of getting here is reported.
 func (q *query) abandonSnapshot(reason string, err error) {
 	q.log.Debug("snapshot read abandoned, falling back to the trie",
+		zap.Stringer("nodeID", q.nodeID),
 		zap.String("reason", reason),
 		zap.Stringer("account", q.account),
 		zap.Error(err),
