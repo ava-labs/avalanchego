@@ -35,11 +35,12 @@ message GetCodeResponse {
   repeated bytes data = 1;
 }
 
-// GetBlockRequest returns the block at height plus num_parents
+// GetBlockRequest returns the block at (hash, height) plus num_parents
 // ancestors: [height, height-1, ..., height-num_parents].
 message GetBlockRequest {
   uint64 height = 1;
   uint32 num_parents = 2;
+  bytes hash = 3; // names the block, so a non-canonical one is still servable
 }
 
 message GetBlockResponse {

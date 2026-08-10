@@ -261,6 +261,8 @@ func TestSyncer(t *testing.T) {
 			for _, h := range tt.wantHeights {
 				want := blocks[h]
 				require.NotNil(t, rawdb.ReadBlock(target, want.Hash(), want.NumberU64()), "block %d missing", h)
+				require.Equal(t, want.Hash(), rawdb.ReadCanonicalHash(target, want.NumberU64()),
+					"block %d is not canonical", h)
 			}
 		})
 	}
@@ -306,14 +308,23 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 				}))
 			}
 
+			target := rawdb.NewMemoryDatabase()
 			tip := blocks[len(blocks)-1]
-			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), rawdb.NewMemoryDatabase(), tip.Hash(), tip.NumberU64(), 200, opts...)
+			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 200, opts...)
 			require.NoError(t, err)
 
 			if !tt.cancelAfterBatch {
 				cancel()
 			}
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
+
+			// A batch accepted before the cancellation must survive it.
+			stored := rawdb.ReadBlock(target, tip.Hash(), tip.NumberU64())
+			if tt.cancelAfterBatch {
+				require.NotNil(t, stored, "verified blocks were discarded on cancel")
+				return
+			}
+			require.Nil(t, stored, "nothing was fetched before the cancel")
 		})
 	}
 }
@@ -485,4 +496,31 @@ func encodeTipFirst(t *testing.T, blocks []*types.Block, n int) [][]byte {
 		raw[i] = encodeBlock(t, blocks[len(blocks)-1-i])
 	}
 	return raw
+}
+
+// A peer that reorged still holds the requested block, so naming it by hash
+// keeps that peer useful.
+func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
+	ctx := t.Context()
+
+	ours := synctest.MakeChain(t, 10, synctest.WithTxsPerBlock(1))
+	theirs := synctest.MakeChain(t, 10, synctest.WithTxsPerBlock(3))
+	wanted := ours[5]
+	require.NotEqual(t, wanted.Hash(), theirs[5].Hash(), "the chains diverge")
+	require.Equal(t, wanted.NumberU64(), theirs[5].NumberU64(), "at the same height")
+
+	// The peer is canonical on theirs but still stores ours.
+	both := append(append([]*types.Block{}, theirs...), ours...)
+
+	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	handler, served := countingHandler(t, both)
+	require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+
+	got, err := getBlocks(ctx, logging.NoLog{}, NewClient(net, tracker),
+		wanted.Hash(), wanted.NumberU64(), 3, nil)
+
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+	require.Equal(t, wanted.Hash(), got[0].Hash())
+	require.Equal(t, int32(1), served.Load(), "one request, no retry loop")
 }
