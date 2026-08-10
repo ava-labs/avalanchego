@@ -22,20 +22,26 @@ import (
 type ChainVM[BP BlockProperties] interface {
 	common.VM
 
-	GetBlock(context.Context, ids.ID) (BP, error)
-	GetAncestors(context.Context, ids.ID, int, int, time.Duration) ([][]byte, error)
-	ParseBlock(context.Context, []byte) (BP, error)
-	BatchedParseBlock(context.Context, [][]byte) ([]BP, error)
-	BuildBlock(context.Context, *block.Context) (BP, error) // block.Context MAY be nil
+	GetBlock(ctx context.Context, blkID ids.ID) (BP, error)
+	GetAncestors(
+		ctx context.Context,
+		blkID ids.ID,
+		maxBlocksNum int,
+		maxBlocksSize int,
+		timeout time.Duration,
+	) ([][]byte, error)
+	ParseBlock(ctx context.Context, blockBytes []byte) (BP, error)
+	BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]BP, error)
+	BuildBlock(ctx context.Context, blkCtx *block.Context) (BP, error) // block.Context MAY be nil
 
 	// Transferred from [snowman.Block] and [block.WithVerifyContext].
-	VerifyBlock(context.Context, *block.Context, BP) error // block.Context MAY be nil
-	AcceptBlock(context.Context, BP) error
-	RejectBlock(context.Context, BP) error
+	VerifyBlock(ctx context.Context, blkCtx *block.Context, blk BP) error // block.Context MAY be nil
+	AcceptBlock(ctx context.Context, blk BP) error
+	RejectBlock(ctx context.Context, blk BP) error
 
-	SetPreference(context.Context, ids.ID, *block.Context) error // block.Context MAY be nil
-	LastAccepted(context.Context) (ids.ID, error)
-	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
+	SetPreference(ctx context.Context, blkID ids.ID, blkCtx *block.Context) error // block.Context MAY be nil
+	LastAccepted(ctx context.Context) (ids.ID, error)
+	GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error)
 }
 
 // BlockProperties is a read-only subset of [snowman.Block]. The state-modifying

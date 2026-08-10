@@ -82,7 +82,7 @@ var _ saetest.Peer = (*SUT)(nil)
 // other fields SHOULD instead be exposed as methods, such as [SUT.stateAt], to
 // avoid over-reliance on internal implementation details.
 type SUT struct {
-	block.ChainVM
+	adaptor.ChainVMWithContext
 	*ethclient.Client
 	rpcClient *rpc.Client
 
@@ -216,11 +216,11 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		ChainVMWithContext: snow,
+		Client:             ethClient,
+		rpcClient:          rpcClient,
+		rawVM:              vm.VM,
+		genesis:            vm.last.settled.Load(),
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
@@ -1310,7 +1310,7 @@ func TestDuplicateVerify(t *testing.T) {
 
 			first := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
 			second, err := sut.ParseBlock(ctx, first.Bytes())
-			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVM)
+			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVMWithContext)
 			blks := []snowman.Block{first, second}
 
 			// Consensus may call [block.WithVerifyContext.VerifyWithContext] on
@@ -1327,9 +1327,9 @@ func TestDuplicateVerify(t *testing.T) {
 			}
 
 			parent := blks[test.acceptIndex]
-			require.NoErrorf(t, sut.SetPreference(ctx, parent.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
+			require.NoErrorf(t, sut.SetPreference(ctx, parent.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVMWithContext)
 			child, err := sut.BuildBlock(ctx)
-			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVM)
+			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVMWithContext)
 			// Loads the parent from [VM.consensusCritical].
 			require.NoErrorf(t, child.Verify(ctx), "%T.Verify() child of duplicated block", child)
 
