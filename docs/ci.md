@@ -11,6 +11,10 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
+- [Provision CI job dependencies](#provision-ci-job-dependencies)
+- [Using Nix in GitHub Actions](#using-nix-in-github-actions)
+  - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
+  - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
   - [Pin third-party actions](#pin-third-party-actions)
@@ -91,6 +95,79 @@ feature-specific helpers with the feature, such as
 `scripts/actionlint.sh` allows workflow calls to helpers named `workflow-*.sh`. Do
 not use that allowance for an operation that should be a task or normal script.
 
+## Provision CI job dependencies
+
+Nix provides the repository's preferred local development environment. See
+[Using the dev shell](../CONTRIBUTING.md#using-the-dev-shell). GitHub-hosted
+runners are ephemeral, so installing Nix adds setup work to every job that uses
+it.
+
+Because installing Nix is per-job work on hosted runners, `install-nix` is
+reserved for jobs with dependencies that another setup action does not provide.
+
+| Dependency | Provisioning mechanism | Use when |
+| --- | --- | --- |
+| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use Nix or Bazel to provide it. |
+| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel, which also provides Go. |
+| Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency supplied by the Nix dev shell, which also provides Go. |
+
+`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
+provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
+for dependencies that Bazel does not provide.
+
+## Using Nix in GitHub Actions
+
+Installing Nix makes Nix available, but does not ensure later commands use the
+Nix development shell.
+
+### Run `install-nix` jobs in the Nix dev shell
+
+A job that directly uses `./.github/actions/install-nix` must set its default shell to
+`nix develop`.
+
+CI previously failed when a job installed Nix but ran `scripts/run_task.sh` from a
+step outside the dev shell. In these jobs, the dev shell, rather than
+`setup-go-for-project`, supplies `task` and the required Go version.
+
+The failure occurred as follows:
+
+1. `task` was not in the `PATH`.
+2. `scripts/run_task.sh` ran `task` with `go run`.
+3. The runner Go version was in the `PATH`.
+4. The runner Go version differed from the repository version.
+5. Go downloaded the required version.
+6. The download failed and failed the job.
+
+Using the Nix dev shell avoids this failure mode by ensuring that `task` and the
+required Go version are in the `PATH`.
+
+An alternative to setting the Nix dev shell in the workflow could be to start it in
+`scripts/run_task.sh`. This would protect task calls, but not direct script calls. A
+job default shell protects both.
+
+Set the job default shell as follows:
+
+```yaml
+defaults:
+  run:
+    shell: nix develop --command bash -x {0}
+```
+
+Set a step shell only when that step needs different behavior from the default. For
+example, a step that reads GitHub Actions environment variables can use `nix develop
+--impure --command bash -x {0}`.
+
+### Start the Nix dev shell in composite actions
+
+A composite action cannot set `defaults.run.shell`. A calling job's default shell does
+not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
+shell.
+
+Composite actions that use the Nix dev shell currently expect the calling job to
+install Nix. Future work could remove this requirement by making the `install-nix`
+composite action idempotent so that jobs and custom actions could safely invoke it
+repeatedly.
+
 ## Runners and external actions
 
 ### Use versioned GitHub-hosted runners
@@ -160,6 +237,12 @@ and `lint-all-ci` tasks also run `lint-action`. In addition to `actionlint`,
 - task calls from workflows that pass option flags after `--`
 - third-party action references without full SHAs and tag comments
 - floating `ubuntu-latest` and `macos-latest` runner labels
+- jobs that use `install-nix` without a `nix develop` default shell
+- step shells that duplicate the job default shell
+
+[`scripts/check_workflow_nix_shell.sh`](../scripts/check_workflow_nix_shell.sh)
+checks the last two rules from the workflow YAML. It only rejects an exact
+duplicate because `nix develop` and `nix develop --impure` behave differently.
 
 These checks catch common violations, but they do not prove that a workflow is
 correct. Always review the workflow's permissions, inputs, secrets, failure handling,

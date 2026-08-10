@@ -83,6 +83,9 @@ jobs:
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
     runs-on: ${{ matrix.runner || 'ubuntu-24.04' }}
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     permissions:
       id-token: write
       contents: read

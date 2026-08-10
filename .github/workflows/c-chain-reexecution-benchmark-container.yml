@@ -93,6 +93,9 @@ jobs:
       id-token: write
       contents: write
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       - name: Install ARC Dependencies
@@ -110,7 +113,6 @@ jobs:
         uses: ./.github/actions/install-nix
       - name: Configure dependency versions
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        shell: nix develop --command bash {0}
         run: ./scripts/run_task.sh run-polyrepo
         env:
           LIBEVM_REF: ${{ matrix.libevm-ref }}

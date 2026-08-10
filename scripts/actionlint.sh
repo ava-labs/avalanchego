@@ -98,3 +98,6 @@ if [[ -n "${FLOATING_RUNNERS}" ]]; then
   echo "Pin explicit runner versions instead so runner image upgrades happen through reviewed repo changes rather than when GitHub updates a floating label on the default branch."
   exit 1
 fi
+
+echo "Checking Nix dev shell use in GitHub Actions workflows..."
+"${AVALANCHE_PATH}"/scripts/check_workflow_nix_shell.sh
