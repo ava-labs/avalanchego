@@ -214,6 +214,18 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  7,
 		},
 		{
+			// An on-disk prefix sits behind a gap wider than one batch. The
+			// skip runs inside the fetch loop, so it is not limited to the
+			// leading run.
+			name:          "skips an on-disk prefix behind a gap",
+			numBlocks:     130,
+			onDisk:        heights(1, 66),
+			fromHeight:    130,
+			blocksToFetch: 130,
+			wantHeights:   []int{1, 66, 67, 130},
+			wantRequests:  1,
+		},
+		{
 			name:          "accepting verifier sees every block",
 			numBlocks:     10,
 			fromHeight:    5,
@@ -523,4 +535,12 @@ func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
 	require.Len(t, got, 3)
 	require.Equal(t, wanted.Hash(), got[0].Hash())
 	require.Equal(t, int32(1), served.Load(), "one request, no retry loop")
+}
+
+func heights(from, to int) []int {
+	out := make([]int, 0, to-from+1)
+	for h := from; h <= to; h++ {
+		out = append(out, h)
+	}
+	return out
 }
