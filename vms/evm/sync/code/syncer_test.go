@@ -81,6 +81,7 @@ func TestSyncer(t *testing.T) {
 		perReq        int
 		wantRequests  int
 	}{
+		{name: "empty"},
 		{name: "single_blob", numFromSource: 1, wantRequests: 1},
 		{name: "batches_across_requests", numFromSource: 40, perReq: 4, wantRequests: 10},
 		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2, wantRequests: 1},
@@ -148,25 +149,6 @@ func TestSyncer(t *testing.T) {
 			require.Equal(t, tt.numFromSource, requested, "every missing hash is requested once")
 		})
 	}
-}
-
-// A batch is only handed off once it holds something, so draining with nothing
-// batched must not cost a request, even at a non-positive batch size.
-func TestSyncer_NeverSendsEmptyRequest(t *testing.T) {
-	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	counter := synctest.NewCountingResponder(newResponder(log, memorydb.New()))
-	client := serve(t, ctx, log, counter)
-
-	// Closed without ever being fed, so the syncer drains with an empty batch.
-	ch := make(chan common.Hash)
-	close(ch)
-
-	s := NewSyncer(log, client, memorydb.New(), ch)
-	s.codeHashesPerReq = 0
-
-	require.NoError(t, s.Sync(ctx))
-	require.Zero(t, counter.Count(), "an empty batch must never be sent")
 }
 
 func TestClaimSet(t *testing.T) {

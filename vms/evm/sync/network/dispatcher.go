@@ -119,8 +119,7 @@ type Outcome struct {
 	once      sync.Once
 }
 
-// NodeID is the peer that served the response, so a caller rejecting it can
-// name the peer at fault.
+// NodeID is the peer that served the response.
 func (o *Outcome) NodeID() ids.NodeID {
 	return o.nodeID
 }

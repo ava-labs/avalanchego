@@ -93,11 +93,17 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 			if !ok {
 				return batch, nil
 			}
-			missing, err := s.needsFetch(codeHash)
+			// A claim is released only after its code is committed, so taking one
+			// first keeps the disk read below from going stale.
+			if !claimed.claim(codeHash) {
+				continue
+			}
+			stored, err := clearIfStored(s.db, codeHash)
 			if err != nil {
 				return nil, err
 			}
-			if !missing || !claimed.claim(codeHash) {
+			if stored {
+				claimed.release([]common.Hash{codeHash})
 				continue
 			}
 
@@ -120,7 +126,7 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, clai
 	if err != nil {
 		return err
 	}
-	if err := s.persist(hashes, data); err != nil {
+	if err := persist(s.db, hashes, data); err != nil {
 		return err
 	}
 	// Released only after the commit, so a repeat arriving next is seen on disk
@@ -148,28 +154,29 @@ func (c *claimSet) release(hashes []common.Hash) {
 	}
 }
 
-// needsFetch reports whether codeHash has to come from a peer.
-func (s *Syncer) needsFetch(codeHash common.Hash) (bool, error) {
-	if !rawdb.HasCode(s.db, codeHash) {
-		return true, nil
+// clearIfStored reports whether the code is already on disk, deleting its
+// to-fetch marker when it is.
+func clearIfStored(db ethdb.KeyValueStore, codeHash common.Hash) (bool, error) {
+	if !rawdb.HasCode(db, codeHash) {
+		return false, nil
 	}
-	if err := customrawdb.DeleteCodeToFetch(s.db, codeHash); err != nil {
-		return false, fmt.Errorf("failed to delete stale code marker: %w", err)
+	if err := customrawdb.DeleteCodeToFetch(db, codeHash); err != nil {
+		return false, fmt.Errorf("deleting stale code marker: %w", err)
 	}
-	return false, nil
+	return true, nil
 }
 
 // persist writes the code and clears the to-fetch markers in one batch.
-func (s *Syncer) persist(hashes []common.Hash, data [][]byte) error {
-	batch := s.db.NewBatch()
+func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
+	batch := db.NewBatch()
 	for i, codeHash := range hashes {
 		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
-			return fmt.Errorf("failed to delete code to fetch marker: %w", err)
+			return fmt.Errorf("deleting code to fetch marker: %w", err)
 		}
 		rawdb.WriteCode(batch, codeHash, data[i])
 	}
 	if err := batch.Write(); err != nil {
-		return fmt.Errorf("failed to write fetched code: %w", err)
+		return fmt.Errorf("writing fetched code: %w", err)
 	}
 	return nil
 }
