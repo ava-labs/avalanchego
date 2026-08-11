@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/unwind"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -78,18 +78,11 @@ type VM struct {
 	rpcProvider  *rpc.Provider
 	newTxs       chan struct{}
 
-	// toClose are closed in reverse order during [VM.Shutdown]. If a resource
+	// closers are closed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
-	toClose []io.Closer
+	closers unwind.Closers
 }
-
-// closerFunc adapts a func() error to [io.Closer].
-type closerFunc func() error
-
-var _ io.Closer = (*closerFunc)(nil)
-
-func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
 //
@@ -120,12 +113,8 @@ func NewVM[T hook.Transaction](
 	db ethdb.Database,
 	network *network.Network,
 ) (_ *VM, retErr error) {
-	var toClose []io.Closer
-	defer func() {
-		if retErr != nil {
-			retErr = errors.Join(retErr, closeAll(toClose))
-		}
-	}()
+	var closers unwind.Closers
+	defer closers.CloseIfPointsToNonNil(&retErr)
 
 	if cfg.Now == nil {
 		cfg.Now = time.Now
@@ -134,52 +123,41 @@ func NewVM[T hook.Transaction](
 		zap.Reflect("config", cfg),
 	)
 
+	// ==========  Metrics  ==========
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
+	metrics, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
 
+	// ==========  Execution Results DB  ==========
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
 	}
-	toClose = append(toClose, &xdb)
+	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
 	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-	exec, consensusCritical, err := rec.newExecution(reg)
+	exec, consensusCritical, lastSettled, err := rec.newExecutor(ctx, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
-	toClose = append(toClose, exec)
-
-	if err := rec.executeAllAccepted(ctx, exec); err != nil {
-		return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
-	}
-
-	lastSettled, err := rec.populateConsensusCriticalBlocks(exec, consensusCritical)
-	if err != nil {
-		return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
-	}
+	closers.Push(exec)
+	metrics.markSettled(lastSettled.Height())
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
 	if err != nil {
 		return nil, err
 	}
-	toClose = append(toClose, mempoolClosers...)
-
 	newTxs, newTxsCloser := signalNewTxsToEngine(pool)
-	toClose = append(toClose, newTxsCloser)
-
-	// ==========  Metrics  ==========
-	metrics, err := newMetrics(reg)
-	if err != nil {
-		return nil, fmt.Errorf("registering sae metrics: %w", err)
-	}
-	metrics.markSettled(lastSettled.Height())
+	closers.Push(append(mempoolClosers, newTxsCloser)...)
 
 	vm := &VM{
 		network:           network,
@@ -201,7 +179,7 @@ func NewVM[T hook.Transaction](
 			ethBlockSource(consensusCritical, db),
 		},
 		newTxs:  newTxs,
-		toClose: toClose,
+		closers: closers,
 	}
 
 	head := exec.LastExecuted()
@@ -219,7 +197,7 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, err
 		}
-		vm.toClose = append(vm.toClose, rpcProvider)
+		vm.closers.Push(rpcProvider)
 		vm.rpcProvider = rpcProvider
 	}
 	return vm, nil
@@ -238,13 +216,9 @@ func newGossipMempool(
 	exec *saexec.Executor,
 	blockSource saetypes.BlockSource,
 	reg prometheus.Registerer,
-) (_ *txgossip.Set, _ []io.Closer, retErr error) {
-	var toClose []io.Closer
-	defer func() {
-		if retErr != nil {
-			retErr = errors.Join(retErr, closeAll(toClose))
-		}
-	}()
+) (_ *txgossip.Set, _ unwind.Closers, retErr error) {
+	var closers unwind.Closers
+	defer closers.CloseIfPointsToNonNil(&retErr)
 
 	bc := txgossip.NewBlockChain(exec, blockSource)
 	pools := []txpool.SubPool{
@@ -254,7 +228,7 @@ func newGossipMempool(
 	if err != nil {
 		return nil, nil, fmt.Errorf("txpool.New(...): %v", err)
 	}
-	toClose = append(toClose, txPool)
+	closers.Push(txPool)
 
 	bloomMetrics, err := bloom.NewMetrics("mempool", reg)
 	if err != nil {
@@ -300,12 +274,12 @@ func newGossipMempool(
 	})
 
 	mempool.RegisterPushGossiper(pushGossiper)
-	toClose = append(toClose, closerFunc(func() error {
+	closers.Push(unwind.CloserFunc(func() error {
 		cancel()
 		wg.Wait()
 		return nil
 	}))
-	return mempool, toClose, nil
+	return mempool, closers, nil
 }
 
 // signalNewTxsToEngine subscribes to the mempool's [txpool.TxPool] to unblock
@@ -316,7 +290,7 @@ func newGossipMempool(
 func signalNewTxsToEngine(mempool *txgossip.Set) (chan struct{}, io.Closer) {
 	ch := make(chan core.NewTxsEvent)
 	sub := mempool.Pool.SubscribeTransactions(ch, false /*reorgs but ignored by legacypool*/)
-	closer := closerFunc(func() error {
+	closer := unwind.CloserFunc(func() error {
 		defer close(ch)
 		sub.Unsubscribe()
 		return <-sub.Err() // guaranteed to be closed due to unsubscribing
@@ -383,15 +357,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 
 // Shutdown gracefully closes the VM.
 func (vm *VM) Shutdown(context.Context) error {
-	return closeAll(vm.toClose)
-}
-
-func closeAll(closers []io.Closer) error {
-	errs := make([]error, len(closers))
-	for i, c := range slices.Backward(closers) {
-		errs[i] = c.Close()
-	}
-	return errors.Join(errs...)
+	return vm.closers.Close()
 }
 
 // Version reports the VM's version.

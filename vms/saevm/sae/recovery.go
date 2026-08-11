@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/unwind"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -52,6 +53,9 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 // is the basis for the worst-case checks needed for block verifications.
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
+	// Unlike elsewhere in this package, the trie database MUST be closed on
+	// both the success and error paths; it is only used to probe for available
+	// state and ownership is never transferred to the caller.
 	defer func() {
 		retErr = errors.Join(retErr, cache.TrieDB().Close())
 	}()
@@ -112,10 +116,21 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 // [saexec.Executor.LastExecuted] and an empty map to track consensus-critical
 // blocks. This map will guarantee that a block's settled and post-execution
 // state is available, if the block is executed, as long as it is in the map.
-func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, *syncMap[common.Hash, *blocks.Block], error) {
+func (rec *recovery) newExecutor(
+	ctx context.Context,
+	reg prometheus.Registerer,
+) (
+	_ *saexec.Executor,
+	consensusCritical *syncMap[common.Hash, *blocks.Block],
+	lastSettled *blocks.Block,
+	retErr error,
+) {
+	var closers unwind.Closers
+	defer closers.CloseIfPointsToNonNil(&retErr)
+
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
-		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
+		return nil, nil, nil, fmt.Errorf("finding last committed state: %w", err)
 	}
 	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
 
@@ -127,9 +142,11 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 		rec.snowCtx.Log,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+		return nil, nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
-	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
+	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
+
+	consensusCritical = newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {
 			tracker.Track(b.SettledStateRoot())
 			// The post-execution root is tracked by the [saexec.Executor]
@@ -143,6 +160,7 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 			}
 		},
 	)
+
 	exec, err := saexec.New(
 		lastCommitted,
 		headerSource(consensusCritical, rec.db),
@@ -155,12 +173,18 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 		reg,
 	)
 	if err != nil {
-		return nil, nil, errors.Join(
-			fmt.Errorf("saexec.New(...): %v", err),
-			tracker.Close(lastCommittedRoot),
-		)
+		return nil, nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
-	return exec, consensusCritical, nil
+	closers.Push(exec)
+
+	if err := rec.executeAllAccepted(ctx, exec); err != nil {
+		return nil, nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+	}
+	lastSettled, err = rec.populateConsensusCriticalBlocks(exec, consensusCritical)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
+	}
+	return exec, consensusCritical, lastSettled, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
