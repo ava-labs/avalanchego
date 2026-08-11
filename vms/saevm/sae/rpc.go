@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
@@ -29,16 +28,15 @@ func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 }
 
 func (vm *VM) chain() saerpc.Chain {
-	return chain{vm, vm.exec, vm.network}
+	return chain{vm, vm.exec}
 }
 
 type chain struct {
 	*VM
 	*saexec.Executor
-	network *network.Network
 }
 
-func (c chain) Logger() logging.Logger         { return c.VM.snowCtx.Log }
+func (c chain) Logger() logging.Logger         { return c.snowCtx.Log }
 func (c chain) Hooks() hook.Points             { return c.hooks }
 func (c chain) DB() ethdb.Database             { return c.db }
 func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
