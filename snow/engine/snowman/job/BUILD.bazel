@@ -10,7 +10,10 @@ go_library(
 
 go_test(
     name = "job_test",
-    srcs = ["scheduler_test.go"],
+    srcs = [
+        "scheduler_recursion_test.go",
+        "scheduler_test.go",
+    ],
     embed = [":job"],
     deps = ["@com_github_stretchr_testify//require"],
 )
