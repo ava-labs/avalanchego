@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "network.go",
         "proto.go",
+        "responders.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/synctest",
     visibility = ["//visibility:public"],

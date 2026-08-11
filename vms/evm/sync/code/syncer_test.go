@@ -6,8 +6,6 @@ package code
 import (
 	"context"
 	"crypto/rand"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -28,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestVerifyCode(t *testing.T) {
@@ -112,7 +108,7 @@ func TestSyncer(t *testing.T) {
 			}
 
 			log := loggingtest.New(t, logging.Debug)
-			counter := &countingResponder{inner: newResponder(log, source)}
+			counter := synctest.NewCountingResponder(newResponder(log, source))
 			client := serve(t, ctx, log, counter)
 
 			copies := max(tt.copies, 1)
@@ -139,7 +135,7 @@ func TestSyncer(t *testing.T) {
 			defer it.Release()
 			require.False(t, it.Next(), "all to-fetch markers must be cleared")
 
-			sizes := counter.requests()
+			sizes := requestSizes(counter)
 			require.Len(t, sizes, tt.wantRequests,
 				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
 			requested := 0
@@ -159,7 +155,7 @@ func TestSyncer(t *testing.T) {
 func TestSyncer_NeverSendsEmptyRequest(t *testing.T) {
 	ctx := t.Context()
 	log := loggingtest.New(t, logging.Debug)
-	counter := &countingResponder{inner: newResponder(log, memorydb.New())}
+	counter := synctest.NewCountingResponder(newResponder(log, memorydb.New()))
 	client := serve(t, ctx, log, counter)
 
 	// Closed without ever being fed, so the syncer drains with an empty batch.
@@ -170,7 +166,7 @@ func TestSyncer_NeverSendsEmptyRequest(t *testing.T) {
 	s.codeHashesPerReq = 0
 
 	require.NoError(t, s.Sync(ctx))
-	require.Empty(t, counter.requests(), "an empty batch must never be sent")
+	require.Zero(t, counter.Count(), "an empty batch must never be sent")
 }
 
 func TestClaimSet(t *testing.T) {
@@ -208,61 +204,43 @@ func held(c *claimSet) int {
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancel()
-	hash := crypto.Keccak256Hash([]byte("real code"))
-
 	log := loggingtest.New(t, logging.Debug)
-	responder := &tamperingResponder{}
+	source := memorydb.New()
+	hash := writeCode(t, source, randomCode(t))
+
+	// Well-formed but the wrong code, so only the client's own verification can
+	// reject it.
+	responder := synctest.NewMutatingResponder(newResponder(log, source), -1, func(resp *syncpb.GetCodeResponse) {
+		for i := range resp.GetData() {
+			resp.Data[i] = []byte("tampered")
+		}
+	})
 	client := serve(t, ctx, log, responder)
 
 	got, err := getCode(ctx, log, client, []common.Hash{hash})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, got, "tampered code must never be accepted")
-	require.Positive(t, responder.served.Load(), "the deadline must not expire before a tampered response is rejected")
+	require.Positive(t, responder.Served(), "the deadline must not expire before a tampered response is rejected")
 }
 
 // serve registers r on a single-node in-process network and returns a client
 // bound to it.
 func serve(t *testing.T, ctx context.Context, log logging.Logger, r handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]) *Client {
 	t.Helper()
-
-	nodeID := ids.GenerateTestNodeID()
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	require.NoError(t, net.AddHandler(p2p.EVMCodeRequestHandlerID, handlers.NewHandler(log, r)))
+	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMCodeRequestHandlerID, r)
 	return NewClient(net, tracker)
 }
 
-// countingResponder records the hash count of every request reaching inner, so
-// a test can assert how many round trips the syncer made and how big they were.
-type countingResponder struct {
-	inner handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-	mu    sync.Mutex
-	sizes []int
-}
+type codeCounter = synctest.CountingResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
-func (c *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
-	c.mu.Lock()
-	c.sizes = append(c.sizes, len(req.GetHashes()))
-	c.mu.Unlock()
-	return c.inner.Respond(ctx, nodeID, req)
-}
-
-func (c *countingResponder) requests() []int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return append([]int(nil), c.sizes...)
-}
-
-// tamperingResponder returns well-formed but wrong code, so verification always
-// fails. It counts its answers so a test can show the rejection really happened.
-type tamperingResponder struct{ served atomic.Int64 }
-
-func (r *tamperingResponder) Respond(_ context.Context, _ ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
-	r.served.Add(1)
-	data := make([][]byte, len(req.GetHashes()))
-	for i := range data {
-		data[i] = []byte("tampered")
+// requestSizes is the hash count of every request served, in order.
+func requestSizes(c *codeCounter) []int {
+	reqs := c.Requests()
+	sizes := make([]int, len(reqs))
+	for i, req := range reqs {
+		sizes[i] = len(req.GetHashes())
 	}
-	return &syncpb.GetCodeResponse{Data: data}, nil
+	return sizes
 }
 
 func writeCode(t *testing.T, db ethdb.KeyValueWriter, code []byte) common.Hash {
