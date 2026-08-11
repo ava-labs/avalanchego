@@ -21,12 +21,25 @@ type job[T comparable] struct {
 	job           Job[T]
 }
 
+// resolution records a dependency that was resolved and whether it was
+// fulfilled or abandoned.
+type resolution[T comparable] struct {
+	dependency T
+	fulfilled  bool
+}
+
 // Scheduler implements a dependency graph for jobs. Jobs can be registered with
 // dependencies, and once all dependencies are resolved, the job will be
 // executed.
 type Scheduler[T comparable] struct {
 	// dependents maps a dependency to the jobs that depend on it.
 	dependents map[T][]*job[T]
+
+	// resolving is true while queue is being drained, so that a nested Fulfill
+	// or Abandon call adds to queue instead of recursing.
+	resolving bool
+	// queue holds resolved dependencies that still must run their jobs.
+	queue []resolution[T]
 }
 
 func NewScheduler[T comparable]() *Scheduler[T] {
@@ -70,7 +83,7 @@ func (s *Scheduler[_]) NumDependencies() int {
 //
 // It is safe to call the scheduler during the execution of a job.
 func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
-	return s.resolveDependency(ctx, dependency, true)
+	return s.resolve(ctx, dependency, true)
 }
 
 // Abandon a dependency. If all dependencies for a job are resolved, the job
@@ -78,7 +91,29 @@ func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
 //
 // It is safe to call the scheduler during the execution of a job.
 func (s *Scheduler[T]) Abandon(ctx context.Context, dependency T) error {
-	return s.resolveDependency(ctx, dependency, false)
+	return s.resolve(ctx, dependency, false)
+}
+
+// resolve drains resolved dependencies with a queue instead of recursion. A job
+// that resolves another dependency while it executes adds to queue, so a chain
+// of dependent jobs runs in constant stack space instead of one frame per job.
+func (s *Scheduler[T]) resolve(ctx context.Context, dependency T, fulfilled bool) error {
+	s.queue = append(s.queue, resolution[T]{dependency: dependency, fulfilled: fulfilled})
+	if s.resolving {
+		return nil
+	}
+
+	s.resolving = true
+	defer func() {
+		s.resolving = false
+		s.queue = nil
+	}()
+	for i := 0; i < len(s.queue); i++ {
+		if err := s.resolveDependency(ctx, s.queue[i].dependency, s.queue[i].fulfilled); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Scheduler[T]) resolveDependency(
