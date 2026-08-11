@@ -48,6 +48,7 @@ go_library(
         "//vms/saevm/saexec",
         "//vms/saevm/txgossip",
         "//vms/saevm/types",
+        "//vms/saevm/unwind",
         "//vms/saevm/worstcase",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
