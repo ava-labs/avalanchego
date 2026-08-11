@@ -8,7 +8,10 @@ package adaptor
 
 import (
 	"context"
+	"runtime"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -31,7 +34,6 @@ type ChainVM[BP BlockProperties] interface {
 		timeout time.Duration,
 	) ([][]byte, error)
 	ParseBlock(ctx context.Context, blockBytes []byte) (BP, error)
-	BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]BP, error)
 	BuildBlock(ctx context.Context, blkCtx *block.Context) (BP, error) // block.Context MAY be nil
 
 	// Transferred from [snowman.Block] and [block.WithVerifyContext].
@@ -109,17 +111,25 @@ func (vm adaptor[BP]) ParseBlock(ctx context.Context, blockBytes []byte) (snowma
 	return vm.newBlock(vm.ChainVM.ParseBlock(ctx, blockBytes))
 }
 
+// BatchedParseBlock parses each block in its own goroutine, returning an error
+// if any of the blocks fail to parse.
 func (vm adaptor[BP]) BatchedParseBlock(ctx context.Context, blocksBytes [][]byte) ([]snowman.Block, error) {
-	unwrapped, err := vm.ChainVM.BatchedParseBlock(ctx, blocksBytes)
-	if err != nil {
+	var (
+		eg     errgroup.Group
+		parsed = make([]snowman.Block, len(blocksBytes))
+	)
+	eg.SetLimit(runtime.GOMAXPROCS(0))
+	for i, buf := range blocksBytes {
+		eg.Go(func() error {
+			b, err := vm.ParseBlock(ctx, buf)
+			parsed[i] = b
+			return err
+		})
+	}
+	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
-
-	wrapped := make([]snowman.Block, len(unwrapped))
-	for i, b := range unwrapped {
-		wrapped[i] = vm.wrap(b)
-	}
-	return wrapped, nil
+	return parsed, nil
 }
 
 func (vm adaptor[BP]) BuildBlock(ctx context.Context) (snowman.Block, error) {

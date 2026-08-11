@@ -198,6 +198,10 @@ func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	return vm.newBlock(b), nil
+}
+
+func (vm *VM) newBlock(b snowman.Block) snowman.Block {
 	return &block{
 		vm:           vm,
 		blk:          b,
@@ -207,5 +211,42 @@ func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 		bytes:        b.Bytes(),
 		height:       b.Height(),
 		timestamp:    b.Timestamp(),
-	}, nil
+	}
+}
+
+var _ smblock.BatchedChainVM = (*VM)(nil)
+
+func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
+	return withLocks(vm, func() ([]snowman.Block, error) {
+		unwrapped, err := smblock.BatchedParseBlock(ctx, vm.current.chain, blks)
+		if err != nil {
+			return nil, err
+		}
+
+		wrapped := make([]snowman.Block, len(unwrapped))
+		for i, b := range unwrapped {
+			wrapped[i] = vm.newBlock(b)
+		}
+		return wrapped, nil
+	})
+}
+
+func (vm *VM) GetAncestors(
+	ctx context.Context,
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	maxBlocksRetrievalTime time.Duration,
+) ([][]byte, error) {
+	return withLocks(vm, func() ([][]byte, error) {
+		return smblock.GetAncestors(
+			ctx,
+			vm.current.chainCtx.Log,
+			vm.current.chain,
+			blkID,
+			maxBlocksNum,
+			maxBlocksSize,
+			maxBlocksRetrievalTime,
+		)
+	})
 }
