@@ -12,7 +12,7 @@ tasks:
       - cmd: |
           cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} bazelisk build //main:avalanchego
       - cmd: |
-          cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} env -u AVALANCHEGO_PATH bash -c 'avalanchego_path=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null); go run ./tests/msync/main --avalanchego-path="$avalanchego_path" {{.CLI_ARGS}}'
+          cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} env -u AVALANCHEGO_PATH bash -c 'avalanchego_path=$(realpath "$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null)"); go run ./tests/msync/main --avalanchego-path="$avalanchego_path" {{.CLI_ARGS}}'
 
   e2e-ci:
     desc: Run standalone merkle sync bootstrap validation with race-built bazel avalanchego binary
@@ -20,4 +20,4 @@ tasks:
       - cmd: |
           cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} bazelisk build --config=race //main:avalanchego
       - cmd: |
-          cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} env -u AVALANCHEGO_PATH bash -c 'avalanchego_path=$(bazelisk cquery --config=race --output=files //main:avalanchego 2>/dev/null); go run ./tests/msync/main --avalanchego-path="$avalanchego_path" {{.CLI_ARGS}}'
+          cd {{.TESTS_MSYNC_REPO_ROOT}} && {{.TESTS_MSYNC_NIX_RUN}} env -u AVALANCHEGO_PATH bash -c 'avalanchego_path=$(realpath "$(bazelisk cquery --config=race --output=files //main:avalanchego 2>/dev/null)"); go run ./tests/msync/main --avalanchego-path="$avalanchego_path" {{.CLI_ARGS}}'
