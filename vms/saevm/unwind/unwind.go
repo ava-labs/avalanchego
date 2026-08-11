@@ -42,7 +42,7 @@ func (cs Closers) close() []error {
 // named return argument, as demonstrated in the example.
 func (cs *Closers) CloseIfPointsToNonNil(retErr *error) {
 	// The receiver MUST be a pointer because this method is typically deferred
-	// before any call to [closers.push], and a `defer` statement evaluates its
+	// before any call to [Closers.Push], and a `defer` statement evaluates its
 	// receiver when the statement executes, not when the call runs.
 	if *retErr != nil {
 		*retErr = errors.Join(slices.Concat(
@@ -58,7 +58,7 @@ type CloserFunc func() error
 // Close returns `f()`.
 func (f CloserFunc) Close() error { return f() }
 
-// ClsoerFuncT returns an [io.Closer] for which the `Close()` method returns
+// CloserFuncT returns an [io.Closer] for which the `Close()` method returns
 // `fn(x)`.
 func CloserFuncT[T any](fn func(T) error, x T) io.Closer {
 	return CloserFunc(func() error { return fn(x) })
