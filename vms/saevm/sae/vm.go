@@ -232,7 +232,7 @@ func NewVM[T hook.Transaction](
 // resources and goroutines created by this function; the last closer stops
 // the gossip loops, blocking until they have returned.
 func newGossipMempool(
-	mempoolConfig legacypool.Config,
+	config legacypool.Config,
 	snowCtx *snow.Context,
 	network *network.Network,
 	exec *saexec.Executor,
@@ -248,7 +248,7 @@ func newGossipMempool(
 
 	bc := txgossip.NewBlockChain(exec, blockSource)
 	pools := []txpool.SubPool{
-		legacypool.New(mempoolConfig, bc),
+		legacypool.New(config, bc),
 	}
 	txPool, err := txpool.New(0, bc, pools)
 	if err != nil {
