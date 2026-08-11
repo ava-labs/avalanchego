@@ -150,9 +150,7 @@ func TestBatchedParseBlock(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:  "empty",
-			bytes: nil,
-			want:  nil,
+			name: "empty",
 		},
 		{
 			name:  "whole_chain",
@@ -188,10 +186,15 @@ func TestBatchedParseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := sut.rawVM.BatchedParseBlock(ctx, tt.bytes)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.BatchedParseBlock()", sut.rawVM)
+			parsed, err := sut.BatchedParseBlock(ctx, tt.bytes)
+			require.ErrorIsf(t, err, tt.wantErr, "%T.BatchedParseBlock()", sut.ChainVMWithContext)
+
+			got := make([]*blocks.Block, len(parsed))
+			for i, b := range parsed {
+				got[i] = unwrap(t, b)
+			}
 			if diff := cmp.Diff(tt.want, got, opts); diff != "" {
-				t.Errorf("%T.BatchedParseBlock() diff (-want +got):\n%s", sut.rawVM, diff)
+				t.Errorf("%T.BatchedParseBlock() diff (-want +got):\n%s", sut.ChainVMWithContext, diff)
 			}
 		})
 	}

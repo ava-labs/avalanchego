@@ -6,41 +6,17 @@ package sae
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"golang.org/x/sync/errgroup"
 
 	_ "github.com/ava-labs/avalanchego/snow/engine/snowman/block" // for comment resolution
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
-
-// BatchedParseBlock parses the given blocks concurrently. It returns an error
-// if any of the blocks fail to parse.
-func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]*blocks.Block, error) {
-	var (
-		eg     errgroup.Group
-		parsed = make([]*blocks.Block, len(blks))
-	)
-	eg.SetLimit(runtime.GOMAXPROCS(0))
-	for i, buf := range blks {
-		eg.Go(func() error {
-			b, err := vm.ParseBlock(ctx, buf)
-			parsed[i] = b
-			return err
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-	return parsed, nil
-}
 
 // GetAncestors returns the blocks starting with the block with the given ID and
 // continuing with its ancestors, up to the given maximum number of blocks or
