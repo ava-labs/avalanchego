@@ -35,6 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	snowmanenginetest "github.com/ava-labs/avalanchego/snow/engine/snowman/enginetest"
 )
 
 var (
@@ -242,7 +244,7 @@ func TestEngineQuery(t *testing.T) {
 			RequestID: requestID,
 		}
 		require.Equal(parent.ID(), blockID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(parent.Height()+1, requestedHeight) // next preferred height
 	}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -279,7 +281,7 @@ func TestEngineQuery(t *testing.T) {
 
 	// Handling chits for [child] register a voter job blocking on [child]'s
 	// issuance and send a request for [child].
-	require.NoError(engine.Chits(t.Context(), queryRequest.NodeID, queryRequest.RequestID, child.ID(), child.ID(), child.ID(), child.Height()))
+	require.NoError(engine.Chits(t.Context(), queryRequest.NodeID, queryRequest.RequestID, child.ID(), child.ID(), child.Height()))
 
 	queryRequest = nil
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blockID ids.ID, requestedHeight uint64) {
@@ -290,7 +292,7 @@ func TestEngineQuery(t *testing.T) {
 			RequestID: requestID,
 		}
 		require.Equal(child.ID(), blockID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(child.Height()+1, requestedHeight) // next preferred height
 	}
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
@@ -387,7 +389,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk0.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk0.Height()+1, requestedHeight) // next preferred height
 	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -430,8 +432,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.Equal(vdr0, inVdr)
 		require.Equal(blk1.ID(), blkID)
 	}
-	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
-	require.NoError(te.Chits(t.Context(), vdr1, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
+	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk1.ID(), blk1.ID(), blk1.Height()))
+	require.NoError(te.Chits(t.Context(), vdr1, *queryRequestID, blk1.ID(), blk1.ID(), blk1.Height()))
 
 	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -458,12 +460,12 @@ func TestEngineMultipleQuery(t *testing.T) {
 		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk1.Height()+1, requestedHeight) // next preferred height
 	}
 	require.NoError(te.Put(t.Context(), vdr0, *getRequestID, blk1.Bytes()))
 
 	// Should be dropped because the query was already filled
-	require.NoError(te.Chits(t.Context(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.ID(), blk0.Height()))
+	require.NoError(te.Chits(t.Context(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.Height()))
 
 	require.Equal(snowtest.Accepted, blk1.Status)
 	require.Zero(te.blocked.NumDependencies())
@@ -507,7 +509,8 @@ func TestEngineBlockedIssue(t *testing.T) {
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
-	require.Equal(blk1.ID(), te.Consensus.Preference())
+	pref, _ := te.Consensus.Preference()
+	require.Equal(blk1.ID(), pref)
 }
 
 func TestEngineRespondsToGetRequest(t *testing.T) {
@@ -582,7 +585,7 @@ func TestEnginePushQuery(t *testing.T) {
 		vdrSet := set.Of(vdr)
 		require.True(inVdrs.Equals(vdrSet))
 		require.Equal(blk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	require.NoError(te.PushQuery(t.Context(), vdr, 20, blk.Bytes(), 1))
@@ -713,7 +716,7 @@ func TestVoteCanceling(t *testing.T) {
 		vdrSet := set.Of(vdr0, vdr1, vdr2)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.Bytes(), blkBytes)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	require.NoError(te.issue(
@@ -886,7 +889,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(t.Context(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID, blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, reqID, fakeBlkID, fakeBlkID, blk.Height()))
 	require.Equal(1, te.blocked.NumDependencies())
 
 	sender.CantSendPullQuery = false
@@ -940,7 +943,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(t.Context(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID, blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, reqID, fakeBlkID, fakeBlkID, blk.Height()))
 	require.Equal(1, te.blocked.NumDependencies())
 
 	sender.CantSendPullQuery = false
@@ -1081,7 +1084,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 			RequestID: requestID,
 		}
 		require.Equal(issuedBlk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(issuedBlk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	// Issuing [issuedBlk] will immediately adds [issuedBlk] to consensus, sets
@@ -1095,32 +1098,17 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 
 	sender.SendPullQueryF = nil
 
-	// In response to the query for [issuedBlk], the peer is responding with,
-	// the currently pending issuance, [blockingBlk]. The direct conflict of
-	// [issuedBlk] is [missingBlk]. This registers a voter job dependent on
-	// [blockingBlk] and [missingBlk].
+	// In response to the query for [issuedBlk] at height 2, the peer answers
+	// with [blockingBlk], its block at that height.
 	require.NoError(te.Chits(
 		t.Context(),
 		queryRequest.NodeID,
 		queryRequest.RequestID,
 		blockingBlk.ID(),
-		missingBlk.ID(),
 		blockingBlk.ID(),
 		blockingBlk.Height(),
 	))
 	require.Equal(2, te.blocked.NumDependencies())
-
-	queryRequest = nil
-	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
-		require.Nil(queryRequest)
-		require.Equal(set.Of(peerID), nodeIDs)
-		queryRequest = &common.Request{
-			NodeID:    peerID,
-			RequestID: requestID,
-		}
-		require.Equal(blockingBlk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
-	}
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1137,8 +1125,8 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	// Issuing [missingBlk] will add the block into consensus. However, it will
-	// not send a query for it as it is not the preferred block.
+	// Delivering [missingBlk] fills the missing dependency for [blockingBlk]
+	// and as a result the preferred chain of the peer can be finalized.
 	require.NoError(te.Put(
 		t.Context(),
 		getRequest.NodeID,
@@ -1148,6 +1136,8 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	require.Equal(snowtest.Accepted, missingBlk.Status)
 	require.Equal(snowtest.Accepted, blockingBlk.Status)
 	require.Equal(snowtest.Rejected, issuedBlk.Status)
+	require.Zero(te.Consensus.NumProcessing())
+	require.Zero(te.blocked.NumDependencies())
 }
 
 func TestEngineRetryFetch(t *testing.T) {
@@ -1234,7 +1224,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		false,
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
-	require.NoError(te.Chits(t.Context(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID, invalidBlk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlk.Height()))
 
 	require.Equal(snowtest.Accepted, validBlk.Status)
 }
@@ -1336,7 +1326,8 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 
 	require.NoError(te.Put(t.Context(), vdr, *reqID, missingBlk.Bytes()))
 
-	require.Equal(pendingBlk.ID(), te.Consensus.Preference())
+	pref, _ := te.Consensus.Preference()
+	require.Equal(pendingBlk.ID(), pref)
 }
 
 func TestEnginePushQueryRequestIDConflict(t *testing.T) {
@@ -1412,7 +1403,8 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 
 	require.NoError(te.Put(t.Context(), vdr, *reqID, missingBlk.Bytes()))
 
-	require.Equal(pendingBlk.ID(), te.Consensus.Preference())
+	pref, _ := te.Consensus.Preference()
+	require.Equal(pendingBlk.ID(), pref)
 }
 
 func TestEngineAggressivePolling(t *testing.T) {
@@ -1554,7 +1546,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		vdrSet := set.Of(vdr0, vdr1)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 	}
 	require.NoError(te.issue(
 		t.Context(),
@@ -1578,13 +1570,13 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(t.Context(), vdr1, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr1, *queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Accepted, blk.Status)
 }
 
@@ -1682,7 +1674,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.Chits(t.Context(), vdr, reqID, blk0.ID(), blk0.ID(), blk0.ID(), blk0.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, reqID, blk0.ID(), blk0.ID(), blk0.Height()))
 
 	require.True(queried)
 }
@@ -1721,7 +1713,7 @@ func TestEngineDropRejectedBlockOnReceipt(t *testing.T) {
 	require.Len(queryRequestIDs, 1)
 
 	// Vote for [acceptedBlk] and cause it to be accepted.
-	require.NoError(te.Chits(t.Context(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.Height()))
+	require.NoError(te.Chits(t.Context(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.Height()))
 	require.Len(queryRequestIDs, 1) // Shouldn't have caused another query
 	require.Equal(snowtest.Accepted, acceptedBlk.Status)
 
@@ -1764,11 +1756,11 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 
 	sender.SendPushQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkBytes []byte, requestedHeight uint64) {
 		require.NotEqual(nonPreferredBlk.Bytes(), blkBytes)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(preferredBlk.Height()+1, requestedHeight) // next preferred height
 	}
 	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID, requestedHeight uint64) {
 		require.NotEqual(nonPreferredBlk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(preferredBlk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	require.NoError(te.Put(t.Context(), vdr, 0, preferredBlk.Bytes()))
@@ -1852,7 +1844,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		vdrSet := set.Of(vdr)
 		require.Equal(vdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk1.Height()+1, requestedHeight) // next preferred height
 	}
 	// This engine now handles the response to the "Get" request. This should cause [blk1] to be issued
 	// which will result in attempting to issue [blk2]. However, [blk2] should fail verification and be dropped.
@@ -1887,7 +1879,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Now we are expecting a Chits message, and we receive it for [blk2]
 	// instead of [blk1]. This will cause the node to again request [blk2].
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID(), blk2.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk2.ID(), blk2.ID(), blk2.Height()))
 
 	// The votes should be bubbled through [blk2] despite the fact that it is
 	// failing verification.
@@ -1920,14 +1912,14 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		*queryRequestID = requestID
 		require.Equal(expectedVdrSet, inVdrs)
 		require.Equal(blk2.ID(), blkID)
-		require.Equal(uint64(2), requestedHeight)
+		require.Equal(blk2.Height()+1, requestedHeight) // next preferred height
 	}
 	// Expect that the Engine will send a PullQuery after receiving this Gossip message for [blk2].
 	require.NoError(te.PushQuery(t.Context(), vdr, 0, blk2.Bytes(), 0))
 	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID(), blk2.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk2.ID(), blk2.ID(), blk2.Height()))
 	require.Equal(snowtest.Accepted, blk2.Status)
 }
 
@@ -2010,44 +2002,20 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		*queryRequestID = requestID
 		require.Equal(expectedVdrSet, inVdrs)
 		require.Equal(blk1.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk1.Height()+1, requestedHeight) // next preferred height
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
 	require.NoError(te.Put(t.Context(), vdr, *reqID, blk2.Bytes()))
 	require.True(*queried)
 
-	sendReqID := new(uint32)
-	reqVdr := new(ids.NodeID)
-	// Update GetF to produce a more detailed error message in the case that receiving a Chits
-	// message causes us to send another Get request.
-	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			t.Fatal("Unexpectedly sent a Get request for blk1")
-		case blk2.ID():
-			t.Logf("sending get for blk2 with %d", requestID)
-			*sendReqID = requestID
-			*reqVdr = inVdr
-			return
-		case blk3.ID():
-			t.Logf("sending get for blk3 with %d", requestID)
-			*sendReqID = requestID
-			*reqVdr = inVdr
-			return
-		default:
-			t.Fatal("Unexpectedly sent a Get request for unknown block")
-		}
-	}
-
-	// Now we are expecting a Chits message and we receive it for [blk3].
-	// This will cause the node to again request [blk3].
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk3.ID(), blk1.ID(), blk3.ID(), blk3.Height()))
-
-	// Drop the re-request for [blk3] to cause the poll to terminate. The votes
-	// should be bubbled through [blk3] despite the fact that it hasn't been
-	// issued.
-	require.NoError(te.GetFailed(t.Context(), *reqVdr, *sendReqID))
+	// Now we are expecting a Chits message and we receive it for [blk3]. The
+	// engine holds [blk3], but could not issue it because [blk2] fails
+	// verification, so [blk3] is not a block the vote can be applied to
+	// directly. Everything [blk3] needs is already cached, so no new Get is
+	// sent - the SendGetF installed above stays in place and its
+	// require.False(*asked) fails the test if one is.
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk3.ID(), blk3.ID(), blk3.Height()))
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
@@ -2094,7 +2062,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		*queryRequestGPID = requestID
 		require.Equal(grandParentBlk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(grandParentBlk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	// Give the engine the grandparent
@@ -2132,7 +2100,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 		*queryRequestAID = requestID
 		require.Equal(parentBlkA.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(parentBlkA.Height()+1, requestedHeight) // next preferred height
 	}
 	sender.CantSendPullQuery = false
 
@@ -2144,8 +2112,8 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require.NoError(te.Put(t.Context(), vdr, 0, parentBlkA.BytesV))
 
 	// Give 2 chits for [parentBlkA]/[parentBlkB]
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestAID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV, parentBlkB.Height()))
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestGPID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV, parentBlkB.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestAID, parentBlkB.IDV, parentBlkB.IDV, parentBlkB.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestGPID, parentBlkB.IDV, parentBlkB.IDV, parentBlkB.Height()))
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
@@ -2221,7 +2189,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		*queryRequestID = requestID
 		require.Contains(inVdrs, vdr)
 		require.Equal(blk.Bytes(), blkBytes)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 	}
 
 	require.NoError(te.issue(
@@ -2250,10 +2218,10 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		*queryRequestID = requestID
 		require.Contains(inVdrs, vdr)
 		require.Equal(blk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 	}
 
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 
 	require.Equal(snowtest.Undecided, blk.Status)
 
@@ -2336,7 +2304,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		queryRequestID = requestID
 		require.Contains(inVdrs, vdr)
 		require.Equal(blk.ID(), blkID)
-		require.Equal(uint64(1), requestedHeight)
+		require.Equal(blk.Height()+1, requestedHeight) // next preferred height
 		queried = true
 	}
 
@@ -2359,7 +2327,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	// Voting for the block that was issued during the period when the validator
 	// set was misconfigured should result in it being accepted successfully.
-	require.NoError(te.Chits(t.Context(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Accepted, blk.Status)
 }
 
@@ -2518,14 +2486,12 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		pollRequestIDs[0],
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
-		acceptedChain[1].ID(),
 		acceptedChain[1].Height(),
 	))
 	require.NoError(engine.Chits(
 		t.Context(),
 		nodeID1,
 		pollRequestIDs[0],
-		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].Height(),
@@ -2548,7 +2514,6 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		t.Context(),
 		nodeID2,
 		pollRequestIDs[0],
-		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
 		rejectedChain[0].Height(),
@@ -2574,7 +2539,6 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		pollRequestIDs[1],
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
-		acceptedChain[1].ID(),
 		acceptedChain[1].Height(),
 	))
 	require.NoError(engine.Chits(
@@ -2583,14 +2547,12 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		pollRequestIDs[1],
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
-		acceptedChain[2].ID(),
 		acceptedChain[2].Height(),
 	))
 	require.NoError(engine.Chits(
 		t.Context(),
 		nodeID2,
 		pollRequestIDs[1],
-		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		rejectedChain[1].Height(),
@@ -2625,7 +2587,6 @@ func TestEngineVoteStallRegression(t *testing.T) {
 				t.Context(),
 				nodeID,
 				pollRequestIDs[i],
-				acceptedChain[2].ID(),
 				acceptedChain[2].ID(),
 				acceptedChain[2].ID(),
 				acceptedChain[2].Height(),
@@ -2727,45 +2688,249 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 		chain[:1],
 	)
 
-	// Vote for block 2 or block 1 in poll 0. This should trigger Get requests
-	// for both block 2 and block 1.
+	// Vote for block 2 in poll 0. Under the "vote only on the block at the
+	// requested height" semantics, the voter has a single dependency: block 2.
+	// Block 2 isn't available yet, so the engine requests it.
 	require.NoError(engine.Chits(
 		t.Context(),
 		nodeID,
 		pollRequestIDs[0],
 		chain[2].ID(),
-		chain[1].ID(),
 		snowmantest.GenesisID,
 		0,
 	))
 	require.Len(pollRequestIDs, 1)
-	require.Contains(getRequestIDs, chain[1].ID())
 	require.Contains(getRequestIDs, chain[2].ID())
 
-	// Mark the request for block 2 as failed. This should not cause the poll to
-	// be applied as there is still an outstanding request for block 1.
-	require.NoError(engine.GetFailed(
+	// Deliver block 2. It can't be issued into consensus yet because its parent
+	// (block 1) is still missing, so block 2 is only queued as pending and block
+	// 1 is requested. The voter is still blocked on block 2 being issued, so
+	// poll 0 must NOT be applied yet. This is the early-termination regression:
+	// a partially-assembled branch must not terminate the voter.
+	require.NoError(engine.Put(
 		t.Context(),
 		nodeID,
 		getRequestIDs[chain[2].ID()],
+		chain[2].Bytes(),
 	))
 	require.Len(pollRequestIDs, 1)
+	require.Contains(getRequestIDs, chain[1].ID())
+	// Block 2 is only pending issuance, so its status is still Undecided.
+	require.Equal(snowtest.Undecided, chain[2].Status)
 
-	// Issue block 1. This should cause the poll to be applied to both block 0
-	// and block 1.
+	// Deliver block 1. This lets block 1 and then block 2 be issued into
+	// consensus, which finally resolves the voter's dependency and applies the
+	// poll to the whole branch. Each newly issued block extends the preferred
+	// chain, so each one also fires a follow-up query (polls for block 1 and
+	// block 2).
 	require.NoError(engine.Put(
 		t.Context(),
 		nodeID,
 		getRequestIDs[chain[1].ID()],
 		chain[1].Bytes(),
 	))
-	// Because Put added a new preferred block to the chain, a new poll will be
-	// created.
-	require.Len(pollRequestIDs, 2)
+	require.Len(pollRequestIDs, 3)
 	require.Equal(snowtest.Accepted, chain[0].Status)
 	require.Equal(snowtest.Accepted, chain[1].Status)
-	// Block 2 still hasn't been issued, so it's status should remain Undecided.
-	require.Equal(snowtest.Undecided, chain[2].Status)
+	require.Equal(snowtest.Accepted, chain[2].Status)
+}
+
+// TestEngineForkNearAcceptFrontierAdvancesAcceptFrontier is a liveness regression
+// test that tests that a node can still agree on blocks if the votes need to go through
+// blocks that fail verification while their parents aren't accepted.
+// It runs the same scenario twice: once with small blocks, and once with every block
+// inflated past the unverifiedBlockCache size (proving convergence doesn't depend
+// on that cache).
+//
+// The concern is that the votes that a node collects on a losing fork may not bubble to the accept frontier,
+// preventing the node from advancing its accept frontier and causing liveness to fail.
+//
+//	         accept frontier
+//	              │
+//	Genesis ──────┤
+//	 (0)          ├── A0 ── A1 ── A2      forkA: fetched from the remote peer; becomes
+//	              │   (1)   (2)   (3)            the node's tall processing chain
+//	              │
+//	              └── B0 ── B1 ── B2      forkB: what the remote peer prefers;
+//	                  (1)   (2)   (3)            diverges from the accepted chain
+//	                                             at the accept frontier (Genesis)
+//
+// The node holds neither fork: it fetches both from the remote peer over the wire.
+// It first learns of forkA via a PullQuery for its tip and fetches the whole chain,
+// building a tall processing chain. Meanwhile the remote peer keeps voting forkB.
+//
+// To make the concern as sharp as possible, forkB is verify-gated on parent
+// acceptance: B1 cannot be verified until B0 is accepted, and B2 not until B1
+// is accepted. So even though the peer's vote points the node at the forkB tip
+// (B2), the node cannot verify B2 - it can only make progress by accepting
+// forkB from the bottom up. The node must therefore reject its tall forkA and
+// climb forkB one accepted block at a time. The test asserts it does exactly
+// that and fully converges (liveness holds).
+func TestEngineForkNearAcceptFrontierAdvancesAcceptFrontier(t *testing.T) {
+	const forkLen = 3
+	tests := []struct {
+		name      string
+		blockSize int
+	}{
+		{
+			name:      "normal blocks",
+			blockSize: 0,
+		},
+		{
+			// Every block is inflated, so it overflows the unverifiedBlockCache.
+			// This proves vote bubbling does not depend on the byte-bounded
+			// cache.
+			name:      "blocks larger than cache",
+			blockSize: nonVerifiedCacheSize + 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			blockSize := test.blockSize
+
+			forkA := snowmantest.BuildDescendants(snowmantest.Genesis, forkLen)
+			forkB := snowmantest.BuildDescendants(snowmantest.Genesis, forkLen)
+
+			// Inflate every block past blockSize, keeping each block's bytes unique (its
+			// first bytes are its ID). Must run before the VMs index the blocks by bytes.
+			if blockSize > 0 {
+				for _, blk := range append(slices.Clone(forkA), forkB...) {
+					big := make([]byte, blockSize)
+					id := blk.ID()
+					copy(big, id[:])
+					blk.BytesV = big
+				}
+			}
+
+			forkATip := forkA[forkLen-1]
+			forkBTip := forkB[forkLen-1]
+
+			nodeID := ids.GenerateTestNodeID()
+			peerID := ids.GenerateTestNodeID()
+			network := snowmanenginetest.NewNetwork(t)
+
+			// [connect] controls whether the engine treats [peer] as a connected validator.
+			// A node that hasn't connected its validator can still fetch blocks via Get
+			// but its own queries abort for insufficient connected
+			// stake - which we use to fetch forkA without triggering forkB convergence.
+			newEngine := func(self, peer ids.NodeID, vm *snowmanenginetest.VM, connect bool) *Engine {
+				cfg := DefaultConfig(t) // K=1, AlphaPreference=1, AlphaConfidence=1, Beta=1
+				require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+				if connect {
+					require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+				}
+				cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+				cfg.VM = vm
+
+				cfg.Sender = network.CreateSender(self)
+				snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+				require.NoError(err)
+				cfg.AllGetsServer = snowGetHandler
+
+				e, err := New(cfg)
+				require.NoError(err)
+				network.Register(self, e)
+				return e
+			}
+
+			// The peer holds both forks and serves either on request.
+			// It reports the forkB tip as its last accepted block and prefers
+			// it, but it also serves forkA blocks over the wire so the node can fetch
+			// them.
+			peerVM := snowmanenginetest.NewVM(t, append(slices.Clone(forkA), forkB...))
+			peerVM.LastAcceptedBlock = forkBTip
+
+			// The node holds neither fork locally: it must fetch every block above Genesis
+			// over the wire. It can parse either fork. forkB is verify-gated on parent
+			// acceptance, so the node can only verify a forkB block after its parent has
+			// been accepted; forkA is not gated.
+			forkBIDs := set.Set[ids.ID]{}
+			for _, blk := range forkB {
+				forkBIDs.Add(blk.ID())
+			}
+			nodeVM := snowmanenginetest.NewVM(t, append(slices.Clone(forkA), forkB...))
+			nodeVM.LastAcceptedBlock = snowmantest.Genesis
+			nodeVM.Has = func(*snowmantest.Block) bool {
+				return false
+			}
+			nodeVM.RequireAcceptedParentToVerify = func(blk *snowmantest.Block) bool {
+				return forkBIDs.Contains(blk.ID())
+			}
+
+			// node is the engine under test, and peer is the remote peer it fetches blocks from.
+			// The peer is connected, the node isn't connected so it can't issue queries, just fetch blocks.
+			peerEngine := newEngine(peerID, nodeID, peerVM, true)
+			nodeEngine := newEngine(nodeID, peerID, nodeVM, false)
+
+			require.NoError(peerEngine.Start(t.Context(), 0))
+			require.NoError(nodeEngine.Start(t.Context(), 0))
+
+			// Phase 1 - fetch forkA over the wire. The node learns of forkA through a
+			// regular PullQuery for its tip (which carries just the block ID). Since the
+			// node holds no forkA blocks, it fetches the whole chain from the peer via
+			// Get/Put. Its own queries abort (peer not connected yet), so it
+			// builds forkA without any forkB convergence interfering.
+			require.NoError(nodeEngine.PullQuery(t.Context(), peerID, 0, forkATip.ID(), 0))
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+
+			// The node now holds all of forkA as a tall processing chain preferred over
+			// Genesis, with nothing accepted yet.
+			for i, blk := range forkA {
+				require.Truef(nodeEngine.Consensus.Processing(blk.ID()), "forkA block at height %d not processing", i+1)
+			}
+			preferenceID, preferenceHeight := nodeEngine.Consensus.Preference()
+			require.Equal(forkATip.ID(), preferenceID)
+			require.Equal(uint64(forkLen), preferenceHeight)
+			nodeLastAcceptedID, nodeLastAcceptedHeight := nodeEngine.Consensus.LastAccepted()
+			require.Equal(snowmantest.GenesisID, nodeLastAcceptedID)
+			require.Zero(nodeLastAcceptedHeight)
+
+			// The node knows nothing about forkB: with its validator unconnected it never
+			// queried the peer, so it never received forkB's IDs and never requested,
+			// cached, or issued any forkB block. Only the forkA blocks are processing.
+			require.Equal(forkLen, nodeEngine.Consensus.NumProcessing())
+			for i, blk := range forkB {
+				id := blk.ID()
+				require.Falsef(nodeEngine.Consensus.Processing(id), "forkB block at height %d unexpectedly processing", i+1)
+				_, pending := nodeEngine.pending[id]
+				require.Falsef(pending, "forkB block at height %d unexpectedly pending", i+1)
+				_, cached := nodeEngine.unverifiedBlockCache.Get(id)
+				require.Falsef(cached, "forkB block at height %d unexpectedly cached", i+1)
+				require.Falsef(nodeEngine.blkReqs.HasValue(id), "forkB block at height %d unexpectedly requested", i+1)
+			}
+
+			// Phase 2 - converge onto forkB. Connect the peer so the node can query it.
+			require.NoError(nodeEngine.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
+
+			// Round 1: the node queries at preferredHeight+1, the peer answers with forkB,
+			// and the node fetches forkB. But the blocks of forkB can only be verified upon parent acceptance,
+			// so only B0 (whose parent Genesis is accepted) can be verified. The vote for
+			// the forkB tip has to bubble to B0 and in each round the previously accepted block unblocks the next one,
+			// so the node climbs forkB one block at a time.
+			for height := uint64(1); height <= uint64(forkLen); height++ {
+				require.NoError(nodeEngine.Gossip(t.Context()))
+				require.NoError(network.DeliverMessages())
+				require.False(network.HasQueuedMessagesToDispatch())
+
+				_, acceptedHeight := nodeEngine.Consensus.LastAccepted()
+				require.Equal(height, acceptedHeight)
+			}
+
+			// The accept frontier advanced from Genesis all the way onto forkB.
+			acceptedID, acceptedHeight := nodeEngine.Consensus.LastAccepted()
+			require.Equal(forkBTip.ID(), acceptedID)
+			require.Equal(uint64(forkLen), acceptedHeight)
+			require.Zero(nodeEngine.Consensus.NumProcessing())
+			for i, blk := range forkB {
+				require.Equalf(snowtest.Accepted, blk.Status, "forkB block at height %d not accepted", i+1)
+			}
+			for i, blk := range forkA {
+				require.Equalf(snowtest.Rejected, blk.Status, "forkA block at height %d not rejected", i+1)
+			}
+		})
+	}
 }
 
 // Voting for an unissued cached block that fails verification should not
@@ -2912,7 +3077,6 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		nodeID,
 		pollRequestIDs[0],
 		acceptedChain[0].ID(),
-		acceptedChain[0].ID(),
 		snowmantest.GenesisID,
 		0,
 	))
@@ -2938,7 +3102,6 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		nodeID,
 		pollRequestIDs[1],
 		rejectedChain[1].ID(),
-		rejectedChain[1].ID(),
 		snowmantest.GenesisID,
 		0,
 	))
@@ -2957,7 +3120,6 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		t.Context(),
 		nodeID,
 		pollRequestIDs[2],
-		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		snowmantest.GenesisID,
 		0,
@@ -3310,8 +3472,8 @@ func TestEngineAcceptedHeight(t *testing.T) {
 
 	require.NoError(engCfg.Consensus.Initialize(ctx, params, blk1.ID(), blk1.Height(), time.Now()))
 
-	require.NoError(te.Chits(t.Context(), vdr0, 1, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
-	require.NoError(te.Chits(t.Context(), vdr1, 2, blk2.ID(), blk2.ID(), blk2.ID(), blk2.Height()))
+	require.NoError(te.Chits(t.Context(), vdr0, 1, blk1.ID(), blk1.ID(), blk1.Height()))
+	require.NoError(te.Chits(t.Context(), vdr1, 2, blk2.ID(), blk2.ID(), blk2.Height()))
 
 	eBlk1, h1, ok := te.acceptedFrontiers.LastAccepted(vdr0)
 	require.True(ok)
@@ -3369,7 +3531,7 @@ func TestPChainProgressUpdaterCalledOnAccept(t *testing.T) {
 	require.False(progressUpdated)
 
 	// Vote for the block to accept it
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.Height()))
 
 	require.Equal(snowtest.Accepted, blk.Status)
 	require.True(progressUpdated)
@@ -3382,4 +3544,75 @@ type mockPChainProgressUpdater struct {
 
 func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
+}
+
+func TestEngineNetworkBuildsAndAcceptsBlocks(t *testing.T) {
+	require := require.New(t)
+
+	// A shared chain that the building engine hands out one block at a time as it
+	// is asked to build. Both nodes hold every block, so a peer can parse a block
+	// the moment it is queried about it.
+	const numBlocks = 100
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, numBlocks)
+
+	network := snowmanenginetest.NewNetwork(t)
+
+	nodeAID := ids.GenerateTestNodeID()
+	nodeBID := ids.GenerateTestNodeID()
+
+	vmA := snowmanenginetest.NewVM(t, chain)
+	vmB := snowmanenginetest.NewVM(t, chain)
+
+	// Whichever engine is asked to build returns the next block in the chain. An
+	// engine only builds on top of its preferred tip, so the chain order matches
+	// the order blocks are accepted. Only one engine builds per round, so a single
+	// shared cursor over the chain is enough.
+	var built int
+	buildNext := func(context.Context) (snowman.Block, error) {
+		blk := chain[built]
+		built++
+		return blk, nil
+	}
+	vmA.BuildBlockF = buildNext
+	vmB.BuildBlockF = buildNext
+
+	newEngine := func(self, peer ids.NodeID, vm *snowmanenginetest.VM) *Engine {
+		cfg := DefaultConfig(t)
+		require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+		require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+		cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+		cfg.VM = vm
+
+		cfg.Sender = network.CreateSender(self)
+		snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+		require.NoError(err)
+		cfg.AllGetsServer = snowGetHandler
+
+		e, err := New(cfg)
+		require.NoError(err)
+		network.Register(self, e)
+		return e
+	}
+
+	engineA := newEngine(nodeAID, nodeBID, vmA)
+	engineB := newEngine(nodeBID, nodeAID, vmB)
+
+	require.NoError(engineA.Start(t.Context(), 0))
+	require.NoError(engineB.Start(t.Context(), 0))
+
+	engines := []*Engine{engineA, engineB}
+	for i, blk := range chain {
+		builder := engines[i%len(engines)]
+		require.NoError(builder.Notify(t.Context(), common.PendingTxs)) // Trigger to build the next block in the chain.
+		require.NoError(network.DeliverMessages())
+		require.False(network.HasQueuedMessagesToDispatch())
+
+		// The block was accepted, and both engines agree on it as their tip.
+		require.Equal(snowtest.Accepted, blk.Status)
+		for _, e := range engines {
+			acceptedID, acceptedHeight := e.Consensus.LastAccepted()
+			require.Equal(blk.ID(), acceptedID)
+			require.Equal(uint64(i+1), acceptedHeight)
+		}
+	}
 }
