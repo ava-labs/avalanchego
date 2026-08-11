@@ -41,19 +41,16 @@ type Syncer struct {
 	client     *Client
 	db         ethdb.KeyValueStore
 	codeHashes <-chan common.Hash
-
-	codeHashesPerReq int // best-effort target size, the final batch may be smaller
 }
 
 // NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
 // verified code into db, fetching from peers through c.
 func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash) *Syncer {
 	return &Syncer{
-		log:              log,
-		client:           c,
-		db:               db,
-		codeHashes:       codeHashes,
-		codeHashesPerReq: maxHashesPerRequest,
+		log:        log,
+		client:     c,
+		db:         db,
+		codeHashes: codeHashes,
 	}
 }
 
@@ -83,7 +80,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // returns the batch it could not fill. An error abandons that batch, since the
 // caller stops the run rather than sending it.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) ([]common.Hash, error) {
-	batch := make([]common.Hash, 0, s.codeHashesPerReq)
+	batch := make([]common.Hash, 0, maxHashesPerRequest)
 	for {
 		select {
 		case <-ctx.Done():
@@ -108,14 +105,14 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 			}
 
 			batch = append(batch, codeHash)
-			if len(batch) < s.codeHashesPerReq {
+			if len(batch) < maxHashesPerRequest {
 				continue
 			}
 			full := batch
 			eg.Go(func() error {
 				return s.fetchAndPersist(ctx, full, claimed)
 			})
-			batch = make([]common.Hash, 0, s.codeHashesPerReq)
+			batch = make([]common.Hash, 0, maxHashesPerRequest)
 		}
 	}
 }

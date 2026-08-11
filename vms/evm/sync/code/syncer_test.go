@@ -78,15 +78,14 @@ func TestSyncer(t *testing.T) {
 		numFromSource int
 		numOnDisk     int
 		copies        int // times each hash is enqueued, zero means once
-		perReq        int
-		wantRequests  int
 	}{
 		{name: "empty"},
-		{name: "single_blob", numFromSource: 1, wantRequests: 1},
-		{name: "batches_across_requests", numFromSource: 40, perReq: 4, wantRequests: 10},
-		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2, wantRequests: 1},
+		{name: "single_blob", numFromSource: 1},
+		{name: "batches_across_requests", numFromSource: 3 * maxHashesPerRequest},
+		{name: "partial_final_batch", numFromSource: 2*maxHashesPerRequest + 1},
+		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2},
 		// Shared bytecode puts the same hash on the queue many times.
-		{name: "repeats_fetched_once", numFromSource: 1, copies: 200, perReq: 4, wantRequests: 1},
+		{name: "repeats_fetched_once", numFromSource: 1, copies: 200},
 	}
 
 	for _, tt := range tests {
@@ -122,11 +121,7 @@ func TestSyncer(t *testing.T) {
 			}
 			close(ch)
 
-			s := NewSyncer(log, client, target, ch)
-			if tt.perReq > 0 {
-				s.codeHashesPerReq = tt.perReq
-			}
-			require.NoError(t, s.Sync(ctx))
+			require.NoError(t, NewSyncer(log, client, target, ch).Sync(ctx))
 
 			for hash, code := range want {
 				require.Equal(t, code, rawdb.ReadCode(target, hash))
@@ -136,14 +131,16 @@ func TestSyncer(t *testing.T) {
 			defer it.Release()
 			require.False(t, it.Next(), "all to-fetch markers must be cleared")
 
+			// Only the trailing batch can be short, so the count follows directly.
+			wantRequests := (tt.numFromSource + maxHashesPerRequest - 1) / maxHashesPerRequest
 			sizes := requestSizes(recorder)
-			require.Len(t, sizes, tt.wantRequests,
+			require.Len(t, sizes, wantRequests,
 				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
 			requested := 0
 			for _, size := range sizes {
 				// The handler drops a request over the cap, so an overgrown
 				// batch costs the whole request, not just the excess.
-				require.LessOrEqual(t, size, s.codeHashesPerReq, "a request outgrew the batch size")
+				require.LessOrEqual(t, size, maxHashesPerRequest, "a request outgrew the batch size")
 				requested += size
 			}
 			require.Equal(t, tt.numFromSource, requested, "every missing hash is requested once")
