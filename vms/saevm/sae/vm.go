@@ -123,11 +123,17 @@ func NewVM[T hook.Transaction](
 		zap.Reflect("config", cfg),
 	)
 
+	// ==========  Metrics  ==========
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
+	metrics, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
 
+	// ==========  Execution Results DB  ==========
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
 	)
@@ -137,38 +143,19 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-	exec, consensusCritical, err := rec.newExecution(reg)
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
 	closers.Push(exec)
-
-	if err := rec.executeAllAccepted(ctx, exec); err != nil {
-		return nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
-	}
-
-	lastSettled, err := rec.populateConsensusCriticalBlocks(exec, consensusCritical)
-	if err != nil {
-		return nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
-	}
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
 	if err != nil {
 		return nil, err
 	}
-	closers.Push(mempoolClosers...)
-
 	newTxs, newTxsCloser := signalNewTxsToEngine(pool)
-	closers.Push(newTxsCloser)
-
-	// ==========  Metrics  ==========
-	metrics, err := newMetrics(reg)
-	if err != nil {
-		return nil, fmt.Errorf("registering sae metrics: %w", err)
-	}
-	metrics.markSettled(lastSettled.Height())
+	closers.Push(append(mempoolClosers, newTxsCloser)...)
 
 	vm := &VM{
 		network:           network,
@@ -193,10 +180,16 @@ func NewVM[T hook.Transaction](
 		closers: closers,
 	}
 
-	head := exec.LastExecuted()
-	vm.preference.Store(head)
-	vm.last.accepted.Store(head)
-	vm.last.settled.Store(lastSettled)
+	// ==========  Frontiers  ==========
+	{
+		e := exec.LastExecuted()
+		vm.preference.Store(e)
+		vm.last.accepted.Store(e)
+
+		s := e.LastSettled()
+		vm.last.settled.Store(s)
+		metrics.markSettled(s.Height())
+	}
 
 	// ==========  RPC Provider  ==========
 	{

@@ -112,13 +112,26 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	}
 }
 
-// newExecution returns an executor that is ready to execute any child of
-// [recovery.lastCommitted] and an empty map to track consensus-critical blocks.
-// This map will guarantee that a block's settled and post-execution state is
-// available, if the block is executed, as long as it is in the map.
-func (rec *recovery) newExecution(reg prometheus.Registerer) (_ *saexec.Executor, _ *syncMap[common.Hash, *blocks.Block], retErr error) {
+// recoverExecutor returns an [sae.Executor] that is ready to execute any child
+// of the last-known accepted block, and a map of all consensus-critical blocks.
+func recoverExecutor(
+	ctx context.Context,
+	db ethdb.Database,
+	xdb saetypes.ExecutionResults,
+	chainConfig *params.ChainConfig,
+	snowCtx *snow.Context,
+	hooks hook.Points,
+	cfg Config,
+	reg prometheus.Registerer,
+) (
+	_ *saexec.Executor,
+	_ *syncMap[common.Hash, *blocks.Block],
+	retErr error,
+) {
 	var closers unwind.Closers
 	defer closers.CloseIfPointsToNonNil(&retErr)
+
+	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
@@ -152,6 +165,7 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (_ *saexec.Executor
 			}
 		},
 	)
+
 	exec, err := saexec.New(
 		lastCommitted,
 		headerSource(consensusCritical, rec.db),
@@ -165,6 +179,14 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (_ *saexec.Executor
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+	}
+	closers.Push(exec)
+
+	if err := rec.executeAllAccepted(ctx, exec); err != nil {
+		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+	}
+	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
+		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
 	return exec, consensusCritical, nil
 }
@@ -234,10 +256,10 @@ func lastOf[E any](s []E) E {
 }
 
 // populateConsensusCriticalBlocks populates bMap with all blocks from the last
-// executed back to, and including, the block that it settled. Said settled
-// block is returned for convenience. bMap MUST be empty and MUST already have
-// its callbacks bound to the executor's state tracker; see [NewVM].
-func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
+// executed back to, and including, the block that it settled. bMap MUST be
+// empty and MUST already have its callbacks bound to the executor's state
+// tracker.
+func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 
@@ -279,19 +301,19 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
-		return nil, err
+		return err
 	}
-	lastSettled = lastOf(chain)
+	lastSettled := lastOf(chain)
 	for _, b := range chain {
 		bMap.Store(b.Hash(), b)
 	}
 
 	for i, b := range chain[:len(chain)-1] {
 		if err := extend(b); err != nil {
-			return nil, err
+			return err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, b := range bMap.m {
@@ -300,8 +322,8 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			stage = blocks.Settled
 		}
 		if err := b.CheckInvariants(stage); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return lastSettled, nil
+	return nil
 }
