@@ -55,6 +55,8 @@ func TestCloseIfPointsToNonNil(t *testing.T) {
 			t.Logf("Closers pushed in order: %v", tt.closers)
 
 			got := func() (retErr error) {
+				// This pattern simulates typical usage, as further demonstrated
+				// in the method's example.
 				defer tt.closers.CloseIfPointsToNonNil(&retErr)
 				return tt.retErr
 			}()
