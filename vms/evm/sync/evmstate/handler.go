@@ -229,6 +229,20 @@ func (q *query) wholeTrie(more bool) bool {
 	return len(q.startKey) == 0 && !more
 }
 
+// atLimit reports that the response holds every leaf the request allows.
+func (q *query) atLimit() bool {
+	return len(q.resp.Keys) >= int(q.limit)
+}
+
+// appendLeaves appends as many leaves as the limit allows, reporting how many
+// were kept so the caller can tell a whole segment from a trimmed one.
+func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
+	kept = min(len(keys), int(q.limit)-len(q.resp.Keys))
+	q.resp.Keys = append(q.resp.Keys, keys[:kept]...)
+	q.resp.Values = append(q.resp.Values, vals[:kept]...)
+	return kept
+}
+
 // collect fills [query.resp] with the leaf range and its proof.
 func (q *query) collect(ctx context.Context) error {
 	if q.snapshot != nil {
@@ -244,7 +258,7 @@ func (q *query) collect(ctx context.Context) error {
 		q.resp.ProofVals = nil
 	}
 
-	if len(q.resp.Keys) < int(q.limit) {
+	if !q.atLimit() {
 		more, err := q.fillFromTrie(ctx, q.endKey)
 		if err != nil {
 			return err
@@ -317,53 +331,62 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 		return !more, nil
 	}
 
-	// Slow path: validate the snapshot keys in fixed-size segments. A valid
-	// segment appends directly, an invalid one leaves a gap that the next
-	// valid segment bridges from the trie.
-	//
-	// Example with snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] invalid:
-	//   i=0  [A B] valid    append           -> resp=[A B]
-	//   i=2  [C D] invalid  mark gap         -> resp unchanged
-	//   i=4  [E]   valid    trie-fill to E   -> resp=[A B C D E]
-	//                       drop trailing E  -> resp=[A B C D]
-	//                       append [E]       -> resp=[A B C D E]
+	return q.fillFromSegments(ctx, snapKeys, snapVals)
+}
+
+// fillFromSegments serves the range one fixed-size segment at a time, for a
+// snapshot that diverges from the trie somewhere. A segment that proves against
+// the trie is appended, one that fails leaves a gap the next good segment
+// bridges by iterating the trie across it.
+//
+// snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] diverged:
+//
+//	[A B] proves    append        -> resp=[A B]
+//	[C D] fails     mark the gap  -> resp=[A B]
+//	[E]   proves    bridge to E   -> resp=[A B C D]
+//	                append past E -> resp=[A B C D E]
+func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byte) (done bool, _ error) {
 	hasGap := false
-	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
-		segmentEnd := min(i+snapshotSegmentLen, len(snapKeys))
-		_, segValid, _, err := q.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
+	// Whether the trie holds keys past the response. Only a proved segment
+	// answers it, so it starts pessimistic. A stale answer from an unproved
+	// trailing segment is safe, collect re-derives it whenever the response
+	// is short of the limit.
+	trieHasMore := true
+
+	for i := 0; i < len(snapKeys) && ctx.Err() == nil; i += snapshotSegmentLen {
+		end := min(i+snapshotSegmentLen, len(snapKeys))
+		_, valid, more, err := q.isRangeValid(snapKeys[i:end], snapVals[i:end], hasGap)
 		if err != nil {
 			return false, err
 		}
-		if !segValid {
+		if !valid {
 			hasGap = true
 			continue
 		}
 
+		start := i
 		if hasGap {
-			// Fill to snapKeys[i] inclusive, then drop it. The segment
-			// append below re-adds it, and it must not be duplicated.
+			// The bridge stops on snapKeys[i] inclusive, so skip it here.
 			if _, err := q.fillFromTrie(ctx, snapKeys[i]); err != nil {
 				return false, err
 			}
-			if len(q.resp.Keys) >= int(q.limit) || ctx.Err() != nil {
+			if q.atLimit() {
 				break
 			}
-			q.resp.Keys = q.resp.Keys[:len(q.resp.Keys)-1]
-			q.resp.Values = q.resp.Values[:len(q.resp.Values)-1]
+			start = i + 1
 		}
 		hasGap = false
 
-		// Only bites when the gap fill above advanced past the snapshot index,
-		// which needs leaves the trie holds and the snapshot lacks.
-		segmentEnd = min(segmentEnd, i+int(q.limit)-len(q.resp.Keys))
-		q.resp.Keys = append(q.resp.Keys, snapKeys[i:segmentEnd]...)
-		q.resp.Values = append(q.resp.Values, snapVals[i:segmentEnd]...)
+		// The response now ends where this segment was proved, so the segment's
+		// verdict carries. A trimmed segment leaves the rest of the trie to come.
+		kept := q.appendLeaves(snapKeys[start:end], snapVals[start:end])
+		trieHasMore = more || kept < end-start
 
-		if len(q.resp.Keys) >= int(q.limit) {
+		if q.atLimit() {
 			break
 		}
 	}
-	return false, nil
+	return q.wholeTrie(trieHasMore), nil
 }
 
 // snapshotLeaves opens a disk-layer iterator over the account trie, or over
@@ -449,7 +472,7 @@ func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ erro
 			more = true
 			break
 		}
-		if len(q.resp.Keys) >= int(q.limit) || ctx.Err() != nil {
+		if q.atLimit() || ctx.Err() != nil {
 			more = true
 			break
 		}
