@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -67,35 +66,30 @@ func New(
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
-	saedbConfig saedb.Config,
+	tracker *saedb.Tracker,
 	hooks hook.Points,
-	snowCtx *snow.Context,
+	logger logging.Logger,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), snowCtx.ChainDataDir, snowCtx.Log)
-	if err != nil {
-		return nil, err
-	}
-
 	m, err := newMetrics(reg, lastExecuted)
 	if err != nil {
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
-		Tracker: t,
+		Tracker: tracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
-		log:     snowCtx.Log,
+		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan queuedBlock, 2*saedbConfig.CommitInterval),
+		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			snowCtx.Log,
+			logger,
 		},
 		chainConfig: chainConfig,
 		db:          db,
