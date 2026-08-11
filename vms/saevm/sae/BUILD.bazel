@@ -35,6 +35,7 @@ go_library(
         "//utils/bloom",
         "//utils/constants",
         "//utils/logging",
+        "//utils/unwind",
         "//version",
         "//vms/components/gas",
         "//vms/saevm/adaptor",
