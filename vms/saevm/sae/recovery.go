@@ -112,24 +112,30 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	}
 }
 
-// newExecutor returns an [sae.Executor] that is ready to execute any child of
-// the last-known accepted block, a map of all consesnsus-critical blocks, and
-// the last-settled block.
-func (rec *recovery) newExecutor(
+// recoverExecutor returns an [sae.Executor] that is ready to execute any child
+// of the last-known accepted block, and a map of all consesnsus-critical blocks.
+func recoverExecutor(
 	ctx context.Context,
+	db ethdb.Database,
+	xdb saetypes.ExecutionResults,
+	chainConfig *params.ChainConfig,
+	snowCtx *snow.Context,
+	hooks hook.Points,
+	cfg Config,
 	reg prometheus.Registerer,
 ) (
 	_ *saexec.Executor,
-	consensusCritical *syncMap[common.Hash, *blocks.Block],
-	lastSettled *blocks.Block,
+	_ *syncMap[common.Hash, *blocks.Block],
 	retErr error,
 ) {
 	var closers unwind.Closers
 	defer closers.CloseIfPointsToNonNil(&retErr)
 
+	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
+
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("finding last committed state: %w", err)
+		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
 	}
 	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
 
@@ -141,11 +147,11 @@ func (rec *recovery) newExecutor(
 		rec.snowCtx.Log,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
 	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
 
-	consensusCritical = newSyncMap[common.Hash, *blocks.Block](
+	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {
 			tracker.Track(b.SettledStateRoot())
 			// The post-execution root is tracked by the [saexec.Executor]
@@ -172,18 +178,17 @@ func (rec *recovery) newExecutor(
 		reg,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
 	closers.Push(exec)
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
-		return nil, nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 	}
-	lastSettled, err = rec.populateConsensusCriticalBlocks(exec, consensusCritical)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
+	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
+		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
-	return exec, consensusCritical, lastSettled, nil
+	return exec, consensusCritical, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
@@ -251,10 +256,10 @@ func lastOf[E any](s []E) E {
 }
 
 // populateConsensusCriticalBlocks populates bMap with all blocks from the last
-// executed back to, and including, the block that it settled. Said settled
-// block is returned for convenience. bMap MUST be empty and MUST already have
-// its callbacks bound to the executor's state tracker; see [NewVM].
-func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
+// executed back to, and including, the block that it settled. bMap MUST be
+// empty and MUST already have its callbacks bound to the executor's state
+// tracker.
+func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 
@@ -296,19 +301,19 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
-		return nil, err
+		return err
 	}
-	lastSettled = lastOf(chain)
+	lastSettled := lastOf(chain)
 	for _, b := range chain {
 		bMap.Store(b.Hash(), b)
 	}
 
 	for i, b := range chain[:len(chain)-1] {
 		if err := extend(b); err != nil {
-			return nil, err
+			return err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, b := range bMap.m {
@@ -317,8 +322,8 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			stage = blocks.Settled
 		}
 		if err := b.CheckInvariants(stage); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return lastSettled, nil
+	return nil
 }

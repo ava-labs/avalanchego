@@ -143,13 +143,11 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
-	exec, consensusCritical, lastSettled, err := rec.newExecutor(ctx, reg)
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
 	closers.Push(exec)
-	metrics.markSettled(lastSettled.Height())
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
@@ -182,10 +180,16 @@ func NewVM[T hook.Transaction](
 		closers: closers,
 	}
 
-	head := exec.LastExecuted()
-	vm.preference.Store(head)
-	vm.last.accepted.Store(head)
-	vm.last.settled.Store(lastSettled)
+	// ==========  Frontiers  ==========
+	{
+		e := exec.LastExecuted()
+		vm.preference.Store(e)
+		vm.last.accepted.Store(e)
+
+		s := e.LastSettled()
+		vm.last.settled.Store(s)
+		metrics.markSettled(s.Height())
+	}
 
 	// ==========  RPC Provider  ==========
 	{
