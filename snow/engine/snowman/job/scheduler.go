@@ -81,7 +81,9 @@ func (s *Scheduler[_]) NumDependencies() int {
 // Fulfill a dependency. If all dependencies for a job are resolved, the job
 // will be executed.
 //
-// It is safe to call the scheduler during the execution of a job.
+// It is safe to call the scheduler during the execution of a job. Such a call
+// only enqueues the resolution; the jobs it unblocks run after the current job
+// returns, and errors from them are reported by the outermost call.
 func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
 	return s.resolve(ctx, dependency, true)
 }
@@ -89,7 +91,9 @@ func (s *Scheduler[T]) Fulfill(ctx context.Context, dependency T) error {
 // Abandon a dependency. If all dependencies for a job are resolved, the job
 // will be executed.
 //
-// It is safe to call the scheduler during the execution of a job.
+// It is safe to call the scheduler during the execution of a job. Such a call
+// only enqueues the resolution; the jobs it unblocks run after the current job
+// returns, and errors from them are reported by the outermost call.
 func (s *Scheduler[T]) Abandon(ctx context.Context, dependency T) error {
 	return s.resolve(ctx, dependency, false)
 }
