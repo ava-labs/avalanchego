@@ -16,7 +16,6 @@ go_test(
     ],
     embed = [":unwind"],
     deps = [
-        "@com_github_ava_labs_avalanchego//vms/saevm/unwind",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_stretchr_testify//assert",
