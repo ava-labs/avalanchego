@@ -85,6 +85,44 @@ func (s *Sender) close() {
 	s.wg.Wait()
 }
 
+// Close permanently stops the Sender and blocks until all in-flight messages
+// are delivered; messages sent afterwards are silently dropped. It is
+// idempotent, and is registered as a cleanup by [Sender.Start] — call it
+// directly when message delivery must provably stop BEFORE other cleanups run
+// (e.g. before a peer's VM shuts down).
+func (s *Sender) Close() {
+	s.close()
+}
+
+// Drain blocks until every message in flight at the time of the call has been
+// delivered, then resumes delivering. Messages sent while draining are
+// silently dropped, mirroring production gossip's lossiness. Drain MUST NOT be
+// called concurrently with [Sender.Close] or another Drain.
+func (s *Sender) Drain() {
+	s.wgLock.Lock()
+	wasClosing := s.closing
+	s.closing = true
+	s.wgLock.Unlock()
+
+	// We MUST NOT hold wgLock while waiting; see [Sender.close].
+	s.wg.Wait()
+
+	s.wgLock.Lock()
+	s.closing = wasClosing // a permanently closed Sender stays closed
+	s.wgLock.Unlock()
+}
+
+// RemovePeer unregisters the peer registered under nodeID, if any, so that no
+// subsequently sampled message is delivered to it. In-flight deliveries that
+// already sampled the peer are unaffected: callers tearing a peer down MUST
+// follow with [Sender.Drain] before making the peer unsafe to call.
+func (s *Sender) RemovePeer(nodeID ids.NodeID) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	delete(s.peers, nodeID)
+}
+
 // AddPeer registers peer so that messages addressed to peer.NodeID() are
 // delivered to it.
 func (s *Sender) AddPeer(peer Peer) {
