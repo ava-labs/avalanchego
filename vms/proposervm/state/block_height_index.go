@@ -29,6 +29,13 @@ type HeightIndexGetter interface {
 	GetMinimumHeight() (uint64, error)
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
+	// GetBlockIDsInRange returns the indexed blockIDs for the heights in
+	// [low, high], in ascending order of height. Heights are contiguous keys,
+	// so the range is served by a single ordered scan rather than one lookup
+	// per height. Fewer IDs than requested are returned if the range runs past
+	// what is indexed.
+	GetBlockIDsInRange(low, high uint64) ([]ids.ID, error)
+
 	// Fork height is stored when the first post-fork block/option is accepted.
 	// Before that, fork height won't be found.
 	GetForkHeight() (uint64, error)
@@ -94,6 +101,38 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	}
 	hi.heightsCache.Put(height, blkID)
 	return blkID, err
+}
+
+func (hi *heightIndex) GetBlockIDsInRange(low, high uint64) ([]ids.ID, error) {
+	if low > high {
+		return nil, nil
+	}
+
+	it := hi.heightDB.NewIteratorWithStart(database.PackUInt64(low))
+	defer it.Release()
+
+	// high-low+1 can overflow only for a range spanning the whole uint64
+	// space, which no caller asks for; cap the pre-allocation regardless.
+	blkIDs := make([]ids.ID, 0, min(high-low+1, 1024))
+	for uint64(len(blkIDs)) <= high-low && it.Next() {
+		height, err := database.ParseUInt64(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		// Heights are packed big-endian, so iteration is height-ordered. A gap
+		// means the range is not contiguous and the caller must not treat what
+		// follows as the ancestors of what came before.
+		if height != low+uint64(len(blkIDs)) {
+			break
+		}
+
+		blkID, err := ids.ToID(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		blkIDs = append(blkIDs, blkID)
+	}
+	return blkIDs, it.Error()
 }
 
 func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {
