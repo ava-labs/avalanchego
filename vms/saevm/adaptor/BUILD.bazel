@@ -13,5 +13,6 @@ go_library(
         "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
+        "@org_golang_x_sync//errgroup",
     ],
 )
