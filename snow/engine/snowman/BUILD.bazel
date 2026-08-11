@@ -9,6 +9,7 @@ go_library(
         "issuer.go",
         "memory_block.go",
         "metrics.go",
+        "pending.go",
         "voter.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman",
@@ -48,6 +49,7 @@ go_test(
     srcs = [
         "config_test.go",
         "engine_test.go",
+        "pending_test.go",
     ],
     embed = [":snowman"],
     deps = [
@@ -64,6 +66,7 @@ go_test(
         "//snow/engine/enginetest",
         "//snow/engine/snowman/ancestor",
         "//snow/engine/snowman/block/blocktest",
+        "//snow/engine/snowman/enginetest",
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",

@@ -1978,7 +1978,7 @@ type PushQuery struct {
 	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	// Container being gossiped
 	Container []byte `protobuf:"bytes,4,opt,name=container,proto3" json:"container,omitempty"`
-	// Requesting peer's last accepted height
+	// The height that the requesting peer is asking for the preference at
 	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -2062,7 +2062,7 @@ type PullQuery struct {
 	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	// Container id being gossiped
 	ContainerId []byte `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	// Requesting peer's last accepted height
+	// The height that the requesting peer is asking for the preference at
 	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -2142,7 +2142,7 @@ type Chits struct {
 	// Request ID of the original PushQuery/PullQuery request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// ID of the currently preferred block
-	PreferredId []byte `protobuf:"bytes,3,opt,name=preferred_id,json=preferredId,proto3" json:"preferred_id,omitempty"`
+	PreferredId []byte `protobuf:"bytes,3,opt,name=preferred_id,json=preferredId,proto3" json:"preferred_id,omitempty"` // TODO: remove this field in the future as we don't need it anymore.
 	// ID of the last accepted block
 	AcceptedId []byte `protobuf:"bytes,4,opt,name=accepted_id,json=acceptedId,proto3" json:"accepted_id,omitempty"`
 	// ID of the currently preferred block at the requested height
