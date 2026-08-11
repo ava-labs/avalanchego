@@ -47,7 +47,7 @@ func TestScheduler_AbandonLongChainDoesNotRecurse(t *testing.T) {
 	)
 
 	s := NewScheduler[int]()
-	ctx := context.Background()
+	ctx := t.Context()
 	depth, maxDepth := 0, 0
 	for k := 1; k <= chainLen; k++ {
 		job := &abandonChainJob{
