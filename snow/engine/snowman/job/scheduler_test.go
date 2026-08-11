@@ -58,6 +58,27 @@ func newSchedulerWithJob[T comparable](
 	return s
 }
 
+// chainJob propagates its parent's resolution to the next job in the chain.
+type chainJob struct {
+	scheduler  *Scheduler[int]
+	dependency int
+	depth      *int
+	maxDepth   *int
+}
+
+func (j *chainJob) Execute(ctx context.Context, fulfilled []int, _ []int) error {
+	*j.depth++
+	*j.maxDepth = max(*j.maxDepth, *j.depth)
+	defer func() {
+		*j.depth--
+	}()
+
+	if len(fulfilled) > 0 {
+		return j.scheduler.Fulfill(ctx, j.dependency)
+	}
+	return j.scheduler.Abandon(ctx, j.dependency)
+}
+
 func TestScheduler_Schedule(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
@@ -251,79 +272,6 @@ func TestScheduler_Fulfill(t *testing.T) {
 	}
 }
 
-// chainJob resolves its own dependency the same way its parent dependency was
-// resolved, which unblocks the next job in a linear chain of dependent blocks.
-type chainJob struct {
-	scheduler  *Scheduler[int]
-	dependency int
-	depth      *int
-	maxDepth   *int
-}
-
-func (j *chainJob) Execute(ctx context.Context, fulfilled []int, _ []int) error {
-	*j.depth++
-	*j.maxDepth = max(*j.maxDepth, *j.depth)
-	defer func() {
-		*j.depth--
-	}()
-
-	if len(fulfilled) > 0 {
-		return j.scheduler.Fulfill(ctx, j.dependency)
-	}
-	return j.scheduler.Abandon(ctx, j.dependency)
-}
-
-// A chain of N blocks that all get resolved must not nest Execute N calls
-// deep. The scheduler drains the chain iteratively, so the stack stays flat
-// and a long backlog cannot overflow it.
-func TestScheduler_LongChainDoesNotRecurse(t *testing.T) {
-	const (
-		chainLen       = 50_000
-		maxNestedDepth = 16
-	)
-
-	tests := []struct {
-		name    string
-		resolve func(*Scheduler[int], context.Context, int) error
-	}{
-		{
-			name:    "fulfill",
-			resolve: (*Scheduler[int]).Fulfill,
-		},
-		{
-			name:    "abandon",
-			resolve: (*Scheduler[int]).Abandon,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			s := NewScheduler[int]()
-			depth, maxDepth := 0, 0
-			for k := 1; k <= chainLen; k++ {
-				job := &chainJob{
-					scheduler:  s,
-					dependency: k,
-					depth:      &depth,
-					maxDepth:   &maxDepth,
-				}
-				require.NoError(s.Schedule(t.Context(), job, k-1))
-			}
-
-			require.NoError(test.resolve(s, t.Context(), 0))
-
-			require.Less(
-				maxDepth,
-				maxNestedDepth,
-				"resolving a %d-block chain nested Execute %d levels deep; a chain this long overflows the stack",
-				chainLen,
-				maxDepth,
-			)
-		})
-	}
-}
-
 func TestScheduler_Abandon(t *testing.T) {
 	userJob := &testJob{}
 	tests := []struct {
@@ -406,6 +354,50 @@ func TestScheduler_Abandon(t *testing.T) {
 			require.Equal(test.expectedFulfilled, userJob.fulfilled)
 			require.Equal(test.expectedAbandoned, userJob.abandoned)
 			require.Equal(test.expectedScheduler, test.scheduler)
+		})
+	}
+}
+
+// Resolving a long chain of dependent jobs must not nest Execute calls, since
+// a drain that recurses one frame per job overflows the stack.
+func TestScheduler_LongChainDoesNotRecurse(t *testing.T) {
+	const chainLen = 50_000
+
+	tests := []struct {
+		name      string
+		fulfilled bool
+	}{
+		{
+			name:      "fulfill",
+			fulfilled: true,
+		},
+		{
+			name:      "abandon",
+			fulfilled: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := NewScheduler[int]()
+			depth, maxDepth := 0, 0
+			for k := 1; k <= chainLen; k++ {
+				job := &chainJob{
+					scheduler:  s,
+					dependency: k,
+					depth:      &depth,
+					maxDepth:   &maxDepth,
+				}
+				require.NoError(s.Schedule(t.Context(), job, k-1))
+			}
+
+			if test.fulfilled {
+				require.NoError(s.Fulfill(t.Context(), 0))
+			} else {
+				require.NoError(s.Abandon(t.Context(), 0))
+			}
+			require.Equal(1, maxDepth)
 		})
 	}
 }
