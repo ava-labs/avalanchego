@@ -172,36 +172,36 @@ func (b *block) Reject(ctx context.Context) error {
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	return withLocks(vm, func() (snowman.Block, error) {
-		return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
+		return vm.newBlock(vm.current.chain.BuildBlock(ctx))
 	})
 }
 
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *smblock.Context) (snowman.Block, error) {
 	return withLocks(vm, func() (snowman.Block, error) {
-		return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
+		return vm.newBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
 	})
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	return withLocks(vm, func() (snowman.Block, error) {
-		return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
+		return vm.newBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
 	})
 }
 
 func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	return withLocks(vm, func() (snowman.Block, error) {
-		return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
+		return vm.newBlock(vm.current.chain.GetBlock(ctx, blkID))
 	})
 }
 
-func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
+func (vm *VM) newBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm.newBlock(b), nil
+	return vm.wrapBlock(b), nil
 }
 
-func (vm *VM) newBlock(b snowman.Block) snowman.Block {
+func (vm *VM) wrapBlock(b snowman.Block) snowman.Block {
 	return &block{
 		vm:           vm,
 		blk:          b,
@@ -225,7 +225,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 
 		wrapped := make([]snowman.Block, len(unwrapped))
 		for i, b := range unwrapped {
-			wrapped[i] = vm.newBlock(b)
+			wrapped[i] = vm.wrapBlock(b)
 		}
 		return wrapped, nil
 	})
