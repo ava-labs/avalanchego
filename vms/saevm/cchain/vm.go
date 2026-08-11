@@ -284,7 +284,7 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
-	if err := vm.updateHandlers(ctx); err != nil {
+	if err := vm.setHandlers(ctx); err != nil {
 		return fmt.Errorf("updating HTTP handlers: %w", err)
 	}
 

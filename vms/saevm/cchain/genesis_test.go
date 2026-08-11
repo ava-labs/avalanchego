@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
@@ -660,4 +661,32 @@ func TestSetupGenesis(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWriteGenesisState ensures that the genesis changes are persisted to the
+// database.
+func TestWriteGenesisState(t *testing.T) {
+	genesis := avalanchegenesis.GetConfig(constants.MainnetID).CChainGenesis
+	ctx := &snow.Context{
+		NetworkUpgrades: upgrade.GetConfig(constants.MainnetID),
+	}
+
+	g, err := parseGenesis(ctx, []byte(genesis))
+	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
+
+	block, err := g.block()
+	require.NoErrorf(t, err, "%T.block()", g)
+
+	root, err := g.root()
+	require.NoErrorf(t, err, "%T.root()", g)
+	require.Equal(t, block.Root(), root, "%T.root()", g)
+
+	db := rawdb.NewMemoryDatabase()
+	tdbCfg := triedb.HashDefaults
+	tdb := triedb.NewDatabase(db, tdbCfg)
+	require.Falsef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
+
+	_, err = g.writeState(db, tdb)
+	require.NoErrorf(t, err, "%T.writeState()", g)
+	require.Truef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
 }

@@ -27,8 +27,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return vm.handlers.toInterface(), nil
 }
 
-// updateHandlers initializes the lazy handlers with the real implementations.
-func (vm *VM) updateHandlers(ctx context.Context) error {
+// setHandlers initializes the lazy handlers with the real implementations.
+func (vm *VM) setHandlers(ctx context.Context) error {
 	m, err := vm.VM.CreateHandlers(ctx)
 	if err != nil {
 		return fmt.Errorf("creating SAE handlers: %w", err)

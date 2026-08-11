@@ -83,7 +83,7 @@ type config struct {
 func defaultConfig() config {
 	return config{
 		Pruning:                      true,
-		StateSyncEnabled:             false, // TODO(alarso16): change to nil once state sync is in production
+		StateSyncEnabled:             false, // TODO(alarso16): change to true once state sync is in production
 		CommitInterval:               saedb.DefaultCommitInterval,
 		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
 		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
