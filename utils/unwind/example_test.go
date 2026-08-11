@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/unwind"
+	"github.com/ava-labs/avalanchego/utils/unwind"
 )
 
 func stagedConstructor(fail bool) (retErr error) {
