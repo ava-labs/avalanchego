@@ -173,8 +173,7 @@ func TestResponder_Rejects(t *testing.T) {
 				cancel()
 			}
 
-			// A server fault logs at ERROR, which loggingtest.New turns into a
-			// failure, so record instead and assert on what was logged.
+			// loggingtest.New fails the test on an ERROR, so record instead.
 			log := loggingtest.NewRecorder(logging.Debug)
 			r := newResponder(log, trieDB, common.HashLength)
 			resp, appErr := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
@@ -184,7 +183,7 @@ func TestResponder_Rejects(t *testing.T) {
 			require.ErrorIs(t, appErr, tt.wantErr)
 			require.Nil(t, resp)
 
-			// Only a fault is worth an ERROR, a peer's bad request is not.
+			// Only a fault earns an ERROR, a peer's bad request does not.
 			faults := log.AtLeast(logging.Error)
 			if tt.wantErr == p2p.ErrUnexpected {
 				require.Len(t, faults, 1, "a server fault must be logged")
@@ -206,8 +205,7 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 	}{
 		{name: "mirrors the trie", apply: func(snapshotCase) {}},
 		{name: "corrupt middle segment", apply: func(c snapshotCase) { c.corrupt(64, 128) }},
-		// The only shape where the gap fill advances past the snapshot index,
-		// which is where the segment trim bites.
+		// The only shape where the segment trim bites.
 		{name: "missing leaves", apply: func(c snapshotCase) {
 			kept := make([]synctest.StaticPair, 0, len(c.leaves))
 			kept = append(kept, c.leaves[:1]...)
@@ -238,6 +236,92 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 	}
 }
 
+// The snapshot is a latency optimisation, never visible to the peer.
+func TestResponder_SnapshotChangesNothing(t *testing.T) {
+	t.Parallel()
+
+	const numAccounts = 300
+
+	divergences := map[string][2]int{
+		"mirrors the trie": {0, 0},
+		"head segment":     {0, 64},
+		"middle segment":   {64, 128},
+		"segment boundary": {63, 65},
+		"tail segment":     {236, numAccounts},
+		"every segment":    {0, numAccounts},
+	}
+	limits := map[string]uint32{
+		"whole trie":      numAccounts,
+		"under a segment": 1,
+		"one segment":     64,
+		"past a segment":  65,
+		"over the cap":    uint32(MaxLeavesLimit) + 10,
+	}
+
+	for dname, diverge := range divergences {
+		for lname, limit := range limits {
+			t.Run(fmt.Sprintf("%s/%s", dname, lname), func(t *testing.T) {
+				t.Parallel()
+
+				trieDB := synctest.NewTrieDB()
+				c := newAccountCase(t, trieDB, numAccounts)
+				c.corrupt(diverge[0], diverge[1])
+				withSnap := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+
+				bareDB := synctest.NewTrieDB()
+				bare := newAccountCase(t, bareDB, numAccounts)
+				require.Equal(t, c.root, bare.root)
+				noSnap := newResponder(loggingtest.New(t, logging.Debug), bareDB, common.HashLength)
+
+				req := func() *syncpb.GetLeafRequest {
+					return &syncpb.GetLeafRequest{RootHash: c.root.Bytes(), KeyLimit: limit}
+				}
+				got, gotErr := withSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
+				want, wantErr := noSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
+
+				require.Equal(t, wantErr, gotErr)
+				require.Equal(t, want.GetKeys(), got.GetKeys())
+				require.Equal(t, want.GetValues(), got.GetValues())
+				require.Equal(t, len(want.GetProofVals()) == 0, len(got.GetProofVals()) == 0,
+					"proof presence must not depend on the snapshot")
+			})
+		}
+	}
+}
+
+// The whole-trie shortcut's complement: without a proof a client reads a short
+// range as the trie's end.
+func TestResponder_PartialResponseCarriesProof(t *testing.T) {
+	t.Parallel()
+
+	const numAccounts = 300
+
+	for _, limit := range []uint32{251, 260, 299} {
+		t.Run(fmt.Sprintf("limit=%d", limit), func(t *testing.T) {
+			t.Parallel()
+			trieDB := synctest.NewTrieDB()
+			c := newAccountCase(t, trieDB, numAccounts)
+
+			// Missing from the snapshot only, so the bridge overshoots and the
+			// limit trims the segment reaching the trie's end.
+			kept := make([]synctest.StaticPair, 0, len(c.leaves))
+			kept = append(kept, c.leaves[:1]...)
+			kept = append(kept, c.leaves[50:]...)
+			c.snap.Accounts = kept
+
+			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+				RootHash: c.root.Bytes(),
+				KeyLimit: limit,
+			})
+			require.Nil(t, appErr)
+			require.NotNil(t, resp)
+			require.Less(t, len(resp.Keys), numAccounts, "the limit must leave leaves unserved")
+			require.NotEmpty(t, resp.ProofVals, "a partial response must carry a proof")
+		})
+	}
+}
+
 func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 	t.Parallel()
 
@@ -257,6 +341,39 @@ func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 			require.Equal(t, c.account, reads[0].Account, "must read the requested scope")
 		})
 	}
+}
+
+// A real [snapshot.Tree] driven through the case the disk-layer read exists
+// for: a root the tree has retired.
+func TestResponder_ServesHistoricalRootFromDiskLayer(t *testing.T) {
+	t.Parallel()
+
+	const numAccounts = 100
+
+	trieDB, disk := synctest.NewTrieDBWithDisk()
+	oldRoot, keys, vals, _ := synctest.FillAccountTrie(t, trieDB, numAccounts)
+	newRoot := synctest.AdvanceAccountTrie(t, trieDB, oldRoot, 30)
+	require.NotEqual(t, oldRoot, newRoot)
+
+	tree := synctest.NewSnapshotTree(t, disk, trieDB, newRoot)
+	synctest.RequireRootRetired(t, tree, oldRoot)
+
+	log := loggingtest.NewRecorder(logging.Debug)
+	r := newResponder(log, trieDB, common.HashLength, WithSnapshot(tree))
+	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+		RootHash: oldRoot.Bytes(),
+		KeyLimit: uint32(len(keys)),
+	})
+	require.Nil(t, appErr)
+	require.NotNil(t, resp)
+
+	require.Equal(t, keys, resp.Keys)
+	require.Equal(t, vals, resp.Values)
+
+	// Without this the assertions above pass on a pure trie fallback.
+	require.Empty(t, log.Filter(func(rec *loggingtest.Record) bool {
+		return rec.Msg == "snapshot read abandoned, falling back to the trie"
+	}), "the disk layer must have been read")
 }
 
 func TestResponder_BoundedRange(t *testing.T) {
@@ -394,8 +511,8 @@ func TestResponder_Snapshot(t *testing.T) {
 				r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
 				requireServesWholeTrie(t, r, c)
 
-				// The trie fallback serves the same leaves, so this is what
-				// proves the snapshot ran at all.
+				// The trie fallback serves the same leaves, so only this proves
+				// the snapshot ran.
 				require.NotEmpty(t, c.snap.Reads(), "snapshot must be consulted")
 			})
 		}
