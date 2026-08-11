@@ -235,7 +235,7 @@ func (c *cancelAfter) Respond(ctx context.Context, nodeID ids.NodeID, req *syncp
 	return c.inner.Respond(ctx, nodeID, req)
 }
 
-func newLeafResponder(tb testing.TB, trieDB *triedb.Database) *responder {
+func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
 	tb.Helper()
-	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength)
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
 }

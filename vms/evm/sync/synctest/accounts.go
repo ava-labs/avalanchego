@@ -10,9 +10,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
@@ -89,24 +87,3 @@ func AdvanceAccountTrie(t *testing.T, trieDB *triedb.Database, from common.Hash,
 
 // advancedNonceOffset keeps an advanced account distinct at any index.
 const advancedNonceOffset = 1_000_000
-
-// NewSnapshotTree builds a real [snapshot.Tree] with its disk layer generated
-// from the state at root, for driving a handler through the production type.
-func NewSnapshotTree(t *testing.T, disk ethdb.Database, trieDB *triedb.Database, root common.Hash) *snapshot.Tree {
-	t.Helper()
-	tree, err := snapshot.New(snapshot.Config{CacheSize: 1}, disk, trieDB, root)
-	require.NoError(t, err)
-	require.Equal(t, root, tree.DiskRoot())
-	return tree
-}
-
-// RequireRootRetired asserts tree cannot serve root. libevm reports the miss
-// with no sentinel, so this asserts iteration is impossible, not which error.
-func RequireRootRetired(t *testing.T, tree *snapshot.Tree, root common.Hash) {
-	t.Helper()
-	it, err := tree.AccountIterator(root, common.Hash{})
-	if err == nil {
-		it.Release()
-		t.Fatalf("snapshot tree still serves root %s", root)
-	}
-}

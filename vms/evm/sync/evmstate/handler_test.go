@@ -85,7 +85,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
+			r := newLeafResponder(t, trieDB)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.ErrorIs(t, appErr, errInvalidRequest)
 			require.Nil(t, resp)
@@ -112,7 +112,7 @@ func TestResponder_Serves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
 
-			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
+			r := newLeafResponder(t, trieDB)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: tt.limit,
@@ -206,12 +206,7 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 		{name: "mirrors the trie", apply: func(snapshotCase) {}},
 		{name: "corrupt middle segment", apply: func(c snapshotCase) { c.corrupt(64, 128) }},
 		// The only shape where the segment trim bites.
-		{name: "missing leaves", apply: func(c snapshotCase) {
-			kept := make([]synctest.StaticPair, 0, len(c.leaves))
-			kept = append(kept, c.leaves[:1]...)
-			kept = append(kept, c.leaves[100:]...)
-			c.snap.Accounts = kept
-		}},
+		{name: "missing leaves", apply: func(c snapshotCase) { c.drop(1, 100) }},
 	}
 
 	for _, limit := range []uint32{1, 63, 64, 65, 129, 200} {
@@ -222,7 +217,7 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 				c := newAccountCase(t, trieDB, numAccounts)
 				shape.apply(c)
 
-				r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 					RootHash: c.root.Bytes(),
 					KeyLimit: limit,
@@ -266,7 +261,7 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 				trieDB := synctest.NewTrieDB()
 				c := newAccountCase(t, trieDB, numAccounts)
 				c.corrupt(diverge[0], diverge[1])
-				withSnap := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+				withSnap := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 
 				bareDB := synctest.NewTrieDB()
 				bare := newAccountCase(t, bareDB, numAccounts)
@@ -302,14 +297,11 @@ func TestResponder_PartialResponseCarriesProof(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			c := newAccountCase(t, trieDB, numAccounts)
 
-			// Missing from the snapshot only, so the bridge overshoots and the
-			// limit trims the segment reaching the trie's end.
-			kept := make([]synctest.StaticPair, 0, len(c.leaves))
-			kept = append(kept, c.leaves[:1]...)
-			kept = append(kept, c.leaves[50:]...)
-			c.snap.Accounts = kept
+			// The bridge then overshoots and the limit trims the segment that
+			// reaches the trie's end.
+			c.drop(1, 50)
 
-			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+			r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: c.root.Bytes(),
 				KeyLimit: limit,
@@ -331,7 +323,7 @@ func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			c := kind.build(t, trieDB, 20)
 
-			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+			r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 			requireServesWholeTrie(t, r, c)
 
 			reads := c.snap.Reads()
@@ -358,8 +350,7 @@ func TestResponder_ServesHistoricalRootFromDiskLayer(t *testing.T) {
 	tree := synctest.NewSnapshotTree(t, disk, trieDB, newRoot)
 	synctest.RequireRootRetired(t, tree, oldRoot)
 
-	log := loggingtest.NewRecorder(logging.Debug)
-	r := newResponder(log, trieDB, common.HashLength, WithSnapshot(tree))
+	r := newLeafResponder(t, trieDB, WithSnapshot(tree))
 	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: oldRoot.Bytes(),
 		KeyLimit: uint32(len(keys)),
@@ -371,9 +362,9 @@ func TestResponder_ServesHistoricalRootFromDiskLayer(t *testing.T) {
 	require.Equal(t, vals, resp.Values)
 
 	// Without this the assertions above pass on a pure trie fallback.
-	require.Empty(t, log.Filter(func(rec *loggingtest.Record) bool {
-		return rec.Msg == "snapshot read abandoned, falling back to the trie"
-	}), "the disk layer must have been read")
+	reads := tree.Reads()
+	require.Len(t, reads, 1)
+	require.Equal(t, tree.DiskRoot(), reads[0].Root, "the disk layer must have been read")
 }
 
 func TestResponder_BoundedRange(t *testing.T) {
@@ -390,7 +381,7 @@ func TestResponder_BoundedRange(t *testing.T) {
 			if withSnapshot {
 				opts = append(opts, WithSnapshot(c.snap))
 			}
-			r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, opts...)
+			r := newLeafResponder(t, trieDB, opts...)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: c.root.Bytes(),
 				StartKey: c.keys[10],
@@ -412,7 +403,7 @@ func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, int(MaxLeavesLimit)+200)
 
-	r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength)
+	r := newLeafResponder(t, trieDB)
 	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(MaxLeavesLimit) + 200,
@@ -442,6 +433,15 @@ type snapshotCase struct {
 	leaves []synctest.StaticPair
 }
 
+// drop removes [from, to) from the snapshot only, so the trie holds leaves the
+// snapshot lacks and a bridge overshoots the snapshot index.
+func (c snapshotCase) drop(from, to int) {
+	kept := make([]synctest.StaticPair, 0, len(c.leaves))
+	kept = append(kept, c.leaves[:from]...)
+	kept = append(kept, c.leaves[to:]...)
+	c.snap.Accounts = kept
+}
+
 // corrupt points [from, to) at leaf 0's value, well formed but not matching the
 // trie. A segment fails on any single mismatch.
 func (c snapshotCase) corrupt(from, to int) {
@@ -464,12 +464,13 @@ func newStorageCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
 	for i := range keys {
 		leaves[i] = synctest.StaticPair{K: keys[i], V: vals[i]}
 	}
+	static := &synctest.StaticSnapshot{Storage: map[common.Hash][]synctest.StaticPair{account: leaves}}
 	return snapshotCase{
 		root:    root,
 		account: account,
 		keys:    keys,
 		vals:    vals,
-		snap:    &synctest.StaticSnapshot{Storage: map[common.Hash][]synctest.StaticPair{account: leaves}},
+		snap:    static,
 		leaves:  leaves,
 	}
 }
@@ -508,7 +509,7 @@ func TestResponder_Snapshot(t *testing.T) {
 					c.snap.Err = errors.New("snapshot unavailable")
 				}
 
-				r := newResponder(loggingtest.New(t, logging.Debug), trieDB, common.HashLength, WithSnapshot(c.snap))
+				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 				requireServesWholeTrie(t, r, c)
 
 				// The trie fallback serves the same leaves, so only this proves
