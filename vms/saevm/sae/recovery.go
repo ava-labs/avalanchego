@@ -109,9 +109,9 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 }
 
 // newExecution returns an executor that is ready to execute any child of
-// [saexec.Executor.LastExecuted] and an empty map to track consensus-critical
-// blocks. This map will guarantee that a block's settled and post-execution
-// state is available, if the block is executed, as long as it is in the map.
+// [recovery.lastCommitted] and an empty map to track consensus-critical blocks.
+// This map will guarantee that a block's settled and post-execution state is
+// available, if the block is executed, as long as it is in the map.
 func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, *syncMap[common.Hash, *blocks.Block], error) {
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
