@@ -17,18 +17,18 @@ type Closers []io.Closer
 // Push is a convenience wrapper for:
 //
 //	*c = append(*c, cs...)
-func (c *Closers) Push(cs ...io.Closer) {
-	*c = append(*c, cs...)
+func (cs *Closers) Push(xx ...io.Closer) {
+	*cs = append(*cs, xx...)
 }
 
 // Close closes every [io.Closer], in reverse order.
-func (c Closers) Close() error {
-	return errors.Join(c.close()...)
+func (cs Closers) Close() error {
+	return errors.Join(cs.close()...)
 }
 
-func (c Closers) close() []error {
-	errs := make([]error, 0, len(c))
-	for _, c := range slices.Backward(c) {
+func (cs Closers) close() []error {
+	errs := make([]error, 0, len(cs))
+	for _, c := range slices.Backward(cs) {
 		// Reported in the same order as executed to allow tests to assert the
 		// reversal.
 		errs = append(errs, c.Close())
@@ -40,14 +40,14 @@ func (c Closers) close() []error {
 // points to a non-nil error, joining any resulting errors into it. It is
 // expected to be defer-called in a function, with a pointer to said function's
 // named return argument, as demonstrated in the example.
-func (c *Closers) CloseIfPointsToNonNil(retErr *error) {
+func (cs *Closers) CloseIfPointsToNonNil(retErr *error) {
 	// The receiver MUST be a pointer because this method is typically deferred
 	// before any call to [closers.push], and a `defer` statement evaluates its
 	// receiver when the statement executes, not when the call runs.
 	if *retErr != nil {
 		*retErr = errors.Join(slices.Concat(
 			[]error{*retErr},
-			c.close(),
+			cs.close(),
 		)...)
 	}
 }
