@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 )
 
 var _ block.BatchedChainVM = (*VM)(nil)
@@ -35,6 +37,28 @@ func (vm *VM) GetAncestors(
 	res := make([][]byte, 0, maxBlocksNum)
 	currentByteLength := 0
 	startTime := vm.Clock.Time()
+
+	// Prefer the indexed walk, which resolves the whole height range up front
+	// and reads the blocks concurrently. It only applies to accepted blocks;
+	// anything else falls through to the serial walk below.
+	if indexed, ok := vm.getAncestorsIndexed(ctx, blkID, maxBlocksNum, maxBlocksSize, startTime.Add(maxBlocksRetrievalTime)); ok {
+		res = indexed
+		for _, blkBytes := range res {
+			currentByteLength += wrappers.IntLen + len(blkBytes)
+		}
+		if len(res) >= maxBlocksNum ||
+			currentByteLength >= maxBlocksSize ||
+			!vm.Clock.Time().Before(startTime.Add(maxBlocksRetrievalTime)) {
+			return res, nil
+		}
+		// The indexed walk stops at the fork height, so continue from the
+		// parent of the oldest block returned.
+		parentID, err := statelessblock.ParentID(res[len(res)-1])
+		if err != nil {
+			return res, nil
+		}
+		blkID = parentID
+	}
 
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit
@@ -156,6 +180,52 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		}
 	}
 	return blocks, nil
+}
+
+// getAncestorsIndexed serves the post-fork portion of a GetAncestors response
+// using the height index, which lets the block reads be issued concurrently
+// instead of one per parent pointer.
+//
+// It reports false when the request cannot be served this way, in which case
+// the caller must fall back to walking parent pointers. That happens when the
+// requested block's height cannot be determined, or when the block is not the
+// accepted block at that height - the height index describes only the accepted
+// chain, so serving from it for any other block would return the wrong blocks.
+func (vm *VM) getAncestorsIndexed(
+	ctx context.Context,
+	blkID ids.ID,
+	maxBlocksNum int,
+	maxBlocksSize int,
+	deadline time.Time,
+) ([][]byte, bool) {
+	// One block is fetched the expensive way to learn its height; every other
+	// block in the response is then read without decoding.
+	blk, err := vm.getPostForkBlock(ctx, blkID)
+	if err != nil {
+		return nil, false
+	}
+	height := blk.Height()
+
+	// Only the accepted chain is indexed by height.
+	acceptedID, err := vm.State.GetBlockIDAtHeight(height)
+	if err != nil || acceptedID != blkID {
+		return nil, false
+	}
+
+	res, err := state.GetAncestorBytes(
+		vm.State,
+		vm.State,
+		height,
+		maxBlocksNum,
+		maxBlocksSize,
+		deadline,
+		vm.Clock.Time,
+		state.DefaultAncestorsConcurrency,
+	)
+	if err != nil || len(res) == 0 {
+		return nil, false
+	}
+	return res, true
 }
 
 func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
