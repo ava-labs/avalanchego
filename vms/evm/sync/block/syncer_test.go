@@ -134,7 +134,7 @@ func TestSyncer(t *testing.T) {
 		blocksToFetch uint64
 		wantHeights   []int
 		txsPerBlock   int   // non-zero grows blocks so a long sync crosses the flush threshold
-		wantRequests  int32 // requests the syncer must send to peers
+		wantRequests  int   // requests the syncer must send to peers
 		wantVerified  int32 // blocks the verifier must see
 	}{
 		{
@@ -237,7 +237,6 @@ func TestSyncer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			nodeID := ids.GenerateTestNodeID()
 
 			blocks := synctest.MakeChain(t, tt.numBlocks, synctest.WithTxsPerBlock(tt.txsPerBlock))
 			target := rawdb.NewMemoryDatabase()
@@ -245,9 +244,7 @@ func TestSyncer(t *testing.T) {
 				writeBlock(t, target, blocks[h])
 			}
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			handler, requests := countingHandler(t, blocks)
-			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+			net, tracker, requests := countingNetwork(t, ctx, blocks)
 
 			var (
 				verified atomic.Int32
@@ -267,7 +264,7 @@ func TestSyncer(t *testing.T) {
 
 			require.Equal(t, tt.wantVerified, verified.Load())
 			// Skipped blocks must never be requested from peers.
-			require.Equal(t, tt.wantRequests, requests.Load())
+			require.Equal(t, tt.wantRequests, requests.Count())
 			for _, h := range tt.wantHeights {
 				want := blocks[h]
 				require.NotNil(t, rawdb.ReadBlock(target, want.Hash(), want.NumberU64()), "block %d missing", h)
@@ -304,9 +301,7 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			handler, _ := countingHandler(t, blocks)
-			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+			net, tracker, _ := countingNetwork(t, ctx, blocks)
 
 			// Accept the batch, then cancel, so the loop reaches its guard with
 			// blocks already written.
@@ -466,22 +461,15 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 	}
 }
 
-// countingResponder counts the requests it serves, so a test can assert the
-// syncer never asked for blocks it already had.
-type countingResponder struct {
-	inner    handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
-	requests atomic.Int32
-}
+type blockCounter = synctest.CountingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
-func (r *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
-	r.requests.Add(1)
-	return r.inner.Respond(ctx, nodeID, req)
-}
-
-func countingHandler(t *testing.T, blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
+// countingNetwork serves blocks on a loopback network and counts the requests,
+// so a test can assert the syncer never asked for blocks it already had.
+func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockCounter) {
 	log := loggingtest.New(t, logging.Debug)
-	r := &countingResponder{inner: newResponder(log, synctest.NewBlockMap(blocks))}
-	return handlers.NewHandler(log, r), &r.requests
+	r := synctest.NewCountingResponder(newResponder(log, synctest.NewBlockMap(blocks)))
+	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, r)
+	return net, tracker, r
 }
 
 func writeBlock(t *testing.T, db ethdb.Database, block *types.Block) {
@@ -522,9 +510,7 @@ func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
 	// The peer is canonical on theirs but still stores ours.
 	both := append(append([]*types.Block{}, theirs...), ours...)
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	handler, served := countingHandler(t, both)
-	require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
+	net, tracker, served := countingNetwork(t, ctx, both)
 
 	got, err := getBlocks(ctx, logging.NoLog{}, NewClient(net, tracker),
 		wanted.Hash(), wanted.NumberU64(), 3, nil)
@@ -532,7 +518,7 @@ func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 	require.Equal(t, wanted.Hash(), got[0].Hash())
-	require.Equal(t, int32(1), served.Load(), "one request, no retry loop")
+	require.Equal(t, 1, served.Count(), "one request, no retry loop")
 }
 
 func heights(from, to int) []int {
