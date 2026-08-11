@@ -113,7 +113,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 }
 
 // recoverExecutor returns an [sae.Executor] that is ready to execute any child
-// of the last-known accepted block, and a map of all consesnsus-critical blocks.
+// of the last-known accepted block, and a map of all consensus-critical blocks.
 func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
