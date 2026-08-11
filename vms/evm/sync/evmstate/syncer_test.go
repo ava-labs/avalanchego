@@ -6,7 +6,6 @@ package evmstate
 import (
 	"bytes"
 	"context"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestVerifyLeafs(t *testing.T) {
@@ -75,7 +73,7 @@ func TestSyncer(t *testing.T) {
 	tests := []struct {
 		name         string
 		numKeys      int
-		wantRequests int32
+		wantRequests int
 	}{
 		{name: "single batch", numKeys: 50, wantRequests: 1},
 		{name: "exact limit", numKeys: int(MaxLeavesLimit), wantRequests: 1},
@@ -91,11 +89,11 @@ func TestSyncer(t *testing.T) {
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
-			counting := &countingResponder{inner: newLeafResponder(t, trieDB)}
-			syncer, target := newSyncer(t, ctx, root, leafHandler(t, counting))
+			counting := synctest.NewCountingResponder(newLeafResponder(t, trieDB))
+			syncer, target := newSyncer(t, ctx, root, counting)
 			require.NoError(t, syncer.Sync(ctx))
 
-			require.Equal(t, tt.wantRequests, counting.served.Load())
+			require.Equal(t, tt.wantRequests, counting.Count())
 			requireReconstructed(t, target, root, keys, vals)
 		})
 	}
@@ -130,9 +128,8 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 
 	// Every response is tampered. Cancel after a few retries, no wall-clock wait.
-	tampering := &flakyResponder{inner: newLeafResponder(t, trieDB), bad: -1}
-	handler := leafHandler(t, &cancelAfter{inner: tampering, after: 3, cancel: cancel})
-	syncer, target := newSyncer(t, ctx, root, handler)
+	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), -1, tamperLeaf)
+	syncer, target := newSyncer(t, ctx, root, synctest.NewCancelAfter(tampering, 3, cancel))
 	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled, "tampered leaves must never be accepted")
 
 	// Nothing accepted, target stays empty.
@@ -150,22 +147,35 @@ func TestSyncer_RecoversAfterBadResponses(t *testing.T) {
 
 	// Corrupt the first two responses, then serve correctly.
 	syncer, target := newSyncer(t, ctx, root,
-		leafHandler(t, &flakyResponder{inner: newLeafResponder(t, trieDB), bad: 2}))
+		synctest.NewMutatingResponder(newLeafResponder(t, trieDB), 2, tamperLeaf))
 	require.NoError(t, syncer.Sync(ctx), "the re-request loop must recover after transient bad responses")
 
 	requireReconstructed(t, target, root, keys, vals)
 }
 
-// newSyncer wires a loopback network serving handler and returns a syncer for the
-// trie at root together with its target db.
-func newSyncer(t *testing.T, ctx context.Context, root common.Hash, handler p2p.Handler) (*Syncer, ethdb.Database) {
+// newSyncer serves r on a loopback network and returns a syncer for the trie at
+// root together with its target db.
+func newSyncer(
+	t *testing.T,
+	ctx context.Context,
+	root common.Hash,
+	r handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse],
+) (*Syncer, ethdb.Database) {
 	t.Helper()
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
+	log := loggingtest.New(t, logging.Debug)
+	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID, r)
 	target := rawdb.NewMemoryDatabase()
-	syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, root, common.Hash{})
+	syncer, err := NewSyncer(log, NewClient(net, tracker), target, root, common.Hash{})
 	require.NoError(t, err)
 	return syncer, target
+}
+
+// tamperLeaf corrupts a served value so its range proof fails, leaving the
+// client's own verification as the thing under test.
+func tamperLeaf(resp *syncpb.GetLeafResponse) {
+	if len(resp.GetValues()) > 0 {
+		resp.Values[0] = bytes.Repeat([]byte{0xff}, common.HashLength)
+	}
 }
 
 // requireReconstructed asserts every pair is queryable through the trie rebuilt
@@ -179,60 +189,6 @@ func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash,
 		require.NoError(t, err)
 		require.Equal(t, vals[i], got)
 	}
-}
-
-// countingResponder counts the requests it serves, so a test can assert the
-// syncer's batching.
-type countingResponder struct {
-	inner  *responder
-	served atomic.Int32
-}
-
-func (c *countingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	c.served.Add(1)
-	return c.inner.Respond(ctx, nodeID, req)
-}
-
-// flakyResponder corrupts a value in the first bad responses so their range
-// proof fails, then serves correctly. A negative bad corrupts every response.
-type flakyResponder struct {
-	inner  *responder
-	bad    int32
-	served atomic.Int32
-}
-
-func (f *flakyResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	resp, appErr := f.inner.Respond(ctx, nodeID, req)
-	if appErr != nil || len(resp.GetValues()) == 0 {
-		return resp, appErr
-	}
-	if seen := f.served.Add(1); f.bad < 0 || seen <= f.bad {
-		resp.Values[0] = bytes.Repeat([]byte{0xff}, common.HashLength)
-	}
-	return resp, nil
-}
-
-// leafHandler drives r through the real shell, so the tests exercise the
-// production unmarshal, marshal and error path.
-func leafHandler(tb testing.TB, r handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]) p2p.Handler {
-	tb.Helper()
-	return handlers.NewHandler(loggingtest.New(tb, logging.Debug), r)
-}
-
-// cancelAfter cancels once it has served after requests, bounding a retry loop
-// without a wall-clock wait.
-type cancelAfter struct {
-	inner  handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-	after  int32
-	cancel context.CancelFunc
-	served atomic.Int32
-}
-
-func (c *cancelAfter) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if c.served.Add(1) >= c.after {
-		c.cancel()
-	}
-	return c.inner.Respond(ctx, nodeID, req)
 }
 
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
