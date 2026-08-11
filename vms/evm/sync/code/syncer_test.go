@@ -109,8 +109,8 @@ func TestSyncer(t *testing.T) {
 			}
 
 			log := loggingtest.New(t, logging.Debug)
-			counter := synctest.NewCountingResponder(newResponder(log, source))
-			client := serve(t, ctx, log, counter)
+			recorder := synctest.NewRecordingResponder(newResponder(log, source))
+			client := serve(t, ctx, log, recorder)
 
 			copies := max(tt.copies, 1)
 			ch := make(chan common.Hash, len(want)*copies)
@@ -136,7 +136,7 @@ func TestSyncer(t *testing.T) {
 			defer it.Release()
 			require.False(t, it.Next(), "all to-fetch markers must be cleared")
 
-			sizes := requestSizes(counter)
+			sizes := requestSizes(recorder)
 			require.Len(t, sizes, tt.wantRequests,
 				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
 			requested := 0
@@ -213,10 +213,10 @@ func serve(t *testing.T, ctx context.Context, log logging.Logger, r handlers.Res
 	return NewClient(net, tracker)
 }
 
-type codeCounter = synctest.CountingResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+type codeRecorder = synctest.RecordingResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
 // requestSizes is the hash count of every request served, in order.
-func requestSizes(c *codeCounter) []int {
+func requestSizes(c *codeRecorder) []int {
 	reqs := c.Requests()
 	sizes := make([]int, len(reqs))
 	for i, req := range reqs {

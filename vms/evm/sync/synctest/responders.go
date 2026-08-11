@@ -35,19 +35,19 @@ func ServeResponder[V any, Req handlers.ProtoMessage[V], Resp proto.Message](
 	return net, tracker
 }
 
-// CountingResponder records every request reaching inner.
-type CountingResponder[Req, Resp proto.Message] struct {
+// RecordingResponder records every request reaching inner.
+type RecordingResponder[Req, Resp proto.Message] struct {
 	inner handlers.Responder[Req, Resp]
 
 	lock     sync.Mutex
 	requests []Req
 }
 
-func NewCountingResponder[Req, Resp proto.Message](inner handlers.Responder[Req, Resp]) *CountingResponder[Req, Resp] {
-	return &CountingResponder[Req, Resp]{inner: inner}
+func NewRecordingResponder[Req, Resp proto.Message](inner handlers.Responder[Req, Resp]) *RecordingResponder[Req, Resp] {
+	return &RecordingResponder[Req, Resp]{inner: inner}
 }
 
-func (c *CountingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+func (c *RecordingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
 	c.lock.Lock()
 	c.requests = append(c.requests, req)
 	c.lock.Unlock()
@@ -55,13 +55,13 @@ func (c *CountingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.N
 }
 
 // Requests returns the requests served so far, in arrival order.
-func (c *CountingResponder[Req, Resp]) Requests() []Req {
+func (c *RecordingResponder[Req, Resp]) Requests() []Req {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return slices.Clone(c.requests)
 }
 
-func (c *CountingResponder[Req, Resp]) Count() int {
+func (c *RecordingResponder[Req, Resp]) Count() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return len(c.requests)
