@@ -4,7 +4,9 @@
 package state
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -21,16 +23,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-const blockCacheSize = 64 * units.MiB
+const (
+	blockCacheSize = 64 * units.MiB
+
+	// innerBlockOffset is the byte offset of the block itself within a
+	// serialized blockWrapper: a codec version followed by the length prefix of
+	// [blockWrapper.Block], which is the wrapper's first serialized field.
+	// TestInnerBlockBytes enforces that layout.
+	innerBlockOffset = wrappers.ShortLen + wrappers.IntLen
+)
 
 var (
-	errBlockWrongVersion = errors.New("wrong version")
+	errBlockWrongVersion     = errors.New("wrong version")
+	errTruncatedBlockWrapper = errors.New("truncated block wrapper")
 
 	_ BlockState = (*blockState)(nil)
 )
 
 type BlockState interface {
 	GetBlock(blkID ids.ID) (block.Block, error)
+	// GetBlockBytesAndParent returns the serialized block along with the ID of
+	// its parent. See [blockState.GetBlockBytesAndParent].
+	GetBlockBytesAndParent(blkID ids.ID) ([]byte, ids.ID, error)
 	PutBlock(blk block.Block) error
 	DeleteBlock(blkID ids.ID) error
 }
@@ -112,6 +126,60 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 
 	s.blkCache.Put(blkID, &blkWrapper)
 	return blk, nil
+}
+
+// GetBlockBytesAndParent returns the serialized block along with the ID of its
+// parent.
+//
+// It is a cheaper alternative to [blockState.GetBlock] for callers that walk a
+// chain of blocks but only need to return their bytes. It performs the same
+// single database read, but skips decoding the block, computing its ID, and
+// parsing its staking certificate.
+//
+// Unlike [blockState.GetBlock] it does not populate the block cache. This path
+// serves historical range scans, which have no reuse within a walk and would
+// otherwise evict the recent blocks that consensus depends on.
+func (s *blockState) GetBlockBytesAndParent(blkID ids.ID) ([]byte, ids.ID, error) {
+	if blk, found := s.blkCache.Get(blkID); found {
+		if blk == nil {
+			return nil, ids.Empty, database.ErrNotFound
+		}
+		return blk.Block, blk.block.ParentID(), nil
+	}
+
+	blkWrapperBytes, err := s.db.Get(blkID[:])
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+
+	blkBytes, err := innerBlockBytes(blkWrapperBytes)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+
+	parentID, err := block.ParentID(blkBytes)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	return blkBytes, parentID, nil
+}
+
+// innerBlockBytes returns the [blockWrapper.Block] field of a serialized
+// blockWrapper without decoding the wrapper. The returned slice aliases b.
+func innerBlockBytes(b []byte) ([]byte, error) {
+	if len(b) < innerBlockOffset {
+		return nil, fmt.Errorf("%w: got %d bytes, need at least %d", errTruncatedBlockWrapper, len(b), innerBlockOffset)
+	}
+	if version := binary.BigEndian.Uint16(b); version != CodecVersion {
+		return nil, errBlockWrongVersion
+	}
+	// Computed in uint64 so that a corrupt length cannot overflow into a valid
+	// looking offset.
+	end := uint64(innerBlockOffset) + uint64(binary.BigEndian.Uint32(b[wrappers.ShortLen:]))
+	if end > uint64(len(b)) {
+		return nil, fmt.Errorf("%w: block field ends at %d, past the %d bytes available", errTruncatedBlockWrapper, end, len(b))
+	}
+	return b[innerBlockOffset:end], nil
 }
 
 func (s *blockState) PutBlock(blk block.Block) error {

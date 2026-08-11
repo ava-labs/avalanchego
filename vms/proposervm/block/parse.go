@@ -4,11 +4,49 @@
 package block
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+const (
+	// parentIDOffset is the byte offset of a block's parent ID within its
+	// serialized form: a codec version followed by the type ID assigned by
+	// [Codec].
+	//
+	// Every type registered with [Codec] serializes its parent ID as its first
+	// field, so this offset does not depend on which type the bytes hold.
+	// TestParentIDOffset enforces that invariant against all registered types.
+	parentIDOffset = wrappers.ShortLen + wrappers.IntLen
+	parentIDEnd    = parentIDOffset + ids.IDLen
+)
+
+var errTooShortForParentID = errors.New("insufficient bytes to contain a parent ID")
+
+// ParentID returns the parent ID of a serialized block without decoding the
+// block.
+//
+// It exists for callers that walk a chain of blocks but only need their bytes -
+// notably serving GetAncestors - and lets them skip the reflection-based
+// decoding, ID hashing, and X.509 certificate parsing that
+// [ParseWithoutVerification] performs.
+//
+// The bytes are assumed to have been produced by [Codec]. ParentID validates
+// the codec version and the length, but not the block's structure; callers
+// handling untrusted bytes must use [Parse].
+func ParentID(b []byte) (ids.ID, error) {
+	if len(b) < parentIDEnd {
+		return ids.Empty, fmt.Errorf("%w: got %d bytes, need %d", errTooShortForParentID, len(b), parentIDEnd)
+	}
+	if version := binary.BigEndian.Uint16(b); version != CodecVersion {
+		return ids.Empty, fmt.Errorf("expected codec version %d but got %d", CodecVersion, version)
+	}
+	return ids.ID(b[parentIDOffset:parentIDEnd]), nil
+}
 
 type ParseResult struct {
 	Block Block

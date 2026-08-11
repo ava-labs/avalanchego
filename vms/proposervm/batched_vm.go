@@ -39,13 +39,14 @@ func (vm *VM) GetAncestors(
 	// hereinafter loop over proposerVM cache and DB, possibly till snowman++
 	// fork is hit
 	for {
-		blk, err := vm.getStatelessBlk(blkID)
+		// Only the bytes and the parent link are needed to serve the response,
+		// so the block is deliberately not decoded here. See
+		// [VM.getStatelessBlkBytes].
+		blkBytes, parentID, err := vm.getStatelessBlkBytes(blkID)
 		if err != nil {
 			// maybe we have hit the proposerVM fork here?
 			break
 		}
-
-		blkBytes := blk.Bytes()
 
 		// Ensure response size isn't too large. Include wrappers.IntLen because
 		// the size of the message is included with each container, and the size
@@ -57,7 +58,7 @@ func (vm *VM) GetAncestors(
 		}
 
 		res = append(res, blkBytes)
-		blkID = blk.ParentID()
+		blkID = parentID
 		if len(res) >= maxBlocksNum {
 			return res, nil
 		}
@@ -162,4 +163,19 @@ func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
 		return currentBlk.getStatelessBlk(), nil
 	}
 	return vm.State.GetBlock(blkID)
+}
+
+// getStatelessBlkBytes returns the serialized block along with the ID of its
+// parent, which together are everything [VM.GetAncestors] needs to walk the
+// chain and build its response.
+//
+// Blocks currently in consensus are already decoded, so they are served from
+// memory as before. Blocks read from disk skip decoding entirely; see
+// [state.BlockState.GetBlockBytesAndParent].
+func (vm *VM) getStatelessBlkBytes(blkID ids.ID) ([]byte, ids.ID, error) {
+	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
+		blk := currentBlk.getStatelessBlk()
+		return blk.Bytes(), blk.ParentID(), nil
+	}
+	return vm.State.GetBlockBytesAndParent(blkID)
 }
