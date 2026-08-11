@@ -172,4 +172,3 @@ func (s *snapshotReads) record(read SnapshotRead) {
 
 	s.reads = append(s.reads, read)
 }
-
