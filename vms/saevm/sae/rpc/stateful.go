@@ -311,14 +311,14 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 		return nil, nil, err
 	}
 	rules := b.ChainConfig().Rules(child.Number(), true /*isMerge*/, child.Time())
-	// All parameters passed to [saexec.BeforeExecutingBlock] MUST exactly match
+	// All parameters passed to [saexec.StartExecutingBlock] MUST exactly match
 	// those that [saexec.Execute] pass, so that the hooks see the same state.
 	// Parent will have a faked header, so we pass the restored parent block.
 	//
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
-	if err := saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parentBlock.Header(), child); err != nil {
+	if err := saexec.StartExecutingBlock(b.Hooks(), rules, sdb, parentBlock.Header(), child); err != nil {
 		return nil, nil, err
 	}
 	return sdb, noopRelease, nil

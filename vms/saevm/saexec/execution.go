@@ -153,10 +153,10 @@ type (
 	}
 )
 
-// BeforeExecutingBlock applies the state changes required before executing
+// StartExecutingBlock applies the state changes required before executing
 // b's transactions, specifically the before-block hook and the EIP-4788 beacon
 // root, mirroring [core.StateProcessor.Process].
-func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
 		return fmt.Errorf("before-block hook: %v", err)
 	}
@@ -207,7 +207,7 @@ func Execute(
 	}
 
 	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
-	if err := BeforeExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+	if err := StartExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
 

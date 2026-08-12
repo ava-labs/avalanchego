@@ -140,17 +140,17 @@ func logTopOfStackAfter(tb testing.TB, code []byte) ([]byte, uint64, cmp.Options
 	}
 }
 
-// beforeExecutingBlockResult describes the before-block hook's inputs. The
+// startExecutingBlockResult describes the before-block hook's inputs. The
 // hashes commit to every field of the parent header and block it receives, so a
 // faked or re-sealed one changes them. Balance counts the calls, which the
 // hashes can't, as a hook applied twice records the same ones.
-type beforeExecutingBlockResult struct {
+type startExecutingBlockResult struct {
 	ParentHash common.Hash
 	BlockHash  common.Hash
 	Balance    *uint256.Int
 }
 
-func (r beforeExecutingBlockResult) Bytes() []byte {
+func (r startExecutingBlockResult) Bytes() []byte {
 	balance := r.Balance.Bytes32()
 	return slices.Concat(
 		r.ParentHash[:],
@@ -159,17 +159,17 @@ func (r beforeExecutingBlockResult) Bytes() []byte {
 	)
 }
 
-// Hex is the encoding of [beforeExecutingBlockResult.Bytes] that a caller sees
+// Hex is the encoding of [startExecutingBlockResult.Bytes] that a caller sees
 // in [logger.ExecutionResult.ReturnValue].
-func (r beforeExecutingBlockResult) Hex() string {
+func (r startExecutingBlockResult) Hex() string {
 	return common.Bytes2Hex(r.Bytes())
 }
 
-// withBeforeExecutingBlockPrecompile records each before-block hook call in the
-// precompile's own account, and registers a precompile returning the recorded
-// [beforeExecutingBlockResult]. No debug_trace* endpoint exposes the hook, so
-// returning its inputs as data is what makes them assertable.
-func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
+// withStartExecutingBlockPrecompile records each start-executing-block hook call
+// in the precompile's own account, and registers a precompile returning the
+// recorded [startExecutingBlockResult]. No debug_trace* endpoint exposes the hook,
+// so returning its inputs as data is what makes them assertable.
+func withStartExecutingBlockPrecompile(precompile common.Address) sutOption {
 	var (
 		parentHashSlot = common.Hash{0}
 		blockHashSlot  = common.Hash{1}
@@ -177,7 +177,7 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 	precompileOpt := withPrecompile(precompile, vm.NewStatefulPrecompile(
 		func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
 			sdb := env.ReadOnlyState()
-			result := beforeExecutingBlockResult{
+			result := startExecutingBlockResult{
 				ParentHash: sdb.GetState(precompile, parentHashSlot),
 				BlockHash:  sdb.GetState(precompile, blockHashSlot),
 				Balance:    sdb.GetBalance(precompile),
@@ -211,7 +211,7 @@ func TestDebugTrace(t *testing.T) {
 		timeOpt,
 		// Using an increased base fee allows the fee to change during the test.
 		withGenesisBaseFee(params.GWei),
-		withBeforeExecutingBlockPrecompile(precompile),
+		withStartExecutingBlockPrecompile(precompile),
 	)
 	var (
 		sender = sut.wallet.Addresses()[0]
@@ -279,8 +279,8 @@ func TestDebugTrace(t *testing.T) {
 
 	// precompileResult is what the precompile should return during the provided
 	// block's execution.
-	precompileResult := func(block *types.Block) beforeExecutingBlockResult {
-		return beforeExecutingBlockResult{
+	precompileResult := func(block *types.Block) startExecutingBlockResult {
+		return startExecutingBlockResult{
 			ParentHash: block.ParentHash(),
 			BlockHash:  block.Hash(),
 			Balance:    uint256.NewInt(block.NumberU64()),
