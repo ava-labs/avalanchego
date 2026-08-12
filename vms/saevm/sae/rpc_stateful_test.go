@@ -675,7 +675,7 @@ func TestDebugIntermediateRoots(t *testing.T) {
 	require.Len(t, roots, numTxs, "one root per transaction")
 	assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
 	// This holds only because nothing modifies state after the last tx:
-	// hookstest.Stub.AfterExecutingBlock is a no-op and there are no
+	// hookstest.Stub.FinishExecutingBlock is a no-op and there are no
 	// end-of-block ops. Hooks that mutate post-transaction state (e.g.
 	// the C-Chain's) would break this!!
 	assert.Equal(t, block.PostExecutionStateRoot(), roots[numTxs-1], "last root is the block's post-execution root")
