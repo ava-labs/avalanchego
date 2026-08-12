@@ -89,8 +89,7 @@ type Points interface {
 	// execution. It MUST NOT change data outside of the [state.StateDB].
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	// AfterExecutingBlock runs only during canonical execution, before the VM
-	// commits the post-execution state. It MAY change data outside of the
-	// [state.StateDB].
+	// commits the post-execution state.
 	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
