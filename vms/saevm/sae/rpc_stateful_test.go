@@ -188,7 +188,7 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 
 	return options.Func[sutConfig](func(c *sutConfig) {
 		precompileOpt.Configure(c)
-		c.hooks.BeforeExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
+		c.hooks.StartExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 			sdb.SetState(precompile, parentHashSlot, parent.Hash())
 			sdb.SetState(precompile, blockHashSlot, b.Hash())
 			// A non-empty account stops EIP-158 deleting the slots above, as

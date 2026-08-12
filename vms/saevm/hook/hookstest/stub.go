@@ -37,7 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
-	BeforeExecutingBlockFn  func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
+	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -245,7 +245,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 // StartExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
 // otherwise it is a no-op.
 func (s *Stub) StartExecutingBlock(rules params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
-	if fn := s.BeforeExecutingBlockFn; fn != nil {
+	if fn := s.StartExecutingBlockFn; fn != nil {
 		return fn(rules, sdb, parent, b)
 	}
 	return nil
