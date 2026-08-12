@@ -89,11 +89,11 @@ func TestSyncer(t *testing.T) {
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
-			counting := synctest.NewCountingResponder(newLeafResponder(t, trieDB))
-			syncer, target := newSyncer(t, ctx, root, counting)
+			recording := synctest.NewRecordingResponder(newLeafResponder(t, trieDB))
+			syncer, target := newSyncer(t, ctx, root, recording)
 			require.NoError(t, syncer.Sync(ctx))
 
-			require.Equal(t, tt.wantRequests, counting.Count())
+			require.Equal(t, tt.wantRequests, recording.Count())
 			requireReconstructed(t, target, root, keys, vals)
 		})
 	}
