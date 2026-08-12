@@ -151,7 +151,7 @@ impl WriteItem for ProofNode {
         self.key.write_item(out);
         out.push_var_int(self.partial_len);
         self.value_digest.write_item(out);
-        ChildMask::from_children(&self.child_hashes).write_item(out);
+        out.extend_from_slice(&self.child_hashes.bitmap().to_le_bytes());
         for (_, child) in self.child_hashes.iter_present() {
             child.write_item(out);
         }

@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood_storage::{Children, PathComponent, U4};
+use firewood_storage::{PathComponent, U4};
 
 /// Compact u16 bitmap for tracking which of a branch node's 16 children
 /// are present or "outside" the proven range.
@@ -38,14 +38,6 @@ impl ChildMask {
     /// Sets the bit at `nibble`, returning the updated mask.
     pub(crate) const fn set(self, nibble: U4) -> Self {
         Self(self.0 | 1u16.wrapping_shl(nibble.as_u8() as u32))
-    }
-
-    /// Create a new `ChildMask` from the given children array, setting a bit
-    /// for each child that is `Some`.
-    pub(crate) fn from_children<T>(children: &Children<Option<T>>) -> Self {
-        Self(children.iter_present().fold(0, |bits, (i, _)| {
-            bits | 1u16.wrapping_shl(u32::from(i.as_u8()))
-        }))
     }
 
     /// Iterates over the indices of all set bits, yielding `PathComponent`s.
@@ -206,33 +198,6 @@ mod tests {
         assert!(!mask.is_set(u4(1)));
         assert!(mask.is_set(u4(4)));
         assert!(mask.is_set(u4(15)));
-    }
-
-    #[test]
-    fn child_mask_from_children_empty() {
-        let children: Children<Option<()>> = Children::new();
-        let mask = ChildMask::from_children(&children);
-        assert_eq!(mask.0, 0);
-    }
-
-    #[test]
-    fn child_mask_from_children_some() {
-        let mut children: Children<Option<()>> = Children::new();
-        children[PathComponent::ALL[0]] = Some(());
-        children[PathComponent::ALL[5]] = Some(());
-        children[PathComponent::ALL[15]] = Some(());
-        let mask = ChildMask::from_children(&children);
-        assert!(mask.is_set(u4(0)));
-        assert!(!mask.is_set(u4(1)));
-        assert!(mask.is_set(u4(5)));
-        assert!(mask.is_set(u4(15)));
-    }
-
-    #[test]
-    fn child_mask_from_children_all() {
-        let children: Children<Option<()>> = Children::from_fn(|_| Some(()));
-        let mask = ChildMask::from_children(&children);
-        assert_eq!(mask, ChildMask::ALL);
     }
 
     #[test]

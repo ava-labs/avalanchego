@@ -50,9 +50,9 @@
 use crate::proofs::eth::ACCOUNT_DEPTH_NIBBLES;
 use firewood_storage::hash_node_as_storage_trie_root_parts;
 use firewood_storage::{
-    Children, DefaultHashMode, FileIoError, HashMode, HashType, Hashable, IntoHashType,
-    IntoSplitPath, NibblesIterator, Path, PathBuf, PathComponent, PathIterItem, Preimage, RlpError,
-    SplitPath, TrieHash, TriePath, ValueDigest,
+    Children, DefaultHashMode, DenseChildren, FileIoError, HashMode, HashType, Hashable,
+    IntoHashType, IntoSplitPath, NibblesIterator, Path, PathBuf, PathComponent, PathIterItem,
+    Preimage, RlpError, SplitPath, TrieHash, TriePath, ValueDigest,
 };
 use thiserror::Error;
 
@@ -288,7 +288,7 @@ pub enum ProofError {
     #[error("missing end proof: end_key is set or batch_ops is non-empty")]
     MissingEndProof,
 
-    /// Proof node is unreachable in the proving trie during collapse                                                 
+    /// Proof node is unreachable in the proving trie during collapse
     #[error("proof node unreachable in proving trie")]
     ProofNodeUnreachable,
 
@@ -310,7 +310,7 @@ pub struct ProofNode {
     /// Otherwise, the node's value or the hash of its value.
     pub value_digest: Option<ValueDigest<Value>>,
     /// The hash of each child, or None if the child does not exist.
-    pub child_hashes: Children<Option<HashType>>,
+    pub child_hashes: DenseChildren<HashType>,
 }
 
 impl std::fmt::Debug for ProofNode {
@@ -373,7 +373,7 @@ impl Hashable for ProofNode {
     }
 
     fn children(&self) -> Children<Option<HashType>> {
-        self.child_hashes.clone()
+        firewood_storage::children_from_dense(&self.child_hashes)
     }
 }
 
@@ -429,7 +429,7 @@ impl From<PathIterItem> for ProofNode {
             key: item.key_nibbles,
             partial_len,
             value_digest,
-            child_hashes,
+            child_hashes: firewood_storage::dense_from_children(&child_hashes),
         }
     }
 }
@@ -853,7 +853,7 @@ mod tests {
         nibbles: &[u8],
         parent_prefix_len: usize,
         value: Option<&[u8]>,
-        child_hashes: Children<Option<HashType>>,
+        child_hashes: DenseChildren<HashType>,
     ) -> ProofNode {
         let key: PathBuf = nibbles
             .iter()
@@ -883,10 +883,10 @@ mod tests {
         let mut child_nibbles = account_nibbles.clone();
         child_nibbles.push(1); // branch nibble
         child_nibbles.extend([0u8; 63]);
-        let storage_child = make_node(&child_nibbles, 0, Some(b"v"), Children::new());
+        let storage_child = make_node(&child_nibbles, 0, Some(b"v"), DenseChildren::new());
 
-        let mut account_children: Children<Option<HashType>> = Children::new();
-        account_children[PathComponent(U4::new_masked(1))] = Some(HashType::from([0xABu8; 32]));
+        let mut account_children = DenseChildren::new();
+        account_children.insert(U4::new_masked(1), HashType::from([0xABu8; 32]));
         let account = make_node(&account_nibbles, 0, None, account_children);
         let root_hash: TrieHash = account.to_hash().into_triehash();
 
@@ -909,14 +909,16 @@ mod tests {
     #[test]
     fn proof_for_wrong_branch_is_rejected() {
         // Leaf at nibble path [3, 0] with a value.
-        let leaf = make_node(&[3, 0], 1, Some(b"val_b"), Children::new());
+        let leaf = make_node(&[3, 0], 1, Some(b"val_b"), DenseChildren::new());
         let leaf_hash = leaf.to_hash();
 
         // Root branch with children at nibbles 3 and 5.
-        let mut root_children: Children<Option<HashType>> = Children::new();
-        root_children[PathComponent(firewood_storage::U4::new_masked(3))] = Some(leaf_hash);
-        root_children[PathComponent(firewood_storage::U4::new_masked(5))] =
-            Some(HashType::from([0xCC; 32]));
+        let mut root_children = DenseChildren::new();
+        root_children.insert(firewood_storage::U4::new_masked(3), leaf_hash);
+        root_children.insert(
+            firewood_storage::U4::new_masked(5),
+            HashType::from([0xCC; 32]),
+        );
         let root = make_node(&[], 0, None, root_children);
         let root_hash: TrieHash = root.to_hash().into_triehash();
 

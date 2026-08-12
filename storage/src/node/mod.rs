@@ -20,7 +20,9 @@ use crate::{HashType, LinearAddress, Path, PathBuf, PathComponent, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
 pub use branch::{BranchNode, Child};
-pub use children::{Children, ChildrenSlots};
+pub use children::{
+    Children, ChildrenSlots, DenseChildren, children_from_dense, dense_from_children,
+};
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarInt, VarIntReader as _};
 pub use leaf::LeafNode;

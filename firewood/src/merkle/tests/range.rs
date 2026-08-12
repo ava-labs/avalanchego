@@ -21,7 +21,7 @@ fn proof_node(nibbles: &[u8]) -> ProofNode {
         key: nibble_path(nibbles),
         partial_len: 0,
         value_digest: None,
-        child_hashes: Children::new(),
+        child_hashes: DenseChildren::new(),
     }
 }
 

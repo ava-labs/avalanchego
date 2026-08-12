@@ -1807,6 +1807,7 @@ name = "firewood"
 version = "0.8.0"
 dependencies = [
  "aquamarine",
+ "arity-arrays",
  "bytemuck",
  "bytemuck_derive",
  "clap",

@@ -385,10 +385,7 @@ fn fetch_only_storage_child<V>(
 where
     V: DbView + ?Sized,
 {
-    let Some((nibble, _)) = (&account_node.child_hashes)
-        .into_iter()
-        .find(|(_, c)| c.is_some())
-    else {
+    let Some((nibble, _)) = account_node.child_hashes.iter_present().next() else {
         return Ok(None);
     };
 

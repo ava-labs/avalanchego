@@ -106,8 +106,8 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     // Branch (has children).
     let mut items: [RlpItem<'_>; BranchNode::MAX_CHILDREN + 1] =
         [RlpItem::Empty; BranchNode::MAX_CHILDREN + 1];
-    for ((_, child), slot) in (&node.child_hashes).into_iter().zip(items.iter_mut()) {
-        *slot = proof_child_rlp_item(child.as_ref());
+    for ((_, child), slot) in node.child_hashes.iter().zip(items.iter_mut()) {
+        *slot = proof_child_rlp_item(child);
     }
     // The 17th element is the value. Account nodes carry their value in
     // account RLP that gets spliced in below, not in the branch slot.
@@ -125,8 +125,11 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     // hasher hashed.
     let inner_bytes: Box<[u8]> = if is_account {
         match value_bytes {
-            Some(v) => fix_account_storage_root_value(v, &node.child_hashes)
-                .unwrap_or_else(|| Box::from(v)),
+            Some(v) => fix_account_storage_root_value(
+                v,
+                &firewood_storage::children_from_dense(&node.child_hashes),
+            )
+            .unwrap_or_else(|| Box::from(v)),
             None => branch_bytes,
         }
     } else {
@@ -186,11 +189,8 @@ pub fn account_storage_root_rlp(account_node: &ProofNode) -> Option<Box<[u8]>> {
     }
     let mut items: [RlpItem<'_>; BranchNode::MAX_CHILDREN + 1] =
         [RlpItem::Empty; BranchNode::MAX_CHILDREN + 1];
-    for ((_, child), slot) in (&account_node.child_hashes)
-        .into_iter()
-        .zip(items.iter_mut())
-    {
-        *slot = proof_child_rlp_item(child.as_ref());
+    for ((_, child), slot) in account_node.child_hashes.iter().zip(items.iter_mut()) {
+        *slot = proof_child_rlp_item(child);
     }
     // The 17th slot stays empty: at the storage trie root there is no value.
     Some(encode_list(&items))
@@ -297,7 +297,9 @@ fn proof_child_rlp_item(child: Option<&HashType>) -> RlpItem<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use firewood_storage::{IntoHashType, PathBuf, RlpList, TrieHash, TriePathFromUnpackedBytes};
+    use firewood_storage::{
+        DenseChildren, IntoHashType, PathBuf, RlpList, TrieHash, TriePathFromUnpackedBytes,
+    };
 
     fn pathbuf_from_nibbles(nibbles: &[u8]) -> PathBuf {
         let components =
@@ -310,7 +312,7 @@ mod tests {
             key: pathbuf_from_nibbles(nibbles),
             partial_len: 0,
             value_digest: Some(ValueDigest::Value(value.into())),
-            child_hashes: Children::new(),
+            child_hashes: DenseChildren::new(),
         }
     }
 
@@ -331,7 +333,7 @@ mod tests {
             key: pathbuf_from_nibbles(&[1, 2]),
             partial_len: 0,
             value_digest: None,
-            child_hashes: Children::new(),
+            child_hashes: DenseChildren::new(),
         };
         let bytes = proof_node_to_mpt_rlp(&node);
         assert_eq!(bytes.len(), 1);
@@ -352,8 +354,8 @@ mod tests {
     fn branch_empty_partial_path_emits_seventeen_field_list() {
         // Branch with one 32-byte hash child at index 7, no value, empty
         // partial path. Expected output: a single 17-element RLP list.
-        let mut children: Children<Option<HashType>> = Children::new();
-        children.replace(PathComponent::ALL[7], Some(hash_child(0xAB)));
+        let mut children = DenseChildren::new();
+        children.insert(PathComponent::ALL[7].0, hash_child(0xAB));
         let node = ProofNode {
             key: pathbuf_from_nibbles(&[]),
             partial_len: 0,
@@ -381,8 +383,8 @@ mod tests {
         // Non-account branch with non-empty partial path; the 17-element
         // branch RLP exceeds 31 bytes, so the verifier needs both the
         // inner branch and an outer extension that hash-references it.
-        let mut children: Children<Option<HashType>> = Children::new();
-        children.replace(PathComponent::ALL[3], Some(hash_child(0xCD)));
+        let mut children = DenseChildren::new();
+        children.insert(PathComponent::ALL[3].0, hash_child(0xCD));
         let node = ProofNode {
             key: pathbuf_from_nibbles(&[5, 6, 7]),
             partial_len: 0,

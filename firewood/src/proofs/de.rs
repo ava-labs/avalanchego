@@ -19,9 +19,7 @@ use crate::{
     merkle::{Key, Value},
     proofs::magic::{BATCH_DELETE, BATCH_DELETE_RANGE, BATCH_PUT},
 };
-#[cfg(feature = "ethhash")]
-use firewood_storage::HashType;
-use firewood_storage::{Children, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest};
+use firewood_storage::{HashType, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest};
 use integer_encoding::VarInt;
 use std::num::NonZeroUsize;
 
@@ -194,10 +192,12 @@ impl Version0 for ProofNode {
 
         let children_map = reader.read_item::<ChildMask>()?;
 
-        let mut child_hashes = Children::new();
+        let mut child_hashes =
+            arity_arrays::FixedArray::<Option<HashType>, arity_arrays::Arity16>::new();
         for idx in children_map.iter_indices() {
-            child_hashes[idx] = Some(reader.read_item()?);
+            child_hashes.replace(idx.0, Some(reader.read_item()?));
         }
+        let child_hashes = firewood_storage::DenseChildren::from(child_hashes);
 
         Ok(ProofNode {
             key,

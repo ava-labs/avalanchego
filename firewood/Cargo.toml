@@ -35,6 +35,7 @@ hex.workspace = true
 integer-encoding.workspace = true
 thiserror.workspace = true
 # Regular dependencies
+arity-arrays = { version = "0.2.0", default-features = false, features = ["16"] }
 typed-builder = "0.23.2"
 rayon = "1.12.0"
 parking_lot.workspace = true
@@ -80,6 +81,11 @@ required-features = ["test_utils"]
 
 [[bench]]
 name = "defer_persist"
+harness = false
+required-features = ["test_utils"]
+
+[[bench]]
+name = "proofs"
 harness = false
 required-features = ["test_utils"]
 

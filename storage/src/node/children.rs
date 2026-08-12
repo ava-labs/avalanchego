@@ -1,6 +1,8 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use arity_arrays::{Arity16, PackedArray};
+
 use crate::PathComponent;
 
 const MAX_CHILDREN: usize = PathComponent::LEN;
@@ -248,5 +250,60 @@ impl<'a, T: 'a> IntoIterator for &'a mut Children<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.each_mut().into_iter()
+    }
+}
+
+/// A pointer-sized, present-only container of a branch node's children, sized to
+/// exactly the children that exist (zero heap when empty). Backed by
+/// [`arity_arrays::PackedArray`], indexed by [`crate::U4`].
+pub type DenseChildren<T> = PackedArray<T, Arity16>;
+
+/// Builds a [`DenseChildren`] holding only the present (`Some`) entries of
+/// `children`, cloning each present value.
+#[must_use]
+pub fn dense_from_children<T: Clone>(children: &Children<Option<T>>) -> DenseChildren<T> {
+    children
+        .iter_present()
+        .map(|(pc, value)| (pc.0, value.clone()))
+        .collect()
+}
+
+/// Expands a [`DenseChildren`] back into a full 16-slot [`Children`], cloning each
+/// present value; absent slots become `None`.
+#[must_use]
+pub fn children_from_dense<T: Clone>(dense: &DenseChildren<T>) -> Children<Option<T>> {
+    let mut children = Children::new();
+    for (index, value) in dense.iter_present() {
+        children[PathComponent(index)] = Some(value.clone());
+    }
+    children
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dense_children_round_trips_with_children() {
+        // Children -> DenseChildren -> Children is the identity on present slots.
+        let mut c: Children<Option<u32>> = Children::new();
+        c[PathComponent::ALL[1]] = Some(10);
+        c[PathComponent::ALL[9]] = Some(90);
+        c[PathComponent::ALL[15]] = Some(150);
+
+        let dense = dense_from_children(&c);
+        assert_eq!(dense.count(), 3);
+        assert_eq!(dense.get(PathComponent::ALL[1].0), Some(&10));
+        assert_eq!(dense.get(PathComponent::ALL[9].0), Some(&90));
+        assert_eq!(dense.get(PathComponent::ALL[0].0), None);
+
+        let back = children_from_dense(&dense);
+        assert_eq!(back, c);
+
+        // Empty round-trips with zero allocation (the #2099 property).
+        let empty: Children<Option<u32>> = Children::new();
+        let dense_empty = dense_from_children(&empty);
+        assert!(dense_empty.is_empty());
+        assert_eq!(children_from_dense(&dense_empty), empty);
     }
 }

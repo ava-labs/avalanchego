@@ -519,7 +519,8 @@ fn build_branch_parts<'b>(
 
     // For children outside the proven range, use proof node hashes.
     if let (Some(pn), Some(outside)) = (proof_node, outside_mask) {
-        for (nibble, hash) in pn.child_hashes.iter_present() {
+        for (index, hash) in pn.child_hashes.iter_present() {
+            let nibble = PathComponent(index);
             if outside.is_set(nibble.0) {
                 child_hashes[nibble] = Some(hash.clone());
             }
@@ -574,7 +575,8 @@ fn single_effective_account_child(
     }
     // Out-of-range children, taken from the proof node.
     if let (Some(pn), Some(mask)) = (proof_node, outside_mask) {
-        for (nibble, _) in pn.child_hashes.iter_present() {
+        for (index, _) in pn.child_hashes.iter_present() {
+            let nibble = PathComponent(index);
             if mask.is_set(nibble.0) {
                 if only_child.is_some() {
                     return None;

@@ -5,7 +5,7 @@ use integer_encoding::VarInt;
 use test_case::test_case;
 
 use firewood_storage::{
-    Children, IntoHashType, PathComponent, SeededRng, TrieHash, ValueDigest, logger::debug,
+    DenseChildren, IntoHashType, PathComponent, SeededRng, TrieHash, ValueDigest, logger::debug,
 };
 
 use super::{
@@ -471,10 +471,12 @@ fn make_proof_node(
         .iter()
         .map(|&n| PathComponent::try_new(n).unwrap())
         .collect();
-    let mut child_hashes = Children::new();
+    let mut child_hashes = DenseChildren::new();
     for &nibble in child_nibbles {
-        child_hashes[PathComponent::try_new(nibble).unwrap()] =
-            Some(TrieHash::from([0u8; 32]).into_hash_type());
+        child_hashes.insert(
+            PathComponent::try_new(nibble).unwrap().0,
+            TrieHash::from([0u8; 32]).into_hash_type(),
+        );
     }
     ProofNode {
         key,
@@ -773,11 +775,13 @@ fn generate_random_proof_node(rng: &SeededRng) -> ProofNode {
         let value: Box<[u8]> = (0..val_len).map(|_| rng.random::<u8>()).collect();
         ValueDigest::Value(value)
     });
-    let mut child_hashes = Children::new();
+    let mut child_hashes = DenseChildren::new();
     for nibble in 0u8..16 {
         if rng.random::<bool>() {
-            child_hashes[PathComponent::try_new(nibble).unwrap()] =
-                Some(TrieHash::from(rng.random::<[u8; 32]>()).into_hash_type());
+            child_hashes.insert(
+                PathComponent::try_new(nibble).unwrap().0,
+                TrieHash::from(rng.random::<[u8; 32]>()).into_hash_type(),
+            );
         }
     }
     ProofNode {

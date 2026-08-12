@@ -20,7 +20,7 @@ use std::fmt::Write;
 use super::*;
 use crate::{ProofError, ProofNode};
 use firewood_storage::{
-    Children, Committed, DeletedNodeTracking, MemStore, Mutable, NodeHashAlgorithm, NodeStore,
+    Committed, DeletedNodeTracking, DenseChildren, MemStore, Mutable, NodeHashAlgorithm, NodeStore,
     NodeStoreHeader, PathComponent, Propose, RootReader, TrieHash, ValueDigest,
 };
 
@@ -222,7 +222,7 @@ fn test_branch_proof_node(
         key,
         partial_len: 0,
         value_digest,
-        child_hashes: Children::new(),
+        child_hashes: DenseChildren::new(),
     }
 }
 
