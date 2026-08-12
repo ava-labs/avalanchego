@@ -66,7 +66,6 @@ pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{
     BranchNode, Child, Children, ChildrenSlots, DenseChildren, LeafNode, Node, PathIterItem,
-    children_from_dense, dense_from_children,
 };
 pub use nodestore::{
     AreaIndex, Committed, CommittedId, CommittedParentHash, DeletedNodeTracking, HashedNodeReader,

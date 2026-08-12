@@ -373,7 +373,7 @@ impl Hashable for ProofNode {
     }
 
     fn children(&self) -> Children<Option<HashType>> {
-        firewood_storage::children_from_dense(&self.child_hashes)
+        Children::from(&self.child_hashes)
     }
 }
 
@@ -429,7 +429,7 @@ impl From<PathIterItem> for ProofNode {
             key: item.key_nibbles,
             partial_len,
             value_digest,
-            child_hashes: firewood_storage::dense_from_children(&child_hashes),
+            child_hashes: child_hashes.to_dense(),
         }
     }
 }

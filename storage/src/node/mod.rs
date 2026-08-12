@@ -20,9 +20,7 @@ use crate::{HashType, LinearAddress, Path, PathBuf, PathComponent, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
 pub use branch::{BranchNode, Child};
-pub use children::{
-    Children, ChildrenSlots, DenseChildren, children_from_dense, dense_from_children,
-};
+pub use children::{Children, ChildrenSlots, DenseChildren};
 use enum_as_inner::EnumAsInner;
 use integer_encoding::{VarInt, VarIntReader as _};
 pub use leaf::LeafNode;
@@ -570,8 +568,10 @@ mod test {
     #[test_case(Node::Branch(Box::new(BranchNode {
         partial_path: Path::from(vec![0, 1, 2, 3]),
         value: Some(vec![4, 5, 6, 7].into()),
-        children: Children::from_fn(|_|
-                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+        // Each child's hash starts with its own nibble so a decode that pairs
+        // slots with the wrong wire entries fails the round-trip comparison.
+        children: Children::from_fn(|pc|
+                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| if i == 0 { pc.as_u8() } else { i as u8 }).into()))
         )})), 652; "full branch node with long partial path and value"
     )]
     #[test_case(Node::Branch(Box::new(BranchNode {

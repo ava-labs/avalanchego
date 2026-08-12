@@ -125,11 +125,8 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     // hasher hashed.
     let inner_bytes: Box<[u8]> = if is_account {
         match value_bytes {
-            Some(v) => fix_account_storage_root_value(
-                v,
-                &firewood_storage::children_from_dense(&node.child_hashes),
-            )
-            .unwrap_or_else(|| Box::from(v)),
+            Some(v) => fix_account_storage_root_value(v, &Children::from(&node.child_hashes))
+                .unwrap_or_else(|| Box::from(v)),
             None => branch_bytes,
         }
     } else {

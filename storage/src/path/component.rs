@@ -115,13 +115,6 @@ impl PathComponent {
         // arity's `U4` provides no `join`; compute it directly.
         (self.0.as_u8() << 4) | other.0.as_u8()
     }
-
-    pub(crate) const fn wrapping_next(self) -> Self {
-        match crate::u4::U4::try_new(self.0.as_u8().wrapping_add(1)) {
-            Some(next) => Self(next),
-            None => Self(crate::u4::U4::MIN),
-        }
-    }
 }
 
 impl std::fmt::Debug for PathComponent {
