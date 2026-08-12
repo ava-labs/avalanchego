@@ -50,9 +50,9 @@
 use crate::proofs::eth::ACCOUNT_DEPTH_NIBBLES;
 use firewood_storage::hash_node_as_storage_trie_root_parts;
 use firewood_storage::{
-    Children, FileIoError, HashType, Hashable, IntoHashType, IntoSplitPath, NibblesIterator, Path,
-    PathBuf, PathComponent, PathIterItem, Preimage, RlpError, SplitPath, TrieHash, TriePath,
-    ValueDigest,
+    Children, DefaultHashMode, FileIoError, HashMode, HashType, Hashable, IntoHashType,
+    IntoSplitPath, NibblesIterator, Path, PathBuf, PathComponent, PathIterItem, Preimage, RlpError,
+    SplitPath, TrieHash, TriePath, ValueDigest,
 };
 use thiserror::Error;
 
@@ -543,7 +543,7 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
 
         let mut iter = self.0.as_ref().iter().peekable();
         while let Some(node) = iter.next() {
-            let computed = if cfg!(feature = "ethhash") && hash_as_storage_root {
+            let computed = if DefaultHashMode::ALGORITHM.is_ethereum() && hash_as_storage_root {
                 compute_node_hash_as_storage_trie_root(node)
             } else {
                 Some(node.to_hash())

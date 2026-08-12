@@ -6,7 +6,7 @@ use crate::merkle::parallel::CreateProposalError;
 use crate::merkle::{Key, Value};
 use crate::persist_worker::PersistError;
 use crate::{Proof, ProofError, ProofNode, RangeProof};
-use firewood_storage::{FileIoError, TrieHash};
+use firewood_storage::{DefaultHashMode, FileIoError, HashMode, TrieHash};
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -51,27 +51,12 @@ pub trait OptionalHashKeyExt: Sized {
     fn or_default_root_hash(self) -> Option<HashKey>;
 }
 
-#[cfg(not(feature = "ethhash"))]
 impl HashKeyExt for HashKey {
-    /// Creates a new `HashKey` representing the empty root hash.
+    /// Returns the empty-database root hash for the compile-selected mode:
+    /// `None` for merkledb, `Some(keccak256(0x80))` for ethhash.
     #[inline]
     fn default_root_hash() -> Option<HashKey> {
-        None
-    }
-}
-
-#[cfg(feature = "ethhash")]
-impl HashKeyExt for HashKey {
-    #[inline]
-    fn default_root_hash() -> Option<HashKey> {
-        const EMPTY_RLP_HASH: [u8; size_of::<TrieHash>()] = [
-            // "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
-            0x56, 0xe8, 0x1f, 0x17, 0x1b, 0xcc, 0x55, 0xa6, 0xff, 0x83, 0x45, 0xe6, 0x92, 0xc0,
-            0xf8, 0x6e, 0x5b, 0x48, 0xe0, 0x1b, 0x99, 0x6c, 0xad, 0xc0, 0x01, 0x62, 0x2f, 0xb5,
-            0xe3, 0x63, 0xb4, 0x21,
-        ];
-
-        Some(EMPTY_RLP_HASH.into())
+        DefaultHashMode::default_root_hash()
     }
 }
 

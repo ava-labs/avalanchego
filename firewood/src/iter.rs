@@ -5,8 +5,8 @@ use crate::api::{KeyType, KeyValuePair};
 use crate::merkle::{Key, Value};
 
 use firewood_storage::{
-    BranchNode, Child, FileIoError, NibblesIterator, Node, PathBuf, PathComponent, PathIterItem,
-    SharedNode, TriePathFromUnpackedBytes, TrieReader,
+    BranchNode, Child, DefaultHashMode, FileIoError, HashMode, NibblesIterator, Node, PathBuf,
+    PathComponent, PathIterItem, SharedNode, TriePathFromUnpackedBytes, TrieReader,
 };
 use std::cmp::Ordering;
 use std::iter::FusedIterator;
@@ -352,15 +352,13 @@ fn fix_account_value(
     child_hashes: &firewood_storage::Children<Option<firewood_storage::HashType>>,
     must_recompute: bool,
 ) -> Option<(Key, Value)> {
-    #[cfg(feature = "ethhash")]
-    if must_recompute
+    if DefaultHashMode::ALGORITHM.is_ethereum()
+        && must_recompute
         && key.len() == 32
         && let Some(fixed) = firewood_storage::fix_account_storage_root_value(value, child_hashes)
     {
         return Some((key, fixed));
     }
-    // suppress unused warnings when ethhash is not enabled
-    let _ = (child_hashes, must_recompute);
     Some((key, Box::from(value)))
 }
 

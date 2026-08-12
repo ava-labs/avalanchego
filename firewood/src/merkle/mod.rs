@@ -27,10 +27,10 @@ use crate::{
 use firewood_metrics::{HistogramExt, firewood_counter, firewood_histogram};
 use firewood_storage::MemStore;
 use firewood_storage::{
-    BranchNode, Child, Children, DeletedNodeTracking, FileIoError, HashType, HashableShunt,
-    HashedNodeReader, ImmutableProposal, IntoHashType, LeafNode, MaybePersistedNode, Mutable,
-    MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose,
-    ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
+    BranchNode, Child, Children, DefaultHashMode, DeletedNodeTracking, FileIoError, HashMode,
+    HashType, HashableShunt, HashedNodeReader, ImmutableProposal, IntoHashType, LeafNode,
+    MaybePersistedNode, Mutable, MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf,
+    PathComponent, Propose, ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
 };
 use firewood_storage::{
     hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
@@ -500,7 +500,9 @@ fn build_branch_parts<'b>(
         // Apply the storage-trie-root fold for the account's lone storage
         // child; the dispatch lives here at the parent so the child's recursive
         // call doesn't need to carry a flag.
-        let child_hash = if cfg!(feature = "ethhash") && single_storage_child == Some(nibble) {
+        let child_hash = if DefaultHashMode::ALGORITHM.is_ethereum()
+            && single_storage_child == Some(nibble)
+        {
             compute_root_hash_as_storage_trie_root(
                 child_node,
                 &full_key,
@@ -556,7 +558,7 @@ fn single_effective_account_child(
     proof_node: Option<&ProofNode>,
     outside_mask: Option<&ChildMask>,
 ) -> Option<PathComponent> {
-    if !cfg!(feature = "ethhash") || full_key.len() != ACCOUNT_DEPTH_NIBBLES {
+    if !DefaultHashMode::ALGORITHM.is_ethereum() || full_key.len() != ACCOUNT_DEPTH_NIBBLES {
         return None;
     }
 

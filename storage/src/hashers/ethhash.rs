@@ -105,8 +105,8 @@ use crate::eth_encoding::nibbles_to_eth_compact;
 use crate::logger::warn;
 use crate::rlp::{NULL_RLP, RlpItem, encode_list, replace_list_field};
 use crate::{
-    BranchNode, HashType, Hashable, Preimage, TrieHash, TriePath, ValueDigest,
-    hashednode::HasUpdate, logger::trace,
+    BranchNode, EthHash, HashMode, HashType, Hashable, NodeHashAlgorithm, Path, Preimage, TrieHash,
+    TriePath, ValueDigest, hashednode::HasUpdate, logger::trace,
 };
 use sha3::{Digest, Keccak256};
 use smallvec::SmallVec;
@@ -114,6 +114,26 @@ use smallvec::SmallVec;
 impl HasUpdate for Keccak256 {
     fn update<T: AsRef<[u8]>>(&mut self, data: T) {
         sha3::Digest::update(self, data);
+    }
+}
+
+impl HashMode for EthHash {
+    const ALGORITHM: NodeHashAlgorithm = NodeHashAlgorithm::Ethereum;
+
+    /// Returns the hash of an empty Ethereum trie: `keccak256(0x80)`.
+    fn default_root_hash() -> Option<TrieHash> {
+        // keccak256(0x80): "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+        const EMPTY_RLP_HASH: [u8; 32] = [
+            0x56, 0xe8, 0x1f, 0x17, 0x1b, 0xcc, 0x55, 0xa6, 0xff, 0x83, 0x45, 0xe6, 0x92, 0xc0,
+            0xf8, 0x6e, 0x5b, 0x48, 0xe0, 0x1b, 0x99, 0x6c, 0xad, 0xc0, 0x01, 0x62, 0x2f, 0xb5,
+            0xe3, 0x63, 0xb4, 0x21,
+        ];
+        Some(EMPTY_RLP_HASH.into())
+    }
+
+    /// Returns true if the nibble length is 64 (account key) or 128 (storage-slot key).
+    fn is_valid_key(key: &Path) -> bool {
+        matches!(key.0.len(), 64 | 128)
     }
 }
 
