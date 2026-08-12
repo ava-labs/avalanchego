@@ -140,9 +140,9 @@ func logTopOfStackAfter(tb testing.TB, code []byte) ([]byte, uint64, cmp.Options
 	}
 }
 
-// startExecutingBlockResult describes the before-block hook's inputs. The
-// hashes commit to every field of the parent header and block it receives, so a
-// faked or re-sealed one changes them. Balance counts the calls, which the
+// startExecutingBlockResult describes the start-executing-block hook's inputs.
+// The hashes commit to every field of the parent header and block it receives,
+// so a faked or re-sealed one changes them. Balance counts the calls, which the
 // hashes can't, as a hook applied twice records the same ones.
 type startExecutingBlockResult struct {
 	ParentHash common.Hash
@@ -165,10 +165,10 @@ func (r startExecutingBlockResult) Hex() string {
 	return common.Bytes2Hex(r.Bytes())
 }
 
-// withStartExecutingBlockPrecompile records each start-executing-block hook call
-// in the precompile's own account, and registers a precompile returning the
-// recorded [startExecutingBlockResult]. No debug_trace* endpoint exposes the hook,
-// so returning its inputs as data is what makes them assertable.
+// withStartExecutingBlockPrecompile records each start-executing-block hook
+// call in the precompile's own account, and registers a precompile returning
+// the recorded [startExecutingBlockResult]. No debug_trace* endpoint exposes
+// the hook, so returning its inputs as data is what makes them assertable.
 func withStartExecutingBlockPrecompile(precompile common.Address) sutOption {
 	var (
 		parentHashSlot = common.Hash{0}
@@ -245,8 +245,8 @@ func TestDebugTrace(t *testing.T) {
 	// MUST be fast-forwarded to the traced block's time to reach its base fee.
 	clock.Advance(time.Second)
 
-	// The traced block reports what its before-block hook saw at index 0 and
-	// logs the base fee it replayed with at index 1.
+	// The traced block reports what its start-executing-block hook saw at index
+	// 0 and logs the base fee it replayed with at index 1.
 	precompileTx := callPrecompile()
 	logBaseFeeCode, logBaseFeePC, cmpBaseFeeLOG1 := logTopOfStackAfter(t, saetest.Ops(vm.BASEFEE))
 	baseFeeTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
@@ -373,8 +373,9 @@ func TestDebugTrace(t *testing.T) {
 					},
 				},
 				{
-					// debug_traceCall applies no before-block changes, so a result
-					// carrying the canonical child's would mean they leaked in.
+					// debug_traceCall applies no start-executing-block changes, so
+					// a result carrying the canonical child's would mean they
+					// leaked in.
 					name:   "call_on_parent",
 					method: "debug_traceCall",
 					args:   []any{callPrecompileArgs, rpc.BlockNumber(parent.NumberU64())}, // #nosec G115 -- block heights are small

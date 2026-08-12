@@ -153,12 +153,12 @@ type (
 	}
 )
 
-// StartExecutingBlock applies the state changes required before executing
-// b's transactions, specifically the before-block hook and the EIP-4788 beacon
-// root, mirroring [core.StateProcessor.Process].
+// StartExecutingBlock applies the state changes required before executing b's
+// transactions, specifically the start-executing-block hook and the EIP-4788
+// beacon root, mirroring [core.StateProcessor.Process].
 func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
-		return fmt.Errorf("before-block hook: %v", err)
+		return fmt.Errorf("start-executing-block hook: %v", err)
 	}
 
 	core.SetBeaconBlockRoot(stateDB, b.Header())
@@ -177,6 +177,10 @@ func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.S
 //
 // The gas clock and base fee come from the parent's post-execution clock,
 // except pre-SAE blocks, which use their own header's fee.
+//
+// Execute only runs the deterministic hooks, so it is also safe to use for
+// historical execution. Canonical-only side effects belong in
+// [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
@@ -290,7 +294,7 @@ func Execute(
 	}
 
 	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
-		return nil, fmt.Errorf("after-block hook: %v", err)
+		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
 	endTime := time.Now()
@@ -321,7 +325,7 @@ func Execute(
 
 func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
-		return fmt.Errorf("after canonical block hook: %v", err)
+		return fmt.Errorf("after-executing-block hook: %v", err)
 	}
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
