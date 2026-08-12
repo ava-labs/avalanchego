@@ -14,6 +14,11 @@ vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
   # dev-shell toolchain when nix is available, without depending on cwd.
   NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .TASKFILE_DIR}}'
+  # Shared Bazel test command template.
+  # YAML `&bazel_test_cmd` defines the template once; tasks reuse it with
+  # `cmd: *bazel_test_cmd`, and Task then renders that template using the
+  # task-local `BAZEL_CONFIG` and `TARGETS` vars.
+  BAZEL_TEST_CMD: &bazel_test_cmd '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test{{if .BAZEL_CONFIG}} --config={{.BAZEL_CONFIG}}{{end}} {{.TARGETS}}'
 
 tasks:
   default: './scripts/run_task.sh --list'
@@ -103,26 +108,120 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
+  # These tasks run Go unit-test shards only. Keep `//:gazelle_test` out.
+  # The shuffle config passes a Go-only test option. See
+  # docs/bazel.md#generated-unit-test-suites.
   bazel-test-unit-all:
-    desc: Run all generated unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //:unit_tests'
+    desc: Run all generated unit-test shards with Bazel (no race, no shuffle - default Bazel mode)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
 
-  # TODO: Remove this task when bazel-test-unit-all uses the fast configuration.
-  bazel-test-unit-all-fast:
-    desc: Run all generated unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //:unit_tests'
+  bazel-test-unit-all-race:
+    desc: Run all generated unit-test shards with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-all-race-shuffle:
+    desc: Run all generated unit-test shards with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-all-shuffle:
+    desc: Run all generated unit-test shards with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-unit-avalanchego:
-    desc: Run AvalancheGo unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:avalanchego_unit_tests'
+    desc: Run the AvalancheGo Bazel unit-test shard (non-graft code plus patched-dependency checks; no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:avalanchego_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-avalanchego-race:
+    desc: Run the AvalancheGo Bazel unit-test shard (non-graft code plus patched-dependency checks; race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:avalanchego_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-avalanchego-race-shuffle:
+    desc: Run the AvalancheGo Bazel unit-test shard (non-graft code plus patched-dependency checks; race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:avalanchego_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-avalanchego-shuffle:
+    desc: Run the AvalancheGo Bazel unit-test shard (non-graft code plus patched-dependency checks; race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:avalanchego_unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-unit-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:coreth_unit_tests'
+    desc: Run coreth/evm unit tests with Bazel (no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-coreth-race:
+    desc: Run coreth/evm unit tests with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-coreth-race-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-coreth-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-unit-subnet-evm:
-    desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:subnet_evm_unit_tests'
+    desc: Run subnet-evm unit tests with Bazel (no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-subnet-evm-race:
+    desc: Run subnet-evm unit tests with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-subnet-evm-race-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-unit-subnet-evm-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
 
   build:
     desc: Builds avalanchego
