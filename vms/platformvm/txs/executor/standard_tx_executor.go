@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	_ txs.Visitor = (*standardTxExecutor)(nil)
+	_ platform.TxVisitor = (*standardTxExecutor)(nil)
 
 	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
 	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
@@ -78,7 +78,7 @@ var (
 func StandardTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
-	tx *txs.Tx,
+	tx *platform.Tx,
 	state *state.Diff,
 ) (set.Set[ids.ID], map[ids.ID]*atomic.Requests, func(), error) {
 	standardExecutor := standardTxExecutor{
@@ -99,7 +99,7 @@ type standardTxExecutor struct {
 	backend       *Backend
 	state         *state.Diff // state is expected to be modified
 	feeCalculator fee.Calculator
-	tx            *txs.Tx
+	tx            *platform.Tx
 
 	// outputs of visitor execution
 	onAccept       func() // may be nil
@@ -107,15 +107,15 @@ type standardTxExecutor struct {
 	atomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*standardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*standardTxExecutor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return ErrWrongTxType
 }
 
-func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*standardTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	if tx.Validator.NodeID == ids.EmptyNodeID {
 		return errEmptyNodeID
 	}
@@ -149,7 +149,7 @@ func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
 	if err := verifyAddSubnetValidatorTx(
 		e.backend,
 		e.feeCalculator,
@@ -170,7 +170,7 @@ func (e *standardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	return nil
 }
 
-func (e *standardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (e *standardTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	if _, err := verifyAddDelegatorTx(
 		e.backend,
 		e.feeCalculator,
@@ -191,7 +191,7 @@ func (e *standardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
+func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 	// Make sure this transaction is well formed.
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -310,7 +310,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
+func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		}
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := platform.Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 			}
 			utxos[i+len(tx.Ins)] = utxo
@@ -408,7 +408,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
+func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -477,7 +477,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -500,12 +500,12 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	return nil
 }
 
-// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
+// Verifies a [*platform.RemoveSubnetValidatorTx] and, if it passes, executes it on
 // [e.State]. For verification rules, see [verifyRemoveSubnetValidatorTx]. This
 // transaction will result in [tx.NodeID] being removed as a validator of
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
-func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
 	staker, isCurrentValidator, err := verifyRemoveSubnetValidatorTx(
 		e.backend,
 		e.feeCalculator,
@@ -534,7 +534,7 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	return nil
 }
 
-func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) error {
 	currentTimestamp := e.state.GetTimestamp()
 	if e.backend.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
 		return errTransformSubnetTxPostEtna
@@ -606,7 +606,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	return nil
 }
 
-func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.backend,
 		e.feeCalculator,
@@ -639,7 +639,7 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
-func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermissionlessDelegatorTx) error {
 	if err := verifyAddPermissionlessDelegatorTx(
 		e.backend,
 		e.feeCalculator,
@@ -660,11 +660,11 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
-// Verifies a [*txs.TransferSubnetOwnershipTx] and, if it passes, executes it on
+// Verifies a [*platform.TransferSubnetOwnershipTx] and, if it passes, executes it on
 // [e.State]. For verification rules, see [verifyTransferSubnetOwnershipTx].
 // This transaction will result in the ownership of [tx.Subnet] being transferred
 // to [tx.Owner].
-func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
 	err := verifyTransferSubnetOwnershipTx(
 		e.backend,
 		e.feeCalculator,
@@ -684,7 +684,7 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwn
 	return nil
 }
 
-func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
+func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -739,7 +739,7 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -777,11 +777,11 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			return err
 		}
 
-		remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		remainingBalanceOwner, err := platform.Codec.Marshal(platform.CodecVersion, &vdr.RemainingBalanceOwner)
 		if err != nil {
 			return err
 		}
-		deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.DeactivationOwner)
+		deactivationOwner, err := platform.Codec.Marshal(platform.CodecVersion, &vdr.DeactivationOwner)
 		if err != nil {
 			return err
 		}
@@ -872,7 +872,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 	return nil
 }
 
-func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -979,11 +979,11 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	if err != nil {
 		return err
 	}
-	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.RemainingBalanceOwner)
+	remainingBalanceOwner, err := platform.Codec.Marshal(platform.CodecVersion, &msg.RemainingBalanceOwner)
 	if err != nil {
 		return err
 	}
-	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.DisableOwner)
+	deactivationOwner, err := platform.Codec.Marshal(platform.CodecVersion, &msg.DisableOwner)
 	if err != nil {
 		return err
 	}
@@ -1030,7 +1030,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	return nil
 }
 
-func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1125,7 +1125,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 		// balance.
 		if l1Validator.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
-			if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+			if _, err := platform.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
 			}
 
@@ -1176,7 +1176,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	return nil
 }
 
-func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1253,7 +1253,7 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 	return nil
 }
 
-func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1276,7 +1276,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	}
 
 	var disableOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &disableOwner); err != nil {
+	if _, err := platform.Codec.Unmarshal(l1Validator.DeactivationOwner, &disableOwner); err != nil {
 		return err
 	}
 
@@ -1335,7 +1335,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := platform.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return err
 	}
 
@@ -1371,7 +1371,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	return e.state.PutL1Validator(l1Validator)
 }
 
-func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenewedValidatorTx) error {
 	if err := verifyAddAutoRenewedValidatorTx(e.backend, e.feeCalculator, e.state, e.tx, tx); err != nil {
 		return err
 	}
@@ -1450,7 +1450,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	return nil
 }
 
-func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
 	validator, err := verifySetAutoRenewedValidatorConfigTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {
 		return err
@@ -1474,12 +1474,12 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRene
 	return nil
 }
 
-func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
+func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
 		txID      = e.tx.ID()
@@ -1491,7 +1491,7 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 		// Pre-Durango, stakers set a future [StartTime] and are added to the
 		// pending staker set. They are promoted to the current staker set once
 		// the chain time reaches [StartTime].
-		scheduledStakerTx, ok := stakerTx.(txs.ScheduledStaker)
+		scheduledStakerTx, ok := stakerTx.(platform.ScheduledStaker)
 		if !ok {
 			return fmt.Errorf("%w: %T", errMissingStartTimePreDurango, stakerTx)
 		}

@@ -6,13 +6,13 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 const blkLabel = "blk"
 
 var (
-	_ block.Visitor = (*blockMetrics)(nil)
+	_ platform.BlockVisitor = (*blockMetrics)(nil)
 
 	blkLabels = []string{blkLabel}
 )
@@ -41,21 +41,21 @@ func newBlockMetrics(registerer prometheus.Registerer) (*blockMetrics, error) {
 	return m, registerer.Register(m.numBlocks)
 }
 
-func (m *blockMetrics) BanffAbortBlock(*block.BanffAbortBlock) error {
+func (m *blockMetrics) BanffAbortBlock(*platform.BanffAbortBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "abort",
 	}).Inc()
 	return nil
 }
 
-func (m *blockMetrics) BanffCommitBlock(*block.BanffCommitBlock) error {
+func (m *blockMetrics) BanffCommitBlock(*platform.BanffCommitBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "commit",
 	}).Inc()
 	return nil
 }
 
-func (m *blockMetrics) BanffProposalBlock(b *block.BanffProposalBlock) error {
+func (m *blockMetrics) BanffProposalBlock(b *platform.BanffProposalBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "proposal",
 	}).Inc()
@@ -67,7 +67,7 @@ func (m *blockMetrics) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) BanffStandardBlock(b *block.BanffStandardBlock) error {
+func (m *blockMetrics) BanffStandardBlock(b *platform.BanffStandardBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "standard",
 	}).Inc()
@@ -79,28 +79,28 @@ func (m *blockMetrics) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	return nil
 }
 
-func (m *blockMetrics) ApricotAbortBlock(*block.ApricotAbortBlock) error {
+func (m *blockMetrics) ApricotAbortBlock(*platform.ApricotAbortBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "abort",
 	}).Inc()
 	return nil
 }
 
-func (m *blockMetrics) ApricotCommitBlock(*block.ApricotCommitBlock) error {
+func (m *blockMetrics) ApricotCommitBlock(*platform.ApricotCommitBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "commit",
 	}).Inc()
 	return nil
 }
 
-func (m *blockMetrics) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
+func (m *blockMetrics) ApricotProposalBlock(b *platform.ApricotProposalBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "proposal",
 	}).Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
+func (m *blockMetrics) ApricotStandardBlock(b *platform.ApricotStandardBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "standard",
 	}).Inc()
@@ -112,7 +112,7 @@ func (m *blockMetrics) ApricotStandardBlock(b *block.ApricotStandardBlock) error
 	return nil
 }
 
-func (m *blockMetrics) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
+func (m *blockMetrics) ApricotAtomicBlock(b *platform.ApricotAtomicBlock) error {
 	m.numBlocks.With(prometheus.Labels{
 		blkLabel: "atomic",
 	}).Inc()

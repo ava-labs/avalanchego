@@ -13,9 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -164,10 +164,10 @@ func advanceTimeTo(
 
 		stakerToAdd := *stakerToRemove
 		stakerToAdd.NextTime = stakerToRemove.EndTime
-		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
+		stakerToAdd.Priority = platform.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		// Only permissionless networks (including the primary network) are eligible for rewards
-		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+		if stakerToRemove.Priority != platform.SubnetPermissionedValidatorPendingPriority {
 			supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 			if err != nil {
 				return nil, false, err
@@ -245,7 +245,7 @@ func advanceTimeTo(
 
 		// Invariant: Permissioned stakers are encountered first for a given
 		//            timestamp because their priority is the smallest.
-		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
+		if stakerToRemove.Priority != platform.SubnetPermissionedValidatorCurrentPriority {
 			// Permissionless stakers are removed by the RewardValidatorTx (or a
 			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
 			// AdvanceTimeTx.

@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -16,7 +16,7 @@ const (
 	WarpQuorumDenominator = 100
 )
 
-var _ txs.Visitor = (*warpVerifier)(nil)
+var _ platform.TxVisitor = (*warpVerifier)(nil)
 
 // VerifyWarpMessages verifies all warp messages in the tx. If any of the warp
 // messages are invalid, an error is returned.
@@ -25,7 +25,7 @@ func VerifyWarpMessages(
 	networkID uint32,
 	validatorState validators.State,
 	pChainHeight uint64,
-	tx txs.UnsignedTx,
+	tx platform.UnsignedTx,
 ) error {
 	return tx.Visit(&warpVerifier{
 		context:        ctx,
@@ -42,95 +42,95 @@ type warpVerifier struct {
 	pChainHeight   uint64
 }
 
-func (*warpVerifier) AddValidatorTx(*txs.AddValidatorTx) error {
+func (*warpVerifier) AddValidatorTx(*platform.AddValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (*warpVerifier) AddSubnetValidatorTx(*platform.AddSubnetValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*warpVerifier) AddDelegatorTx(*platform.AddDelegatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) CreateChainTx(*txs.CreateChainTx) error {
+func (*warpVerifier) CreateChainTx(*platform.CreateChainTx) error {
 	return nil
 }
 
-func (*warpVerifier) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (*warpVerifier) CreateSubnetTx(*platform.CreateSubnetTx) error {
 	return nil
 }
 
-func (*warpVerifier) ImportTx(*txs.ImportTx) error {
+func (*warpVerifier) ImportTx(*platform.ImportTx) error {
 	return nil
 }
 
-func (*warpVerifier) ExportTx(*txs.ExportTx) error {
+func (*warpVerifier) ExportTx(*platform.ExportTx) error {
 	return nil
 }
 
-func (*warpVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*warpVerifier) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return nil
 }
 
-func (*warpVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*warpVerifier) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (*warpVerifier) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (*warpVerifier) TransformSubnetTx(*platform.TransformSubnetTx) error {
 	return nil
 }
 
-func (*warpVerifier) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+func (*warpVerifier) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+func (*warpVerifier) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (*warpVerifier) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
 	return nil
 }
 
-func (*warpVerifier) BaseTx(*txs.BaseTx) error {
+func (*warpVerifier) BaseTx(*platform.BaseTx) error {
 	return nil
 }
 
-func (*warpVerifier) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
+func (*warpVerifier) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
 	return nil
 }
 
-func (*warpVerifier) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+func (*warpVerifier) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
 	return nil
 }
 
-func (*warpVerifier) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+func (*warpVerifier) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
 	return nil
 }
 
-func (w *warpVerifier) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+func (w *warpVerifier) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
 	return w.verify(tx.Message)
 }
 
-func (w *warpVerifier) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+func (w *warpVerifier) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
 	return w.verify(tx.Message)
 }
 
-func (*warpVerifier) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+func (*warpVerifier) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
 	return nil
 }
 
-func (*warpVerifier) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+func (*warpVerifier) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
 	return nil
 }
 
-func (*warpVerifier) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*warpVerifier) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return nil
 }
 
