@@ -461,13 +461,13 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 	}
 }
 
-type blockCounter = synctest.CountingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
+type blockCounter = synctest.RecordingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
 // countingNetwork serves blocks on a loopback network and counts the requests,
 // so a test can assert the syncer never asked for blocks it already had.
 func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockCounter) {
 	log := loggingtest.New(t, logging.Debug)
-	r := synctest.NewCountingResponder(newResponder(log, synctest.NewBlockMap(blocks)))
+	r := synctest.NewRecordingResponder(newResponder(log, synctest.NewBlockMap(blocks)))
 	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, r)
 	return net, tracker, r
 }
