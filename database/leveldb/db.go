@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"runtime"
 	"slices"
-	"sync"
+	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/sync"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -275,8 +277,41 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return has, updateError(err)
 }
 
+var pcPool = sync.Pool[[]uintptr]{
+	New: func() []uintptr {
+		return make([]uintptr, 32)
+	},
+}
+
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
+	// DO NOT MERGE
+	done := make(chan struct{})
+	defer func() { <-done }()
+	go func() {
+		defer close(done)
+
+		db.metrics.tmpGetInvocations.Inc()
+
+		pcs := pcPool.Get()
+		defer pcPool.Put(pcs)
+		n := runtime.Callers(2, pcs) // skip goroutine and Get()
+
+		frames := runtime.CallersFrames(pcs[:n])
+		for {
+			f, more := frames.Next()
+			if strings.Contains(f.File, "avalanchego/vms/saevm") {
+				db.metrics.tmpSAEGetInvocationSources.WithLabelValues(
+					fmt.Sprintf("%s:%d", f.File, f.Line),
+				).Inc()
+				break
+			}
+			if !more {
+				break
+			}
+		}
+	}()
+
 	value, err := db.DB.Get(key, nil)
 	return value, updateError(err)
 }

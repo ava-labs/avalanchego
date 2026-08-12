@@ -59,10 +59,25 @@ type metrics struct {
 	seekCompactions prometheus.Counter
 
 	priorStats, currentStats *leveldb.DBStats
+
+	// DO NOT MERGE
+	tmpGetInvocations          prometheus.Counter
+	tmpSAEGetInvocationSources *prometheus.CounterVec
 }
 
 func newMetrics(reg prometheus.Registerer) (metrics, error) {
 	m := metrics{
+		tmpGetInvocations: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "get_invocations",
+			Help: "number of times the Get() method was called",
+		}),
+		tmpSAEGetInvocationSources: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "sae_get_invocation_sources",
+				Help: "number of times the [file:line] was the closest SAE location to invoke a Get()",
+			},
+			[]string{"file_and_line"},
+		),
 		writesDelayedCount: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "writes_delayed",
 			Help: "number of cumulative writes that have been delayed due to compaction",
@@ -161,6 +176,9 @@ func newMetrics(reg prometheus.Registerer) (metrics, error) {
 	}
 
 	err := errors.Join(
+		reg.Register(m.tmpGetInvocations),
+		reg.Register(m.tmpSAEGetInvocationSources),
+
 		reg.Register(m.writesDelayedCount),
 		reg.Register(m.writesDelayedDuration),
 		reg.Register(m.writeIsDelayed),
