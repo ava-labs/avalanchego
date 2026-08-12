@@ -16,9 +16,8 @@
 
 use crate::node::branch::ReadSerializable;
 use crate::nodestore::AreaIndex;
-use crate::{HashType, LinearAddress, Path, PathBuf, PathComponent, SharedNode};
+use crate::{DefaultHashMode, HashMode, LinearAddress, Path, PathBuf, PathComponent, SharedNode};
 use bitfield::bitfield;
-use branch::Serializable as _;
 pub use branch::{BranchNode, Child};
 pub use children::{Children, ChildrenSlots, DenseChildren};
 use enum_as_inner::EnumAsInner;
@@ -284,7 +283,7 @@ impl Node {
                             .persist_info()
                             .expect("child must be hashed when serializing");
                         encoded.extend_from_slice(&address.get().to_ne_bytes());
-                        hash.write_to(encoded);
+                        DefaultHashMode::write_child_hash(hash, encoded)?;
                     }
                 } else {
                     for (position, child) in child_iter {
@@ -293,7 +292,7 @@ impl Node {
                             .persist_info()
                             .expect("child must be hashed when serializing");
                         encoded.extend_from_slice(&address.get().to_ne_bytes());
-                        hash.write_to(encoded);
+                        DefaultHashMode::write_child_hash(hash, encoded)?;
                     }
                 }
             }
@@ -384,7 +383,7 @@ impl Node {
                         serialized.read_exact(&mut address_buf)?;
                         let address = u64::from_ne_bytes(address_buf);
 
-                        let hash = HashType::from_reader(&mut serialized)?;
+                        let hash = DefaultHashMode::read_child_hash(&mut serialized)?;
 
                         *child = Some(Child::AddressWithHash(
                             LinearAddress::new(address)
@@ -408,7 +407,7 @@ impl Node {
                         serialized.read_exact(&mut address_buf)?;
                         let address = u64::from_ne_bytes(address_buf);
 
-                        let hash = HashType::from_reader(&mut serialized)?;
+                        let hash = DefaultHashMode::read_child_hash(&mut serialized)?;
 
                         children[position] = Some(Child::AddressWithHash(
                             LinearAddress::new(address)
@@ -610,6 +609,54 @@ than 126 bytes as the length would be encoded in multiple bytes.
         let deserialized = Node::from_reader(&mut cursor).unwrap();
 
         assert_eq!(node, deserialized);
+    }
+
+    /// Golden test locking the on-disk byte layout of a branch node's
+    /// child-hash region in eth mode: an 8-byte native-endian address followed
+    /// by the hash codec output (`0x00` + 32 raw bytes for a full hash). These
+    /// bytes must stay byte-for-byte stable so existing databases keep working.
+    #[cfg(feature = "ethhash")]
+    #[test]
+    fn test_eth_child_hash_region_exact_bytes() {
+        // A partial branch with a single child at slot 15, no value. Distinct
+        // per-byte values make a mismatch easy to spot in the failure hex dump.
+        let hash_bytes: [u8; 32] = std::array::from_fn(|i| i as u8);
+        let child_hash: crate::HashType = hash_bytes.into();
+        let node = Node::Branch(Box::new(BranchNode {
+            partial_path: Path::from(vec![0, 1]),
+            value: None,
+            children: Children::from_fn(|i| {
+                if i.as_u8() == 15 {
+                    Some(Child::AddressWithHash(
+                        LinearAddress::new(1).unwrap(),
+                        child_hash.clone(),
+                    ))
+                } else {
+                    None
+                }
+            }),
+        }));
+
+        let mut serialized = Vec::new();
+        node.as_bytes(&mut serialized).unwrap();
+
+        // The child record is the tail of the encoding.
+        let mut expected_tail = Vec::new();
+        expected_tail.push(15u8); // child-slot nibble varint (single byte)
+        expected_tail.extend_from_slice(&1u64.to_ne_bytes()); // address
+        expected_tail.push(0x00); // full-hash discriminant
+        expected_tail.extend_from_slice(&hash_bytes);
+
+        assert!(
+            serialized.ends_with(&expected_tail),
+            "child-hash region changed; got {}",
+            hex::encode(&serialized)
+        );
+
+        // And the whole thing must round-trip.
+        let mut cursor = std::io::Cursor::new(&serialized);
+        cursor.set_position(1);
+        assert_eq!(node, Node::from_reader(&mut cursor).unwrap());
     }
 
     #[test]

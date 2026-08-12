@@ -51,6 +51,12 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
             return Err(ProofError::ValueAtOddNibbleLength);
         }
 
+        if DefaultHashMode::ALGORITHM.is_ethereum()
+            && matches!(proof_node.value_digest, Some(ValueDigest::Hash(_)))
+        {
+            return Err(ProofError::UnexpectedValueDigest);
+        }
+
         self.insert_branch_from_nibbles(&key_nibbles)?;
 
         // insert_branch_from_nibbles guarantees a branch exists at this path
@@ -60,7 +66,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
 
         let proof_value = match proof_node.value_digest.as_ref() {
             Some(ValueDigest::Value(v)) => Some(v.as_ref()),
-            #[cfg(not(feature = "ethhash"))]
             Some(digest @ ValueDigest::Hash(_)) => {
                 // In merkledb mode, large values (>= 32 bytes) are stored as
                 // hashes in serialized proofs. If the branch's value hashes to

@@ -7,7 +7,7 @@
 //! It provides efficient encoding of proof nodes, child bitmaps, and range proofs
 //! for transmission or persistent storage.
 
-use firewood_storage::{PathBuf, PathComponentSliceExt, ValueDigest};
+use firewood_storage::{DefaultHashMode, HashMode, PathBuf, PathComponentSliceExt, ValueDigest};
 use integer_encoding::VarInt;
 
 use super::{
@@ -199,7 +199,8 @@ impl<T: AsRef<[u8]>> WriteItem for ValueDigest<T> {
                 out.push(0);
                 v.write_item(out);
             }
-            #[cfg(not(feature = "ethhash"))]
+            // Only produced by the merkledb scheme (large values hashed); the
+            // Ethereum scheme never emits a `Hash` digest.
             ValueDigest::Hash(h) => {
                 out.push(1);
                 h.write_item(out);
@@ -220,17 +221,30 @@ impl WriteItem for firewood_storage::TrieHash {
     }
 }
 
-#[cfg(feature = "ethhash")]
 impl WriteItem for firewood_storage::HashType {
     fn write_item(&self, out: &mut Vec<u8>) {
-        match self {
-            firewood_storage::HashType::Hash(h) => {
-                out.push(0);
-                h.write_item(out);
+        // The two schemes use different proof wire layouts for a child hash;
+        // dispatch on the database's algorithm so each format is preserved
+        // byte-for-byte.
+        if DefaultHashMode::ALGORITHM.is_ethereum() {
+            match self {
+                firewood_storage::HashType::Hash(h) => {
+                    out.push(0);
+                    h.write_item(out);
+                }
+                firewood_storage::HashType::Rlp(h) => {
+                    out.push(1);
+                    h.write_item(out);
+                }
             }
-            firewood_storage::HashType::Rlp(h) => {
-                out.push(1);
-                h.write_item(out);
+        } else {
+            // MerkleDB child hashes are always a bare 32-byte hash, with no
+            // discriminant byte.
+            match self {
+                firewood_storage::HashType::Hash(h) => h.write_item(out),
+                firewood_storage::HashType::Rlp(_) => {
+                    unreachable!("merkledb child hash is never inline RLP")
+                }
             }
         }
     }

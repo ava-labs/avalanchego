@@ -2,7 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::{
-    Children, HashType, HashableShunt, IntoSplitPath, Node, Path, PathComponent, SplitPath,
+    Children, DefaultHashMode, HashMode, HashType, HashableShunt, IntoSplitPath, Node, Path,
+    PathComponent, SplitPath, TrieHash,
 };
 use smallvec::SmallVec;
 
@@ -76,9 +77,10 @@ impl<A: smallvec::Array<Item = u8>> HasUpdate for SmallVec<A> {
 pub enum ValueDigest<T> {
     /// The node's value.
     Value(T),
-    #[cfg(not(feature = "ethhash"))]
     /// For MerkleDB hashing, the digest is the hash of the value if it is 32
-    /// bytes or longer.
+    /// bytes or longer. (Unused by the Ethereum scheme, which never stores a
+    /// value as a hash, but the variant exists unconditionally so both schemes
+    /// share one data type.)
     Hash(HashType),
 }
 
@@ -90,12 +92,12 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
                 // This proof proves that `key` maps to `got_value`.
                 got_value.as_ref() == expected.as_ref()
             }
-            #[cfg(not(feature = "ethhash"))]
             Self::Hash(got_hash) => {
                 use sha2::{Digest, Sha256};
                 // This proof proves that `key` maps to a value
-                // whose hash is `got_hash`.
-                *got_hash == HashType::from(Sha256::digest(expected.as_ref()))
+                // whose hash is `got_hash`. `HashType` implements
+                // `PartialEq<TrieHash>`, so compare without re-wrapping.
+                *got_hash == TrieHash::from(Sha256::digest(expected.as_ref()))
             }
         }
     }
@@ -104,39 +106,38 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
     pub fn as_ref(&self) -> ValueDigest<&[u8]> {
         match self {
             Self::Value(v) => ValueDigest::Value(v.as_ref()),
-            #[cfg(not(feature = "ethhash"))]
             Self::Hash(h) => ValueDigest::Hash(h.clone()),
         }
     }
 
     /// Returns the inner bytes if this digest carries a value, or `None` if
-    /// it carries only a hash. The `Hash` variant only exists in non-ethhash
-    /// builds, so in ethhash builds this function always returns `Some`.
+    /// it carries only a hash. The Ethereum scheme never produces a `Hash`
+    /// digest, so under that scheme this function always returns `Some`.
     pub fn value(&self) -> Option<&[u8]> {
         match self {
             Self::Value(v) => Some(v.as_ref()),
-            #[cfg(not(feature = "ethhash"))]
             Self::Hash(_) => None,
         }
     }
 
     /// Convert the value to a hash if it is not already a hash.
     ///
-    /// If the value is less than 32 bytes, it will be passed through as is
-    /// instead of hashing.
+    /// Under the MerkleDB scheme, a value of 32 bytes or more is replaced by
+    /// its SHA-256 hash; shorter values pass through unchanged. The Ethereum
+    /// scheme never hashes values, so this is the identity there.
     ///
-    /// If etherum hashing is enabled, this will always return the value as is.
+    /// The capping is the MerkleDB scheme's behavior, so it is gated on the
+    /// database's algorithm at runtime rather than threaded through `H`
+    /// (deferred to a follow-up PR).
     pub fn make_hash(&self) -> ValueDigest<&[u8]> {
         match self.as_ref() {
-            #[cfg(not(feature = "ethhash"))]
-            ValueDigest::Value(v) if v.len() >= 32 => {
+            ValueDigest::Value(v) if v.len() >= 32 && !DefaultHashMode::ALGORITHM.is_ethereum() => {
                 use sha2::{Digest, Sha256};
-                ValueDigest::Hash(HashType::from(Sha256::digest(v)))
+                ValueDigest::Hash(HashType::from(TrieHash::from(Sha256::digest(v))))
             }
 
             ValueDigest::Value(v) => ValueDigest::Value(v),
 
-            #[cfg(not(feature = "ethhash"))]
             ValueDigest::Hash(v) => ValueDigest::Hash(v),
         }
     }
@@ -145,7 +146,6 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
     pub fn map<O>(self, f: impl FnOnce(T) -> O) -> ValueDigest<O> {
         match self {
             Self::Value(v) => ValueDigest::Value(f(v)),
-            #[cfg(not(feature = "ethhash"))]
             Self::Hash(h) => ValueDigest::Hash(h),
         }
     }
@@ -155,7 +155,6 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for ValueDigest<T> {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Value(v) => v.as_ref(),
-            #[cfg(not(feature = "ethhash"))]
             Self::Hash(h) => h.as_ref(),
         }
     }
@@ -198,4 +197,19 @@ pub trait Preimage: std::fmt::Debug {
 
     /// Write this hash preimage to `buf`.
     fn write(&self, buf: &mut impl HasUpdate);
+}
+
+/// A single blanket implementation that delegates to the compile-selected
+/// [`DefaultHashMode`].
+///
+/// Threading a generic `H: HashMode` through these call sites (so a caller can
+/// pick the scheme at runtime) is deferred to a follow-up PR.
+impl<T: Hashable> Preimage for T {
+    fn to_hash(&self) -> HashType {
+        DefaultHashMode::to_hash(self)
+    }
+
+    fn write(&self, buf: &mut impl HasUpdate) {
+        DefaultHashMode::write_preimage(self, buf);
+    }
 }

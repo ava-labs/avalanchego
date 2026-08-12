@@ -404,9 +404,8 @@ fn update_account_storage_root(node: &mut Node, path_prefix: &Path) {
 
 /// Extract the `TrieHash` for the single-storage-child case. At account
 /// depth storage child encodings always exceed 32 bytes (32-byte keys), so
-/// the inline-RLP variant cannot occur in ethhash mode; without ethhash
-/// every child is already a hash.
-#[cfg(feature = "ethhash")]
+/// the inline-RLP variant cannot occur; under the merkledb scheme every child
+/// is already a 32-byte hash.
 fn single_child_storage_root(child: HashType) -> crate::TrieHash {
     match child {
         HashType::Hash(hash) => hash,
@@ -417,16 +416,9 @@ fn single_child_storage_root(child: HashType) -> crate::TrieHash {
     }
 }
 
-#[cfg(not(feature = "ethhash"))]
-const fn single_child_storage_root(child: HashType) -> crate::TrieHash {
-    // Without ethhash, `HashType` is `TrieHash`.
-    child
-}
-
 /// Encode one child slot of an account's storage branch as an [`RlpItem`].
 /// Mirrors the dispatch the ethhash hasher does inline (see
-/// `storage/src/hashers/ethhash.rs::Preimage::write`).
-#[cfg(feature = "ethhash")]
+/// `storage/src/hashers/ethhash.rs::EthHash::write_preimage`).
 fn child_to_rlp_item(child: Option<&HashType>) -> RlpItem<'_> {
     match child {
         Some(HashType::Hash(hash)) => RlpItem::Bytes(hash.as_slice()),
@@ -434,14 +426,6 @@ fn child_to_rlp_item(child: Option<&HashType>) -> RlpItem<'_> {
             "account-depth storage child cannot have inline RLP: \
              storage node encoding with 32-byte keys always exceeds 32 bytes"
         ),
-        None => RlpItem::Empty,
-    }
-}
-
-#[cfg(not(feature = "ethhash"))]
-fn child_to_rlp_item(child: Option<&HashType>) -> RlpItem<'_> {
-    match child {
-        Some(hash) => RlpItem::Bytes(hash.as_slice()),
         None => RlpItem::Empty,
     }
 }

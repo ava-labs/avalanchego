@@ -5,6 +5,28 @@ use super::*;
 #[cfg(feature = "ethhash")]
 use test_case::test_case;
 
+#[cfg(feature = "ethhash")]
+#[test]
+fn test_reconcile_branch_proof_node_rejects_hashed_value_digest() {
+    let mut merkle = create_in_memory_merkle();
+    let proof_node = test_branch_proof_node(
+        &[0xa, 0xb],
+        Some(ValueDigest::Hash(TrieHash::from([0xabu8; 32]).into())),
+    );
+
+    let err = merkle
+        .reconcile_branch_proof_node(&proof_node, |_, _| {
+            panic!("invalid digest must be rejected before conflict resolution")
+        })
+        .unwrap_err();
+
+    assert!(matches!(err, ProofError::UnexpectedValueDigest));
+    assert!(
+        merkle.get_node_from_nibbles(&[0xa, 0xb]).unwrap().is_none(),
+        "invalid digest must be rejected before mutating the trie"
+    );
+}
+
 #[test]
 fn test_reconcile_branch_proof_node_creates_missing_branch_without_value() {
     let mut merkle = create_in_memory_merkle();

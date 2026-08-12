@@ -3,17 +3,18 @@
 
 //! # Node preimage hashing
 //!
-//! This module provides two mutually-exclusive implementations of
-//! [`Preimage`](crate::Preimage) (and therefore [`to_hash`](crate::Preimage::to_hash))
-//! for trie nodes. Exactly one is compiled in based on feature flags:
+//! This module provides the two implementations of [`HashMode`](crate::HashMode)
+//! — the per-scheme preimage hashing (`to_hash`/`write_preimage`) and child-hash
+//! codec — for trie nodes. Both are compiled into every binary so the scheme can
+//! be selected at runtime:
 //!
-//! | Feature           | Module     | Hash       | Compatibility           |
-//! |-------------------|------------|------------|-------------------------|
-//! | default (off)     | `merkledb` | SHA-256    | Avalanche `merkledb`    |
-//! | `ethhash`         | `ethhash`  | Keccak-256 | Ethereum MPT / C-Chain  |
+//! | Scheme           | Module     | Hash       | Compatibility           |
+//! |------------------|------------|------------|-------------------------|
+//! | `MerkleDbHash`   | `merkledb` | SHA-256    | Avalanche `merkledb`    |
+//! | `EthHash`        | `ethhash`  | Keccak-256 | Ethereum MPT / C-Chain  |
 //!
 //! The two encodings are **not interchangeable**: a database created under one
-//! set of flags cannot be read with the other. Root hashes, proofs, and on-disk
+//! scheme cannot be read with the other. Root hashes, proofs, and on-disk
 //! node encodings all differ.
 //!
 //! ## What these modules produce
@@ -31,15 +32,13 @@
 //!
 //! ## Where to look
 //!
-//! - Hashing the current revision: `ethhash::Preimage::write` /
-//!   `merkledb::Preimage::write`, via
+//! - Hashing the current revision: `EthHash::write_preimage` /
+//!   `MerkleDbHash::write_preimage`, via
 //!   [`NodeStore::hash_helper`](crate::NodeStore::hash_helper) in
 //!   `nodestore::hash`.
 //! - Post-hash fixups for account `storageRoot`:
 //!   `fix_account_storage_root_value` in `nodestore::hash` (proof-generation
-//!   path; only compiled with `ethhash`).
+//!   path; only meaningful under the Ethereum scheme).
 
-#[cfg(feature = "ethhash")]
 pub(crate) mod ethhash;
-#[cfg(not(feature = "ethhash"))]
-mod merkledb;
+pub(crate) mod merkledb;
