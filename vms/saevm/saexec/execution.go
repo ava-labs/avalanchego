@@ -127,6 +127,9 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := e.hooks.AfterExecutingCanonicalBlock(b.EthBlock(), result.Receipts); err != nil {
+		return fmt.Errorf("after canonical block hook: %v", err)
+	}
 	return e.afterExecution(b, result)
 }
 

@@ -256,8 +256,6 @@ func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB,
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
-
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -268,6 +266,16 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
 			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
 		}
+	}
+	return nil
+}
+
+func (h *hooks) AfterExecutingCanonicalBlock(b *types.Block, receipts types.Receipts) error {
+	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return fmt.Errorf("parsing txs: %w", err)
 	}
 
 	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
