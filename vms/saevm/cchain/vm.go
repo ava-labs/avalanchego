@@ -368,10 +368,9 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 	return b, nil
 }
 
-// Shutdown releases every resource allocated by [VM.Initialize] in reverse
-// order.
+// Shutdown releases every resource allocated by the [VM] in reverse order.
 //
-// It is idempotent and safe to call after a partially-failed [VM.Initialize].
+// It is idempotent and safe to call at any time.
 func (vm *VM) Shutdown(ctx context.Context) error {
 	errs := make([]error, len(vm.onClose))
 	for i, f := range slices.Backward(vm.onClose) {

@@ -76,7 +76,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	case snow.Initializing:
 		// no event can occur while the VM is initializing.
 		<-ctx.Done()
-		return 0, ctx.Err()
+		return 0, context.Cause(ctx)
 	case snow.StateSyncing:
 		return vm.SummaryHandler.WaitForEvent(ctx)
 	}
