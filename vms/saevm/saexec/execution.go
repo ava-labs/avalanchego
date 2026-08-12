@@ -127,9 +127,6 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	if err := e.hooks.AfterExecutingCanonicalBlock(b.EthBlock(), result.Receipts); err != nil {
-		return fmt.Errorf("after canonical block hook: %v", err)
-	}
 	return e.afterExecution(b, result)
 }
 
@@ -323,6 +320,10 @@ func Execute(
 }
 
 func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
+	if err := e.hooks.AfterExecutingCanonicalBlock(b.EthBlock(), r.Receipts); err != nil {
+		return fmt.Errorf("after canonical block hook: %v", err)
+	}
+
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
 	root, err := r.StateDB.Commit(b.NumberU64(), true)
