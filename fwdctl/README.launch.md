@@ -229,6 +229,7 @@ intentionally skipped so the node generates a fresh NodeID on first boot.
 ## Operational behavior
 
 - Managed instances are tagged with `ManagedBy=fwdctl`
+- Newly launched instances include `Owner=<AWS caller identity>`
 - Only managed instances are targeted by `launch list` and `launch kill`
 - `launch list` marks instances launched by your current AWS identity with `*`
 - `launch kill` requires explicit confirmation unless `-y`/`--yes` is provided.

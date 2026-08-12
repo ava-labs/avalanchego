@@ -22,6 +22,9 @@ pub enum LaunchError {
     #[error("EC2 operation failed: {0}")]
     Ec2(Box<aws_sdk_ec2::Error>),
 
+    #[error("EC2 launch failed; required launch tags, including Owner, were not applied: {0}")]
+    OwnerTag(String),
+
     #[error("SSM operation failed: {0}")]
     Ssm(Box<aws_sdk_ssm::Error>),
 
@@ -721,6 +724,7 @@ fn log_dry_run_plan(opts: &DeployOptions, ami_id: &str, user_data_size: usize, l
     info!("      tags:");
     info!("        ManagedBy=fwdctl");
     info!("        Component=firewood");
+    info!("        Owner={launched_by}");
     info!("        LaunchedBy={launched_by}");
     if let Some(tag) = &opts.custom_tag {
         info!("        CustomTag={tag}");

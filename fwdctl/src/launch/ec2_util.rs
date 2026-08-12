@@ -28,6 +28,8 @@ const UBUNTU_NOBLE_AMI_NAME_PATTERN: &str =
     "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-{arch}-server-*";
 /// Root EBS volume size (GiB) for launched benchmark instances.
 const ROOT_VOLUME_SIZE_GIB: i32 = 50;
+/// Tag key identifying the AWS caller responsible for the instance.
+const OWNER_TAG_KEY: &str = "Owner";
 /// Tag key used to identify instances managed by `fwdctl`.
 const MANAGED_BY_TAG_KEY: &str = "ManagedBy";
 /// Tag value used to identify instances managed by `fwdctl`.
@@ -158,6 +160,18 @@ pub async fn launch_instance(
         .tag_specifications(
             TagSpecification::builder()
                 .resource_type(ResourceType::Instance)
+                .set_tags(Some(tags.clone()))
+                .build(),
+        )
+        .tag_specifications(
+            TagSpecification::builder()
+                .resource_type(ResourceType::Volume)
+                .set_tags(Some(tags.clone()))
+                .build(),
+        )
+        .tag_specifications(
+            TagSpecification::builder()
+                .resource_type(ResourceType::NetworkInterface)
                 .set_tags(Some(tags))
                 .build(),
         );
@@ -175,7 +189,12 @@ pub async fn launch_instance(
     }
 
     info!("Requesting EC2 instance: {}", opts.instance_type);
-    let response = request.send().await?;
+    // EC2 applies TagSpecifications as part of RunInstances. If tagging is not
+    // authorized, the request fails instead of creating an unowned instance.
+    let response = request
+        .send()
+        .await
+        .map_err(|error| LaunchError::OwnerTag(super::format_aws_sdk_error(&error)))?;
 
     response
         .instances()
@@ -209,6 +228,7 @@ fn build_tags(opts: &DeployOptions, instance_name: &str, username: &str) -> Vec<
     let mut tags = vec![
         tag("Name", instance_name),
         tag("Component", "firewood"),
+        tag(OWNER_TAG_KEY, username),
         tag("ManagedBy", "fwdctl"),
         tag("LaunchedBy", username),
     ];
