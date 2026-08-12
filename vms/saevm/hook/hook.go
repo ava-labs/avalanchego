@@ -88,7 +88,7 @@ type Points interface {
 	// MUST NOT apply any state changes outside of the [state.StateDB].
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	// AfterExecutingCanonicalBlock runs only after canonical block execution. It
-	// can update data outside the state database.
+	// can update data outside the [state.StateDB].
 	AfterExecutingCanonicalBlock(*types.Block, types.Receipts) error
 }
 
