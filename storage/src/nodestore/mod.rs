@@ -48,7 +48,6 @@ pub(crate) mod header;
 pub(crate) mod persist;
 pub(crate) mod primitives;
 
-use crate::IntoHashType;
 use crate::arc_swap_triomphe::TriompheArc;
 use crate::linear::{OffsetReader, ReadableNodeMode};
 use crate::logger::{debug, trace};
@@ -155,7 +154,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
         if let Some(root_address) = header.root_address() {
             let root_hash = if let Some(hash) = header.root_hash() {
-                hash.into_hash_type()
+                HashType::from(hash)
             } else {
                 debug!("No root hash in header; computing from disk");
                 nodestore
@@ -1751,7 +1750,7 @@ mod tests {
 
         // Retrieve root address and hash from the header
         let root_address = header.root_address().unwrap();
-        let root_hash = header.root_hash().unwrap().into_hash_type();
+        let root_hash = HashType::from(header.root_hash().unwrap());
 
         // Reconstruct using with_root
         let restored = NodeStore::with_root(

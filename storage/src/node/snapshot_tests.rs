@@ -49,7 +49,7 @@
 //! | [`branch`] | `one_child` | Branch: one child (`merkledb__`/`ethhash__`) |
 //! | [`branch`] | `with_value` | Branch: value + one child (`merkledb__`/`ethhash__`) |
 //!
-//! ## `HashOrRlp` serialization (ethhash feature only)
+//! ## `HashType` serialization (ethhash feature only)
 //!
 //! | Function | Case | Subject |
 //! |----------|------|---------|
@@ -58,7 +58,6 @@
 
 use test_case::test_case;
 
-use crate::IntoHashType;
 use crate::node::branch::Serializable;
 use crate::node::{BranchNode, LeafNode, Node};
 use crate::nodestore::alloc::FreeArea;
@@ -92,9 +91,9 @@ fn hash_mode_name(name: &str) -> String {
 }
 
 /// Builds a zero-hash child entry at the given nibble index using
-/// [`TrieHash::from`] + [`IntoHashType`], which works under both hash modes.
+/// [`TrieHash::from`] + `.into()`, which works under both hash modes.
 fn child_at(nibble: u8) -> impl Fn(PathComponent) -> Option<Child> {
-    let hash: crate::HashType = TrieHash::from([0u8; 32]).into_hash_type();
+    let hash: crate::HashType = TrieHash::from([0u8; 32]).into();
     move |i| {
         if i.as_u8() == nibble {
             Some(Child::AddressWithHash(
@@ -169,7 +168,7 @@ fn branch(name: &str, path: Vec<u8>, value: Option<Vec<u8>>, child: u8) {
     insta::assert_snapshot!(hash_mode_name(name), hex::encode(node_as_bytes(&node)));
 }
 
-/// [`crate::HashType`] (`HashOrRlp`) serialization — available only when the
+/// [`crate::HashType`] serialization — available only when the
 /// `ethhash` feature is enabled. Each value is prefixed with a 1-byte
 /// discriminant: `0x00` for a full 32-byte Keccak hash, non-zero (the RLP
 /// length) for an inline RLP value.

@@ -37,6 +37,7 @@ mod path;
 mod root_store;
 #[cfg(any(test, feature = "test_utils"))]
 mod test_utils;
+mod trie_hash;
 mod tries;
 mod u4;
 
@@ -61,7 +62,7 @@ pub use checker::{CheckOpt, CheckerReport, DBStats, FreeListsStats, TrieStats};
 pub use hashednode::{Hashable, Preimage, ValueDigest, hash_node, hash_preimage};
 pub use hashedshunt::HashableShunt;
 pub use hashmode::{DefaultHashMode, EthHash, HashMode, MerkleDbHash};
-pub use hashtype::{HashType, IntoHashType, InvalidTrieHashLength, TrieHash};
+pub use hashtype::HashType;
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{
@@ -80,6 +81,7 @@ pub use path::{
     PartialPath, PathBuf, PathCommonPrefix, PathComponent, PathComponentSliceExt, PathGuard,
     SplitPath, TriePath, TriePathAsPackedBytes, TriePathFromPackedBytes, TriePathFromUnpackedBytes,
 };
+pub use trie_hash::{InvalidTrieHashLength, TrieHash};
 pub use tries::{
     DuplicateKeyError, HashedKeyValueTrieRoot, HashedTrieNode, IterAscending, IterDescending,
     KeyValueTrieRoot, TrieEdgeIter, TrieEdgeState, TrieNode, TrieValueIter,

@@ -28,9 +28,9 @@ use firewood_metrics::{HistogramExt, firewood_counter, firewood_histogram};
 use firewood_storage::MemStore;
 use firewood_storage::{
     BranchNode, Child, Children, DefaultHashMode, DeletedNodeTracking, FileIoError, HashMode,
-    HashType, HashableShunt, HashedNodeReader, ImmutableProposal, IntoHashType, LeafNode,
-    MaybePersistedNode, Mutable, MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf,
-    PathComponent, Propose, ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
+    HashType, HashableShunt, HashedNodeReader, ImmutableProposal, LeafNode, MaybePersistedNode,
+    Mutable, MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose,
+    ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
 };
 use firewood_storage::{
     hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
@@ -1064,7 +1064,7 @@ fn verify_range_proof_root_hash<H: ProofCollection<Node = ProofNode>>(
     let computed =
         compute_root_hash_with_proofs(&root_node, &[], &proof_node_map, &outside_children);
 
-    let expected = root_hash.clone().into_hash_type();
+    let expected = HashType::from(root_hash.clone());
     if computed != expected {
         return Err(api::Error::ProofError(ProofError::UnexpectedHash {
             expected,
@@ -1260,7 +1260,7 @@ pub fn verify_change_proof_root_hash(
     let computed =
         compute_root_hash_with_proofs(&root_node, &[], &proof_node_map, &outside_children);
 
-    if computed != verification.end_root.clone().into_hash_type() {
+    if computed != verification.end_root {
         return Err(api::Error::ProofError(ProofError::EndRootMismatch));
     }
 

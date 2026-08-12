@@ -219,7 +219,7 @@ fn exclusion_with_proof_value_present() {
     debug!("{proof:#?}");
     assert_eq!(
         proof.as_ref().first().unwrap().to_hash(),
-        root_hash.clone().into_hash_type()
+        HashType::from(root_hash.clone())
     );
 
     // Ensure at least one node in the proof carries a value (proof value present)

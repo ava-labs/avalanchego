@@ -17,9 +17,9 @@ use weak_table::WeakValueHashMap;
 
 use derive_where::derive_where;
 
+use crate::TrieHash;
 use crate::linear::filebacked::FileBacked;
 use crate::nodestore::{Committed, DeletedNodeTracking, LinearAddress, NodeStore};
-use crate::{IntoHashType, TrieHash};
 
 /// Type alias for a committed revision stored in the root store.
 pub type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
@@ -158,7 +158,7 @@ impl RootStore {
 
         // 4. Construct the committed revision
         let nodestore = Arc::new(NodeStore::with_root(
-            hash.clone().into_hash_type(),
+            hash.clone().into(),
             addr,
             self.storage.clone(),
             // `RootStore` only exists when the database was opened in

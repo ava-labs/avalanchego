@@ -5,7 +5,7 @@ use integer_encoding::VarInt;
 use test_case::test_case;
 
 use firewood_storage::{
-    DenseChildren, IntoHashType, PathComponent, SeededRng, TrieHash, ValueDigest, logger::debug,
+    DenseChildren, PathComponent, SeededRng, TrieHash, ValueDigest, logger::debug,
 };
 
 use super::{
@@ -475,7 +475,7 @@ fn make_proof_node(
     for &nibble in child_nibbles {
         child_hashes.insert(
             PathComponent::try_new(nibble).unwrap().0,
-            TrieHash::from([0u8; 32]).into_hash_type(),
+            TrieHash::from([0u8; 32]).into(),
         );
     }
     ProofNode {
@@ -780,7 +780,7 @@ fn generate_random_proof_node(rng: &SeededRng) -> ProofNode {
         if rng.random::<bool>() {
             child_hashes.insert(
                 PathComponent::try_new(nibble).unwrap().0,
-                TrieHash::from(rng.random::<[u8; 32]>()).into_hash_type(),
+                TrieHash::from(rng.random::<[u8; 32]>()).into(),
             );
         }
     }

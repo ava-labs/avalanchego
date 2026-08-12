@@ -395,7 +395,7 @@ fn test_crafted_conflicting_proof_nodes_rejected() {
     let bytes: [u8; 32] = child_hash.clone().into_triehash().into();
     let mut new_bytes = bytes;
     new_bytes[0] ^= 1;
-    *child_hash = firewood_storage::TrieHash::from(new_bytes).into_hash_type();
+    *child_hash = firewood_storage::TrieHash::from(new_bytes).into();
 
     let crafted = FrozenChangeProof::new(
         crate::Proof::new(valid.start_proof().as_ref().into()),

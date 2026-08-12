@@ -74,7 +74,7 @@
 
 use test_case::test_case;
 
-use firewood_storage::{DenseChildren, IntoHashType, PathComponent, TrieHash, ValueDigest};
+use firewood_storage::{DenseChildren, PathComponent, TrieHash, ValueDigest};
 
 use super::types::{Proof, ProofNode};
 use crate::api::{FrozenChangeProof, FrozenRangeProof};
@@ -128,7 +128,7 @@ fn make_node(
     for &nibble in child_nibbles {
         child_hashes.insert(
             PathComponent::try_new(nibble).unwrap().0,
-            TrieHash::from([0u8; 32]).into_hash_type(),
+            TrieHash::from([0u8; 32]).into(),
         );
     }
     ProofNode {

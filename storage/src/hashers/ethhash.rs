@@ -303,7 +303,7 @@ impl HashMode for EthHash {
     }
 
     fn write_child_hash<W: ExtendableBytes>(hash: &HashType, buf: &mut W) -> Result<(), Error> {
-        // Delegate to the existing `HashOrRlp` codec so the on-disk bytes stay
+        // Delegate to the existing `HashType` codec so the on-disk bytes stay
         // byte-for-byte frozen: `0x00` + 32 bytes for a full hash, or
         // `len` + RLP bytes for an inline-RLP child.
         HashType::write_to(hash, buf);

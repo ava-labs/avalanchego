@@ -9,9 +9,8 @@ use crate::nodestore::alloc::FreeAreaWithMetadata;
 use crate::nodestore::primitives::{AreaIndex, area_size_iter};
 use crate::{
     CheckerError, Committed, DefaultHashMode, FileIoError, HashMode, HashType, HashedNodeReader,
-    IntoHashType, LinearAddress, Mutable, Node, NodeReader, NodeStore, Path, Propose,
-    ReadableStorage, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
-    nodestore::NodeStoreHeader,
+    LinearAddress, Mutable, Node, NodeReader, NodeStore, Path, Propose, ReadableStorage,
+    RootReader, StoredAreaParent, TrieNodeParent, WritableStorage, nodestore::NodeStoreHeader,
 };
 
 #[cfg(not(feature = "ethhash"))]
@@ -194,7 +193,7 @@ where
                 if let Some(root_address) = root.as_linear_address() {
                     let (trie_stats, trie_errors) = self.visit_trie(
                         root_address,
-                        root_hash.into_hash_type(),
+                        root_hash.into(),
                         &mut visited,
                         opt.progress_bar.as_ref(),
                         opt.hash_check,
