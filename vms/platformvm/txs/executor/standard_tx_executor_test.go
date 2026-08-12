@@ -74,16 +74,13 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	tests := []struct {
 		banffTime time.Time
 	}{
-		{
-			// Case: Before banff
+		{ // Case: Before banff
 			banffTime: chainTime.Add(1),
 		},
-		{
-			// Case: At banff
+		{ // Case: At banff
 			banffTime: chainTime,
 		},
-		{
-			// Case: After banff
+		{ // Case: After banff
 			banffTime: chainTime.Add(-1),
 		},
 	}
@@ -1351,15 +1348,13 @@ func TestDurangoMemoField(t *testing.T) {
 				wallet := newWallet(t, env, walletConfig{})
 				tx, err := wallet.IssueExportTx(
 					env.ctx.XChainID,
-					[]*avax.TransferableOutput{
-						{
-							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-							Out: &secp256k1fx.TransferOutput{
-								Amt:          units.Avax,
-								OutputOwners: *owners,
-							},
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt:          units.Avax,
+							OutputOwners: *owners,
 						},
-					},
+					}},
 					common.WithMemo(memoField),
 				)
 				require.NoError(err)
@@ -1665,22 +1660,20 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*platform.RemoveSubnetValidatorTx
 	unsignedTx := &platform.RemoveSubnetValidatorTx{
 		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
-				Ins: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID: ids.GenerateTestID(),
-						},
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						In: &secp256k1fx.TransferInput{
-							Amt: 1,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0, 1},
-							},
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.GenerateTestID(),
+					},
+					Asset: avax.Asset{
+						ID: ids.GenerateTestID(),
+					},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+						Input: secp256k1fx.Input{
+							SigIndices: []uint32{0, 1},
 						},
 					},
-				},
+				}},
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -2055,22 +2048,20 @@ func newTransformSubnetTx(t *testing.T) (*platform.TransformSubnetTx, *platform.
 	unsignedTx := &platform.TransformSubnetTx{
 		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
-				Ins: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID: ids.GenerateTestID(),
-						},
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						In: &secp256k1fx.TransferInput{
-							Amt: 1,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0, 1},
-							},
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.GenerateTestID(),
+					},
+					Asset: avax.Asset{
+						ID: ids.GenerateTestID(),
+					},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+						Input: secp256k1fx.Input{
+							SigIndices: []uint32{0, 1},
 						},
 					},
-				},
+				}},
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -2550,11 +2541,9 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			name: "invalid if subnet is transformed",
 			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.AddSubnetTransformation(&platform.Tx{
-					Unsigned: &platform.TransformSubnetTx{
-						Subnet: subnetID,
-					},
-				})
+				e.state.AddSubnetTransformation(&platform.Tx{Unsigned: &platform.TransformSubnetTx{
+					Subnet: subnetID,
+				}})
 				return nil
 			},
 			expectedErr: errIsImmutable,
@@ -4956,11 +4945,9 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 				require.NoError(t, err)
 
 				tx.Auth = &secp256k1fx.Input{SigIndices: []uint32{0}}
-				sTx.Creds = []verify.Verifiable{
-					&secp256k1fx.Credential{}, &secp256k1fx.Credential{
-						Sigs: [][secp256k1.SignatureLen]byte{[secp256k1.SignatureLen]byte(dummySig)},
-					},
-				}
+				sTx.Creds = []verify.Verifiable{&secp256k1fx.Credential{}, &secp256k1fx.Credential{
+					Sigs: [][secp256k1.SignatureLen]byte{[secp256k1.SignatureLen]byte(dummySig)},
+				}}
 			},
 			wantErr: secp256k1fx.ErrWrongSig,
 		},
