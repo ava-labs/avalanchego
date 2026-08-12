@@ -247,7 +247,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
+func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
@@ -255,7 +255,7 @@ func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB,
 	return nil
 }
 
-func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
+func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -270,7 +270,7 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ ty
 	return nil
 }
 
-func (h *hooks) AfterExecutingCanonicalBlock(b *types.Block, receipts types.Receipts) error {
+func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))

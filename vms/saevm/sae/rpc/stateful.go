@@ -45,8 +45,8 @@ type noEndOfBlockOps struct {
 // EndOfBlockOps always returns nil.
 func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
 
-// AfterExecutingBlock always returns nil.
-func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+// FinishExecutingBlock always returns nil.
+func (noEndOfBlockOps) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
 }
 

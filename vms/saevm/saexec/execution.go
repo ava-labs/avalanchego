@@ -157,7 +157,7 @@ type (
 // b's transactions, specifically the before-block hook and the EIP-4788 beacon
 // root, mirroring [core.StateProcessor.Process].
 func BeforeExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent, b); err != nil {
+	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
 		return fmt.Errorf("before-block hook: %v", err)
 	}
 
@@ -289,7 +289,7 @@ func Execute(
 		}
 	}
 
-	if err := hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
 		return nil, fmt.Errorf("after-block hook: %v", err)
 	}
 
@@ -320,7 +320,7 @@ func Execute(
 }
 
 func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
-	if err := e.hooks.AfterExecutingCanonicalBlock(b.EthBlock(), r.Receipts); err != nil {
+	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
 		return fmt.Errorf("after canonical block hook: %v", err)
 	}
 

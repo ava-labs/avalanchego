@@ -242,22 +242,22 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 	return nil
 }
 
-// BeforeExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
+// StartExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
 // otherwise it is a no-op.
-func (s *Stub) BeforeExecutingBlock(rules params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
+func (s *Stub) StartExecutingBlock(rules params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 	if fn := s.BeforeExecutingBlockFn; fn != nil {
 		return fn(rules, sdb, parent, b)
 	}
 	return nil
 }
 
-// AfterExecutingBlock is a no-op that always returns nil.
-func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+// FinishExecutingBlock is a no-op that always returns nil.
+func (*Stub) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
 }
 
-// AfterExecutingCanonicalBlock is a no-op that always returns nil.
-func (*Stub) AfterExecutingCanonicalBlock(*types.Block, types.Receipts) error {
+// AfterExecutingBlock is a no-op that always returns nil.
+func (*Stub) AfterExecutingBlock(*types.Block, types.Receipts) error {
 	return nil
 }
 

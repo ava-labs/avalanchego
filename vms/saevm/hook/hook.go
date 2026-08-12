@@ -79,17 +79,17 @@ type Points interface {
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
-	// BeforeExecutingBlock is called immediately prior to executing the block;
+	// StartExecutingBlock is called immediately prior to executing the block;
 	// rules are those of the block and parent is the header of the block's
 	// parent.
-	BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
-	// AfterExecutingBlock applies final block changes to the provided state
+	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
+	// FinishExecutingBlock applies final block changes to the provided state
 	// database. It runs during canonical and historical block execution. It
 	// MUST NOT apply any state changes outside of the [state.StateDB].
-	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
-	// AfterExecutingCanonicalBlock runs only after canonical block execution. It
+	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// AfterExecutingBlock runs only after canonical block execution. It
 	// can update data outside the [state.StateDB].
-	AfterExecutingCanonicalBlock(*types.Block, types.Receipts) error
+	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
 // BlockBuilder constructs a block given its components.
