@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -45,8 +46,7 @@ func (vm *VM) setHandlers(ctx context.Context) error {
 
 	m[avaxHTTPExtensionPath] = handler
 
-	vm.handlers.setHandlers(m)
-	return nil
+	return vm.handlers.setHandlers(m)
 }
 
 // A handlerMap is a fixed set of HTTP routes whose implementations can be
@@ -69,14 +69,30 @@ func (m handlerMap) toInterface() map[string]http.Handler {
 	return iface
 }
 
-// setHandlers routes each lazy handler to its actual implementation. The
-// actual paths MUST exactly match the paths registered at construction.
-func (m handlerMap) setHandlers(actual map[string]http.Handler) {
-	for path, h := range actual {
-		if lazy, ok := m[path]; ok {
-			lazy.set(h)
+var (
+	errUnregisteredHandlerPath = errors.New("handler path not registered at construction")
+	errMissingHandlerPath      = errors.New("no handler provided for registered path")
+)
+
+// setHandlers routes each lazy handler to its implementation. Paths must match
+// those registered at construction exactly, else a route stays unserved. Both
+// directions are validated before any routing, so a mismatch changes nothing.
+func (m handlerMap) setHandlers(actual map[string]http.Handler) error {
+	for path := range actual {
+		if _, ok := m[path]; !ok {
+			return fmt.Errorf("%w: %q", errUnregisteredHandlerPath, path)
 		}
 	}
+	for path := range m {
+		if _, ok := actual[path]; !ok {
+			return fmt.Errorf("%w: %q", errMissingHandlerPath, path)
+		}
+	}
+
+	for path, h := range actual {
+		m[path].set(h)
+	}
+	return nil
 }
 
 var _ http.Handler = (*lazyHandler)(nil)

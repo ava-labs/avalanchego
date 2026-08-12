@@ -185,8 +185,7 @@ func (g *genesis) setup(db ethdb.Database) error {
 		return fmt.Errorf("constructing genesis block: %w", err)
 	}
 
-	// We can't exit early here. Even if the genesis block is on disk, the
-	// genesis state might not be.
+	// No early exit: the stored chainConfig is checked for compatibility below.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {

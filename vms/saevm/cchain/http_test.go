@@ -51,7 +51,7 @@ func TestHandlerMap(t *testing.T) {
 		assert.Equalf(t, http.StatusNotFound, get(t, h).Code, "GET %q before setHandlers", path)
 	}
 
-	m.setHandlers(stubHandlers(paths...))
+	require.NoErrorf(t, m.setHandlers(stubHandlers(paths...)), "%T.setHandlers(matching paths)", m)
 
 	after := m.toInterface()
 	require.ElementsMatchf(t, paths, slices.Collect(maps.Keys(after)), "%T.toInterface() paths", m)
@@ -65,5 +65,38 @@ func TestHandlerMap(t *testing.T) {
 			assert.Equalf(t, http.StatusOK, rec.Code, "GET %q via %s", path, desc)
 			assert.Equalf(t, path, rec.Body.String(), "GET %q via %s routed to wrong handler", path, desc)
 		}
+	}
+}
+
+// Route-set drift must be an error, not a permanently unserved path.
+func TestHandlerMapPathMismatch(t *testing.T) {
+	paths := []string{"/foo", "/bar"}
+
+	tests := []struct {
+		name    string
+		actual  []string
+		wantErr error
+	}{
+		{
+			name:    "unregistered_path",
+			actual:  []string{"/foo", "/bar", "/surprise"},
+			wantErr: errUnregisteredHandlerPath,
+		},
+		{
+			name:    "missing_path",
+			actual:  []string{"/foo"},
+			wantErr: errMissingHandlerPath,
+		},
+		{
+			name:   "exact_match",
+			actual: paths,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := newHandlerMap(paths...).setHandlers(stubHandlers(tt.actual...))
+			require.ErrorIsf(t, err, tt.wantErr, "setHandlers(%v) with %v registered", tt.actual, paths)
+		})
 	}
 }
