@@ -10,7 +10,7 @@ docker run --rm \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \
-  jaegertracing/jaeger:latest
+  jaegertracing/jaeger:2.20.0@sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8
 ```
 
 Jaeger stores traces in memory. Traces are lost when the container stops.
