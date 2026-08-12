@@ -33,9 +33,8 @@ var (
 
 // Syncer fetches contract code by hash from the network and persists it to db.
 //
-// One goroutine reads the queue, checks the db and composes batches, so a hash
-// is claimed exactly once. Each full batch is fetched, verified and written by a
-// worker, bounded to numSyncWorkers at a time.
+// One goroutine batches queued hashes. Up to numSyncWorkers others each fetch,
+// verify and store a batch, so the round trips overlap.
 type Syncer struct {
 	log        logging.Logger
 	client     *Client
@@ -56,39 +55,39 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes
 
 // Sync runs until codeHashes is drained and closed, or ctx ends.
 func (s *Syncer) Sync(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	eg, egCtx := errgroup.WithContext(ctx)
-	eg.SetLimit(numSyncWorkers)
+	// The batcher occupies a slot of its own, so numSyncWorkers fetches still run
+	// alongside it.
+	eg.SetLimit(numSyncWorkers + 1)
 
 	claimed := &claimSet{}
-
-	batch, err := s.batchHashes(egCtx, eg, claimed)
-	switch {
-	case err != nil:
-		// batchHashes runs outside the group, so only this stops the workers still
-		// retrying for work that is no longer wanted.
-		cancel()
-	case len(batch) > 0:
-		eg.Go(func() error { return s.fetchAndPersist(egCtx, batch, claimed) })
-	}
-	return errors.Join(err, eg.Wait())
+	eg.Go(func() error { return s.batchHashes(egCtx, eg, claimed) })
+	return eg.Wait()
 }
 
-// batchHashes drains the queue into full batches, handing each to a worker, and
-// returns the batch it could not fill. An error abandons that batch, since the
-// caller stops the run rather than sending it.
-func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) ([]common.Hash, error) {
+// batchHashes drains the queue, handing every batch to a worker. The last one is
+// short unless the queue divides evenly.
+func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) error {
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
+	fetch := func() {
+		full := batch
+		eg.Go(func() error {
+			return s.fetchAndPersist(ctx, full, claimed)
+		})
+		batch = make([]common.Hash, 0, maxHashesPerRequest)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 
 		case codeHash, ok := <-s.codeHashes:
 			if !ok {
-				return batch, nil
+				if len(batch) > 0 {
+					fetch()
+				}
+				return nil
 			}
 			// A claim is released only after its code is committed, so taking one
 			// first keeps the disk read below from going stale.
@@ -97,7 +96,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 			}
 			stored, err := clearIfStored(s.db, codeHash)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if stored {
 				claimed.release([]common.Hash{codeHash})
@@ -105,14 +104,9 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 			}
 
 			batch = append(batch, codeHash)
-			if len(batch) < maxHashesPerRequest {
-				continue
+			if len(batch) == maxHashesPerRequest {
+				fetch()
 			}
-			full := batch
-			eg.Go(func() error {
-				return s.fetchAndPersist(ctx, full, claimed)
-			})
-			batch = make([]common.Hash, 0, maxHashesPerRequest)
 		}
 	}
 }
