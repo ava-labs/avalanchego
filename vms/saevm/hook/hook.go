@@ -84,7 +84,8 @@ type Points interface {
 	// parent.
 	BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	// AfterExecutingBlock applies final block changes to the provided state
-	// database. It runs during canonical and historical block execution.
+	// database. It runs during canonical and historical block execution. It
+	// MUST NOT apply any state changes outside of the [state.StateDB].
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	// AfterExecutingCanonicalBlock runs only after canonical block execution. It
 	// can update data outside the state database.
