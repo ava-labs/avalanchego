@@ -113,36 +113,6 @@ jobs:
       - name: Check TODO/FIXME annotations
         run: ./scripts/run-just.sh ci-check-todos
 
-  rust-lint-pr-comments:
-    # caveat emptor: actions-rs/clippy-check can only write comments on pull requests
-    # not originating from a fork.
-    if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name
-    needs: build
-    strategy:
-      matrix:
-        include:
-          - profile-key: debug-no-default-features
-          - profile-key: debug-no-features
-          - profile-key: debug-no-features
-            os: macos-26
-          - profile-key: debug-ethhash-logger
-          - profile-key: debug-all-features
-    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
-        with:
-          toolchain: nightly-2026-07-05
-          components: clippy
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2 -> v2.9.1
-        with:
-          save-if: "false"
-          shared-key: ${{ matrix.profile-key }}
-      - uses: giraffate/clippy-action@13b9d32482f25d29ead141b79e7e04e7900281e0 # @v1 -> v1.0.1
-        with:
-          reporter: 'github-pr-check'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
   rust-lint:
     needs: build
     strategy:
