@@ -242,7 +242,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 	return nil
 }
 
-// StartExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
+// StartExecutingBlock proxies to [Stub.StartExecutingBlockFn] if non-nil,
 // otherwise it is a no-op.
 func (s *Stub) StartExecutingBlock(rules params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 	if fn := s.StartExecutingBlockFn; fn != nil {
