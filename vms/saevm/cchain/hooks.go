@@ -255,6 +255,7 @@ func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB,
 	return nil
 }
 
+//nolint:revive // TODO(JonathanOppenheimer): remove this nolint once https://github.com/ava-labs/avalanchego/pull/5774 is merged.
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
