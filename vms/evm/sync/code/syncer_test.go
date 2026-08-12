@@ -113,6 +113,8 @@ func TestSyncer(t *testing.T) {
 
 			copies := max(tt.copies, 1)
 			ch := make(chan common.Hash, len(want)*copies)
+			// TODO(#5652): marking and enqueueing belong together in the queue's
+			// AddCode. Build the fixture through it once that lands.
 			for hash := range want {
 				require.NoError(t, customrawdb.WriteCodeToFetch(target, hash))
 				for range copies {
