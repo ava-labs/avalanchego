@@ -84,16 +84,17 @@ func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, re
 		if err := b.ExecuteHistoricalBlock(replaying, stateDB); err != nil {
 			return nil, nil, fmt.Errorf("replaying block %d: %w", height, err)
 		}
-
-		// IntermediateRoot flushes each complete block into the mutable
-		// reconstructed view. This is required when one block deletes an
-		// account and a later block recreates it.
-		got := stateDB.IntermediateRoot(true /* deleteEmptyObjects */)
-		want := restored.PostExecutionStateRoot()
-		if got != want {
-			return nil, nil, fmt.Errorf("%w: block %d produced %#x, want %#x", ErrReconstructedRootMismatch, height, got, want)
-		}
+		// Finalise makes end-of-block state changes visible to the next block
+		// without calculating an intermediate root.
+		stateDB.Finalise(true /* deleteEmptyObjects */)
 		parent = restored
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	got := stateDB.IntermediateRoot(true /* deleteEmptyObjects */)
+	if got != root {
+		return nil, nil, fmt.Errorf("%w: block %d produced %#x, want %#x", ErrReconstructedRootMismatch, target.Height(), got, root)
 	}
 
 	failed = false
