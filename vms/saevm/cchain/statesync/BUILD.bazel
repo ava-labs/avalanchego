@@ -18,7 +18,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
-        "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//utils/logging",
         "//vms/saevm/adaptor",
@@ -60,9 +59,9 @@ go_test(
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_stretchr_testify//require",
-        "@org_golang_x_sync//errgroup",
     ],
 )

@@ -21,8 +21,6 @@ var _ adaptor.SummaryProperties = (*Summary)(nil)
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 // Summary is the minimal necessary information to implement a [block.StateSummary]
-//
-
 type Summary struct {
 	AcceptedHeight uint64      `canoto:"uint,1"`
 	AcceptedHash   common.Hash `canoto:"fixed bytes,2"`

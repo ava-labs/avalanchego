@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -33,29 +33,50 @@ import (
 	saestatesync "github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
-// commitInterval is the trie commit interval used by every handler under test.
-const commitInterval = 4
+const (
+	// commitInterval is the trie commit interval used by every handler under test.
+	commitInterval = 4
+	// settleLag is the number of blocks behind a block that its settled height is.
+	settleLag = 3
+)
 
-// SUT bundles a [SummaryHandler] with the state it was built over. It is driven
-// entirely through hand-populated storage, with no VM.
-type SUT struct {
-	*SummaryHandler
+type (
+	// SUT bundles a [SummaryHandler] with the state it was built over. It is driven
+	// entirely through hand-populated storage, with no VM.
+	SUT struct {
+		*SummaryHandler
+		state *state.State
+	}
 
-	state     *state.State
-	settleLag uint64
+	sutConfig struct {
+		// lastExecuted is the last block height that has been applied to the state.
+		lastExecuted uint64
+	}
+	sutOption = options.Option[sutConfig]
+)
+
+// withNumExecutedBlocks returns a [sutOption] that sets the number of blocks
+// that have been applied to the state.
+func withNumExecutedBlocks(num uint64) sutOption {
+	return options.Func[sutConfig](func(cfg *sutConfig) {
+		cfg.lastExecuted = num
+	})
 }
 
 // newSUT builds a handler over an in-memory ethdb and state, where blocks
 // 1..lastExecuted are canonical and an atomic root is applied at each of those
-// heights. Each block at height h settles height [settledHeightFor](h), i.e. the
-// block lag heights behind it.
-func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
+// heights. Each block at height h settles height the block [settleLag] behind it.
+//
+// By default, only the genesis is written.
+func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	t.Helper()
+
+	cfg := options.As(opts...)
 
 	// Apply a distinct atomic root at every executed height.
 	st := newState(t)
 	var build exportBuilder
-	for h := uint64(1); h <= lastExecuted; h++ {
+	for h := uint64(1); h <= cfg.lastExecuted; h++ {
 		require.NoErrorf(t, st.Apply(h, []*tx.Tx{build.newExport()}), "Apply(%d)", h)
 	}
 
@@ -65,14 +86,14 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 	ethDB := rawdb.NewMemoryDatabase()
 	genesis := newBlock(0)
 	writeBlock(ethDB, genesis)
-	for h := uint64(1); h <= lastExecuted; h++ {
+	for h := uint64(1); h <= cfg.lastExecuted; h++ {
 		writeBlock(ethDB, newBlock(h))
 	}
 
 	handler, err := New(
 		saestatesync.Config{DBConfig: saedb.Config{CommitInterval: commitInterval}},
 		ethDB,
-		hookStub{lag: settleLag},
+		hookStub{},
 		st,
 		loggingtest.New(t, logging.Debug),
 	)
@@ -83,7 +104,6 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 	return &SUT{
 		SummaryHandler: handler,
 		state:          st,
-		settleLag:      settleLag,
 	}
 }
 
@@ -120,7 +140,7 @@ func newBlock(height uint64) *types.Block {
 func (s *SUT) wantRoot(t *testing.T, blockHeight uint64) common.Hash {
 	t.Helper()
 
-	settled := settledHeightFor(blockHeight, s.settleLag)
+	settled := settledHeightFor(blockHeight, settleLag)
 	root, err := s.state.GetRoot(settled)
 	require.NoErrorf(t, err, "GetRoot(%d)", settled)
 	return root
@@ -137,15 +157,11 @@ func settledHeightFor(blockHeight, settleLag uint64) uint64 {
 
 type hookStub struct {
 	hook.Points
-
-	lag uint64
 }
 
-func (h hookStub) SettledBy(hdr *types.Header) hook.Settled {
-	return hook.Settled{Height: settledHeightFor(hdr.Number.Uint64(), h.lag)}
+func (hookStub) SettledBy(hdr *types.Header) hook.Settled {
+	return hook.Settled{Height: settledHeightFor(hdr.Number.Uint64(), settleLag)}
 }
-
-var _ hook.Points = hookStub{}
 
 // exportBuilder produces export txs with unique amounts so that each applied
 // height yields a distinct root.
@@ -168,16 +184,13 @@ func (b *exportBuilder) newExport() *tx.Tx {
 }
 
 func TestGetStateSummary(t *testing.T) {
-	const (
-		settleLag    = 3
-		lastExecuted = 2*commitInterval + 1 // 9
-	)
-	sut := newSUT(t, settleLag, lastExecuted)
+	const lastExecuted = 2*commitInterval + 1
+	sut := newSUT(t, withNumExecutedBlocks(lastExecuted))
 
 	// Only committed heights can be served. Each settles a distinct, earlier
 	// height, so an incorrect height selection would embed a different root.
 	for _, blockHeight := range []uint64{0, commitInterval, 2 * commitInterval} {
-		t.Run(fmt.Sprintf("height: %d", blockHeight), func(t *testing.T) {
+		t.Run(fmt.Sprintf("height_%d", blockHeight), func(t *testing.T) {
 			got, err := sut.GetStateSummary(t.Context(), blockHeight)
 			require.NoErrorf(t, err, "GetStateSummary(%d)", blockHeight)
 			require.Equalf(t, blockHeight, got.Height(), "GetStateSummary(%d).Height()", blockHeight)
@@ -188,12 +201,11 @@ func TestGetStateSummary(t *testing.T) {
 
 func TestGetLastStateSummary(t *testing.T) {
 	const (
-		settleLag     = 3
 		lastCommitted = 2 * commitInterval
 		lastExecuted  = lastCommitted + 1
 	)
 
-	sut := newSUT(t, settleLag, lastExecuted)
+	sut := newSUT(t, withNumExecutedBlocks(lastExecuted))
 	got, err := sut.GetLastStateSummary(t.Context())
 	require.NoError(t, err, "GetLastStateSummary()")
 	require.Equal(t, uint64(lastCommitted), got.Height(), "GetLastStateSummary().Height()")
@@ -201,7 +213,7 @@ func TestGetLastStateSummary(t *testing.T) {
 }
 
 func TestOnlyGenesis(t *testing.T) {
-	handler := newSUT(t, 1, 0) // no committed blocks, only genesis
+	handler := newSUT(t)
 
 	got, err := handler.GetLastStateSummary(t.Context())
 	require.NoError(t, err, "GetLastStateSummary()")
@@ -215,21 +227,15 @@ func TestOnlyGenesis(t *testing.T) {
 }
 
 func TestWaitForEvent(t *testing.T) {
-	handler := newSUT(t, 1, 0) // no committed blocks, only genesis
-
+	handler := newSUT(t)
 	ctx, cancel := context.WithCancel(t.Context())
-	eg, egCtx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		_, err := handler.WaitForEvent(egCtx)
-		return err
-	})
 	cancel()
-	require.ErrorIs(t, eg.Wait(), context.Canceled)
+	_, err := handler.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestAcceptSummary(t *testing.T) {
-	handler := newSUT(t, 1, 0) // no committed blocks, only genesis
-
+	handler := newSUT(t)
 	mode, err := handler.AcceptSummary(t.Context(), &summary{})
 	require.NoError(t, err)
 	require.Equal(t, block.StateSyncSkipped, mode)
