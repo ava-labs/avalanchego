@@ -204,7 +204,6 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 		genesis     = vm.deferredArgs.g
 		ethDB       = vm.deferredArgs.db
 		saeConfig   = vm.deferredArgs.cfg
-		snowCtx     = vm.ctx
 		hooks       = vm.deferredArgs.hooks
 		pendingTxs  = vm.deferredArgs.pendingTxs
 		warpStorage = vm.deferredArgs.warpStorage
@@ -212,20 +211,20 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 	)
 	vm.deferredArgs = nil
 
-	tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	tdbConfig := saeConfig.DBConfig.TrieDBConfig(vm.ctx.ChainDataDir, vm.ctx.Log)
 	if err := genesis.checkAndWriteState(ethDB, tdbConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
 	var err error
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, vm.Network)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, vm.ctx, vm.chainConfig, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	vm.txpool, err = txpool.New(vm.ctx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
@@ -248,13 +247,13 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 		return fmt.Errorf("creating gossip bloom set: %w", err)
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
-		snowCtx.NodeID,
+		vm.ctx.NodeID,
 		vm.Network.Network,
 		vm.Network.ValidatorPeers,
 		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
-			Log:           snowCtx.Log,
+			Log:           vm.ctx.Log,
 			Registry:      reg,
 			Namespace:     "gossip",
 			HandlerID:     p2p.AtomicTxGossipHandlerID,
@@ -273,17 +272,17 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 	gossipCtx, cancelGossip := context.WithCancel(context.Background())
 	var gossipWG sync.WaitGroup
 	gossipWG.Go(func() {
-		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, vm.pullGossipPeriod)
+		gossip.Every(gossipCtx, vm.ctx.Log, pullGossiper, vm.pullGossipPeriod)
 	})
 	gossipWG.Go(func() {
-		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, vm.pushGossipPeriod)
+		gossip.Every(gossipCtx, vm.ctx.Log, pushGossiper, vm.pushGossipPeriod)
 	})
 	vm.onClose = append(vm.onClose, func(context.Context) error {
 		cancelGossip()
 		gossipWG.Wait()
 		return nil
 	})
-	if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, snowCtx.WarpSigner); err != nil {
+	if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, vm.ctx.WarpSigner); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 

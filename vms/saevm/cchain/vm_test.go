@@ -386,7 +386,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		sut.Client = NewClient(server.URL)
 		sut.ethclient = ethclient.NewClient(ethRPCClient)
 	})
-	require.NoErrorf(tb, sut.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	// The engine sets the preference to the last accepted block when entering
 	// normal operation.
@@ -395,6 +394,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
 		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
 	}
+	require.NoErrorf(tb, sut.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
