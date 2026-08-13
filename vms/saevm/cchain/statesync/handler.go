@@ -31,8 +31,6 @@ type SummaryHandler struct {
 	state *state.State
 	ethDB ethdb.Database
 	log   logging.Logger
-
-	stateSyncDone chan struct{}
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
@@ -58,17 +56,7 @@ func New(
 		hooks:          hooks,
 		ethDB:          db,
 		log:            log,
-		stateSyncDone:  make(chan struct{}),
 	}, nil
-}
-
-// Shutdown cancels any ongoing state sync.
-func (h *SummaryHandler) Shutdown(ctx context.Context) error {
-	if err := h.SummaryHandler.Shutdown(ctx); err != nil {
-		return err
-	}
-	// TODO(alarso16): cancel any ongoing state sync
-	return nil
 }
 
 // GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
@@ -98,16 +86,23 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		return nil, err
 	}
 
-	hdr := rawdb.ReadHeader(h.ethDB, base.BlockHash(), base.Height())
+	hdr := rawdb.ReadHeader(h.ethDB, base.AcceptedHash, base.AcceptedHeight)
 	if hdr == nil {
-		h.log.Error("can't find header for block in database", zap.Stringer("blockHash", base.BlockHash()), zap.Uint64("height", base.Height()))
-		return nil, fmt.Errorf("can't find header for block %s at height %d", base.BlockHash(), base.Height())
+		h.log.Error("missing header",
+			zap.Uint64("acceptedHeight", base.AcceptedHeight),
+			zap.Stringer("acceptedHash", base.AcceptedHash),
+		)
+		return nil, fmt.Errorf("missing header %d with hash %s", base.AcceptedHeight, base.AcceptedHash)
 	}
 	settledHeight := h.hooks.SettledBy(hdr).Height
-
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
-		h.log.Error("getting settled C-Chain state root for state summary", zap.Uint64("settledHeight", settledHeight), zap.Error(err))
+		h.log.Error("getting settled cross-chain state root",
+			zap.Uint64("acceptedHeight", base.AcceptedHeight),
+			zap.Stringer("acceptedHash", base.AcceptedHash),
+			zap.Uint64("settledHeight", settledHeight),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 	return &summary{

@@ -22,10 +22,10 @@ var _ adaptor.SummaryProperties = (*Summary)(nil)
 
 // Summary is the minimal necessary information to implement a [block.StateSummary]
 //
-//nolint:revive // struct-tag: canoto allows unexported fields
+
 type Summary struct {
-	height    uint64      `canoto:"uint,1"`
-	blockHash common.Hash `canoto:"fixed bytes,2"`
+	AcceptedHeight uint64      `canoto:"uint,1"`
+	AcceptedHash   common.Hash `canoto:"fixed bytes,2"`
 
 	canotoData canotoData_Summary
 }
@@ -43,8 +43,8 @@ func (*SummaryHandler) ParseStateSummary(_ context.Context, summaryBytes []byte)
 // hash.
 func NewSummary(hash common.Hash, height uint64) *Summary {
 	return &Summary{
-		height:    height,
-		blockHash: hash,
+		AcceptedHeight: height,
+		AcceptedHash:   hash,
 	}
 }
 
@@ -53,14 +53,9 @@ func (s *Summary) Bytes() []byte {
 	return s.MarshalCanoto()
 }
 
-// BlockHash returns the hash of the block represented by the [Summary].
-func (s *Summary) BlockHash() common.Hash {
-	return s.blockHash
-}
-
 // Height returns the height of the block represented by the [Summary].
 func (s *Summary) Height() uint64 {
-	return s.height
+	return s.AcceptedHeight
 }
 
 // ID returns an ID that uniquely identifies the [Summary].

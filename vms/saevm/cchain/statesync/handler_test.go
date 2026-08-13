@@ -4,6 +4,7 @@
 package statesync
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -13,9 +14,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -209,4 +212,25 @@ func TestOnlyGenesis(t *testing.T) {
 	require.NoError(t, err, "GetStateSummary(0)")
 	require.Equal(t, uint64(0), got.Height(), "GetStateSummary(0).Height()")
 	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetStateSummary(0).settledRoot")
+}
+
+func TestWaitForEvent(t *testing.T) {
+	handler := newSUT(t, 1, 0) // no committed blocks, only genesis
+
+	ctx, cancel := context.WithCancel(t.Context())
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		_, err := handler.WaitForEvent(egCtx)
+		return err
+	})
+	cancel()
+	require.ErrorIs(t, eg.Wait(), context.Canceled)
+}
+
+func TestAcceptSummary(t *testing.T) {
+	handler := newSUT(t, 1, 0) // no committed blocks, only genesis
+
+	mode, err := handler.AcceptSummary(t.Context(), &summary{})
+	require.NoError(t, err)
+	require.Equal(t, block.StateSyncSkipped, mode)
 }
