@@ -17,11 +17,13 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 ## Rust Memory Management
 
-Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both should be explicitly freed to avoid leaking Rust memory - otherwise we must rely on Go's garbage collector to eventually call `runtime.AddCleanup`.
+Firewood's CGo FFI exposes three object types that use the Rust heap: `ffi.Revision`, `ffi.Proposal`, and `ffi.Reconstructed`. Release these objects explicitly when the interface supports release. Otherwise, `runtime.AddCleanup` releases them after they become unreachable.
 
-Proposals tracked by the `TrieDB` are freed when committed. Any remaining handles (pending or committable proposals, and revisions held by tries) are force-closed on the Rust side by `TrieDB.Close`, which calls `ffi.Close` with `ffi.WithForceCloseHandles()`.
+`TrieDB` releases each tracked proposal when it commits the proposal. `TrieDB.Close` force-closes each remaining handle in Rust. It calls `ffi.Close` with `ffi.WithForceCloseHandles()`.
 
-Revisions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Outstanding trie references need not be garbage collected before `TrieDB.Close()`, but they are invalid afterward and must not be used. Users must be conscious that holding a `state.Trie` for longer than necessary can easily lead to a memory leak within Firewood.
+Usually, `runtime.AddCleanup` releases a revision because `state.Trie` has no `Close` method. A trie reference can remain reachable when `TrieDB.Close` runs. The close operation invalidates the reference. Do not use the reference after this operation. Do not keep a trie reference longer than necessary because the reference uses Rust memory.
+
+Each reconstructed database session owns the initial `ffi.Reconstructed` handle. It also owns each clone that `StateDB.Copy` creates. Trace interfaces return a release function for these handles. The ordinary `ethapi.Backend` interface cannot return this function. For that interface, `runtime.AddCleanup` releases each handle after the state becomes unreachable.
 
 ## Operation Model
 
@@ -31,7 +33,8 @@ Unlike `graft/evm/firewood`, which supports an arbitrary DAG of proposals (multi
 
 The linear invariant means:
 
-- Any proposal created via `accountTrie.Hash()` will be tracked in `accountTrie.Commit()`, and **must** then be moved to the committable map in `TrieDB.Update`.
+- The account trie tracks each canonical proposal when `accountTrie.Commit` runs. `TrieDB.Update` **MUST** then move the proposal to the committable map. A reconstructed state does not create a proposal or use this bookkeeping.
+- A reconstructed state **MUST NOT** call `StateDB.Commit`. Its account trie returns an error for this call.
 - The parent of each new proposal must be either the current committed tip of the Firewood database or the most recent uncommitted proposal in the chain.
 - Branching — creating two proposals from the same parent — is not supported.
 
@@ -40,7 +43,7 @@ The linear invariant means:
 Reads never reflect pending writes (see [Why reads aren't safe](#why-reads-arent-safe)); this has particular implications for `SELFDESTRUCT`. The `SELFDESTRUCT` opcode must delete an account's entire storage trie, but `state.StateDB` does not iterate over and individually delete each storage slot — it relies on the trie to handle bulk deletion. Firewood handles this via prefix deletion: `DeleteAccount` issues an `ffi.PrefixDelete(accountKey)`, which atomically removes the account leaf and all storage slots that share the same key prefix. This means:
 
 - No explicit storage-trie iteration is required for self-destructed accounts.
-- After a `SELFDESTRUCT`, storage reads return nothing correctly, because the prefix-deleted state is reflected in the proposal produced by the next `Hash()`.
+- After a `SELFDESTRUCT`, the next `Hash()` applies the prefix deletion. It applies the deletion to a canonical proposal or the reconstructed view.
 - If storage for a self-destructed account is read *before* the next `Hash()`, the old reader would still show the account's storage — but `state.StateDB` never reads storage for a self-destructed account before committing, so this edge case does not arise.
 
 ## Design Decisions
@@ -61,7 +64,7 @@ As a consequence, `Commit` for a single root may queue many proposals to be comm
 
 `TrieDB.Reader(root)` always returns an error. The `triedb.Backend` interface expects `Reader` to supply node bytes to a generic `trie.Trie`, which then reassembles the Merkle Trie from encoded node data. Firewood does not store state in that format, and the resulting `trie.Trie` created would be nonsensical.
 
-Instead, this package provides custom `accountTrie` and `storageTrie` implementations that read directly from `ffi.Revision` and `ffi.Proposal` objects via flat key-value `Get` calls. This avoids another implementation of a reader-like object, and allows re-using the Firewood API.
+Instead, this package provides custom `accountTrie`, `reconstructedAccountTrie`, and `storageTrie` types. These types read `ffi.Revision`, `ffi.Proposal`, and `ffi.Reconstructed` objects through flat key-value `Get` calls, sharing the encoding in `baseTrie`. This design uses the Firewood API without another reader adapter.
 
 ### Why reads aren't safe
 

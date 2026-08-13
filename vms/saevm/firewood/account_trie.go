@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"go.uber.org/zap"
@@ -78,7 +77,7 @@ func (a *accountTrie) Hash() common.Hash {
 }
 
 // updateProposal checks whether the pending proposal is out of date, and if it
-// is, creates a new proposal with the addiotional changes and updates the
+// is, creates a new proposal with the additional changes and updates the
 // internal state.
 func (a *accountTrie) updateProposal() error {
 	if a.lastProposalSize == len(a.updateOps) {
@@ -86,7 +85,6 @@ func (a *accountTrie) updateProposal() error {
 	}
 
 	proposal, err := a.tdb.newProposal(a.parentRoot, a.updateOps)
-	// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
 	if err != nil {
 		return err
 	}
@@ -119,14 +117,6 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 		a.tdb.trieCommit(a.pending)
 	}
 	return a.root, nil, nil
-}
-
-// Prove writes the inclusion or exclusion proof for the already hashed key to
-// the provided writer.
-//
-// TODO(alarso16): Implement.
-func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
-	return errProveNotImplemented
 }
 
 // Copy creates a copy of the [accountTrie].
