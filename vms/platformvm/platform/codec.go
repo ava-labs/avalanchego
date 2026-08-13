@@ -33,20 +33,14 @@ func init() {
 
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
-		// Blocks and transactions share a single type-ID space. The
-		// registration order below is load-bearing: it determines the byte
-		// representation produced by marshalling and must not change.
 		errs.Add(
-			RegisterApricotBlockTypes(c),
-			RegisterApricotTypes(c),
-			RegisterBanffTypes(c),
-			RegisterBanffBlockTypes(c),
-		)
-
-		errs.Add(
-			RegisterDurangoTypes(c),
-			RegisterEtnaTypes(c),
-			RegisterHeliconTypes(c),
+			registerApricotBlockTypes(c),
+			registerApricotTxTypes(c),
+			registerBanffTxTypes(c),
+			registerBanffBlockTypes(c),
+			registerDurangoTxTypes(c),
+			registerEtnaTxTypes(c),
+			registerHeliconTxTypes(c),
 		)
 	}
 
@@ -61,10 +55,10 @@ func init() {
 	}
 }
 
-// RegisterApricotBlockTypes registers the block types that were valid during
+// registerApricotBlockTypes registers the block types that were valid during
 // the Apricot series of upgrades. These occupy the first type IDs, ahead of the
 // Apricot transaction types.
-func RegisterApricotBlockTypes(targetCodec linearcodec.Codec) error {
+func registerApricotBlockTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
@@ -74,9 +68,9 @@ func RegisterApricotBlockTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-// RegisterApricotTypes registers the type information for transactions that
-// were valid during the Apricot series of upgrades.
-func RegisterApricotTypes(targetCodec linearcodec.Codec) error {
+// registerApricotTxTypes registers the transaction types that were valid during
+// the Apricot series of upgrades.
+func registerApricotTxTypes(targetCodec linearcodec.Codec) error {
 	errs := wrappers.Errs{}
 
 	// The secp256k1fx is registered here because this is the same place it is
@@ -107,9 +101,9 @@ func RegisterApricotTypes(targetCodec linearcodec.Codec) error {
 	return errs.Err
 }
 
-// RegisterBanffTypes registers the type information for transactions that were
+// registerBanffTxTypes registers the transaction types that were
 // valid during the Banff series of upgrades.
-func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
+func registerBanffTxTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
 		targetCodec.RegisterType(&TransformSubnetTx{}),
@@ -121,9 +115,9 @@ func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-// RegisterBanffBlockTypes registers the block types that were valid during the
+// registerBanffBlockTypes registers the block types that were valid during the
 // Banff series of upgrades. These follow the Banff transaction types.
-func RegisterBanffBlockTypes(targetCodec linearcodec.Codec) error {
+func registerBanffBlockTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&BanffProposalBlock{}),
 		targetCodec.RegisterType(&BanffAbortBlock{}),
@@ -132,18 +126,18 @@ func RegisterBanffBlockTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-// RegisterDurangoTypes registers the type information for transactions that
-// were valid during the Durango series of upgrades.
-func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
+// registerDurangoTxTypes registers the transaction types that were valid during
+// the Durango series of upgrades.
+func registerDurangoTxTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
 		targetCodec.RegisterType(&BaseTx{}),
 	)
 }
 
-// RegisterEtnaTypes registers the type information for transactions that
+// registerEtnaTxTypes registers the transaction types that
 // were valid during the Etna series of upgrades.
-func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
+func registerEtnaTxTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ConvertSubnetToL1Tx{}),
 		targetCodec.RegisterType(&RegisterL1ValidatorTx{}),
@@ -153,9 +147,9 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-// RegisterHeliconTypes registers the type information for transactions that
-// were valid during the Helicon series of upgrades.
-func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
+// registerHeliconTxTypes registers the transaction types that were valid during
+// the Helicon series of upgrades.
+func registerHeliconTxTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&AddAutoRenewedValidatorTx{}),
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
