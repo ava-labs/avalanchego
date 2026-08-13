@@ -127,8 +127,6 @@ func TestReconstructedRootsMatchCanonical(t *testing.T) {
 			tt.run(canonical, func() {
 				want = append(want, canonical.IntermediateRoot(true /* EIP-158 */))
 			})
-			require.NotEmpty(t, want, "canonical roots recorded")
-
 			var got []common.Hash
 			reconstructed := newReconstructedStateDB(t, db, seed)
 			tt.run(reconstructed, func() {

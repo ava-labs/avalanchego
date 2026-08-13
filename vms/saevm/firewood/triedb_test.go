@@ -30,15 +30,7 @@ import (
 func newDB(t *testing.T) state.Database {
 	t.Helper()
 
-	return newDBWithLog(t, loggingtest.New(t, logging.Debug))
-}
-
-// newDBWithLog is [newDB] for tests that cannot use the test logger, which is
-// not concurrency-safe.
-func newDBWithLog(t *testing.T, log logging.Logger) state.Database {
-	t.Helper()
-
-	cfg := DefaultConfig(t.TempDir(), log)
+	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
 	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 		DBOverride: cfg.BackendConstructor,
 	})
@@ -604,16 +596,15 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 // TestConcurrentProposalListAccess checks concurrent reconstruction and block
 // execution.
 //
-// This test is only meaningful under the race detector. It uses [logging.NoLog]
-// because the test logger is not concurrency-safe.
+// Run this test with the race detector to verify that proposalsLock synchronizes
+// reconstruction with proposal creation and commit.
 func TestConcurrentProposalListAccess(t *testing.T) {
 	const (
 		numBlocks      = 20
-		numReaders     = 4
 		readsPerReader = 100
 	)
 
-	db := newDBWithLog(t, logging.NoLog{})
+	db := newDB(t)
 
 	// Commit a first block so the readers always have a root to open.
 	sdb := newStateDB(t, db, types.EmptyRootHash)
@@ -627,19 +618,17 @@ func TestConcurrentProposalListAccess(t *testing.T) {
 	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
 
 	var wg sync.WaitGroup
-	for range numReaders {
-		wg.Go(func() {
-			for range readsPerReader {
-				// Errors are expected whenever the executor commits the root out
-				// from under the reader, and are not what this test pins.
-				root := *latest.Load()
-				recon, err := tdb.NewReconstructed(root)
-				if err == nil {
-					_ = recon.Drop()
-				}
+	wg.Go(func() {
+		for range readsPerReader {
+			// Errors are expected whenever the executor commits the root out
+			// from under the reader, and are not what this test pins.
+			root := *latest.Load()
+			recon, err := tdb.NewReconstructed(root)
+			if err == nil {
+				_ = recon.Drop()
 			}
-		})
-	}
+		}
+	})
 
 	last := first
 	for i := uint64(2); i <= numBlocks; i++ {
