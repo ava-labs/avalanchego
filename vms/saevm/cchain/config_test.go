@@ -152,6 +152,16 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
 		},
 		{
+			name: "api/state_replay_concurrency",
+			json: `{"state-replay-concurrency":2}`,
+			want: with(func(c *config) { c.StateReplayConcurrency = 2 }),
+		},
+		{
+			name:    "api/state_replay_concurrency_zero",
+			json:    `{"state-replay-concurrency":0}`,
+			wantErr: testerr.Is(rpc.ErrZeroStateReplayConcurrency),
+		},
+		{
 			name:    "api/batch_request_limit_too_large",
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
@@ -194,6 +204,7 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
+				"state-replay-concurrency":2,
 				"warp-off-chain-messages":["0x1234"],
 				"api-resolve-pending-to-last-executed":true
 			}`,
@@ -212,6 +223,7 @@ func TestParseConfig(t *testing.T) {
 				TxPoolGlobalSlots:            2048,
 				AllowUnprotectedTxs:          true,
 				BatchRequestLimit:            50,
+				StateReplayConcurrency:       2,
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
 			},

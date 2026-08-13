@@ -117,7 +117,9 @@ var errFatal = errors.New("fatal execution error")
 type blockProcessorHooks interface {
 	BlockTime(*types.Header) time.Time
 	SettledBy(*types.Header) hook.Settled
+	EndOfBlockOps(*types.Block) ([]hook.Op, error)
 	StartExecutingBlock(params.Rules, *state.StateDB, *types.Header, *types.Block) error
+	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
 
 // A BlockProcessor applies deterministic block state transitions. It has no
@@ -448,4 +450,42 @@ func (p *BlockProcessor) ExecuteBlockUntil(b *blocks.Block, stateDB *state.State
 		}
 	}
 	return &bc.BlockExecutionState, nil
+}
+
+// ExecuteBlock applies every deterministic state change in b to stateDB.
+// stateDB MUST represent b's parent's post-execution state.
+//
+// It records no block progress, publishes no receipts, and does not mark b as
+// executed.
+func (p *BlockProcessor) ExecuteBlock(b *blocks.Block, stateDB *state.StateDB) error {
+	bc, err := p.beforeTransactions(b, stateDB)
+	if err != nil {
+		return err
+	}
+
+	txs := b.Transactions()
+	receipts := make(types.Receipts, len(txs))
+	for ti, tx := range txs {
+		receipt, err := p.executeTransaction(b, stateDB, bc, ti, tx)
+		if err != nil {
+			return err
+		}
+		receipts[ti] = receipt
+	}
+
+	ops, err := p.hooks.EndOfBlockOps(b.EthBlock())
+	if err != nil {
+		return fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, p.hooks, b.Hash(), err)
+	}
+	for i, o := range ops {
+		b.CheckOpBurnerBalanceBounds(stateDB, len(txs)+i, o)
+		if err := o.ApplyTo(stateDB); err != nil {
+			return fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+		}
+	}
+
+	if err := p.hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+		return fmt.Errorf("finish-executing-block hook: %v", err)
+	}
+	return nil
 }
