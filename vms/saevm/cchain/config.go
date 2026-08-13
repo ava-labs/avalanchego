@@ -83,7 +83,7 @@ type config struct {
 func defaultConfig() config {
 	return config{
 		Pruning:                      true,
-		StateSyncEnabled:             false, // TODO(alarso16): change to true once state sync is in production
+		StateSyncEnabled:             true,
 		CommitInterval:               saedb.DefaultCommitInterval,
 		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
 		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
@@ -118,7 +118,6 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 		if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval {
 			return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 		}
-		c.StateSyncEnabled = false // TODO(alarso16): remove this once state sync is in production
 	}
 	return c, nil
 }

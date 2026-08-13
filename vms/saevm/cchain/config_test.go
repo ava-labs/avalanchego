@@ -179,16 +179,8 @@ func TestParseConfig(t *testing.T) {
 		// State sync
 		{
 			name: "state_sync_enabled",
-			json: `{"state-sync-enabled":true}`,
-			want: with(func(c *config) { c.StateSyncEnabled = true }),
-		},
-		{
-			name:      "state_sync_not_enabled_on_production_network",
-			networkID: constants.MainnetID,
-			json:      `{"state-sync-enabled":true}`,
-			want: with(func(c *config) {
-				c.StateSyncEnabled = false
-			}),
+			json: `{"state-sync-enabled":false}`,
+			want: with(func(c *config) { c.StateSyncEnabled = false }),
 		},
 
 		// All active fields
@@ -209,7 +201,7 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
-				"state-sync-enabled":true,
+				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"],
 				"api-resolve-pending-to-last-executed":true
 			}`,
@@ -230,7 +222,7 @@ func TestParseConfig(t *testing.T) {
 				BatchRequestLimit:            50,
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
-				StateSyncEnabled:             true,
+				StateSyncEnabled:             false,
 			},
 		},
 	}
