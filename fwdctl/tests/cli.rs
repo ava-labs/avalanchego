@@ -423,90 +423,111 @@ fn test_slow_fwdctl_dump_with_start_stop_and_max() {
 
 #[test]
 fn test_slow_fwdctl_dump_with_csv_and_json() {
-    with_tmpdir(|db_path| {
-        create_db(db_path);
-        insert_key_value(db_path, "a", "1");
-        insert_key_value(db_path, "b", "2");
-        insert_key_value(db_path, "c", "3");
+    with_tmpdir(|tmp_dir| {
+        let db_path = tmp_dir.join("db");
+        create_db(&db_path);
+        insert_key_value(&db_path, "a", "1");
+        insert_key_value(&db_path, "b", "2");
+        insert_key_value(&db_path, "c", "3");
 
         // Test output csv
+        let csv_file = tmp_dir.join("dump.csv");
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-format"])
             .arg("csv")
+            .args(["--output-file-name"])
+            .arg(&csv_file)
             .assert()
             .success()
-            .stdout(predicate::str::contains("Dumping to dump.csv"));
+            .stdout(predicate::str::contains(format!(
+                "Dumping to {}",
+                csv_file.display()
+            )));
 
-        let contents = fs::read_to_string("dump.csv").expect("Should read dump.csv file");
+        let contents = fs::read_to_string(&csv_file).expect("Should read dump.csv file");
         assert_eq!(contents, "a,1\nb,2\nc,3\n");
-        fs::remove_file("dump.csv").expect("Should remove dump.csv file");
 
         // Test output json
+        let json_file = tmp_dir.join("dump.json");
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-format"])
             .arg("json")
+            .args(["--output-file-name"])
+            .arg(&json_file)
             .assert()
             .success()
-            .stdout(predicate::str::contains("Dumping to dump.json"));
+            .stdout(predicate::str::contains(format!(
+                "Dumping to {}",
+                json_file.display()
+            )));
 
-        let contents = fs::read_to_string("dump.json").expect("Should read dump.json file");
+        let contents = fs::read_to_string(&json_file).expect("Should read dump.json file");
         assert_eq!(
             contents,
             "{\n  \"a\": \"1\",\n  \"b\": \"2\",\n  \"c\": \"3\"\n}\n"
         );
-        fs::remove_file("dump.json").expect("Should remove dump.json file");
     });
 }
 
 #[test]
 fn fwdctl_dump_json_escapes_special_characters() {
-    with_tmpdir(|db_path| {
-        create_db(db_path);
+    with_tmpdir(|tmp_dir| {
+        let db_path = tmp_dir.join("db");
+        create_db(&db_path);
 
         cargo_bin_cmd!()
             .arg("insert")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["say\"hi\\", "line\n\t\u{1}"])
             .assert()
             .success();
 
+        let json_file = tmp_dir.join("dump.json");
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-format", "json"])
+            .args(["--output-file-name"])
+            .arg(&json_file)
             .assert()
             .success();
 
-        let contents = fs::read_to_string("dump.json").expect("Should read dump.json file");
+        let contents = fs::read_to_string(&json_file).expect("Should read dump.json file");
         assert_eq!(
             contents,
             "{\n  \"say\\\"hi\\\\\": \"line\\n\\t\\u0001\"\n}\n"
         );
-        fs::remove_file("dump.json").expect("Should remove dump.json file");
     });
 }
 
 #[test]
 fn fwdctl_dump_with_file_name() {
-    with_tmpdir(|db_path| {
-        create_db(db_path);
-        insert_key_value(db_path, "a", "1");
+    with_tmpdir(|tmp_dir| {
+        let db_path = tmp_dir.join("db");
+        create_db(&db_path);
+        insert_key_value(&db_path, "a", "1");
+
+        // `--output-file-name` is a base path; `dump` sets the extension from
+        // `--output-format`, so one base yields both `test.csv` and `test.json`.
+        let base = tmp_dir.join("test");
+        let csv_file = base.with_extension("csv");
+        let json_file = base.with_extension("json");
 
         // Test without output format
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-file-name"])
-            .arg("test")
+            .arg(&base)
             .assert()
             .failure()
             .stderr(predicate::str::contains("--output-format"));
@@ -515,35 +536,39 @@ fn fwdctl_dump_with_file_name() {
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-format"])
             .arg("csv")
             .args(["--output-file-name"])
-            .arg("test")
+            .arg(&base)
             .assert()
             .success()
-            .stdout(predicate::str::contains("Dumping to test.csv"));
+            .stdout(predicate::str::contains(format!(
+                "Dumping to {}",
+                csv_file.display()
+            )));
 
-        let contents = fs::read_to_string("test.csv").expect("Should read test.csv file");
+        let contents = fs::read_to_string(&csv_file).expect("Should read test.csv file");
         assert_eq!(contents, "a,1\n");
-        fs::remove_file("test.csv").expect("Should remove test.csv file");
 
         // Test output json
         cargo_bin_cmd!()
             .arg("dump")
             .arg("--db")
-            .arg(db_path)
+            .arg(&db_path)
             .args(["--output-format"])
             .arg("json")
             .args(["--output-file-name"])
-            .arg("test")
+            .arg(&base)
             .assert()
             .success()
-            .stdout(predicate::str::contains("Dumping to test.json"));
+            .stdout(predicate::str::contains(format!(
+                "Dumping to {}",
+                json_file.display()
+            )));
 
-        let contents = fs::read_to_string("test.json").expect("Should read test.json file");
+        let contents = fs::read_to_string(&json_file).expect("Should read test.json file");
         assert_eq!(contents, "{\n  \"a\": \"1\"\n}\n");
-        fs::remove_file("test.json").expect("Should remove test.json file");
     });
 }
 
