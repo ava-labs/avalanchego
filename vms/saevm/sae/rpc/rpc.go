@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/event"
@@ -50,6 +51,9 @@ type Chain interface {
 
 	// Execution results and replay
 	saedb.StateDBOpener
+	CanReconstruct() bool
+	CommitInterval() uint64
+	Reconstructing(common.Hash) (*state.StateDB, func(), error)
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
 
@@ -67,10 +71,11 @@ type Config struct {
 	APIs set.Set[API]
 
 	// Resource limits
-	BlocksPerBloomSection uint64
-	EVMTimeout            time.Duration
-	GasCap                uint64
-	BatchRequestLimit     uint64 // 0 = no limit
+	BlocksPerBloomSection  uint64
+	EVMTimeout             time.Duration
+	GasCap                 uint64
+	BatchRequestLimit      uint64 // 0 = no limit
+	StateReplayConcurrency uint64
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
@@ -86,6 +91,13 @@ var (
 	ErrUnknownAPI = errors.New("unknown API")
 )
 
+const DefaultStateReplayConcurrency = 1
+
+var (
+	ErrZeroStateReplayConcurrency     = errors.New("state replay concurrency must be non-zero")
+	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
+)
+
 // Verify checks that all values in c are within usable bounds.
 func (c Config) Verify() error {
 	if c.BatchRequestLimit > math.MaxInt {
@@ -96,6 +108,12 @@ func (c Config) Verify() error {
 		if !known.Contains(a) {
 			return fmt.Errorf("%w: %q", ErrUnknownAPI, a)
 		}
+	}
+	if c.StateReplayConcurrency == 0 {
+		return ErrZeroStateReplayConcurrency
+	}
+	if c.StateReplayConcurrency > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
 	}
 	return nil
 }
@@ -133,6 +151,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		chain.Mempool(),
 		chainIdx,
 		override,
+		make(chan struct{}, config.StateReplayConcurrency),
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via

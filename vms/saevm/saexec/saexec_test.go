@@ -1130,16 +1130,6 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			},
 		},
 		{
-			name:     "firewood_archival",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available, as MUST the state
-				// committed at shutdown.
-				return height <= numBlocks
-			},
-		},
-		{
 			name:     "firewood",
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,

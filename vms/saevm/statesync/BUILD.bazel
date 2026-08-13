@@ -72,6 +72,7 @@ go_test(
         "//vms/saevm/network",
         "//vms/saevm/params",
         "//vms/saevm/sae",
+        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",

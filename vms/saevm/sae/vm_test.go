@@ -160,7 +160,10 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
 			},
-			RPCConfig: saerpc.Config{APIs: saerpc.DefaultAPIs()},
+			RPCConfig: saerpc.Config{
+				APIs:                   saerpc.DefaultAPIs(),
+				StateReplayConcurrency: saerpc.DefaultStateReplayConcurrency,
+			},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
