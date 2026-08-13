@@ -387,9 +387,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		sut.ethclient = ethclient.NewClient(ethRPCClient)
 	})
 
-	// The engine sets the preference to the last accepted block when entering
-	// normal operation.
 	if cfg.state == snow.NormalOp {
+		// The engine sets the preference to the last accepted block when entering
+		// normal operation. The bootstrapper will first set it to bootstrapping.
+		require.NoErrorf(tb, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", vm, snow.Bootstrapping)
 		lastAccepted, err := sut.LastAccepted(ctx)
 		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
 		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
