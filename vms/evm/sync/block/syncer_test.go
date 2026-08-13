@@ -264,7 +264,7 @@ func TestSyncer(t *testing.T) {
 
 			require.Equal(t, tt.wantVerified, verified.Load())
 			// Skipped blocks must never be requested from peers.
-			require.Equal(t, tt.wantRequests, requests.Count())
+			require.Len(t, requests.Requests(), tt.wantRequests)
 			for _, h := range tt.wantHeights {
 				want := blocks[h]
 				require.NotNil(t, rawdb.ReadBlock(target, want.Hash(), want.NumberU64()), "block %d missing", h)
@@ -461,11 +461,11 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 	}
 }
 
-type blockCounter = synctest.RecordingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
+type blockRecorder = synctest.RecordingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
 // countingNetwork serves blocks on a loopback network and counts the requests,
 // so a test can assert the syncer never asked for blocks it already had.
-func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockCounter) {
+func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockRecorder) {
 	log := loggingtest.New(t, logging.Debug)
 	r := synctest.NewRecordingResponder(newResponder(log, synctest.NewBlockMap(blocks)))
 	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, r)
@@ -518,7 +518,7 @@ func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 	require.Equal(t, wanted.Hash(), got[0].Hash())
-	require.Equal(t, 1, served.Count(), "one request, no retry loop")
+	require.Len(t, served.Requests(), 1, "one request, no retry loop")
 }
 
 func heights(from, to int) []int {
