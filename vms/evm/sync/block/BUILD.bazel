@@ -44,7 +44,6 @@ go_test(
         "//snow/engine/common",
         "//utils/logging",
         "//utils/logging/loggingtest",
-        "//vms/evm/sync/handlers",
         "//vms/evm/sync/synctest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
