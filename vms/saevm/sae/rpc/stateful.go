@@ -285,10 +285,9 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	if err != nil {
 		return nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
-	//
-	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
-	// beacon root (already fixed upstream in geth), it will be applied twice,
-	// so we should drop it here.
+
+	// TODO(JonathanOppenheimer): Once libevm's tracer APIs apply the EIP-4788
+	// beacon root, avoid applying it here while preserving the start-of-block hook.
 	result, err := b.ExecuteTransactionPrefix(block, sdb, 0)
 	if err != nil {
 		return nil, nil, err
