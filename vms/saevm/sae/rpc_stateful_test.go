@@ -6,6 +6,7 @@ package sae
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -955,7 +956,8 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 	}
 	src.close()
 
-	ctx, sut := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(srcXDB.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+	restartedXDB := srcXDB.Clone()
+	ctx, sut := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(restartedXDB), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = saetest.CopyDB(t, srcDB)
 		c.dataDir = dataDir
 	}))
@@ -981,6 +983,37 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 	}
 	require.NotNil(t, missingState, "a historical state requiring replay")
 
+	var replayTarget *blocks.Block
+	for h := uint64(2); h <= numBlocks && replayTarget == nil; h++ {
+		candidate := blocksByHeight[h]
+		root := candidate.PostExecutionStateRoot()
+		if _, err := sut.rawVM.exec.StateDB(root); err == nil {
+			continue
+		} else {
+			require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.StateDB() at height %d", h)
+		}
+		_, release, err := sut.rawVM.exec.Reconstructing(root)
+		if err == nil {
+			release()
+			continue
+		}
+		require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.Reconstructing() at height %d", h)
+		for distance := uint64(1); distance <= min(h, commitInterval); distance++ {
+			seedRoot := blocksByHeight[h-distance].PostExecutionStateRoot()
+			_, release, err := sut.rawVM.exec.Reconstructing(seedRoot)
+			if errors.Is(err, saedb.ErrStateUnavailable) {
+				continue
+			}
+			require.NoErrorf(t, err, "Executor.Reconstructing() at seed height %d", h-distance)
+			release()
+			if distance >= 2 {
+				replayTarget = candidate
+			}
+			break
+		}
+	}
+	require.NotNil(t, replayTarget, "a historical state requiring at least two replayed blocks")
+
 	for h := range uint64(numBlocks + 1) {
 		height := new(big.Int).SetUint64(h)
 
@@ -1005,4 +1038,22 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 		}},
 		cmpopts.EquateEmpty(),
 	)...)
+
+	// The target state depends on this block, but reconstruction does not need
+	// its recorded root. Corrupting only this intermediate commitment proves
+	// replay does not validate or otherwise depend on it.
+	intermediate := blocksByHeight[replayTarget.Height()-1]
+	result, err := restartedXDB.Get(intermediate.Height())
+	require.NoError(t, err, "ExecutionResults.Get(intermediate height)")
+	wantRoot := intermediate.PostExecutionStateRoot()
+	require.Equal(t, 1, bytes.Count(result, wantRoot[:]), "recorded intermediate root occurrences")
+	bogusRoot := wantRoot
+	bogusRoot[0] ^= 0xff
+	result = bytes.Replace(result, wantRoot[:], bogusRoot[:], 1)
+	require.NoError(t, restartedXDB.Put(intermediate.Height(), result), "ExecutionResults.Put(intermediate height)")
+	require.NoError(t, restartedXDB.Sync(intermediate.Height(), intermediate.Height()), "ExecutionResults.Sync(intermediate height)")
+
+	got, err := sut.NonceAt(ctx, addr, new(big.Int).SetUint64(replayTarget.Height()))
+	require.NoError(t, err, "Client.NonceAt(replay target with corrupt intermediate root)")
+	require.Equal(t, replayTarget.Height(), got, "nonce at replay target")
 }
