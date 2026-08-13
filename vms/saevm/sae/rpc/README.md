@@ -25,10 +25,10 @@ beneath. The table below lists every method that differs.
 | Method | Behavior | Implementation |
 | --- | --- | --- |
 | `StateAtBlock` | The post-execution state of the provided block. | `backend` |
-| | The provided block's post-execution state with the **canonical child's** before-block changes applied, allowing transaction tracing on the child to include these operations. | `tracerBackend` |
+| | The provided block's post-execution state with the **canonical child's** `StartExecutingBlock` changes applied, allowing transaction tracing on the child to include these operations. | `tracerBackend` |
 | | The post-execution state of the provided block, with none of the child's changes, because `debug_traceCall` is expected to run immediately after that block. | `traceCallBackend` |
-| | The provided block's post-execution state with the **caller-supplied block** before-block changes. | `suppliedHashBackend` |
-| `StateAtTransaction` | Applies the provided block's before-block changes, then replays its transactions up to the target index, reaching the state just before it. | `backend` |
+| | The provided block's post-execution state with the **caller-supplied block's** `StartExecutingBlock` changes. | `suppliedHashBackend` |
+| `StateAtTransaction` | Applies the provided block's `StartExecutingBlock` changes, then replays its transactions up to the target index, reaching the state just before it. | `backend` |
 | | The same replay, but of the **stored block**, needed because the faked header would otherwise reach the hooks. | `tracerBackend` |
 | `BlockByHash`, `BlockByNumber` | The stored block: worst-case base fee, no post-execution state root. | `backend` |
 | | The stored block with a faked header carrying the executed base fee and post-execution state root. | `tracerBackend` |
