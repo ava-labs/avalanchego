@@ -5,6 +5,8 @@ package firewood
 
 import (
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -28,7 +30,15 @@ import (
 func newDB(t *testing.T) state.Database {
 	t.Helper()
 
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
+	return newDBWithLog(t, loggingtest.New(t, logging.Debug))
+}
+
+// newDBWithLog is [newDB] for tests that cannot use the test logger, which is
+// not concurrency-safe.
+func newDBWithLog(t *testing.T, log logging.Logger) state.Database {
+	t.Helper()
+
+	cfg := DefaultConfig(t.TempDir(), log)
 	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 		DBOverride: cfg.BackendConstructor,
 	})
@@ -512,6 +522,11 @@ func TestMultipleProposals(t *testing.T) {
 		lastRoot = root
 	}
 
+	tdb, ok := db.TrieDB().Backend().(*TrieDB)
+	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
+	_, err := tdb.NewReconstructed(lastRoot)
+	require.ErrorIsf(t, err, ErrReconstructionNotCommitted, "%T.NewReconstructed(%s)", tdb, lastRoot)
+
 	require.NoErrorf(t, db.TrieDB().Commit(lastRoot, false), "triedb.Commit(%s)", lastRoot)
 
 	// Firewood loses all uncommitted proposals on close, to test that it was
@@ -525,7 +540,7 @@ func TestMultipleProposals(t *testing.T) {
 	}()
 
 	// Would fail if an [ffi.Revision] cannot be found
-	_, err := db.OpenTrie(lastRoot)
+	_, err = db.OpenTrie(lastRoot)
 	require.NoErrorf(t, err, "%T.OpenTrie(%s)", db, lastRoot)
 }
 
@@ -584,6 +599,61 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 	require.Panicsf(t, func() {
 		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
 	}, "%T.BackendConstructor()", cfg)
+}
+
+// TestConcurrentProposalListAccess checks concurrent reconstruction and block
+// execution.
+//
+// This test is only meaningful under the race detector. It uses [logging.NoLog]
+// because the test logger is not concurrency-safe.
+func TestConcurrentProposalListAccess(t *testing.T) {
+	const (
+		numBlocks      = 20
+		numReaders     = 4
+		readsPerReader = 100
+	)
+
+	db := newDBWithLog(t, logging.NoLog{})
+
+	// Commit a first block so the readers always have a root to open.
+	sdb := newStateDB(t, db, types.EmptyRootHash)
+	applyBlock(sdb, 1)
+	first, err := sdb.Commit(1, true /* EIP-158 */)
+	require.NoError(t, err, "state.StateDB.Commit()")
+
+	var latest atomic.Pointer[common.Hash]
+	latest.Store(&first)
+	tdb, ok := db.TrieDB().Backend().(*TrieDB)
+	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
+
+	var wg sync.WaitGroup
+	for range numReaders {
+		wg.Go(func() {
+			for range readsPerReader {
+				// Errors are expected whenever the executor commits the root out
+				// from under the reader, and are not what this test pins.
+				root := *latest.Load()
+				recon, err := tdb.NewReconstructed(root)
+				if err == nil {
+					_ = recon.Drop()
+				}
+			}
+		})
+	}
+
+	last := first
+	for i := uint64(2); i <= numBlocks; i++ {
+		sdb := newStateDB(t, db, last)
+		applyBlock(sdb, i)
+		last, err = sdb.Commit(i, true /* EIP-158 */)
+		require.NoErrorf(t, err, "state.StateDB.Commit() for block %d", i)
+
+		root := last // MUST be a fresh variable; readers dereference the pointer
+		latest.Store(&root)
+		require.NoErrorf(t, db.TrieDB().Commit(last, false), "triedb.Commit(%s)", last)
+	}
+
+	wg.Wait()
 }
 
 // TestUnknownCommitNoError verifies that committing a root that is not known to

@@ -8,9 +8,15 @@
 package saedb
 
 import (
+	"errors"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 )
+
+// ErrStateUnavailable means the requested trie state is not held by the
+// configured backend. Callers MAY recover it from an earlier state.
+var ErrStateUnavailable = errors.New("state unavailable")
 
 // ShouldCommitTrieDB returns whether or not to commit the state trie to disk.
 func ShouldCommitTrieDB(blockNum, commitInterval uint64) bool {
