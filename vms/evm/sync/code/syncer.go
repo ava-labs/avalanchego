@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -29,6 +30,7 @@ var (
 	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
 	errCodeSizeExceeded  = errors.New("max code size exceeded")
 	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
+	errUnexpectedCode    = errors.New("unexpected code")
 )
 
 // Syncer fetches contract code by hash from the network and persists it to db.
@@ -36,85 +38,174 @@ var (
 // One goroutine batches queued hashes. Up to numSyncWorkers others each fetch,
 // verify and store a batch, so the round trips overlap.
 type Syncer struct {
-	log        logging.Logger
-	client     *Client
-	db         ethdb.KeyValueStore
-	codeHashes <-chan common.Hash
+	log    logging.Logger
+	client *Client
+	db     ethdb.KeyValueStore
+
+	trackedlock   sync.Mutex
+	trackedHashes set.Set[common.Hash]
+
+	// closeLock guards closed, so a signal cannot race the close.
+	closeLock sync.Mutex
+	closed    bool
+
+	hasPendingHashes chan struct{}
+	pendingLock      sync.Mutex
+	pendingHashes    []common.Hash
 }
 
-// NewSyncer returns a [Syncer] that reads code hashes from codeHashes and writes
-// verified code into db, fetching from peers through c.
-func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, codeHashes <-chan common.Hash) *Syncer {
+// NewSyncer returns a [Syncer] that fetches code from peers through c and
+// writes it, verified, into db. Markers persisted by an earlier run are
+// re-enqueued, so a crashed sync resumes where it stopped.
+func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, error) {
+	codeToFetch, err := readCodeToFetch(db)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{} // Initially process the code from disk
 	return &Syncer{
-		log:        log,
-		client:     c,
-		db:         db,
-		codeHashes: codeHashes,
+		log:              log,
+		client:           c,
+		db:               db,
+		trackedHashes:    set.Of(codeToFetch...),
+		hasPendingHashes: ch,
+		pendingHashes:    codeToFetch,
+	}, nil
+}
+
+// AddCode persists a durable marker for each hash not already being synced and
+// enqueues it. It never blocks. A call with more=false closes the queue, and
+// every call after that fails.
+func (s *Syncer) AddCode(codeHashes []common.Hash, more bool) error {
+	toSync := s.track(codeHashes)
+	if err := writeToFetch(s.db, toSync); err != nil {
+		return err
+	}
+	s.enqueue(toSync)
+
+	s.closeLock.Lock()
+	defer s.closeLock.Unlock()
+
+	if s.closed {
+		return errUnexpectedCode
+	}
+
+	if more {
+		select {
+		case s.hasPendingHashes <- struct{}{}:
+		default:
+		}
+		return nil
+	}
+
+	s.closed = true
+	close(s.hasPendingHashes)
+	return nil
+}
+
+// track adds the codeHashes to the in-memory set of hashes. It returns the
+// subset of hashes that were not already tracked.
+func (s *Syncer) track(codeHashes []common.Hash) []common.Hash {
+	toSync := make([]common.Hash, 0, len(codeHashes))
+
+	s.trackedlock.Lock()
+	defer s.trackedlock.Unlock()
+
+	for _, codeHash := range codeHashes {
+		if s.trackedHashes.Contains(codeHash) {
+			continue
+		}
+		s.trackedHashes.Add(codeHash)
+		toSync = append(toSync, codeHash)
+	}
+
+	return toSync
+}
+
+// untrack removes the codeHashes from the in-memory set of hashes.
+func (s *Syncer) untrack(codeHashes []common.Hash) {
+	s.trackedlock.Lock()
+	defer s.trackedlock.Unlock()
+
+	for _, codeHash := range codeHashes {
+		s.trackedHashes.Remove(codeHash)
 	}
 }
 
-// Sync runs until codeHashes is drained and closed, or ctx ends.
+// enqueue adds codeHashes to the queue of hashes for the batcher to consume.
+func (s *Syncer) enqueue(codeHashes []common.Hash) {
+	s.pendingLock.Lock()
+	defer s.pendingLock.Unlock()
+
+	s.pendingHashes = append(s.pendingHashes, codeHashes...)
+}
+
+// dequeue removes and returns all queued codeHashes.
+func (s *Syncer) dequeue() []common.Hash {
+	s.pendingLock.Lock()
+	defer s.pendingLock.Unlock()
+
+	codeHashes := s.pendingHashes
+	s.pendingHashes = nil
+	return codeHashes
+}
+
+// Sync runs until the queue is drained and closed by [Syncer.AddCode], or ctx
+// ends.
 func (s *Syncer) Sync(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
-	// The batcher occupies a slot of its own, so numSyncWorkers fetches still run
-	// alongside it.
+	// The batcher occupies a slot of its own, so numSyncWorkers fetches still
+	// run alongside it.
 	eg.SetLimit(numSyncWorkers + 1)
 
 	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
 	return eg.Wait()
 }
 
-// batchHashes drains the queue, handing every batch to a worker. The last one is
-// short unless the queue divides evenly.
+// batchHashes drains the queue, handing every batch to a worker. The last one
+// is short unless the queue divides evenly.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
-	claimed := &claimSet{}
-	batch := make([]common.Hash, 0, maxHashesPerRequest)
-	fetch := func() {
-		full := batch
-		eg.Go(func() error {
-			return s.fetchAndPersist(ctx, full, claimed)
-		})
-		batch = make([]common.Hash, 0, maxHashesPerRequest)
-	}
-
+	var queued []common.Hash
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 
-		case codeHash, ok := <-s.codeHashes:
-			if !ok {
-				if len(batch) > 0 {
-					fetch()
-				}
-				return nil
-			}
-			// Claim first, so a repeat cannot read the code missing and then claim
-			// it as the commit lands. Cleanup runs either way, since a hash
-			// re-marked mid-commit is only cleared by a later copy.
-			alreadyClaimed := !claimed.claim(codeHash)
-			stored, err := clearIfStored(s.db, codeHash)
+		case _, more := <-s.hasPendingHashes:
+			// [Syncer.AddCode] doesn't check for the presence of code before
+			// writing the markers, to avoid the DB read latency hit. So we
+			// filter out any hashes that are already in the DB here before
+			// sending any network requests for them.
+			missing, err := clearStored(s.db, s.dequeue())
 			if err != nil {
 				return err
 			}
-			if alreadyClaimed {
-				continue
-			}
-			if stored {
-				claimed.release(codeHash)
-				continue
-			}
+			queued = append(queued, missing...)
 
-			batch = append(batch, codeHash)
-			if len(batch) == maxHashesPerRequest {
-				fetch()
+			for len(queued) >= maxHashesPerRequest {
+				full := queued[:maxHashesPerRequest]
+				queued = queued[maxHashesPerRequest:]
+				eg.Go(func() error {
+					return s.fetchAndPersist(ctx, full)
+				})
 			}
+			if more {
+				continue
+			}
+			if len(queued) > 0 {
+				eg.Go(func() error {
+					return s.fetchAndPersist(ctx, queued)
+				})
+			}
+			return nil
 		}
 	}
 }
 
 // fetchAndPersist fetches code for hashes from the network and writes it to db.
-func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, claimed *claimSet) error {
+func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) error {
 	data, err := getCode(ctx, s.log, s.client, hashes)
 	if err != nil {
 		return err
@@ -122,41 +213,68 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, clai
 	if err := persist(s.db, hashes, data); err != nil {
 		return err
 	}
-	// Released only after the commit, so a repeat arriving next is seen on disk
-	// rather than fetched again.
-	claimed.release(hashes...)
+	s.untrack(hashes)
 	return nil
 }
 
-// claimSet holds the hashes a batch has taken, from the moment batchHashes picks one
-// until its code is committed, so a repeat is not fetched twice. It is bounded by
-// the work outstanding, not by the hashes seen.
-type claimSet struct {
-	m sync.Map
+// readCodeToFetch returns the hashes whose to-fetch markers are persisted in
+// db.
+func readCodeToFetch(db ethdb.Iteratee) ([]common.Hash, error) {
+	it := customrawdb.NewCodeToFetchIterator(db)
+	defer it.Release()
+
+	var codeHashes []common.Hash
+	for it.Next() {
+		codeHashes = append(
+			codeHashes,
+			common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):]),
+		)
+	}
+	if err := it.Error(); err != nil {
+		return nil, fmt.Errorf("iterating code to fetch: %w", err)
+	}
+	return codeHashes, nil
 }
 
-// claim reports whether codeHash was taken, and false if it was already held.
-func (c *claimSet) claim(codeHash common.Hash) bool {
-	_, held := c.m.LoadOrStore(codeHash, struct{}{})
-	return !held
+// writeToFetch writes, in one batch, a marker for each codeHash to fetch.
+func writeToFetch(db ethdb.KeyValueStore, codeHashes []common.Hash) error {
+	batch := db.NewBatch()
+	for _, codeHash := range codeHashes {
+		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
+			return fmt.Errorf("writing code to fetch marker: %w", err)
+		}
+	}
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("writing code to fetch: %w", err)
+	}
+	return nil
 }
 
-func (c *claimSet) release(hashes ...common.Hash) {
-	for _, codeHash := range hashes {
-		c.m.Delete(codeHash)
+// clearStored deletes, in one batch, the markers of hashes whose code is
+// already in db, and returns the hashes still missing.
+func clearStored(db ethdb.KeyValueStore, codeHashes []common.Hash) ([]common.Hash, error) {
+	var (
+		missing = make([]common.Hash, 0, len(codeHashes))
+		batch   = db.NewBatch()
+	)
+	// TODO(StephenButtolph): This is a read-heavy operation, so it may be worth
+	// parallelizing the HasCode checks.
+	for _, codeHash := range codeHashes {
+		if !rawdb.HasCode(db, codeHash) {
+			missing = append(missing, codeHash)
+			continue
+		}
+		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+			return nil, fmt.Errorf("deleting stale code marker: %w", err)
+		}
 	}
-}
-
-// clearIfStored reports whether the code is already on disk, deleting its
-// to-fetch marker when it is.
-func clearIfStored(db ethdb.KeyValueStore, codeHash common.Hash) (bool, error) {
-	if !rawdb.HasCode(db, codeHash) {
-		return false, nil
+	if batch.ValueSize() == 0 {
+		return missing, nil
 	}
-	if err := customrawdb.DeleteCodeToFetch(db, codeHash); err != nil {
-		return false, fmt.Errorf("deleting stale code marker: %w", err)
+	if err := batch.Write(); err != nil {
+		return nil, fmt.Errorf("deleting stale code markers: %w", err)
 	}
-	return true, nil
+	return missing, nil
 }
 
 // persist writes the code and clears the to-fetch markers in one batch.
