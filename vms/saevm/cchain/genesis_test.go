@@ -682,10 +682,12 @@ func TestWriteGenesisState(t *testing.T) {
 	require.Equal(t, block.Root(), root, "%T.root()", g)
 
 	db := rawdb.NewMemoryDatabase()
-	tdbCfg := triedb.HashDefaults
-	tdb := triedb.NewDatabase(db, tdbCfg)
-	require.Falsef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	defer func() {
+		require.NoErrorf(t, tdb.Close(), "%T.Close()", tdb)
+	}()
 
+	require.Falsef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
 	_, err = g.writeState(db, tdb)
 	require.NoErrorf(t, err, "%T.writeState()", g)
 	require.Truef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)

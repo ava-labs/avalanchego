@@ -133,9 +133,9 @@ func testUnblocking(t *testing.T, blocking func(*testing.T), unblock func()) {
 	blocking(t)
 }
 
-// TestHandlerMap asserts that a [handlerMap] exposes every path registered at
-// construction, serving 404 until [handlerMap.setHandlers] provides the actual
-// implementations. The toInterface map should be available at any time.
+// TestHandlerMap asserts that [HTTPHandlers] exposes every path registered at
+// construction, serving 404 until [HTTPHandlers.Set] provides the actual
+// implementations. The AsInterface map should be available at any time.
 func TestHandlerMap(t *testing.T) {
 	paths := []string{"/foo", "/bar", "/baz"}
 	handlers := NewHTTPHandlers(paths...)

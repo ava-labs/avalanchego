@@ -27,7 +27,6 @@ go_library(
         "genesis.go",
         "gossip.go",
         "hooks.go",
-        "http.go",
         "metrics.go",
         "state.go",
         "vm.go",

@@ -50,7 +50,7 @@ func (h *httpHandler) set(handler http.Handler) {
 type HTTPHandlers struct {
 	lock sync.Mutex
 	// cond is broadcast when blocked becomes false or inflight goes to 0,
-	// waking any waiters in enter and drain to re-check their conditions.
+	// waking any waiters in Enter and Drain to re-check their conditions.
 	cond     *lock.Cond
 	routes   map[string]*httpHandler
 	blocked  bool // whether new requests are parked

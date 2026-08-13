@@ -114,10 +114,9 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 	if err := saeCfg.DBConfig.Verify(); err != nil {
 		return config{}, err
 	}
-	if constants.ProductionNetworkIDs.Contains(networkID) {
-		if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval {
-			return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
-		}
+	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
+		constants.ProductionNetworkIDs.Contains(networkID) {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
 }
