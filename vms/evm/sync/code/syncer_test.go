@@ -6,8 +6,9 @@ package code
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -90,8 +91,7 @@ func TestSyncer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// A broken skip re-requests forever, so bound the wait.
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			source := memorydb.New()
 			target := memorydb.New()
@@ -108,8 +108,14 @@ func TestSyncer(t *testing.T) {
 			}
 
 			log := loggingtest.New(t, logging.Debug)
+			// Only the trailing batch can be short, so the count follows directly.
+			wantRequests := (tt.numFromSource + maxHashesPerRequest - 1) / maxHashesPerRequest
+
 			recorder := synctest.NewRecordingResponder(newResponder(log, source))
-			client := serve(t, ctx, log, recorder)
+			// A broken skip re-requests forever, so stop the run at the first
+			// request beyond what batching explains rather than waiting it out.
+			guard := synctest.NewCancelAfter(recorder, wantRequests+1, cancel)
+			client := serve(t, ctx, log, guard)
 
 			copies := max(tt.copies, 1)
 			ch := make(chan common.Hash, len(want)*copies)
@@ -123,7 +129,9 @@ func TestSyncer(t *testing.T) {
 			}
 			close(ch)
 
-			require.NoError(t, NewSyncer(log, client, target, ch).Sync(ctx))
+			err := NewSyncer(log, client, target, ch).Sync(ctx)
+			require.False(t, guard.Fired(), "the syncer requested more than batching explains")
+			require.NoError(t, err)
 
 			for hash, code := range want {
 				require.Equal(t, code, rawdb.ReadCode(target, hash))
@@ -133,8 +141,6 @@ func TestSyncer(t *testing.T) {
 			defer it.Release()
 			require.False(t, it.Next(), "all to-fetch markers must be cleared")
 
-			// Only the trailing batch can be short, so the count follows directly.
-			wantRequests := (tt.numFromSource + maxHashesPerRequest - 1) / maxHashesPerRequest
 			sizes := requestSizes(recorder)
 			require.Len(t, sizes, wantRequests,
 				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
@@ -167,7 +173,7 @@ func TestClaimSet(t *testing.T) {
 	}
 	require.Equal(t, len(batch), held(&c))
 
-	c.release(batch)
+	c.release(batch...)
 	require.Zero(t, held(&c), "a released batch must leave nothing behind")
 	require.True(t, c.claim(batch[0]), "a released hash can be claimed again")
 }
@@ -183,15 +189,19 @@ func held(c *claimSet) int {
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
-	defer cancel()
+	// Enough bad answers to show a rejection is not a one-off, then a good one so
+	// the test ends on the syncer's own terms rather than on a deadline.
+	const tampered = 2
+
+	ctx := t.Context()
 	log := loggingtest.New(t, logging.Debug)
 	source := memorydb.New()
-	hash := writeCode(t, source, randomCode(t))
+	code := randomCode(t)
+	hash := writeCode(t, source, code)
 
 	// Well-formed but the wrong code, so only the client's own verification can
 	// reject it.
-	responder := synctest.NewMutatingResponder(newResponder(log, source), -1, func(resp *syncpb.GetCodeResponse) {
+	responder := synctest.NewMutatingResponder(newResponder(log, source), tampered, func(resp *syncpb.GetCodeResponse) {
 		for i := range resp.GetData() {
 			resp.Data[i] = []byte("tampered")
 		}
@@ -199,9 +209,140 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	client := serve(t, ctx, log, responder)
 
 	got, err := getCode(ctx, log, client, []common.Hash{hash})
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Nil(t, got, "tampered code must never be accepted")
-	require.Positive(t, responder.Served(), "the deadline must not expire before a tampered response is rejected")
+	require.NoError(t, err)
+	require.Equal(t, [][]byte{code}, got, "tampered code must never be accepted")
+	require.Equal(t, tampered+1, responder.Served(), "every tampered response must cost a re-request")
+}
+
+// A repeat reaching the batcher while its first copy is mid-commit must cost
+// neither a second fetch nor a leaked marker.
+func TestSyncer_RepeatDuringCommit(t *testing.T) {
+	tests := []struct {
+		name       string
+		pauseAfter bool // stop the worker after its commit rather than before it
+		remark     bool // a producer re-marks the repeat while the worker is stopped
+	}{
+		{name: "claim_still_held"},
+		{name: "marker_rewritten", pauseAfter: true, remark: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			log := loggingtest.New(t, logging.Debug)
+
+			source, raw := memorydb.New(), memorydb.New()
+			commit := newBreakpoint()
+			target := newBlockingDB(raw, commit, tt.pauseAfter)
+
+			// A full batch, so it dispatches while the queue stays open.
+			hashes := make([]common.Hash, maxHashesPerRequest)
+			for i := range hashes {
+				hashes[i] = writeCode(t, source, randomCode(t))
+				require.NoError(t, customrawdb.WriteCodeToFetch(raw, hashes[i]))
+			}
+			repeat := hashes[0]
+
+			// Already stored, so it is skipped rather than fetched. Receiving it
+			// proves the batcher finished the iteration before it.
+			barrier := writeCode(t, raw, randomCode(t))
+
+			recorder := synctest.NewRecordingResponder(newResponder(log, source))
+			// One batch is all this should ever cost, so a second request ends the
+			// run instead of retrying against a peer that cannot satisfy it.
+			guard := synctest.NewCancelAfter(recorder, 2, cancel)
+			client := serve(t, ctx, log, guard)
+			ch := make(chan common.Hash)
+			syncErr := make(chan error, 1)
+			go func() { syncErr <- NewSyncer(log, client, target, ch).Sync(ctx) }()
+
+			for _, h := range hashes {
+				send(t, ctx, ch, h)
+			}
+			// The guard cancels rather than the clock, so every rendezvous below
+			// ends on the same signal instead of hanging.
+			defer commit.resume()
+			require.NoError(t, commit.wait(ctx), "the syncer never reached the commit")
+
+			if tt.remark {
+				require.NoError(t, customrawdb.WriteCodeToFetch(raw, repeat))
+			}
+			send(t, ctx, ch, repeat)
+			send(t, ctx, ch, barrier)
+			commit.resume()
+			close(ch)
+			require.False(t, guard.Fired(), "a repeat must not cost a second request")
+			require.NoError(t, <-syncErr)
+
+			requested := 0
+			for _, n := range requestSizes(recorder) {
+				requested += n
+			}
+			require.Equal(t, len(hashes), requested, "a repeat must not cost a second fetch")
+
+			require.Equal(t, rawdb.ReadCode(source, repeat), rawdb.ReadCode(raw, repeat))
+			it := customrawdb.NewCodeToFetchIterator(raw)
+			defer it.Release()
+			require.False(t, it.Next(), "every marker must be cleared")
+		})
+	}
+}
+
+// A failed write must fail the sync. Reporting success would drop the hash for
+// the rest of the run, leaving the code unstored with nothing still saying it is
+// owed.
+func TestSyncer_WriteFailure(t *testing.T) {
+	errBoom := errors.New("boom")
+
+	tests := []struct {
+		name    string
+		stored  bool // already on disk, so the marker is cleared rather than fetched
+		failing func(ethdb.KeyValueStore) *failingDB
+	}{
+		{
+			name:   "clearing_a_stale_marker",
+			stored: true,
+			failing: func(inner ethdb.KeyValueStore) *failingDB {
+				return &failingDB{KeyValueStore: inner, onDelete: errBoom}
+			},
+		},
+		{
+			name: "committing_fetched_code",
+			failing: func(inner ethdb.KeyValueStore) *failingDB {
+				return &failingDB{KeyValueStore: inner, onCommit: errBoom}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			log := loggingtest.New(t, logging.Debug)
+
+			source, raw := memorydb.New(), memorydb.New()
+			code := randomCode(t)
+			hash := writeCode(t, source, code)
+			if tt.stored {
+				writeCode(t, raw, code)
+			}
+			require.NoError(t, customrawdb.WriteCodeToFetch(raw, hash))
+
+			recorder := synctest.NewRecordingResponder(newResponder(log, source))
+			// A swallowed failure would leave the hash owed and re-requested.
+			guard := synctest.NewCancelAfter(recorder, 2, cancel)
+			client := serve(t, ctx, log, guard)
+
+			ch := make(chan common.Hash, 1)
+			ch <- hash
+			close(ch)
+
+			err := NewSyncer(log, client, tt.failing(raw), ch).Sync(ctx)
+			require.ErrorIs(t, err, errBoom)
+			require.False(t, guard.Fired(), "the failure must end the run rather than retry")
+		})
+	}
 }
 
 // serve registers r on a single-node in-process network and returns a client
@@ -237,4 +378,115 @@ func randomCode(t *testing.T) []byte {
 	_, err := rand.Read(code)
 	require.NoError(t, err)
 	return code
+}
+
+// breakpoint stops the first goroutine to reach it, so a test can act while the
+// code under test is held at a chosen point.
+type breakpoint struct {
+	stopOnce   sync.Once
+	resumeOnce sync.Once
+	hit        chan struct{}
+	resumed    chan struct{}
+}
+
+func newBreakpoint() *breakpoint {
+	return &breakpoint{hit: make(chan struct{}), resumed: make(chan struct{})}
+}
+
+// stop is called by the code under test.
+func (b *breakpoint) stop() {
+	b.stopOnce.Do(func() {
+		close(b.hit)
+		<-b.resumed
+	})
+}
+
+// wait blocks until the code under test reaches the breakpoint, and reports why
+// it never will once ctx ends.
+func (b *breakpoint) wait(ctx context.Context) error {
+	select {
+	case <-b.hit:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// resume lets it continue. Idempotent, so a test can defer it and still resume
+// at the point it meant to.
+func (b *breakpoint) resume() { b.resumeOnce.Do(func() { close(b.resumed) }) }
+
+// send hands h to the batcher, failing rather than blocking once the batcher has
+// stopped consuming.
+func send(t *testing.T, ctx context.Context, ch chan<- common.Hash, h common.Hash) {
+	t.Helper()
+	select {
+	case ch <- h:
+	case <-ctx.Done():
+		t.Fatalf("the batcher stopped consuming: %v", ctx.Err())
+	}
+}
+
+// blockingDB stops a worker on one side of its commit, so a test can drive a
+// repeat through the batcher while the first copy is mid-flight.
+type blockingDB struct {
+	ethdb.KeyValueStore
+	bp    *breakpoint
+	after bool // stop once the commit has landed rather than before it
+}
+
+func newBlockingDB(inner ethdb.KeyValueStore, bp *breakpoint, after bool) *blockingDB {
+	return &blockingDB{KeyValueStore: inner, bp: bp, after: after}
+}
+
+func (db *blockingDB) NewBatch() ethdb.Batch {
+	return &blockingBatch{Batch: db.KeyValueStore.NewBatch(), db: db}
+}
+
+type blockingBatch struct {
+	ethdb.Batch
+	db *blockingDB
+}
+
+func (b *blockingBatch) Write() error {
+	if !b.db.after {
+		b.db.bp.stop()
+	}
+	err := b.Batch.Write()
+	if b.db.after {
+		b.db.bp.stop()
+	}
+	return err
+}
+
+// failingDB fails the marker delete, the commit, or neither, so a test can pick
+// which of the syncer's two write paths breaks.
+type failingDB struct {
+	ethdb.KeyValueStore
+	onDelete error
+	onCommit error
+}
+
+func (db *failingDB) Delete(key []byte) error {
+	if db.onDelete != nil {
+		return db.onDelete
+	}
+	return db.KeyValueStore.Delete(key)
+}
+
+func (db *failingDB) NewBatch() ethdb.Batch {
+	batch := db.KeyValueStore.NewBatch()
+	if db.onCommit == nil {
+		return batch
+	}
+	return &failingBatch{Batch: batch, err: db.onCommit}
+}
+
+type failingBatch struct {
+	ethdb.Batch
+	err error
+}
+
+func (b *failingBatch) Write() error {
+	return b.err
 }

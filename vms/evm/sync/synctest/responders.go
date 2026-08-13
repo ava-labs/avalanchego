@@ -61,14 +61,8 @@ func (c *RecordingResponder[Req, Resp]) Requests() []Req {
 	return slices.Clone(c.requests)
 }
 
-func (c *RecordingResponder[Req, Resp]) Count() int {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	return len(c.requests)
-}
-
-// MutatingResponder corrupts the first bad responses from inner. A negative bad
-// corrupts every response, zero corrupts none.
+// MutatingResponder corrupts the first bad responses from inner, zero corrupts
+// none.
 //
 // Tampering with well-formed responses, rather than erroring, leaves the client's
 // own verification as the thing under test.
@@ -93,11 +87,49 @@ func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.N
 	if appErr != nil {
 		return resp, appErr
 	}
-	if served := int(m.served.Add(1)); m.bad < 0 || served <= m.bad {
+	if served := int(m.served.Add(1)); served <= m.bad {
 		m.mutate(resp)
 	}
 	return resp, nil
 }
 
 // Served returns how many responses passed through, corrupted or not.
-func (m *MutatingResponder[Req, Resp]) Served() int { return int(m.served.Load()) }
+func (m *MutatingResponder[Req, Resp]) Served() int {
+	return int(m.served.Load())
+}
+
+// CancelAfter cancels once the at-th request arrives, ending a sync that would
+// otherwise never converge.
+type CancelAfter[Req, Resp proto.Message] struct {
+	inner  handlers.Responder[Req, Resp]
+	cancel context.CancelFunc
+	at     int
+
+	seen atomic.Int32
+}
+
+func NewCancelAfter[Req, Resp proto.Message](
+	inner handlers.Responder[Req, Resp],
+	at int,
+	cancel context.CancelFunc,
+) *CancelAfter[Req, Resp] {
+	return &CancelAfter[Req, Resp]{inner: inner, cancel: cancel, at: at}
+}
+
+func (c *CancelAfter[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+	if c.reached(int(c.seen.Add(1))) {
+		c.cancel()
+	}
+	return c.inner.Respond(ctx, nodeID, req)
+}
+
+// Fired reports whether the cancel was triggered.
+func (c *CancelAfter[Req, Resp]) Fired() bool {
+	return c.reached(int(c.seen.Load()))
+}
+
+// reached reports whether seen requests is enough to cancel. A non-positive at
+// never cancels.
+func (c *CancelAfter[Req, Resp]) reached(seen int) bool {
+	return c.at > 0 && seen >= c.at
+}

@@ -60,14 +60,14 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	// alongside it.
 	eg.SetLimit(numSyncWorkers + 1)
 
-	claimed := &claimSet{}
-	eg.Go(func() error { return s.batchHashes(egCtx, eg, claimed) })
+	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
 	return eg.Wait()
 }
 
 // batchHashes drains the queue, handing every batch to a worker. The last one is
 // short unless the queue divides evenly.
-func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *claimSet) error {
+func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
+	claimed := &claimSet{}
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
 	fetch := func() {
 		full := batch
@@ -89,17 +89,19 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group, claimed *c
 				}
 				return nil
 			}
-			// A claim is released only after its code is committed, so taking one
-			// first keeps the disk read below from going stale.
-			if !claimed.claim(codeHash) {
-				continue
-			}
+			// Claim first, so a repeat cannot read the code missing and then claim
+			// it as the commit lands. Cleanup runs either way, since a hash
+			// re-marked mid-commit is only cleared by a later copy.
+			alreadyClaimed := !claimed.claim(codeHash)
 			stored, err := clearIfStored(s.db, codeHash)
 			if err != nil {
 				return err
 			}
+			if alreadyClaimed {
+				continue
+			}
 			if stored {
-				claimed.release([]common.Hash{codeHash})
+				claimed.release(codeHash)
 				continue
 			}
 
@@ -122,7 +124,7 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, clai
 	}
 	// Released only after the commit, so a repeat arriving next is seen on disk
 	// rather than fetched again.
-	claimed.release(hashes)
+	claimed.release(hashes...)
 	return nil
 }
 
@@ -139,7 +141,7 @@ func (c *claimSet) claim(codeHash common.Hash) bool {
 	return !held
 }
 
-func (c *claimSet) release(hashes []common.Hash) {
+func (c *claimSet) release(hashes ...common.Hash) {
 	for _, codeHash := range hashes {
 		c.m.Delete(codeHash)
 	}
