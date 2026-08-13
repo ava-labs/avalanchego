@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 var errExecutorClosed = errors.New("saexec.Executor closed")
@@ -123,7 +122,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
+	if err != nil {
+		return err
+	}
+	result, err := e.executeBlock(b, stateDB, e.receipts, log, true)
 	if err != nil {
 		return err
 	}
@@ -131,14 +134,13 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 }
 
 type (
-	// ReceiptStore receives per-transaction receipts during block execution.
-	// Only the [Executor] needs to provide a real implementation to [Execute]
-	// and all other callers MUST use [NullReceiptStore].
-	ReceiptStore interface {
+	// receiptStore receives per-transaction receipts during block execution.
+	// Only canonical execution provides a real implementation.
+	receiptStore interface {
 		Load(common.Hash) (eventual.Value[*Receipt], bool)
 	}
 
-	// ExecutionResults holds the outputs of [Execute].
+	// ExecutionResults holds block execution outputs.
 	ExecutionResults struct {
 		BaseFee     *uint256.Int
 		StateDB     *state.StateDB
@@ -153,10 +155,10 @@ type (
 	}
 )
 
-// StartExecutingBlock applies the state changes required before executing b's
+// startExecutingBlock applies the state changes required before executing b's
 // transactions, specifically the start-executing-block hook and the EIP-4788
 // beacon root, mirroring [core.StateProcessor.Process].
-func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+func startExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
 		return fmt.Errorf("start-executing-block hook: %v", err)
 	}
@@ -170,31 +172,85 @@ func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.S
 	return nil
 }
 
-// Execute executes the transactions in the [blocks.Block], beginning from the
-// post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
-// the number of transactions to process, allowing partial execution for
-// intra-block inspection.
+// ExecuteBlock executes all deterministic state changes in b against stateDB.
+// It does not commit stateDB or run canonical-only hooks.
+func (e *Executor) ExecuteBlock(b *blocks.Block, stateDB *state.StateDB) (*ExecutionResults, error) {
+	return e.executeBlock(b, stateDB, nullReceiptStore{}, e.log, false)
+}
+
+// ExecuteTransactionPrefix executes the first numTxs transactions in b against
+// stateDB. It does not run end-of-block operations or finish-executing-block
+// hooks.
+func (e *Executor) ExecuteTransactionPrefix(b *blocks.Block, stateDB *state.StateDB, numTxs int) (*ExecutionResults, error) {
+	if numTxs < 0 || numTxs > len(b.Transactions()) {
+		return nil, fmt.Errorf("transaction count %d out of range [0, %d]", numTxs, len(b.Transactions()))
+	}
+	return e.executeTransactions(b, stateDB, numTxs, nullReceiptStore{}, e.log, false)
+}
+
+// executeBlock executes all deterministic block state changes.
+func (e *Executor) executeBlock(
+	b *blocks.Block,
+	stateDB *state.StateDB,
+	receiptStore receiptStore,
+	log logging.Logger,
+	recordProgress bool,
+) (*ExecutionResults, error) {
+	r, err := e.executeTransactions(b, stateDB, len(b.Transactions()), receiptStore, log, recordProgress)
+	if err != nil {
+		return nil, err
+	}
+
+	numTxs := len(b.Transactions())
+	interimExecutionTime := r.FinishBy.Gas.Time.Clone()
+	interimExecutionTime.Tick(r.GasConsumed)
+	ops, err := e.hooks.EndOfBlockOps(b.EthBlock())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, e.hooks, b.Hash(), err)
+	}
+	for i, o := range ops {
+		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
+		r.GasConsumed += o.Gas
+		interimExecutionTime.Tick(o.Gas)
+		if recordProgress {
+			b.SetInterimExecutionTime(interimExecutionTime)
+		}
+
+		if err := o.ApplyTo(stateDB); err != nil {
+			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+		}
+	}
+
+	if err := e.hooks.FinishExecutingBlock(stateDB, b.EthBlock(), r.Receipts); err != nil {
+		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
+	}
+
+	target, gasCfg := e.hooks.GasConfigAfter(b.Header())
+	if err := r.FinishBy.Gas.AfterBlock(r.GasConsumed, target, gasCfg); err != nil {
+		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	}
+
+	r.FinishBy.Wall = time.Now()
+	log.Trace(
+		"Block execution complete",
+		zap.Uint64("gas_consumed", uint64(r.GasConsumed)),
+		zap.Time("gas_time", r.FinishBy.Gas.AsTime()),
+		zap.Time("wall_time", r.FinishBy.Wall),
+	)
+	return r, nil
+}
+
+// executeTransactions executes the first numTxs transactions in b.
 //
 // The gas clock and base fee come from the parent's post-execution clock,
 // except pre-SAE blocks, which use their own header's fee.
-//
-// Execute only runs the deterministic hooks, so it is also safe to use for
-// historical execution. Canonical-only side effects belong in
-// [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
-//
-// Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
-// consensus-critical internal values (e.g. interim execution time). A "live"
-// accepted block (as against one recovered from the database) MUST NOT be
-// passed directly to [Execute], only to [Executor.Enqueue].
-func Execute(
+func (e *Executor) executeTransactions(
 	b *blocks.Block,
-	sdbo saedb.StateDBOpener,
-	maxNumTxs int,
-	hooks hook.Points,
-	config *params.ChainConfig,
-	chainCtx core.ChainContext,
-	receiptStore ReceiptStore,
+	stateDB *state.StateDB,
+	numTxs int,
+	receiptStore receiptStore,
 	log logging.Logger,
+	recordProgress bool,
 ) (*ExecutionResults, error) {
 	log.Trace("Executing block")
 
@@ -202,33 +258,27 @@ func Execute(
 	header := b.Header()
 
 	gasClock := parent.ExecutedByGasTime()
-	gasClock.BeforeBlock(hooks.BlockTime(header))
+	gasClock.BeforeBlock(e.hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
-	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, err
-	}
-
-	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
-	if err := StartExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
+	if err := startExecutingBlock(e.hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
 
 	baseFee := gasClock.BaseFee()
-	if hook.Synchronous(hooks, header) {
+	if hook.Synchronous(e.hooks, header) {
 		baseFee = b.WorstCaseBaseFee()
 	} else {
 		b.CheckBaseFeeBound(baseFee)
 	}
 	header.BaseFee = baseFee.ToBig()
 
-	signer := b.Signer(config)
+	signer := b.Signer(e.chainConfig)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
 
-	txs := b.Transactions()
-	txs = txs[:min(len(txs), maxNumTxs)]
+	txs := b.Transactions()[:numTxs]
 	receipts := make(types.Receipts, len(txs))
 
 	for ti, tx := range txs {
@@ -237,8 +287,8 @@ func Execute(
 
 		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(
-			config,
-			chainCtx,
+			e.chainConfig,
+			e.chainContext,
 			&header.Coinbase,
 			&gasPool,
 			stateDB,
@@ -252,7 +302,9 @@ func Execute(
 		}
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
-		b.SetInterimExecutionTime(perTxClock)
+		if recordProgress {
+			b.SetInterimExecutionTime(perTxClock)
+		}
 		// TODO(arr4n) investigate calling the same method on pending blocks in
 		// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
 		// returns false, meaning that execution is blocking consensus.
@@ -277,49 +329,15 @@ func Execute(
 		receipts[ti] = receipt
 	}
 
-	numTxs := len(b.Transactions())
-	ops, err := hooks.EndOfBlockOps(b.EthBlock())
-	if err != nil {
-		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, hooks, b.Hash(), err)
-	}
-	for i, o := range ops {
-		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
-		blockGasConsumed += o.Gas
-		perTxClock.Tick(o.Gas)
-		b.SetInterimExecutionTime(perTxClock)
-
-		if err := o.ApplyTo(stateDB); err != nil {
-			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
-		}
-	}
-
-	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
-		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
-	}
-
-	endTime := time.Now()
-	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(blockGasConsumed, target, gasCfg); err != nil {
-		return nil, fmt.Errorf("after-block gas time update: %w", err)
-	}
-
-	log.Trace(
-		"Block execution complete",
-		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
-		zap.Time("gas_time", gasClock.AsTime()),
-		zap.Time("wall_time", endTime),
-	)
-
 	r := &ExecutionResults{
 		BaseFee:     baseFee,
 		StateDB:     stateDB,
 		Signer:      signer,
-		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		BlockCtx:    core.NewEVMBlockContext(header, e.chainContext, &header.Coinbase),
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 	}
 	r.FinishBy.Gas = gasClock
-	r.FinishBy.Wall = endTime
 	return r, nil
 }
 
@@ -355,13 +373,12 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	return nil
 }
 
-// NullReceiptStore is a no-op [ReceiptStore] for use when receipt broadcasting
-// is not needed (e.g. state tracing).
-type NullReceiptStore struct{}
+// nullReceiptStore discards receipt notifications.
+type nullReceiptStore struct{}
 
-var _ ReceiptStore = (*NullReceiptStore)(nil)
+var _ receiptStore = nullReceiptStore{}
 
 // Load always returns the zero value and false.
-func (*NullReceiptStore) Load(common.Hash) (eventual.Value[*Receipt], bool) {
+func (nullReceiptStore) Load(common.Hash) (eventual.Value[*Receipt], bool) {
 	return eventual.Value[*Receipt]{}, false
 }

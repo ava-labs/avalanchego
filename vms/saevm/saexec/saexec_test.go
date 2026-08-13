@@ -486,6 +486,32 @@ func TestEndOfBlockOps(t *testing.T) {
 	})
 }
 
+func TestExecuteTransactionPrefixSkipsEndOfBlockOps(t *testing.T) {
+	_, sut := newSUT(t)
+	recipient := common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+	b := sut.chain.NewBlock(t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &recipient,
+			Value:    big.NewInt(1),
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
+		Mint: []saehookstest.AccountCredit{{
+			Address: recipient,
+			Amount:  *uint256.NewInt(100),
+		}},
+	}})))
+
+	sdb, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+	require.NoError(t, err, "Executor.StateDB()")
+	result, err := sut.ExecuteTransactionPrefix(b, sdb, len(b.Transactions()))
+	require.NoError(t, err, "Executor.ExecuteTransactionPrefix()")
+
+	want := uint256.NewInt(1)
+	require.Equal(t, want, result.StateDB.GetBalance(recipient), "recipient balance after transaction prefix")
+}
+
 func TestGasAccounting(t *testing.T) {
 	const gasPerTx = gas.Gas(params.TxGas)
 	hooks := saehookstest.NewStub(5 * gasPerTx)

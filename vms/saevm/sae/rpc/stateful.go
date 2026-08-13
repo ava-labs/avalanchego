@@ -26,29 +26,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
-
-// noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps] and [hook.Points.FinishExecutingBlock], used by
-// the tracer to skip end-of-block operations during partial replay.
-//
-// TODO(StephenButtolph): Properly abstract execution to not rely on method
-// suppression. It is fragile and could result in accidentially modifying the
-// block state or even disk state during tracing.
-type noEndOfBlockOps struct {
-	hook.Points
-}
-
-// EndOfBlockOps always returns nil.
-func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
-
-// FinishExecutingBlock always returns nil.
-func (noEndOfBlockOps) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
-	return nil
-}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -154,10 +134,6 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing.
 //
-// Replay calls [saexec.Execute] - the same pipeline used by
-// [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
-// operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
-//
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
@@ -177,19 +153,14 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
+	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
+	if err != nil {
+		return nil, bCtx, nil, nil, err
+	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
-	result, err := saexec.Execute(
-		block,
-		b,
-		txIndex,
-		noEndOfBlockOps{b.Hooks()},
-		b.ChainConfig(),
-		b.ChainContext(),
-		&saexec.NullReceiptStore{},
-		b.Logger(),
-	)
+	result, err := b.ExecuteTransactionPrefix(block, stateDB, txIndex)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
@@ -310,18 +281,19 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	if err != nil {
 		return nil, nil, err
 	}
-	rules := b.ChainConfig().Rules(child.Number(), true /*isMerge*/, child.Time())
-	// All parameters passed to [saexec.StartExecutingBlock] MUST exactly match
-	// those that [saexec.Execute] pass, so that the hooks see the same state.
-	// Parent will have a faked header, so we pass the restored parent block.
+	block, err := b.NewBlock(child, parentBlock, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("constructing SAE block: %v", err)
+	}
 	//
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
-	if err := saexec.StartExecutingBlock(b.Hooks(), rules, sdb, parentBlock.Header(), child); err != nil {
+	result, err := b.ExecuteTransactionPrefix(block, sdb, 0)
+	if err != nil {
 		return nil, nil, err
 	}
-	return sdb, noopRelease, nil
+	return result.StateDB, noopRelease, nil
 }
 
 // StateAtTransaction returns the state served by [backend.StateAtTransaction]
