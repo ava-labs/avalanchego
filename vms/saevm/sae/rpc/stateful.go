@@ -132,7 +132,8 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // StateAtTransaction returns the execution environment of a particular
 // transaction within a block. It replays all preceding transactions to produce
 // the state just before the target transaction, then returns the message and
-// block context needed for tracing.
+// block context needed for tracing. Replay does not record block progress or
+// mark the block as executed.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
@@ -153,14 +154,9 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
-	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, bCtx, nil, nil, err
-	}
-
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
-	result, err := b.ExecuteTransactionPrefix(block, stateDB, txIndex)
+	result, err := b.ExecuteBlockUntil(block, txIndex)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
@@ -275,9 +271,11 @@ func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 }
 
 // stateAtBlockWithChild returns the parent's post-execution state with the
-// child block's pre-transaction state changes applied.
+// child block's pre-transaction state changes applied. It does not record
+// block progress or mark the child as executed.
 func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, child *types.Block) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	sdb, parentBlock, err := b.backend.stateAtBlock(ctx, n)
+	num := rpc.BlockNumber(n) // #nosec G115 -- won't overflow for a while.
+	parentBlock, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -288,11 +286,11 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 
 	// TODO(JonathanOppenheimer): Once libevm's tracer APIs apply the EIP-4788
 	// beacon root, avoid applying it here while preserving the start-of-block hook.
-	result, err := b.ExecuteTransactionPrefix(block, sdb, 0)
+	sdb, err := b.StateBeforeTransactions(block)
 	if err != nil {
 		return nil, nil, err
 	}
-	return result.StateDB, noopRelease, nil
+	return sdb, noopRelease, nil
 }
 
 // StateAtTransaction returns the state served by [backend.StateAtTransaction]

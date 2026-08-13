@@ -486,30 +486,83 @@ func TestEndOfBlockOps(t *testing.T) {
 	})
 }
 
-func TestExecuteTransactionPrefixSkipsEndOfBlockOps(t *testing.T) {
+func TestExecuteBlockUntil(t *testing.T) {
 	_, sut := newSUT(t)
-	recipient := common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+	firstRecipient := common.Address{'f', 'i', 'r', 's', 't'}
+	secondRecipient := common.Address{'s', 'e', 'c', 'o', 'n', 'd'}
 	b := sut.chain.NewBlock(t, types.Transactions{
 		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &recipient,
+			To:       &firstRecipient,
 			Value:    big.NewInt(1),
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &secondRecipient,
+			Value:    big.NewInt(2),
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
 		}),
 	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
 		Mint: []saehookstest.AccountCredit{{
-			Address: recipient,
+			Address: firstRecipient,
 			Amount:  *uint256.NewInt(100),
 		}},
 	}})))
 
-	sdb, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
-	require.NoError(t, err, "Executor.StateDB()")
-	result, err := sut.ExecuteTransactionPrefix(b, sdb, len(b.Transactions()))
-	require.NoError(t, err, "Executor.ExecuteTransactionPrefix()")
+	tests := []struct {
+		name       string
+		numTxs     int
+		wantFirst  *uint256.Int
+		wantSecond *uint256.Int
+		wantErr    bool
+	}{
+		{
+			name:       "no transactions",
+			wantFirst:  new(uint256.Int),
+			wantSecond: new(uint256.Int),
+		},
+		{
+			name:       "one transaction",
+			numTxs:     1,
+			wantFirst:  uint256.NewInt(1),
+			wantSecond: new(uint256.Int),
+		},
+		{
+			name:       "all transactions",
+			numTxs:     len(b.Transactions()),
+			wantFirst:  uint256.NewInt(1),
+			wantSecond: uint256.NewInt(2),
+		},
+		{
+			name:    "negative transaction count",
+			numTxs:  -1,
+			wantErr: true,
+		},
+		{
+			name:    "transaction count exceeds block",
+			numTxs:  len(b.Transactions()) + 1,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := sut.ExecuteBlockUntil(b, tt.numTxs)
+			if tt.wantErr {
+				require.ErrorIs(t, err, errTransactionCountOutOfRange, "Executor.ExecuteBlockUntil()")
+				return
+			}
+			require.NoError(t, err, "Executor.ExecuteBlockUntil()")
+			require.Equal(t, tt.wantFirst, result.StateDB.GetBalance(firstRecipient), "first recipient balance")
+			require.Equal(t, tt.wantSecond, result.StateDB.GetBalance(secondRecipient), "second recipient balance")
 
-	want := uint256.NewInt(1)
-	require.Equal(t, want, result.StateDB.GetBalance(recipient), "recipient balance after transaction prefix")
+			gasClock := b.ParentBlock().ExecutedByGasTime()
+			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
+			_, ok, err := blocks.LastToSettleAt(sut.hooks, gasClock.AsTime(), b)
+			require.NoError(t, err, "blocks.LastToSettleAt()")
+			require.False(t, ok, "prefix execution recorded canonical progress")
+		})
+	}
 }
 
 func TestGasAccounting(t *testing.T) {
