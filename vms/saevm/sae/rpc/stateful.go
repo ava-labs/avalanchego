@@ -154,9 +154,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
+	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
+	if err != nil {
+		return nil, bCtx, nil, nil, err
+	}
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
-	result, err := b.ExecuteBlockUntil(block, txIndex)
+	result, err := b.ExecuteBlockUntil(block, stateDB, txIndex)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
@@ -165,7 +169,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
+	return msg, result.BlockCtx, stateDB, noopRelease, nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
@@ -283,11 +287,14 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	if err != nil {
 		return nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
+	sdb, err := b.StateDB(parentBlock.PostExecutionStateRoot())
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// TODO(JonathanOppenheimer): Once libevm's tracer APIs apply the EIP-4788
 	// beacon root, avoid applying it here while preserving the start-of-block hook.
-	sdb, err := b.StateBeforeTransactions(block)
-	if err != nil {
+	if err := b.StateBeforeTransactions(block, sdb); err != nil {
 		return nil, nil, err
 	}
 	return sdb, noopRelease, nil

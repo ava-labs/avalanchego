@@ -547,14 +547,16 @@ func TestExecuteBlockUntil(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := sut.ExecuteBlockUntil(b, tt.numTxs)
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+			_, err = sut.ExecuteBlockUntil(b, stateDB, tt.numTxs)
 			if tt.wantErr {
 				require.ErrorIs(t, err, errTransactionCountOutOfRange, "Executor.ExecuteBlockUntil()")
 				return
 			}
 			require.NoError(t, err, "Executor.ExecuteBlockUntil()")
-			require.Equal(t, tt.wantFirst, result.StateDB.GetBalance(firstRecipient), "first recipient balance")
-			require.Equal(t, tt.wantSecond, result.StateDB.GetBalance(secondRecipient), "second recipient balance")
+			require.Equal(t, tt.wantFirst, stateDB.GetBalance(firstRecipient), "first recipient balance")
+			require.Equal(t, tt.wantSecond, stateDB.GetBalance(secondRecipient), "second recipient balance")
 
 			gasClock := b.ParentBlock().ExecutedByGasTime()
 			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))

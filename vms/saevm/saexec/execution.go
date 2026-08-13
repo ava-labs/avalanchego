@@ -124,7 +124,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := e.executeBlock(b, log)
+	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
+	if err != nil {
+		return err
+	}
+	result, err := e.executeBlock(b, stateDB, log)
 	if err != nil {
 		return err
 	}
@@ -135,6 +139,7 @@ type (
 	// executionResults holds block execution outputs.
 	executionResults struct {
 		BlockExecutionState
+		StateDB     *state.StateDB
 		Receipts    types.Receipts
 		GasConsumed gas.Gas
 		FinishBy    struct {
@@ -148,7 +153,6 @@ type (
 	// block execution.
 	BlockExecutionState struct {
 		BaseFee  *uint256.Int
-		StateDB  *state.StateDB
 		Signer   types.Signer
 		BlockCtx vm.BlockContext
 	}
@@ -171,21 +175,13 @@ func startExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.S
 	return nil
 }
 
-// StateBeforeTransactions opens b's parent state and applies b's
-// pre-transaction state changes, including the start-executing-block hook. It
-// does not execute transactions, apply end-of-block operations, commit state,
-// or mark the block as executed.
-func (e *Executor) StateBeforeTransactions(b *blocks.Block) (*state.StateDB, error) {
-	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
-	if err != nil {
-		return nil, err
-	}
+// StateBeforeTransactions applies b's pre-transaction state changes to
+// stateDB, which MUST represent b's parent's post-execution state. It does not
+// execute transactions or subsequent block operations.
+func (e *Executor) StateBeforeTransactions(b *blocks.Block, stateDB *state.StateDB) error {
 	header := b.Header()
 	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	if err := startExecutingBlock(e.hooks, rules, stateDB, b.ParentBlock().Header(), b.EthBlock()); err != nil {
-		return nil, err
-	}
-	return stateDB, nil
+	return startExecutingBlock(e.hooks, rules, stateDB, b.ParentBlock().Header(), b.EthBlock())
 }
 
 // ExecuteBlockUntil executes the first numTxs transactions in b. After those
@@ -194,11 +190,11 @@ func (e *Executor) StateBeforeTransactions(b *blocks.Block) (*state.StateDB, err
 // does not record block progress or mark the block as executed.
 //
 // numTxs MUST be in the range [0, len(b.Transactions())].
-func (e *Executor) ExecuteBlockUntil(b *blocks.Block, numTxs int) (*BlockExecutionState, error) {
+func (e *Executor) ExecuteBlockUntil(b *blocks.Block, stateDB *state.StateDB, numTxs int) (*BlockExecutionState, error) {
 	if numTxs < 0 || numTxs > len(b.Transactions()) {
 		return nil, fmt.Errorf("%w: %d not in [0, %d]", errTransactionCountOutOfRange, numTxs, len(b.Transactions()))
 	}
-	r, err := e.executeTransactions(b, numTxs, false /*canonical*/, e.log)
+	r, err := e.executeTransactions(b, stateDB, numTxs, false /*canonical*/, e.log)
 	if err != nil {
 		return nil, err
 	}
@@ -206,9 +202,9 @@ func (e *Executor) ExecuteBlockUntil(b *blocks.Block, numTxs int) (*BlockExecuti
 }
 
 // executeBlock executes all deterministic block state changes.
-func (e *Executor) executeBlock(b *blocks.Block, log logging.Logger) (*executionResults, error) {
+func (e *Executor) executeBlock(b *blocks.Block, stateDB *state.StateDB, log logging.Logger) (*executionResults, error) {
 	numTxs := len(b.Transactions())
-	r, err := e.executeTransactions(b, numTxs, true /*canonical*/, log)
+	r, err := e.executeTransactions(b, stateDB, numTxs, true /*canonical*/, log)
 	if err != nil {
 		return nil, err
 	}
@@ -247,14 +243,11 @@ func (e *Executor) executeBlock(b *blocks.Block, log logging.Logger) (*execution
 	return r, nil
 }
 
-// executeTransactions executes the first numTxs transactions in b, beginning
-// from the post-execution state of b's parent. Only canonical execution
-// publishes receipts and records block progress.
-//
-// The gas clock and base fee come from the parent's post-execution clock,
-// except pre-SAE blocks, which use their own header's fee.
+// executeTransactions executes the first numTxs transactions in b against
+// stateDB. Only canonical execution publishes receipts and records progress.
 func (e *Executor) executeTransactions(
 	b *blocks.Block,
+	stateDB *state.StateDB,
 	numTxs int,
 	canonical bool,
 	log logging.Logger,
@@ -267,11 +260,6 @@ func (e *Executor) executeTransactions(
 	gasClock := parent.ExecutedByGasTime()
 	gasClock.BeforeBlock(e.hooks.BlockTime(header))
 	interimTime := gasClock.Time.Clone()
-
-	stateDB, err := e.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, err
-	}
 
 	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	if err := startExecutingBlock(e.hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
@@ -349,10 +337,10 @@ func (e *Executor) executeTransactions(
 	r := &executionResults{
 		BlockExecutionState: BlockExecutionState{
 			BaseFee:  baseFee,
-			StateDB:  stateDB,
 			Signer:   signer,
 			BlockCtx: core.NewEVMBlockContext(header, e.chainContext, &header.Coinbase),
 		},
+		StateDB:     stateDB,
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 		interimTime: interimTime,
