@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,21 +16,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var (
-	_               simplex.Communication = (*Comm)(nil)
-	errNodeNotFound                       = errors.New("node not found in the validator list")
+	_               simplexcommon.Communication = (*Comm)(nil)
+	errNodeNotFound                             = errors.New("node not found in the validator list")
 )
 
 type Comm struct {
-	logger   simplex.Logger
+	logger   simplexcommon.Logger
 	subnetID ids.ID
 	chainID  ids.ID
 	// broadcastNodes are the nodes that should receive broadcast messages
 	broadcastNodes set.Set[ids.NodeID]
 	// allNodes are the IDs of all the nodes in the subnet
-	allNodes []simplex.NodeID
+	allNodes simplexcommon.Nodes
 
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
@@ -40,12 +41,16 @@ type Comm struct {
 
 func NewComm(config *Config) (*Comm, error) {
 	broadcastNodes := set.NewSet[ids.NodeID](len(config.Params.InitialValidators) - 1)
-	allNodes := make([]simplex.NodeID, 0, len(config.Params.InitialValidators))
+	allNodes := make(simplexcommon.Nodes, 0, len(config.Params.InitialValidators))
 
 	includesOurNodeID := false
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
-		allNodes = append(allNodes, vd.NodeID[:])
+		allNodes = append(allNodes, simplexcommon.Node{
+			Id:     vd.NodeID[:],
+			Weight: 1,
+			PK:     vd.PublicKey,
+		})
 		if vd.NodeID == config.Ctx.NodeID {
 			includesOurNodeID = true
 			continue // skip our own node ID
@@ -74,11 +79,11 @@ func NewComm(config *Config) (*Comm, error) {
 	}, nil
 }
 
-func (c *Comm) Nodes() []simplex.NodeID {
+func (c *Comm) Validators() simplexcommon.Nodes {
 	return c.allNodes
 }
 
-func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
+func (c *Comm) Send(msg *simplexcommon.Message, destination simplexcommon.NodeID) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
@@ -99,7 +104,7 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) Broadcast(msg *simplex.Message) {
+func (c *Comm) Broadcast(msg *simplexcommon.Message) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
@@ -109,14 +114,11 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.OutboundMessage, error) {
+func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*message.OutboundMessage, error) {
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		msg, err := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create block proposal: %w", err)
-		}
+		msg := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
 		simplexMsg = msg
 	case msg.VoteMessage != nil:
 		simplexMsg = newVote(c.chainID, msg.VoteMessage)
@@ -133,10 +135,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.O
 	case msg.ReplicationRequest != nil:
 		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
 	case msg.VerifiedReplicationResponse != nil:
-		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create replication response: %w", err)
-		}
+		msg := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
 		simplexMsg = msg
 	default:
 		return nil, fmt.Errorf("unknown message type: %+v", msg)

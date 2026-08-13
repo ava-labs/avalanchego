@@ -6,7 +6,6 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -15,13 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
-var testSimplexMessage = simplex.Message{
-	VoteMessage: &simplex.Vote{
-		Vote: simplex.ToBeSignedVote{
-			BlockHeader: simplex.BlockHeader{
-				ProtocolMetadata: simplex.ProtocolMetadata{
+var testSimplexMessage = simplexcommon.Message{
+	VoteMessage: &simplexcommon.Vote{
+		Vote: simplexcommon.ToBeSignedVote{
+			BlockHeader: simplexcommon.BlockHeader{
+				ProtocolMetadata: simplexcommon.ProtocolMetadata{
 					Version: 1,
 					Epoch:   1,
 					Round:   1,
@@ -29,7 +30,7 @@ var testSimplexMessage = simplex.Message{
 				},
 			},
 		},
-		Signature: simplex.Signature{
+		Signature: simplexcommon.Signature{
 			Signer: []byte("dummy_node_id"),
 			Value:  []byte("dummy_signature"),
 		},
@@ -65,8 +66,8 @@ func TestCommBroadcast(t *testing.T) {
 	require.NoError(t, err)
 	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
-	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
-	for _, node := range comm.Nodes() {
+	nodes := make([]ids.NodeID, 0, len(comm.Validators().NodeIDs()))
+	for _, node := range comm.Validators().NodeIDs() {
 		if node.Equals(config.Ctx.NodeID[:]) {
 			continue // skip the sending node
 		}
@@ -97,15 +98,15 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 	chainID := ids.GenerateTestID()
 	tests := []struct {
 		name string
-		resp *simplex.VerifiedReplicationResponse
+		resp *simplexcommon.VerifiedReplicationResponse
 	}{
 		{
 			name: "nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data: []simplexcommon.VerifiedQuorumRound{
 					{
 						VerifiedBlock: &Block{
-							metadata: simplex.ProtocolMetadata{},
+							metadata: simplexcommon.ProtocolMetadata{},
 							vmBlock:  snowmantest.Genesis,
 						},
 					},
@@ -115,18 +116,18 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 		},
 		{
 			name: "empty seqs",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data:        []simplex.VerifiedQuorumRound{},
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data:        []simplexcommon.VerifiedQuorumRound{},
 				LatestRound: nil,
 			},
 		},
 		{
 			name: "non-nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{},
-				LatestRound: &simplex.VerifiedQuorumRound{
+			resp: &simplexcommon.VerifiedReplicationResponse{
+				Data: []simplexcommon.VerifiedQuorumRound{},
+				LatestRound: &simplexcommon.VerifiedQuorumRound{
 					VerifiedBlock: &Block{
-						metadata: simplex.ProtocolMetadata{},
+						metadata: simplexcommon.ProtocolMetadata{},
 						vmBlock:  snowmantest.Genesis,
 					},
 				},
@@ -136,8 +137,7 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := newReplicationResponse(chainID, tt.resp)
-			require.NoError(t, err)
+			require.NotNil(t, newReplicationResponse(chainID, tt.resp))
 		})
 	}
 }

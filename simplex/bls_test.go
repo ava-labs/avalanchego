@@ -8,27 +8,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
 func TestBLSVerifier(t *testing.T) {
 	config := newEngineConfig(t, 1)
 	signer, verifier, err := NewBLSAuth(config)
 	require.NoError(t, err)
-	otherNodeID := ids.GenerateTestNodeID()
+	otherKey, err := localsigner.New()
+	require.NoError(t, err)
+	otherPK := otherKey.PublicKey().Compress()
 
 	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
 	tests := []struct {
 		name      string
 		expectErr error
-		nodeID    []byte
+		pk        []byte
 		sig       []byte
 	}{
 		{
 			name:      "valid_signature",
 			expectErr: nil,
-			nodeID:    config.Ctx.NodeID[:],
+			pk:        config.Params.InitialValidators[0].PublicKey,
 			sig: func() []byte {
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
@@ -36,9 +38,9 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "not_in_membership_set",
-			expectErr: errSignerNotFound,
-			nodeID:    otherNodeID[:],
+			name:      "wrong_public_key",
+			expectErr: errSignatureVerificationFailed,
+			pk:        otherPK,
 			sig: func() []byte {
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
@@ -48,7 +50,7 @@ func TestBLSVerifier(t *testing.T) {
 		{
 			name:      "invalid_message_encoding",
 			expectErr: errSignatureVerificationFailed,
-			nodeID:    config.Ctx.NodeID[:],
+			pk:        config.Params.InitialValidators[0].PublicKey,
 			sig: func() []byte {
 				sig, err := config.SignBLS(msg)
 				require.NoError(t, err)
@@ -56,9 +58,9 @@ func TestBLSVerifier(t *testing.T) {
 			}(),
 		},
 		{
-			name:      "invalid_nodeID",
-			expectErr: errInvalidNodeID,
-			nodeID:    []byte{0x01, 0x02, 0x03, 0x04, 0x05}, // Incorrect length NodeID
+			name:      "malformed_public_key",
+			expectErr: errFailedToParsePublicKey,
+			pk:        []byte{0x01, 0x02, 0x03, 0x04, 0x05}, // Incorrect length PublicKey
 			sig: func() []byte {
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
@@ -68,20 +70,20 @@ func TestBLSVerifier(t *testing.T) {
 		{
 			name:      "nil_signature",
 			expectErr: errFailedToParseSignature,
-			nodeID:    config.Ctx.NodeID[:],
+			pk:        config.Params.InitialValidators[0].PublicKey,
 			sig:       nil,
 		},
 		{
 			name:      "malformed_signature",
 			expectErr: errFailedToParseSignature,
-			nodeID:    config.Ctx.NodeID[:],
+			pk:        config.Params.InitialValidators[0].PublicKey,
 			sig:       []byte{0x01, 0x02, 0x03}, // Malformed signature
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifier.Verify(msg, tt.sig, tt.nodeID)
+			err := verifier.VerifySignature(msg, tt.sig, tt.pk)
 			require.ErrorIs(t, err, tt.expectErr)
 		})
 	}

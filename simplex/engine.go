@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexepoch "github.com/ava-labs/simplex/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -47,7 +48,7 @@ type Engine struct {
 	validators.Connector
 	vm block.ChainVM
 
-	epoch              *simplex.Epoch
+	epoch              *simplexepoch.Epoch
 	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
 	logger             logging.Logger
@@ -124,26 +125,28 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		blockTracker: bt,
 	}
 
-	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     config.Params.MaxNetworkDelay,
-		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
-		QCDeserializer:      qcDeserializer,
-		Logger:              config.Log,
-		ID:                  config.Ctx.NodeID[:],
-		Signer:              &signer,
-		Verifier:            &verifier,
-		BlockDeserializer:   blockDeserializer,
-		SignatureAggregator: signatureAggregator,
-		Comm:                comm,
-		Storage:             storage,
-		WAL:                 config.WAL,
-		BlockBuilder:        blockBuilder,
-		Epoch:               simplexBlock.metadata.Epoch,
-		StartTime:           time.Now(),
-		ReplicationEnabled:  true,
+	epochConfig := simplexepoch.EpochConfig{
+		MaxProposalWait:    config.Params.MaxNetworkDelay,
+		MaxRebroadcastWait: config.Params.MaxRebroadcastWait,
+		QCDeserializer:     qcDeserializer,
+		Logger:             config.Log,
+		ID:                 config.Ctx.NodeID[:],
+		Signer:             &signer,
+		Verifier:           &verifier,
+		BlockDeserializer:  blockDeserializer,
+		SignatureAggregatorCreator: func(_ []simplexcommon.Node) simplexcommon.SignatureAggregator {
+			return signatureAggregator
+		},
+		Comm:               comm,
+		Storage:            storage,
+		WAL:                config.WAL,
+		BlockBuilder:       blockBuilder,
+		Epoch:              simplexBlock.metadata.Epoch,
+		StartTime:          time.Now(),
+		ReplicationEnabled: true,
 	}
 
-	epoch, err := simplex.NewEpoch(epochConfig)
+	epoch, err := simplexepoch.NewEpoch(epochConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +221,7 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
 }
 
-func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplex.Message, error) {
+func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplexcommon.Message, error) {
 	if msg == nil {
 		return nil, errNilField
 	}
