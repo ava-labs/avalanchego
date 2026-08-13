@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "account_trie.go",
         "base_trie.go",
+        "reconstructed.go",
         "state.go",
         "storage_trie.go",
         "triedb.go",
@@ -36,7 +37,10 @@ go_library(
 
 go_test(
     name = "firewood_test",
-    srcs = ["triedb_test.go"],
+    srcs = [
+        "reconstructed_test.go",
+        "triedb_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":firewood"],
     deps = [
@@ -44,6 +48,7 @@ go_test(
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/set",
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
