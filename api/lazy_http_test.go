@@ -46,7 +46,7 @@ func recordNewResponse(h http.Handler) *httptest.ResponseRecorder {
 // installed, while in-flight requests are untouched.
 func TestHTTPHandlersBlockUnblock(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		handlers := NewHTTPHandlers()
+		handlers := NewMutableHTTPHandlers()
 		const (
 			path = "path"
 			body = "body"
@@ -89,7 +89,7 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 func TestHTTPHandlersDrain(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
-		handlers := NewHTTPHandlers()
+		handlers := NewMutableHTTPHandlers()
 		const path = "path"
 		handlers.Set(map[string]http.Handler{
 			path: blockingHandler{release: release},
@@ -133,12 +133,12 @@ func testUnblocking(t *testing.T, blocking func(*testing.T), unblock func()) {
 	blocking(t)
 }
 
-// TestHandlerMap asserts that [HTTPHandlers] exposes every path registered at
-// construction, serving 404 until [HTTPHandlers.Set] provides the actual
+// TestHandlerMap asserts that [MutableHTTPHandlers] exposes every path registered at
+// construction, serving 404 until [MutableHTTPHandlers.Set] provides the actual
 // implementations. The AsInterface map should be available at any time.
 func TestHandlerMap(t *testing.T) {
 	paths := []string{"/foo", "/bar", "/baz"}
-	handlers := NewHTTPHandlers(paths...)
+	handlers := NewMutableHTTPHandlers(paths...)
 
 	before := handlers.AsInterface()
 	require.ElementsMatchf(t, paths, slices.Collect(maps.Keys(before)), "%T.toInterface() paths", handlers)

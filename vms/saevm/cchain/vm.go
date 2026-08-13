@@ -73,14 +73,15 @@ type VM struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
-	mode                utils.Atomic[snow.State]
-	deferredArgs        *deferredInit
-	onBootstrappingOnce sync.Once
-	handlers            *api.HTTPHandlers
+	mode                  utils.Atomic[snow.State]
+	deferredArgs          *deferredInit
+	prepBlockHandlingOnce sync.Once
+	handlers              *api.MutableHTTPHandlers
 
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
+	closeMu sync.Mutex
 	onClose []func(context.Context) error
 
 	lastWaitForEvent utils.Atomic[time.Time]
@@ -99,6 +100,8 @@ type deferredInit struct {
 var ethDBPrefix = []byte("ethdb")
 
 // Initialize initializes the VM.
+//
+// Initialize is NOT safe to be called concurrently with any other method.
 func (vm *VM) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
@@ -175,7 +178,7 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 
-	if err := genesis.setup(ethDB); err != nil {
+	if err := genesis.checkCompatibility(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 	vm.SummaryHandler, err = cchainsync.New(userConfig.stateSyncConfig(), ethDB, hooks, vm.state, snowCtx.Log)
@@ -193,13 +196,13 @@ func (vm *VM) Initialize(
 		warpStorage: warpStorage,
 		registry:    reg,
 	}
-	vm.handlers = api.NewHTTPHandlers(handlerPaths...)
+	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 	return nil
 }
 
-// onBootstrapping finishes initializing the VM after all necessary state is available.
-// This MUST be called exactly once, guaranteed using VM.onBootstrappingOnce.
-func (vm *VM) onBootstrapping(ctx context.Context) error {
+// prepBlockHandling finishes initializing the VM after all necessary state is available.
+// This MUST be called exactly once, guaranteed using [VM.onBootstrappingOnce].
+func (vm *VM) prepBlockHandling(ctx context.Context) error {
 	var (
 		genesis     = vm.deferredArgs.g
 		ethDB       = vm.deferredArgs.db
@@ -211,8 +214,13 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 	)
 	vm.deferredArgs = nil
 
+	// Some of the initialization below requires closing later, but there are no
+	// guarantees that [VM.Shutdown] will not be called concurrently.
+	vm.closeMu.Lock()
+	defer vm.closeMu.Unlock()
+
 	tdbConfig := saeConfig.DBConfig.TrieDBConfig(vm.ctx.ChainDataDir, vm.ctx.Log)
-	if err := genesis.checkAndWriteState(ethDB, tdbConfig); err != nil {
+	if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
@@ -410,6 +418,9 @@ func (vm *VM) setHandlers(ctx context.Context) error {
 //
 // It is idempotent and safe to call at any time.
 func (vm *VM) Shutdown(ctx context.Context) error {
+	vm.closeMu.Lock()
+	defer vm.closeMu.Unlock()
+
 	errs := make([]error, len(vm.onClose))
 	for i, f := range slices.Backward(vm.onClose) {
 		errs[i] = f(ctx)

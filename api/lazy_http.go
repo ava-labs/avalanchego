@@ -16,7 +16,7 @@ import (
 // pass through its parent's gate and are counted as in-flight so they can be
 // blocked and drained around a transition.
 type httpHandler struct {
-	parent *HTTPHandlers
+	parent *MutableHTTPHandlers
 
 	handler utils.Atomic[http.Handler]
 }
@@ -25,10 +25,10 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Park until requests are unblocked. enter returns false only if the
 	// request's context is canceled while parked, which here means the
 	// connection closed; the client is gone, so there is no response to write.
-	if !h.parent.Enter(r.Context()) {
+	if !h.parent.enter(r.Context()) {
 		return
 	}
-	defer h.parent.Leave()
+	defer h.parent.leave()
 
 	handler := h.handler.Get()
 
@@ -44,22 +44,22 @@ func (h *httpHandler) set(handler http.Handler) {
 	h.handler.Set(handler)
 }
 
-// HTTPHandlers is a collection of updatable routes. It can block new requests
+// MutableHTTPHandlers is a collection of updatable routes. It can block new requests
 // to every route and drain the in-flight ones, so an API implementation can
 // safely change routing.
-type HTTPHandlers struct {
+type MutableHTTPHandlers struct {
 	lock sync.Mutex
 	// cond is broadcast when blocked becomes false or inflight goes to 0,
-	// waking any waiters in Enter and Drain to re-check their conditions.
+	// waking any waiters in enter and Drain to re-check their conditions.
 	cond     *lock.Cond
 	routes   map[string]*httpHandler
 	blocked  bool // whether new requests are parked
 	inflight int  // number of requests currently being served
 }
 
-// NewHTTPHandlers returns a new [HTTPHandlers] with the given paths registered.
-func NewHTTPHandlers(paths ...string) *HTTPHandlers {
-	h := &HTTPHandlers{
+// NewMutableHTTPHandlers returns a new [MutableHTTPHandlers] with the given paths registered.
+func NewMutableHTTPHandlers(paths ...string) *MutableHTTPHandlers {
+	h := &MutableHTTPHandlers{
 		routes: make(map[string]*httpHandler),
 	}
 	h.cond = lock.NewCond(&h.lock)
@@ -69,9 +69,9 @@ func NewHTTPHandlers(paths ...string) *HTTPHandlers {
 	return h
 }
 
-// Block parks new requests to every route until [HTTPHandlers.Unblock] is
+// Block parks new requests to every route until [MutableHTTPHandlers.Unblock] is
 // called. In-flight requests are unaffected.
-func (h *HTTPHandlers) Block() {
+func (h *MutableHTTPHandlers) Block() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -79,8 +79,8 @@ func (h *HTTPHandlers) Block() {
 }
 
 // Unblock lets new requests through again, releasing any parked by
-// [HTTPHandlers.Block].
-func (h *HTTPHandlers) Unblock() {
+// [MutableHTTPHandlers.Block].
+func (h *MutableHTTPHandlers) Unblock() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -90,7 +90,7 @@ func (h *HTTPHandlers) Unblock() {
 
 // Drain blocks until no requests are in flight or ctx is canceled, returning
 // ctx's error in the latter case.
-func (h *HTTPHandlers) Drain(ctx context.Context) error {
+func (h *MutableHTTPHandlers) Drain(ctx context.Context) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -102,9 +102,9 @@ func (h *HTTPHandlers) Drain(ctx context.Context) error {
 	return nil
 }
 
-// Enter parks while requests are blocked, then registers an in-flight request.
-// If it returns true, [HTTPHandlers.Leave] MUST be called.
-func (h *HTTPHandlers) Enter(ctx context.Context) bool {
+// enter parks while requests are blocked, then registers an in-flight request.
+// If it returns true, [MutableHTTPHandlers.leave] MUST be called.
+func (h *MutableHTTPHandlers) enter(ctx context.Context) bool {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -117,9 +117,9 @@ func (h *HTTPHandlers) Enter(ctx context.Context) bool {
 	return true
 }
 
-// Leave records that an in-flight request returned, waking [HTTPHandlers.Drain]
+// leave records that an in-flight request returned, waking [MutableHTTPHandlers.Drain]
 // if none remain.
-func (h *HTTPHandlers) Leave() {
+func (h *MutableHTTPHandlers) leave() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -131,7 +131,7 @@ func (h *HTTPHandlers) Leave() {
 
 // Set rebinds tracked routes to newHandlers. Routes absent from newHandlers
 // are kept but serve 404.
-func (h *HTTPHandlers) Set(newHandlers map[string]http.Handler) {
+func (h *MutableHTTPHandlers) Set(newHandlers map[string]http.Handler) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -152,7 +152,7 @@ func (h *HTTPHandlers) Set(newHandlers map[string]http.Handler) {
 }
 
 // AsInterface returns the tracked routes as an [http.Handler] map.
-func (h *HTTPHandlers) AsInterface() map[string]http.Handler {
+func (h *MutableHTTPHandlers) AsInterface() map[string]http.Handler {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

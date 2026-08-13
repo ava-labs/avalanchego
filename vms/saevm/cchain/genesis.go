@@ -171,15 +171,13 @@ var (
 	errNoHeadHeader        = errors.New("no head header")
 )
 
-// setup configures the database with genesis.
-//
-// It verifies that the genesis is compatible with any previously setup genesis
-// state by checking the genesis block hash along with the rules used to execute
-// the head block.
+// checkCompatibility verifies that the genesis is compatible with any
+// previously stored genesis state by checking the genesis block hash along with
+// the rules used to execute the head block.
 //
 // Once the chain is ready to be initialized, one must call
 // [genesis.checkAndWriteState] to ensure the genesis state is available.
-func (g *genesis) setup(db ethdb.Database) error {
+func (g *genesis) checkCompatibility(db ethdb.Database) error {
 	block, err := g.block()
 	if err != nil {
 		return fmt.Errorf("constructing genesis block: %w", err)
@@ -199,26 +197,24 @@ func (g *genesis) setup(db ethdb.Database) error {
 
 	// If the rules change for the head block, it may have been executed
 	// incorrectly.
-	{
-		prev := rawdb.ReadChainConfig(db, hash)
-		if prev == nil {
-			return errNoStoredChainConfig
-		}
-		head := rawdb.ReadHeadHeader(db)
-		if head == nil {
-			return errNoHeadHeader
-		}
-		height, timestamp := head.Number.Uint64(), head.Time
-		// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-		// that bypasses this compatibility check; we need to make such a check
-		// unnecessary for the c-chain.
-		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
-			return fmt.Errorf("incompatible chain config: %w", err)
-		}
-		// We will be executing new blocks based on the new chain config, so we
-		// need to keep it up-to-date in the database for the next restart.
-		rawdb.WriteChainConfig(db, hash, g.Config)
+	prev := rawdb.ReadChainConfig(db, hash)
+	if prev == nil {
+		return errNoStoredChainConfig
 	}
+	head := rawdb.ReadHeadHeader(db)
+	if head == nil {
+		return errNoHeadHeader
+	}
+	height, timestamp := head.Number.Uint64(), head.Time
+	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
+	// that bypasses this compatibility check; we need to make such a check
+	// unnecessary for the c-chain.
+	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
+		return fmt.Errorf("incompatible chain config: %w", err)
+	}
+	// We will be executing new blocks based on the new chain config, so we
+	// need to keep it up-to-date in the database for the next restart.
+	rawdb.WriteChainConfig(db, hash, g.Config)
 
 	return nil
 }
@@ -333,9 +329,9 @@ func activatePrecompile(statedb *state.StateDB, addr common.Address) {
 	statedb.SetCode(addr, []byte{0x01})
 }
 
-// checkAndWriteState commits the genesis allocation to the state database if
+// setupTrieDB commits the genesis allocation to the state database if
 // it is not already present.
-func (g *genesis) checkAndWriteState(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+func (g *genesis) setupTrieDB(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
 	root, err := g.root()
 	if err != nil {
 		return fmt.Errorf("computing genesis root: %w", err)

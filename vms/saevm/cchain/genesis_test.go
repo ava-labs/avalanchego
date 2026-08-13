@@ -614,7 +614,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.setup(db), "%T.setup(initial)", g)
+			require.NoErrorf(t, g.checkCompatibility(db), "%T.setup(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
@@ -643,7 +643,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.setup(db)
+			err = g.checkCompatibility(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
 			}

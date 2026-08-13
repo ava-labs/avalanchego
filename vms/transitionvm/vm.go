@@ -61,7 +61,7 @@ type VM struct {
 	consensusState utils.Atomic[snow.State]
 	preferenceSet  utils.Atomic[bool]
 	connections    *connections
-	httpHandlers   *api.HTTPHandlers
+	httpHandlers   *api.MutableHTTPHandlers
 	current        *current
 }
 
@@ -108,7 +108,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 
 	vm.connections = newConnections()
-	vm.httpHandlers = api.NewHTTPHandlers()
+	vm.httpHandlers = api.NewMutableHTTPHandlers()
 
 	log := preChainCtx.Log
 	log.Info("checking for transition marker")

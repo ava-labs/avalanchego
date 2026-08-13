@@ -23,8 +23,8 @@ import (
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
-		vm.onBootstrappingOnce.Do(func() {
-			err = vm.onBootstrapping(ctx)
+		vm.prepBlockHandlingOnce.Do(func() {
+			err = vm.prepBlockHandling(ctx)
 		})
 		if err != nil {
 			return err
