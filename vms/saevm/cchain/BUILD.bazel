@@ -120,7 +120,6 @@ go_test(
         "genesis_test.go",
         "gossip_test.go",
         "hooks_test.go",
-        "http_test.go",
         "metrics_test.go",
         "state_test.go",
         "vm_test.go",

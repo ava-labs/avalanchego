@@ -21,6 +21,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -73,7 +74,7 @@ type VM struct {
 	mode                utils.Atomic[snow.State]
 	deferredArgs        *deferredInit
 	onBootstrappingOnce sync.Once
-	handlers            handlerMap
+	handlers            *api.HTTPHandlers
 
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -190,7 +191,7 @@ func (vm *VM) Initialize(
 		warpStorage: warpStorage,
 		registry:    reg,
 	}
-	vm.handlers = newHandlerMap(handlerPaths...)
+	vm.handlers = api.NewHTTPHandlers(handlerPaths...)
 	return nil
 }
 
