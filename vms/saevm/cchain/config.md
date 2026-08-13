@@ -63,6 +63,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 | `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
+| `state-replay-concurrency` | uint64 | Maximum number of historical state requests that may replay blocks concurrently. | `1` |
 
 ## State Sync
 
