@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -364,10 +363,10 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			responder := &staticResponder{blocks: [][]byte{tt.served}, cancel: cancel}
-			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID,
-				handlers.NewHandler(logging.NoLog{}, responder)))
+			// The syncer only re-requests after rejecting, so a second request
+			// is the rejection signal and ends a sync that never converges.
+			guard := synctest.NewCancelAfter(&staticResponder{blocks: [][]byte{tt.served}}, 2, cancel)
+			net, tracker := synctest.ServeResponder(t, ctx, logging.NoLog{}, p2p.EVMBlockRequestHandlerID, guard)
 
 			var opts []SyncerOption
 			if tt.verify != nil {
@@ -379,23 +378,17 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
 			require.Nil(t, rawdb.ReadBlock(target, tip.Hash(), tip.NumberU64()))
-			require.Greater(t, responder.served.Load(), int32(1), "the response was never rejected and re-requested")
+			require.True(t, guard.Fired(), "the response was never rejected and re-requested")
 		})
 	}
 }
 
-// staticResponder answers every request with the same blocks and cancels on
-// the second, which the syncer only sends after rejecting the first.
+// staticResponder answers every request with the same blocks.
 type staticResponder struct {
 	blocks [][]byte
-	cancel context.CancelFunc
-	served atomic.Int32
 }
 
 func (r *staticResponder) Respond(context.Context, ids.NodeID, *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
-	if r.served.Add(1) > 1 {
-		r.cancel()
-	}
 	return &syncpb.GetBlockResponse{Blocks: r.blocks}, nil
 }
 
