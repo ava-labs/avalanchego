@@ -1168,17 +1168,6 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			},
 		},
 		{
-			name:     "firewood_archival",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available.
-				// The last executed state MUST NOT be available, since
-				// Firewood guarantees recovery from the last committed proposal.
-				return height < numBlocks
-			},
-		},
-		{
 			name:     "firewood",
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,

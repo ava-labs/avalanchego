@@ -106,10 +106,6 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 			// Firewood doesn't allow memory-only operation
 			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
 		}
-		if c.Archival {
-			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
-			c.CommitInterval = 1
-		}
 		return &triedb.Config{
 			DBOverride: firewood.Config{
 				Path:                   filepath.Join(dataDir, graftfw.Directory),
