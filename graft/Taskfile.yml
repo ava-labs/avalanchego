@@ -11,7 +11,6 @@ vars:
   # dev-shell toolchain when nix is available, without nesting nix shells.
   NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
   # REPO_MODULE: github.com/ava-labs/REPO_NAME
-  STREVM_MODULE: github.com/ava-labs/strevm
 
 tasks:
   default: '{{.NIX_RUN}} {{.TASKFILE_DIR}}/../scripts/run_task.sh --list'
@@ -30,14 +29,3 @@ tasks:
       - sh: 'test -n "{{.CLI_ARGS}}"'
         msg: "Usage: task graft:firewood-subtree-merge -- <source-path>"
     cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} firewood
-
-  strevm-rewrite-imports:
-    desc: Rewrite imports of out-of-tree strevm ({{.STREVM_MODULE}}) to in-tree saevm
-    cmd: bash {{.TASKFILE_DIR}}/scripts/rewrite-imports.sh {{.STREVM_MODULE}} github.com/ava-labs/avalanchego/vms/saevm
-
-  strevm-subtree-merge:
-    desc: Perform git subtree merge of strevm into vms/saevm from a local source (commits)
-    preconditions:
-      - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Usage: task graft:strevm-subtree-merge -- <source-path>"
-    cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} vms/saevm
