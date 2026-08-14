@@ -93,7 +93,7 @@ func TestSyncer(t *testing.T) {
 			syncer, target := newSyncer(t, ctx, root, recording)
 			require.NoError(t, syncer.Sync(ctx))
 
-			require.Equal(t, tt.wantRequests, recording.Count())
+			require.Len(t, recording.Requests(), tt.wantRequests)
 			requireReconstructed(t, target, root, keys, vals)
 		})
 	}
@@ -127,10 +127,15 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 
-	// Every response is tampered. Cancel after a few retries, no wall-clock wait.
-	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), -1, tamperLeaf)
-	syncer, target := newSyncer(t, ctx, root, synctest.NewCancelAfter(tampering, 3, cancel))
+	// Corrupting as many responses as the guard allows tampers every one the
+	// syncer sees, and cancelling ends a sync that never converges.
+	const attempts = 3
+	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), attempts, tamperLeaf)
+	guard := synctest.NewCancelAfter(tampering, attempts, cancel)
+
+	syncer, target := newSyncer(t, ctx, root, guard)
 	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled, "tampered leaves must never be accepted")
+	require.True(t, guard.Fired(), "the sync ended for a reason other than the guard")
 
 	// Nothing accepted, target stays empty.
 	it := target.NewIterator(nil, nil)
