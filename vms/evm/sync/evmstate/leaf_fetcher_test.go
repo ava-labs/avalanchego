@@ -188,7 +188,7 @@ func TestLeafFetch_BadResponses(t *testing.T) {
 
 	tests := []struct {
 		name string
-		// badResponses is how many responses to corrupt, negative for every one.
+		// badResponses is how many responses to corrupt from the first onwards.
 		badResponses int
 		cancelAfter  int
 		wantErr      error
@@ -198,8 +198,9 @@ func TestLeafFetch_BadResponses(t *testing.T) {
 			badResponses: 2,
 		},
 		{
+			// Corrupt every response the guard allows, so only the cancel can end it.
 			name:         "never accepts tampered leaves",
-			badResponses: -1,
+			badResponses: 3,
 			cancelAfter:  3,
 			wantErr:      context.Canceled,
 		},
@@ -251,7 +252,7 @@ func recordingLeafResponder(tb testing.TB, trieDB *triedb.Database) *leafRecorde
 	return synctest.NewRecordingResponder(newLeafResponder(tb, trieDB))
 }
 
-// flakyLeafResponder corrupts the first badResponses responses. Negative corrupts all.
+// flakyLeafResponder corrupts the first badResponses responses.
 func flakyLeafResponder(tb testing.TB, trieDB *triedb.Database, badResponses int) leafResponder {
 	return synctest.NewMutatingResponder(
 		newLeafResponder(tb, trieDB),
