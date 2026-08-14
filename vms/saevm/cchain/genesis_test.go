@@ -469,7 +469,7 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 	return c
 }
 
-func TestSetupGenesis(t *testing.T) {
+func TestWriteGenesis(t *testing.T) {
 	const emptyGenesis = `{
 		"config":{
 			"chainId":2
@@ -614,7 +614,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.checkCompatibility(db), "%T.setup(initial)", g)
+			require.NoErrorf(t, g.verifyAndWriteBlock(db), "%T.verifyAndWriteBlock(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
@@ -643,9 +643,9 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.checkCompatibility(db)
+			err = g.verifyAndWriteBlock(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
+				t.Fatalf("%T.verifyAndWriteBlock(restart) error (-want +got)\n%s", g, diff)
 			}
 			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
 			if tt.wantErr != nil {
@@ -676,10 +676,7 @@ func TestWriteGenesisState(t *testing.T) {
 
 	block, err := g.block()
 	require.NoErrorf(t, err, "%T.block()", g)
-
-	root, err := g.root()
-	require.NoErrorf(t, err, "%T.root()", g)
-	require.Equal(t, block.Root(), root, "%T.root()", g)
+	root := block.Root()
 
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)

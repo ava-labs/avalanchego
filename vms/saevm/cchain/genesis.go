@@ -171,13 +171,13 @@ var (
 	errNoHeadHeader        = errors.New("no head header")
 )
 
-// checkCompatibility verifies that the genesis is compatible with any
+// verifyAndWriteBlock verifies that the genesis is compatible with any
 // previously stored genesis state by checking the genesis block hash along with
 // the rules used to execute the head block.
 //
 // Once the chain is ready to be initialized, one must call
-// [genesis.checkAndWriteState] to ensure the genesis state is available.
-func (g *genesis) checkCompatibility(db ethdb.Database) error {
+// [genesis.setupTrieDB] to ensure the genesis state is available.
+func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	block, err := g.block()
 	if err != nil {
 		return fmt.Errorf("constructing genesis block: %w", err)
