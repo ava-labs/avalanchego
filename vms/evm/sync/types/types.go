@@ -3,7 +3,18 @@
 
 package types
 
-import "context"
+import (
+	"context"
+
+	"google.golang.org/protobuf/proto"
+)
+
+// ProtoMessage constrains a message to its pointer type, so a generic holder can
+// allocate one with new instead of taking a constructor.
+type ProtoMessage[T any] interface {
+	proto.Message
+	*T
+}
 
 // Syncer is the interface every sync operation implements, independent of its
 // mechanism or storage layer.
