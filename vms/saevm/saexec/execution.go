@@ -261,8 +261,7 @@ func (e *Executor) executeTransactions(
 	gasClock.BeforeBlock(e.hooks.BlockTime(header))
 	interimTime := gasClock.Time.Clone()
 
-	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	if err := startExecutingBlock(e.hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+	if err := e.StateBeforeTransactions(b, stateDB); err != nil {
 		return nil, err
 	}
 
