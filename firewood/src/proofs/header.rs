@@ -7,6 +7,8 @@
 //! The header contains metadata about the proof format including version, hash mode,
 //! branching factor, and proof type, enabling quick validation before deserialization.
 
+use firewood_storage::NodeHashAlgorithm;
+
 use super::{magic, types::ProofType};
 
 /// A fixed-size header at the beginning of every serialized proof.
@@ -36,12 +38,25 @@ const _: () = {
     assert!(size_of::<Header>() == 32);
 };
 
-impl From<ProofType> for Header {
-    fn from(proof_type: ProofType) -> Self {
+/// Fields resolved from a successfully validated proof header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ValidatedHeader {
+    /// The type of proof encoded in the body.
+    pub(super) proof_type: ProofType,
+    /// The node-hashing algorithm used to encode the proof body.
+    pub(super) node_hash_algorithm: NodeHashAlgorithm,
+}
+
+impl From<(ProofType, NodeHashAlgorithm)> for Header {
+    fn from((proof_type, hash_mode): (ProofType, NodeHashAlgorithm)) -> Self {
+        let hash_mode = match hash_mode {
+            NodeHashAlgorithm::MerkleDB => magic::MERKLEDB_HASH_MODE,
+            NodeHashAlgorithm::Ethereum => magic::ETHEREUM_HASH_MODE,
+        };
         Self {
             magic: *magic::PROOF_HEADER,
             version: magic::PROOF_VERSION,
-            hash_mode: magic::HASH_MODE,
+            hash_mode,
             branch_factor: magic::BRANCH_FACTOR,
             proof_type: proof_type as u8,
             _reserved: [0; 20],
@@ -50,19 +65,25 @@ impl From<ProofType> for Header {
 }
 
 impl Header {
-    /// Validates the header, returning the discovered proof type if valid.
+    /// Validates the header and returns its resolved fields.
     ///
-    /// If `expected_type` is `Some`, the proof type must match (in which case the return
-    /// value can be ignored).
+    /// If `expected_type` is `Some`, the proof type must match (in which case the
+    /// returned proof type can be ignored). The resolved algorithm is taken from
+    /// the self-describing `hash_mode` header byte: any known mode (`0` =
+    /// MerkleDB, `1` = Ethereum) is accepted so a single binary can parse either
+    /// wire format; only a truly-unknown byte is rejected.
+    /// .
     ///
     /// # Errors
     ///
-    /// Returns an [`InvalidHeader`] if the header is invalid. See the enum variants for
-    /// possible reasons.
+    /// Returns:
+    /// - [`InvalidHeader`] if the header is invalid. See the enum variants for
+    ///   possible reasons.
+    /// - [`InvalidHeader::UnsupportedHashMode`] if the header's `hash_mode` byte is unrecognized.
     pub(super) fn validate(
         &self,
         expected_type: Option<ProofType>,
-    ) -> Result<ProofType, InvalidHeader> {
+    ) -> Result<ValidatedHeader, InvalidHeader> {
         if self.magic != *magic::PROOF_HEADER {
             return Err(InvalidHeader::InvalidMagic { found: self.magic });
         }
@@ -73,11 +94,12 @@ impl Header {
             });
         }
 
-        if self.hash_mode != magic::HASH_MODE {
-            return Err(InvalidHeader::UnsupportedHashMode {
+        // Resolve the self-describing hash-mode byte into an algorithm.
+        let algorithm = NodeHashAlgorithm::try_from(u64::from(self.hash_mode)).map_err(|_| {
+            InvalidHeader::UnsupportedHashMode {
                 found: self.hash_mode,
-            });
-        }
+            }
+        })?;
 
         if self.branch_factor != magic::BRANCH_FACTOR {
             return Err(InvalidHeader::UnsupportedBranchFactor {
@@ -96,7 +118,10 @@ impl Header {
                     expected: Some(expected),
                 })
             }
-            (Some(found), _) => Ok(found),
+            (Some(found), _) => Ok(ValidatedHeader {
+                proof_type: found,
+                node_hash_algorithm: algorithm,
+            }),
         }
     }
 }
@@ -119,12 +144,13 @@ pub enum InvalidHeader {
         /// The version byte found instead of a supported version.
         found: u8,
     },
-    /// The proof was encoded for an unsupported hash mode.
+    /// The proof was encoded for an unknown hash mode (a byte that maps to no
+    /// known [`NodeHashAlgorithm`]).
     #[error(
-        "unsupported hash mode: found {found:02x} ({}); expected {:02x} ({})",
+        "unsupported hash mode: found {found:02x} ({}); expected {:02x} (sha256) or {:02x} (keccak256)",
         magic::hash_mode_name(*found),
-        magic::HASH_MODE,
-        magic::hash_mode_name(magic::HASH_MODE)
+        0u8,
+        1u8,
     )]
     UnsupportedHashMode {
         /// The flag indicating which hash mode created this proof.

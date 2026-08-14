@@ -8,7 +8,7 @@
 //! validation of the format.
 
 use super::{
-    header::{Header, InvalidHeader},
+    header::InvalidHeader,
     reader::{ProofReader, ReadError, ReadItem, V0Reader, Version0},
     types::{Proof, ProofNode, ProofType},
 };
@@ -19,9 +19,7 @@ use crate::{
     merkle::{Key, Value},
     proofs::magic::{BATCH_DELETE, BATCH_DELETE_RANGE, BATCH_PUT},
 };
-use firewood_storage::{
-    DefaultHashMode, HashMode, HashType, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest,
-};
+use firewood_storage::{HashType, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest};
 use integer_encoding::VarInt;
 use std::num::NonZeroUsize;
 
@@ -38,14 +36,19 @@ impl FrozenRangeProof {
     pub fn from_slice(data: &[u8]) -> Result<Self, ReadError> {
         let mut reader = ProofReader::new(data);
 
-        let header = reader.read_item::<Header>()?;
-        header
+        let header = reader.read_header()?;
+        let validated_header = header
             .validate(Some(ProofType::Range))
             .map_err(ReadError::InvalidHeader)?;
 
         match header.version {
             0 => {
-                let mut reader = V0Reader::new(reader, header);
+                // Body reads dispatch on the proof's own self-describing mode
+                // so this binary reads either wire format.
+                let mut reader = V0Reader::new(
+                    reader.into_body(validated_header.node_hash_algorithm),
+                    header,
+                );
                 let this = reader.read_v0_item()?;
                 if reader.remainder().is_empty() {
                     Ok(this)
@@ -99,8 +102,8 @@ impl FrozenChangeProof {
     pub fn from_slice(data: &[u8]) -> Result<Self, ReadError> {
         let mut reader = ProofReader::new(data);
 
-        let header = reader.read_item::<Header>()?;
-        header
+        let header = reader.read_header()?;
+        let validated_header = header
             .validate(Some(ProofType::Change))
             .map_err(ReadError::InvalidHeader)?;
 
@@ -112,7 +115,12 @@ impl FrozenChangeProof {
             ));
         }
 
-        let mut reader = V0Reader::new(reader, header);
+        // Body reads dispatch on the proof's own self-describing mode so this
+        // binary reads either wire format.
+        let mut reader = V0Reader::new(
+            reader.into_body(validated_header.node_hash_algorithm),
+            header,
+        );
         let this = reader.read_v0_item()?;
         if reader.remainder().is_empty() {
             Ok(this)
@@ -132,10 +140,11 @@ impl Version0 for FrozenRangeProof {
         let end_proof = reader.read_v0_item()?;
         let key_values = reader.read_v0_item()?;
 
-        Ok(Self::new(
+        Ok(Self::with_hash_mode(
             Proof::new(start_proof),
             Proof::new(end_proof),
             key_values,
+            reader.node_hash_algorithm(),
         ))
     }
 }
@@ -146,10 +155,11 @@ impl Version0 for FrozenChangeProof {
         let end_proof = reader.read_v0_item()?;
         let key_values = reader.read_v0_item()?;
 
-        Ok(Self::new(
+        Ok(Self::with_hash_mode(
             Proof::new(start_proof),
             Proof::new(end_proof),
             key_values,
+            reader.node_hash_algorithm(),
         ))
     }
 }
@@ -228,16 +238,6 @@ impl Version0 for (Box<[u8]>, Box<[u8]>) {
 
     fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
         Ok((reader.read_item()?, reader.read_item()?))
-    }
-}
-
-impl<'a> ReadItem<'a> for Header {
-    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
-        reader
-            .read_chunk::<{ size_of::<Header>() }>()
-            .map_err(|err| err.set_item("header"))
-            .copied()
-            .map(bytemuck::cast)
     }
 }
 
@@ -346,9 +346,10 @@ impl<'a> ReadItem<'a> for ChildMask {
 impl<'a> ReadItem<'a> for HashType {
     fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
         // The two schemes use different proof wire layouts for a child hash;
-        // dispatch on the database's algorithm so each format is read back the
-        // way it was written.
-        if DefaultHashMode::ALGORITHM.is_ethereum() {
+        // dispatch on the proof's own self-describing mode (resolved from the
+        // header byte and threaded onto the reader) so each format is read back
+        // the way it was written, regardless of the compile default.
+        if reader.node_hash_algorithm().is_ethereum() {
             match reader
                 .read_item::<u8>()
                 .map_err(|err| err.set_item("hash type discriminant"))?

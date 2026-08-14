@@ -51,8 +51,8 @@ use crate::proofs::eth::ACCOUNT_DEPTH_NIBBLES;
 use firewood_storage::hash_node_as_storage_trie_root_parts;
 use firewood_storage::{
     Children, DefaultHashMode, DenseChildren, FileIoError, HashMode, HashType, Hashable,
-    IntoSplitPath, NibblesIterator, Path, PathBuf, PathComponent, PathIterItem, Preimage, RlpError,
-    SplitPath, TrieHash, TriePath, ValueDigest,
+    IntoSplitPath, NibblesIterator, NodeHashAlgorithm, Path, PathBuf, PathComponent, PathIterItem,
+    Preimage, RlpError, SplitPath, TrieHash, TriePath, ValueDigest,
 };
 use thiserror::Error;
 
@@ -301,6 +301,18 @@ pub enum ProofError {
     /// boundary index, so the proof must include that child.
     #[error("exclusion proof missing child at boundary index")]
     ExclusionProofMissingChild,
+
+    /// The proof's self-describing hash mode (from its header byte) does not
+    /// match the mode the verifier was asked to verify against. Distinct from
+    /// [`InvalidHeader::UnsupportedHashMode`](super::InvalidHeader::UnsupportedHashMode),
+    /// which means the header byte maps to no known algorithm at all.
+    #[error("proof hash mode mismatch (expected {expected:?}, found {found:?})")]
+    HashModeMismatch {
+        /// The hash algorithm the verifier was asked to verify against.
+        expected: NodeHashAlgorithm,
+        /// The hash algorithm the proof was actually encoded with.
+        found: NodeHashAlgorithm,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq)]

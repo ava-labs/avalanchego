@@ -4,7 +4,7 @@
 use std::num::NonZeroUsize;
 
 use firewood::{
-    KeyRange, ProofError, RangeProofVerificationContext,
+    KeyRange, NodeHashAlgorithm, ProofError, RangeProofVerificationContext,
     api::{self, DbView, FrozenRangeProof, HashKey},
 };
 use firewood_metrics::{MetricsContext, firewood_counter};
@@ -129,11 +129,13 @@ impl<'db> RangeProofContext<'db> {
 
         debug_assert!(self.verification.is_none());
 
+        // Expected mode is compile-time default - any proof with a different mode is rejected up front.
         self.verification = Some(firewood::verify_range_proof_structure(
             &self.proof,
             root,
             start_key,
             end_key,
+            NodeHashAlgorithm::compile_option(),
             max_length,
         )?);
         Ok(())

@@ -7,7 +7,9 @@
 //! It provides efficient encoding of proof nodes, child bitmaps, and range proofs
 //! for transmission or persistent storage.
 
-use firewood_storage::{DefaultHashMode, HashMode, PathBuf, PathComponentSliceExt, ValueDigest};
+use firewood_storage::{
+    EthHash, MerkleDbHash, NodeHashAlgorithm, PathBuf, PathComponentSliceExt, ValueDigest,
+};
 use integer_encoding::VarInt;
 
 use super::{
@@ -78,15 +80,40 @@ impl FrozenRangeProof {
     ///
     /// Variable-length integers are encoded using unsigned LEB128.
     pub fn write_to_vec(&self, out: &mut Vec<u8>) {
-        Header::from(ProofType::Range).write_item(out);
-        self.write_item(out);
+        // The proof's hash mode determines the child-hash wire layout and the
+        // value-digest hashing rule; use its self-describing mode rather than
+        // the compile default.
+        let mut w = ProofWriter {
+            out,
+            mode: self.hash_mode(),
+        };
+        Header::from((ProofType::Range, w.mode)).write_item(&mut w);
+        self.write_item(&mut w);
     }
 }
 
 impl FrozenChangeProof {
     pub fn write_to_vec(&self, out: &mut Vec<u8>) {
-        Header::from(ProofType::Change).write_item(out);
-        self.write_item(out);
+        let mut w = ProofWriter {
+            out,
+            mode: self.hash_mode(),
+        };
+        Header::from((ProofType::Change, w.mode)).write_item(&mut w);
+        self.write_item(&mut w);
+    }
+}
+
+/// Mirrors `ProofReader`: carries the output buffer and the hash mode the proof
+/// is encoded with. Mode-dependent items (`ValueDigest`, `HashType`) consult
+/// `node_hash_algorithm()`; everything else just writes.
+struct ProofWriter<'a> {
+    out: &'a mut Vec<u8>,
+    mode: NodeHashAlgorithm,
+}
+
+impl ProofWriter<'_> {
+    const fn node_hash_algorithm(&self) -> NodeHashAlgorithm {
+        self.mode
     }
 }
 
@@ -104,42 +131,42 @@ impl PushVarInt for Vec<u8> {
 }
 
 trait WriteItem {
-    fn write_item(&self, out: &mut Vec<u8>);
+    fn write_item(&self, w: &mut ProofWriter<'_>);
 }
 
 impl WriteItem for FrozenRangeProof {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        self.start_proof().write_item(out);
-        self.end_proof().write_item(out);
-        self.key_values().write_item(out);
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        self.start_proof().write_item(w);
+        self.end_proof().write_item(w);
+        self.key_values().write_item(w);
     }
 }
 
 impl WriteItem for FrozenChangeProof {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        self.start_proof().write_item(out);
-        self.end_proof().write_item(out);
-        self.batch_ops().write_item(out);
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        self.start_proof().write_item(w);
+        self.end_proof().write_item(w);
+        self.batch_ops().write_item(w);
     }
 }
 
 impl WriteItem for [BatchOp<Key, Value>] {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.push_var_int(self.len());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.push_var_int(self.len());
         for item in self {
             match item {
                 BatchOp::Put { key, value } => {
-                    out.push(BATCH_PUT);
-                    key.write_item(out);
-                    value.write_item(out);
+                    w.out.push(BATCH_PUT);
+                    key.write_item(w);
+                    value.write_item(w);
                 }
                 BatchOp::Delete { key } => {
-                    out.push(BATCH_DELETE);
-                    key.write_item(out);
+                    w.out.push(BATCH_DELETE);
+                    key.write_item(w);
                 }
                 BatchOp::DeleteRange { prefix } => {
-                    out.push(BATCH_DELETE_RANGE);
-                    prefix.write_item(out);
+                    w.out.push(BATCH_DELETE_RANGE);
+                    prefix.write_item(w);
                 }
             }
         }
@@ -147,101 +174,108 @@ impl WriteItem for [BatchOp<Key, Value>] {
 }
 
 impl WriteItem for ProofNode {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        self.key.write_item(out);
-        out.push_var_int(self.partial_len);
-        self.value_digest.write_item(out);
-        out.extend_from_slice(&self.child_hashes.bitmap().to_le_bytes());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        self.key.write_item(w);
+        w.out.push_var_int(self.partial_len);
+        self.value_digest.write_item(w);
+        w.out
+            .extend_from_slice(&self.child_hashes.bitmap().to_le_bytes());
         for (_, child) in self.child_hashes.iter_present() {
-            child.write_item(out);
+            child.write_item(w);
         }
     }
 }
 
 impl WriteItem for PathBuf {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.push_var_int(self.len());
-        out.extend_from_slice(self.as_byte_slice());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.push_var_int(self.len());
+        w.out.extend_from_slice(self.as_byte_slice());
     }
 }
 
 impl<T: WriteItem> WriteItem for Option<T> {
-    fn write_item(&self, out: &mut Vec<u8>) {
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
         if let Some(v) = self {
-            out.push(1);
-            v.write_item(out);
+            w.out.push(1);
+            v.write_item(w);
         } else {
-            out.push(0);
+            w.out.push(0);
         }
     }
 }
 
 impl<T: WriteItem> WriteItem for [T] {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.push_var_int(self.len());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.push_var_int(self.len());
         for item in self {
-            item.write_item(out);
+            item.write_item(w);
         }
     }
 }
 
 impl WriteItem for [u8] {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.push_var_int(self.len());
-        out.extend_from_slice(self);
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.push_var_int(self.len());
+        w.out.extend_from_slice(self);
     }
 }
 
 impl<T: AsRef<[u8]>> WriteItem for ValueDigest<T> {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        match self.make_hash() {
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        // The value-digest hashing rule (cap large values under MerkleDB,
+        // identity under Ethereum) is selected by the writer's runtime mode.
+        let hashed = match w.node_hash_algorithm() {
+            NodeHashAlgorithm::Ethereum => self.make_hash::<EthHash>(),
+            NodeHashAlgorithm::MerkleDB => self.make_hash::<MerkleDbHash>(),
+        };
+        match hashed {
             ValueDigest::Value(v) => {
-                out.push(0);
-                v.write_item(out);
+                w.out.push(0);
+                v.write_item(w);
             }
             // Only produced by the merkledb scheme (large values hashed); the
             // Ethereum scheme never emits a `Hash` digest.
             ValueDigest::Hash(h) => {
-                out.push(1);
-                h.write_item(out);
+                w.out.push(1);
+                h.write_item(w);
             }
         }
     }
 }
 
 impl WriteItem for Header {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(bytemuck::bytes_of(self));
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.extend_from_slice(bytemuck::bytes_of(self));
     }
 }
 
 impl WriteItem for firewood_storage::TrieHash {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(self.as_ref());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.extend_from_slice(self.as_ref());
     }
 }
 
 impl WriteItem for firewood_storage::HashType {
-    fn write_item(&self, out: &mut Vec<u8>) {
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
         // The two schemes use different proof wire layouts for a child hash;
-        // dispatch on the database's algorithm so each format is preserved
-        // byte-for-byte.
-        if DefaultHashMode::ALGORITHM.is_ethereum() {
+        // dispatch on the writer's runtime algorithm so each format is
+        // preserved byte-for-byte.
+        if w.node_hash_algorithm().is_ethereum() {
             match self {
                 firewood_storage::HashType::Hash(h) => {
-                    out.push(0);
-                    h.write_item(out);
+                    w.out.push(0);
+                    h.write_item(w);
                 }
                 firewood_storage::HashType::Rlp(h) => {
-                    out.push(1);
-                    h.write_item(out);
+                    w.out.push(1);
+                    h.write_item(w);
                 }
             }
         } else {
             // MerkleDB child hashes are always a bare 32-byte hash, with no
             // discriminant byte.
             match self {
-                firewood_storage::HashType::Hash(h) => h.write_item(out),
+                firewood_storage::HashType::Hash(h) => h.write_item(w),
                 firewood_storage::HashType::Rlp(_) => {
                     unreachable!("merkledb child hash is never inline RLP")
                 }
@@ -251,15 +285,15 @@ impl WriteItem for firewood_storage::HashType {
 }
 
 impl WriteItem for ChildMask {
-    fn write_item(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(&self.to_le_bytes());
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
+        w.out.extend_from_slice(&self.to_le_bytes());
     }
 }
 
 impl<K: AsRef<[u8]>, V: AsRef<[u8]>> WriteItem for (K, V) {
-    fn write_item(&self, out: &mut Vec<u8>) {
+    fn write_item(&self, w: &mut ProofWriter<'_>) {
         let (key, value) = self;
-        key.as_ref().write_item(out);
-        value.as_ref().write_item(out);
+        key.as_ref().write_item(w);
+        value.as_ref().write_item(w);
     }
 }

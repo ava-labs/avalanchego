@@ -29,8 +29,8 @@ use firewood_storage::MemStore;
 use firewood_storage::{
     BranchNode, Child, Children, DefaultHashMode, DeletedNodeTracking, FileIoError, HashMode,
     HashType, HashableShunt, HashedNodeReader, ImmutableProposal, LeafNode, MaybePersistedNode,
-    Mutable, MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose,
-    ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
+    Mutable, MutableKind, NibblesIterator, Node, NodeHashAlgorithm, NodeStore, Path, PathBuf,
+    PathComponent, Propose, ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
 };
 use firewood_storage::{
     hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
@@ -773,17 +773,36 @@ fn right_edge<'a>(
 /// this loop is the canonical way to assemble full-range coverage from
 /// truncated proofs.
 ///
+/// # Node Hashing Algorithm
+///
+/// `algorithm` is the hash mode the caller expects the proof to be encoded
+/// with. If the proof's own self-describing mode (resolved from its header byte
+/// at parse time) disagrees, verification is rejected up front with
+/// [`ProofError::HashModeMismatch`].
+///
 /// # Errors
 ///
 /// Returns [`api::Error::ProofError`] if the proof is structurally invalid,
-/// keys are outside the requested range, boundary proofs fail verification,
-/// or the reconstructed root hash doesn't match.
+/// the proof's hash mode does not match `algorithm`, keys are outside the
+/// requested range, boundary proofs fail verification, or the reconstructed
+/// root hash doesn't match.
 pub fn verify_range_proof<H: ProofCollection<Node = ProofNode>>(
     first_key: Option<impl KeyType>,
     last_key: Option<impl KeyType>,
     root_hash: &TrieHash,
+    algorithm: NodeHashAlgorithm,
     proof: &RangeProof<impl KeyType, impl ValueType, H>,
 ) -> Result<(), api::Error> {
+    // Reject a proof whose self-describing mode disagrees with the caller's
+    // expectation before any hashing happens. Node hashing below still follows
+    // the compile default, so only matching-mode proofs may proceed.
+    if proof.hash_mode() != algorithm {
+        return Err(api::Error::ProofError(ProofError::HashModeMismatch {
+            expected: algorithm,
+            found: proof.hash_mode(),
+        }));
+    }
+
     let first_key_bytes: Option<&[u8]> = first_key.as_ref().map(AsRef::as_ref);
     let last_key_bytes: Option<&[u8]> = last_key.as_ref().map(AsRef::as_ref);
 

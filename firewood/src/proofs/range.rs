@@ -58,6 +58,8 @@
 
 use std::num::NonZeroUsize;
 
+use firewood_storage::{DefaultHashMode, HashMode, NodeHashAlgorithm};
+
 use crate::api::{self, FrozenRangeProof, HashKey};
 use crate::merkle::verify_range_proof;
 use crate::proofs::ProofError;
@@ -92,6 +94,11 @@ pub struct RangeProofVerificationContext {
 /// the cryptographic range-proof verification via
 /// [`verify_range_proof`].
 ///
+/// # Node Hashing Algorithm
+///
+/// `algorithm` is the hash mode the caller expects; it is forwarded to
+/// [`verify_range_proof`], which rejects a header-mode-mismatched proof.
+///
 /// # Errors
 ///
 /// Returns [`api::Error::ProofError`] with
@@ -103,6 +110,7 @@ pub fn verify_range_proof_structure(
     root: HashKey,
     start_key: Option<&[u8]>,
     end_key: Option<&[u8]>,
+    algorithm: NodeHashAlgorithm,
     max_length: Option<NonZeroUsize>,
 ) -> Result<RangeProofVerificationContext, api::Error> {
     if let Some(max) = max_length
@@ -113,7 +121,7 @@ pub fn verify_range_proof_structure(
         ));
     }
 
-    verify_range_proof(start_key, end_key, &root, proof)?;
+    verify_range_proof(start_key, end_key, &root, algorithm, proof)?;
 
     Ok(RangeProofVerificationContext {
         root,
@@ -181,6 +189,12 @@ pub struct RangeProof<K, V, H> {
     start_proof: Proof<H>,
     end_proof: Proof<H>,
     key_values: Box<[(K, V)]>,
+    /// The hash algorithm this proof was constructed or parsed with. For proofs
+    /// built in this binary it is the compile default; for proofs parsed via
+    /// [`FrozenRangeProof::from_slice`](crate::api::FrozenRangeProof::from_slice)
+    /// it is resolved from the self-describing header byte.
+    /// [`ProofError::HashModeMismatch`]).
+    hash_mode: NodeHashAlgorithm,
 }
 
 impl<K, V, H> std::fmt::Debug for RangeProof<K, V, H>
@@ -195,6 +209,7 @@ where
             .field("start_proof", &self.start_proof)
             .field("end_proof", &self.end_proof)
             .field("key_values", &self.key_values)
+            .field("hash_mode", &self.hash_mode)
             .finish()
     }
 }
@@ -233,11 +248,38 @@ where
         end_proof: Proof<H>,
         key_values: Box<[(K, V)]>,
     ) -> Self {
+        // Proofs built in this binary carry the compile-default mode.
+        Self::with_hash_mode(
+            start_proof,
+            end_proof,
+            key_values,
+            DefaultHashMode::ALGORITHM,
+        )
+    }
+
+    /// Like [`RangeProof::new`], but records the [`NodeHashAlgorithm`] the proof
+    /// was encoded with. Used by the parse path
+    /// ([`FrozenRangeProof::from_slice`](crate::api::FrozenRangeProof::from_slice))
+    /// to stamp the mode resolved from the self-describing header byte.
+    #[must_use]
+    pub(crate) const fn with_hash_mode(
+        start_proof: Proof<H>,
+        end_proof: Proof<H>,
+        key_values: Box<[(K, V)]>,
+        hash_mode: NodeHashAlgorithm,
+    ) -> Self {
         Self {
             start_proof,
             end_proof,
             key_values,
+            hash_mode,
         }
+    }
+
+    /// The hash algorithm this proof was constructed or parsed with.
+    #[must_use]
+    pub const fn hash_mode(&self) -> NodeHashAlgorithm {
+        self.hash_mode
     }
 
     /// Returns a reference to the start proof, which may be empty.

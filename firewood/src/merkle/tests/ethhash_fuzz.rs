@@ -35,7 +35,7 @@ use crate::api::{
 use crate::db::{Db, DbConfig};
 use crate::merkle::{Key, Value, verify_change_proof_root_hash, verify_range_proof};
 use crate::verify_change_proof_structure;
-use firewood_storage::{SeededRng, replace_list_field};
+use firewood_storage::{NodeHashAlgorithm, SeededRng, replace_list_field};
 use rand::seq::SliceRandom;
 
 /// An account's key paired with its sorted, distinct storage-slot bytes (byte
@@ -473,7 +473,8 @@ fn check_valid_range_proof(
         .range_proof(first, last, None)
         .unwrap_or_else(|e| panic!("range_proof should succeed ({locator}): {e}"));
     let range_proof = maybe_serialize_round_trip_range(rng, range_proof);
-    verify_range_proof(first, last, root, &range_proof)
+    // This fuzzer is ethhash-gated, so every proof it builds is Ethereum-mode.
+    verify_range_proof(first, last, root, NodeHashAlgorithm::Ethereum, &range_proof)
         .unwrap_or_else(|e| panic!("valid range proof should verify ({locator}): {e}"));
     range_proof
 }
@@ -494,8 +495,15 @@ fn check_valid_change_proof(
         .change_proof(start_root.clone(), end_root.clone(), first, last, None)
         .unwrap_or_else(|e| panic!("change_proof should succeed ({locator}): {e}"));
     let change_proof = maybe_serialize_round_trip_change(rng, change_proof);
-    let ctx = verify_change_proof_structure(&change_proof, end_root.clone(), first, last, None)
-        .unwrap_or_else(|e| panic!("valid change proof structure should verify ({locator}): {e}"));
+    let ctx = verify_change_proof_structure(
+        &change_proof,
+        end_root.clone(),
+        first,
+        last,
+        NodeHashAlgorithm::Ethereum,
+        None,
+    )
+    .unwrap_or_else(|e| panic!("valid change proof structure should verify ({locator}): {e}"));
     let parent = db.revision(start_root.clone()).unwrap();
     let proposal = db
         .apply_change_proof_to_parent(&change_proof, &*parent)
@@ -801,7 +809,14 @@ fn test_slow_ethhash_proof_fuzz() {
             ] {
                 if let Some(tampered) = tampered {
                     assert!(
-                        verify_range_proof(first, last, end_root, &tampered).is_err(),
+                        verify_range_proof(
+                            first,
+                            last,
+                            end_root,
+                            NodeHashAlgorithm::Ethereum,
+                            &tampered
+                        )
+                        .is_err(),
                         "tampered range proof must be rejected ({kind}, {locator})"
                     );
                 }
@@ -811,7 +826,8 @@ fn test_slow_ethhash_proof_fuzz() {
             // proof must still be accepted (recomputed at hash time).
             if let Some(forged) = forge_range_storage_root(&range, &rng) {
                 assert!(
-                    verify_range_proof(first, last, end_root, &forged).is_ok(),
+                    verify_range_proof(first, last, end_root, NodeHashAlgorithm::Ethereum, &forged)
+                        .is_ok(),
                     "forged storageRoot range proof must be accepted ({locator})"
                 );
             }

@@ -3,6 +3,8 @@
 
 use std::{fmt::Debug, num::NonZeroUsize};
 
+use firewood_storage::{DefaultHashMode, HashMode, NodeHashAlgorithm};
+
 use crate::{
     Proof, ProofCollection, ProofError,
     api::{self, FrozenChangeProof, HashKey},
@@ -20,6 +22,11 @@ pub struct ChangeProof<K: AsRef<[u8]> + Debug, V: AsRef<[u8]> + Debug, H> {
     start_proof: Proof<H>,
     end_proof: Proof<H>,
     batch_ops: Box<[BatchOp<K, V>]>,
+    /// The hash algorithm this proof was constructed or parsed with. For proofs
+    /// built in this binary it is the compile default; for proofs parsed via
+    /// [`FrozenChangeProof::from_slice`](crate::api::FrozenChangeProof::from_slice)
+    /// it is resolved from the self-describing header byte.
+    hash_mode: NodeHashAlgorithm,
 }
 
 impl<K, V, H> std::fmt::Debug for ChangeProof<K, V, H>
@@ -34,6 +41,7 @@ where
             .field("start_proof", &self.start_proof)
             .field("end_proof", &self.end_proof)
             .field("batch_ops", &self.batch_ops)
+            .field("hash_mode", &self.hash_mode)
             .finish()
     }
 }
@@ -52,11 +60,39 @@ where
         end_proof: Proof<H>,
         key_values: Box<[BatchOp<K, V>]>,
     ) -> Self {
+        // Proofs built in this binary carry the compile-default mode; the parse
+        // path stamps the resolved header mode via `new_with_hash_mode`.
+        Self::with_hash_mode(
+            start_proof,
+            end_proof,
+            key_values,
+            DefaultHashMode::ALGORITHM,
+        )
+    }
+
+    /// Like [`ChangeProof::new`], but records the [`NodeHashAlgorithm`] the proof
+    /// was encoded with. Used by the parse path
+    /// ([`FrozenChangeProof::from_slice`](crate::api::FrozenChangeProof::from_slice))
+    /// to stamp the mode resolved from the self-describing header byte.
+    #[must_use]
+    pub(crate) const fn with_hash_mode(
+        start_proof: Proof<H>,
+        end_proof: Proof<H>,
+        key_values: Box<[BatchOp<K, V>]>,
+        hash_mode: NodeHashAlgorithm,
+    ) -> Self {
         Self {
             start_proof,
             end_proof,
             batch_ops: key_values,
+            hash_mode,
         }
+    }
+
+    /// The hash algorithm this proof was constructed or parsed with.
+    #[must_use]
+    pub const fn hash_mode(&self) -> NodeHashAlgorithm {
+        self.hash_mode
     }
 
     /// Returns a reference to the start proof, which may be empty.
@@ -300,10 +336,18 @@ fn compute_right_edge_key<'a>(
 /// - Start and end proof hash chain verification against `end_root`
 /// - End proof inclusion/exclusion consistency with the last batch operation
 ///
+/// # Node Hashing Algorithm
+///
+/// `algorithm` is the hash mode the caller expects the proof to be encoded
+/// with. If the proof's own self-describing mode (from its header byte)
+/// disagrees, verification is rejected up front with
+/// [`ProofError::HashModeMismatch`] before any node hashing happens.
+///
 /// # Errors
 ///
-/// Returns [`api::Error::ProofError`] if the proof is structurally invalid
-/// or boundary proof hash chains fail verification.
+/// Returns [`api::Error::ProofError`] if the proof is structurally invalid,
+/// the proof's hash mode does not match `algorithm`, or boundary proof hash
+/// chains fail verification.
 ///
 /// On success, returns a [`ChangeProofVerificationContext`] capturing the
 /// verification parameters for use by downstream root hash verification.
@@ -312,8 +356,18 @@ pub fn verify_change_proof_structure(
     end_root: HashKey,
     start_key: Option<&[u8]>,
     end_key: Option<&[u8]>,
+    algorithm: NodeHashAlgorithm,
     max_length: Option<NonZeroUsize>,
 ) -> Result<ChangeProofVerificationContext, api::Error> {
+    // Reject a proof whose self-describing mode disagrees with the caller's
+    // expectation before any hashing happens.
+    if proof.hash_mode() != algorithm {
+        return Err(api::Error::ProofError(ProofError::HashModeMismatch {
+            expected: algorithm,
+            found: proof.hash_mode(),
+        }));
+    }
+
     let batch_ops = proof.batch_ops();
 
     // --- O(1) checks first ---

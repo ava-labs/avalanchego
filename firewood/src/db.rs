@@ -22,9 +22,9 @@ use crate::verify_change_proof_structure;
 use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
 use firewood_metrics::{firewood_counter, firewood_histogram};
 use firewood_storage::{
-    CheckOpt, CheckerReport, Committed, CommittedParentHash, FileBacked, FileIoError,
-    HashedNodeReader, ImmutableProposal, NodeHashAlgorithm, NodeStore, Parentable, ReadableStorage,
-    Reconstructed, TrieReader,
+    CheckOpt, CheckerReport, Committed, CommittedParentHash, DefaultHashMode, FileBacked,
+    FileIoError, HashMode, HashedNodeReader, ImmutableProposal, NodeHashAlgorithm, NodeStore,
+    Parentable, ReadableStorage, Reconstructed, TrieReader,
 };
 use std::io::Write;
 use std::num::NonZeroUsize;
@@ -336,8 +336,15 @@ impl Db {
         end_key: Option<&[u8]>,
         max_length: Option<NonZeroUsize>,
     ) -> Result<Proposal<'_>, api::Error> {
-        let verification =
-            verify_change_proof_structure(proof, end_root.clone(), start_key, end_key, max_length)?;
+        // Expected mode is the compile default - a proof with a different mode is rejected.
+        let verification = verify_change_proof_structure(
+            proof,
+            end_root.clone(),
+            start_key,
+            end_key,
+            DefaultHashMode::ALGORITHM,
+            max_length,
+        )?;
         let parent = self.manager.current_revision();
         let proposal = self.apply_change_proof_to_parent(proof, &*parent)?;
         verify_change_proof_root_hash(proof, &verification, &proposal)?;

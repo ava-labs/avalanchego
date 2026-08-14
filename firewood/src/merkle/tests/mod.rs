@@ -18,11 +18,36 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use super::*;
+use crate::proofs::range::RangeProof;
+use crate::{
+    ProofCollection,
+    api::{Error, KeyType, ValueType},
+};
 use crate::{ProofError, ProofNode};
 use firewood_storage::{
-    Committed, DeletedNodeTracking, DenseChildren, MemStore, Mutable, NodeHashAlgorithm, NodeStore,
-    NodeStoreHeader, PathComponent, Propose, RootReader, TrieHash, ValueDigest,
+    Committed, DefaultHashMode, DeletedNodeTracking, DenseChildren, HashMode, MemStore, Mutable,
+    NodeHashAlgorithm, NodeStore, NodeStoreHeader, PathComponent, Propose, RootReader, TrieHash,
+    ValueDigest,
 };
+
+/// Test wrapper around [`crate::merkle::verify_range_proof`] that supplies the
+/// compile-default hash mode as the expected `algorithm` (the mode every proof
+/// built in the test binary carries). Shadows the glob-imported real function
+/// so the many existing call sites need not pass the mode explicitly.
+fn verify_range_proof<H: ProofCollection<Node = ProofNode>>(
+    first_key: Option<impl KeyType>,
+    last_key: Option<impl KeyType>,
+    root_hash: &TrieHash,
+    proof: &RangeProof<impl KeyType, impl ValueType, H>,
+) -> Result<(), Error> {
+    crate::merkle::verify_range_proof(
+        first_key,
+        last_key,
+        root_hash,
+        DefaultHashMode::ALGORITHM,
+        proof,
+    )
+}
 
 // Returns n random key-value pairs.
 fn generate_random_kvs(rng: &firewood_storage::SeededRng, n: usize) -> Vec<(Vec<u8>, Vec<u8>)> {

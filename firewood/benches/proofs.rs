@@ -16,7 +16,9 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use firewood::Merkle;
 use firewood::api::DbView as _;
 use firewood::verify_range_proof_structure;
-use firewood_storage::{DeletedNodeTracking, MemStore, NodeStore, SeededRng};
+use firewood_storage::{
+    DefaultHashMode, DeletedNodeTracking, HashMode, MemStore, NodeStore, SeededRng,
+};
 use rand::{RngExt, distr::Alphanumeric};
 
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
@@ -66,8 +68,15 @@ fn bench_proofs(criterion: &mut Criterion) {
     group.bench_function("range_proof/verify", |b| {
         let proof = view.range_proof(Some(first), Some(last), limit).unwrap();
         b.iter(|| {
-            verify_range_proof_structure(&proof, root_hash.clone(), Some(first), Some(last), limit)
-                .unwrap();
+            verify_range_proof_structure(
+                &proof,
+                root_hash.clone(),
+                Some(first),
+                Some(last),
+                DefaultHashMode::ALGORITHM,
+                limit,
+            )
+            .unwrap();
         });
     });
 

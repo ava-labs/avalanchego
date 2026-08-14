@@ -9,7 +9,7 @@ use crate::api::{BatchOp, FrozenChangeProof, FrozenRangeProof, HashKey};
 use crate::db::Db;
 use crate::merkle::{Key, Value};
 use crate::{ChangeProof, Proof, ProofNode, verify_change_proof_structure};
-use firewood_storage::SeededRng;
+use firewood_storage::{NodeHashAlgorithm, SeededRng};
 
 /// Build a `FrozenChangeProof` from mutated parts.
 pub(in crate::merkle::tests) fn build_change_proof(
@@ -47,7 +47,16 @@ pub(in crate::merkle::tests) fn change_proof_rejected(
     first: Option<&[u8]>,
     last: Option<&[u8]>,
 ) -> bool {
-    match verify_change_proof_structure(proof, end_root.clone(), first, last, None) {
+    // This module is ethhash-gated (only the ethhash-shaped fuzzer uses it),
+    // so every proof it sees is Ethereum-mode.
+    match verify_change_proof_structure(
+        proof,
+        end_root.clone(),
+        first,
+        last,
+        NodeHashAlgorithm::Ethereum,
+        None,
+    ) {
         Err(_) => true,
         Ok(ctx) => verify_and_check(db, proof, &ctx, start_root.clone()).is_err(),
     }
