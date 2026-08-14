@@ -119,7 +119,6 @@ func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64,
 	}
 	var blocks []*types.Block
 	_, err := s.client.Send(ctx, req,
-		func() *syncpb.GetBlockResponse { return &syncpb.GetBlockResponse{} },
 		func(resp *syncpb.GetBlockResponse) error {
 			b, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
 			if err != nil {

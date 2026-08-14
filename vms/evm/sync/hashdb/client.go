@@ -24,7 +24,7 @@ import (
 )
 
 // sender is the transport a [Client] sends requests over.
-type sender = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+type sender = network.Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse]
 
 // Client reads verified leaf ranges over the proto protocol. A caller never
 // sees a range that failed its proof.
@@ -44,7 +44,7 @@ func NewClient(
 ) *Client {
 	return &Client{
 		log: log,
-		sender: network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 			n,
 			handlerID,
 			peers,
@@ -82,7 +82,6 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 
 	var more bool
 	resp, err := c.sender.Send(ctx, reqPB,
-		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
 		func(resp *syncpb.GetLeafResponse) error {
 			m, err := verifyRange(c.minKey, req, resp)
 			if err != nil {
