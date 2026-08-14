@@ -117,7 +117,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 				}
 			}
 
-			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, newLeafResp, verify)
+			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, verify)
 			require.NoError(t, err)
 			require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
 			require.Len(t, got.GetKeys(), 1) // fresh response per attempt, no merge
@@ -144,7 +144,7 @@ func TestSend_NoPeersThenConnect(t *testing.T) {
 		tracker.Connected(nodeID, &version.Application{Major: 99})
 	}()
 
-	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, newLeafResp, acceptLeaf)
+	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
 	require.NoError(t, err)
 	require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
 }
@@ -158,7 +158,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	_, tracker := newTestTracker(t, nodeID)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
-	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, newLeafResp, acceptLeaf)
+	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, got)
 	require.Zero(t, calls.Load())
@@ -192,15 +192,13 @@ func TestSend_CtxExpiryReportsLastFailure(t *testing.T) {
 			_, tracker := newTestTracker(t, peers...)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
-			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, newLeafResp, tt.verify)
+			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, tt.verify)
 			require.Nil(t, got)
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 			require.ErrorIs(t, err, tt.wantLast)
 		})
 	}
 }
-
-func newLeafResp() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} }
 
 func acceptLeaf(*syncpb.GetLeafResponse) error { return nil }
 
@@ -210,9 +208,9 @@ func newRetryDispatcher(
 	nodeID ids.NodeID,
 	h p2p.Handler,
 	tracker *p2p.PeerTracker,
-) *Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] {
+) *Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse] {
 	t.Helper()
-	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)
+	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)
 	c.policy = *options.ApplyTo(defaultRetryPolicy(),
 		WithPeerFailureBackoff(time.Millisecond),
 		WithNoPeersInitialBackoff(time.Millisecond),

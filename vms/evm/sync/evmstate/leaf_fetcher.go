@@ -157,7 +157,6 @@ func (f *leafFetcher) getLeaves(ctx context.Context, t task, start []byte) (leaf
 	}
 	var more bool
 	resp, err := f.client.Send(ctx, req,
-		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
 		func(resp *syncpb.GetLeafResponse) error {
 			m, err := verifyLeaves(root, start, resp)
 			if err != nil {

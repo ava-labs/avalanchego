@@ -67,7 +67,7 @@ func TestDispatcher_SendTo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			_, tracker := newTestTracker(t, nodeID)
-			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
@@ -111,7 +111,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 
 	reg, tracker := newTestTracker(t, nodeID)
 	seedResponsive(t, reg, tracker, nodeID)
-	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
 
@@ -165,7 +165,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 			if tt.seed {
 				seedResponsive(t, reg, tracker, nodeID)
 			}
-			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
@@ -219,15 +219,15 @@ func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p
 	return reg, tracker
 }
 
-func newTestDispatcher[Req, Resp proto.Message](
+func newTestDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	h p2p.Handler,
 	peers *p2p.PeerTracker,
-) *Dispatcher[Req, Resp] {
+) *Dispatcher[Req, V, Resp] {
 	t.Helper()
-	return &Dispatcher[Req, Resp]{
+	return &Dispatcher[Req, V, Resp]{
 		client: p2ptest.NewSelfClient(t, ctx, nodeID, h),
 		peers:  peers,
 	}

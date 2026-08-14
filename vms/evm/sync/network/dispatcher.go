@@ -26,22 +26,29 @@ var (
 	errUnmarshalResponse = errors.New("unmarshal response")
 )
 
+// ProtoMessage constrains a message to its pointer type, so a generic holder can
+// allocate one with new instead of taking a constructor.
+type ProtoMessage[T any] interface {
+	proto.Message
+	*T
+}
+
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
-type Dispatcher[Req, Resp proto.Message] struct {
+type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
 	client *p2p.Client
 	peers  *p2p.PeerTracker
 	policy retryPolicy
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
-func NewDispatcher[Req, Resp proto.Message](
+func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
 	opts ...RetryOption,
-) *Dispatcher[Req, Resp] {
-	return &Dispatcher[Req, Resp]{
+) *Dispatcher[Req, V, Resp] {
+	return &Dispatcher[Req, V, Resp]{
 		client: n.NewClient(handlerID, noopSampler{}),
 		peers:  peers,
 		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
@@ -49,12 +56,10 @@ func NewDispatcher[Req, Resp proto.Message](
 }
 
 // Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// Each attempt gets a fresh Resp from newResp, so a failed one never merges into
-// the next.
-func (d *Dispatcher[Req, Resp]) Send(
+// Each attempt gets its own response.
+func (d *Dispatcher[Req, V, Resp]) Send(
 	ctx context.Context,
 	req Req,
-	newResp func() Resp,
 	verify func(Resp) error,
 ) (Resp, error) {
 	return doRetry(ctx, d.policy, verify, func() (Resp, *Outcome, error) {
@@ -63,7 +68,7 @@ func (d *Dispatcher[Req, Resp]) Send(
 			var zero Resp
 			return zero, nil, errNoPeers
 		}
-		resp := newResp()
+		resp := Resp(new(V))
 		outcome, err := d.SendTo(ctx, nodeID, req, resp)
 		return resp, outcome, err
 	})
@@ -72,7 +77,7 @@ func (d *Dispatcher[Req, Resp]) Send(
 // SendTo sends req to nodeID. A pre-send context or marshal error
 // returns unscored, any later failure scores the peer and returns a nil
 // Outcome.
-func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+func (d *Dispatcher[Req, V, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

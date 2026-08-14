@@ -11,11 +11,11 @@ import (
 )
 
 // Client sends code-by-hash requests.
-type Client = network.Dispatcher[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+type Client = network.Dispatcher[*syncpb.GetCodeRequest, syncpb.GetCodeResponse, *syncpb.GetCodeResponse]
 
 // NewClient binds a [Client] at [p2p.EVMCodeRequestHandlerID] on n.
 func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
-	return network.NewDispatcher[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse](
+	return network.NewDispatcher[*syncpb.GetCodeRequest, syncpb.GetCodeResponse, *syncpb.GetCodeResponse](
 		n,
 		p2p.EVMCodeRequestHandlerID,
 		peers,
