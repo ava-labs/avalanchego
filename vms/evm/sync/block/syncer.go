@@ -163,7 +163,6 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 	}
 	var blocks []*evmtypes.Block
 	_, err := c.Send(ctx, req,
-		func() *syncpb.GetBlockResponse { return &syncpb.GetBlockResponse{} },
 		func(resp *syncpb.GetBlockResponse) error {
 			b, err := verifyBlocks(hash, numParents, resp.GetBlocks(), verify)
 			if err != nil {

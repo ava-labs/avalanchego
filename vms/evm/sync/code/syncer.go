@@ -280,7 +280,6 @@ func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
 	resp, err := c.Send(ctx, req,
-		func() *syncpb.GetCodeResponse { return &syncpb.GetCodeResponse{} },
 		func(resp *syncpb.GetCodeResponse) error {
 			if err := verifyCode(hashes, resp.GetData()); err != nil {
 				log.Debug("invalid code response, re-requesting", zap.Error(err))
