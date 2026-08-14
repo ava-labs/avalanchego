@@ -29,11 +29,11 @@ var (
 )
 
 // sender is the transport a [Client] sends over.
-type sender = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+type sender = network.Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse]
 
 // newSender binds the leaf transport to handlerID on n.
 func newSender(n *p2p.Network, handlerID uint64, peers *p2p.PeerTracker) *sender {
-	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+	return network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		n,
 		handlerID,
 		peers,
@@ -65,7 +65,6 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 
 	var more bool
 	pbResp, err := c.sender.Send(ctx, pbReq,
-		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
 		func(resp *syncpb.GetLeafResponse) error {
 			m, err := verifyRange(req, resp)
 			if err != nil {

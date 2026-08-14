@@ -36,7 +36,6 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...H
 func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLeafRequest) *syncpb.GetLeafResponse {
 	t.Helper()
 	resp, err := c.sender.Send(ctx, req,
-		func() *syncpb.GetLeafResponse { return &syncpb.GetLeafResponse{} },
 		func(*syncpb.GetLeafResponse) error { return nil },
 	)
 	require.NoError(t, err)
