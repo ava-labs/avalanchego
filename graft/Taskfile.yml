@@ -15,10 +15,6 @@ vars:
 tasks:
   default: '{{.NIX_RUN}} {{.TASKFILE_DIR}}/../scripts/run_task.sh --list'
 
-  # REPO_NAME-rewrite-imports:
-  #   desc: Rewrite imports of out-of-tree REPO_NAME to in-tree REPO_NAME
-  #   cmd: bash {{.TASKFILE_DIR}}/scripts/rewrite-imports.sh {{.REPO_MODULE}}
-
   # REPO_NAME-subtree-merge:
   #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME from a local source (commits)
   #   cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh BRANCH {{.CLI_ARGS}} graft/REPO_NAME
