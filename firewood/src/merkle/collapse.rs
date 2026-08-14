@@ -7,66 +7,84 @@ use firewood_storage::{
     Child, Mutable, Node, NodeStore, Path, PathComponent, Propose, ReadableStorage,
 };
 
-use crate::{ProofError, api, merkle::Merkle};
+use crate::{
+    ProofError, api,
+    merkle::{Merkle, get_helper},
+};
 
-/// Returns `true` when a nibble at position `child_nib` under the accumulated
-/// prefix `acc_prefix` could contain keys within `[start_nib, end_nib]`.
+/// The proven range, in nibbles.
+///
+/// The `collapse_*` functions thread it as an `Option`, where `None` skips range
+/// checking — off-path children are stripped freely and branch values cleared
+/// unconditionally — while `Some` enforces the range, so stripping an off-path
+/// child that holds an in-range key is a tamper and in-range values are kept.
+/// [`Merkle::child_in_range`], [`Merkle::boundary_child_source`], and
+/// `change_outside_children` take it directly.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CollapseRange<'a> {
+    /// The lower bound of the proven range. Unbounded below is the empty slice
+    /// rather than an `Option`, because the empty slice already sorts as the
+    /// minimum key and so compares correctly against every key.
+    pub(crate) start: &'a [u8],
+    /// The upper bound, or `None` for unbounded (+∞). This side needs the
+    /// `Option`: the empty slice is the *minimum* key, so reusing it here would
+    /// judge every key out of range at the upper bound.
+    pub(crate) end: Option<&'a [u8]>,
+}
+
+/// Where the hash step should get a boundary terminal's on-path child.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BoundaryChildSource {
+    /// Recompute the child from the proving trie. Required whenever the trie
+    /// may hold an in-range key under it, so a forged or omitted in-range op
+    /// surfaces as a root-hash mismatch.
+    Recompute,
+    /// Take the child hash from the proof. Sound only for a child definitely
+    /// present with no in-range key under it, since a proof-supplied hash is
+    /// never checked against the batch ops.
+    Proof,
+}
+
+/// Returns `true` when the child at `nibble` under the accumulated prefix
+/// `acc_prefix` could contain keys within `range`.
 ///
 /// This is a fast, nibble-level check used by [`Merkle::child_in_range`] as
 /// a first pass. It may return `true` for straddling nibbles — positions
 /// where the boundary passes through the subtree — even if no actual keys
 /// in the subtree are in range. `child_in_range` recurses into the subtree
 /// to resolve those cases.
-fn nibble_in_range(
-    acc_prefix: &[u8],
-    nibble: PathComponent,
-    start_nib: &[u8],
-    end_nib: &[u8],
-) -> bool {
+fn nibble_in_range(acc_prefix: &[u8], nibble: PathComponent, range: CollapseRange<'_>) -> bool {
+    let CollapseRange { start, end } = range;
     let depth = acc_prefix.len();
     let child_nib = nibble.0.as_u8();
 
-    // Split each boundary at `depth`. The left half is compared against
-    // the same-length prefix of acc_prefix; the right half's first element
-    // (if any) is compared against child_nib to break ties.
-    let split = depth.min(start_nib.len());
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "split is min(depth, len), always in bounds"
-    )]
-    let (start_pre, start_rest) = start_nib.split_at(split);
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "split is min(depth, len), always in bounds"
-    )]
-    let (acc_start, _) = acc_prefix.split_at(split);
-    let above_start = match acc_start.cmp(start_pre) {
+    // Compare acc_prefix against each boundary over their overlapping prefix
+    // (`min(depth, boundary len)` nibbles). On a tie, the boundary's next
+    // nibble breaks it against child_nib.
+    let split = depth.min(start.len());
+    let above_start = match acc_prefix.iter().take(split).cmp(start.iter().take(split)) {
         Ordering::Greater => true,
         Ordering::Less => false,
-        Ordering::Equal => match start_rest.first() {
+        Ordering::Equal => match start.get(split) {
             None => true,
             Some(&boundary) => child_nib >= boundary,
         },
     };
 
-    let split = depth.min(end_nib.len());
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "split is min(depth, len), always in bounds"
-    )]
-    let (end_pre, end_rest) = end_nib.split_at(split);
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "split is min(depth, len), always in bounds"
-    )]
-    let (acc_end, _) = acc_prefix.split_at(split);
-    let below_end = match acc_end.cmp(end_pre) {
-        Ordering::Less => true,
-        Ordering::Greater => false,
-        Ordering::Equal => match end_rest.first() {
-            None => false,
-            Some(&boundary) => child_nib <= boundary,
-        },
+    // A `None` end bound is +∞: every key is below it.
+    let below_end = match end {
+        None => true,
+        Some(end) => {
+            let split = depth.min(end.len());
+            match acc_prefix.iter().take(split).cmp(end.iter().take(split)) {
+                Ordering::Less => true,
+                Ordering::Greater => false,
+                Ordering::Equal => match end.get(split) {
+                    None => false,
+                    Some(&boundary) => child_nib <= boundary,
+                },
+            }
+        }
     };
 
     above_start && below_end
@@ -104,29 +122,18 @@ fn consume_partial_path<'a>(
 }
 
 impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
-    /// Collapse intermediate branches between two consecutive proof-path
-    /// positions.
-    ///
-    /// The proof implies a direct path from the parent to the child with
-    /// no intermediate branch nodes. If the fork's trie has extra branches
-    /// along this path (from out-of-range keys), this method removes their
-    /// off-path children on the outside of the range and flattens
-    /// single-child branches.
-    ///
-    /// Between consecutive proof nodes in `end_root`, the path is direct:
-    /// intermediate nodes have only the on-path child. Removes all
-    /// non-on-path children and values from intermediate branches so the
-    /// proving trie matches `end_root`'s path-compressed structure.
     /// Collapse the proving trie's root so its structure matches the end
-    /// trie's root path. When out-of-range deletions cause the end trie's
-    /// root to compress (e.g., root `partial_path` changes from `[]` to `[1]`),
-    /// the proposal root still has the old shape. This strips non-on-path
-    /// children from the root and flattens single-child branches so the
-    /// root's `partial_path` matches the first proof node's key.
+    /// trie's root path.
+    ///
+    /// When out-of-range deletions cause the end trie's root to compress
+    /// (e.g., root `partial_path` changes from `[]` to `[1]`), the proposal
+    /// root still has the old shape. This strips non-on-path children from the
+    /// root and flattens single-child branches so the root's `partial_path`
+    /// matches the first proof node's key.
     pub(crate) fn collapse_root_to_path(
         &mut self,
         target: &[PathComponent],
-        range: Option<(&[u8], &[u8])>,
+        range: Option<CollapseRange<'_>>,
     ) -> Result<(), api::Error> {
         // The root's partial_path consumes some prefix of target.
         // Only collapse if target extends beyond the root's partial_path.
@@ -154,13 +161,23 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         Ok(())
     }
 
-    /// `range`: `(start_nibbles, end_nibbles)` for the proven range.
-    /// In-range children that are also proposal-local trigger rejection.
+    /// Collapse intermediate branches between two consecutive proof-path
+    /// positions.
+    ///
+    /// The proof implies a direct path from the parent to the child with no
+    /// intermediate branch nodes. If the proving trie has extra branches along
+    /// this path (from out-of-range keys), this strips their off-path children
+    /// and flattens single-child branches so the trie matches `end_root`'s
+    /// path-compressed structure.
+    ///
+    /// Stripping an off-path child that holds an in-range key triggers
+    /// rejection. A branch value is cleared only when the node's own key is out
+    /// of range, and a node that keeps its value is never flattened.
     pub(crate) fn collapse_branch_to_path(
         &mut self,
         from: &[PathComponent],
         to: &[PathComponent],
-        range: Option<(&[u8], &[u8])>,
+        range: Option<CollapseRange<'_>>,
     ) -> Result<(), api::Error> {
         // `to` must start with `from` since consecutive proof nodes form a
         // parent-child path — the child's key is always a prefix extension
@@ -202,7 +219,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         key: &[PathComponent],
         suffix: &[PathComponent],
         parent_prefix: &[u8],
-        range: Option<(&[u8], &[u8])>,
+        range: Option<CollapseRange<'_>>,
     ) -> Result<Node, api::Error> {
         // get a reference to the partial path for ease of reading
         let pp = &node.partial_path().0;
@@ -221,13 +238,10 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
             return Err(api::Error::ProofError(ProofError::ProofNodeUnreachable));
         }
 
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "diverge == pp.len() <= key.len() by the check above"
-        )]
-        let (_, key_rest) = key.split_at(diverge);
-
-        let Some((&child_component, deeper)) = key_rest.split_first() else {
+        // `diverge == pp.len()` here, so this is the part of `key` beyond the
+        // consumed partial path. An empty remainder means an exact match.
+        let Some((&child_component, deeper)) = key.get(diverge..).and_then(|r| r.split_first())
+        else {
             // Exact match — arrived at the parent proof node.
             return self.collapse_descend(node, suffix, parent_prefix, range);
         };
@@ -260,7 +274,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         mut node: Node,
         path: &[PathComponent],
         acc_prefix: &[u8],
-        range: Option<(&[u8], &[u8])>,
+        range: Option<CollapseRange<'_>>,
     ) -> Result<Node, api::Error> {
         let Some((&first, remaining)) = path.split_first() else {
             return Ok(node);
@@ -290,7 +304,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
     }
 
     /// Returns `true` when the subtree rooted at `child` contains any key
-    /// within `[start_nib, end_nib]`.
+    /// within `range`.
     ///
     /// Reads the child node, computes its full nibble prefix, and checks
     /// whether the key is in range. For leaves this is a direct comparison.
@@ -301,16 +315,16 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         child: &Child,
         acc_prefix: &[u8],
         nibble: PathComponent,
-        start_nib: &[u8],
-        end_nib: &[u8],
+        range: CollapseRange<'_>,
     ) -> Result<bool, api::Error> {
-        if !nibble_in_range(acc_prefix, nibble, start_nib, end_nib) {
+        if !nibble_in_range(acc_prefix, nibble, range) {
             return Ok(false);
         }
 
         let child_node = child.as_shared_node(&self.nodestore)?;
         let pfx = build_child_prefix(acc_prefix, nibble.0.as_u8(), &child_node);
-        let key_in_range = pfx.as_ref() >= start_nib && pfx.as_ref() <= end_nib;
+        let key_in_range =
+            pfx.as_ref() >= range.start && range.end.is_none_or(|end| pfx.as_ref() <= end);
 
         let Some(branch) = child_node.as_branch() else {
             return Ok(key_in_range);
@@ -324,11 +338,59 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
             let Some(inner_child) = child_slot else {
                 continue;
             };
-            if self.child_in_range(inner_child, &pfx, child_nibble, start_nib, end_nib)? {
+            if self.child_in_range(inner_child, &pfx, child_nibble, range)? {
                 return Ok(true);
             }
         }
         Ok(false)
+    }
+
+    /// Decides where a boundary terminal's on-path child comes from.
+    ///
+    /// `node_key` is the terminal's full nibble path, `on_path` the child
+    /// nibble the boundary key descends into, and `range` the proven range.
+    ///
+    /// Navigates the proving trie to the node at `node_key`, then asks
+    /// [`Merkle::child_in_range`] about that child. Answers
+    /// [`BoundaryChildSource::Recompute`] whenever the trie cannot confirm
+    /// otherwise — the sound default, since a recompute that mismatches
+    /// `end_root` is a rejection, so nothing is silently taken from the proof.
+    /// Only a child definitely present with no in-range key under it answers
+    /// [`BoundaryChildSource::Proof`].
+    pub(crate) fn boundary_child_source(
+        &self,
+        node_key: &[PathComponent],
+        on_path: PathComponent,
+        range: CollapseRange<'_>,
+    ) -> Result<BoundaryChildSource, api::Error> {
+        let Some(root) = self.root() else {
+            return Ok(BoundaryChildSource::Recompute);
+        };
+        let acc: Vec<u8> = node_key.iter().map(|c| c.as_u8()).collect();
+
+        // `get_helper` yields a node only when one sits exactly at `acc`. Every
+        // other outcome — the path ends inside a partial path, diverges, or runs
+        // past a leaf — means `node_key` is not a node boundary in the proposal,
+        // which takes the same sound default as the arms below.
+        let Some(node) = get_helper(&self.nodestore, &root, &acc)? else {
+            return Ok(BoundaryChildSource::Recompute);
+        };
+        let Some(branch) = node.as_branch() else {
+            return Ok(BoundaryChildSource::Recompute);
+        };
+        match branch.children[on_path].as_ref() {
+            // No on-path child in the proposal, so there is no in-range key
+            // under it to report. Either answer computes the same root here —
+            // the hash step skips an absent child before consulting the mask,
+            // and the caller has already rejected a proof carrying a child hash
+            // at this nibble — so return the same sound default as above.
+            None => Ok(BoundaryChildSource::Recompute),
+            Some(child) => Ok(if self.child_in_range(child, &acc, on_path, range)? {
+                BoundaryChildSource::Recompute
+            } else {
+                BoundaryChildSource::Proof
+            }),
+        }
     }
 
     /// Strip non-on-path children from an intermediate branch and recurse.
@@ -345,7 +407,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         mut node: Node,
         path: &[PathComponent],
         acc_prefix: &[u8],
-        range: Option<(&[u8], &[u8])>,
+        range: Option<CollapseRange<'_>>,
     ) -> Result<Node, api::Error> {
         let Some((&on_path, remaining)) = path.split_first() else {
             return Ok(node);
@@ -361,16 +423,29 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
                 continue;
             }
 
-            if let Some((start_nib, end_nib)) = range
+            if let Some(range) = range
                 && let Some(child) = slot.as_ref()
-                && self.child_in_range(child, acc_prefix, nibble, start_nib, end_nib)?
+                && self.child_in_range(child, acc_prefix, nibble, range)?
             {
                 return Err(api::Error::ProofError(ProofError::EndRootMismatch));
             }
 
             *slot = None;
         }
-        branch.value = None;
+
+        // Clear the value only when this node's key is out of the proven range.
+        // The hash step prefers a present value over the proof's digest, so a
+        // retained out-of-range value would be hashed instead of the one the
+        // proof supplies for the end trie. Clearing lets the proof supply it.
+        // An in-range value belongs to an in-range key and must be kept so it
+        // is validated against the batch. Dropping it lets a forged or omitted
+        // in-range op whose key is a prefix of the boundary slip through.
+        let out_of_range = range.is_none_or(|CollapseRange { start, end }| {
+            acc_prefix < start || end.is_some_and(|end| acc_prefix > end)
+        });
+        if out_of_range {
+            branch.value = None;
+        }
 
         // Recurse into the on-path child.
         let Some(child) = branch.children.take(on_path) else {
@@ -387,6 +462,14 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
 
         branch.children[on_path] = Some(Child::Node(child_node));
 
+        // A valued node is never flattened. When it has a single child,
+        // merging into that child would drop the value and hide a forged or
+        // omitted in-range op whose key sits here, so the value must survive to
+        // be validated against the batch. Checked before take_only_child, which
+        // removes the child.
+        if branch.value.is_some() {
+            return Ok(node);
+        }
         // If exactly one child remains, flatten by merging partial paths.
         let Some((child_idx, only_child)) = branch.children.take_only_child() else {
             return Ok(node);
@@ -437,14 +520,22 @@ mod tests {
         acc_prefix: &[u8],
         nibble: u8,
         start_nib: &[u8],
-        end_nib: &[u8],
+        end_nib: Option<&[u8]>,
         expected: bool,
     ) {
         let mut merkle = create_test_merkle();
         let child = setup(&mut merkle);
         let pc = PathComponent::try_new(nibble).unwrap();
         let result = merkle
-            .child_in_range(&child, acc_prefix, pc, start_nib, end_nib)
+            .child_in_range(
+                &child,
+                acc_prefix,
+                pc,
+                CollapseRange {
+                    start: start_nib,
+                    end: end_nib,
+                },
+            )
             .unwrap();
         assert_eq!(
             result, expected,
@@ -460,7 +551,7 @@ mod tests {
             &[],
             0x5,
             &[0x8],
-            &[0xf],
+            Some(&[0xf]),
             false,
         );
 
@@ -470,7 +561,7 @@ mod tests {
             &[],
             0x0,
             &[0x0, 0x1],
-            &[0x1, 0x0],
+            Some(&[0x1, 0x0]),
             false,
         );
 
@@ -480,7 +571,7 @@ mod tests {
             &[],
             0x0,
             &[0x0, 0x1],
-            &[0x1, 0x0],
+            Some(&[0x1, 0x0]),
             true,
         );
 
@@ -490,7 +581,7 @@ mod tests {
             &[],
             0x3,
             &[0x1, 0x0],
-            &[0x3, 0x0],
+            Some(&[0x3, 0x0]),
             false,
         );
 
@@ -500,7 +591,7 @@ mod tests {
             &[],
             0x0,
             &[0x0, 0x1],
-            &[0x0, 0xf],
+            Some(&[0x0, 0xf]),
             false,
         );
 
@@ -510,7 +601,7 @@ mod tests {
             &[],
             0x0,
             &[0x0, 0x1],
-            &[0x0, 0xf],
+            Some(&[0x0, 0xf]),
             true,
         );
 
@@ -520,7 +611,18 @@ mod tests {
             &[],
             0x0,
             &[0x0, 0x0],
-            &[0x0, 0xf],
+            Some(&[0x0, 0xf]),
+            true,
+        );
+
+        // unbounded end (None = +∞): a key above start is in range. An empty
+        // end slice sorts as the minimum key and would wrongly reject this.
+        check_child_in_range(
+            |m| branch_child(m, &[b"\x50", b"\x10"], 0x5),
+            &[],
+            0x5,
+            &[0x0],
+            None,
             true,
         );
     }
@@ -528,38 +630,55 @@ mod tests {
     #[test]
     fn test_nibble_in_range() {
         let pc = |n| PathComponent::try_new(n).unwrap();
+        // Range helpers: `nir` takes a bounded end, `nir_open` an unbounded one.
+        let nir = |acc: &[u8], n: PathComponent, s: &[u8], e: &[u8]| {
+            nibble_in_range(
+                acc,
+                n,
+                CollapseRange {
+                    start: s,
+                    end: Some(e),
+                },
+            )
+        };
+        let nir_open = |acc: &[u8], n: PathComponent, s: &[u8]| {
+            nibble_in_range(
+                acc,
+                n,
+                CollapseRange {
+                    start: s,
+                    end: None,
+                },
+            )
+        };
 
         // inside range
-        assert!(nibble_in_range(&[0xa], pc(0x5), &[0xa, 0x0], &[0xa, 0xf]));
+        assert!(nir(&[0xa], pc(0x5), &[0xa, 0x0], &[0xa, 0xf]));
         // before start
-        assert!(!nibble_in_range(&[0xa], pc(0x2), &[0xa, 0x5], &[0xa, 0xf]));
+        assert!(!nir(&[0xa], pc(0x2), &[0xa, 0x5], &[0xa, 0xf]));
         // after end
-        assert!(!nibble_in_range(&[0xa], pc(0xf), &[0xa, 0x0], &[0xa, 0x5]));
+        assert!(!nir(&[0xa], pc(0xf), &[0xa, 0x0], &[0xa, 0x5]));
         // at start boundary
-        assert!(nibble_in_range(&[0xa], pc(0x5), &[0xa, 0x5], &[0xa, 0xf]));
+        assert!(nir(&[0xa], pc(0x5), &[0xa, 0x5], &[0xa, 0xf]));
         // at end boundary
-        assert!(nibble_in_range(&[0xa], pc(0x5), &[0xa, 0x0], &[0xa, 0x5]));
+        assert!(nir(&[0xa], pc(0x5), &[0xa, 0x0], &[0xa, 0x5]));
         // acc_prefix past start — in range regardless of nibble
-        assert!(nibble_in_range(&[0xb], pc(0x0), &[0xa, 0x5], &[0xf, 0x0]));
+        assert!(nir(&[0xb], pc(0x0), &[0xa, 0x5], &[0xf, 0x0]));
         // acc_prefix before end — in range regardless of nibble
-        assert!(nibble_in_range(&[0xa], pc(0xf), &[0x0, 0x0], &[0xb, 0x0]));
+        assert!(nir(&[0xa], pc(0xf), &[0x0, 0x0], &[0xb, 0x0]));
         // empty prefix
-        assert!(nibble_in_range(&[], pc(0x5), &[0x0], &[0xf]));
-        assert!(!nibble_in_range(&[], pc(0x5), &[0x6], &[0xf]));
+        assert!(nir(&[], pc(0x5), &[0x0], &[0xf]));
+        assert!(!nir(&[], pc(0x5), &[0x6], &[0xf]));
         // start shorter than depth — child is past start
-        assert!(nibble_in_range(
-            &[0xa, 0xb],
-            pc(0x0),
-            &[0xa],
-            &[0xa, 0xb, 0xf]
-        ));
+        assert!(nir(&[0xa, 0xb], pc(0x0), &[0xa], &[0xa, 0xb, 0xf]));
         // end shorter than depth — child is past end
-        assert!(!nibble_in_range(
-            &[0xa, 0xb],
-            pc(0x0),
-            &[0xa, 0xb, 0x0],
-            &[0xa]
-        ));
+        assert!(!nir(&[0xa, 0xb], pc(0x0), &[0xa, 0xb, 0x0], &[0xa]));
+
+        // unbounded end (None = +∞): any nibble at or above start is in range,
+        // including cases an empty-slice end would wrongly reject.
+        assert!(nir_open(&[0xa], pc(0xf), &[0xa, 0x0]));
+        assert!(nir_open(&[], pc(0x0), &[]));
+        assert!(!nir_open(&[0xa], pc(0x2), &[0xa, 0x5]));
     }
 
     #[test]
@@ -707,7 +826,10 @@ mod tests {
             &[pc(1), pc(0)],
             &[pc(2), pc(1)],
             &[0x1, 0x0],
-            Some((&[0x1, 0x0, 0x2, 0x0], &[0x1, 0x0, 0x2, 0xf])),
+            Some(CollapseRange {
+                start: &[0x1, 0x0, 0x2, 0x0],
+                end: Some(&[0x1, 0x0, 0x2, 0xf]),
+            }),
         );
         assert!(matches!(
             result,

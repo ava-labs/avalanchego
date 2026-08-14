@@ -55,14 +55,14 @@ fn stored_key_values<K: AsRef<[u8]>>(
 
 #[test]
 fn outside_children_empty_proof() {
-    let result = compute_outside_children(&[], EdgeBoundary::Left(None)).unwrap();
+    let (result, _) = compute_outside_children(&[], &EdgeBoundary::Left(None)).unwrap();
     assert!(result.is_empty());
 }
 
 #[test]
 fn outside_children_single_node_no_boundary() {
     let nodes = [proof_node(&[1, 2])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None)).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(None)).unwrap();
     assert!(result.is_empty());
 }
 
@@ -71,7 +71,7 @@ fn outside_children_single_node_exact_match() {
     // Boundary matches terminal exactly — no children marked.
     let nodes = [proof_node(&[1, 2])];
     // boundary key 0x12 expands to nibbles [1, 2]
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x12]))).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(Some(&[0x12]))).unwrap();
     assert!(result.is_empty());
 }
 
@@ -79,9 +79,9 @@ fn outside_children_single_node_exact_match() {
 fn outside_children_single_node_exact_match_right_edge() {
     // Boundary matches terminal exactly on right edge — all children marked outside.
     let nodes = [proof_node(&[1, 2])];
-    let result = compute_outside_children(
+    let (result, _) = compute_outside_children(
         &nodes,
-        EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x12]))),
+        &EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x12]))),
     )
     .unwrap();
     // Look up the mask for the terminal node at [1, 2].
@@ -100,7 +100,7 @@ fn outside_children_ancestor_left_edge() {
     // Terminal is ancestor of boundary. On-path nibble = 5.
     // Left edge: children < 5 are outside.
     let nodes = [proof_node(&[1])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     let mask = result[&nibble_path(&[1])];
     // Children 0..5 should be outside (strictly left of 5)
     for i in 0..16u8 {
@@ -117,9 +117,9 @@ fn outside_children_ancestor_right_edge() {
     // Terminal key [1], boundary key 0x15 → nibbles [1, 5].
     // Right edge: children > 5 are outside.
     let nodes = [proof_node(&[1])];
-    let result = compute_outside_children(
+    let (result, _) = compute_outside_children(
         &nodes,
-        EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x15]))),
+        &EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x15]))),
     )
     .unwrap();
     let mask = result[&nibble_path(&[1])];
@@ -137,7 +137,7 @@ fn outside_children_diverges_past_terminal_left() {
     // Terminal key [1, 3], boundary nibbles [1, 5] (diverge at pos 1: 5 > 3).
     // Left edge + boundary past terminal → all children outside.
     let nodes = [proof_node(&[1, 3])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     let mask = result[&nibble_path(&[1, 3])];
     for i in 0..16u8 {
         assert!(
@@ -152,7 +152,7 @@ fn outside_children_diverges_before_terminal_left() {
     // Terminal key [1, 7], boundary nibbles [1, 5] (diverge at pos 1: 5 < 7).
     // Left edge + boundary before terminal → no children outside.
     let nodes = [proof_node(&[1, 7])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     assert!(
         !result.contains_key(&nibble_path(&[1, 7])),
         "no mask when boundary before terminal"
@@ -164,7 +164,7 @@ fn outside_children_two_nodes_left_edge() {
     // Parent [1], child [1, 5]. On-path nibble = 5.
     // Left edge: children < 5 on parent are outside.
     let nodes = [proof_node(&[1]), proof_node(&[1, 5])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None)).unwrap();
+    let (result, _) = compute_outside_children(&nodes, &EdgeBoundary::Left(None)).unwrap();
     let mask = result[&nibble_path(&[1])];
     for i in 0..16u8 {
         assert_eq!(
@@ -180,8 +180,8 @@ fn outside_children_two_nodes_right_edge() {
     // Parent [1], child [1, 5]. On-path nibble = 5.
     // Right edge: children > 5 on parent are outside.
     let nodes = [proof_node(&[1]), proof_node(&[1, 5])];
-    let result =
-        compute_outside_children(&nodes, EdgeBoundary::Right(RightBoundary::InRange(None)))
+    let (result, _) =
+        compute_outside_children(&nodes, &EdgeBoundary::Right(RightBoundary::InRange(None)))
             .unwrap();
     let mask = result[&nibble_path(&[1])];
     for i in 0..16u8 {
@@ -199,7 +199,7 @@ fn outside_children_child_not_prefixed_by_parent() {
     // child.key.get(parent.key.len()) = [2,5].get(1) = Some(5), so no error;
     // but child key [1] with parent [1, 2] means child.key.get(2) = None → error.
     let nodes = [proof_node(&[1, 2]), proof_node(&[1])];
-    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None));
+    let result = compute_outside_children(&nodes, &EdgeBoundary::Left(None));
     assert!(
         matches!(result, Err(ProofError::ShouldBePrefixOfNextKey)),
         "expected ShouldBePrefixOfNextKey, got {result:?}"

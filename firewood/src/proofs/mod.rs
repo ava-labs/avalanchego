@@ -240,6 +240,14 @@
 //! `start_root` structure that doesn't exist in `end_root` and will be
 //! accounted for by the proof's boundary hashes.
 //!
+//! **Values at intermediate nodes** follow the same range rule. A node whose
+//! own key is out of range has its value cleared, so Step 4 can supply the
+//! digest the proof carries for `end_root`. A node whose key is in range keeps
+//! its value, so it is validated against `batch_ops` — dropping it would let a
+//! forged or omitted in-range op whose key is a prefix of the boundary slip
+//! through. Because a node that keeps its value must survive, it is never
+//! flattened into its only child.
+//!
 //! `collapse_root_to_path` applies the same logic to the root itself,
 //! handling cases where out-of-range deletions caused `end_root`'s root
 //! to path-compress (e.g., root partial_path changes from `[]` to
@@ -250,6 +258,22 @@
 //! `compute_outside_children` determines which children at each
 //! boundary proof node fall outside the proven range (left of
 //! `requested_start_key` or right of `right_edge_key`).
+//!
+//! A boundary terminal's on-path child — the child the boundary key descends
+//! into — is resolved against the **proving trie**: it is marked outside only
+//! when the proposal holds no in-range key under it. An omitted in-range
+//! delete or a forged op leaves its key in the proposal, so that child stays
+//! in range and is recomputed rather than taken from the proof, and the
+//! mismatch is caught. An omitted in-range put leaves the proposal with no
+//! child there at all, which is likewise kept in range and recomputed. An
+//! unbounded right edge is treated as +∞ here, not as an empty (minimum) key.
+//!
+//! Marking that child outside substitutes the proof's child hash for it, which
+//! is safe only when the proof has no hash at that nibble — otherwise it could
+//! supply one that hides in-range state. Structural verification (phase 1)
+//! already guarantees this for any valid exclusion proof
+//! (`ExclusionProofMissingChild`), and [`verify_change_proof_root_hash`] checks
+//! it locally so the guarantee does not depend on phase 1 having run.
 //!
 //! `compute_root_hash_with_proofs` recursively walks the **proving trie**:
 //!
