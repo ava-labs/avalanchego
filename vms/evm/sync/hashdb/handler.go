@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -70,10 +70,10 @@ func WithSnapshot(s SnapshotReader) HandlerOption {
 	})
 }
 
-// RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
+// RegisterHandler serves leaf-range requests at the id handler ID on net.
+func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, id uint64, opts ...HandlerOption) error {
 	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
-	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
+	return net.AddHandler(id, h)
 }
 
 // SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather

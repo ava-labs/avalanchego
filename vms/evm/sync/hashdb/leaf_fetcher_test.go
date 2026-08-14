@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -100,7 +100,7 @@ func (*recordingTask) Account() common.Hash { return common.Hash{} }
 func (*recordingTask) Start() []byte        { return nil }
 func (*recordingTask) End() []byte          { return nil }
 
-func (r *recordingTask) OnLeaves(_ context.Context, batch leafBatch) error {
+func (r *recordingTask) OnLeaves(_ context.Context, batch LeafBatch) error {
 	r.keys = append(r.keys, batch.keys...)
 	return nil
 }
@@ -111,16 +111,16 @@ func (r *recordingTask) OnFinish(context.Context) error {
 }
 
 // runLeafTask drives one task through a single worker.
-func runLeafTask(t *testing.T, ctx context.Context, r leafResponder, tk task) error {
+func runLeafTask(t *testing.T, ctx context.Context, r leafResponder, tk Task) error {
 	t.Helper()
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID, r)
 
-	tasks := make(chan task, 1)
+	tasks := make(chan Task, 1)
 	tasks <- tk
 	close(tasks)
 
-	return newLeafFetcher(log, NewClient(net, tracker), tasks, 1).sync(ctx)
+	return NewLeafFetcher(log, NewClient(net, tracker, p2p.EVMLeafRequestHandlerID), tasks, 1).Sync(ctx)
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
