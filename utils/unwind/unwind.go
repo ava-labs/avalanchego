@@ -81,10 +81,12 @@ type CloserOf[T any] interface {
 	Close(T) error
 }
 
+// CloserOfFunc converts a function into a [CloserOf].
 type CloserOfFunc[T any] func(T) error
 
 func (f CloserOfFunc[T]) Close(arg T) error { return f(arg) }
 
+// NoArgCloserOf is a [CloserOf] that ignores its argument.
 type NoArgCloserOf[T any] func() error
 
 func (f NoArgCloserOf[T]) Close(T) error { return f() }

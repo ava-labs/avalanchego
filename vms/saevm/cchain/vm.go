@@ -422,7 +422,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 		}
 	}
 
-	// MUST occur after [VM.preBlockHanding] to avoid race setting txpool and VM
+	// MUST occur after [VM.prepBlockHanding] to avoid race setting txpool and VM
 	vm.mode.Set(state)
 	return nil
 }
@@ -459,6 +459,19 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return vm.activeHandler().LastAccepted(ctx)
 }
+
+// earliestBuildTime returns the earliest wall-clock time at which a child of b
+// may be built.
+func earliestBuildTime(b *blocks.Block) time.Time {
+	h := b.Header()
+	return blockTime(h).Add(delayExponent(h).DelayDuration())
+}
+
+// minWaitForEventDelay is the minimum spacing between consecutive
+// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
+// reasonable frequency for the engine to poll on whether to build a block or
+// not.
+const minWaitForEventDelay = 100 * time.Millisecond
 
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
 // block has elapsed, then waits for a transaction to be in the txpool or for
@@ -517,19 +530,6 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		vm.lastWaitForEvent.Set(vm.now())
 	}
 	return r.msg, r.err
-}
-
-// minWaitForEventDelay is the minimum spacing between consecutive
-// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
-// reasonable frequency for the engine to poll on whether to build a block or
-// not.
-const minWaitForEventDelay = 100 * time.Millisecond
-
-// earliestBuildTime returns the earliest wall-clock time at which a child of b
-// may be built.
-func earliestBuildTime(b *blocks.Block) time.Time {
-	h := b.Header()
-	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
 // waitUntil blocks until [VM.now] reaches t, returning early with the
