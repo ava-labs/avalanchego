@@ -71,10 +71,8 @@ git fetch origin
 # The target branch might be master, or a tooling PR 
 git reset --hard origin/[TARGET BRANCH]
 
-cd graft
-
-# Do the graft again
-task [REPOSITORY NAME]-subtree-merge
+# Do the graft again from a local checkout of the source repository.
+task graft:[REPOSITORY NAME]-subtree-merge -- SOURCE_PATH
 git push --force
 ```
 

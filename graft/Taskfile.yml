@@ -9,11 +9,10 @@ version: '3'
 vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
   # dev-shell toolchain when nix is available, without nesting nix shells.
-  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
-  # REPO_MODULE: github.com/ava-labs/REPO_NAME
+  GRAFT_NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
 
 tasks:
-  default: '{{.NIX_RUN}} {{.TASKFILE_DIR}}/../scripts/run_task.sh --list'
+  default: '{{.GRAFT_NIX_RUN}} {{.TASKFILE_DIR}}/../scripts/run_task.sh --list'
 
   # REPO_NAME-subtree-merge:
   #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME from a local source (commits)
@@ -23,5 +22,5 @@ tasks:
     desc: Perform git subtree merge of firewood into firewood from a local source (commits)
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Usage: task graft:firewood-subtree-merge -- <source-path>"
+        msg: "Usage: task graft:firewood-subtree-merge -- [--dry-run] <source-path>"
     cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} firewood
