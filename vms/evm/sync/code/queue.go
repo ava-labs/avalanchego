@@ -47,7 +47,7 @@ func (q *queue) admit(hashes []common.Hash, write func() error) error {
 }
 
 // enqueue appends unconditionally. The caller holds closeMu, or runs before any
-// producer holds the syncer as recovery does.
+// producer does, as recovery is.
 func (q *queue) enqueue(hashes []common.Hash) {
 	if len(hashes) == 0 {
 		return
@@ -60,8 +60,7 @@ func (q *queue) enqueue(hashes []common.Hash) {
 	q.wake()
 }
 
-// close stops taking hashes. What is pending is still drained, and calling it
-// twice is safe.
+// close stops taking hashes. Pending hashes still drain, and it is idempotent.
 func (q *queue) close() {
 	// Taking closeMu for writing waits out admits already inside one, so done is
 	// only closed once every accepted hash is pending.

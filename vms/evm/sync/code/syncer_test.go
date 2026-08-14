@@ -4,10 +4,10 @@
 package code
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	"errors"
+	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -20,7 +20,10 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,13 +31,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	// Importing saetest pulls in libevm packages that start goroutines at init,
+	// so ignore what exists before any test runs, not what a test leaks.
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
 func TestVerifyCode(t *testing.T) {
@@ -97,6 +104,7 @@ func TestSyncer(t *testing.T) {
 		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2},
 		// Shared bytecode puts the same hash on the queue many times.
 		{name: "repeats_fetched_once", numFromSource: 1, copies: 200},
+		{name: "repeats_at_batch_boundary_fetched_once", numFromSource: maxHashesPerRequest, copies: 2},
 	}
 
 	for _, tt := range tests {
@@ -129,19 +137,23 @@ func TestSyncer(t *testing.T) {
 			syncer, err := NewSyncer(log, client, target)
 			require.NoError(t, err)
 
+			// Added while the syncer runs, so the batcher is woken mid-flight.
 			copies := max(tt.copies, 1)
-			for hash := range want {
-				for range copies {
-					require.NoError(t, syncer.AddCode(ctx, []common.Hash{hash}))
+			var eg errgroup.Group
+			eg.Go(func() error {
+				defer syncer.CloseInput()
+				for hash := range want {
+					for range copies {
+						if err := syncer.AddCode(ctx, []common.Hash{hash}); err != nil {
+							return err
+						}
+					}
 				}
-			}
-			// Only what is missing is owed.
-			require.Len(t, markedHashes(t, target), tt.numFromSource,
-				"code already stored must never be marked")
+				return nil
+			})
+			eg.Go(func() error { return syncer.Sync(ctx) })
 
-			syncer.CloseInput()
-
-			err = syncer.Sync(ctx)
+			err = eg.Wait()
 			require.False(t, guard.Fired(), "the syncer requested more than batching explains")
 			require.NoError(t, err)
 
@@ -156,14 +168,36 @@ func TestSyncer(t *testing.T) {
 				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
 			requested := 0
 			for _, size := range sizes {
-				// The handler drops a request over the cap, so an overgrown
-				// batch costs the whole request, not just the excess.
+				// An overgrown batch costs the whole request, since the handler drops it.
 				require.LessOrEqual(t, size, maxHashesPerRequest, "a request outgrew the batch size")
 				requested += size
 			}
 			require.Equal(t, tt.numFromSource, requested, "every missing hash is requested once")
 		})
 	}
+}
+
+// Code already on disk is neither marked nor requested, so a resumed sync takes
+// no ownership of what it has.
+func TestSyncer_SkipsStoredCode(t *testing.T) {
+	ctx := t.Context()
+	log := loggingtest.New(t, logging.Debug)
+	source, target := memorydb.New(), memorydb.New()
+
+	missing := writeRandomCode(t, source)
+	stored := writeRandomCode(t, target)
+
+	recorder := synctest.NewRecordingResponder(newResponder(log, source))
+	syncer, err := NewSyncer(log, serve(t, ctx, log, recorder), target)
+	require.NoError(t, err)
+	require.NoError(t, syncer.AddCode(ctx, []common.Hash{missing, stored}))
+
+	require.Equal(t, []common.Hash{missing}, markedHashes(t, target),
+		"only the missing hash is owed")
+
+	syncer.CloseInput()
+	require.NoError(t, syncer.Sync(ctx))
+	require.Equal(t, []int{1}, requestSizes(recorder), "stored code is never requested")
 }
 
 func TestClaimSet(t *testing.T) {
@@ -262,7 +296,7 @@ func TestSyncer_InputClosed(t *testing.T) {
 	}
 }
 
-// AddCode racing CloseInput has two outcomes: accepted and marked, or refused 
+// AddCode racing CloseInput has two outcomes: accepted and marked, or refused
 // and unmarked. A marker left by a refused call is code owed to nobody.
 func TestSyncer_AddCodeRacesCloseInput(t *testing.T) {
 	const producers = 50
@@ -413,8 +447,7 @@ func newHoldingResponder(inner handlers.Responder[*syncpb.GetCodeRequest, *syncp
 }
 
 func (h *holdingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
-	// Later requests pass through, so a test asserting there is no second one
-	// still finishes.
+	// Later requests pass through, so a no-second-request assertion still finishes.
 	if !h.first.Swap(true) {
 		close(h.holding)
 		<-h.released
@@ -439,44 +472,92 @@ func (h *holdingResponder) release() {
 	})
 }
 
-// A failed write must fail the run. Reporting success would leave the code
-// unstored with nothing saying it is owed.
+// A crash at any single write must leave the store recoverable by a fresh syncer
+// plus a re-add of whatever AddCode refused.
 func TestSyncer_WriteFailure(t *testing.T) {
-	errBoom := errors.New("boom")
+	log := loggingtest.New(t, logging.Debug)
+	source := memorydb.New()
 
-	t.Run("clearing_recovered_markers", func(t *testing.T) {
-		log := loggingtest.New(t, logging.Debug)
-		raw := memorydb.New()
-		// Marked and stored, so recovery clears the marker and commits.
-		hash := writeRandomCode(t, raw)
-		require.NoError(t, customrawdb.WriteCodeToFetch(raw, hash))
+	// A full batch and a short one, so concurrent worker commits are in the stream.
+	hashes := make([]common.Hash, maxHashesPerRequest+1)
+	want := map[common.Hash][]byte{}
+	for i := range hashes {
+		code := randomCode(t)
+		hashes[i] = writeCode(t, source, code)
+		want[hashes[i]] = code
+	}
+	// Already stored on the target, so a stale-marker clear is in the stream too.
+	storedCode := randomCode(t)
+	storedHash := crypto.Keccak256Hash(storedCode)
+	want[storedHash] = storedCode
 
-		_, err := NewSyncer(log, nil, &failingDB{KeyValueStore: raw, err: errBoom})
-		require.ErrorIs(t, err, errBoom)
-	})
+	// Markers a previous run left, so recovery has a clear and a re-queue to
+	// crash during rather than an empty batch.
+	resumed := append([]common.Hash{storedHash}, hashes[:3]...)
+	hashes = hashes[3:]
 
-	t.Run("committing_fetched_code", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		log := loggingtest.New(t, logging.Debug)
-
-		source, raw := memorydb.New(), memorydb.New()
-		hash := writeRandomCode(t, source)
-
-		recorder := synctest.NewRecordingResponder(newResponder(log, source))
-		// A swallowed failure would leave the hash owed and re-requested.
-		guard := synctest.NewCancelAfter(recorder, 2, cancel)
-		client := serve(t, ctx, log, guard)
-
-		db := &failingDB{KeyValueStore: raw, err: errBoom, onlyCode: true}
-		syncer, err := NewSyncer(log, client, db)
+	// A clean run counts the ops, so the sweep can crash at every one of them.
+	ops := func() int {
+		counter := saetest.NewFlakyDB(newSeededDB(t, storedCode, resumed), math.MaxInt)
+		_, err := runSync(t, log, source, evmdb.New(counter), hashes)
 		require.NoError(t, err)
-		require.NoError(t, syncer.AddCode(ctx, []common.Hash{hash}))
-		syncer.CloseInput()
+		return counter.Calls()
+	}()
+	require.Positive(t, ops)
 
-		require.ErrorIs(t, syncer.Sync(ctx), errBoom)
-		require.False(t, guard.Fired(), "the failure must end the run rather than retry")
-	})
+	for failAfter := range ops {
+		t.Run(fmt.Sprintf("fail_after_%d", failAfter), func(t *testing.T) {
+			raw := newSeededDB(t, storedCode, resumed)
+			flaky := evmdb.New(saetest.NewFlakyDB(raw, failAfter))
+
+			// Only an accepted AddCode promises a durable marker.
+			reAdd, err := runSync(t, log, source, flaky, hashes)
+			if err != nil {
+				require.ErrorIs(t, err, saetest.ErrInjected)
+			}
+
+			// A second syncer over the same store, now healthy, must converge.
+			target := evmdb.New(raw)
+			_, err = runSync(t, log, source, target, reAdd)
+			require.NoError(t, err)
+
+			for hash, code := range want {
+				require.Equalf(t, code, rawdb.ReadCode(target, hash), "code for %s", hash)
+			}
+			require.Empty(t, markedHashes(t, target), "every marker must be cleared")
+		})
+	}
+}
+
+// newSeededDB returns a store holding stored code and a previous run's markers,
+// seeded before any fault injector wraps it.
+func newSeededDB(t *testing.T, stored []byte, marked []common.Hash) database.Database {
+	t.Helper()
+	raw := memdb.New()
+	db := evmdb.New(raw)
+	writeCode(t, db, stored)
+	for _, codeHash := range marked {
+		require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
+	}
+	return raw
+}
+
+// runSync adds hashes and runs one syncer over db, returning what it refused.
+func runSync(t *testing.T, log logging.Logger, source, db ethdb.KeyValueStore, hashes []common.Hash) ([]common.Hash, error) {
+	t.Helper()
+	ctx := t.Context()
+
+	syncer, err := NewSyncer(log, serve(t, ctx, log, newResponder(log, source)), db)
+	if err != nil {
+		return hashes, err
+	}
+	if err := syncer.AddCode(ctx, hashes); err != nil {
+		return hashes, err
+	}
+
+	// Sync returns once input closes and the queue drains, so close first.
+	syncer.CloseInput()
+	return nil, syncer.Sync(ctx)
 }
 
 // serve registers r on a single-node in-process network.
@@ -517,36 +598,4 @@ func randomCode(t *testing.T) []byte {
 	_, err := rand.Read(code)
 	require.NoError(t, err)
 	return code
-}
-
-// failingDB fails a commit, chosen by what the batch carries. Only fetched code
-// writes bytecode, so onlyCode picks the worker's commit.
-type failingDB struct {
-	ethdb.KeyValueStore
-	err      error
-	onlyCode bool
-}
-
-func (db *failingDB) NewBatch() ethdb.Batch {
-	return &failingBatch{Batch: db.KeyValueStore.NewBatch(), db: db}
-}
-
-type failingBatch struct {
-	ethdb.Batch
-	db       *failingDB
-	hasBytes bool
-}
-
-func (b *failingBatch) Put(key, value []byte) error {
-	if bytes.HasPrefix(key, rawdb.CodePrefix) {
-		b.hasBytes = true
-	}
-	return b.Batch.Put(key, value)
-}
-
-func (b *failingBatch) Write() error {
-	if b.db.onlyCode && !b.hasBytes {
-		return b.Batch.Write()
-	}
-	return b.db.err
 }

@@ -67,14 +67,18 @@ func TestQueue_DrainedMeansEmpty(t *testing.T) {
 				}
 				wg.Go(q.close)
 
-				// The batcher's own stop condition.
+				// Sleeping on an empty drain keeps this from starving the producers.
 				drained := 0
 				for {
 					taken, closed := q.take()
 					drained += len(taken)
-					if closed && len(taken) == 0 {
+					if len(taken) > 0 {
+						continue
+					}
+					if closed {
 						break
 					}
+					require.NoError(t, q.wait(t.Context()))
 				}
 				wg.Wait()
 				close(results)

@@ -37,8 +37,7 @@ var (
 // Syncer resolves contract code by hash, and owns every write to both the
 // bytecode and the to-fetch marker.
 //
-// One goroutine batches queued hashes. Up to numSyncWorkers others fetch, so the
-// round trips overlap.
+// One goroutine batches queued hashes, numSyncWorkers others fetch.
 type Syncer struct {
 	log    logging.Logger
 	client *Client
@@ -63,8 +62,8 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, 
 	return s, nil
 }
 
-// AddCode records hashes as outstanding and queues them. Code already on disk is
-// neither marked nor queued. Never waits on the fetchers.
+// AddCode marks hashes as outstanding and queues them, skipping code already on
+// disk. Never waits on the fetchers.
 func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) error {
 	if len(hashes) == 0 {
 		return nil
@@ -146,16 +145,17 @@ func (s *Syncer) requeueOutstanding() error {
 	if err := it.Error(); err != nil {
 		return fmt.Errorf("iterating code to fetch markers: %w", err)
 	}
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("committing recovered marker clears: %w", err)
+	if batch.ValueSize() > 0 {
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("committing recovered marker clears: %w", err)
+		}
 	}
 
 	s.q.enqueue(outstanding)
 	return nil
 }
 
-// batchHashes drains the queue, handing every full batch to a worker. Only the
-// trailing batch is short.
+// batchHashes drains the queue, handing each full batch to a worker.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 	claimed := &claimSet{}
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
@@ -240,8 +240,8 @@ func (c *claimSet) release(hashes ...common.Hash) {
 	}
 }
 
-// clearIfStored reports whether the code is already on disk, deleting its
-// to-fetch marker through w when it is.
+// clearIfStored deletes the to-fetch marker through w if the code is on disk,
+// reporting whether it was.
 func clearIfStored(r ethdb.KeyValueReader, w ethdb.KeyValueWriter, codeHash common.Hash) (bool, error) {
 	if !rawdb.HasCode(r, codeHash) {
 		return false, nil

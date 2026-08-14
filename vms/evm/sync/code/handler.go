@@ -23,8 +23,7 @@ import (
 )
 
 // maxHashesPerRequest caps the hashes per request, sized for contracts within
-// MaxCodeSize. Oversized genesis code can still outgrow the message limit, which
-// nothing here enforces.
+// MaxCodeSize. Oversized genesis code can still outgrow the message limit.
 const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
 
 var (
