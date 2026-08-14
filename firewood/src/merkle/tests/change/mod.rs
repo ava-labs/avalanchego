@@ -132,3 +132,4 @@ pub(super) mod fuzz_common;
 mod partial;
 mod regression;
 mod structural;
+mod walk;

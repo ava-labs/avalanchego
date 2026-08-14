@@ -1009,6 +1009,38 @@ fn test_dos_array_length_bounds() {
     }
 }
 
+#[test_case(b"", &[0u8] ; "empty key")]
+#[test_case(b"a", &[b'a', 0] ; "single byte")]
+#[test_case(b"\xff", &[0xff, 0] ; "maximum byte does not carry")]
+#[test_case(b"ab\x00", &[b'a', b'b', 0, 0] ; "key already ending in zero")]
+fn test_lex_successor(key: &[u8], expected: &[u8]) {
+    assert_eq!(&*super::lex_successor(key), expected);
+}
+
+#[test_case(b"" ; "empty key")]
+#[test_case(b"a" ; "single byte")]
+#[test_case(b"\xff\xff" ; "maximum bytes")]
+#[test_case(b"key50" ; "multi byte")]
+fn test_lex_successor_is_least_strict_upper_bound(key: &[u8]) {
+    let successor = super::lex_successor(key);
+    assert!(&*successor > key, "the successor must sort above the key");
+
+    // Nothing sorts strictly between a key and its successor. A string that
+    // diverges from `key` at some byte is either below `key` entirely or above
+    // the successor, so it can never land between them; only a string extending
+    // `key` could. Every extension begins with a byte of at least 0, so it is at
+    // or above the successor, and the ones beginning with 0 are the cases where
+    // that is least obvious.
+    for extra in [&[0u8][..], &[0, 0], &[0, 0xff], &[1], &[0xff]] {
+        let mut extension = key.to_vec();
+        extension.extend_from_slice(extra);
+        assert!(
+            extension[..] >= successor[..],
+            "{extension:?} sorts between {key:?} and its successor"
+        );
+    }
+}
+
 mod box_array_deserialization_tests {
     use std::num::NonZeroUsize;
 

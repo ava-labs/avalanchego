@@ -150,8 +150,8 @@
 //! keys), or absent edge proofs (when the range covers the entire
 //! keyspace).
 //!
-//! Note: `requested_start_key` and `right_edge_key` (which equals
-//! `requested_end_key` unless the proof was truncated) are used during
+//! Note: `requested_start_key` and `right_edge_key` (the key the end proof is
+//! anchored at — see `compute_right_edge_key`) are used during
 //! root hash verification (Phase 3) to distinguish in-range from
 //! out-of-range nodes. This determines which proof node values to
 //! adopt during branch expansion and which children to check during
@@ -336,6 +336,17 @@ pub use self::reader::ReadError;
 pub use self::types::{
     EmptyProofCollection, Proof, ProofCollection, ProofEdge, ProofError, ProofNode, ProofType,
 };
+
+/// Returns the smallest byte string strictly greater than `key`: `key` with a
+/// `0x00` byte appended, since nothing sorts between the two. Total — every byte
+/// string has one, including the empty key.
+///
+/// [`find_next_key_after_change_proof`] uses it to resume strictly above the last
+/// key a proof covered. Both request bounds are inclusive, so resuming at that key
+/// would cover it again and never advance.
+fn lex_successor(key: &[u8]) -> Box<[u8]> {
+    [key, &[0]].concat().into_boxed_slice()
+}
 
 pub(super) mod magic {
     //! Magic constants for proof format identification.
