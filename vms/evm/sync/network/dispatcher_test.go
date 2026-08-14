@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -219,7 +220,7 @@ func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p
 	return reg, tracker
 }
 
-func newTestDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
+func newTestDispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]](
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,

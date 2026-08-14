@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 )
 
 var (
@@ -26,23 +27,16 @@ var (
 	errUnmarshalResponse = errors.New("unmarshal response")
 )
 
-// ProtoMessage constrains a message to its pointer type, so a generic holder can
-// allocate one with new instead of taking a constructor.
-type ProtoMessage[T any] interface {
-	proto.Message
-	*T
-}
-
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
-type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
+type Dispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]] struct {
 	client *p2p.Client
 	peers  *p2p.PeerTracker
 	policy retryPolicy
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
-func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
+func NewDispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]](
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,

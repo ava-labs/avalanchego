@@ -18,10 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 )
 
 // ServeResponder registers r at handlerID on a single-node loopback network.
-func ServeResponder[V any, Req handlers.ProtoMessage[V], Resp proto.Message](
+func ServeResponder[V any, Req types.ProtoMessage[V], Resp proto.Message](
 	t *testing.T,
 	ctx context.Context,
 	log logging.Logger,

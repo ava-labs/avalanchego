@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 )
 
 var _ p2p.Handler = (*Handler[emptypb.Empty, *emptypb.Empty, *emptypb.Empty])(nil)
@@ -31,13 +32,6 @@ var (
 		Message: "failed to marshal proto response",
 	}
 )
-
-// ProtoMessage constrains a request to a pointer type, so [Handler] can
-// allocate one with new instead of taking a constructor.
-type ProtoMessage[T any] interface {
-	proto.Message
-	*T
-}
 
 // Responder is the per-RPC contract behind [Handler]:
 //
@@ -60,13 +54,13 @@ func Fault(log logging.Logger, nodeID ids.NodeID, err error) *common.AppError {
 }
 
 // Handler is a typed [p2p.Handler] for one EVM-sync RPC.
-type Handler[V any, Req ProtoMessage[V], Resp proto.Message] struct {
+type Handler[V any, Req types.ProtoMessage[V], Resp proto.Message] struct {
 	p2p.NoOpHandler
 	log       logging.Logger
 	responder Responder[Req, Resp]
 }
 
-func NewHandler[V any, Req ProtoMessage[V], Resp proto.Message](log logging.Logger, responder Responder[Req, Resp]) *Handler[V, Req, Resp] {
+func NewHandler[V any, Req types.ProtoMessage[V], Resp proto.Message](log logging.Logger, responder Responder[Req, Resp]) *Handler[V, Req, Resp] {
 	return &Handler[V, Req, Resp]{log: log, responder: responder}
 }
 
