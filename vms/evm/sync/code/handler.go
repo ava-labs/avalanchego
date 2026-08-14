@@ -22,9 +22,9 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// maxHashesPerRequest caps the hashes per request so a response of that many
-// max-size contracts stays within the p2p message limit, with headroom for
-// proto framing and the other message fields.
+// maxHashesPerRequest caps the hashes per request, sized for contracts within
+// MaxCodeSize. Oversized genesis code can still outgrow the message limit, which
+// nothing here enforces.
 const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
 
 var (
