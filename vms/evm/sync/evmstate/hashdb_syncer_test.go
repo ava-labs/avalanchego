@@ -416,8 +416,9 @@ func TestHashDBSyncer_CancelPropagates(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	f := synctest.NewStateFixture(t, []synctest.AccountDesc{{WithCode: true}, {WithCode: true}})
 
-	// Every response tampered, so only cancellation can end it.
-	r := synctest.NewCancelAfter(flakyLeafResponder(t, f.TrieDB, -1), 5, cancel)
+	// Every response the guard allows is tampered, so only cancellation can end it.
+	const attempts = 5
+	r := synctest.NewCancelAfter(flakyLeafResponder(t, f.TrieDB, attempts), attempts, cancel)
 
 	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafResponder(r))
 	require.ErrorIs(t, sut.sync(t, ctx), context.Canceled)
