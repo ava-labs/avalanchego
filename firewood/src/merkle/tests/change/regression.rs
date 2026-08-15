@@ -2,8 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 //! Deterministic regression tests for change-proof verification at range
-//! boundaries, where a boundary key shares a trie-descent path with a
-//! neighbouring key.
+//! boundaries, where the verifier must decide whether a boundary proof node
+//! falls inside the proven range.
 //!
 //! Soundness — a tampered, forged, or omitted op must be rejected:
 //! - `test_tampered_right_edge_delete_to_put_is_rejected` (#2091): in a
@@ -30,6 +30,13 @@
 //!   where the deleted key extends the bound.
 //! - `test_out_of_range_delete_below_start_bound_verifies`: start bound, where
 //!   the bound extends the deleted key.
+//!
+//! Completeness — a reconcile guard must test both bounds, not one (#2154,
+//! #2145):
+//! - `test_all_deleted_range_with_survivor_above_end_bound_verifies`: every
+//!   in-range key is deleted and the sole survivor sorts above the end bound.
+//! - `test_key_empty_range_verifies`: the range contains no keys in either
+//!   revision, so the start proof's exclusion terminal sorts past the end bound.
 
 use super::*;
 use crate::{ChangeProof, Proof};
@@ -426,5 +433,104 @@ fn test_split_start_boundary_child_omitted_in_range_delete_is_rejected() {
         "a split boundary child must be recomputed from the proposal. The start \
          boundary's child holds the in-range 0xd490 as well as the out-of-range \
          0xd410, so it cannot be taken from the proof"
+    );
+}
+
+/// A bounded change proof must verify when every in-range key was deleted and
+/// the sole surviving key sorts above the end bound.
+///
+/// start trie: `{ 0x10, 0x56, 0x5601, 0xf1 }`
+/// end trie:   `{ 0x5601 }`  (all others deleted, `0x5601` rewritten)
+/// range:      `[0x1000, 0x56]`
+///
+/// `0x10` sorts below `0x1000` (a shorter key comes first), so only `Delete
+/// 0x56` is in range. `0x5601` sorts above the bound `0x56` and is therefore out
+/// of range, but it is the end trie's only key, so it appears as a valued node
+/// in the start proof. A reconcile guard testing only `>= start_key` judges it
+/// in-range and reports its value as `UnexpectedValue`, rejecting an honest
+/// proof. Nothing here needs a limit or truncation.
+///
+/// The `Put` rewriting `0x5601` is load-bearing: `reconcile_branch_proof_node`
+/// short-circuits when the proof node's value already equals the branch's, so
+/// without a value change the guard is never reached and this test passes even
+/// with the defect present.
+#[test]
+fn test_all_deleted_range_with_survivor_above_end_bound_verifies() {
+    let (db, _dir) = setup_db![
+        (b"\x10".as_slice(), b"a".as_slice()),
+        (b"\x56".as_slice(), b"b".as_slice()),
+        (b"\x56\x01".as_slice(), b"c".as_slice()),
+        (b"\xf1".as_slice(), b"d".as_slice())
+    ];
+    let (start_root, end_root) = commit_batch(
+        &db,
+        vec![
+            BatchOp::Delete { key: b"\x10" },
+            BatchOp::Delete { key: b"\x56" },
+            BatchOp::Put {
+                key: b"\x56\x01",
+                value: b"c2",
+            },
+            BatchOp::Delete { key: b"\xf1" },
+        ],
+    );
+
+    let (sk, ek) = (b"\x10\x00".as_slice(), b"\x56".as_slice());
+    let proof = db
+        .change_proof(
+            start_root.clone(),
+            end_root.clone(),
+            Some(sk),
+            Some(ek),
+            None,
+        )
+        .unwrap();
+    assert_eq!(proof.batch_ops().len(), 1);
+    verify(&db, &proof, &start_root, &end_root, Some(sk), Some(ek)).expect(
+        "honest change proof over [0x1000, 0x56] must verify. The surviving \
+         0x5601 sorts above the end bound, so it is out of range and its value \
+         must not be reported as UnexpectedValue",
+    );
+}
+
+/// A change proof over a range that contains no keys in either revision must
+/// verify (#2145). The start trie holds `0x20` and the end trie holds `0xe0`, so
+/// the range `[0x60, 0xb0]` is empty on both sides and the proof correctly
+/// claims nothing changed within it.
+///
+/// Both boundary proofs are generated from the end trie, so the start proof is
+/// an exclusion proof whose terminal is the nearest end-trie key at or after
+/// `0x60` — that is `0xe0`, which sorts after the end bound. A guard testing
+/// only `>= start_key` treats that terminal as in-range and reports its value as
+/// `UnexpectedValue`, rejecting an honest proof.
+#[test]
+fn test_key_empty_range_verifies() {
+    let (db, _dir) = setup_db![(b"\x20".as_slice(), b"\x01".as_slice())];
+    let (start_root, end_root) = commit_batch(
+        &db,
+        vec![
+            BatchOp::Delete { key: b"\x20" },
+            BatchOp::Put {
+                key: b"\xe0",
+                value: b"\x01",
+            },
+        ],
+    );
+
+    let (sk, ek) = (b"\x60".as_slice(), b"\xb0".as_slice());
+    let proof = db
+        .change_proof(
+            start_root.clone(),
+            end_root.clone(),
+            Some(sk),
+            Some(ek),
+            None,
+        )
+        .unwrap();
+    assert!(proof.batch_ops().is_empty());
+    verify(&db, &proof, &start_root, &end_root, Some(sk), Some(ek)).expect(
+        "honest change proof over the key-empty range [0x60, 0xb0] must verify. \
+         The start proof's exclusion terminal 0xe0 sorts after the end bound, so \
+         it is out of range and its value must not be reported as UnexpectedValue",
     );
 }

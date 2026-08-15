@@ -208,11 +208,12 @@
 //! so the hash computation reflects `end_root`.
 //!
 //! For exclusion proofs, the terminal proof node may overshoot the
-//! boundary key to the nearest existing key. Such nodes are in-range
-//! (>= `requested_start_key` for start proofs, <= `requested_end_key`
-//! for end proofs) and
-//! value conflicts there are real errors — the proposal already has
-//! the correct value from the batch_ops.
+//! boundary key to the nearest existing key. Such a node is in-range only
+//! when it lies within both bounds, `[requested_start_key,
+//! right_edge_key]`, and a value conflict there is a real error — the
+//! proposal already has the correct value from the batch_ops. Testing one
+//! bound alone would judge a terminal beyond the far bound as in-range,
+//! and report its legitimately differing value as an error.
 //!
 //! ### Step 3 — Branch collapsing
 //!

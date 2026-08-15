@@ -32,6 +32,22 @@ pub(crate) struct CollapseRange<'a> {
     pub(crate) end: Option<&'a [u8]>,
 }
 
+impl CollapseRange<'_> {
+    /// Whether a node at nibble path `node` sits inside the range.
+    ///
+    /// Both reconcile loops in [`verify_change_proof_root_hash`] and
+    /// [`Merkle::collapse_strip`]'s value check ask this same question: a node's
+    /// position is in range or it is not, regardless of which proof carried it.
+    /// Testing only the near bound would judge a divergent terminal beyond the
+    /// far bound as in-range, and report its legitimately differing value as
+    /// `UnexpectedValue`.
+    ///
+    /// [`verify_change_proof_root_hash`]: crate::merkle::verify_change_proof_root_hash
+    pub(crate) fn contains(&self, node: &[u8]) -> bool {
+        node >= self.start && self.end.is_none_or(|end| node <= end)
+    }
+}
+
 /// Where the hash step should get a boundary terminal's on-path child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BoundaryChildSource {
@@ -323,8 +339,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
 
         let child_node = child.as_shared_node(&self.nodestore)?;
         let pfx = build_child_prefix(acc_prefix, nibble.0.as_u8(), &child_node);
-        let key_in_range =
-            pfx.as_ref() >= range.start && range.end.is_none_or(|end| pfx.as_ref() <= end);
+        let key_in_range = range.contains(pfx.as_ref());
 
         let Some(branch) = child_node.as_branch() else {
             return Ok(key_in_range);
@@ -440,9 +455,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         // An in-range value belongs to an in-range key and must be kept so it
         // is validated against the batch. Dropping it lets a forged or omitted
         // in-range op whose key is a prefix of the boundary slip through.
-        let out_of_range = range.is_none_or(|CollapseRange { start, end }| {
-            acc_prefix < start || end.is_some_and(|end| acc_prefix > end)
-        });
+        let out_of_range = range.is_none_or(|range| !range.contains(acc_prefix));
         if out_of_range {
             branch.value = None;
         }
