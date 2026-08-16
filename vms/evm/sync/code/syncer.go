@@ -39,10 +39,11 @@ var (
 //
 // One goroutine batches queued hashes, numSyncWorkers others fetch.
 type Syncer struct {
-	log    logging.Logger
-	client *Client
-	db     ethdb.KeyValueStore
-	q      *queue
+	log     logging.Logger
+	client  *Client
+	db      ethdb.KeyValueStore
+	q       *queue
+	claimed *claimSet
 
 	started atomic.Bool
 }
@@ -51,10 +52,11 @@ type Syncer struct {
 // peers through c. An interrupted sync resumes from the markers it left.
 func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, error) {
 	s := &Syncer{
-		log:    log,
-		client: c,
-		db:     db,
-		q:      newQueue(),
+		log:     log,
+		client:  c,
+		db:      db,
+		q:       newQueue(),
+		claimed: &claimSet{},
 	}
 	if err := s.requeueOutstanding(); err != nil {
 		return nil, err
@@ -63,8 +65,9 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, 
 }
 
 // AddCode marks hashes as outstanding and queues them, skipping code already on
-// disk. Never waits on the fetchers.
-func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) error {
+// disk or already claimed by a repeat still in flight. Never waits on the
+// fetchers.
+func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr error) {
 	if len(hashes) == 0 {
 		return nil
 	}
@@ -72,25 +75,42 @@ func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) error {
 		return err
 	}
 
+	// Held across the write and the enqueue, so a refused call leaves nothing owed.
+	if !s.q.enter() {
+		return ErrInputClosed
+	}
+	defer s.q.exit()
+
 	batch := s.db.NewBatch()
 	missing := make([]common.Hash, 0, len(hashes))
+	// Released on any error, so a failed call leaves nothing claimed with no
+	// fetch coming for it.
+	defer func() {
+		if retErr != nil {
+			s.claimed.release(missing...)
+		}
+	}()
+
 	for _, codeHash := range hashes {
 		if rawdb.HasCode(s.db, codeHash) {
 			continue
 		}
+		// Claim before writing, so a repeat already claimed is skipped here
+		// instead of writing a duplicate marker or queuing a duplicate fetch.
+		if !s.claimed.claim(codeHash) {
+			continue
+		}
+		missing = append(missing, codeHash)
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("marking code to fetch: %w", err)
 		}
-		missing = append(missing, codeHash)
+	}
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("committing code to fetch markers: %w", err)
 	}
 
-	// One step against CloseInput, so a refused call leaves nothing owed.
-	return s.q.admit(missing, func() error {
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("committing code to fetch markers: %w", err)
-		}
-		return nil
-	})
+	s.q.enqueue(missing)
+	return nil
 }
 
 // CloseInput stops taking hashes. [Syncer.Sync] returns once the queue drains.
@@ -115,8 +135,9 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
-// requeueOutstanding re-queues the markers a previous run left, clearing those
-// whose code has since arrived. Runs before any producer holds the Syncer.
+// requeueOutstanding re-queues markers a previous run left, clearing ones
+// StateDB.Commit already satisfied outside a fetch. Runs before any producer
+// holds the Syncer.
 func (s *Syncer) requeueOutstanding() error {
 	it := customrawdb.NewCodeToFetchIterator(s.db)
 	defer it.Release()
@@ -130,10 +151,14 @@ func (s *Syncer) requeueOutstanding() error {
 			return err
 		}
 		if !stored {
+			// Claimed here too, so a concurrent AddCode for the same hash defers
+			// to whichever of the two reaches the queue.
+			s.claimed.claim(codeHash)
 			outstanding = append(outstanding, codeHash)
 			continue
 		}
-		// A near-complete sync clears a marker per contract, too many for one batch.
+		// Resuming after many blocks executed locally can satisfy most markers
+		// this way, too many clears for one batch.
 		if batch.ValueSize() < ethdb.IdealBatchSize {
 			continue
 		}
@@ -155,14 +180,14 @@ func (s *Syncer) requeueOutstanding() error {
 	return nil
 }
 
-// batchHashes drains the queue, handing each full batch to a worker.
+// batchHashes drains the queue, handing each full batch to a worker. Every
+// dequeued hash arrives already claimed by AddCode or recovery.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
-	claimed := &claimSet{}
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
 	fetch := func() {
 		full := batch
 		eg.Go(func() error {
-			return s.fetchAndPersist(ctx, full, claimed)
+			return s.fetchAndPersist(ctx, full)
 		})
 		batch = make([]common.Hash, 0, maxHashesPerRequest)
 	}
@@ -170,21 +195,6 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 	for {
 		queued, closed := s.q.take()
 		for _, codeHash := range queued {
-			// Claim first, so a repeat cannot read the code missing and then claim
-			// it as the commit lands. Cleanup runs either way.
-			alreadyClaimed := !claimed.claim(codeHash)
-			stored, err := clearIfStored(s.db, s.db, codeHash)
-			if err != nil {
-				return err
-			}
-			if alreadyClaimed {
-				continue
-			}
-			if stored {
-				claimed.release(codeHash)
-				continue
-			}
-
 			batch = append(batch, codeHash)
 			if len(batch) == maxHashesPerRequest {
 				fetch()
@@ -197,11 +207,9 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 			}
 			return nil
 		}
-		// More may have arrived while this drain ran.
-		if len(queued) > 0 {
-			continue
-		}
 
+		// A wakeup already pending from work added mid-drain returns at once, so
+		// this never waits past hashes that arrived while queued was processed.
 		if err := s.q.wait(ctx); err != nil {
 			return err
 		}
@@ -209,7 +217,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 }
 
 // fetchAndPersist fetches code for hashes from the network and writes it to db.
-func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, claimed *claimSet) error {
+func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) error {
 	data, err := getCode(ctx, s.log, s.client, hashes)
 	if err != nil {
 		return err
@@ -218,12 +226,12 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash, clai
 		return err
 	}
 	// Released only after the commit, so a repeat is seen on disk instead.
-	claimed.release(hashes...)
+	s.claimed.release(hashes...)
 	return nil
 }
 
-// claimSet holds the hashes a batch has taken, until their code is committed, so
-// a repeat is not fetched twice. Bounded by the work outstanding.
+// claimSet holds the hashes accepted into the pipeline, until their code is
+// committed, so a repeat is not fetched twice. Bounded by the work outstanding.
 type claimSet struct {
 	m sync.Map
 }

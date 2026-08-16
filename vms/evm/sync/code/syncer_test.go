@@ -6,6 +6,7 @@ package code
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
@@ -231,6 +233,49 @@ func held(c *claimSet) int {
 	return n
 }
 
+func TestSyncer_RepeatsOfStoredCodeNeverClaim(t *testing.T) {
+	const (
+		numHashes = 50
+		producers = 8
+	)
+
+	log := loggingtest.New(t, logging.Debug)
+	db := memorydb.New()
+
+	stored := make([]common.Hash, numHashes)
+	for i := range stored {
+		stored[i] = writeRandomCode(t, db)
+	}
+
+	syncer, err := NewSyncer(log, nil, db)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	for range producers {
+		wg.Go(func() {
+			assert.NoError(t, syncer.AddCode(t.Context(), stored))
+		})
+	}
+	wg.Wait()
+
+	require.Zero(t, held(syncer.claimed), "already-stored code must never be claimed")
+	require.Empty(t, markedHashes(t, db), "already-stored code must never be marked")
+}
+
+// A write failure must release its claim, or the hash is stuck forever.
+func TestSyncer_ClaimReleasedOnWriteFailure(t *testing.T) {
+	log := loggingtest.New(t, logging.Debug)
+	// Fails on the first op.
+	db := evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
+
+	syncer, err := NewSyncer(log, nil, db)
+	require.NoError(t, err)
+
+	hash := common.Hash{1}
+	require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{hash}), saetest.ErrInjected)
+	require.Zero(t, held(syncer.claimed), "a failed write must not leave a claim behind")
+}
+
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	// Enough bad answers to show a rejection is not a one-off.
 	const tampered = 2
@@ -342,6 +387,97 @@ func TestSyncer_AddCodeRacesCloseInput(t *testing.T) {
 		"a marker exists exactly when AddCode accepted the hash")
 }
 
+func TestSyncer_DrainedQueueMeansEmpty(t *testing.T) {
+	t.Parallel()
+
+	log := loggingtest.New(t, logging.Debug)
+
+	tests := []struct {
+		name          string
+		rounds        int
+		producers     int
+		hashesPerCall int
+		dbFails       bool
+		wantAccepted  bool // whether any AddCode is expected to succeed at all
+	}{
+		{name: "one_producer", rounds: 20000, producers: 1, hashesPerCall: 1, wantAccepted: true},
+		{name: "many_producers", rounds: 2000, producers: 8, hashesPerCall: 1, wantAccepted: true},
+		{name: "batched_add_code", rounds: 2000, producers: 4, hashesPerCall: 5, wantAccepted: true},
+		{name: "db_fails", rounds: 100, producers: 4, hashesPerCall: 3, dbFails: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			offered := make([]common.Hash, tt.hashesPerCall)
+			for i := range offered {
+				offered[i] = common.Hash{byte(i + 1)}
+			}
+
+			everAccepted := false
+			for round := range tt.rounds {
+				db := ethdb.KeyValueStore(memorydb.New())
+				if tt.dbFails {
+					// Fails from the first op, so every write in this round is rejected.
+					db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
+				}
+				syncer, err := NewSyncer(log, nil, db)
+				require.NoError(t, err)
+
+				// Buffered to the producer count, so no AddCode waits to report.
+				results := make(chan error, tt.producers)
+
+				var wg sync.WaitGroup
+				for range tt.producers {
+					wg.Go(func() {
+						results <- syncer.AddCode(t.Context(), offered)
+					})
+				}
+				wg.Go(syncer.CloseInput)
+
+				// Sleeping on an empty drain keeps this from starving the producers.
+				drained := 0
+				for {
+					taken, closed := syncer.q.take()
+					drained += len(taken)
+					if len(taken) > 0 {
+						continue
+					}
+					if closed {
+						break
+					}
+					require.NoError(t, syncer.q.wait(t.Context()))
+				}
+				wg.Wait()
+				close(results)
+
+				// Same hashes for every producer, so nil just means admitted.
+				accepted := false
+				for err := range results {
+					if err == nil {
+						accepted = true
+						continue
+					}
+					require.Truef(t, errors.Is(err, ErrInputClosed) || errors.Is(err, saetest.ErrInjected),
+						"round %d: AddCode refused with an unexpected error: %v", round, err)
+				}
+
+				wantDrained := 0
+				if accepted {
+					wantDrained = len(offered)
+				}
+				require.Equalf(t, wantDrained, drained,
+					"round %d: a hash stayed queued after the drain reported empty and closed", round)
+				everAccepted = everAccepted || accepted
+			}
+
+			require.Equal(t, tt.wantAccepted, everAccepted,
+				"whether any AddCode is accepted is what the case is built to exercise")
+		})
+	}
+}
+
 // markedHashes is every hash currently recorded as owed.
 func markedHashes(t *testing.T, db ethdb.Iteratee) []common.Hash {
 	t.Helper()
@@ -385,9 +521,10 @@ func TestSyncer_ResumesFromMarkers(t *testing.T) {
 	require.Empty(t, markedHashes(t, target), "recovery must clear every marker it resolves")
 }
 
-// A repeat arriving while its first copy is being fetched must cost neither a
-// second request nor a leaked marker.
+// Concurrent repeats of an in-flight hash must cost no extra fetch.
 func TestSyncer_RepeatDuringFetch(t *testing.T) {
+	const concurrentRepeats = 20
+
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	log := loggingtest.New(t, logging.Debug)
@@ -416,8 +553,15 @@ func TestSyncer_RepeatDuringFetch(t *testing.T) {
 	defer held.release()
 	require.NoError(t, held.wait(ctx), "the syncer never sent a request")
 
-	// Outstanding, so the claim on every hash in the request is held.
-	require.NoError(t, syncer.AddCode(ctx, []common.Hash{repeat}))
+	// Held in flight, so concurrent repeats must defer to it.
+	var wg sync.WaitGroup
+	for range concurrentRepeats {
+		wg.Go(func() {
+			assert.NoError(t, syncer.AddCode(ctx, []common.Hash{repeat}))
+		})
+	}
+	wg.Wait()
+
 	syncer.CloseInput()
 	held.release()
 	require.NoError(t, <-syncErr)

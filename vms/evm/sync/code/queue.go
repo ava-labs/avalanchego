@@ -16,34 +16,32 @@ type queue struct {
 	pendingMu sync.Mutex
 	pending   []common.Hash
 
-	// Held for reading across an admit, so close waits out producers already
-	// inside one. Closing done is the close, so a waiter cannot be left asleep.
-	closeMu sync.RWMutex
-	done    chan struct{}
+	closeMu sync.RWMutex  // held across AddCode's write and across take(), so close waits out both
+	done    chan struct{} // closing it is the close, so a waiter cannot be left asleep
 
-	// Buffered to one, so appends between two drains cost a single wakeup.
-	signal chan struct{}
+	signal chan struct{} // buffered to one, so appends between two drains cost a single wakeup
 }
 
 func newQueue() *queue {
-	return &queue{signal: make(chan struct{}, 1), done: make(chan struct{})}
+	return &queue{
+		signal: make(chan struct{}, 1),
+		done:   make(chan struct{}),
+	}
 }
 
-// admit persists hashes through write and queues them as one step against close,
-// so a refused call leaves nothing behind.
-func (q *queue) admit(hashes []common.Hash, write func() error) error {
+// enter reports whether the queue still takes hashes.
+func (q *queue) enter() bool {
 	q.closeMu.RLock()
-	defer q.closeMu.RUnlock()
-
 	if q.isClosed() {
-		return ErrInputClosed
+		q.closeMu.RUnlock()
+		return false
 	}
-	if err := write(); err != nil {
-		return err
-	}
+	return true
+}
 
-	q.enqueue(hashes)
-	return nil
+// exit releases what a successful enter held. Call it once per true enter.
+func (q *queue) exit() {
+	q.closeMu.RUnlock()
 }
 
 // enqueue appends unconditionally. The caller holds closeMu, or runs before any
@@ -62,8 +60,7 @@ func (q *queue) enqueue(hashes []common.Hash) {
 
 // close stops taking hashes. Pending hashes still drain, and it is idempotent.
 func (q *queue) close() {
-	// Taking closeMu for writing waits out admits already inside one, so done is
-	// only closed once every accepted hash is pending.
+	// Taking closeMu for writing waits out any producer already inside enter.
 	q.closeMu.Lock()
 	defer q.closeMu.Unlock()
 
@@ -105,8 +102,11 @@ func (q *queue) wake() {
 // take empties the queue and reports whether input is closed. Closed with
 // nothing pending is the batcher's stop condition.
 func (q *queue) take() ([]common.Hash, bool) {
-	// Both in one critical section, so the batcher cannot pair an empty queue
-	// from before an append with a closed flag from after it.
+	// Held across the same section as enter, so every read of pending and
+	// done is gated by closeMu the same way.
+	q.closeMu.RLock()
+	defer q.closeMu.RUnlock()
+
 	q.pendingMu.Lock()
 	defer q.pendingMu.Unlock()
 
