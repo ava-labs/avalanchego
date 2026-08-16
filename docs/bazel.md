@@ -33,6 +33,7 @@ avalanchego monorepo.
 - [Common Tasks](#common-tasks)
   - [Building](#building)
   - [Testing](#testing)
+    - [Generated Unit-Test Suites](#generated-unit-test-suites)
     - [Test Options](#test-options)
     - [Test Timeouts](#test-timeouts)
     - [Non-Unit Tests and the `manual` Tag](#non-unit-tests-and-the-manual-tag)
@@ -87,7 +88,7 @@ task bazel-build
 task bazel-build-opt
 
 # Run unit tests
-task bazel-test
+task bazel-test-unit-all
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -457,16 +458,16 @@ bazel build //...
 
 ### Testing
 
-By default, `bazel test` matches `scripts/build_test.sh` behavior,
-with a few exceptions:
+Use `bazel test //:unit_tests` for unit testing. It runs each non-manual
+Go test rule once. It does not run `//:gazelle_test` or other non-Go test
+rules.
 
-- The script excludes several directories via `go list | grep -v ...`;
-  Bazel instead relies on `tags = ["manual"]` to keep non-unit tests
-  out of `bazel test //...`.
+Use `bazel test //...` for broader Bazel validation. It runs
+`//:gazelle_test` and can run other non-Go, non-manual test rules.
 
 ```bash
-# Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+# Run all generated unit tests (shuffle enabled, race on)
+task bazel-test-unit-all           # or: bazel test //:unit_tests
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -475,7 +476,7 @@ bazel test //utils/...
 bazel test //utils:set_test --test_filter=TestSet_Add
 
 # Fast local iteration (no race, no shuffle)
-task bazel-test-fast               # or: bazel test --config=fast //...
+task bazel-test-unit-all-fast      # or: bazel test --config=fast //:unit_tests
 
 # Collect coverage
 bazel coverage //...
@@ -483,6 +484,89 @@ bazel coverage //...
 # Run E2E tests (requires built binary)
 task bazel-test-e2e
 ```
+
+Bazel unit-test task names use `bazel-test-unit-<area>`. Use `all` to run every
+unit-test shard.
+
+#### Generated Unit-Test Suites
+
+CI runs the AvalancheGo, Coreth/EVM, and Subnet-EVM unit-test shards in
+parallel. This reduces elapsed CI time compared with one long unit-test suite.
+CI jobs, local tasks, and dependency-cache setup all need to select the same
+tests. If consumers repeat each shard's query and filters, they duplicate the
+selection logic. The definitions can then diverge. Instead, each shard has one
+generated, reusable Bazel target.
+
+The shard definitions in `.bazel/test_shards.json` are the source for these
+targets. Each definition contains a target name, description, and Bazel query.
+The generator evaluates the query, applies the common unit-test constraints,
+and writes the selected labels to `.bazel/generated_test_suites.bzl`.
+`.bazel/test_suites.bzl` uses those labels to declare root `test_suite`
+targets.
+
+The generator writes static lists because Bazel cannot evaluate a query when it
+loads or analyzes BUILD and Starlark code. A `test_suite` requires an explicit
+list of test labels. The checked-in lists record each shard's membership.
+Reviewers can see assignment changes in the generated-file diff. Separate
+queries would not provide a shared Bazel target or one reviewed definition of
+shard membership.
+
+Bazel CI runs these generated targets:
+
+- `//:avalanchego_unit_tests` contains root-module Go tests and the libevm
+  secp256k1 patch test from [`.bazel/patches`](../.bazel/patches/BUILD.bazel).
+  It excludes graft modules, `//:gazelle_test`, and root `test_suite` rules.
+  The query excludes root suites to prevent selection of generated shards
+  through `//:unit_tests`. Do not replace this filter with a list of shard
+  names.
+- `//:coreth_unit_tests` contains Go tests in the Coreth and EVM graft modules.
+- `//:subnet_evm_unit_tests` contains Go tests in the Subnet-EVM graft module.
+
+`//:unit_tests` aggregates the three shards for local use. CI runs them
+separately to reduce elapsed test time.
+
+The generator excludes tests tagged `manual`. It rejects non-Go tests, empty
+shards, shards that overlap, and non-manual Go tests that no shard selects.
+These checks keep every non-manual Go test in exactly one shard. They also
+ensure that each suite member accepts the options for Go tests. Race detection
+can then find unsafe concurrent access. The shuffle option can expose
+order-dependent tests.
+
+Direct path patterns could include a non-Go test that does not accept those
+options. Direct path patterns could also omit a Go test after its module moves.
+
+Generated suites use the normal Bazel metadata workflow. Run the task below
+after a shard-definition change. Also run it after a source or BUILD change
+that can affect test metadata or shard membership:
+
+```bash
+task bazel-generate-metadata
+```
+
+The task runs Gazelle before the suite generator. Gazelle updates BUILD rule
+inputs after changes to a test file, package, or import. The suite generator
+then updates membership after a `go_test` target change or a test move or tag
+change. This order matters because a stale suite can still name a test that now
+has the `manual` tag. Manual non-Go tests do not affect generated suites.
+
+Do not edit `.bazel/generated_test_suites.bzl` by hand. Commit it with the
+change that caused the generated output to change.
+
+Treat shard names as CI interfaces. If you add, remove, or rename a shard,
+update its consumers in the same change. These include the Bazel test tasks,
+[`bazel_ci_dependency_list.sh`](../scripts/bazel_ci_dependency_list.sh), and
+[`bazel-ci.yml`](../.github/workflows/bazel-ci.yml). Update a shard's
+description and query together when its purpose changes.
+
+First, commit the generated output. Then run the task below from a clean
+working tree to verify all Bazel metadata:
+
+```bash
+task bazel-check-metadata
+```
+
+If the check changes the working tree, regenerate the metadata. Commit the
+result. Run the check again.
 
 #### Test Options
 
@@ -495,13 +579,13 @@ task bazel-test-e2e
 Examples:
 ```bash
 # Disable race detection
-bazel test --config=norace //...
+bazel test --config=norace //:unit_tests
 
 # Disable shuffle only
-bazel test --config=noshuffle //...
+bazel test --config=noshuffle //:unit_tests
 
 # Fast mode (no shuffle, no race)
-bazel test --config=fast //...
+bazel test --config=fast //:unit_tests
 ```
 
 #### Test Timeouts
@@ -523,9 +607,8 @@ category (120s). See Custom Test Macros for how this is wired up.
 #### Non-Unit Tests and the `manual` Tag
 
 Tests that are not unit tests (e2e tests, integration tests, load
-tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
-excludes them from `bazel test //...` which should only run unit
-tests.
+tests) must have `tags = ["manual"]` in their BUILD.bazel file. This excludes
+them from generated unit-test suites and from `bazel test //...`.
 
 This roughly mirrors the behavior of `scripts/build_test.sh`, which excludes these directories via grep:
 ```bash
@@ -654,7 +737,7 @@ therefore enables both:
 ### Cache key
 
 The GitHub Actions cache key is:
-`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh')}`
+`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh', '.bazel/generated_test_suites.bzl')}`
 with a same-platform restore prefix of
 `bazel-repo-${runner.os}-${runner.arch}-`.
 
@@ -665,6 +748,8 @@ That split is intentional:
   dependency set changes
 - `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
   checked-in Bazel CI target patterns used by setup change
+- `.bazel/generated_test_suites.bzl` invalidates the cache when the generated
+  membership of a unit-test suite changes
 - the broader same-platform restore key still gives a useful warm start
   because these caches store downloaded dependency data, not per-run
   build outputs
