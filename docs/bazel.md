@@ -399,8 +399,6 @@ bazel build //...
 By default, `bazel test` matches `scripts/build_test.sh` behavior,
 with a few exceptions:
 
-- The script passes `-tags test` to `go test`; currently there are no
-  `//go:build test` files in this repo, so it has no effect.
 - The script excludes several directories via `go list | grep -v ...`;
   Bazel instead relies on `tags = ["manual"]` to keep non-unit tests
   out of `bazel test //...`.
