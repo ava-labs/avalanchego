@@ -121,13 +121,28 @@ git remote add "${TEMP_REMOTE_NAME}" "${SOURCE_PATH}"
 TEMP_REMOTE_ADDED=true
 echo "fetching ${VERSION} from ${SOURCE_PATH}"
 git fetch "${TEMP_REMOTE_NAME}" "${VERSION}"
+SOURCE_COMMIT=$(git rev-parse 'FETCH_HEAD^{commit}')
+echo "resolved ${VERSION} to ${SOURCE_COMMIT}"
 
 if [ "${DRY_RUN}" = true ]; then
   echo "dry run completed successfully; no subtree merge was performed"
   exit 0
 fi
 
-echo "performing subtree merge of ${VERSION} into ${TARGET_PATH}"
-git subtree add --prefix="${TARGET_PATH}" "${TEMP_REMOTE_NAME}" "${VERSION}"
+SOURCE_PATH_ARGUMENT=$(printf '%q' "${SOURCE_PATH}")
+GRAFT_NAME="${TARGET_PATH##*/}"
+REPRODUCE_COMMAND="task graft:${GRAFT_NAME}-subtree-merge -- ${SOURCE_COMMIT} ${SOURCE_PATH_ARGUMENT}"
+COMMIT_MESSAGE=$(cat <<EOF
+[graft] Add ${REPO_BASENAME} at ${SOURCE_COMMIT}
+
+Source: ${SOURCE_PATH}
+
+Reproduce with:
+${REPRODUCE_COMMAND}
+EOF
+)
+
+echo "performing subtree merge of ${SOURCE_COMMIT} into ${TARGET_PATH}"
+git subtree add --prefix="${TARGET_PATH}" --message="${COMMIT_MESSAGE}" "${TEMP_REMOTE_NAME}" "${SOURCE_COMMIT}"
 
 echo "subtree merge of ${REPO_BASENAME} completed successfully"

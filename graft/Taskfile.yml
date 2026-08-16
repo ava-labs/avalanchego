@@ -16,11 +16,11 @@ tasks:
 
   # REPO_NAME-subtree-merge:
   #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME from a local source (commits)
-  #   cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh BRANCH {{.CLI_ARGS}} graft/REPO_NAME
+  #   cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh {{.CLI_ARGS}} graft/REPO_NAME
 
   firewood-subtree-merge:
     desc: Perform git subtree merge of firewood into firewood from a local source (commits)
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Usage: task graft:firewood-subtree-merge -- [--dry-run] <source-path>"
-    cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} firewood
+        msg: "Usage: task graft:firewood-subtree-merge -- <version> [--dry-run] <source-path>"
+    cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh {{.CLI_ARGS}} firewood
