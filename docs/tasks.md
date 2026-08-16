@@ -15,6 +15,7 @@ tasks](../CONTRIBUTING.md#running-tasks) in
   - [Why not Make or just?](#why-not-make-or-just)
 - [How tasks should work in this repo](#how-tasks-should-work-in-this-repo)
   - [Keep tasks simple](#keep-tasks-simple)
+  - [Keep Taskfile entries sorted](#keep-taskfile-entries-sorted)
   - [CI should run named tasks](#ci-should-run-named-tasks)
   - [Some CI-only setup still belongs in workflows](#some-ci-only-setup-still-belongs-in-workflows)
 - [Examples](#examples)
@@ -92,6 +93,14 @@ main exception is code under [`.github/`](../.github/) when it is specific to Gi
 Actions or packaging.
 
 This makes the real behavior easier to check, test, reuse, and review.
+
+### Keep Taskfile entries sorted
+
+List public tasks in alphabetical order by name. Keep `default` first. You can group
+internal tasks, whose names start with `_`, near the tasks that use them.
+
+Sorting makes `task --list` and Taskfile review easier. Keep the order when you
+add, rename, or remove a task.
 
 ### CI should run named tasks
 
