@@ -5,4 +5,5 @@ go_library(
     srcs = ["types.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/types",
     visibility = ["//visibility:public"],
+    deps = ["@org_golang_google_protobuf//proto"],
 )

@@ -21,11 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestDispatcher_Send(t *testing.T) {
+func TestDispatcher_SendTo(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
@@ -34,7 +35,6 @@ func TestDispatcher_Send(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		peers   []ids.NodeID
 		handler p2p.Handler
 		cancel  bool
 		want    *syncpb.GetLeafResponse
@@ -42,31 +42,22 @@ func TestDispatcher_Send(t *testing.T) {
 	}{
 		{
 			name:    "round trip",
-			peers:   []ids.NodeID{nodeID},
 			handler: echoHandler(wantBytes),
 			want:    want,
 		},
 		{
-			name:    "no peer to send to",
-			handler: p2p.NoOpHandler{},
-			wantErr: errNoPeers,
-		},
-		{
 			name:    "handler returns AppError",
-			peers:   []ids.NodeID{nodeID},
 			handler: errorHandler(),
 			wantErr: errHandlerFailed,
 		},
 		{
 			name:    "response bytes are not valid proto",
-			peers:   []ids.NodeID{nodeID},
 			handler: echoHandler([]byte{0xff, 0xff, 0xff}),
 			wantErr: errUnmarshalResponse,
 		},
 		{
 			// Pre-send cancel returns at the ctx.Err() guard, before the handler.
 			name:    "context cancelled before send",
-			peers:   []ids.NodeID{nodeID},
 			handler: p2p.NoOpHandler{},
 			cancel:  true,
 			wantErr: context.Canceled,
@@ -76,8 +67,8 @@ func TestDispatcher_Send(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			_, tracker := newTestTracker(t, tt.peers...)
-			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+			_, tracker := newTestTracker(t, nodeID)
+			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
@@ -88,15 +79,15 @@ func TestDispatcher_Send(t *testing.T) {
 			}
 
 			got := &syncpb.GetLeafResponse{}
-			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, got)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.Send()", c)
+			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
+			require.ErrorIsf(t, err, tt.wantErr, "%T.SendTo()", c)
 			if tt.wantErr != nil {
 				// Failures self-register, the caller gets no Outcome.
-				require.Nilf(t, outcome, "%T.Send() outcome", c)
+				require.Nilf(t, outcome, "%T.SendTo() outcome", c)
 				return
 			}
 
-			require.NotNilf(t, outcome, "%T.Send() outcome", c)
+			require.NotNilf(t, outcome, "%T.SendTo() outcome", c)
 			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
@@ -121,7 +112,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 
 	reg, tracker := newTestTracker(t, nodeID)
 	seedResponsive(t, reg, tracker, nodeID)
-	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
 
@@ -175,7 +166,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 			if tt.seed {
 				seedResponsive(t, reg, tracker, nodeID)
 			}
-			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
@@ -229,15 +220,15 @@ func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p
 	return reg, tracker
 }
 
-func newTestDispatcher[Req, Resp proto.Message](
+func newTestDispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]](
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	h p2p.Handler,
 	peers *p2p.PeerTracker,
-) *Dispatcher[Req, Resp] {
+) *Dispatcher[Req, V, Resp] {
 	t.Helper()
-	return &Dispatcher[Req, Resp]{
+	return &Dispatcher[Req, V, Resp]{
 		client: p2ptest.NewSelfClient(t, ctx, nodeID, h),
 		peers:  peers,
 	}

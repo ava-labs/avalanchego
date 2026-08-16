@@ -10,11 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 )
 
 var (
@@ -27,37 +29,49 @@ var (
 
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
-type Dispatcher[Req, Resp proto.Message] struct {
+type Dispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]] struct {
 	client *p2p.Client
 	peers  *p2p.PeerTracker
+	policy retryPolicy
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
-func NewDispatcher[Req, Resp proto.Message](
+func NewDispatcher[Req proto.Message, V any, Resp types.ProtoMessage[V]](
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
-) *Dispatcher[Req, Resp] {
-	return &Dispatcher[Req, Resp]{
+	opts ...RetryOption,
+) *Dispatcher[Req, V, Resp] {
+	return &Dispatcher[Req, V, Resp]{
 		client: n.NewClient(handlerID, noopSampler{}),
 		peers:  peers,
+		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
 	}
 }
 
-// Send picks a peer and forwards to [SendTo], or returns errNoPeers
-// (unscored) when none is available.
-func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
-	nodeID, ok := d.peers.SelectPeer()
-	if !ok {
-		return nil, errNoPeers
-	}
-	return d.SendTo(ctx, nodeID, req, resp)
+// Send retries req through [SendTo] until verify accepts a response or ctx ends.
+// Each attempt gets its own response.
+func (d *Dispatcher[Req, V, Resp]) Send(
+	ctx context.Context,
+	req Req,
+	verify func(Resp) error,
+) (Resp, error) {
+	return doRetry(ctx, d.policy, verify, func() (Resp, *Outcome, error) {
+		nodeID, ok := d.peers.SelectPeer()
+		if !ok {
+			var zero Resp
+			return zero, nil, errNoPeers
+		}
+		resp := Resp(new(V))
+		outcome, err := d.SendTo(ctx, nodeID, req, resp)
+		return resp, outcome, err
+	})
 }
 
 // SendTo sends req to nodeID. A pre-send context or marshal error
 // returns unscored, any later failure scores the peer and returns a nil
 // Outcome.
-func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+func (d *Dispatcher[Req, V, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

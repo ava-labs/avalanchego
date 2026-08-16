@@ -25,6 +25,7 @@ go_library(
         "//utils/set",
         "//version",
         "//vms/evm/sync/handlers",
+        "//vms/evm/sync/types",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state/snapshot",

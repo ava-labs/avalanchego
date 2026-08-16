@@ -153,37 +153,30 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return errors.Join(fetchErr, batch.Write())
 }
 
-// getBlocks requests up to numParents blocks ending at (hash, height), verifies
-// the returned chain links back from hash, scores the peer, and re-requests on
-// any network or verification failure until ctx ends.
+// getBlocks fetches up to numParents blocks ending at (hash, height), verified
+// to chain back from hash.
 func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, numParents uint16, verify BlockVerifier) ([]*evmtypes.Block, error) {
 	req := &syncpb.GetBlockRequest{
 		Hash:       hash.Bytes(),
 		Height:     height,
 		NumParents: uint32(numParents),
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetBlockResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			continue
-		}
-
-		blocks, err := verifyBlocks(hash, numParents, resp.GetBlocks(), verify)
-		if err != nil {
-			outcome.Failure()
-			log.Debug("invalid block response, re-requesting", zap.Error(err))
-			continue
-		}
-
-		outcome.Success()
-		return blocks, nil
+	var blocks []*evmtypes.Block
+	_, err := c.Send(ctx, req,
+		func(resp *syncpb.GetBlockResponse) error {
+			b, err := verifyBlocks(hash, numParents, resp.GetBlocks(), verify)
+			if err != nil {
+				log.Debug("invalid block response, re-requesting", zap.Error(err))
+				return err
+			}
+			blocks = b
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
+	return blocks, nil
 }
 
 // verifyBlocks decodes raw and reports whether it is the parent chain ending at

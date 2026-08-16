@@ -20,11 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func assertContract[V any, Req handlers.ProtoMessage[V], Resp proto.Message](t *testing.T, req Req, resp Resp) {
+func assertContract[V any, Req types.ProtoMessage[V], Resp proto.Message](t *testing.T, req Req, resp Resp) {
 	nodeID := ids.GenerateTestNodeID()
 	reqBytes := synctest.MustMarshal(t, req)
 
