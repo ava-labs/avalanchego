@@ -1,4 +1,5 @@
+.agents
+.bazel/patches/build_files
 .claude
 .direnv
-.bazel/patches/build_files
 bazel-avalanchego
