@@ -32,6 +32,7 @@ func TestResponder(t *testing.T) {
 	tests := []struct {
 		name     string
 		hashes   []common.Hash
+		budget   int // zero means the default budget
 		wantData [][]byte
 		wantErr  *avacommon.AppError
 	}{
@@ -60,6 +61,22 @@ func TestResponder(t *testing.T) {
 			hashes:  make([]common.Hash, maxHashesPerRequest+1),
 			wantErr: errTooManyHashes,
 		},
+		{
+			// A prefix is a valid partial answer, so the client can resume
+			// for whatever it left out instead of failing the whole request.
+			name:     "size_bounded_prefix",
+			hashes:   []common.Hash{codeHash, otherHash},
+			budget:   len(codeBytes),
+			wantData: [][]byte{codeBytes},
+		},
+		{
+			// Even alone this cannot fit, so no prefix trick helps: the peer
+			// rejects it outright instead of trying to send it.
+			name:    "single_hash_too_large_rejected",
+			hashes:  []common.Hash{codeHash},
+			budget:  len(codeBytes) - 1,
+			wantErr: errCodeTooLarge,
+		},
 	}
 
 	for _, tt := range tests {
@@ -67,6 +84,9 @@ func TestResponder(t *testing.T) {
 			t.Parallel()
 
 			r := newResponder(loggingtest.New(t, logging.Debug), db)
+			if tt.budget > 0 {
+				r.sizeBudget = tt.budget
+			}
 
 			rawHashes := make([][]byte, len(tt.hashes))
 			for i, h := range tt.hashes {
@@ -92,5 +112,6 @@ func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
 		"errTooManyHashes": errTooManyHashes,
 		"errHashNotFound":  errHashNotFound,
+		"errCodeTooLarge":  errCodeTooLarge,
 	})
 }

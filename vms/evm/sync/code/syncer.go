@@ -64,9 +64,8 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, 
 	return s, nil
 }
 
-// AddCode marks hashes as outstanding and queues them, skipping code already on
-// disk or already claimed by a repeat still in flight. Never waits on the
-// fetchers.
+// AddCode marks hashes as outstanding and queues them, skipping code already
+// stored or already claimed by a repeat in flight. Never waits on the fetchers.
 func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr error) {
 	if len(hashes) == 0 {
 		return nil
@@ -136,8 +135,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 }
 
 // requeueOutstanding re-queues markers a previous run left, clearing ones
-// StateDB.Commit already satisfied outside a fetch. Runs before any producer
-// holds the Syncer.
+// StateDB.Commit already satisfied. Runs before any producer holds the Syncer.
 func (s *Syncer) requeueOutstanding() error {
 	it := customrawdb.NewCodeToFetchIterator(s.db)
 	defer it.Release()
@@ -275,25 +273,31 @@ func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
 	return nil
 }
 
-// getCode requests hashes through c and verifies every blob against its hash,
-// scoring the peer. Re-requests until ctx ends.
+// getCode requests hashes through c, resuming for whatever a partial response
+// leaves out. Scores the peer per request, and fails fast on an unfetchable hash.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
-	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	for {
+	data := make([][]byte, 0, len(hashes))
+	remaining := hashes
+	for len(remaining) > 0 {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 
+		req := &syncpb.GetCodeRequest{Hashes: hashBytes(remaining)}
 		resp := &syncpb.GetCodeResponse{}
 		outcome, err := c.Send(ctx, req, resp)
+		if errors.Is(err, errCodeTooLarge) {
+			return nil, fmt.Errorf("%w: %s", errCodeTooLarge, remaining[0])
+		}
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
 			log.Debug("code request failed, re-requesting", zap.Error(err))
 			continue
 		}
 
-		data := resp.GetData()
-		if err := verifyCode(hashes, data); err != nil {
+		got := resp.GetData()
+		n, err := verifyCodePrefix(remaining, got)
+		if err != nil {
 			outcome.Failure()
 			log.Debug("invalid code response, re-requesting",
 				zap.Stringer("nodeID", outcome.NodeID()),
@@ -303,23 +307,24 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		}
 
 		outcome.Success()
-		return data, nil
+		data = append(data, got...)
+		remaining = remaining[n:]
 	}
+	return data, nil
 }
 
-// verifyCode reports whether data is the code for hashes, in order.
-func verifyCode(hashes []common.Hash, data [][]byte) error {
-	if len(data) != len(hashes) {
-		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
+// verifyCodePrefix reports how many leading hashes data accounts for, which may
+// be fewer than requested when the rest would not fit in one message.
+func verifyCodePrefix(hashes []common.Hash, data [][]byte) (int, error) {
+	if len(data) == 0 || len(data) > len(hashes) {
+		return 0, fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
 	}
 	for i, code := range data {
-		// Size is deliberately not checked. Contracts larger than MaxCodeSize
-		// exist, and rejecting one would reject the only answer a peer can give.
 		if got := crypto.Keccak256Hash(code); got != hashes[i] {
-			return fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
+			return 0, fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
 		}
 	}
-	return nil
+	return len(data), nil
 }
 
 func hashBytes(hashes []common.Hash) [][]byte {
