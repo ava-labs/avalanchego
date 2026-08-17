@@ -127,6 +127,10 @@ tasks:
       TARGETS: '//:unit_tests'
     cmd: *bazel_test_cmd
 
+  bazel-test-firewood-ffi:
+    desc: Run Firewood FFI tests for both ethhash and MerkleDB variants with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //firewood/ffi:ffi_test //firewood/ffi/tests/eth:eth_test //firewood/ffi/tests/firewood:firewood_test'
+
   bazel-test-unit-all-race-shuffle:
     desc: Run all generated unit-test shards with Bazel (race on, shuffle on)
     vars:
@@ -370,6 +374,10 @@ tasks:
       - task: lint-yaml-fix
       - task: check-clean-branch
 
+  check-rust-version:
+    desc: Checks that Rust version and edition in MODULE.bazel match firewood/Cargo.toml
+    cmd: '{{.NIX_RUN}} ./scripts/check_rust_version.sh'
+
   collect-kind-diagnostics:
     desc: Collects runner, Docker, kind, and Kubernetes diagnostics. Optional arg is output dir.
     cmd: '{{.NIX_RUN}} ./scripts/collect_kind_diagnostics.sh {{.CLI_ARGS}}'
@@ -469,6 +477,7 @@ tasks:
       - lint-action
       - lint-shell
       - check-go-version
+      - check-rust-version
       - check-require-directives
 
   _lint-readonly-serial:
@@ -490,6 +499,7 @@ tasks:
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
+      - task: check-rust-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
 

@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "update-cgo-ldflags_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/firewood/ffi/gen/update-cgo-ldflags",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "update-cgo-ldflags",
+    embed = [":update-cgo-ldflags_lib"],
+    visibility = ["//visibility:public"],
+)

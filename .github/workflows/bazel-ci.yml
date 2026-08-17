@@ -39,6 +39,7 @@ jobs:
       - setup
       - unit-avalanchego
       - unit-coreth
+      - unit-firewood-ffi
       - unit-subnet-evm
       - e2e
     runs-on: ${{ inputs.runner }}
@@ -123,6 +124,16 @@ jobs:
               ;;
           esac
           ./scripts/run_task.sh "$task_name"
+
+  unit-firewood-ffi:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+      - name: Run firewood ffi unit tests with Bazel
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-firewood-ffi
 
   unit-subnet-evm:
     needs: setup
