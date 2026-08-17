@@ -424,7 +424,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.ctx,
 		s.state,
 		s.chainConfig,
-		s.txpool.Pending,
+		s.pending,
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
@@ -582,7 +582,7 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	// The pool updates the verification state atomically with evicting the
 	// included tx, so observing the eviction guarantees the state has been
 	// updated.
-	for s.txpool.Has(t.ID()) {
+	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
 			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())

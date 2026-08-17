@@ -65,13 +65,14 @@ type VM struct {
 	pushGossipPeriod time.Duration
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
-	now func() time.Time
+	now              func() time.Time
+	lastWaitForEvent utils.Atomic[time.Time]
 
 	ctx         *snow.Context
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
 	metrics     *metrics
-	txpool      *txpool.Txpool
+	pending     *txpool.Pending
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
 	gossipSet *gossip.BloomSet[*gossipTx]
@@ -85,8 +86,6 @@ type VM struct {
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	closer unwind.ClosersOf[context.Context]
-
-	lastWaitForEvent utils.Atomic[time.Time]
 }
 
 type deferredInit struct {
@@ -227,21 +226,22 @@ func (vm *VM) prepBlockHandling(ctx context.Context) error {
 	vm.closer.Push(unwind.CloserOfFunc[context.Context](vm.VM.Shutdown))
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(vm.ctx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	txpool, err := txpool.New(vm.ctx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
 	vm.closer.Push(unwind.NoArgCloserOf[context.Context](func() error {
-		vm.txpool.Close()
+		txpool.Close()
 		return nil
 	}))
+	vm.pending = txpool.Pending
 
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
 	}
 	vm.gossipSet, err = gossip.NewBloomSet(
-		newGossipTxPool(vm.txpool),
+		newGossipTxPool(txpool),
 		gossip.BloomSetConfig{
 			Metrics: bloomMetrics,
 		},
@@ -521,7 +521,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	}()
 	go func() {
 		defer cancel()
-		err := vm.txpool.AwaitTxs(raceCtx)
+		err := vm.pending.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 
