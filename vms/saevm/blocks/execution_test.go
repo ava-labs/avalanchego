@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -50,15 +51,18 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	ethB := types.NewBlock(
+	ethB, err := hookstest.BuildBlock(
 		&types.Header{
 			Number: big.NewInt(1),
 			Time:   42,
 		},
+		nil, // blockContext
 		txs,
-		nil, nil, // uncles, receipts
-		saetest.TrieHasher(),
+		nil, // receipts
+		nil, // ops
+		hook.Settled{Height: 1, GasUnix: 1},
 	)
+	require.NoError(t, err, "hookstest.BuildBlock()")
 	db := rawdb.NewMemoryDatabase()
 	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()
@@ -103,9 +107,7 @@ func TestMarkExecuted(t *testing.T) {
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	// This block is NOT synchronous, so no hooks are needed.
-	// NOTE: this pattern is only acceptable in tests.
-	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
+	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(hookstest.NewStub(1e6), db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool
@@ -195,6 +197,69 @@ func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
 	// A synchronous block is its own last-settled block.
 	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
+}
+
+func TestRestoreExecutionArtefacts(t *testing.T) {
+	header := func() *types.Header {
+		return &types.Header{
+			Number:      big.NewInt(1),
+			BaseFee:     big.NewInt(1),
+			Time:        42,
+			ReceiptHash: types.EmptyRootHash, // needed for well-formed invariants check
+		}
+	}
+
+	tests := []struct {
+		name     string
+		settled  *hook.Settled
+		xdbValue []byte
+		wantErr  error
+	}{
+		{
+			// A block carrying a non-zero settlement marker is asynchronous
+			// (built under SAE) and MUST have persisted execution results.
+			name:    "asynchronous_block_missing_results",
+			settled: &hook.Settled{Height: 1, GasUnix: 1},
+			wantErr: ErrMissingExecutionResults,
+		},
+		{
+			// A markerless (synchronous) header must be restored from the
+			// header alone; the execution-results DB is not consulted, even
+			// if it contains (possibly corrupt) data at that height.
+			name:     "synchronous_block_ignores_xdb",
+			xdbValue: []byte("not canoto"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				ethB *types.Block
+				err  error
+			)
+			if tt.settled != nil {
+				ethB, err = hookstest.BuildBlock(header(), nil, nil, nil, nil, *tt.settled)
+				require.NoError(t, err, "hookstest.BuildBlock()")
+			} else {
+				ethB = types.NewBlockWithHeader(header())
+			}
+			db := rawdb.NewMemoryDatabase()
+			xdb := saetest.NewExecutionResultsDB()
+			if tt.xdbValue != nil {
+				require.NoError(t, xdb.Put(ethB.NumberU64(), tt.xdbValue), "%T.Put()", xdb)
+			}
+
+			hooks := hookstest.NewStub(1e6)
+			b := newBlock(t, ethB, nil, nil)
+			err = b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr, "%T.RestoreExecutionArtefacts()", b)
+				return
+			}
+			require.NoErrorf(t, err, "%T.RestoreExecutionArtefacts()", b)
+			require.Equalf(t, tt.settled == nil, b.Synchronous(), "%T.Synchronous()", b)
+		})
+	}
 }
 
 // selfAsHasher adds a Hash() method to a common.Hash, returning itself.

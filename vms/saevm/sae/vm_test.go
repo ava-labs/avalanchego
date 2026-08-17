@@ -132,7 +132,24 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
-func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+// uninitializedVM holds a [SinceGenesis] VM and its adaptor, constructed the
+// same way [newSUT] does, but not yet initialized. It allows tests to assert
+// on errors returned by [uninitializedVM.initialize] without needing a fully
+// initialized SUT.
+type uninitializedVM struct {
+	tb testing.TB
+
+	conf    *sutConfig
+	keys    *saetest.KeyChain
+	vm      *SinceGenesis[hookstest.Op]
+	snow    adaptor.ChainVMWithContext
+	ctx     context.Context
+	snowCtx *snow.Context
+	logger  *loggingtest.Logger
+	sender  *saetest.Sender
+}
+
+func newUninitializedVM(tb testing.TB, numAccounts uint, opts ...sutOption) *uninitializedVM {
 	tb.Helper()
 
 	// gasTarget is approximately the current C-Chain mainnet gas target as of
@@ -182,16 +199,45 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
-		ctx,
-		snowCtx,
-		conf.db,
-		marshalJSON(tb, conf.genesis),
+	return &uninitializedVM{
+		tb: tb,
+
+		conf:    conf,
+		keys:    keys,
+		vm:      vm,
+		snow:    snow,
+		ctx:     ctx,
+		snowCtx: snowCtx,
+		logger:  logger,
+		sender:  sender,
+	}
+}
+
+// initialize calls [adaptor.ChainVMWithContext.Initialize] on the wrapped VM,
+// returning any error instead of asserting on it, so callers can inspect
+// startup errors directly.
+func (u *uninitializedVM) initialize() error {
+	u.tb.Helper()
+
+	return u.snow.Initialize(
+		u.ctx,
+		u.snowCtx,
+		u.conf.db,
+		marshalJSON(u.tb, u.conf.genesis),
 		nil, // upgrade bytes
 		nil, // config bytes (not ChainConfig)
 		nil, // Fxs
-		sender,
-	), "Initialize()")
+		u.sender,
+	)
+}
+
+func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+	tb.Helper()
+
+	u := newUninitializedVM(tb, numAccounts, opts...)
+	require.NoError(tb, u.initialize(), "Initialize()")
+
+	conf, keys, vm, snow, ctx, snowCtx, logger, sender := u.conf, u.keys, u.vm, u.snow, u.ctx, u.snowCtx, u.logger, u.sender
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,

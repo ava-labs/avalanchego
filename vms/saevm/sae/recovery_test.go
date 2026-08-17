@@ -4,13 +4,16 @@
 package sae
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -24,10 +27,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // TestRecoverAfterCrash recovers from a copy of a running VM's database,
@@ -277,6 +282,58 @@ func TestRecover(t *testing.T) {
 			})
 		})
 	}
+}
+
+// A failure to open the execution-results database must abort [VM]
+// initialization with an error that unwraps to the cause and names the
+// on-disk path.
+func TestNewVMExecutionResultsDBError(t *testing.T) {
+	t.Parallel()
+
+	errInjected := errors.New("injected ExecutionResultsDB failure")
+	u := newUninitializedVM(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetypes.ExecutionResults{}, errInjected
+		}))
+		c.logLevel = logging.Warn
+	}))
+	err := u.initialize()
+	require.ErrorIs(t, err, errInjected, "Initialize() with failing ExecutionResultsDB")
+	require.Contains(t, err.Error(), filepath.Join(u.snowCtx.ChainDataDir, executionResultsDir), "Initialize() error should name the execution-results path")
+}
+
+func TestNewVMIncompatibleExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var (
+		srcDB      database.Database
+		srcGenesis core.Genesis
+	)
+	ctx, src := newSUT(t, 1, sutOpt, options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		srcGenesis = c.genesis
+		c.logLevel = logging.Warn
+	}))
+
+	b := src.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, b)
+	settler := src.runConsensusLoop(t)
+	require.NoErrorf(t, settler.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settler)
+	require.Equal(t, b.Height(), src.rawVM.last.settled.Load().Height(), "settled height after accepting settler")
+
+	u := newUninitializedVM(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetest.NewExecutionResultsDB(), nil
+		}))
+		c.db = saetest.CopyDB(t, srcDB)
+		c.genesis = srcGenesis
+		c.logLevel = logging.Warn
+	}))
+	err := u.initialize()
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "Initialize() with incompatible execution-results DB")
+	require.Contains(t, err.Error(), filepath.Join(u.snowCtx.ChainDataDir, executionResultsDir), "Initialize() error should name the execution-results path")
 }
 
 func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
