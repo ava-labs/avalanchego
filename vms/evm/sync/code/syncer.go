@@ -23,7 +23,12 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const numSyncWorkers = 5
+const (
+	numSyncWorkers = 5
+
+	// defaultIntakeBound caps outstanding hashes before intake waits.
+	defaultIntakeBound = 100_000
+)
 
 var (
 	// ErrInputClosed reports that nothing will fetch what the caller is offering.
@@ -51,11 +56,17 @@ type Syncer struct {
 // NewSyncer returns a [Syncer] that writes verified code into db, fetching from
 // peers through c. An interrupted sync resumes from the markers it left.
 func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, error) {
+	return newSyncer(log, c, db, defaultIntakeBound)
+}
+
+// newSyncer is [NewSyncer] with the intake bound exposed, so a test can reach a
+// value small enough to engage.
+func newSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore, bound int) (*Syncer, error) {
 	s := &Syncer{
 		log:     log,
 		client:  c,
 		db:      db,
-		q:       newQueue(),
+		q:       newQueue(bound),
 		claimed: &claimSet{},
 	}
 	if err := s.requeueOutstanding(); err != nil {
@@ -65,7 +76,7 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, 
 }
 
 // AddCode marks hashes as outstanding and queues them, skipping code already
-// stored or already claimed by a repeat in flight. Never waits on the fetchers.
+// stored or claimed by a repeat in flight. Waits while intake is full.
 func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr error) {
 	if len(hashes) == 0 {
 		return nil
@@ -74,7 +85,22 @@ func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr erro
 		return err
 	}
 
-	// Held across the write and the enqueue, so a refused call leaves nothing owed.
+	// Reserved before the gate, since waiting inside it would block close, and
+	// for the whole call, since what survives the filter is not known yet.
+	reserved := len(hashes)
+	if err := s.q.reserve(ctx, reserved); err != nil {
+		return err
+	}
+	// Only a failure keeps the whole reservation. The enqueue below consumes
+	// what survived and hands the rest back.
+	defer func() {
+		if retErr != nil {
+			s.q.release(reserved)
+		}
+	}()
+
+	// Held across the claim, the write and the enqueue, so a refused call leaves
+	// nothing owed and no repeat skips a hash this call then fails to queue.
 	if !s.q.enter() {
 		return ErrInputClosed
 	}
@@ -108,7 +134,7 @@ func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr erro
 		return fmt.Errorf("committing code to fetch markers: %w", err)
 	}
 
-	s.q.enqueue(missing)
+	s.q.enqueue(missing, reserved)
 	return nil
 }
 
@@ -174,7 +200,7 @@ func (s *Syncer) requeueOutstanding() error {
 		}
 	}
 
-	s.q.enqueue(outstanding)
+	s.q.enqueue(outstanding, 0)
 	return nil
 }
 

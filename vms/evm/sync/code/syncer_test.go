@@ -202,27 +202,122 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
-// Code already on disk is neither marked nor requested, so a resumed sync takes
-// no ownership of what it has.
-func TestSyncer_SkipsStoredCode(t *testing.T) {
-	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	source, target := memorydb.New(), memorydb.New()
+func TestSyncer_AddCode(t *testing.T) {
+	tests := []struct {
+		name       string
+		bound      int  // intake ceiling
+		stored     int  // blobs the target already holds, every one of them offered
+		fresh      int  // never-seen hashes, offered alongside the stored ones
+		prefill    int  // hashes admitted before the call under test
+		preHeld    int  // slots another producer is holding
+		closeInput bool // close input before the call
+		flaky      bool // a store that fails from its first op
+		producers  int  // concurrent identical calls, zero means one
 
-	missing := writeRandomCode(t, source)
-	stored := writeRandomCode(t, target)
+		wantErr       error
+		wantMarked    int
+		wantClaims    int
+		wantOccupancy int
+	}{
+		{
+			// Repeats of stored code are invariant 6's common case, and none of
+			// them may cost a marker, a claim or a slot.
+			name:      "stored_code_is_neither_marked_nor_claimed",
+			bound:     4,
+			stored:    16,
+			producers: 8,
+		},
+		{
+			name:          "missing_code_is_marked_and_holds_slots",
+			bound:         4,
+			fresh:         4,
+			wantMarked:    4,
+			wantClaims:    4,
+			wantOccupancy: 4,
+		},
+		{
+			// AddCode reserves for the whole call before the filter runs, so it
+			// hands back the surplus and not a slot more.
+			name:          "mixed_call_holds_only_what_survives_the_filter",
+			bound:         32,
+			stored:        2,
+			fresh:         2,
+			preHeld:       2,
+			wantMarked:    2,
+			wantClaims:    2,
+			wantOccupancy: 4,
+		},
+		{
+			name:    "write_failure_releases_the_claim",
+			bound:   4,
+			fresh:   1,
+			flaky:   true,
+			wantErr: saetest.ErrInjected,
+		},
+		{
+			name:       "closed_input_refuses_and_marks_nothing",
+			bound:      4,
+			fresh:      1,
+			closeInput: true,
+			wantErr:    ErrInputClosed,
+		},
+		{
+			// Nothing drains here, so only the close can release the full gate.
+			name:          "closed_input_releases_a_full_gate",
+			bound:         2,
+			fresh:         1,
+			prefill:       2,
+			closeInput:    true,
+			wantErr:       ErrInputClosed,
+			wantMarked:    2,
+			wantClaims:    2,
+			wantOccupancy: 2,
+		},
+	}
 
-	recorder := synctest.NewRecordingResponder(newResponder(log, source))
-	syncer, err := NewSyncer(log, serve(t, ctx, log, recorder), target)
-	require.NoError(t, err)
-	require.NoError(t, syncer.AddCode(ctx, []common.Hash{missing, stored}))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.Equal(t, []common.Hash{missing}, markedHashes(t, target),
-		"only the missing hash is owed")
+			raw := memdb.New()
+			db := evmdb.New(raw)
+			offered := make([]common.Hash, 0, tt.stored+tt.fresh)
+			for range tt.stored {
+				offered = append(offered, writeRandomCode(t, db))
+			}
+			for i := range tt.fresh {
+				offered = append(offered, common.Hash{byte(i + 1)})
+			}
 
-	syncer.CloseInput()
-	require.NoError(t, syncer.Sync(ctx))
-	require.Equal(t, []int{1}, requestSizes(recorder), "stored code is never requested")
+			syncer, err := newSyncer(loggingtest.New(t, logging.Debug), nil, db, tt.bound)
+			require.NoError(t, err)
+
+			for i := range tt.prefill {
+				require.NoError(t, syncer.AddCode(t.Context(), []common.Hash{{byte(i + 100)}}))
+			}
+			if tt.preHeld > 0 {
+				taken, _ := syncer.q.tryReserve(tt.preHeld)
+				require.True(t, taken, "another producer holds slots")
+			}
+			if tt.closeInput {
+				syncer.CloseInput()
+			}
+			if tt.flaky {
+				// Swapped in after construction, so the constructor is not what fails.
+				syncer.db = evmdb.New(saetest.NewFlakyDB(raw, 0))
+			}
+
+			var eg errgroup.Group
+			for range max(tt.producers, 1) {
+				eg.Go(func() error { return syncer.AddCode(t.Context(), offered) })
+			}
+			require.ErrorIs(t, eg.Wait(), tt.wantErr)
+
+			require.Len(t, markedHashes(t, db), tt.wantMarked)
+			require.Equal(t, tt.wantClaims, held(syncer.claimed))
+			require.Equal(t, tt.wantOccupancy, occupancy(syncer.q))
+		})
+	}
 }
 
 func TestClaimSet(t *testing.T) {
@@ -254,49 +349,6 @@ func held(c *claimSet) int {
 		return true
 	})
 	return n
-}
-
-func TestSyncer_RepeatsOfStoredCodeNeverClaim(t *testing.T) {
-	const (
-		numHashes = 50
-		producers = 8
-	)
-
-	log := loggingtest.New(t, logging.Debug)
-	db := memorydb.New()
-
-	stored := make([]common.Hash, numHashes)
-	for i := range stored {
-		stored[i] = writeRandomCode(t, db)
-	}
-
-	syncer, err := NewSyncer(log, nil, db)
-	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-	for range producers {
-		wg.Go(func() {
-			assert.NoError(t, syncer.AddCode(t.Context(), stored))
-		})
-	}
-	wg.Wait()
-
-	require.Zero(t, held(syncer.claimed), "already-stored code must never be claimed")
-	require.Empty(t, markedHashes(t, db), "already-stored code must never be marked")
-}
-
-// A write failure must release its claim, or the hash is stuck forever.
-func TestSyncer_ClaimReleasedOnWriteFailure(t *testing.T) {
-	log := loggingtest.New(t, logging.Debug)
-	// Fails on the first op.
-	db := evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
-
-	syncer, err := NewSyncer(log, nil, db)
-	require.NoError(t, err)
-
-	hash := common.Hash{1}
-	require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{hash}), saetest.ErrInjected)
-	require.Zero(t, held(syncer.claimed), "a failed write must not leave a claim behind")
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
@@ -373,49 +425,27 @@ func TestSyncer_RejectsUnfetchableHash(t *testing.T) {
 	require.ErrorIs(t, err, errCodeTooLarge)
 }
 
-// However input closed, a later AddCode must be refused and leave no marker.
-// A marker left behind is code owed with nothing running to fetch it.
-func TestSyncer_InputClosed(t *testing.T) {
-	tests := []struct {
-		name  string
-		close func(t *testing.T, s *Syncer)
-	}{
-		{
-			name:  "by_the_producer",
-			close: func(_ *testing.T, s *Syncer) { s.CloseInput() },
-		},
-		{
-			// Cancelled rather than drained, so only Sync's exit can close input.
-			name: "by_sync_exiting",
-			close: func(t *testing.T, s *Syncer) {
-				ctx, cancel := context.WithCancel(t.Context())
-				syncErr := make(chan error, 1)
-				go func() { syncErr <- s.Sync(ctx) }()
-				cancel()
-				require.ErrorIs(t, <-syncErr, context.Canceled)
-				require.ErrorIs(t, s.Sync(t.Context()), errSyncAlreadyRun)
-			},
-		},
-	}
+// Sync closes input on its way out, so a producer outliving it is refused rather
+// than left marking code nothing will fetch.
+func TestSyncer_SyncExitClosesInput(t *testing.T) {
+	log := loggingtest.New(t, logging.Debug)
+	db := memorydb.New()
+	syncer, err := NewSyncer(log, nil, db)
+	require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			log := loggingtest.New(t, logging.Debug)
-			db := memorydb.New()
-			syncer, err := NewSyncer(log, nil, db)
-			require.NoError(t, err)
+	// Cancelled rather than drained, so only Sync's exit can close input.
+	ctx, cancel := context.WithCancel(t.Context())
+	syncErr := make(chan error, 1)
+	go func() { syncErr <- syncer.Sync(ctx) }()
+	cancel()
+	require.ErrorIs(t, <-syncErr, context.Canceled)
+	require.ErrorIs(t, syncer.Sync(t.Context()), errSyncAlreadyRun)
 
-			tt.close(t, syncer)
-
-			// A live context, so the refusal is input's, not the caller's.
-			require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{{1}}), ErrInputClosed)
-			require.Empty(t, markedHashes(t, db), "a refused AddCode must not leave a marker behind")
-		})
-	}
+	// A live context, so the refusal is input's, not the caller's.
+	require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{{1}}), ErrInputClosed)
+	require.Empty(t, markedHashes(t, db), "a refused AddCode must not leave a marker behind")
 }
 
-// AddCode racing CloseInput has two outcomes: accepted and marked, or refused
-// and unmarked. A marker left by a refused call is code owed to nobody.
 func TestSyncer_AddCodeRacesCloseInput(t *testing.T) {
 	const producers = 50
 
@@ -815,4 +845,59 @@ func randomCode(t *testing.T) []byte {
 	_, err := rand.Read(code)
 	require.NoError(t, err)
 	return code
+}
+
+func TestSyncer_BoundedIntakeCompletes(t *testing.T) {
+	const (
+		bound     = 8
+		producers = 8
+		perCall   = 4
+		// Past the point where the batcher parks in eg.Go, so the drain that
+		// frees intake is itself throttled.
+		blobs = (numSyncWorkers+1)*maxHashesPerRequest + 128
+	)
+
+	ctx := t.Context()
+	log := loggingtest.New(t, logging.Debug)
+	source, target := memorydb.New(), memorydb.New()
+
+	want := make(map[common.Hash][]byte, blobs)
+	hashes := make([]common.Hash, 0, blobs)
+	for range blobs {
+		code := randomCode(t)
+		hash := writeCode(t, source, code)
+		want[hash] = code
+		hashes = append(hashes, hash)
+	}
+
+	client := serve(t, ctx, log, newResponder(log, source))
+	syncer, err := newSyncer(log, client, target, bound)
+	require.NoError(t, err)
+
+	var eg errgroup.Group
+	eg.Go(func() error { return syncer.Sync(ctx) })
+	eg.Go(func() error {
+		defer syncer.CloseInput()
+
+		var producing errgroup.Group
+		for p := range producers {
+			producing.Go(func() error {
+				for i := p * perCall; i < len(hashes); i += producers * perCall {
+					if err := syncer.AddCode(ctx, hashes[i:min(i+perCall, len(hashes))]); err != nil {
+						return err
+					}
+					assert.LessOrEqual(t, occupancy(syncer.q), bound)
+				}
+				return nil
+			})
+		}
+		return producing.Wait()
+	})
+	require.NoError(t, eg.Wait())
+
+	require.Zero(t, reservedSlots(syncer.q), "every reservation must be handed back")
+	require.Empty(t, markedHashes(t, target), "all to-fetch markers must be cleared")
+	for hash, code := range want {
+		require.Equal(t, code, rawdb.ReadCode(target, hash))
+	}
 }

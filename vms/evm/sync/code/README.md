@@ -56,6 +56,10 @@ is only a hand-off.
    arriving between the read and the claim still gets refetched once.
    Persisting is idempotent, so the redundancy is harmless.
 
+7. **Intake is bounded.** A slot is held from `AddCode` until the batcher takes
+   the hash, not until its code commits, so nothing a worker holds counts
+   against the bound. Recovery bypasses it, having nothing draining yet.
+
 ```mermaid
 sequenceDiagram
   participant P as Producer
@@ -65,10 +69,12 @@ sequenceDiagram
   participant W as Worker
   participant S as Store
   P->>A: hashes
+  Note over A: wait for intake slots
   A->>S: read, skip what is already stored
   A->>C: claim what is missing
   A->>S: mark it, one batch
   A->>B: queue it
+  B->>B: take, freeing their slots
   B->>W: full batch
   W->>W: GetCode, verify, else score down and retry elsewhere
   W->>S: commit bytecode and marker clear together
@@ -78,7 +84,8 @@ sequenceDiagram
 ## Lifecycle
 
 `NewSyncer` clears the markers of code that arrived before the last shutdown and
-re-queues the rest. `AddCode` accepts hashes without ever waiting on the network.
+re-queues the rest. `AddCode` waits while intake is full, so a producer that
+outruns the fetchers is slowed rather than buffered without limit.
 `CloseInput` stops taking hashes, and `Sync` returns once what is queued has
 been fetched. `Sync` closes input on its way out, so a producer outliving it
 learns through `ErrInputClosed` rather than marking code nothing will fetch.
