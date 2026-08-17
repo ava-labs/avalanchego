@@ -78,6 +78,7 @@ log_bazel() {
   log_path_usage "${HOME}/.cache/bazel"
   log_path_usage "${HOME}/.cache/bazel-repository-cache"
   log_path_usage "${HOME}/.cache/bazel-go-repository-modcache"
+  log_path_usage "${HOME}/.cache/bazel-disk-cache"
   log_path_usage "${HOME}/.cache/bazelisk"
 }
 

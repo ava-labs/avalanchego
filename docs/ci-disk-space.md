@@ -53,7 +53,7 @@ Use this document when you are:
 
 Normal repo entrypoints include:
 
-- `task check-ci-disk-space`
+- `./scripts/check_ci_disk_space.sh`
 - `task test-ci-disk-space`
 - `task log-ci-disk-state-bazel`
 - `task log-ci-disk-state-docker`
@@ -196,8 +196,8 @@ When changing this policy, preserve these invariants:
 
 Current validation strategy:
 
-- use `CI_FORCE_FREE_GB` with `task check-ci-disk-space` to exercise healthy
-  and low-space paths deterministically
+- use `CI_FORCE_FREE_GB` with `./scripts/check_ci_disk_space.sh` to exercise
+  healthy and low-space paths deterministically
 - use the `force-free-gb` and `force-free-gb-after-cleanup` test-only inputs on
   `./.github/actions/ensure-disk-space` when validating its branches in CI
 - use the stable logging tasks to inspect the current curated diagnostics

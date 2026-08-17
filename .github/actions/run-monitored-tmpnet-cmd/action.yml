@@ -59,7 +59,7 @@ runs:
   using: composite
   steps:
     - uses: ./.github/actions/ensure-disk-space
-      if: ${{ inputs.runtime == 'kube' }}
+      if: ${{ inputs.runtime == 'kube' && inputs.setup_bazel != 'true' }}
       with:
         diagnostic-groups: docker
     - uses: ./.github/actions/setup-bazel
