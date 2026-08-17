@@ -58,6 +58,7 @@ mkdir -p \
   "${home_dir}/.cache/bazel" \
   "${home_dir}/.cache/bazel-repository-cache" \
   "${home_dir}/.cache/bazel-go-repository-modcache" \
+  "${home_dir}/.cache/bazel-disk-cache" \
   "${home_dir}/.cache/bazelisk"
 
 run_case() {
@@ -90,6 +91,7 @@ assert_contains "${workdir}/bazel.out" "== Bazel disk usage =="
 assert_contains "${workdir}/bazel.out" "7G"
 assert_contains "${workdir}/bazel.out" ".cache/bazel-repository-cache"
 assert_contains "${workdir}/bazel.out" ".cache/bazel-go-repository-modcache"
+assert_contains "${workdir}/bazel.out" ".cache/bazel-disk-cache"
 
 assert_contains "${workdir}/docker.out" "== Docker/image-build disk usage =="
 assert_contains "${workdir}/docker.out" "TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE"

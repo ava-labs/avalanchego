@@ -35,4 +35,3 @@ jobs:
           BUILD_MULTI_ARCH: 1
           PLATFORMS: "linux/amd64,linux/arm64"
           PUBLISH: 1
-          ALLOW_TAG_LATEST: ${{ github.event_name != 'workflow_dispatch' }}
