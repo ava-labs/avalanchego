@@ -224,10 +224,10 @@ func WithRootStore() Option {
 	}
 }
 
-// WithExpensiveMetrics enables expensive metrics recording for this database.
+// WithExpensiveMetricsEnabled enables expensive metrics recording for this database.
 // Expensive metrics are disabled by default since they can introduce overhead.
 // Default: false
-func WithExpensiveMetrics() Option {
+func WithExpensiveMetricsEnabled() Option {
 	return func(c *config) {
 		c.expensiveMetricsEnabled = true
 	}

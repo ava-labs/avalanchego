@@ -130,7 +130,7 @@ func New(config Config) (*TrieDB, error) {
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
-		ffi.WithExpensiveMetrics(),
+		ffi.WithExpensiveMetricsEnabled(),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
