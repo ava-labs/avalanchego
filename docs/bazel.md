@@ -470,8 +470,8 @@ Use `bazel test //...` for broader Bazel validation. It runs
 # Run all generated unit tests (no race, no shuffle)
 task bazel-test-unit-all           # or: bazel test //:unit_tests
 
-# CI uses race detection and shuffle.
-# Run all generated unit tests with this mode.
+# Scheduled CI runs this mode. PR and pre-merge CI use the default mode.
+# See the test-workflow guide.
 task bazel-test-unit-all-race-shuffle  # or: bazel test --config=race-shuffle //:unit_tests
 
 # Run tests for a specific package
@@ -495,6 +495,8 @@ task bazel-test-e2e
 
 Bazel unit-test task names use `bazel-test-unit-<area>`. Use `all` to run every
 unit-test shard.
+
+For the CI modes and platform coverage, see [Test workflows](../.github/workflows/test-workflows.md).
 
 #### Why Generated Unit-Test Suites Exist
 
