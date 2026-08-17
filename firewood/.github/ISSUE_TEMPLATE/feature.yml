@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a capability or improvement
+type: Feature
+labels: ["status/needs-triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area(s)
+      multiple: true
+      options:
+        - storage
+        - revisions
+        - hashing
+        - proofs
+        - ffi
+        - cli
+        - c-chain
+        - benchmark
+        - ci
+        - docs
+    validations:
+      required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem would this solve? Ex. "I'm frustrated when [...]"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

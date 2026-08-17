@@ -1,0 +1,5 @@
+---
+source: storage/src/node/snapshot_tests.rs
+expression: "hex::encode(write_to_vec(&fa))"
+---
+ff00

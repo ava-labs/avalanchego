@@ -1,0 +1,10 @@
+{
+  "id": "firewood-tools",
+  "version": "1.0.0",
+  "name": "Firewood Rust/Go developer tooling",
+  "description": "Installs Firewood's Rust and Go developer tooling (cargo-binstall, sccache, cargo extensions, the nightly toolchain, dockerfmt, shfmt, starship) on top of the rust and go features.",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/rust",
+    "ghcr.io/devcontainers/features/go"
+  ]
+}

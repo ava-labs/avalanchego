@@ -1,0 +1,5 @@
+---
+source: firewood/src/proofs/snapshot_tests.rs
+expression: "hex::encode(node_bytes(&node))"
+---
+01030102030001000568656c6c6f00000000

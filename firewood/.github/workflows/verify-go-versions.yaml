@@ -1,0 +1,46 @@
+name: Verify Go Versions
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify-go-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install jq
+        run: |
+          if command -v jq >/dev/null 2>&1; then
+            # expected on most GHA runners
+            echo "jq is already installed"
+          else
+           sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+      - name: Extract Go versions
+        id: go_versions
+        run: |
+          GO_VERSION_FFI=$(cd ffi && go mod edit -json | jq -r .Go)
+          GO_VERSION_TEST_ETH=$(cd ffi/tests/eth && go mod edit -json | jq -r .Go)
+          GO_VERSION_TEST_FIREWOOD=$(cd ffi/tests/firewood && go mod edit -json | jq -r .Go)
+          echo "ffi=$GO_VERSION_FFI"
+          echo "ffi/tests/eth=$GO_VERSION_TEST_ETH"
+          echo "ffi/tests/firewood=$GO_VERSION_TEST_FIREWOOD"
+          echo "GO_VERSION_FFI=$GO_VERSION_FFI" >> $GITHUB_OUTPUT
+          echo "GO_VERSION_TEST_ETH=$GO_VERSION_TEST_ETH" >> $GITHUB_OUTPUT
+          echo "GO_VERSION_TEST_FIREWOOD=$GO_VERSION_TEST_FIREWOOD" >> $GITHUB_OUTPUT
+
+      - name: Check Go versions match
+        run: |
+          if [ "${{ steps.go_versions.outputs.GO_VERSION_FFI }}" != "${{ steps.go_versions.outputs.GO_VERSION_TEST_ETH }}" ] || \
+             [ "${{ steps.go_versions.outputs.GO_VERSION_FFI }}" != "${{ steps.go_versions.outputs.GO_VERSION_TEST_FIREWOOD }}" ]; then
+            echo "Go versions do not match:"
+            echo "ffi/go.mod: ${{ steps.go_versions.outputs.GO_VERSION_FFI }}"
+            echo "ffi/tests/eth/go.mod: ${{ steps.go_versions.outputs.GO_VERSION_TEST_ETH }}"
+            echo "ffi/tests/firewood/go.mod: ${{ steps.go_versions.outputs.GO_VERSION_TEST_FIREWOOD }}"
+            exit 1
+          fi
+          echo "All Go versions match: ${{ steps.go_versions.outputs.GO_VERSION_FFI }}"

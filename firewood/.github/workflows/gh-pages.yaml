@@ -1,0 +1,192 @@
+name: gh-pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      # Rebuild the Pages artifact for the inputs it actually depends on: the
+      # workflow itself, any docs change, and the Go sources. This is the only
+      # workflow that runs doc2go, so a Go change must rebuild to catch broken
+      # godoc. Rust source is intentionally absent — ci.yaml already runs
+      # `cargo doc -D warnings` on every PR, so gating here on **/*.rs would only
+      # duplicate that stricter check. Deploy is gated below, so PR runs are
+      # build-only.
+      - .github/workflows/gh-pages.yaml
+      - docs/**
+      - ffi/**/*.go
+  # allow manual trigger because we cannot "retry" a deploy step
+  workflow_dispatch:
+  # Rebuild pages after benchmark workflow completes.
+  # Currently only scheduled runs (which run on main) trigger this.
+  # If we later add feature branch benchmarks, remove `branches` filter -
+  # data separation is handled in track-performance.yml (bench/ vs dev/bench/).
+  workflow_run:
+    workflows: ["C-Chain Reexecution Performance Tracking"]
+    types: [completed]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    # Only run on the canonical repo — forks don't have GitHub Pages
+    # configured and the deploy step fails.
+    # Also skip if triggered by failed workflow_run.
+    if: |
+      github.repository == 'ava-labs/firewood' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      has_bench: ${{ steps.bench.outputs.has_bench }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Docs deploy from main; for pull_request events check out the PR head
+          # so the docs/** filter validates the PR's actual changes. A
+          # workflow_dispatch on a non-main branch still builds main by design.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
+      # caution: this is the same restore as in ci.yaml
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2
+        with:
+          save-if: "false"
+      - name: Install mdBook toolchain
+        uses: taiki-e/install-action@b8cecb83565409bcc297b2df6e77f030b2a468d5 # v2.82.0
+        with:
+          tool: mdbook@0.5.3,mdbook-mermaid@0.17.0,cargo-binstall
+      - name: Install the link checker (not in the install-action manifest)
+        # cargo binstall downloads a prebuilt binary when available and
+        # automatically falls back to `cargo install` otherwise.
+        run: cargo binstall --no-confirm mdbook-linkcheck2@0.12.2
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.25
+      - name: Install doc2go
+        run: go install go.abhg.dev/doc2go@v0.12.2
+      - name: Build Rust docs
+        run: cargo doc --document-private-items --no-deps
+      - name: Install preprocessor assets
+        run: |
+          mdbook-mermaid install docs
+      - name: Build the book and stage the site
+        run: |
+          mdbook build docs
+          mkdir -p site
+          cp -r docs/book/html/. site/
+          # Fail fast if the book root did not render — the only automated guard
+          # that the deployed root resolves (deploy does not run on PRs).
+          test -s site/index.html
+      - name: Guard reserved top-level paths
+        # The book owns the site root; rustdoc (/rustdoc), go docs (/ffi), and
+        # benchmark history (/bench, /dev) are merged in by the following steps. If
+        # a book section ever rendered into one of those top-level names, the later
+        # mv/tar would silently overwrite it — fail loudly before that can happen.
+        run: |
+          for reserved in rustdoc ffi bench dev; do
+            if [ -e "site/${reserved}" ]; then
+              echo "error: book output collides with reserved path site/${reserved}" >&2
+              echo "       /${reserved}/ is reserved for generated docs and benchmarks;" >&2
+              echo "       rename the conflicting book section." >&2
+              exit 1
+            fi
+          done
+      - name: Relocate rustdoc under /rustdoc
+        run: |
+          mkdir -p site/rustdoc
+          mv target/doc/* site/rustdoc/
+          # Old root index pointed at /firewood; the rustdoc index now redirects
+          # to the firewood crate within /rustdoc.
+          echo '<meta http-equiv="refresh" content="0; url=firewood">' > site/rustdoc/index.html
+      - name: Build go docs
+        # `-C` changes the process cwd so relative paths resolve from inside ffi.
+        run: doc2go -C ffi -home github.com/ava-labs/firewood/ffi -out "$(pwd)/site/ffi" ./...
+      # Benchmark history lives on the benchmark-data branch (append-only storage).
+      # track-performance.yml populates it via github-action-benchmark:
+      #   bench/              - official history (main only)
+      #   dev/bench/{branch}/ - experimental feature-branch history
+      # Scope the extract to those paths so it cannot clobber the book's index.html
+      # now that the book owns the site root.
+      - name: Include benchmark data
+        id: bench
+        run: |
+          # Fetch benchmark-data branch (may not exist on first run)
+          if ! git fetch origin benchmark-data 2>/dev/null; then
+            echo "No benchmark-data branch yet, skipping"
+            echo "has_bench=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for path in bench dev; do
+            # `git archive FETCH_HEAD bench dev` errors if either path is absent;
+            # extract each only if it exists in the fetched tree.
+            if git ls-tree -d --name-only FETCH_HEAD -- "$path" | grep -q .; then
+              git archive FETCH_HEAD "$path" | tar -x -C site/
+            fi
+          done
+          # Signal whether /bench/ was populated so the smoke job can skip it
+          # on a fresh deploy where no benchmark history exists yet.
+          if [ -d site/bench ]; then
+            echo "has_bench=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_bench=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pages
+          path: site
+          if-no-files-found: error
+          overwrite: true
+          include-hidden-files: true
+  deploy:
+    # Pull requests only validates the build step but does not actually deploy.
+    # Forks don't have Pages configured, so restrict to the canonical repo.
+    if: github.repository == 'ava-labs/firewood' && github.event_name != 'pull_request'
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pages artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: pages
+          path: .
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+      - name: Deploy to GitHub pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  smoke:
+    # Same gate as deploy: canonical repo, non-PR events. Runs only after a
+    # successful deploy, validating the link-outs that linkcheck (web links off)
+    # cannot — e.g. a stale crate directory after a rustdoc relocation.
+    if: github.repository == 'ava-labs/firewood' && github.event_name != 'pull_request'
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Smoke-check deployed paths
+        run: |
+          base="https://ava-labs.github.io/firewood"
+          for path in / /rustdoc/ /rustdoc/firewood/ /ffi/; do
+            url="${base}${path}"
+            echo "checking ${url}"
+            curl --fail --silent --show-error --location --max-time 30 --connect-timeout 10 "${url}" > /dev/null
+          done
+          if [ "${{ needs.build.outputs.has_bench }}" = "true" ]; then
+            url="${base}/bench/"
+            echo "checking ${url}"
+            curl --fail --silent --show-error --location --max-time 30 --connect-timeout 10 "${url}" > /dev/null
+          else
+            echo "skipping /bench/ — no benchmark history on this deploy"
+          fi

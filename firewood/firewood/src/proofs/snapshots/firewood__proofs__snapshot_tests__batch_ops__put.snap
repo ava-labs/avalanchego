@@ -1,0 +1,5 @@
+---
+source: firewood/src/proofs/snapshot_tests.rs
+expression: "hex::encode(&change_proof_bytes(ops)[32..])"
+---
+00000100046b6579310476616c31
