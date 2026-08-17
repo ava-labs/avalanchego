@@ -194,13 +194,18 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 	}
 }
 
+// SettledBy returns the settlement marker encoded in the header by
+// [builder.BuildBlock]. A header carrying no marker (pre-Helicon) is reported
+// as self-settling: Height equal to the header's own block number and zero
+// gas fields — the same shape the Helicon genesis encodes explicitly; see
+// [hook.IsSynchronous].
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
 	if he.SettledHeight == nil ||
 		he.SettledGasUnix == nil ||
 		he.SettledGasNumerator == nil ||
 		he.SettledExcess == nil {
-		return hook.Settled{}
+		return hook.SelfSettled(h)
 	}
 	return hook.Settled{
 		Height:       *he.SettledHeight,

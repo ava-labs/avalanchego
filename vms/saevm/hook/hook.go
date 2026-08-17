@@ -66,10 +66,10 @@ type Points interface {
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
-	// SettledBy returns the extra information for the settled block of the
-	// provided header. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
-	// executed (pre-SAE) headers.
+	// SettledBy returns the settlement marker for the block that the header
+	// settles, as passed to [BlockBuilder.BuildBlock]. A header carrying no
+	// effective marker is reported as self-settling — Height equal to the
+	// header's own block number; see [IsSynchronous].
 	SettledBy(*types.Header) Settled
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
@@ -225,11 +225,23 @@ type Settled struct {
 	Excess       gas.Gas
 }
 
-// Synchronous reports whether the header is that of a synchronously executed
-// (pre-SAE) block.
-func Synchronous(h Points, hdr *types.Header) bool {
-	return h.SettledBy(hdr) == (Settled{})
+// SelfSettled returns the self-settling marker that [Points.SettledBy]
+// reports for a header carrying no effective marker.
+func SelfSettled(hdr *types.Header) Settled {
+	return Settled{Height: hdr.Number.Uint64()}
 }
+
+// SettlesSelf reports whether the marker settles the block carrying hdr,
+// i.e. its Height is the header's own block number — the shape of a header
+// with no effective marker; see [Points.SettledBy].
+func (s Settled) SettlesSelf(hdr *types.Header) bool {
+	return s.Height == hdr.Number.Uint64()
+}
+
+// ErrNoSettlementMarker is returned when a header expected to carry an
+// effective settlement marker (built under SAE) has none — absent or
+// self-settling.
+var ErrNoSettlementMarker = errors.New("header carries no settlement marker")
 
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
@@ -238,7 +250,19 @@ func Synchronous(h Points, hdr *types.Header) bool {
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
 	s := h.SettledBy(settler)
+	if s.SettlesSelf(settler) {
+		return nil, fmt.Errorf("%w: settler %v", ErrNoSettlementMarker, settler.Number)
+	}
 
 	pt := proxytime.New(s.GasUnix, s.GasNumerator, gastime.SafeRateOfTarget(target))
 	return gastime.FromProxyTime(pt, s.Excess, cfg)
+}
+
+// IsSynchronous reports whether the block with the given header was executed
+// synchronously, i.e. not under SAE. This holds iff the header carries no
+// effective settlement marker, reported by [Points.SettledBy] as a
+// self-settling marker — true for pre-SAE blocks and the self-settling
+// Helicon genesis.
+func IsSynchronous(h Points, hdr *types.Header) bool {
+	return h.SettledBy(hdr).SettlesSelf(hdr)
 }

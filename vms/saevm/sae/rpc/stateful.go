@@ -244,7 +244,7 @@ func (a *tracerAPI) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *
 	// A synchronous (pre-SAE) block carries the base fee its transactions
 	// actually paid, so it is traced as supplied.
 	resealed := block
-	if hdr := block.Header(); !hook.Synchronous(a.tracerBackend.Hooks(), hdr) {
+	if hdr := block.Header(); !hook.IsSynchronous(a.tracerBackend.Hooks(), hdr) {
 		parent, err := a.tracerBackend.restoreExecutedParent(ctx, block)
 		if err != nil {
 			return nil, fmt.Errorf("restoring parent block: %w", err)

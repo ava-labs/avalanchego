@@ -248,7 +248,7 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 
 var ErrMissingExecutionResults = errors.New("missing execution results for asynchronous block")
 
-// RestoreExecutionArtefacts reloads post-execution artefacts persisted by
+// restoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called. Synchronous blocks do not persist
 // execution results, so theirs are inferred from the block itself without
@@ -257,32 +257,35 @@ var ErrMissingExecutionResults = errors.New("missing execution results for async
 // obtain the results is reported wrapped in [ErrMissingExecutionResults],
 // alongside the underlying cause.
 //
-// This function does NOT restore the block's settlement state, even if the
+// This method does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
-// appropriate. Because this function breaks this invariant, any consumer
-// SHOULD consider using [RestoreSettledBlock] instead, if possible.
+// appropriate.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+func (b *Block) restoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+	num := b.NumberU64()
+	// [types.Block.Header] returns a deep copy, so it is hoisted here and
+	// threaded through the synchronous helpers to avoid repeated copies.
+	hdr := b.Header()
 	var (
 		e   *executionResults
 		err error
 	)
-	if hook.Synchronous(hooks, b.Header()) {
-		e, err = b.synchronousExecutionResults(hooks)
+	if hook.IsSynchronous(hooks, hdr) {
+		e, err = b.synchronousExecutionResults(hooks, hdr)
 		b.synchronous = true
 	} else {
-		e, err = loadExecutionResults(xdb, b.NumberU64())
+		e, err = loadExecutionResults(xdb, num)
 	}
 	if err != nil {
-		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), err)
+		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, num, b.Hash(), err)
 	}
 
-	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
+	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), num)
 	if err := e.receipts.DeriveFields(
 		chainConfig,
 		b.Hash(),
-		b.NumberU64(),
+		num,
 		b.BuildTime(),
 		e.baseFee.ToBig(),
 		nil, // SAE does not support blob transactions.
@@ -296,11 +299,12 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // synchronousExecutionResults derives the post-execution artefacts of a
 // synchronous block. Unlike asynchronously executed blocks, synchronous blocks
 // do not persist their execution results in the [saetypes.ExecutionResults]
-// database, thus they are extracted from the header.
-func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
+// database, thus they are extracted from the header. hdr MUST be b's own
+// header.
+func (b *Block) synchronousExecutionResults(hooks hook.Points, hdr *types.Header) (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
 	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
-	execTime, err := b.synchronousGasTime(hooks)
+	execTime, err := b.synchronousGasTime(hooks, hdr)
 	if err != nil {
 		return nil, err
 	}
@@ -319,9 +323,8 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 
 // synchronousGasTime derives the gas time of a synchronous block, which has no
 // predecessor clock to advance. Inverting the base fee only approximates the
-// excess.
-func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
-	hdr := b.Header()
+// excess. hdr MUST be b's own header.
+func (b *Block) synchronousGasTime(hooks hook.Points, hdr *types.Header) (*gastime.Time, error) {
 	target, cfg := hooks.GasConfigAfter(hdr)
 	return gastime.New(
 		hooks.BlockTime(hdr),
