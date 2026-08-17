@@ -1,0 +1,368 @@
+// Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
+//! Proof deserialization implementation.
+//!
+//! This module handles the deserialization of proofs from the binary format.
+//! It supports parsing proof headers, proof nodes, and range proofs with full
+//! validation of the format.
+
+use super::{
+    header::InvalidHeader,
+    reader::{ProofReader, ReadError, ReadItem, V0Reader, Version0},
+    types::{Proof, ProofNode, ProofType},
+};
+use crate::merkle::childmask::ChildMask;
+use crate::{
+    api::{FrozenChangeProof, FrozenRangeProof},
+    db::BatchOp,
+    merkle::{Key, Value},
+    proofs::magic::{BATCH_DELETE, BATCH_DELETE_RANGE, BATCH_PUT},
+};
+use firewood_storage::{HashType, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest};
+use integer_encoding::VarInt;
+use std::num::NonZeroUsize;
+
+impl FrozenRangeProof {
+    /// Parses a `FrozenRangeProof` from the given byte slice.
+    ///
+    /// Currently only V0 proofs are supported. See [`FrozenRangeProof::write_to_vec`]
+    /// for the serialization format.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReadError`] if the data is invalid. See the enum variants for
+    /// the possible reasons.
+    pub fn from_slice(data: &[u8]) -> Result<Self, ReadError> {
+        let mut reader = ProofReader::new(data);
+
+        let header = reader.read_header()?;
+        let validated_header = header
+            .validate(Some(ProofType::Range))
+            .map_err(ReadError::InvalidHeader)?;
+
+        match header.version {
+            0 => {
+                // Body reads dispatch on the proof's own self-describing mode
+                // so this binary reads either wire format.
+                let mut reader = V0Reader::new(
+                    reader.into_body(validated_header.node_hash_algorithm),
+                    header,
+                );
+                let this = reader.read_v0_item()?;
+                if reader.remainder().is_empty() {
+                    Ok(this)
+                } else {
+                    Err(reader.invalid_item(
+                        "trailing bytes",
+                        "no data after the proof",
+                        format!("{} bytes", reader.remainder().len()),
+                    ))
+                }
+            }
+            found => Err(ReadError::InvalidHeader(
+                InvalidHeader::UnsupportedVersion { found },
+            )),
+        }
+    }
+}
+
+impl<T: Version0> Version0 for Box<[T]> {
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let num_items = reader
+            .read_item::<usize>()
+            .map_err(|err| err.set_item("array length"))?;
+
+        if num_items > reader.remainder().len() / T::MIN_BYTES_PER_ITEM {
+            return Err(reader.invalid_item(
+                "array length",
+                "length less than or equal to the maximum possible items in remaining bytes",
+                format!(
+                    "{} > ({} / {})",
+                    num_items,
+                    reader.remainder().len(),
+                    T::MIN_BYTES_PER_ITEM
+                ),
+            ));
+        }
+        (0..num_items).map(|_| reader.read_v0_item()).collect()
+    }
+}
+
+impl FrozenChangeProof {
+    /// Parses a `FrozenChangeProof` from the given byte slice.
+    ///
+    /// Currently only V0 proofs are supported. See [`FrozenChangeProof::write_to_vec`]
+    /// for the serialization format.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReadError`] if the data is invalid. See the enum variants for
+    /// the possible reasons.
+    pub fn from_slice(data: &[u8]) -> Result<Self, ReadError> {
+        let mut reader = ProofReader::new(data);
+
+        let header = reader.read_header()?;
+        let validated_header = header
+            .validate(Some(ProofType::Change))
+            .map_err(ReadError::InvalidHeader)?;
+
+        if header.version != 0 {
+            return Err(ReadError::InvalidHeader(
+                InvalidHeader::UnsupportedVersion {
+                    found: header.version,
+                },
+            ));
+        }
+
+        // Body reads dispatch on the proof's own self-describing mode so this
+        // binary reads either wire format.
+        let mut reader = V0Reader::new(
+            reader.into_body(validated_header.node_hash_algorithm),
+            header,
+        );
+        let this = reader.read_v0_item()?;
+        if reader.remainder().is_empty() {
+            Ok(this)
+        } else {
+            Err(reader.invalid_item(
+                "trailing bytes",
+                "no data after the proof",
+                format!("{} bytes", reader.remainder().len()),
+            ))
+        }
+    }
+}
+
+impl Version0 for FrozenRangeProof {
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let start_proof = reader.read_v0_item()?;
+        let end_proof = reader.read_v0_item()?;
+        let key_values = reader.read_v0_item()?;
+
+        Ok(Self::with_hash_mode(
+            Proof::new(start_proof),
+            Proof::new(end_proof),
+            key_values,
+            reader.node_hash_algorithm(),
+        ))
+    }
+}
+
+impl Version0 for FrozenChangeProof {
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let start_proof = reader.read_v0_item()?;
+        let end_proof = reader.read_v0_item()?;
+        let key_values = reader.read_v0_item()?;
+
+        Ok(Self::with_hash_mode(
+            Proof::new(start_proof),
+            Proof::new(end_proof),
+            key_values,
+            reader.node_hash_algorithm(),
+        ))
+    }
+}
+
+impl Version0 for BatchOp<Key, Value> {
+    const MIN_BYTES_PER_ITEM: NonZeroUsize = NonZeroUsize::new(2).unwrap();
+
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        match reader
+            .read_item::<u8>()
+            .map_err(|err| err.set_item("option discriminant"))?
+        {
+            BATCH_PUT => Ok(BatchOp::Put {
+                key: reader.read_item()?,
+                value: reader.read_item()?,
+            }),
+            BATCH_DELETE => Ok(BatchOp::Delete {
+                key: reader.read_item()?,
+            }),
+            BATCH_DELETE_RANGE => Ok(BatchOp::DeleteRange {
+                prefix: reader.read_item()?,
+            }),
+            found => Err(reader.invalid_item("option discriminant", "0, 1, or 2", found)),
+        }
+    }
+}
+
+impl Version0 for ProofNode {
+    const MIN_BYTES_PER_ITEM: NonZeroUsize = NonZeroUsize::new(5).unwrap();
+
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let key = reader.read_v0_item::<PathBuf>()?;
+        let partial_len = reader.read_item()?;
+        if partial_len > key.len() {
+            return Err(reader.invalid_item(
+                "partial key length",
+                "value less than or equal to the key length",
+                partial_len,
+            ));
+        }
+        let value_digest = reader.read_item()?;
+
+        let children_map = reader.read_item::<ChildMask>()?;
+
+        let mut child_hashes =
+            arity_arrays::FixedArray::<Option<HashType>, arity_arrays::Arity16>::new();
+        for idx in children_map.iter_indices() {
+            child_hashes.replace(idx.0, Some(reader.read_item()?));
+        }
+        let child_hashes = firewood_storage::DenseChildren::from(child_hashes);
+
+        Ok(ProofNode {
+            key,
+            partial_len,
+            value_digest,
+            child_hashes,
+        })
+    }
+}
+
+impl Version0 for PathBuf {
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let bytes = reader.read_item::<&[u8]>()?;
+        TriePathFromUnpackedBytes::path_from_unpacked_bytes(bytes).map_err(|_| {
+            reader.invalid_item(
+                "path",
+                "valid nibbles",
+                format!("invalid nibbles: {}", hex::encode(bytes)),
+            )
+        })
+    }
+}
+
+impl Version0 for (Box<[u8]>, Box<[u8]>) {
+    const MIN_BYTES_PER_ITEM: NonZeroUsize = NonZeroUsize::new(2).unwrap();
+
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        Ok((reader.read_item()?, reader.read_item()?))
+    }
+}
+
+impl<'a> ReadItem<'a> for usize {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        match u64::decode_var(reader.remainder()) {
+            Some((n, size)) => {
+                reader.advance(size);
+                Ok(n as usize)
+            }
+            None if reader.remainder().is_empty() => Err(reader.incomplete_item("varint", 1)),
+            #[expect(clippy::indexing_slicing)]
+            None => Err(reader.invalid_item(
+                "varint",
+                "byte with no MSB within 9 bytes",
+                format!(
+                    "{:?}",
+                    &reader.remainder()[..reader.remainder().len().min(10)]
+                ),
+            )),
+        }
+    }
+}
+
+impl<'a> ReadItem<'a> for &'a [u8] {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        let len = reader.read_item::<usize>()?;
+        reader.read_slice(len)
+    }
+}
+
+impl<'a> ReadItem<'a> for Box<[u8]> {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        reader.read_item::<&[u8]>().map(Box::from)
+    }
+}
+
+impl<'a> ReadItem<'a> for u8 {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        reader
+            .read_chunk::<1>()
+            .map(|&[b]| b)
+            .map_err(|err| err.set_item("u8"))
+    }
+}
+
+impl<'a, T: ReadItem<'a>> ReadItem<'a> for Option<T> {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        match reader
+            .read_item::<u8>()
+            .map_err(|err| err.set_item("option discriminant"))?
+        {
+            0 => Ok(None),
+            1 => Ok(Some(reader.read_item::<T>()?)),
+            found => Err(reader.invalid_item("option discriminant", "0 or 1", found)),
+        }
+    }
+}
+
+impl<'a> ReadItem<'a> for ValueDigest<&'a [u8]> {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        match reader
+            .read_item::<u8>()
+            .map_err(|err| err.set_item("value digest discriminant"))?
+        {
+            0 => Ok(ValueDigest::Value(reader.read_item()?)),
+            1 => Ok(ValueDigest::Hash(reader.read_item()?)),
+            found => Err(reader.invalid_item(
+                "value digest discriminant",
+                "0 (value) or 1 (hash)",
+                found,
+            )),
+        }
+    }
+}
+
+impl<'a> ReadItem<'a> for ValueDigest<Box<[u8]>> {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        reader.read_item::<ValueDigest<&[u8]>>().map(|vd| match vd {
+            ValueDigest::Value(v) => ValueDigest::Value(v.into()),
+            ValueDigest::Hash(h) => ValueDigest::Hash(h),
+        })
+    }
+}
+
+impl<'a> ReadItem<'a> for TrieHash {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        reader
+            .read_chunk::<{ size_of::<TrieHash>() }>()
+            .map_err(|err| err.set_item("trie hash"))
+            .copied()
+            .map(TrieHash::from)
+    }
+}
+
+impl<'a> ReadItem<'a> for ChildMask {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        reader
+            .read_chunk::<2>()
+            .map_err(|err| err.set_item("children map"))
+            .copied()
+            .map(ChildMask::from_le_bytes)
+    }
+}
+
+impl<'a> ReadItem<'a> for HashType {
+    fn read_item(reader: &mut ProofReader<'a>) -> Result<Self, ReadError> {
+        // The two schemes use different proof wire layouts for a child hash;
+        // dispatch on the proof's own self-describing mode (resolved from the
+        // header byte and threaded onto the reader) so each format is read back
+        // the way it was written, regardless of the compile default.
+        if reader.node_hash_algorithm().is_ethereum() {
+            match reader
+                .read_item::<u8>()
+                .map_err(|err| err.set_item("hash type discriminant"))?
+            {
+                0 => Ok(HashType::Hash(reader.read_item()?)),
+                1 => Ok(HashType::Rlp(reader.read_item::<&[u8]>()?.into())),
+                found => {
+                    Err(reader.invalid_item("hash type discriminant", "0 (hash) or 1 (rlp)", found))
+                }
+            }
+        } else {
+            // MerkleDB child hashes are a bare 32-byte hash, no discriminant.
+            Ok(HashType::from(reader.read_item::<TrieHash>()?))
+        }
+    }
+}

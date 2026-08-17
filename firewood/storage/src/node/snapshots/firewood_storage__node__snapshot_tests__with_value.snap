@@ -1,0 +1,5 @@
+---
+source: storage/src/node/snapshot_tests.rs
+expression: "hex::encode(node_as_bytes(&node))"
+---
+0009000102030404050607

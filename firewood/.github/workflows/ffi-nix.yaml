@@ -1,0 +1,35 @@
+name: ffi-nix
+
+# Cachix rationale and temporary cache details:
+# see .github/ffi-nix-cachix.md
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ffi-nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@4eae8bea4afaa8f8ea8aa638ab9a7fead2f3d21e # @v31
+      - name: Configure Cachix (temporary read-only for PRs)
+        if: ${{ vars.CACHIX_CACHE_NAME != '' && github.event_name == 'pull_request' }}
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # @v17
+        with:
+          name: ${{ vars.CACHIX_CACHE_NAME }}
+      - name: Configure Cachix (temporary read-write for non-PRs)
+        if: ${{ vars.CACHIX_CACHE_NAME != '' && github.event_name != 'pull_request' }}
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # @v17
+        with:
+          name: ${{ vars.CACHIX_CACHE_NAME }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Check that FFI flake is up-to-date
+        run: ./scripts/run-just.sh check-ffi-flake
+      - name: Test nix build of Golang FFI bindings
+        run: ./scripts/run-just.sh test-ffi-nix

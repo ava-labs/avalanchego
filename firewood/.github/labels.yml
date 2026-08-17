@@ -1,0 +1,173 @@
+# Source of truth for ava-labs/firewood GitHub labels.
+# Synced by .github/workflows/sync-labels.yaml via EndBug/label-sync.
+# `aliases` rename an existing label IN PLACE (associations preserved).
+# Colors are 6 hex digits, no leading '#'. See LABELS.md for the taxonomy.
+
+# --- area/* (magenta) -------------------------------------------------------
+- name: area/storage
+  color: de158e
+  description: "Nodestore, free-lists, on-disk format, FDL"
+  aliases:
+    - storage
+- name: area/revisions
+  color: de158e
+  description: "Revision manager, proposals, commit pipeline"
+  aliases: []
+- name: area/hashing
+  color: de158e
+  description: "SHA-256, ethhash, triehash"
+  aliases: []
+- name: area/proofs
+  color: de158e
+  description: "Range/change proofs, eth_getProof"
+  aliases: []
+- name: area/ffi
+  color: de158e
+  description: "C API and Go wrapper"
+  aliases: []
+- name: area/cli
+  color: de158e
+  description: "fwdctl command-line tool"
+  aliases: []
+- name: area/c-chain
+  color: de158e
+  description: "C-Chain reexecution, libevm integration"
+  aliases:
+    - c-chain
+- name: area/benchmark
+  color: de158e
+  description: "Benchmark suite and perf harness"
+  aliases: []
+- name: area/ci
+  color: de158e
+  description: "Workflows, devcontainer, release tooling, build infra"
+  aliases:
+    - devops
+    - dev infra
+    - github-actions
+- name: area/docs
+  color: de158e
+  description: "Documentation"
+  aliases:
+    - documentation
+
+# --- kind/* (blue) ----------------------------------------------------------
+- name: kind/correctness
+  color: 1d76db
+  description: "Logic or data correctness bugs and fixes"
+  aliases: []
+- name: kind/performance
+  color: 1d76db
+  description: "Throughput, latency, allocation, memory"
+  aliases:
+    - performance
+- name: kind/security
+  color: 1d76db
+  description: "Vulnerabilities and security audits"
+  aliases:
+    - security
+    - audit
+- name: kind/tech-debt
+  color: 1d76db
+  description: "Refactors, cleanup, debt paydown"
+  aliases:
+    - techdebt
+    - cleanup
+- name: kind/observability
+  color: 1d76db
+  description: "Logging, tracing, metrics"
+  aliases:
+    - observability
+- name: kind/testing
+  color: 1d76db
+  description: "Tests, flaky tests, test infrastructure"
+  aliases:
+    - testing
+    - Flaky Test
+- name: kind/dependencies
+  color: 1d76db
+  description: "Dependency updates"
+  aliases:
+    - dependencies
+- name: kind/research
+  color: 1d76db
+  description: "Needs investigation or design before work begins"
+  aliases:
+    - Research Project
+    - design doc
+
+# --- priority/* (severity gradient) -----------------------------------------
+- name: priority/P0
+  color: b60205
+  description: "Critical: data loss/corruption or broken main. Drop everything."
+  aliases: []
+- name: priority/P1
+  color: d93f0b
+  description: "High: needed for next release or blocks users."
+  aliases: []
+- name: priority/P2
+  color: fbca04
+  description: "Medium: should do, not urgent."
+  aliases: []
+- name: priority/P3
+  color: 0e8a16
+  description: "Low: nice to have / someday."
+  aliases:
+    - low priority
+
+# --- status/* ---------------------------------------------------------------
+- name: status/needs-triage
+  color: ededed
+  description: "New; not yet prioritized."
+  aliases: []
+- name: status/needs-info
+  color: fef2c0
+  description: "Blocked on reporter/author for more information."
+  aliases:
+    - needs more info
+    - question
+- name: status/blocked
+  color: e99695
+  description: "Blocked on an external dependency or another item."
+  aliases: []
+- name: status/ready
+  color: 0e8a16
+  description: "Triaged and ready to be picked up."
+  aliases: []
+- name: status/wontfix
+  color: ffffff
+  description: "Will not be worked on."
+  aliases:
+    - wontfix
+- name: status/do-not-merge
+  color: e11d21
+  description: "PR must not be merged in its current state."
+  aliases:
+    - DO NOT MERGE
+
+# --- special flags (un-namespaced) ------------------------------------------
+- name: good first issue
+  color: 7057ff
+  description: "Good for newcomers."
+  aliases: []
+- name: help wanted
+  color: "008672"
+  description: "Extra attention is needed."
+  aliases: []
+- name: no-changelog
+  color: 3af8eb
+  description: "Omit this PR from the changelog."
+  aliases: []
+- name: breaking-change
+  color: f9d0c4
+  description: "Contains a breaking change (affected crate noted in the PR body)."
+  aliases:
+    - breaking-change/firewood
+    - breaking-change/firewood-storage
+    - breaking-change/firewood-ffi
+    - breaking-change/firewood-go
+    - breaking-change/fwdctl
+- name: 3rd party contributor
+  color: fc9c45
+  description: "PR from a fork; flags extra review attention."
+  aliases: []

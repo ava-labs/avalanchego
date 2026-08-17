@@ -1,0 +1,33 @@
+name: Sync labels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/labels.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/labels.yml
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview changes without applying them"
+        type: boolean
+        default: true
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync labels from manifest
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+        with:
+          config-file: .github/labels.yml
+          delete-other-labels: true
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || github.event_name == 'pull_request' || false }}
+          token: ${{ secrets.GITHUB_TOKEN }}

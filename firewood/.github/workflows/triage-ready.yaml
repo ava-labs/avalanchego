@@ -1,0 +1,33 @@
+name: Triage ready on prioritization
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  promote:
+    if: startsWith(github.event.label.name, 'priority/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const num = context.payload.issue.number;
+            const labels = context.payload.issue.labels.map(l => l.name);
+            if (labels.includes('status/needs-triage')) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: num, name: 'status/needs-triage',
+              }).catch(e => { if (e.status !== 404) throw e; });
+              console.log('Removed status/needs-triage');
+            }
+            if (!labels.includes('status/ready')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: num, labels: ['status/ready'],
+              });
+              console.log('Added status/ready');
+            }

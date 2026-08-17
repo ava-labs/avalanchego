@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a defect in Firewood
+type: Bug
+labels: ["status/needs-triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area(s)
+      description: Which part(s) of the system does this touch?
+      multiple: true
+      options:
+        - storage
+        - revisions
+        - hashing
+        - proofs
+        - ffi
+        - cli
+        - c-chain
+        - benchmark
+        - ci
+        - docs
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: To reproduce
+      description: Steps to reproduce the behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Version/commit, OS, feature flags (e.g. ethhash), logs.
+    validations:
+      required: false

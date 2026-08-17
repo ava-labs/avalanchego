@@ -1,0 +1,73 @@
+{
+  "name": "Firewood Development",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu26.04",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/firewood",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/firewood,type=bind,consistency=cached",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/go:1": {},
+    "ghcr.io/devcontainers/features/rust:1": {
+      "profile": "default"
+    },
+    "ghcr.io/devcontainers/features/nix:1": {
+      "extraNixConfig": "experimental-features = nix-command flakes\ntrusted-users = root vscode"
+    },
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "./features/firewood-tools": {}
+  },
+  "mounts": [
+    "source=firewood-sccache-${localEnv:USER},target=/home/vscode/.cache/sccache,type=volume",
+    "source=firewood-cargo-registry-${localEnv:USER},target=/usr/local/cargo/registry,type=volume",
+    "source=firewood-cargo-git-${localEnv:USER},target=/usr/local/cargo/git,type=volume",
+    "source=firewood-go-pkg-${localEnv:USER},target=/go/pkg,type=volume",
+    "source=firewood-gh-config-${localEnv:USER},target=/home/vscode/.config/gh,type=volume",
+    "source=firewood-claude-${localEnv:USER},target=/home/vscode/.claude,type=volume",
+    "source=firewood-bash-history-${localEnv:USER},target=/home/vscode/.commandhistory,type=volume"
+  ],
+  "containerEnv": {
+    "SCCACHE_DIR": "/home/vscode/.cache/sccache"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "DavidAnson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "golang.go",
+        "llvm-vs-code-extensions.lldb-dap",
+        "mhutchie.git-graph",
+        "mk12.better-git-line-blame",
+        "mkhl.shfmt",
+        "ms-vscode.cpptools-extension-pack",
+        "nefrob.vscode-just-syntax",
+        "redhat.vscode-yaml",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "timonwong.shellcheck",
+        "vadimcn.vscode-lldb"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.cargo.features": ["ethhash", "logger"],
+        "[rust]": {
+          "editor.formatOnSave": true
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "runArgs": [
+    "--init"
+    // If `claude login` fails due to IPv6, uncomment the next line and rebuild.
+    // See .devcontainer/README.md and anthropics/devcontainer-features#24.
+    // , "--sysctl", "net.ipv6.conf.all.disable_ipv6=1"
+  ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "sccache --show-stats"
+}

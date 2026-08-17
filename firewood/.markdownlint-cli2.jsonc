@@ -1,0 +1,13 @@
+{
+  // Defines which Markdown files linting includes and excludes, keeping local
+  // pre-push checks aligned with CI. Shared by `just ci-lint-markdown` and the
+  // GitHub Actions Markdown check.
+  "globs": [
+    "*.md",
+    "**/*.md",
+    "!CHANGELOG.md",
+    "!target/**",
+    "!.github/**",
+    "!.claude/**"
+  ]
+}

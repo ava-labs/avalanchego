@@ -1,0 +1,30 @@
+# because apparently caches are isolated across branches
+name: default-branch-cache
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # @master
+        with:
+          toolchain: stable
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Check
+        run: cargo check --workspace --all-targets
+      - name: Build
+        run: cargo build --workspace --all-targets

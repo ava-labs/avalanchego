@@ -1,0 +1,92 @@
+[package]
+name = "firewood-storage"
+version = "0.8.0"
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Suyan Qu <36519575+qusuyan@users.noreply.github.com>",
+]
+description = "Storage layer for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Workspace dependencies
+aquamarine.workspace = true
+bytemuck.workspace = true
+bytemuck_derive.workspace = true
+fastrace.workspace = true
+firewood-metrics.workspace = true
+hex.workspace = true
+integer-encoding.workspace = true
+metrics.workspace = true
+metrics-util = { workspace = true, optional = true }
+nonzero_ext.workspace = true
+rand = { workspace = true, optional = true }
+sha2.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+# Regular dependencies
+bitfield = "0.19.4"
+fjall = "=2.11.2" # 3.0.0 has breaking changes
+derive-where = "1.6.1"
+enum-as-inner = "0.7.0"
+git-version = "0.3.9"
+indicatif = "0.18.6"
+lru = "0.18.1"
+lru-mem = "0.3.0"
+parking_lot.workspace = true
+triomphe = "0.1.16"
+weak-table = "0.3.2"
+# Optional dependencies
+log = { version = "0.4.33", optional = true }
+sha3 = "0.12.0"
+bumpalo = { version = "3.20.3", features = ["collections", "std"] }
+arc-swap = "1.9.2"
+arity-arrays = { version = "0.2.0", default-features = false, features = ["16"] }
+
+[dev-dependencies]
+cfg-if = "1.0.4"
+# Workspace dependencies
+criterion = { workspace = true, features = ["html_reports"] }
+insta.workspace = true
+metrics-util.workspace = true
+pprof = { workspace = true, features = ["flamegraph"] }
+rand.workspace = true
+rlp = "0.6.1"
+tempfile.workspace = true
+test-case.workspace = true
+
+[build-dependencies]
+bytemuck.workspace = true
+sha2.workspace = true
+
+# The io-uring crate only builds on Linux, so the dependency is declared per
+# target. The `io-uring` feature itself stays portable and is a no-op elsewhere;
+# see build.rs for the `cfg(io_uring)` alias that gates the code on both.
+[target.'cfg(target_os = "linux")'.dependencies]
+io-uring = { version = "0.7.13", optional = true }
+
+[features]
+logger = ["log"]
+io-uring = ["dep:io-uring"]
+ethhash = []
+test_utils = ["dep:metrics-util", "dep:rand"]
+
+[[bench]]
+name = "serializer"
+harness = false
+
+[[bench]]
+name = "rlp"
+harness = false
+required-features = ["test_utils"]
+
+[lints]
+workspace = true

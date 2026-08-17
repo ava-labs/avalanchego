@@ -1,0 +1,32 @@
+area/storage:
+  - changed-files:
+      - any-glob-to-any-file: ['storage/**']
+area/revisions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'firewood/src/manager.rs'
+          - 'firewood/src/**/proposal*.rs'
+          - 'firewood/src/v2/**'
+area/hashing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'triehash/**'
+          - 'storage/src/hashers/**'
+area/proofs:
+  - changed-files:
+      - any-glob-to-any-file: ['**/proof*.rs', '**/proofs/**']
+area/ffi:
+  - changed-files:
+      - any-glob-to-any-file: ['ffi/**']
+area/cli:
+  - changed-files:
+      - any-glob-to-any-file: ['fwdctl/**']
+area/benchmark:
+  - changed-files:
+      - any-glob-to-any-file: ['benchmark/**', '*/benches']
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**', '.devcontainer/**']
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**']

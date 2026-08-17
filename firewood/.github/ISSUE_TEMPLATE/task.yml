@@ -1,0 +1,36 @@
+name: Task
+description: A unit of engineering work that is not a bug or a feature
+type: Task
+labels: ["status/needs-triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area(s)
+      multiple: true
+      options:
+        - storage
+        - revisions
+        - hashing
+        - proofs
+        - ffi
+        - cli
+        - c-chain
+        - benchmark
+        - ci
+        - docs
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be done and why.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: false
