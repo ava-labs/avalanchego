@@ -586,7 +586,7 @@ func TestTransferSubnetOwnershipTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
 				return nil
 			},
-			expectedErr: ErrNilTx,
+			expectedErr: avax.ErrNilTx,
 		},
 		{
 			name: "already verified",

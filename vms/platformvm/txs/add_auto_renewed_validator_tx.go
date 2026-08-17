@@ -142,7 +142,7 @@ func (tx *AddAutoRenewedValidatorTx) InitCtx(ctx *snow.Context) {
 func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case len(tx.StakeOuts) == 0:

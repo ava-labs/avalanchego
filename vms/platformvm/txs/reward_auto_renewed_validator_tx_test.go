@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
@@ -20,7 +21,7 @@ func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		{
 			name: "nil",
 			tx:   nil,
-			want: ErrNilTx,
+			want: avax.ErrNilTx,
 		},
 		{
 			name: "missing_timestamp",

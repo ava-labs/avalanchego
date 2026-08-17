@@ -64,7 +64,7 @@ func (*RewardAutoRenewedValidatorTx) Outputs() []*avax.TransferableOutput {
 func (tx *RewardAutoRenewedValidatorTx) SyntacticVerify(*snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return errMissingTxID
 	case tx.Timestamp == 0:

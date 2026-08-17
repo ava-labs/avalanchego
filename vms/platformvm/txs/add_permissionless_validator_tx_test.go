@@ -1414,7 +1414,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return nil
 			},
-			err: ErrNilTx,
+			err: avax.ErrNilTx,
 		},
 		{
 			name: "already verified",

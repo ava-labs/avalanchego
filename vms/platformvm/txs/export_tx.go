@@ -47,7 +47,7 @@ func (tx *ExportTx) InitCtx(ctx *snow.Context) {
 func (tx *ExportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case len(tx.ExportedOutputs) == 0:

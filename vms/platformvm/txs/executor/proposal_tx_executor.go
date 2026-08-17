@@ -310,7 +310,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	switch {
 	case tx == nil:
-		return txs.ErrNilTx
+		return avax.ErrNilTx
 	case len(e.tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
@@ -344,7 +344,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 	switch {
 	case tx == nil:
-		return txs.ErrNilTx
+		return avax.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return ErrInvalidID
 	case len(e.tx.Creds) != 0:
