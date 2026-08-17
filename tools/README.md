@@ -11,6 +11,12 @@ dependencies remain unpolluted.
 
 See `external/go.mod` for usage instructions.
 
+## Bazel Unit-Test Suite Generator
+
+[`generate-bazel-unit-test-suites/`](./generate-bazel-unit-test-suites/)
+generates the checked-in Bazel unit-test suites. Its
+[README](./generate-bazel-unit-test-suites/README.md) explains how to run it.
+
 ## Adding Repo-Local Commands
 
 Custom commands specific to this repository should be implemented as

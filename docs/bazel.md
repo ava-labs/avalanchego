@@ -3,6 +3,69 @@
 This document explains how Bazel is configured and used in the
 avalanchego monorepo.
 
+## Table of contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Why Bazel?](#why-bazel)
+- [Architecture Overview](#architecture-overview)
+  - [Toolchain Strategy](#toolchain-strategy)
+  - [Version Pinning](#version-pinning)
+  - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
+  - [Why Bazel 8?](#why-bazel-8)
+  - [Multi-Module Structure](#multi-module-structure)
+  - [Key Configuration Files](#key-configuration-files)
+  - [BUILD.bazel Files with Custom Content](#buildbazel-files-with-custom-content)
+- [Gazelle](#gazelle)
+  - [Where Gazelle Comes From](#where-gazelle-comes-from)
+  - [When to Run Gazelle](#when-to-run-gazelle)
+  - [How Gazelle Handles Multiple Modules](#how-gazelle-handles-multiple-modules)
+  - [Custom Test Macros via `gazelle:map_kind`](#custom-test-macros-via-gazellemap_kind)
+- [External Dependency Handling](#external-dependency-handling)
+  - [Go Dependencies](#go-dependencies)
+  - [Patched Dependencies](#patched-dependencies)
+    - [Patching strategies](#patching-strategies)
+    - [libevm (secp256k1)](#libevm-secp256k1)
+    - [firewood-go-ethhash FFI](#firewood-go-ethhash-ffi)
+    - [blst (BLS Signatures)](#blst-bls-signatures)
+    - [gnark-crypto (BLS12-381 for KZG)](#gnark-crypto-bls12-381-for-kzg)
+  - [Protocol Buffers](#protocol-buffers)
+- [Common Tasks](#common-tasks)
+  - [Building](#building)
+  - [Testing](#testing)
+    - [Why Generated Unit-Test Suites Exist](#why-generated-unit-test-suites-exist)
+    - [Generated Unit-Test Suites](#generated-unit-test-suites)
+    - [Test Options](#test-options)
+    - [Test Timeouts](#test-timeouts)
+    - [Non-Unit Tests and the `manual` Tag](#non-unit-tests-and-the-manual-tag)
+  - [Maintenance](#maintenance)
+- [Bazel CI External Dependency Caching](#bazel-ci-external-dependency-caching)
+  - [Why this exists](#why-this-exists)
+  - [What is cached](#what-is-cached)
+  - [Cache key](#cache-key)
+  - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
+  - [Enforcement](#enforcement)
+  - [Changing this safely](#changing-this-safely)
+  - [Apple CommandLineTools](#apple-commandlinetools)
+  - [The macOS C compiler](#the-macos-c-compiler)
+- [Adding a New Go Module](#adding-a-new-go-module)
+- [Troubleshooting](#troubleshooting)
+  - ["no such package" or import errors](#no-such-package-or-import-errors)
+  - [Missing external dependency](#missing-external-dependency)
+  - [CGO compilation errors](#cgo-compilation-errors)
+  - [gnark-crypto assembly errors](#gnark-crypto-assembly-errors)
+  - [Build cache issues](#build-cache-issues)
+  - ["duplicate target" errors](#duplicate-target-errors)
+- [CGO Configuration](#cgo-configuration)
+- [Version Stamping](#version-stamping)
+- [Known Limitations](#known-limitations)
+- [Future Improvements](#future-improvements)
+  - [Remote Caching and Execution](#remote-caching-and-execution)
+  - [CI Integration](#ci-integration)
+  - [Patch Maintenance](#patch-maintenance)
+  - [Test Configuration](#test-configuration)
+- [References](#references)
+
 ## Prerequisites
 
 The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
@@ -26,7 +89,7 @@ task bazel-build
 task bazel-build-opt
 
 # Run unit tests
-task bazel-test
+task bazel-test-unit-all
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -396,18 +459,16 @@ bazel build //...
 
 ### Testing
 
-By default, `bazel test` matches `scripts/build_test.sh` behavior,
-with a few exceptions:
+Use `bazel test //:unit_tests` for unit testing. It runs each non-manual
+Go test rule once. It does not run `//:gazelle_test` or other non-Go test
+rules.
 
-- The script passes `-tags test` to `go test`; currently there are no
-  `//go:build test` files in this repo, so it has no effect.
-- The script excludes several directories via `go list | grep -v ...`;
-  Bazel instead relies on `tags = ["manual"]` to keep non-unit tests
-  out of `bazel test //...`.
+Use `bazel test //...` for broader Bazel validation. It runs
+`//:gazelle_test` and can run other non-Go, non-manual test rules.
 
 ```bash
-# Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+# Run all generated unit tests (shuffle enabled, race on)
+task bazel-test-unit-all           # or: bazel test //:unit_tests
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -416,7 +477,7 @@ bazel test //utils/...
 bazel test //utils:set_test --test_filter=TestSet_Add
 
 # Fast local iteration (no race, no shuffle)
-task bazel-test-fast               # or: bazel test --config=fast //...
+task bazel-test-unit-all-fast      # or: bazel test --config=fast //:unit_tests
 
 # Collect coverage
 bazel coverage //...
@@ -424,6 +485,86 @@ bazel coverage //...
 # Run E2E tests (requires built binary)
 task bazel-test-e2e
 ```
+
+Bazel unit-test task names use `bazel-test-unit-<area>`. Use `all` to run every
+unit-test shard.
+
+#### Why Generated Unit-Test Suites Exist
+
+Bazel CI runs the AvalancheGo, Coreth/EVM, and Subnet-EVM test groups as
+separate commands. Each group is a shard: the target set for one CI job. The
+AvalancheGo and Subnet-EVM groups each cover one module. The Coreth/EVM job
+runs both graft modules in one command, so they share a shard. This shard
+layout preserves the existing CI job boundaries.
+
+Keep each shard aligned with its CI job. Change a boundary only when a job must
+run independently. For example, it can need different test options, runners,
+schedules, or required-check behavior. Change the shard definitions, targets,
+tasks, and workflow jobs in the same change.
+
+Previously, CI used path patterns to select each test group. They could include
+a non-Go test or omit a Go test after a module move. A non-Go test cannot accept
+Go test options such as shuffle. A hand-maintained target list could also drift
+from the repository's test rules.
+
+Generated suites keep the checked-in CI groups explicit. The generator rejects
+non-Go tests, empty groups, gaps, and overlapping ownership. It requires every
+non-manual Go test rule to belong to exactly one group. A new or moved Go test
+therefore cannot silently lose generated-suite coverage.
+
+#### Generated Unit-Test Suites
+
+Bazel CI runs three generated root `test_suite` targets:
+
+- `//:avalanchego_unit_tests` contains root-module Go tests. It also contains
+  the libevm secp256k1 test from [`.bazel/patches`](../.bazel/patches/BUILD.bazel).
+  That test checks the Bazel patch for the libevm dependency. The suite excludes
+  graft modules and `//:gazelle_test`.
+- `//:coreth_unit_tests` contains Go tests in the Coreth and EVM graft
+  modules.
+- `//:subnet_evm_unit_tests` contains Go tests in the Subnet-EVM graft module.
+
+`//:unit_tests` aggregates the three shard suites. Use `bazel test
+//:unit_tests` to run all generated unit-test suites locally. CI runs each shard
+separately.
+
+The generator accepts Go test rules only. It rejects a non-Go test rule. These
+checks keep Go unit tests separate from metadata validation. In particular, keep
+`//:gazelle_test` out of `avalanchego_unit_tests`.
+
+The shard definitions are in `.bazel/test_shards.json`. Each definition has a
+name, description, and Bazel query. The generator writes each description as a
+comment in the generated suite file. It rejects a definition with an empty
+description.
+
+Adding, removing, moving, or retagging a test rule selected by a shard query
+changes suite membership. The `manual` tag removes a test from a generated
+suite. Manual non-Go tests do not affect generated suites.
+
+The AvalancheGo query excludes root `test_suite` rules. This prevents it from
+selecting generated shards through `//:unit_tests`. It still selects the
+external libevm test through `.bazel/patches:external_tests`. Do not replace
+this exclusion with a list of generated shard names. That list would require
+changes whenever a shard changes.
+
+Treat shard names as CI interfaces. Task targets,
+[`bazel_ci_dependency_list.sh`](../scripts/bazel_ci_dependency_list.sh), and
+[`bazel-ci.yml`](../.github/workflows/bazel-ci.yml) use them. Change them in the
+same change when you rename, add, or remove a shard. Update its description
+and query in the same change. Keep every non-manual Go test in exactly one
+shard.
+
+After you change `.bazel/test_shards.json` or a test rule that a shard
+query selects, run:
+
+```bash
+task bazel-generate-metadata
+```
+
+The command runs Gazelle, then writes `.bazel/generated_test_suites.bzl`. Do not
+edit that file. Commit the generated file with its source change. Then run
+`task bazel-check-metadata` from a clean working tree. If the check fails,
+update the commit and run the check again.
 
 #### Test Options
 
@@ -436,13 +577,13 @@ task bazel-test-e2e
 Examples:
 ```bash
 # Disable race detection
-bazel test --config=norace //...
+bazel test --config=norace //:unit_tests
 
 # Disable shuffle only
-bazel test --config=noshuffle //...
+bazel test --config=noshuffle //:unit_tests
 
 # Fast mode (no shuffle, no race)
-bazel test --config=fast //...
+bazel test --config=fast //:unit_tests
 ```
 
 #### Test Timeouts
@@ -464,9 +605,8 @@ category (120s). See Custom Test Macros for how this is wired up.
 #### Non-Unit Tests and the `manual` Tag
 
 Tests that are not unit tests (e2e tests, integration tests, load
-tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
-excludes them from `bazel test //...` which should only run unit
-tests.
+tests) must have `tags = ["manual"]` in their BUILD.bazel file. This excludes
+them from generated unit-test suites and from `bazel test //...`.
 
 This roughly mirrors the behavior of `scripts/build_test.sh`, which excludes these directories via grep:
 ```bash
@@ -594,7 +734,7 @@ therefore enables both:
 ### Cache key
 
 The GitHub Actions cache key is:
-`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh')}`
+`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh', '.bazel/generated_test_suites.bzl')}`
 with a same-platform restore prefix of
 `bazel-repo-${runner.os}-${runner.arch}-`.
 
@@ -605,6 +745,8 @@ That split is intentional:
   dependency set changes
 - `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
   checked-in Bazel CI target patterns used by setup change
+- `.bazel/generated_test_suites.bzl` invalidates the cache when the generated
+  membership of a unit-test suite changes
 - the broader same-platform restore key still gives a useful warm start
   because these caches store downloaded dependency data, not per-run
   build outputs
