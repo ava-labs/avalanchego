@@ -78,7 +78,9 @@ func (b *Block) Settled() bool {
 }
 
 // Synchronous reports whether the block was marked as synchronous during
-// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
+// [RestoreSettledBlock] or [RestoreExecutedBlock], i.e. whether
+// [hook.IsSynchronous] held for its header; see the field invariant on
+// [Block].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }

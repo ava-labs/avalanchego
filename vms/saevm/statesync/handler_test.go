@@ -6,7 +6,6 @@ package statesync
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/core"
@@ -33,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -108,13 +106,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	}
 	saeCfg.DBConfig.CommitInterval = cfg.commitInterval
 
-	genesis := core.Genesis{
-		Config:     saetest.ChainConfig(),
-		Alloc:      types.GenesisAlloc{},
-		Timestamp:  saeparams.TauSeconds,
-		BaseFee:    big.NewInt(1),
-		Difficulty: big.NewInt(0), // irrelevant but required
-	}
+	genesis := saetest.Genesis()
 
 	// The [SummaryHandler] requires the genesis block to be written to disk,
 	// but we don't want to actually commit the genesis state.

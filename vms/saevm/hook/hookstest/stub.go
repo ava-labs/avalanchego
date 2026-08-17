@@ -207,8 +207,12 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
-// SettledBy returns the settled information encoded in the Header by [Stub.BuildBlock]
-// or [BuildBlock].
+// SettledBy returns the settlement marker encoded in the header by
+// [Stub.BuildBlock] or [BuildBlock]. A header built by neither decodes to the
+// zero-value marker, which is self-settling — and therefore synchronous, per
+// [hook.IsSynchronous] — only for a height-0 (genesis) header. Tests that
+// need a synchronous block at any other height MUST pass an explicitly
+// self-settling marker to [BuildBlock]; see [hook.SelfSettled].
 func (*Stub) SettledBy(hdr *types.Header) hook.Settled {
 	return getHeaderExtra(hdr).settled.toHook()
 }

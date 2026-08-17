@@ -130,7 +130,7 @@ var (
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
-	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block")
+	errSelfSettlingMarker    = errors.New("self-settling settlement marker indistinguishable from a synchronous block")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
@@ -353,11 +353,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		GasNumerator: settledGasTime.Fraction().Numerator,
 		Excess:       settledGasTime.Excess(),
 	}
-	if settled == (hook.Settled{}) {
-		// An all-zero marker implies pre-SAE (see [hook.Synchronous]),
-		// executing the block with the worst-case fee in its header.
+	if settled.SettlesSelf(hdr) {
+		// A self-settling marker implies synchronous (pre-SAE) execution (see
+		// [hook.IsSynchronous]); a locally built block always settles a strict
+		// ancestor, so this indicates a bug in the caller.
 		log.Error("Settlement marker would indicate synchronous execution")
-		return nil, errZeroSettledMarker
+		return nil, errSelfSettlingMarker
 	}
 
 	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)

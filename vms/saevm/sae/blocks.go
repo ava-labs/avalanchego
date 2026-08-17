@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -175,6 +176,11 @@ var (
 // during bootstrapping.
 func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	header := b.Header()
+	marker := vm.hooks.SettledBy(header)
+	if marker.SettlesSelf(header) {
+		return fmt.Errorf("%w: block %d (%#x)", hook.ErrNoSettlementMarker, b.Height(), b.Hash())
+	}
+
 	lastSettled, err := lastToSettle(vm.hooks, header, parent, vm.config.Now(), vm.log())
 	if err != nil {
 		return err
@@ -185,7 +191,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
 	}
-	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
+	if got, want := lastSettled.NumberU64(), marker.Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
 	if err := b.SetAncestors(parent, lastSettled); err != nil {

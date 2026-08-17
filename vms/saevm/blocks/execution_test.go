@@ -51,9 +51,11 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
+	// The marker settles an earlier block, making this one asynchronous; see
+	// [hook.IsSynchronous].
 	ethB, err := hookstest.BuildBlock(
 		&types.Header{
-			Number: big.NewInt(1),
+			Number: big.NewInt(2),
 			Time:   42,
 		},
 		nil, // blockContext
@@ -106,8 +108,9 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(hookstest.NewStub(1e6), db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
+	fromDB, err := RestoreExecutedBlock(b.EthBlock(), hookstest.NewStub(1e6), loggingtest.New(t, logging.Warn), db, xdb, saetest.ChainConfig())
+	require.NoError(t, err, "RestoreExecutedBlock()")
+	require.NoError(t, fromDB.SetAncestors(b.ParentBlock(), b.LastSettled()), "SetAncestors()")
 	tests := []struct {
 		name           string
 		isLastExecuted bool
@@ -174,90 +177,74 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
-func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
-	// need well-formed receipt hash for invariants check.
-	ethB := types.NewBlockWithHeader(&types.Header{
-		Number:      big.NewInt(1),
+// restorableHeader returns a well-formed header at the given height for
+// restoration tests. A fresh instance is returned on every call because
+// [hookstest.BuildBlock] mutates the header it is given.
+func restorableHeader(height uint64) *types.Header {
+	return &types.Header{
+		Number:      new(big.Int).SetUint64(height),
 		BaseFee:     big.NewInt(1),
 		Time:        42,
-		ReceiptHash: types.EmptyRootHash,
-	})
-	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteBlock(db, ethB)
-
-	// An empty execution-results DB is what signals the block is synchronous.
-	xdb := saetest.NewExecutionResultsDB()
-	hooks := hookstest.NewStub(1e6)
-	b := newBlock(t, ethB, nil, nil)
-	require.NoErrorf(t, b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
-
-	assert.Truef(t, b.Executed(), "%T.Executed()", b)
-	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
-	// See method comment re user responsibility for settlement.
-	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
-	// A synchronous block is its own last-settled block.
-	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
+		ReceiptHash: types.EmptyRootHash, // needed for well-formed invariants check
+	}
 }
 
-func TestRestoreExecutionArtefacts(t *testing.T) {
-	header := func() *types.Header {
-		return &types.Header{
-			Number:      big.NewInt(1),
-			BaseFee:     big.NewInt(1),
-			Time:        42,
-			ReceiptHash: types.EmptyRootHash, // needed for well-formed invariants check
-		}
-	}
+func TestRestoreExecutedBlock(t *testing.T) {
+	hooks := hookstest.NewStub(1e6)
 
 	tests := []struct {
 		name     string
-		settled  *hook.Settled
+		height   uint64
+		settled  hook.Settled
 		xdbValue []byte
 		wantErr  error
 	}{
 		{
-			// A block carrying a non-zero settlement marker is asynchronous
+			// A block carrying a marker for an earlier block is asynchronous
 			// (built under SAE) and MUST have persisted execution results.
 			name:    "asynchronous_block_missing_results",
-			settled: &hook.Settled{Height: 1, GasUnix: 1},
+			height:  2,
+			settled: hook.Settled{Height: 1, GasUnix: 1},
 			wantErr: ErrMissingExecutionResults,
 		},
 		{
-			// A markerless (synchronous) header must be restored from the
-			// header alone; the execution-results DB is not consulted, even
-			// if it contains (possibly corrupt) data at that height.
+			// A self-settling marker — as carried by the genesis or the last
+			// pre-SAE block — makes the block synchronous, restored from the
+			// header alone; the execution-results DB is not consulted, even if
+			// it contains (possibly corrupt) data at that height.
 			name:     "synchronous_block_ignores_xdb",
+			height:   1,
+			settled:  hook.Settled{Height: 1},
 			xdbValue: []byte("not canoto"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var (
-				ethB *types.Block
-				err  error
-			)
-			if tt.settled != nil {
-				ethB, err = hookstest.BuildBlock(header(), nil, nil, nil, nil, *tt.settled)
-				require.NoError(t, err, "hookstest.BuildBlock()")
-			} else {
-				ethB = types.NewBlockWithHeader(header())
-			}
+			hdr := restorableHeader(tt.height)
+			synchronous := tt.settled.SettlesSelf(hdr)
+
+			ethB, err := hookstest.BuildBlock(hdr, nil, nil, nil, nil, tt.settled)
+			require.NoError(t, err, "hookstest.BuildBlock()")
 			db := rawdb.NewMemoryDatabase()
 			xdb := saetest.NewExecutionResultsDB()
 			if tt.xdbValue != nil {
-				require.NoError(t, xdb.Put(ethB.NumberU64(), tt.xdbValue), "%T.Put()", xdb)
+				require.NoErrorf(t, xdb.Put(ethB.NumberU64(), tt.xdbValue), "%T.Put()", xdb)
 			}
 
-			hooks := hookstest.NewStub(1e6)
-			b := newBlock(t, ethB, nil, nil)
-			err = b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig())
+			b, err := RestoreExecutedBlock(ethB, hooks, loggingtest.New(t, logging.Warn), db, xdb, saetest.ChainConfig())
 			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr, "%T.RestoreExecutionArtefacts()", b)
+				require.ErrorIs(t, err, tt.wantErr, "RestoreExecutedBlock()")
 				return
 			}
-			require.NoErrorf(t, err, "%T.RestoreExecutionArtefacts()", b)
-			require.Equalf(t, tt.settled == nil, b.Synchronous(), "%T.Synchronous()", b)
+			require.NoError(t, err, "RestoreExecutedBlock()")
+
+			assert.Truef(t, b.Executed(), "%T.Executed()", b)
+			assert.Equalf(t, synchronous, b.Synchronous(), "%T.Synchronous()", b)
+			// See function comment re caller responsibility for settlement.
+			assert.Falsef(t, b.Settled(), "%T.Settled()", b)
+			// A synchronous block is its own last-settled block.
+			assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
 		})
 	}
 }

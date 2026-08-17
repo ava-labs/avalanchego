@@ -221,7 +221,8 @@ func TestTargetExponent(t *testing.T) {
 }
 
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
-// writes into the header, and returns the zero marker when the header carries none.
+// writes into the header, and reports a header carrying no effective marker as
+// self-settling.
 func TestSettledBy(t *testing.T) {
 	key := txtest.NewKey(t)
 	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
@@ -253,26 +254,48 @@ func TestSettledBy(t *testing.T) {
 		GasNumerator: gas.Gas(3),
 		Excess:       gas.Gas(42),
 	}
-	tests := []struct {
+	type testCase struct {
 		name   string
 		header *types.Header
 		want   hook.Settled
-	}{
+	}
+	tests := []testCase{
 		{
 			name:   "absent_marker",
-			header: &types.Header{},
-			want:   hook.Settled{},
+			header: &types.Header{Number: big.NewInt(3)},
+			want:   hook.Settled{Height: 3},
 		},
 		{
-			name:   "zero",
-			header: built(t, hook.Settled{}),
-			want:   hook.Settled{},
+			name: "self_settling_marker",
+			header: func() *types.Header {
+				h := built(t, nonzero)
+				h.Number = big.NewInt(int64(nonzero.Height)) //#nosec G115 -- nonzero.Height is the hardcoded test fixture 7
+				return h
+			}(),
+			want: nonzero,
 		},
 		{
 			name:   "nonzero",
 			header: built(t, nonzero),
 			want:   nonzero,
 		},
+	}
+	// A marker with any nil field is not effective, so the header is reported
+	// as self-settling.
+	for name, clearField := range map[string]func(*customtypes.HeaderExtra){
+		"settled_height_nil":        func(e *customtypes.HeaderExtra) { e.SettledHeight = nil },
+		"settled_gas_unix_nil":      func(e *customtypes.HeaderExtra) { e.SettledGasUnix = nil },
+		"settled_gas_numerator_nil": func(e *customtypes.HeaderExtra) { e.SettledGasNumerator = nil },
+		"settled_excess_nil":        func(e *customtypes.HeaderExtra) { e.SettledExcess = nil },
+	} {
+		h := built(t, nonzero)
+		clearField(customtypes.GetHeaderExtra(h))
+		h.Number = big.NewInt(9)
+		tests = append(tests, testCase{
+			name:   name,
+			header: h,
+			want:   hook.Settled{Height: 9},
+		})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

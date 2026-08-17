@@ -246,7 +246,10 @@ func TestRecover(t *testing.T) {
 					lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
 					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 
-					for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
+					// A markerless block is synchronous and settles itself, so
+					// its self-settling marker yields its own height.
+					lastOnDiskSettledHeight := sut.hooks.SettledBy(lastOnDisk.Header()).Height
+					for i := lastOnDiskSettledHeight + 1; i < lastSettled; i++ {
 						ethB, err := canonicalBlock(sut.rawVM.db, i)
 						require.NoErrorf(t, err, "canonicalBlock(%d)", i)
 						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
