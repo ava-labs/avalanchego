@@ -20,7 +20,7 @@ approach is suggested to enable effective review of a large migration
 in a piecemeal fashion:
 
  - Create a branch per reviewable task
-   - Subtree merge would be one task, import rewrite another, etc
+   - Subtree merge would be one task, CI migration another, etc
    - The branch for a task subsequent to the initial task would be
      based on the previous task branch
  - Create a PR per branch
@@ -51,15 +51,13 @@ creation of an initial branch from master is assumed before the first
 step, and the commit of all changes and creation of a new branch from
 the current branch before beginning a subsequent step.
 
- - [ ] Add tasks for subtree merge and import rewrite to graft/Taskfile.yml (as per the example of existing tasks)
-   - These tasks are intended to simplify the repeated invocation that
+ - [ ] Add a subtree merge task to graft/Taskfile.yml (as per the example of existing tasks)
+   - The task is intended to simplify the repeated invocation that
      will be required when a repo is being developed in parallel with
      migration.
  - [ ] Execute the subtree merge task (it will commit the result automatically)
  - [ ] Remove files made redundant by the migration
    - Prioritizing file removal before modification minimizes the changes requiring review
- - [ ] Execute the rewrite imports task (it will commit the result automatically)
- - [ ] Perform required go module changes
  - [ ] Migrate CI jobs (unit test, e2e, linting, etc)
  - [ ] Get CI jobs passing
 
@@ -73,10 +71,8 @@ git fetch origin
 # The target branch might be master, or a tooling PR 
 git reset --hard origin/[TARGET BRANCH]
 
-cd graft
-
-# Do the graft again
-task [REPOSITORY NAME]-subtree-merge
+# Do the graft again from a local checkout of the source repository.
+task graft:[REPOSITORY NAME]-subtree-merge -- SOURCE_PATH
 git push --force
 ```
 
