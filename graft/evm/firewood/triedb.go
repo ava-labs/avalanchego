@@ -161,7 +161,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		options = append(options, ffi.WithRootStore())
 	}
 	if metrics.EnabledExpensive {
-		options = append(options, ffi.WithExpensiveMetrics())
+		options = append(options, ffi.WithExpensiveMetricsEnabled())
 	}
 
 	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
