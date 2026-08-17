@@ -39,7 +39,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -213,13 +212,6 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		vmenv := vm.NewEVM(context, vm.TxContext{}, env.state, w.chainConfig, vm.Config{})
 		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, vmenv, env.state)
 	}
-	// Ensure we always stop prefetcher after block building is complete.
-	defer func() {
-		if env.state == nil {
-			return
-		}
-		env.state.StopPrefetcher()
-	}()
 	// Configure any upgrades that should go into effect during this block.
 	blockContext := core.NewBlockContext(header.Number, header.Time)
 	err = core.ApplyUpgrades(w.chainConfig, &parent.Time, blockContext, env.state)
@@ -308,8 +300,6 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 			return nil, fmt.Errorf("%w: %d waiting for %d", ErrInsufficientGasCapacityToBuild, capacity, minimumBuildableCapacity)
 		}
 	}
-	numPrefetchers := w.chain.CacheConfig().TriePrefetcherParallelism
-	currentState.StartPrefetcher("miner", extstate.WithConcurrentWorkers(numPrefetchers))
 	return &environment{
 		signer:           types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:            currentState,

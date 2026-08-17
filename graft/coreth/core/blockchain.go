@@ -1401,10 +1401,6 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	}
 	blockStateInitTimer.Inc(time.Since(substart).Milliseconds())
 
-	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
-	defer statedb.StopPrefetcher()
-
 	// Process block using the parent state as reference point
 	pstart := time.Now()
 	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)
@@ -1763,10 +1759,6 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("could not fetch state for (%s: %d): %v", parent.Hash().Hex(), parent.NumberU64(), err)
 	}
-
-	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
-	defer statedb.StopPrefetcher()
 
 	// Process previously stored block
 	receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})
