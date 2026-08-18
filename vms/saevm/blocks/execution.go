@@ -263,14 +263,13 @@ var ErrMissingExecutionResults = errors.New("missing execution results for async
 // SHOULD consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	var (
 		e   *executionResults
 		err error
 	)
-	if hook.Synchronous(hooks, b.Header()) {
-		e, err = b.synchronousExecutionResults(hooks)
-		b.synchronous = true
+	if hook.Synchronous(b.hooks, b.Header()) {
+		e, err = b.synchronousExecutionResults()
 	} else {
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
@@ -301,10 +300,10 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // synchronous block. Unlike asynchronously executed blocks, synchronous blocks
 // do not persist their execution results in the [saetypes.ExecutionResults]
 // database, thus they are extracted from the header.
-func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
+func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
 	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
-	execTime, err := b.synchronousGasTime(hooks)
+	execTime, err := b.synchronousGasTime()
 	if err != nil {
 		return nil, err
 	}
@@ -324,11 +323,11 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 // synchronousGasTime derives the gas time of a synchronous block, which has no
 // predecessor clock to advance. Inverting the base fee only approximates the
 // excess.
-func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
+func (b *Block) synchronousGasTime() (*gastime.Time, error) {
 	hdr := b.Header()
-	target, cfg := hooks.GasConfigAfter(hdr)
+	target, cfg := b.hooks.GasConfigAfter(hdr)
 	return gastime.New(
-		hooks.BlockTime(hdr),
+		b.hooks.BlockTime(hdr),
 		target,
 		gas.Price(b.headerBaseFee()),
 		cfg,

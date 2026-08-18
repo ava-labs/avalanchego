@@ -60,7 +60,7 @@ func TestIntegration(t *testing.T) {
 	sdb, err := state.New(bc.Genesis().Root(), state.NewDatabase(db), nil)
 	require.NoError(t, err, "state.New(%T.Genesis().Root())", bc)
 
-	build := NewChainBuilder(NewBlock(t, bc.Genesis(), nil, nil))
+	build := NewChainBuilder(NewBlock(t, bc.Genesis(), nil))
 	dest := common.Address{'d', 'e', 's', 't'}
 	for i := range numBlocks {
 		// Genesis is block 0
@@ -126,7 +126,7 @@ func TestNewGenesis(t *testing.T) {
 	gen := NewGenesis(t, db, config, alloc)
 
 	assert.True(t, gen.Executed(), "genesis.Executed()")
-	require.NoError(t, gen.WaitUntilSettled(t.Context()), "genesis.WaitUntilSettled()")
+	assert.True(t, gen.Settled(), "genesis.Settled()")
 	assert.Equal(t, gen.Hash(), gen.LastSettled().Hash(), "genesis.LastSettled().Hash() is self")
 
 	t.Run("alloc", func(t *testing.T) {

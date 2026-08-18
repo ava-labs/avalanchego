@@ -45,7 +45,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.snowCtx.Log)
+	return blocks.New(ethB, parent, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
@@ -285,7 +285,10 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+					return err
+				}
+				if err := b.SetParent(parent); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
@@ -308,14 +311,6 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 		bMap.Store(b.Hash(), b)
 	}
 
-	for i, b := range chain[:len(chain)-1] {
-		if err := extend(b); err != nil {
-			return err
-		}
-		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return err
-		}
-	}
 	for _, b := range bMap.m {
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {

@@ -496,7 +496,7 @@ func TestVerifyBlockSizeLimit(t *testing.T) {
 		nil, // receipts
 		saetest.TrieHasher(),
 	)
-	b := blockstest.NewBlock(t, ethB, nil, nil)
+	b := blockstest.NewBlock(t, ethB, nil)
 	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
 }
 
@@ -925,7 +925,7 @@ func TestSyntacticBlockChecks(t *testing.T) {
 				TxHash:    types.EmptyTxsHash,
 			})
 			ethB := types.NewBlockWithHeader(hdr)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
+			b := blockstest.NewBlock(t, ethB, nil)
 			_, err := sut.ParseBlock(ctx, b.Bytes())
 			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
 		})
@@ -1006,7 +1006,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 				tt.receipts,
 				saetest.TrieHasher(),
 			)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
+			b := blockstest.NewBlock(t, ethB, nil)
 			require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), tt.wantErr, "VerifyBlock()")
 		})
 	}

@@ -149,9 +149,10 @@ func TestParseEthBlock(t *testing.T) {
 			})
 			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
 
-			b, err := New(ethB, nil, nil, log)
+			hooks := hookstest.NewStub(0)
+			b, err := New(ethB, nil, hooks, log)
 			require.NoError(t, err, "New()")
-			_, err = Parse(b.Bytes(), hookstest.NewStub(0))
+			_, err = Parse(b.Bytes(), hooks)
 			assert.ErrorIs(t, err, tt.wantErr, "Parse(#%v @ time %v)", hdr.Number, hdr.Time)
 		})
 	}
