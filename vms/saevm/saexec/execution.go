@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
@@ -132,21 +131,35 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	return e.afterExecution(b, result)
+	return e.afterExecution(b, stateDB, result)
 }
 
 type (
-	// executionResults holds block execution outputs.
-	executionResults struct {
+	// blockContext holds the values that [Executor.beforeTransactions]
+	// derives. The later phases of execution require all of them.
+	blockContext struct {
 		BlockExecutionState
-		StateDB     *state.StateDB
+		// header carries the executed base fee in place of the worst-case fee
+		// that consensus agreed. Later phases MUST use this header, because
+		// [blocks.Block.Header] returns a new copy on every call.
+		header      *types.Header
+		gasClock    *gastime.Time
+		interimTime *proxytime.Time[gas.Gas]
+	}
+
+	// executionResults holds the outputs of executing an entire block.
+	executionResults struct {
+		BaseFee     *uint256.Int
 		Receipts    types.Receipts
 		GasConsumed gas.Gas
-		FinishBy    struct {
-			Gas  *gastime.Time
-			Wall time.Time
-		}
-		interimTime *proxytime.Time[gas.Gas]
+		FinishBy    finishTimes
+	}
+
+	// finishTimes records when a block finished executing, on both the gas
+	// clock and the wall clock.
+	finishTimes struct {
+		Gas  *gastime.Time
+		Wall time.Time
 	}
 
 	// BlockExecutionState holds the state and execution context at a point in
@@ -158,108 +171,42 @@ type (
 	}
 )
 
-// startExecutingBlock applies the state changes required before executing b's
-// transactions, specifically the start-executing-block hook and the EIP-4788
-// beacon root, mirroring [core.StateProcessor.Process].
-func startExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
-	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
-		return fmt.Errorf("start-executing-block hook: %v", err)
-	}
-
-	core.SetBeaconBlockRoot(stateDB, b.Header())
-
-	// SetBeaconRoot only finalizes when it applies the root, so we want to
-	// finalize last. This mirrors the finalization performed by
-	// [core.ApplyTransaction].
-	stateDB.Finalise(rules.IsEIP158)
-	return nil
-}
-
-// StateBeforeTransactions applies b's pre-transaction state changes to
-// stateDB, which MUST represent b's parent's post-execution state. It does not
-// execute transactions or subsequent block operations.
-func (e *Executor) StateBeforeTransactions(b *blocks.Block, stateDB *state.StateDB) error {
-	header := b.Header()
-	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	return startExecutingBlock(e.hooks, rules, stateDB, b.ParentBlock().Header(), b.EthBlock())
-}
-
-// ExecuteBlockUntil executes the first numTxs transactions in b. After those
-// transactions execute, it returns the pending state and execution context. It
-// skips the remaining transactions and all subsequent block operations. It
-// does not record block progress or mark the block as executed.
+// executeBlock applies every deterministic state change in b to stateDB, in
+// the three phases of block execution:
 //
-// numTxs MUST be in the range [0, len(b.Transactions())].
-func (e *Executor) ExecuteBlockUntil(b *blocks.Block, stateDB *state.StateDB, numTxs int) (*BlockExecutionState, error) {
-	if numTxs < 0 || numTxs > len(b.Transactions()) {
-		return nil, fmt.Errorf("%w: %d not in [0, %d]", errTransactionCountOutOfRange, numTxs, len(b.Transactions()))
-	}
-	r, err := e.executeTransactions(b, stateDB, numTxs, false /*canonical*/, e.log)
-	if err != nil {
-		return nil, err
-	}
-	return &r.BlockExecutionState, nil
-}
-
-// executeBlock executes all deterministic block state changes.
+//  1. [Executor.beforeTransactions]
+//  2. [Executor.executeTransactions], for all of b's transactions
+//  3. [Executor.endOfBlock]
+//
+// Canonical-only side effects belong in [Executor.afterExecution].
 func (e *Executor) executeBlock(b *blocks.Block, stateDB *state.StateDB, log logging.Logger) (*executionResults, error) {
-	numTxs := len(b.Transactions())
-	r, err := e.executeTransactions(b, stateDB, numTxs, true /*canonical*/, log)
-	if err != nil {
-		return nil, err
-	}
-
-	ops, err := e.hooks.EndOfBlockOps(b.EthBlock())
-	if err != nil {
-		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, e.hooks, b.Hash(), err)
-	}
-	for i, o := range ops {
-		b.CheckOpBurnerBalanceBounds(r.StateDB, numTxs+i, o)
-		r.GasConsumed += o.Gas
-		r.interimTime.Tick(o.Gas)
-		b.SetInterimExecutionTime(r.interimTime)
-
-		if err := o.ApplyTo(r.StateDB); err != nil {
-			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
-		}
-	}
-
-	if err := e.hooks.FinishExecutingBlock(r.StateDB, b.EthBlock(), r.Receipts); err != nil {
-		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
-	}
-
-	target, gasCfg := e.hooks.GasConfigAfter(b.Header())
-	if err := r.FinishBy.Gas.AfterBlock(r.GasConsumed, target, gasCfg); err != nil {
-		return nil, fmt.Errorf("after-block gas time update: %w", err)
-	}
-
-	r.FinishBy.Wall = time.Now()
-	log.Trace(
-		"Block execution complete",
-		zap.Uint64("gas_consumed", uint64(r.GasConsumed)),
-		zap.Time("gas_time", r.FinishBy.Gas.AsTime()),
-		zap.Time("wall_time", r.FinishBy.Wall),
-	)
-	return r, nil
-}
-
-// executeTransactions executes the first numTxs transactions in b against
-// stateDB. Only canonical execution publishes receipts and records progress.
-func (e *Executor) executeTransactions(
-	b *blocks.Block,
-	stateDB *state.StateDB,
-	numTxs int,
-	canonical bool,
-	log logging.Logger,
-) (*executionResults, error) {
 	log.Trace("Executing block")
 
-	parent := b.ParentBlock()
+	bc, err := e.beforeTransactions(b, stateDB)
+	if err != nil {
+		return nil, err
+	}
+	receipts, gasConsumed, err := e.executeTransactions(b, stateDB, bc, len(b.Transactions()), true /*canonical*/)
+	if err != nil {
+		return nil, err
+	}
+	return e.endOfBlock(b, stateDB, bc, receipts, gasConsumed, log)
+}
+
+// beforeTransactions performs the steps that b requires before any of its
+// transactions can execute:
+//
+//  1. It advances the parent's gas clock to the start of b.
+//  2. It applies b's pre-transaction state changes to stateDB.
+//  3. It replaces b's worst-case base fee with the fee that the gas clock
+//     reached.
+//
+// stateDB MUST represent b's parent's post-execution state.
+func (e *Executor) beforeTransactions(b *blocks.Block, stateDB *state.StateDB) (*blockContext, error) {
 	header := b.Header()
 
-	gasClock := parent.ExecutedByGasTime()
+	gasClock := b.ParentBlock().ExecutedByGasTime()
 	gasClock.BeforeBlock(e.hooks.BlockTime(header))
-	interimTime := gasClock.Time.Clone()
 
 	if err := e.StateBeforeTransactions(b, stateDB); err != nil {
 		return nil, err
@@ -273,16 +220,40 @@ func (e *Executor) executeTransactions(
 	}
 	header.BaseFee = baseFee.ToBig()
 
-	signer := b.Signer(e.chainConfig)
+	return &blockContext{
+		BlockExecutionState: BlockExecutionState{
+			BaseFee:  baseFee,
+			Signer:   b.Signer(e.chainConfig),
+			BlockCtx: core.NewEVMBlockContext(header, e.chainContext, &header.Coinbase),
+		},
+		header:      header,
+		gasClock:    gasClock,
+		interimTime: gasClock.Time.Clone(),
+	}, nil
+}
+
+// executeTransactions executes b's first numTxs transactions against stateDB
+// and performs no end-of-block operation. [Executor.beforeTransactions] MUST
+// apply b's pre-transaction changes to stateDB first.
+//
+// Only canonical execution publishes receipts and records block progress.
+func (e *Executor) executeTransactions(
+	b *blocks.Block,
+	stateDB *state.StateDB,
+	bc *blockContext,
+	numTxs int,
+	canonical bool,
+) (types.Receipts, gas.Gas, error) {
+	header := bc.header
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
-	var blockGasConsumed gas.Gas
+	var gasConsumed gas.Gas
 
 	txs := b.Transactions()[:numTxs]
 	receipts := make(types.Receipts, len(txs))
 
 	for ti, tx := range txs {
 		stateDB.SetTxContext(tx.Hash(), ti)
-		b.CheckSenderBalanceBound(stateDB, signer, tx)
+		b.CheckSenderBalanceBound(stateDB, bc.Signer, tx)
 
 		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(
@@ -293,18 +264,18 @@ func (e *Executor) executeTransactions(
 			stateDB,
 			header,
 			tx,
-			(*uint64)(&blockGasConsumed),
+			(*uint64)(&gasConsumed),
 			vm.Config{},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
+			return nil, 0, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
 		}
 
-		interimTime.Tick(gas.Gas(receipt.GasUsed))
+		bc.interimTime.Tick(gas.Gas(receipt.GasUsed))
 		if canonical {
 			// Reporting progress allows settlement to proceed while the block
 			// is still executing.
-			b.SetInterimExecutionTime(interimTime)
+			b.SetInterimExecutionTime(bc.interimTime)
 			// TODO(arr4n) investigate calling the same method on pending blocks
 			// in the queue. It's only worth it if [blocks.LastToSettleAt]
 			// regularly returns false, meaning that execution is blocking
@@ -327,37 +298,81 @@ func (e *Executor) executeTransactions(
 
 		if canonical {
 			if r, ok := e.receipts.Load(tx.Hash()); ok {
-				r.Put(&Receipt{receipt, signer, tx})
+				r.Put(&Receipt{receipt, bc.Signer, tx})
 			}
 		}
 		receipts[ti] = receipt
 	}
 
-	r := &executionResults{
-		BlockExecutionState: BlockExecutionState{
-			BaseFee:  baseFee,
-			Signer:   signer,
-			BlockCtx: core.NewEVMBlockContext(header, e.chainContext, &header.Coinbase),
-		},
-		StateDB:     stateDB,
-		Receipts:    receipts,
-		GasConsumed: blockGasConsumed,
-		interimTime: interimTime,
+	return receipts, gasConsumed, nil
+}
+
+// endOfBlock applies b's end-of-block operations to stateDB. It then stops
+// both of b's clocks and returns the results of executing b in full.
+//
+// receipts and gasConsumed MUST cover every one of b's transactions.
+func (e *Executor) endOfBlock(
+	b *blocks.Block,
+	stateDB *state.StateDB,
+	bc *blockContext,
+	receipts types.Receipts,
+	gasConsumed gas.Gas,
+	log logging.Logger,
+) (*executionResults, error) {
+	ops, err := e.hooks.EndOfBlockOps(b.EthBlock())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, e.hooks, b.Hash(), err)
 	}
-	r.FinishBy.Gas = gasClock
+
+	numTxs := len(b.Transactions())
+	for i, o := range ops {
+		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
+		gasConsumed += o.Gas
+		bc.interimTime.Tick(o.Gas)
+		b.SetInterimExecutionTime(bc.interimTime)
+
+		if err := o.ApplyTo(stateDB); err != nil {
+			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+		}
+	}
+
+	if err := e.hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
+	}
+
+	target, gasCfg := e.hooks.GasConfigAfter(b.Header())
+	if err := bc.gasClock.AfterBlock(gasConsumed, target, gasCfg); err != nil {
+		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	}
+
+	r := &executionResults{
+		BaseFee:     bc.BaseFee,
+		Receipts:    receipts,
+		GasConsumed: gasConsumed,
+		FinishBy: finishTimes{
+			Gas:  bc.gasClock,
+			Wall: time.Now(),
+		},
+	}
+	log.Trace(
+		"Block execution complete",
+		zap.Uint64("gas_consumed", uint64(r.GasConsumed)),
+		zap.Time("gas_time", r.FinishBy.Gas.AsTime()),
+		zap.Time("wall_time", r.FinishBy.Wall),
+	)
 	return r, nil
 }
 
-func (e *Executor) afterExecution(b *blocks.Block, r *executionResults) error {
+func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *executionResults) error {
 	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
 		return fmt.Errorf("after-executing-block hook: %v", err)
 	}
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
-	root, err := r.StateDB.Commit(b.NumberU64(), true)
+	root, err := stateDB.Commit(b.NumberU64(), true)
 	if err != nil {
-		return fmt.Errorf("%T.Commit() at end of block %d: %w", r.StateDB, b.NumberU64(), err)
+		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
 	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err
@@ -378,4 +393,49 @@ func (e *Executor) afterExecution(b *blocks.Block, r *executionResults) error {
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
 	return nil
+}
+
+// StateBeforeTransactions applies b's pre-transaction state changes to
+// stateDB: the start-executing-block hook, then the EIP-4788 beacon root.
+// This mirrors [core.StateProcessor.Process]. stateDB MUST represent b's
+// parent's post-execution state.
+//
+// It executes no transaction and no end-of-block operation, and it leaves b's
+// worst-case base fee in place.
+func (e *Executor) StateBeforeTransactions(b *blocks.Block, stateDB *state.StateDB) error {
+	header := b.Header()
+	rules := e.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
+	if err := e.hooks.StartExecutingBlock(rules, stateDB, b.ParentBlock().Header(), b.EthBlock()); err != nil {
+		return fmt.Errorf("start-executing-block hook: %v", err)
+	}
+
+	core.SetBeaconBlockRoot(stateDB, header)
+
+	// SetBeaconRoot only finalizes when it applies the root, so we want to
+	// finalize last. This mirrors the finalization performed by
+	// [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
+	return nil
+}
+
+// ExecuteBlockUntil applies b's pre-transaction state changes to stateDB and
+// then executes b's first numTxs transactions. It returns the context in
+// which the next transaction would execute.
+//
+// It skips b's remaining transactions and all of its end-of-block operations.
+// It records no block progress and does not mark b as executed.
+//
+// numTxs MUST be in the range [0, len(b.Transactions())].
+func (e *Executor) ExecuteBlockUntil(b *blocks.Block, stateDB *state.StateDB, numTxs int) (*BlockExecutionState, error) {
+	if numTxs < 0 || numTxs > len(b.Transactions()) {
+		return nil, fmt.Errorf("%w: %d not in [0, %d]", errTransactionCountOutOfRange, numTxs, len(b.Transactions()))
+	}
+	bc, err := e.beforeTransactions(b, stateDB)
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := e.executeTransactions(b, stateDB, bc, numTxs, false /*canonical*/); err != nil {
+		return nil, err
+	}
+	return &bc.BlockExecutionState, nil
 }
