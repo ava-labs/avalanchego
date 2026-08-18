@@ -12,8 +12,11 @@ import (
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie/trienode"
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -37,6 +40,9 @@ func NewReconstructedDatabase(db state.Database, tdb *TrieDB, recon *ffi.Reconst
 		recon:    recon,
 		root:     &root,
 		session:  session,
+		persistence: state.NewDatabase(
+			rawdb.NewMemoryDatabase(),
+		),
 	}
 	return accessor, session.close
 }
@@ -54,8 +60,9 @@ type reconstructedStateAccessor struct {
 	recon *ffi.Reconstructed
 	// root is shared with every trie opened by this accessor, which advances it
 	// as the view is mutated in place.
-	root    *common.Hash
-	session *reconstructedSession
+	root        *common.Hash
+	session     *reconstructedSession
+	persistence state.Database
 }
 
 // reconstructedSession keeps the native views alive until explicit release or
@@ -142,6 +149,19 @@ func (s *reconstructedStateAccessor) CopyTrie(t state.Trie) state.Trie {
 		s.session.views.log.Fatal("unknown trie type", zap.String("type", fmt.Sprintf("%T", t)))
 		return nil
 	}
+}
+
+// DiskDB returns session-local storage so an invalid [state.StateDB.Commit]
+// cannot write contract code to the canonical database before trie commit is
+// rejected.
+func (s *reconstructedStateAccessor) DiskDB() ethdb.KeyValueStore {
+	return s.persistence.DiskDB()
+}
+
+// TrieDB returns session-local storage so no trie operation can reach the
+// canonical database.
+func (s *reconstructedStateAccessor) TrieDB() *triedb.Database {
+	return s.persistence.TrieDB()
 }
 
 var _ state.Trie = (*reconstructedAccountTrie)(nil)

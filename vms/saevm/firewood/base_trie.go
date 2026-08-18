@@ -141,9 +141,9 @@ var (
 
 // NodeIterator returns an error.
 //
-// Node iteration is only used for debug APIs, snapshot generation, and offline
-// pruning. SAE does not support the debug APIs and Firewood does not require
-// snapshots or offline pruning.
+// Node iteration is used for APIs that inspect trie nodes, snapshot generation,
+// and offline pruning. SAE does not expose trie-node inspection, and Firewood
+// does not require snapshots or offline pruning.
 func (*baseTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errNodeIteratorNotImplemented
 }

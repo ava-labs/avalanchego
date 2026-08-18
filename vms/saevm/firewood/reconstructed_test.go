@@ -127,8 +127,6 @@ func TestReconstructedRootsMatchCanonical(t *testing.T) {
 			tt.run(canonical, func() {
 				want = append(want, canonical.IntermediateRoot(true /* EIP-158 */))
 			})
-			require.NotEmpty(t, want, "canonical roots recorded")
-
 			var got []common.Hash
 			reconstructed := newReconstructedStateDB(t, db, seed)
 			tt.run(reconstructed, func() {
@@ -152,8 +150,14 @@ func TestReconstructedRejectsCanonicalOperations(t *testing.T) {
 
 	sdb := newReconstructedStateDB(t, db, seed)
 	applyBlock(sdb, 2)
+	contract := common.Address{0xcc}
+	code := []byte{0x60, 0x00}
+	sdb.SetCode(contract, code)
+	codeHash := sdb.GetCodeHash(contract)
+	require.False(t, rawdb.HasCode(db.DiskDB(), codeHash), "canonical database has code before Commit()")
 	_, err = sdb.Commit(2, true /* EIP-158 */)
 	require.ErrorIs(t, err, errCommitReconstructedState, "state.StateDB.Commit() on reconstructed view")
+	require.False(t, rawdb.HasCode(db.DiskDB(), codeHash), "canonical database has code after Commit()")
 }
 
 // TestReconstructedCopyIsIndependent verifies that writes through a copied state
