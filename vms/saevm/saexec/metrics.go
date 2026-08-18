@@ -163,7 +163,7 @@ func (m *metrics) observeQueueDuration(d time.Duration) {
 
 // markExecuted records that the block has finished executing with the given
 // results.
-func (m *metrics) markExecuted(block *blocks.Block, results *ExecutionResults) {
+func (m *metrics) markExecuted(block *blocks.Block, results *executionResults) {
 	m.executionQueueBlocks.Dec()
 	// MUST use the same worst-case gas value as [metrics.markEnqueued].
 	worstCaseGas := float64(block.WorstCaseGasUsed())

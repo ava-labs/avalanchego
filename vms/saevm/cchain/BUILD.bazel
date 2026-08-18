@@ -180,7 +180,6 @@ go_test(
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saetest",
-        "//vms/saevm/saexec",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/secp256k1fx",
         "@com_github_arr4n_shed//testerr",
