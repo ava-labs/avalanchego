@@ -69,7 +69,6 @@ go_library(
         "//utils/logging",
         "//utils/rpc",
         "//utils/set",
-        "//utils/unwind",
         "//vms",
         "//vms/components/avax",
         "//vms/components/gas",

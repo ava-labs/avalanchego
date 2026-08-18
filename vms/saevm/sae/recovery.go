@@ -149,7 +149,7 @@ func recoverExecutor(
 	if err != nil {
 		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
-	closers.Push(unwind.CloserFuncWith(tracker.Close, lastCommittedRoot))
+	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
 
 	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {

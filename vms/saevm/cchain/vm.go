@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -72,7 +71,7 @@ type VM struct {
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
 	metrics     *metrics
-	pending     *txpool.Pending
+	pendingTxs  *txpool.Pending
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
 	gossipSet *gossip.BloomSet[*gossipTx]
@@ -85,7 +84,9 @@ type VM struct {
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
-	closer unwind.ClosersOf[context.Context]
+	onClose       []func(context.Context) error
+	closeMu       sync.Mutex
+	alreadyClosed bool
 }
 
 type deferredInit struct {
@@ -93,12 +94,14 @@ type deferredInit struct {
 	db          ethdb.Database
 	cfg         sae.Config
 	hooks       *hooks
-	pendingTxs  *txpool.Pending
 	warpStorage *warp.Storage
 	registry    *prometheus.Registry
 }
 
-var ethDBPrefix = []byte("ethdb")
+var (
+	ethDBPrefix      = []byte("ethdb")
+	errAlreadyClosed = errors.New("already closed")
+)
 
 // Initialize initializes the VM.
 //
@@ -114,10 +117,16 @@ func (vm *VM) Initialize(
 	appSender snowcommon.AppSender,
 ) (retErr error) {
 	defer func() {
-		// If any error occurs during initialization, the engine WILL NOT call
-		// [VM.Shutdown].
-		vm.closer.CloseIfPointsToNonNil(ctx, &retErr)
+		if retErr != nil {
+			retErr = errors.Join(retErr, vm.Shutdown(ctx))
+		}
 	}()
+
+	vm.closeMu.Lock() // [VM.Shutdown] acquires this lock.
+	defer vm.closeMu.Unlock()
+	if vm.alreadyClosed {
+		return errAlreadyClosed
+	}
 
 	vm.ctx = snowCtx
 
@@ -144,7 +153,9 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating cchain state: %w", err)
 	}
-	vm.closer.Push(unwind.NoArgCloserOf[context.Context](vm.state.Close))
+	vm.onClose = append(vm.onClose, func(context.Context) error {
+		return vm.state.Close()
+	})
 
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "cchain")
 	if err != nil {
@@ -155,13 +166,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 
-	pendingTxs := txpool.NewPending()
+	vm.pendingTxs = txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
 		vm.chainConfig,
-		pendingTxs,
+		vm.pendingTxs,
 		warpStorage,
 		vm.now,
 		userConfig.desired(),
@@ -184,14 +195,13 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}
-	vm.closer.Push(unwind.CloserOfFunc[context.Context](vm.SummaryHandler.Shutdown))
+	vm.onClose = append(vm.onClose, vm.SummaryHandler.Shutdown)
 
 	vm.deferredArgs = &deferredInit{
 		g:           genesis,
 		db:          ethDB,
 		cfg:         userConfig.saeConfig(vm.now),
 		hooks:       hooks,
-		pendingTxs:  pendingTxs,
 		warpStorage: warpStorage,
 		registry:    reg,
 	}
@@ -200,14 +210,19 @@ func (vm *VM) Initialize(
 }
 
 // prepBlockHandling finishes initializing the VM after all necessary state is available.
-// This MUST be called exactly once, guaranteed using [VM.onBootstrappingOnce].
+// This MUST be called exactly once, guaranteed using [VM.prepBlockHandlingOnce].
 func (vm *VM) prepBlockHandling(ctx context.Context) error {
+	vm.closeMu.Lock()
+	defer vm.closeMu.Unlock()
+	if vm.alreadyClosed {
+		return errAlreadyClosed
+	}
+
 	var (
 		genesis     = vm.deferredArgs.g
 		ethDB       = vm.deferredArgs.db
 		saeConfig   = vm.deferredArgs.cfg
 		hooks       = vm.deferredArgs.hooks
-		pendingTxs  = vm.deferredArgs.pendingTxs
 		warpStorage = vm.deferredArgs.warpStorage
 		reg         = vm.deferredArgs.registry
 	)
@@ -218,23 +233,26 @@ func (vm *VM) prepBlockHandling(ctx context.Context) error {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
+	// Uses of [sae.VM] are NOT protected by [VM.closeMu]. However,
+	// [VM.activeHandler] ensures that methods accessing [sae.VM] only occur
+	// AFTER [vm.SetState] is called with [snow.Bootstrapping] or
+	// [snow.NormalOp], which guarantees that this method has returned no error.
 	var err error
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, vm.ctx, vm.chainConfig, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
-	vm.closer.Push(unwind.CloserOfFunc[context.Context](vm.VM.Shutdown))
+	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	txpool, err := txpool.New(vm.ctx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	txpool, err := txpool.New(vm.ctx, vm.chainConfig, vm.pendingTxs, vm.VM, maxTxPoolSize)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
-	vm.closer.Push(unwind.NoArgCloserOf[context.Context](func() error {
+	vm.onClose = append(vm.onClose, func(context.Context) error {
 		txpool.Close()
 		return nil
-	}))
-	vm.pending = txpool.Pending
+	})
 
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
@@ -300,11 +318,11 @@ func (vm *VM) prepBlockHandling(ctx context.Context) error {
 		gossipWG.Go(func() {
 			gossip.Every(gossipCtx, vm.ctx.Log, pushGossiper, vm.pushGossipPeriod)
 		})
-		vm.closer.Push(unwind.NoArgCloserOf[context.Context](func() error {
+		vm.onClose = append(vm.onClose, func(context.Context) error {
 			cancelGossip()
 			gossipWG.Wait()
 			return nil
-		}))
+		})
 		if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, vm.ctx.WarpSigner); err != nil {
 			return fmt.Errorf("registering warp signature handler: %w", err)
 		}
@@ -422,7 +440,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 		}
 	}
 
-	// MUST occur after [VM.prepBlockHanding] to avoid race setting txpool and VM
+	// MUST occur after [VM.prepBlockHandling] to avoid race setting [VM.VM].
 	vm.mode.Set(state)
 	return nil
 }
@@ -521,7 +539,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	}()
 	go func() {
 		defer cancel()
-		err := vm.pending.AwaitTxs(raceCtx)
+		err := vm.pendingTxs.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 
@@ -547,9 +565,22 @@ func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
 	}
 }
 
-// Shutdown releases every resource allocated by the [VM] in reverse order.
+// Shutdown releases every resource allocated by [VM.Initialize] in reverse
+// order.
 //
-// It is idempotent and safe to call at any time.
+// It is idempotent and safe to call after a partially-failed [VM.Initialize].
 func (vm *VM) Shutdown(ctx context.Context) error {
-	return vm.closer.Close(ctx)
+	vm.closeMu.Lock()
+	defer vm.closeMu.Unlock()
+	if vm.alreadyClosed {
+		return nil
+	}
+	vm.alreadyClosed = true
+
+	errs := make([]error, len(vm.onClose))
+	for i, f := range slices.Backward(vm.onClose) {
+		errs[i] = f(ctx)
+	}
+	vm.onClose = nil
+	return errors.Join(errs...)
 }
