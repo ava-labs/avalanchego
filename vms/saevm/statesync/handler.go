@@ -112,7 +112,8 @@ func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*S
 }
 
 // ParseBlock parses the given bytes into a [blocks.Block] via [blocks.Parse]
-// if it is well-formed. It is safe to be used after state sync finishes.
+// if it is well-formed. Any returned block is safe to be used after state sync
+// finishes.
 func (h *SummaryHandler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks.Block, error) {
 	ethB, err := blocks.Parse(blkBytes, h.hooks)
 	if err != nil {
