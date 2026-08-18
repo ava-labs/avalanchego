@@ -84,6 +84,8 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	return height == nil || *height == 0
 }
 
+var errSynchronousBlock = errors.New("cannot state sync to synchronous block")
+
 // Sync fetches all state associated with [Summary] and applies it to disk.
 // Any error returned MUST be treated as fatal. After this method returns
 // without error, one MUST call [Syncer.WriteSynced] to finalize the state
@@ -114,6 +116,11 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	hdr := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
 	if hdr == nil {
 		return fmt.Errorf("couldn't find header %s at height %d", summary.AcceptedHash, summary.AcceptedHeight)
+	}
+
+	if hook.Synchronous(s.hooks, hdr) {
+		// This requires malicious summary providers, but would corrupt database.
+		return errSynchronousBlock
 	}
 
 	codeSyncer, err := code.NewSyncer(
