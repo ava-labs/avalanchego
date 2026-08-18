@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -49,15 +51,18 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	ethB := types.NewBlock(
+	ethB, err := hookstest.BuildBlock(
 		&types.Header{
 			Number: big.NewInt(1),
 			Time:   42,
 		},
+		nil, // blockContext
 		txs,
-		nil, nil, // uncles, receipts
-		saetest.TrieHasher(),
+		nil, // receipts
+		nil, // ops
+		hook.Settled{Height: 1, GasUnix: 1},
 	)
+	require.NoError(t, err, "hookstest.BuildBlock()")
 	db := rawdb.NewMemoryDatabase()
 	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()

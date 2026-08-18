@@ -138,17 +138,26 @@ func NewVM[T hook.Transaction](
 	}
 
 	// ==========  Execution Results DB  ==========
-	xdb, err := hooks.ExecutionResultsDB(
-		filepath.Join(snowCtx.ChainDataDir, ExecutionResultsDir),
-	)
+	xdbDir := filepath.Join(snowCtx.ChainDataDir, ExecutionResultsDir)
+
+	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
-		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
+		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
 	}
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
 	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
-	if err != nil {
+	switch {
+	case errors.Is(err, blocks.ErrMissingExecutionResults):
+		// Decorate the mismatch with a hint at the likely misconfiguration,
+		// for operators.
+		return nil, fmt.Errorf(
+			"execution results in %q are incompatible with the chain database (is the chain data directory correct?): %w",
+			xdbDir,
+			err,
+		)
+	case err != nil:
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
 	closers.Push(exec)
