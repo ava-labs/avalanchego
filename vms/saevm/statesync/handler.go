@@ -50,6 +50,14 @@ type SummaryHandler struct {
 	stopped bool
 	cancel  context.CancelFunc
 	err     utils.Atomic[error]
+	// target is the summary being synced, recorded by
+	// [SummaryHandler.StateSync] and nil until a sync starts. skipped records
+	// that [SummaryHandler.ShouldAcceptSummary] declined an offered summary.
+	// Both are only read to report health, so they are atomic rather than
+	// guarded by mu: a health check runs while the chain lock is held and MUST
+	// NOT contend with a sync.
+	target  utils.Atomic[*Summary]
+	skipped utils.Atomic[bool]
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and

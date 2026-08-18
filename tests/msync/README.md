@@ -137,12 +137,17 @@ This replaces the earlier approach of grepping `logs/C.log` for syncer names and
 log wording, log levels, or log-line ordering. `logs/C.log` remains the place to look when
 diagnosing a failure.
 
-The producer of these fields is `Health` in `vms/saevm/sae/health.go`, which reports `state` and
-`stateScheme` and carries its own `TODO(#5513)` for the `stateSync` object. The harness re-declares
-the JSON shape it expects rather than importing that type, so a rename fails this test loudly.
+The producers of these fields are `Health` in `vms/saevm/sae/health.go`, which reports `state` and
+`stateScheme`, and `HealthCheck` in `vms/saevm/cchain/health.go`, which adds the `stateSync` object
+from the C-Chain summary handler. The harness re-declares the JSON shape it expects rather than
+importing those types, so a rename fails this test loudly.
 
-Two caveats on the shape above, both tracked by #5513:
-- `stateSync` is never reported by the SAE C-Chain, so the harness does not assert it in SAE mode
+`stateSync.status` is one of `disabled`, `notStarted`, `skipped`, `syncing`, `completed` or `failed`;
+`summaryHeight` and `summaryHash` are only reported once a sync starts.
+
+Two caveats on the shape above:
+- `stateSync` is asserted whenever the C-Chain can sync the requested scheme, which excludes SAE with
+  `--state-scheme=firewood` — see the SAE C-Chain mode section
 - the equivalent coreth producers do not exist on this branch (`graft/coreth/plugin/evm/health.go` is
   a `nil, nil` stub, and there is no `engine.SyncStatus` in `graft/evm/sync/engine/client.go`), so a
   coreth run cannot satisfy these assertions at all — see the SAE C-Chain mode section
@@ -192,6 +197,8 @@ State-scheme note:
   cache so serving nodes can answer leafs requests from their snapshots
 - run the Firewood/MerkleSync variant with:
   `task tests:merkle-sync:e2e -- --state-scheme=firewood`
+- the SAE C-Chain cannot state sync `firewood` yet, so that combination bootstraps from genesis and
+  drops the sync assertions; see the SAE C-Chain mode section
 
 Upgrade-schedule note — this selects the C-Chain implementation under test:
 - unlike the shared `tests/e2e` suite (which leaves the latest upgrade unscheduled by default), this
@@ -207,24 +214,42 @@ Upgrade-schedule note — this selects the C-Chain implementation under test:
 ### SAE C-Chain mode (the default)
 
 With Helicon scheduled (`--activate-latest-after >= 0`) the harness runs in SAE mode, which it logs
-at startup as `saeCChain: true`. **The SAE C-Chain does not implement state sync** — see the
-`TODO(#5513)` in `vms/saevm/cchain/sync.go`, the unimplemented `AcceptSummary` in
-`vms/saevm/statesync/acceptor.go`, and the commented-out `state-sync-enabled` config field in
-`vms/saevm/cchain/config.go`. `StateSyncEnabled()` returns `false`, so no configuration can make a
-sync happen.
+at startup as `saeCChain: true`. The SAE C-Chain implements state sync in `vms/saevm/cchain/statesync`,
+over the SAE handler in `vms/saevm/statesync`, and reports it in its health details, so an SAE run
+asserts the sync itself. Two differences from a coreth run remain, and the harness logs which of them
+applies at startup:
 
-In SAE mode the harness therefore validates **bootstrap and post-bootstrap state only**, and says so
-in a startup warning. Specifically it drops:
-- the state sync status, summary-hash and summary-height health assertions (SAE's health details
-  carry no `stateSync` object; see the matching `TODO(#5513)` in `vms/saevm/sae/health.go`)
-- the scheme-specific sync metrics and the code/block serving metrics, which are coreth metrics
-- the `state-sync-*` chain config keys, which the SAE C-Chain does not accept
+- **Firewood is not syncable yet.** `SummaryHandler.StateSync` builds a `hashdb.NewEVMSyncer`
+  unconditionally, so the SAE C-Chain can only sync the `hash` scheme; see the `TODO(alarso16)` about
+  snapshots and Firewood in `vms/saevm/statesync/server.go`. An SAE run with
+  `--state-scheme=firewood` therefore bootstraps from genesis instead of syncing.
+- **The sync metrics are coreth's.** The metrics asserted above
+  (`avalanche_evm_eth_sync_state_trie_leaves_requested`,
+  `avalanche_evm_sync_firewood_sync_requests_made`, `avalanche_evm_eth_leafs_request_count`) are
+  registered by the coreth/`graft` sync path. SAE syncs over `vms/evm/sync`, which exports no
+  equivalent, so an SAE run asserts the sync through the VM's health details alone.
+
+Two derived flags, logged at startup next to `saeCChain`, capture this:
+
+| flag | meaning | false when |
+| --- | --- | --- |
+| `stateSyncSupported` | the C-Chain can sync the requested scheme, so the bootstrap node is configured to sync and the sync is asserted | SAE with `--state-scheme=firewood` |
+| `assertSyncMetrics` | the requesting- and serving-side sync metrics are asserted | any SAE run |
+
+When `stateSyncSupported` is false the harness validates **bootstrap and post-bootstrap state only**,
+and says so in a startup warning. Specifically it drops:
+- the state sync status, summary-hash and summary-height health assertions
 - the summary-boundary assertion in the post-restart phase, which still runs to prove the restarted
   topology builds blocks
+- `state-sync-enabled` on the bootstrap node, so it bootstraps from genesis
 
-What it still proves: the requested state scheme is in use (`stateScheme` in the VM health details),
-a fresh node bootstraps to `normalOp` against the serving topology, and the post-bootstrap RPC checks
-match the generated workload.
+What it still proves in that case: the requested state scheme is in use (`stateScheme` in the VM
+health details), a fresh node bootstraps to `normalOp` against the serving topology, and the
+post-bootstrap RPC checks match the generated workload.
+
+Independently of the above, an SAE run always drops the `state-sync-min-blocks` and
+`state-sync-commit-interval` chain config keys, which the SAE C-Chain does not accept: it always
+offers to sync what it is given, and takes its summary heights from `commit-interval`.
 
 A negative value leaves Helicon unscheduled and keeps the chain on coreth:
 

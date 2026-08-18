@@ -7,6 +7,7 @@ go_library(
         "acceptor.go",
         "cmpopt.go",
         "handler.go",
+        "health.go",
         "server.go",
         "summary.canoto.go",
         "summary.go",
@@ -51,6 +52,7 @@ go_test(
     srcs = [
         "acceptor_test.go",
         "handler_test.go",
+        "health_test.go",
         "summary_test.go",
         "sut_test.go",
     ],
