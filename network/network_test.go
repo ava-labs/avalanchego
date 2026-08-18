@@ -347,14 +347,10 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := defaultConfig
-			config.PingFrequency = 10 * time.Millisecond
-			config.UptimeCalculator = uptime.TestCalculator{
-				StartTime: tt.startTime,
-				Percent:   tt.peerUptime,
-			}
+			config.UptimeCalculator = uptime.TestCalculator{StartTime: tt.startTime}
 			config.UpgradeConfig.HeliconTime = heliconTime
 
-			_, networks, eg := newFullyConnectedTestNetworkWithConfig(
+			nodeIDs, networks, eg := newFullyConnectedTestNetworkWithConfig(
 				t,
 				[]router.InboundHandler{nil, nil},
 				config,
@@ -366,9 +362,25 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 				require.NoError(t, eg.Wait())
 			})
 
+			sender := networks[1]
+			peers := sender.getPeers(
+				set.Of(nodeIDs[0]),
+				constants.PrimaryNetworkID,
+				subnets.NoOpAllower,
+			)
+			require.Len(t, peers, 1)
+
+			peerUptime := uint32(tt.peerUptime * 100)
+
+			// Send the uptime explicitly to avoid overlapping periodic pings.
+			// Multiple in-flight pings can make a pong appear unexpected and disconnect the peer.
+			ping, err := sender.peerConfig.MessageCreator.Ping(peerUptime)
+			require.NoError(t, err)
+			require.True(t, peers[0].Send(t.Context(), ping))
+
 			require.Eventually(t, func() bool {
 				peers := networks[0].PeerInfo(nil)
-				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == uint32(tt.peerUptime*100)
+				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == peerUptime
 			}, 10*time.Second, 10*time.Millisecond)
 
 			uptime, err := networks[0].NodeUptime()
