@@ -4,7 +4,6 @@
 package blocks
 
 import (
-	"context"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -39,20 +38,24 @@ func ExampleRange() {
 
 	// Returns the (possibly empty) slice of blocks that would be settled by the
 	// block being built.
-	_ = Range(parent.LastSettled(), settle)
+	_ = Range(parent.LastSettled().Height(), settle)
 	// Returns the (possibly empty) slice of blocks that would be left unsettled
 	// by the block being built.
-	_ = Range(settle, parent)
+	_ = Range(settle.Height(), parent)
 }
 
 // blockBuildingPreference exists only to allow examples to build.
 func blockBuildingPreference() *Block { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 3, nil), nil, nil)
+	bb := newBlockBuilder()
+	lastSettled := bb.newFromHooks(t, 3, 3, nil, nil)
+	// [Block.LastSettled] traverses parent links down to the settled height, so
+	// the chain between b and lastSettled must be connected.
+	b4 := bb.newFromHooks(t, 4, 4, lastSettled, lastSettled)
+	parent := bb.newFromHooks(t, 5, 5, b4, lastSettled)
 
-	b := newBlock(t, newEthBlock(6, 10, parent.EthBlock()), parent, lastSettled)
+	b := bb.newFromHooks(t, 6, 10, parent, lastSettled)
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
@@ -63,9 +66,6 @@ func TestSettlementInvariants(t *testing.T) {
 
 	t.Run("before_MarkSettled", func(t *testing.T) {
 		require.False(t, b.Settled(), "Settled()")
-		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
-		defer cancel()
-		require.ErrorIs(t, b.WaitUntilSettled(ctx), context.DeadlineExceeded, "WaitUntilSettled()")
 
 		if diff := cmp.Diff(parent, b.ParentBlock(), CmpOpt()); diff != "" {
 			t.Errorf("ParentBlock() diff (-constructor arg +got):\n%s", diff)
@@ -85,8 +85,7 @@ func TestSettlementInvariants(t *testing.T) {
 	t.Run("after_MarkSettled", func(t *testing.T) {
 		assert.Equal(t, b, lastSettledPtr.Load(), "Atomic pointer to last-settled block")
 		require.True(t, b.Settled(), "Settled()")
-		assert.NoError(t, b.WaitUntilSettled(t.Context()), "WaitUntilSettled()")
-		assert.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
+		require.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
 
 		rec := loggingtest.NewRecorder(logging.Warn)
 		b.log = rec
@@ -150,7 +149,7 @@ func TestSettles(t *testing.T) {
 		8: nil,
 		9: {4, 5, 6, 7},
 	}
-	blocks := newChain(t, 0, 10, lastSettledAtHeight)
+	blocks := newBlockBuilder().newChain(t, 0, 10, lastSettledAtHeight)
 
 	numsToBlocks := func(nums ...uint64) []*Block {
 		bs := make([]*Block, len(nums))
@@ -177,26 +176,26 @@ func TestSettles(t *testing.T) {
 	for _, b := range blocks[1:] {
 		tests = append(tests, testCase{
 			name: "Range([identical blocks])",
-			got:  Range(b.LastSettled(), b.LastSettled()),
+			got:  Range(b.LastSettled().Height(), b.LastSettled()),
 			want: nil,
 		})
 	}
 
 	tests = append(tests, []testCase{
 		{
-			got:  Range(blocks[7].LastSettled(), blocks[3]),
+			got:  Range(blocks[7].LastSettled().Height(), blocks[3]),
 			want: nil,
 		},
 		{
-			got:  Range(blocks[7].LastSettled(), blocks[4]),
+			got:  Range(blocks[7].LastSettled().Height(), blocks[4]),
 			want: numsToBlocks(4),
 		},
 		{
-			got:  Range(blocks[7].LastSettled(), blocks[5]),
+			got:  Range(blocks[7].LastSettled().Height(), blocks[5]),
 			want: numsToBlocks(4, 5),
 		},
 		{
-			got:  Range(blocks[7].LastSettled(), blocks[6]),
+			got:  Range(blocks[7].LastSettled().Height(), blocks[6]),
 			want: numsToBlocks(4, 5, 6),
 		},
 	}...)
@@ -217,7 +216,7 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newChain(t, 0, 30, nil)
+	blocks := newBlockBuilder().newChain(t, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow

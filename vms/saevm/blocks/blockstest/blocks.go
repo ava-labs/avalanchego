@@ -99,7 +99,7 @@ func WithOps(ops []hookstest.Op) EthBlockOption {
 type BlockOption = options.Option[blockProperties]
 
 // NewBlock constructs an SAE block, wrapping the raw Ethereum block.
-func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block, opts ...BlockOption) *blocks.Block {
+func NewBlock(tb testing.TB, eth *types.Block, parent *blocks.Block, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 
 	props := options.ApplyTo(&blockProperties{
@@ -107,7 +107,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block
 		hooks:  hookstest.NewStub(0),
 	}, opts...)
 
-	b, err := blocks.New(eth, parent, lastSettled, props.hooks, props.logger)
+	b, err := blocks.New(eth, parent, props.hooks, props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }

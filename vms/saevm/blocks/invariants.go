@@ -194,7 +194,7 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 		}
 	}
 
-	switch a := b.ancestry.Load(); a {
+	switch a := b.parent.Load(); a {
 	case nil: // settled
 		if expect < Settled {
 			return b.brokenInvariantErr("unexpectedly settled")
@@ -202,9 +202,6 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 	default: // not settled
 		if expect >= Settled {
 			return b.brokenInvariantErr("expected to be settled")
-		}
-		if b.SettledStateRoot() != b.LastSettled().PostExecutionStateRoot() {
-			return b.brokenInvariantErr("state root does not match last-settled post execution")
 		}
 	}
 

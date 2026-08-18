@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
@@ -15,39 +16,95 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
-func hooks() *hookstest.Stub {
-	return hookstest.NewStub(1)
+type blockBuilder struct {
+	hooks    *hookstest.Stub
+	hookTime *time.Time
 }
 
-func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
-	hdr := &types.Header{
-		Number:  new(big.Int).SetUint64(num),
-		BaseFee: big.NewInt(1),
-		Time:    time,
+func newBlockBuilder() *blockBuilder {
+	hookTime := new(time.Time)
+	return &blockBuilder{
+		hooks: hookstest.NewStub(1e9, hookstest.WithNow(func() time.Time {
+			return *hookTime
+		})),
+		hookTime: hookTime,
 	}
-	if parent != nil {
-		hdr.ParentHash = parent.Hash()
-	}
-	return types.NewBlockWithHeader(hdr)
 }
 
-func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Block {
+// new creates a [Block] using [New].
+func (bb *blockBuilder) new(tb testing.TB, ethB *types.Block, parent *Block) (*Block, error) {
 	tb.Helper()
-	b, err := New(eth, parent, lastSettled, hooks(), loggingtest.New(tb, logging.Warn))
-	require.NoError(tb, err, "New()")
+	return New(ethB, parent, bb.hooks, loggingtest.New(tb, logging.Warn))
+}
+
+// mustNew is like [blockBuilder.new] but fails the test on error.
+func (bb *blockBuilder) mustNew(tb testing.TB, ethB *types.Block, parent *Block) *Block {
+	tb.Helper()
+
+	b, err := bb.new(tb, ethB, parent)
+	require.NoErrorf(tb, err, "%T.New() for block %d", bb.hooks, ethB.NumberU64())
 	return b
 }
 
-func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
+// settledBy returns the [hook.Settled] to encode in a block with the given
+// last-settled block. A nil argument returns the zero value, which denotes a
+// synchronous block; see [hook.Synchronous].
+func settledBy(lastSettled *Block) hook.Settled {
+	if lastSettled == nil {
+		return hook.Settled{}
+	}
+	return hook.Settled{
+		Height: lastSettled.Height(),
+		// Guaranteed non-zero so that a block settling the genesis (height 0)
+		// isn't mistaken for a synchronous block.
+		GasNumerator: 1,
+	}
+}
+
+func (bb *blockBuilder) newFromHooks(tb testing.TB, num, sec uint64, parent *Block, lastSettled *Block) *Block {
+	tb.Helper()
+
+	*bb.hookTime = time.Unix(int64(sec), 0)
+	var ethHdr *types.Header
+	if parent != nil {
+		var err error
+		ethHdr, err = bb.hooks.BuildHeader(parent.Header())
+		require.NoErrorf(tb, err, "%T.BuildHeader() for block %d", bb.hooks, num)
+	} else {
+		// A root block (e.g. genesis) has no parent from which to build, so
+		// its height and time are set directly.
+		ethHdr = &types.Header{
+			Number:  new(big.Int).SetUint64(num),
+			Time:    sec,
+			BaseFee: big.NewInt(1),
+		}
+	}
+	ethB, err := bb.hooks.BuildBlock(
+		ethHdr,
+		nil, nil, nil, nil,
+		settledBy(lastSettled),
+	)
+	require.NoErrorf(tb, err, "%T.BuildBlock() for block %d", bb.hooks, num)
+
+	return bb.mustNew(tb, ethB, parent)
+}
+
+// newChain returns a chain of blocks with heights in [startHeight,
+// startHeight+total) and build times equal to their heights. The
+// lastSettledAtHeight map determines each block's last-settled block; a
+// self-settling entry (only valid for the genesis) results in a synchronous
+// block that is marked as settled.
+func (bb *blockBuilder) newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
 	var (
-		ethParent *types.Block
 		parent    *Block
 		blocks    []*Block
+		blackhole atomic.Pointer[Block]
 	)
 	byNum := make(map[uint64]*Block)
 
@@ -68,35 +125,32 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 			}
 		}
 
-		b := newBlock(tb, newEthBlock(n, n /*time*/, ethParent), parent, settle)
+		b := bb.newFromHooks(tb, n, n /*time*/, parent, settle)
 		byNum[n] = b
 		blocks = append(blocks, b)
 		if synchronous {
-			var lastSettledPtr atomic.Pointer[Block]
-			require.NoErrorf(tb, b.MarkSettled(&lastSettledPtr), "MarkSettled()")
-			b.synchronous = true // avoid requiring hooks and DB to mark as synchronous
+			require.NoErrorf(tb, b.MarkSettled(&blackhole), "MarkSettled()")
 		}
-
-		parent = byNum[n]
-		ethParent = parent.EthBlock()
+		parent = b
 	}
 
 	return blocks
 }
 
 func TestSetAncestors(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 0, nil), nil, nil)
-	child := newEthBlock(6, 6, parent.EthBlock())
+	bb := newBlockBuilder()
+	parent := bb.newFromHooks(t, 5, 5, nil, nil)
+	lastSettled := bb.newFromHooks(t, 3, 0, nil, nil)
+	source := bb.newFromHooks(t, 6, 6, parent, lastSettled)
+	child := source.EthBlock()
 
 	t.Run("incorrect_parent", func(t *testing.T) {
 		// Note that the arguments to [New] are inverted.
-		_, err := New(child, lastSettled, parent, hooks(), loggingtest.New(t, logging.Warn))
+		_, err := bb.new(t, child, lastSettled)
 		require.ErrorIs(t, err, errParentHashMismatch, "New() with inverted parent and last-settled blocks")
 	})
 
-	source := newBlock(t, child, parent, lastSettled)
-	dest := newBlock(t, child, nil, nil)
+	dest := bb.mustNew(t, child, nil)
 
 	t.Run("destination_before_copy", func(t *testing.T) {
 		assert.Nilf(t, dest.ParentBlock(), "%T.ParentBlock()", dest)
@@ -106,20 +160,23 @@ func TestSetAncestors(t *testing.T) {
 		t.FailNow()
 	}
 
-	require.NoError(t, dest.CopyAncestorsFrom(source), "CopyAncestorsFrom()")
+	require.NoError(t, dest.CopyParentFrom(source), "CopyAncestorsFrom()")
 	if diff := cmp.Diff(source, dest, CmpOpt()); diff != "" {
 		t.Errorf("After %T.CopyAncestorsFrom(); diff (-want +got):\n%s", dest, diff)
 	}
 
 	t.Run("incompatible_destination_block", func(t *testing.T) {
-		ethB := newEthBlock(source.Height(), source.BuildTime()+1 /*hash mismatch*/, parent.EthBlock())
-		dest := newBlock(t, ethB, nil, nil)
-		require.ErrorIs(t, dest.CopyAncestorsFrom(source), errHashMismatch)
+		dest := bb.newFromHooks(t, source.Height(), source.BuildTime()+1 /*hash mismatch*/, parent, lastSettled)
+		require.ErrorIs(t, dest.CopyParentFrom(source), errHashMismatch)
 	})
 
 	t.Run("not_incrementing_height", func(t *testing.T) {
-		ethB := newEthBlock(parent.Height() /*not incrementing*/, parent.BuildTime(), parent.EthBlock())
-		_, err := New(ethB, parent, nil, hooks(), logging.NoLog{})
+		ethHdr, err := bb.hooks.BuildHeader(parent.Header())
+		require.NoErrorf(t, err, "%T.BuildHeader()", bb.hooks)
+		ethHdr.Number = parent.Number() // not incrementing
+		ethB, err := bb.hooks.BuildBlock(ethHdr, nil, nil, nil, nil, hook.Settled{})
+		require.NoErrorf(t, err, "%T.BuildBlock()", bb.hooks)
+		_, err = bb.new(t, ethB, parent)
 		require.ErrorIs(t, err, errBlockHeightNotIncrementing)
 	})
 }

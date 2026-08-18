@@ -270,7 +270,6 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 	)
 	if hook.Synchronous(b.hooks, b.Header()) {
 		e, err = b.synchronousExecutionResults()
-		b.synchronous = true
 	} else {
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
@@ -314,7 +313,7 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 		byGas:         *execTime.Clone(),
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
-		// receipts are populated in [Block.RestoreExecutionArtefacts], which
+		// receipts are populated in [Block.restoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
 	e.baseFee.SetUint64(b.headerBaseFee())
@@ -325,9 +324,10 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 // predecessor clock to advance. Inverting the base fee only approximates the
 // excess.
 func (b *Block) synchronousGasTime() (*gastime.Time, error) {
-	target, cfg := b.hooks.GasConfigAfter(b.Header())
+	hdr := b.Header()
+	target, cfg := b.hooks.GasConfigAfter(hdr)
 	return gastime.New(
-		b.PreciseTime(),
+		b.hooks.BlockTime(hdr),
 		target,
 		gas.Price(b.headerBaseFee()),
 		cfg,

@@ -496,7 +496,7 @@ func TestVerifyBlockSizeLimit(t *testing.T) {
 		nil, // receipts
 		saetest.TrieHasher(),
 	)
-	b := blockstest.NewBlock(t, ethB, nil, nil)
+	b := blockstest.NewBlock(t, ethB, nil)
 	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
 }
 
@@ -956,7 +956,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 				tt.receipts,
 				saetest.TrieHasher(),
 			)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
+			b := blockstest.NewBlock(t, ethB, nil)
 			require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), tt.wantErr, "VerifyBlock()")
 		})
 	}

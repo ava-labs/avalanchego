@@ -31,20 +31,16 @@ import (
 // execution and settlement. It MUST be constructed with [New].
 type Block struct {
 	b *types.Block
-	// Invariant: ancestry is non-nil and contains non-nil pointers i.f.f. the
-	// block hasn't itself been settled. A synchronous block (e.g. SAE genesis
-	// or the last pre-SAE block) is always considered settled. See [New] for
-	// caveats during construction.
+	// Invariant: parent is non-nil only if the block hasn't itself been
+	// settled. A synchronous block (e.g. SAE genesis or the last pre-SAE block)
+	// is always considered settled. See [New] for caveats during construction.
 	//
 	// Rationale: the ancestral pointers form a linked list that would prevent
 	// garbage collection if not severed. Once a block is settled there is no
 	// need to inspect its history so we sacrifice the ancestors to the GC
 	// Overlord as a sign of our unwavering fealty. See [InMemoryBlockCount] for
 	// observability.
-	ancestry atomic.Pointer[ancestry]
-	// Only the genesis block or the last pre-SAE block is synchronous. These
-	// are self-settling by definition so their `ancestry` MUST be nil.
-	synchronous bool
+	parent atomic.Pointer[Block]
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.
 	bounds *WorstCaseBounds
@@ -59,7 +55,7 @@ type Block struct {
 	interimExecutionTime atomic.Pointer[proxytime.Time[gas.Gas]]
 
 	executed chan struct{} // closed after `execution` is set
-	settled  chan struct{} // closed after `ancestry` is cleared
+	settled  chan struct{} // closed after `parent` is cleared
 
 	hooks hook.Points
 	log   logging.Logger
@@ -75,21 +71,16 @@ func InMemoryBlockCount() int64 {
 
 // New constructs a new Block.
 //
-// While both the `parent` and `lastSettled` arguments MAY be nil, this will
-// result in an invalid Block as it breaks important invariants. In such
-// situations, [Block.CopyAncestorsFrom] MUST then be called before further use
-// of the Block. In practice, this SHOULD only be done when parsing an encoded
-// Block. The provided `hooks` MUST NOT be nil.
-func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
+// While the `parent` argument MAY be nil, this will result in an invalid Block
+// as it breaks important invariants. In such situations, [Block.CopyParentFrom]
+// MUST then be called before further use of the Block. In practice, this SHOULD
+// only be done when parsing an encoded Block.
+func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
 		b:        eth,
 		executed: make(chan struct{}),
 		settled:  make(chan struct{}),
 		hooks:    hooks,
-		log: log.With(
-			zap.Uint64("block_height", eth.NumberU64()),
-			zap.Stringer("block_hash", eth.Hash()),
-		),
 	}
 
 	inMemoryBlockCount.Add(1)
@@ -97,9 +88,13 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 		inMemoryBlockCount.Add(-1)
 	}, struct{}{})
 
-	if err := b.SetAncestors(parent, lastSettled); err != nil {
+	if err := b.SetParent(parent); err != nil {
 		return nil, err
 	}
+	b.log = log.With(
+		zap.Uint64("block_height", b.Height()),
+		zap.Stringer("block_hash", b.Hash()),
+	)
 	return b, nil
 }
 
@@ -107,7 +102,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
 func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
-	b, err := New(eth, nil, nil, hooks, log)
+	b, err := New(eth, nil, hooks, log)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +124,8 @@ var (
 	errHashMismatch               = errors.New("block hash mismatch")
 )
 
-// SetAncestors sets the block's ancestry while enforcing invariants.
-func (b *Block) SetAncestors(parent, lastSettled *Block) error {
+// SetParent sets the block's parent while enforcing invariants.
+func (b *Block) SetParent(parent *Block) error {
 	if parent != nil {
 		if got, want := parent.Hash(), b.ParentHash(); got != want {
 			return fmt.Errorf("%w: constructing Block with parent hash %v; expecting %v", errParentHashMismatch, got, want)
@@ -139,26 +134,22 @@ func (b *Block) SetAncestors(parent, lastSettled *Block) error {
 			return fmt.Errorf("%w: constructing Block with parent height %v and own height %v", errBlockHeightNotIncrementing, parent.Number(), b.Number())
 		}
 	}
-	b.ancestry.Store(&ancestry{
-		parent:      parent,
-		lastSettled: lastSettled,
-	})
+	b.parent.Store(parent)
 	return nil
 }
 
-// CopyAncestorsFrom populates the [Block.ParentBlock] and [Block.LastSettled]
-// values, typically only required during database recovery or block
-// verification. The source block MUST have the same hash as b.
+// CopyParentFrom populates the [Block.ParentBlock] value, typically only
+// required during database recovery or block verification. The source block
+// MUST have the same hash as b.
 //
 // Although the individual ancestral blocks are shallow copied, calling
 // [Block.MarkSettled] on either the source or destination will NOT clear the
 // pointers of the other.
-func (b *Block) CopyAncestorsFrom(c *Block) error {
+func (b *Block) CopyParentFrom(c *Block) error {
 	if from, to := c.Hash(), b.Hash(); from != to {
 		return fmt.Errorf("%w: copying internals from block %#x to %#x", errHashMismatch, from, to)
 	}
-	a := c.ancestry.Load()
-	return b.SetAncestors(a.parent, a.lastSettled)
+	return b.SetParent(c.parent.Load())
 }
 
 // Signer returns the transaction signer for the block.

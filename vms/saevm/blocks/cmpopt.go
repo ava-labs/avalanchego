@@ -18,7 +18,7 @@ import (
 // tests.
 func CmpOpt() cmp.Option {
 	return cmp.Options{
-		cmp.AllowUnexported(Block{}, ancestry{}),
+		cmp.AllowUnexported(Block{}),
 		cmpopts.IgnoreFields(
 			Block{},
 			"bounds",
@@ -35,7 +35,7 @@ func CmpOpt() cmp.Option {
 		)),
 		cmputils.Blocks(),
 		cmputils.Headers(),
-		cmputils.LoadAtomicPointers[ancestry](),
+		cmputils.LoadAtomicPointers[Block](),
 		cmputils.LoadAtomicPointers[executionResults](),
 		cmp.Comparer((*executionResults).equalForTests),
 	}

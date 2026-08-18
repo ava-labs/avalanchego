@@ -157,7 +157,7 @@ func (h *SummaryHandler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, nil, nil, h.hooks, h.snowCtx.Log)
+	return blocks.New(ethB, nil, h.hooks, h.snowCtx.Log)
 }
 
 func (h *SummaryHandler) parseBlock(bytes []byte) (*types.Block, error) {
@@ -179,7 +179,7 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 		return nil, err
 	}
 
-	return blocks.New(ethB, nil, nil, h.hooks, h.snowCtx.Log)
+	return blocks.New(ethB, nil, h.hooks, h.snowCtx.Log)
 }
 
 // LastAccepted returns the ID of the last accepted block. If no blocks have

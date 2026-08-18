@@ -67,7 +67,6 @@ func TestAcceptBlock(t *testing.T) {
 				wantInMemory.Add(
 					bb.Height(),
 					bb.ParentBlock().Height(),
-					bb.LastSettled().Height(),
 				)
 			}
 		}

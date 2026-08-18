@@ -45,7 +45,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
+	return blocks.New(ethB, parent, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
@@ -266,7 +266,7 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := settler.PreciseTime().Add(-saeparams.Tau)
+		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
 		tm := proxytime.Of[gas.Gas](settleAt)
 
 		for {
@@ -286,6 +286,9 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 					return err
 				}
 				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+					return err
+				}
+				if err := b.SetParent(parent); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
@@ -308,14 +311,6 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 		bMap.Store(b.Hash(), b)
 	}
 
-	for i, b := range chain[:len(chain)-1] {
-		if err := extend(b); err != nil {
-			return err
-		}
-		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return err
-		}
-	}
 	for _, b := range bMap.m {
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {

@@ -33,7 +33,7 @@ type blockBuilder interface {
 	// new constructs a [blocks.Block] with the provided arguments. It is
 	// allowed for parent and lastSettled to be nil as an indication that the
 	// block hasn't yet been verified.
-	new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
+	new(eth *types.Block, parent *blocks.Block) (*blocks.Block, error)
 	// build a new block on top of the provided parent. The block context MAY be
 	// nil.
 	build(ctx context.Context, bCtx *block.Context, parent *blocks.Block) (*blocks.Block, error)
@@ -53,8 +53,8 @@ type blockBuilderG[T hook.Transaction] struct {
 	source  saetypes.BlockSource
 }
 
-func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return blocks.New(eth, parent, lastSettled, b.hooks, b.log)
+func (b *blockBuilderG[_]) new(eth *types.Block, parent *blocks.Block) (*blocks.Block, error) {
+	return blocks.New(eth, parent, b.hooks, b.log)
 }
 
 func (b *blockBuilderG[_]) build(
@@ -184,7 +184,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, err
 	}
 
-	unsettled := blocks.Range(lastSettled, parent)
+	unsettled := blocks.Range(lastSettled.Height(), parent)
 	for _, block := range unsettled {
 		blockLog := log.With(
 			zap.Uint64("block_height", block.Height()),
@@ -339,7 +339,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 
 	var receipts types.Receipts
-	settling := blocks.Range(parent.LastSettled(), lastSettled)
+	settling := blocks.Range(parent.LastSettled().Height(), lastSettled)
 	for _, b := range settling {
 		receipts = append(receipts, b.Receipts()...)
 	}
@@ -365,7 +365,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, err
 	}
 
-	block, err := b.new(ethB, parent, lastSettled)
+	block, err := b.new(ethB, parent)
 	if err != nil {
 		return nil, err
 	}

@@ -4,7 +4,6 @@
 package blocks
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,17 +13,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
-type ancestry struct {
-	parent, lastSettled *Block
-}
-
-var (
-	errBlockResettled       = errors.New("block re-settled")
-	errBlockAncestryChanged = errors.New("block ancestry changed during settlement")
-)
+var errBlockResettled = errors.New("block re-settled")
 
 // MarkSettled marks the block as having been settled. This function MUST NOT be
 // called more than once. The atomic pointer to the last-settled block is
@@ -40,17 +33,11 @@ func (b *Block) MarkSettled(lastSettled *atomic.Pointer[Block]) error {
 }
 
 func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
-	a := b.ancestry.Load()
-	if a == nil {
+	if b.Settled() {
 		b.log.Error(errBlockResettled.Error())
 		return fmt.Errorf("%w: block height %d", errBlockResettled, b.Height())
 	}
-	if !b.ancestry.CompareAndSwap(a, nil) { // almost certainly means concurrent calls to this method
-		b.log.Fatal("Block ancestry changed during settlement")
-		// We have to return something to keen the compiler happy, even though we
-		// expect the Fatal to be, well, fatal.
-		return errBlockAncestryChanged
-	}
+	b.parent.Store(nil)
 
 	if lastSettled != nil {
 		lastSettled.Store(b)
@@ -59,63 +46,65 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 	return nil
 }
 
-// WaitUntilSettled blocks until either [Block.MarkSettled] is called or the
-// [context.Context] is cancelled.
-func (b *Block) WaitUntilSettled(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-b.settled:
-		return nil
-	}
-}
-
 // Settled reports whether [Block.MarkSettled] has been called without resulting
 // in an error, or the block was constructed by [RestoreSettledBlock].
 func (b *Block) Settled() bool {
-	return b.ancestry.Load() == nil
+	select {
+	case <-b.settled:
+		return true
+	default:
+		return false
+	}
 }
 
 // Synchronous reports whether the block was marked as synchronous during
 // [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
 func (b *Block) Synchronous() bool {
-	return b.synchronous
-}
-
-func (b *Block) ancestor(ifSettledErrMsg string, get func(*ancestry) *Block) *Block {
-	a := b.ancestry.Load()
-	if a == nil {
-		b.log.Error(ifSettledErrMsg)
-		return nil
-	}
-	return get(a)
+	return hook.Synchronous(b.hooks, b.Header())
 }
 
 const (
 	getParentOfSettledErrMsg  = "Get parent of settled block"
-	getSettledOfSettledErrMsg = "Get last-settled of settled block"
+	getSettledOfSettledErrMsg = getParentOfSettledErrMsg + " while finding last-settled"
 )
 
 // ParentBlock returns the block's parent unless [Block.MarkSettled] has been
 // called, in which case it returns nil and logs an error.
 func (b *Block) ParentBlock() *Block {
-	return b.ancestor(getParentOfSettledErrMsg, func(a *ancestry) *Block {
-		return a.parent
-	})
+	p := b.parent.Load()
+	if p == nil && b.Settled() {
+		b.log.Error(getParentOfSettledErrMsg)
+	}
+	return p
 }
 
-// LastSettled returns the last-settled block at the time of b's acceptance,
-// unless [Block.MarkSettled] has been called, in which case it returns nil and
-// logs an error. Note that this value might not be distinct between contiguous
-// blocks. If the block is synchronous, LastSettled always returns b itself,
-// without logging.
+// LastSettled returns the last-settled block at the time of b's acceptance.
+// If [Block.MarkSettled] has been called on any block in the chain between b
+// and the last-settled block, LastSettled returns nil and logs an error.
+//
+// Note that this value might not be distinct between contiguous blocks. If the
+// block is synchronous, LastSettled always returns b itself, without logging.
 func (b *Block) LastSettled() *Block {
-	if b.synchronous {
+	if b.Synchronous() {
 		return b
 	}
-	return b.ancestor(getSettledOfSettledErrMsg, func(a *ancestry) *Block {
-		return a.lastSettled
-	})
+
+	parent := b.parent.Load()
+	if parent == nil {
+		if b.Settled() {
+			b.log.Error(getSettledOfSettledErrMsg)
+		}
+		return nil
+	}
+
+	settledHeight := b.hooks.SettledBy(b.Header()).Height
+	for parent.Height() > settledHeight {
+		parent = parent.ParentBlock() // a settled intermediate logs for itself
+		if parent == nil {
+			return nil
+		}
+	}
+	return parent
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by
@@ -128,10 +117,13 @@ func (b *Block) LastSettled() *Block {
 // b or its parent. If the block is synchronous, Settles always returns a
 // single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {
-	if b.synchronous {
+	if b.Synchronous() {
 		return []*Block{b}
 	}
-	return Range(b.ParentBlock().LastSettled(), b.LastSettled())
+	return Range(
+		b.hooks.SettledBy(b.ParentBlock().Header()).Height,
+		b.LastSettled(),
+	)
 }
 
 // Range returns the blocks in the continuous, half-open interval (start, end]
@@ -142,8 +134,7 @@ func (b *Block) Settles() []*Block {
 // chain from `end`.
 //
 // If the two arguments are the same block, Range returns an empty slice.
-func Range(start, end *Block) []*Block {
-	startHeight := start.Height()
+func Range(startHeight uint64, end *Block) []*Block {
 	endHeight := end.Height()
 	if endHeight <= startHeight {
 		return nil
