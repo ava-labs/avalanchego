@@ -35,9 +35,10 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
 	*saedb.Tracker
-	quit, done chan struct{}
-	log        logging.Logger
-	hooks      hook.Points
+	quit, done     chan struct{}
+	log            logging.Logger
+	hooks          hook.Points
+	blockProcessor BlockProcessor
 
 	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
@@ -48,7 +49,6 @@ type Executor struct {
 	receipts    *syncMap[common.Hash, eventual.Value[*Receipt]]
 
 	chainContext *chainContext
-	chainConfig  *params.ChainConfig
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
 	metrics      *metrics
@@ -76,26 +76,31 @@ func New(
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
+	chainContext := &chainContext{
+		headerSrc,
+		lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
+		logger,
+	}
 	e := &Executor{
 		Tracker: tracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
 		log:     logger,
 		hooks:   hooks,
+		blockProcessor: BlockProcessor{
+			hooks:        hooks,
+			chainConfig:  chainConfig,
+			chainContext: chainContext,
+		},
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
-		chainContext: &chainContext{
-			headerSrc,
-			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			logger,
-		},
-		chainConfig: chainConfig,
-		db:          db,
-		xdb:         xdb,
-		metrics:     m,
-		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
+		queue:        make(chan queuedBlock, 2*tracker.CommitInterval()),
+		chainContext: chainContext,
+		db:           db,
+		xdb:          xdb,
+		metrics:      m,
+		receipts:     newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
 
@@ -116,13 +121,18 @@ func (e *Executor) Close() error {
 
 // ChainConfig returns the config originally passed to [New].
 func (e *Executor) ChainConfig() *params.ChainConfig {
-	return e.chainConfig
+	return e.blockProcessor.chainConfig
 }
 
 // ChainContext returns a context backed by the [blocks.Source] originally
 // passed to [New].
 func (e *Executor) ChainContext() core.ChainContext {
 	return e.chainContext
+}
+
+// BlockProcessor returns the deterministic block processor used by e.
+func (e *Executor) BlockProcessor() *BlockProcessor {
+	return &e.blockProcessor
 }
 
 // LastExecuted returns the last-executed block in a threadsafe manner.
