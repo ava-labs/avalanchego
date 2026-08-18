@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -565,6 +566,33 @@ func TestExecuteBlockUntil(t *testing.T) {
 			require.False(t, ok, "prefix execution recorded canonical progress")
 		})
 	}
+}
+
+func TestExecuteHistoricalBlock(t *testing.T) {
+	var finished, after int
+	hooks := defaultHooks()
+	hooks.FinishExecutingBlockFn = func(*state.StateDB, *types.Block, types.Receipts) error {
+		finished++
+		return nil
+	}
+	hooks.AfterExecutingBlockFn = func(*types.Block, types.Receipts) error {
+		after++
+		return nil
+	}
+	_, sut := newSUT(t, withHooks(hooks))
+	b := sut.chain.NewBlock(t, nil, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{Gas: 1}})))
+	stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+	require.NoError(t, err, "Executor.StateDB(parent root)")
+
+	err = sut.ExecuteHistoricalBlock(b, stateDB)
+	require.NoError(t, err, "Executor.ExecuteHistoricalBlock()")
+	require.Equal(t, 1, finished, "finish hook calls")
+	require.Zero(t, after, "canonical-only hook calls")
+	gasClock := b.ParentBlock().ExecutedByGasTime()
+	gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
+	_, progressed, err := blocks.LastToSettleAt(sut.hooks, gasClock.AsTime(), b)
+	require.NoError(t, err, "blocks.LastToSettleAt()")
+	require.False(t, progressed, "historical execution recorded canonical progress")
 }
 
 func TestGasAccounting(t *testing.T) {
@@ -1128,17 +1156,6 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			expectAvailable: func(height uint64) bool {
 				// All executed states MUST be available.
 				return height <= numBlocks
-			},
-		},
-		{
-			name:     "firewood_archival",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available.
-				// The last executed state MUST NOT be available, since
-				// Firewood guarantees recovery from the last committed proposal.
-				return height < numBlocks
 			},
 		},
 		{

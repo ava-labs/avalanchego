@@ -127,7 +127,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	result, err := e.executeBlock(b, stateDB, log)
+	result, err := e.executeBlock(b, stateDB, true /*canonical*/, log)
 	if err != nil {
 		return err
 	}
@@ -178,19 +178,20 @@ type (
 //  2. [Executor.executeTransactions], for all of b's transactions
 //  3. [Executor.endOfBlock]
 //
+// Only canonical execution publishes receipts and records block progress.
 // Canonical-only side effects belong in [Executor.afterExecution].
-func (e *Executor) executeBlock(b *blocks.Block, stateDB *state.StateDB, log logging.Logger) (*executionResults, error) {
+func (e *Executor) executeBlock(b *blocks.Block, stateDB *state.StateDB, canonical bool, log logging.Logger) (*executionResults, error) {
 	log.Trace("Executing block")
 
 	bc, err := e.beforeTransactions(b, stateDB)
 	if err != nil {
 		return nil, err
 	}
-	receipts, gasConsumed, err := e.executeTransactions(b, stateDB, bc, len(b.Transactions()), true /*canonical*/)
+	receipts, gasConsumed, err := e.executeTransactions(b, stateDB, bc, len(b.Transactions()), canonical)
 	if err != nil {
 		return nil, err
 	}
-	return e.endOfBlock(b, stateDB, bc, receipts, gasConsumed, log)
+	return e.endOfBlock(b, stateDB, bc, receipts, gasConsumed, canonical, log)
 }
 
 // beforeTransactions performs the steps that b requires before any of its
@@ -308,7 +309,8 @@ func (e *Executor) executeTransactions(
 }
 
 // endOfBlock applies b's end-of-block operations to stateDB. It then stops
-// both of b's clocks and returns the results of executing b in full.
+// both of b's clocks and returns the results of executing b in full. Only
+// canonical execution records block progress.
 //
 // receipts and gasConsumed MUST cover every one of b's transactions.
 func (e *Executor) endOfBlock(
@@ -317,6 +319,7 @@ func (e *Executor) endOfBlock(
 	bc *blockContext,
 	receipts types.Receipts,
 	gasConsumed gas.Gas,
+	canonical bool,
 	log logging.Logger,
 ) (*executionResults, error) {
 	ops, err := e.hooks.EndOfBlockOps(b.EthBlock())
@@ -329,7 +332,9 @@ func (e *Executor) endOfBlock(
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		gasConsumed += o.Gas
 		bc.interimTime.Tick(o.Gas)
-		b.SetInterimExecutionTime(bc.interimTime)
+		if canonical {
+			b.SetInterimExecutionTime(bc.interimTime)
+		}
 
 		if err := o.ApplyTo(stateDB); err != nil {
 			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
@@ -438,4 +443,13 @@ func (e *Executor) ExecuteBlockUntil(b *blocks.Block, stateDB *state.StateDB, nu
 		return nil, err
 	}
 	return &bc.BlockExecutionState, nil
+}
+
+// ExecuteHistoricalBlock executes every deterministic phase of b against
+// stateDB. stateDB MUST represent b's parent's post-execution state.
+//
+// It records no block progress and publishes no canonical execution artifacts.
+func (e *Executor) ExecuteHistoricalBlock(b *blocks.Block, stateDB *state.StateDB) error {
+	_, err := e.executeBlock(b, stateDB, false /*canonical*/, e.log)
+	return err
 }

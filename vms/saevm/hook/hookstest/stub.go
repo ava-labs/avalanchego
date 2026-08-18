@@ -38,6 +38,8 @@ type Stub struct {
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
 	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
+	FinishExecutingBlockFn  func(*state.StateDB, *types.Block, types.Receipts) error
+	AfterExecutingBlockFn   func(*types.Block, types.Receipts) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -251,13 +253,21 @@ func (s *Stub) StartExecutingBlock(rules params.Rules, sdb *state.StateDB, paren
 	return nil
 }
 
-// FinishExecutingBlock is a no-op that always returns nil.
-func (*Stub) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+// FinishExecutingBlock proxies to [Stub.FinishExecutingBlockFn] if non-nil,
+// otherwise it is a no-op.
+func (s *Stub) FinishExecutingBlock(sdb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	if fn := s.FinishExecutingBlockFn; fn != nil {
+		return fn(sdb, b, receipts)
+	}
 	return nil
 }
 
-// AfterExecutingBlock is a no-op that always returns nil.
-func (*Stub) AfterExecutingBlock(*types.Block, types.Receipts) error {
+// AfterExecutingBlock proxies to [Stub.AfterExecutingBlockFn] if non-nil,
+// otherwise it is a no-op.
+func (s *Stub) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
+	if fn := s.AfterExecutingBlockFn; fn != nil {
+		return fn(b, receipts)
+	}
 	return nil
 }
 
