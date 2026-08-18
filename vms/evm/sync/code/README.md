@@ -40,10 +40,10 @@ is only a hand-off.
 2. **Bytecode and its marker clear commit together.** One batch, so recovery
    sees both or neither, and code is never stored with its marker still set.
 
-3. **Nothing unverified is written.** Every answered hash must match what was
-   asked. A response may answer fewer than requested when a batch would not
-   fit in one message, but never more. Size is otherwise unchecked, except a
-   single hash too large for any message is rejected outright.
+3. **Nothing unverified is written.** Count and hash are checked before the
+   commit is reached. Size is not: rejecting an oversized contract would
+   reject the only answer a peer can give. (TODO: revisit for genesis
+   contracts too large for one message.)
 
 4. **A claim outlives its commit.** `AddCode` claims a hash before marking it
    and releases the claim on failure or once the bytecode commits, so a

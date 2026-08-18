@@ -46,11 +46,9 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
-func TestVerifyCodePrefix(t *testing.T) {
+func TestVerifyCode(t *testing.T) {
 	code := []byte("contract bytecode")
 	hash := crypto.Keccak256Hash(code)
-	other := []byte("another blob")
-	otherHash := crypto.Keccak256Hash(other)
 
 	oversized := make([]byte, params.MaxCodeSize+1)
 	oversizedHash := crypto.Keccak256Hash(oversized)
@@ -59,33 +57,17 @@ func TestVerifyCodePrefix(t *testing.T) {
 		name    string
 		hashes  []common.Hash
 		data    [][]byte
-		wantN   int
 		wantErr error
 	}{
 		{
 			name:   "valid",
 			hashes: []common.Hash{hash},
 			data:   [][]byte{code},
-			wantN:  1,
 		},
 		{
-			// A peer answers fewer hashes instead of failing the whole request
-			// when the rest would not fit in one message.
-			name:   "valid_partial",
-			hashes: []common.Hash{hash, otherHash},
-			data:   [][]byte{code},
-			wantN:  1,
-		},
-		{
-			name:    "empty_response",
+			name:    "count_mismatch",
 			hashes:  []common.Hash{hash},
 			data:    [][]byte{},
-			wantErr: errCodeCountMismatch,
-		},
-		{
-			name:    "more_than_requested",
-			hashes:  []common.Hash{hash},
-			data:    [][]byte{code, other},
 			wantErr: errCodeCountMismatch,
 		},
 		{
@@ -100,17 +82,12 @@ func TestVerifyCodePrefix(t *testing.T) {
 			name:   "oversized_but_honest",
 			hashes: []common.Hash{oversizedHash},
 			data:   [][]byte{oversized},
-			wantN:  1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, err := verifyCodePrefix(tt.hashes, tt.data)
-			require.ErrorIs(t, err, tt.wantErr)
-			if tt.wantErr == nil {
-				require.Equal(t, tt.wantN, n)
-			}
+			require.ErrorIs(t, verifyCode(tt.hashes, tt.data), tt.wantErr)
 		})
 	}
 }
@@ -169,7 +146,7 @@ func TestSyncer(t *testing.T) {
 				defer syncer.CloseInput()
 				for hash := range want {
 					for range copies {
-						if err := syncer.AddCode(ctx, []common.Hash{hash}); err != nil {
+						if err := syncer.AddCode([]common.Hash{hash}); err != nil {
 							return err
 						}
 					}
@@ -215,7 +192,7 @@ func TestSyncer_SkipsStoredCode(t *testing.T) {
 	recorder := synctest.NewRecordingResponder(newResponder(log, source))
 	syncer, err := NewSyncer(log, serve(t, ctx, log, recorder), target)
 	require.NoError(t, err)
-	require.NoError(t, syncer.AddCode(ctx, []common.Hash{missing, stored}))
+	require.NoError(t, syncer.AddCode([]common.Hash{missing, stored}))
 
 	require.Equal(t, []common.Hash{missing}, markedHashes(t, target),
 		"only the missing hash is owed")
@@ -276,7 +253,7 @@ func TestSyncer_RepeatsOfStoredCodeNeverClaim(t *testing.T) {
 	var wg sync.WaitGroup
 	for range producers {
 		wg.Go(func() {
-			assert.NoError(t, syncer.AddCode(t.Context(), stored))
+			assert.NoError(t, syncer.AddCode(stored))
 		})
 	}
 	wg.Wait()
@@ -288,14 +265,14 @@ func TestSyncer_RepeatsOfStoredCodeNeverClaim(t *testing.T) {
 // A write failure must release its claim, or the hash is stuck forever.
 func TestSyncer_ClaimReleasedOnWriteFailure(t *testing.T) {
 	log := loggingtest.New(t, logging.Debug)
-	// Fails on the first op.
-	db := evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
 
-	syncer, err := NewSyncer(log, nil, db)
+	syncer, err := NewSyncer(log, nil, memorydb.New())
 	require.NoError(t, err)
 
+	syncer.db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
+
 	hash := common.Hash{1}
-	require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{hash}), saetest.ErrInjected)
+	require.ErrorIs(t, syncer.AddCode([]common.Hash{hash}), saetest.ErrInjected)
 	require.Zero(t, held(syncer.claimed), "a failed write must not leave a claim behind")
 }
 
@@ -323,95 +300,21 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	require.Equal(t, tampered+1, responder.Served(), "every tampered response must cost a re-request")
 }
 
-// A truncated response must resume for the rest, not retry the whole request.
-func TestSyncer_ResumesAfterPartialResponse(t *testing.T) {
-	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	source := memorydb.New()
-
-	hashes := make([]common.Hash, 3)
-	codes := make([][]byte, 3)
-	for i := range hashes {
-		codes[i] = randomCode(t)
-		hashes[i] = writeCode(t, source, codes[i])
-	}
-
-	// Truncated to one entry, regardless of request size.
-	responder := synctest.NewMutatingResponder(newResponder(log, source), 1, func(resp *syncpb.GetCodeResponse) {
-		resp.Data = resp.Data[:1]
-	})
-	recorder := synctest.NewRecordingResponder(responder)
-	client := serve(t, ctx, log, recorder)
-
-	data, err := getCode(ctx, log, client, hashes)
-	require.NoError(t, err)
-	require.Equal(t, codes, data)
-
-	require.Len(t, requestSizes(recorder), 2, "a truncated response costs exactly one resumed request")
-}
-
-// A hash too large for any peer to answer must fail fast, not retry forever.
-func TestSyncer_RejectsUnfetchableHash(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	log := loggingtest.New(t, logging.Debug)
-	source := memorydb.New()
-
-	code := randomCode(t)
-	hash := writeCode(t, source, code)
-
-	r := newResponder(log, source)
-	r.sizeBudget = len(code) - 1 // even this one hash cannot fit
-
-	// A correct reject costs one request. A second means errors.Is missed it
-	// and getCode is retrying, so cut the run instead of hanging on it.
-	guard := synctest.NewCancelAfter(r, 2, cancel)
-	client := serve(t, ctx, log, guard)
-
-	_, err := getCode(ctx, log, client, []common.Hash{hash})
-	require.False(t, guard.Fired(), "errCodeTooLarge must stop getCode after one request")
-	require.ErrorIs(t, err, errCodeTooLarge)
-}
-
 // However input closed, a later AddCode must be refused and leave no marker.
 // A marker left behind is code owed with nothing running to fetch it.
 func TestSyncer_InputClosed(t *testing.T) {
-	tests := []struct {
-		name  string
-		close func(t *testing.T, s *Syncer)
-	}{
-		{
-			name:  "by_the_producer",
-			close: func(_ *testing.T, s *Syncer) { s.CloseInput() },
-		},
-		{
-			// Cancelled rather than drained, so only Sync's exit can close input.
-			name: "by_sync_exiting",
-			close: func(t *testing.T, s *Syncer) {
-				ctx, cancel := context.WithCancel(t.Context())
-				syncErr := make(chan error, 1)
-				go func() { syncErr <- s.Sync(ctx) }()
-				cancel()
-				require.ErrorIs(t, <-syncErr, context.Canceled)
-				require.ErrorIs(t, s.Sync(t.Context()), errSyncAlreadyRun)
-			},
-		},
-	}
+	log := loggingtest.New(t, logging.Debug)
+	db := memorydb.New()
+	syncer, err := NewSyncer(log, nil, db)
+	require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			log := loggingtest.New(t, logging.Debug)
-			db := memorydb.New()
-			syncer, err := NewSyncer(log, nil, db)
-			require.NoError(t, err)
+	syncer.CloseInput()
 
-			tt.close(t, syncer)
+	require.ErrorIs(t, syncer.AddCode([]common.Hash{{1}}), ErrInputClosed)
+	require.Empty(t, markedHashes(t, db), "a refused AddCode must not leave a marker behind")
 
-			// A live context, so the refusal is input's, not the caller's.
-			require.ErrorIs(t, syncer.AddCode(t.Context(), []common.Hash{{1}}), ErrInputClosed)
-			require.Empty(t, markedHashes(t, db), "a refused AddCode must not leave a marker behind")
-		})
-	}
+	// Zero hashes gets no special pass, closed is closed either way.
+	require.ErrorIs(t, syncer.AddCode(nil), ErrInputClosed)
 }
 
 // AddCode racing CloseInput has two outcomes: accepted and marked, or refused
@@ -436,7 +339,7 @@ func TestSyncer_AddCodeRacesCloseInput(t *testing.T) {
 	for i, codeHash := range hashes {
 		wg.Go(func() {
 			<-start
-			errs[i] = syncer.AddCode(t.Context(), []common.Hash{codeHash})
+			errs[i] = syncer.AddCode([]common.Hash{codeHash})
 		})
 	}
 	wg.Go(func() {
@@ -490,13 +393,13 @@ func TestSyncer_DrainedQueueMeansEmpty(t *testing.T) {
 
 			everAccepted := false
 			for round := range tt.rounds {
-				db := ethdb.KeyValueStore(memorydb.New())
-				if tt.dbFails {
-					// Fails from the first op, so every write in this round is rejected.
-					db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
-				}
-				syncer, err := NewSyncer(log, nil, db)
+				syncer, err := NewSyncer(log, nil, memorydb.New())
 				require.NoError(t, err)
+				if tt.dbFails {
+					// Swapped in after construction, so every AddCode write
+					// this round is rejected, whatever recovery itself took.
+					syncer.db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
+				}
 
 				// Buffered to the producer count, so no AddCode waits to report.
 				results := make(chan error, tt.producers)
@@ -504,7 +407,7 @@ func TestSyncer_DrainedQueueMeansEmpty(t *testing.T) {
 				var wg sync.WaitGroup
 				for range tt.producers {
 					wg.Go(func() {
-						results <- syncer.AddCode(t.Context(), offered)
+						results <- syncer.AddCode(offered)
 					})
 				}
 				wg.Go(syncer.CloseInput)
@@ -618,7 +521,7 @@ func TestSyncer_RepeatDuringFetch(t *testing.T) {
 
 	syncer, err := NewSyncer(log, client, target)
 	require.NoError(t, err)
-	require.NoError(t, syncer.AddCode(ctx, hashes))
+	require.NoError(t, syncer.AddCode(hashes))
 
 	syncErr := make(chan error, 1)
 	go func() { syncErr <- syncer.Sync(ctx) }()
@@ -630,7 +533,7 @@ func TestSyncer_RepeatDuringFetch(t *testing.T) {
 	var wg sync.WaitGroup
 	for range concurrentRepeats {
 		wg.Go(func() {
-			assert.NoError(t, syncer.AddCode(ctx, []common.Hash{repeat}))
+			assert.NoError(t, syncer.AddCode([]common.Hash{repeat}))
 		})
 	}
 	wg.Wait()
@@ -768,7 +671,7 @@ func runSync(t *testing.T, log logging.Logger, source, db ethdb.KeyValueStore, h
 	if err != nil {
 		return hashes, err
 	}
-	if err := syncer.AddCode(ctx, hashes); err != nil {
+	if err := syncer.AddCode(hashes); err != nil {
 		return hashes, err
 	}
 

@@ -35,10 +35,6 @@ var (
 		Code:    1001,
 		Message: "requested code not found",
 	}
-	errCodeTooLarge = &avacommon.AppError{
-		Code:    1002,
-		Message: "requested code exceeds the message size limit",
-	}
 )
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
@@ -53,15 +49,13 @@ var _ handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse] = (*re
 type responder struct {
 	log        logging.Logger
 	codeReader ethdb.KeyValueReader
-	sizeBudget int // caps the response, so an outgrown batch is a prefix, not nothing
 }
 
 func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responder {
-	return &responder{log: log, codeReader: codeReader, sizeBudget: constants.MaxContainersLen}
+	return &responder{log: log, codeReader: codeReader}
 }
 
-// Respond answers an in-order prefix of hashes, stopping before the response
-// would outgrow sizeBudget. A shorter response is valid, the client resumes.
+// Respond answers every requested hash, or rejects the whole request.
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
 	hashes := req.GetHashes()
 	if len(hashes) > maxHashesPerRequest {
@@ -73,14 +67,11 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 		return nil, errTooManyHashes
 	}
 
-	var (
-		data = make([][]byte, 0, len(hashes))
-		size int
-	)
-	for _, raw := range hashes {
+	data := make([][]byte, len(hashes))
+	for i, raw := range hashes {
 		hash := common.BytesToHash(raw)
-		code := rawdb.ReadCode(r.codeReader, hash)
-		if len(code) == 0 {
+		data[i] = rawdb.ReadCode(r.codeReader, hash)
+		if len(data[i]) == 0 {
 			r.log.Debug("rejecting request",
 				zap.Stringer("nodeID", nodeID),
 				zap.String("reason", "code not found"),
@@ -88,22 +79,6 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 			)
 			return nil, errHashNotFound
 		}
-
-		switch {
-		case len(data) == 0 && len(code) > r.sizeBudget:
-			r.log.Debug("rejecting request",
-				zap.Stringer("nodeID", nodeID),
-				zap.String("reason", "code too large"),
-				zap.Stringer("hash", hash),
-				zap.Int("size", len(code)),
-			)
-			return nil, errCodeTooLarge
-		case len(data) > 0 && size+len(code) > r.sizeBudget:
-			return &syncpb.GetCodeResponse{Data: data}, nil
-		}
-
-		data = append(data, code)
-		size += len(code)
 	}
 
 	return &syncpb.GetCodeResponse{Data: data}, nil

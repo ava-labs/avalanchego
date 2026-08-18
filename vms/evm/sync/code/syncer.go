@@ -65,15 +65,11 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, 
 }
 
 // AddCode marks hashes as outstanding and queues them, skipping code already
-// stored or already claimed by a repeat in flight. Never waits on the fetchers.
-func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr error) {
-	if len(hashes) == 0 {
-		return nil
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
+// stored or already claimed by a repeat in flight.
+//
+// MUST never block: it shares the node's async App-message pool with the
+// GetCode responses this queues, so waiting on them here can deadlock it.
+func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
 	// Held across the write and the enqueue, so a refused call leaves nothing owed.
 	if !s.q.enter() {
 		return ErrInputClosed
@@ -113,7 +109,8 @@ func (s *Syncer) AddCode(ctx context.Context, hashes []common.Hash) (retErr erro
 }
 
 // CloseInput stops taking hashes. [Syncer.Sync] returns once the queue drains.
-// Safe from any goroutine, more than once, and before Sync.
+// Safe from any goroutine, more than once, and before Sync. Only the producer
+// calls this, never Sync, however Sync exits.
 func (s *Syncer) CloseInput() {
 	s.q.close()
 }
@@ -123,8 +120,6 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	if !s.started.CompareAndSwap(false, true) {
 		return errSyncAlreadyRun
 	}
-	// Stopped consuming, so close input.
-	defer s.CloseInput()
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	// A slot for the batcher, so numSyncWorkers fetches still run alongside it.
@@ -144,6 +139,7 @@ func (s *Syncer) requeueOutstanding() error {
 	var outstanding []common.Hash
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
+		// Clear the CodeToFetch in case another part of the code wrote codehashes outside of the syncer.
 		stored, err := clearIfStored(s.db, batch, codeHash)
 		if err != nil {
 			return err
@@ -155,23 +151,12 @@ func (s *Syncer) requeueOutstanding() error {
 			outstanding = append(outstanding, codeHash)
 			continue
 		}
-		// Resuming after many blocks executed locally can satisfy most markers
-		// this way, too many clears for one batch.
-		if batch.ValueSize() < ethdb.IdealBatchSize {
-			continue
-		}
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("committing recovered marker clears: %w", err)
-		}
-		batch.Reset()
 	}
 	if err := it.Error(); err != nil {
 		return fmt.Errorf("iterating code to fetch markers: %w", err)
 	}
-	if batch.ValueSize() > 0 {
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("committing recovered marker clears: %w", err)
-		}
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("committing recovered marker clears: %w", err)
 	}
 
 	s.q.enqueue(outstanding)
@@ -199,7 +184,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 			}
 		}
 
-		if closed && len(queued) == 0 {
+		if closed {
 			if len(batch) > 0 {
 				fetch()
 			}
@@ -273,31 +258,25 @@ func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
 	return nil
 }
 
-// getCode requests hashes through c, resuming for whatever a partial response
-// leaves out. Scores the peer per request, and fails fast on an unfetchable hash.
+// getCode requests hashes through c and verifies every blob against its hash,
+// scoring the peer.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
-	data := make([][]byte, 0, len(hashes))
-	remaining := hashes
-	for len(remaining) > 0 {
+	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
+	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		req := &syncpb.GetCodeRequest{Hashes: hashBytes(remaining)}
 		resp := &syncpb.GetCodeResponse{}
 		outcome, err := c.Send(ctx, req, resp)
-		if errors.Is(err, errCodeTooLarge) {
-			return nil, fmt.Errorf("%w: %s", errCodeTooLarge, remaining[0])
-		}
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
 			log.Debug("code request failed, re-requesting", zap.Error(err))
 			continue
 		}
 
-		got := resp.GetData()
-		n, err := verifyCodePrefix(remaining, got)
-		if err != nil {
+		data := resp.GetData()
+		if err := verifyCode(hashes, data); err != nil {
 			outcome.Failure()
 			log.Debug("invalid code response, re-requesting",
 				zap.Stringer("nodeID", outcome.NodeID()),
@@ -307,24 +286,26 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		}
 
 		outcome.Success()
-		data = append(data, got...)
-		remaining = remaining[n:]
+		return data, nil
 	}
-	return data, nil
 }
 
-// verifyCodePrefix reports how many leading hashes data accounts for, which may
-// be fewer than requested when the rest would not fit in one message.
-func verifyCodePrefix(hashes []common.Hash, data [][]byte) (int, error) {
-	if len(data) == 0 || len(data) > len(hashes) {
-		return 0, fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
+// verifyCode reports whether data is the code for hashes, in order.
+func verifyCode(hashes []common.Hash, data [][]byte) error {
+	if len(data) != len(hashes) {
+		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
 	}
 	for i, code := range data {
+		// Size is deliberately not checked. Contracts larger than MaxCodeSize
+		// exist, and rejecting one would reject the only answer a peer can give.
+		//
+		// TODO(powerslider): investigate oversized genesis contracts. getCode
+		// retries forever on one, de-scoring every peer that ever holds it.
 		if got := crypto.Keccak256Hash(code); got != hashes[i] {
-			return 0, fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
+			return fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
 		}
 	}
-	return len(data), nil
+	return nil
 }
 
 func hashBytes(hashes []common.Hash) [][]byte {
