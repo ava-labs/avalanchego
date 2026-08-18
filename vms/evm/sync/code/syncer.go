@@ -95,6 +95,12 @@ func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
 		if !s.claimed.claim(codeHash) {
 			continue
 		}
+		// A fetch that just released this claim already committed the code,
+		// so this catches it before requeuing.
+		if rawdb.HasCode(s.db, codeHash) {
+			s.claimed.release(codeHash)
+			continue
+		}
 		missing = append(missing, codeHash)
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("marking code to fetch: %w", err)

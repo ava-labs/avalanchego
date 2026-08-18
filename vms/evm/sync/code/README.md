@@ -52,9 +52,9 @@ is only a hand-off.
 5. **Code already stored is never marked or claimed.** `AddCode` reads the
    store first, so shared bytecode costs neither a marker, a claim, nor a slot.
 
-6. **A repeat racing a commit costs a redundant fetch, never a lost one.** Code
-   arriving between the read and the claim still gets refetched once.
-   Persisting is idempotent, so the redundancy is harmless.
+6. **A repeat racing a commit is caught, not just tolerated.** `AddCode`
+   re-checks the store right after claiming, so code that lands between the
+   first read and the claim is still seen before a fetch is queued for it.
 
 ```mermaid
 sequenceDiagram
