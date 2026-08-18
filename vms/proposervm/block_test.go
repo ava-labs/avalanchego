@@ -85,6 +85,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	vm := &VM{
 		Config: Config{
 			Upgrades:          upgradetest.GetConfig(upgradetest.Latest),
+			WindowDuration:    DefaultWindowDuration,
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
@@ -390,6 +391,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	vm := &VM{
 		Config: Config{
 			Upgrades:          upgradetest.GetConfig(upgradetest.Durango), // Use Durango for pre-Etna behavior
+			WindowDuration:    DefaultWindowDuration,
 			StakingCertLeaf:   pTestCert,
 			StakingLeafSigner: pTestSigner,
 			Registerer:        prometheus.NewRegistry(),
