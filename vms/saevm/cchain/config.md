@@ -70,7 +70,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `state-sync-enabled` | bool | Enable state sync. | `false` |
+| `state-sync-enabled` | bool | Enable state sync. | `true` |
 
 ## Warp
 
