@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/eth/ethconfig"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -137,6 +138,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
+			GasCap:                       ethconfig.Defaults.RPCGasCap,
+			EVMTimeout:                   ethconfig.Defaults.RPCEVMTimeout,
+			TxFeeCap:                     ethconfig.Defaults.RPCTxFeeCap,
 			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
 			BatchRequestLimit:            c.BatchRequestLimit,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
