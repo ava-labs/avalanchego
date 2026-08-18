@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
@@ -424,7 +423,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.ctx,
 		s.state,
 		s.chainConfig,
-		s.pendingTxs,
+		s.pending,
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
@@ -582,7 +581,7 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	// The pool updates the verification state atomically with evicting the
 	// included tx, so observing the eviction guarantees the state has been
 	// updated.
-	for s.pendingTxs.Has(t.ID()) {
+	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
 			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())
@@ -1922,6 +1921,8 @@ func TestConsensusGettersAfterRestart(t *testing.T) {
 	}
 }
 
+// TestConsensusGettersNoState ensures that an empty VM still can serve the
+// genesis block.
 func TestConsensusGettersNoState(t *testing.T) {
 	ctx, sut := newSUT(t, withState(snow.StateSyncing))
 	hash, err := sut.LastAccepted(ctx)
@@ -1944,11 +1945,7 @@ func TestWaitForEventInitializing(t *testing.T) {
 	ctx, sut := newSUT(t, withState(snow.Initializing))
 
 	ctx, cancel := context.WithCancel(ctx)
-	eg, egCtx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		_, err := sut.WaitForEvent(egCtx)
-		return err
-	})
 	cancel()
-	require.ErrorIs(t, eg.Wait(), context.Canceled)
+	_, err := sut.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.Canceled)
 }
