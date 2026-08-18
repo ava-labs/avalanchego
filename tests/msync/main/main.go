@@ -16,12 +16,13 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
@@ -29,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/load/contracts"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -53,6 +56,39 @@ const (
 	defaultStateSyncCommitInterval uint64 = 16
 	defaultStateHistory            uint64 = 128
 	defaultPollingDelay                   = 2 * time.Second
+	defaultStateScheme                    = rawdb.HashScheme
+
+	// defaultStatePollInterval is how often the harness re-reads chain state it
+	// is waiting to become visible.
+	defaultStatePollInterval = 100 * time.Millisecond
+
+	// Transaction gas limits are set explicitly rather than left to
+	// eth_estimateGas. The SAE C-Chain never sets rpc.Config.GasCap (see
+	// vms/saevm/cchain.config), so libevm falls back to MaxUint64/2 as the
+	// estimator's ceiling and can return a limit the mempool rejects outright
+	// with "exceeds block gas limit".
+	//
+	// SAE charges at least ceil(gasLimit/params.Lambda) for every transaction,
+	// so each limit is sized to the work its call performs rather than set to a
+	// uniform maximum.
+	deployGasLimit          uint64 = 3_000_000
+	contractCallGasOverhead uint64 = 200_000
+	trieWriteGasPerValue    uint64 = 25_000
+	loadWriteGasPerSlot     uint64 = 25_000
+	loadModifyGasPerSlot    uint64 = 10_000
+	transferGasLimit        uint64 = 21_000
+
+	// defaultBootstrapHealthCheckFreq is how often the bootstrap node refreshes
+	// its health checks, which bounds the precision of the state sync duration
+	// this harness reports. It is far lower than the tmpnet default of 2s
+	// because a tmpnet-scale sync can finish in well under a second, and a
+	// single chain health check costs tens of microseconds.
+	defaultBootstrapHealthCheckFreq = 100 * time.Millisecond
+
+	// defaultHealthSampleInterval is how often the harness reads the bootstrap
+	// node's health. It is kept at or below
+	// [defaultBootstrapHealthCheckFreq] so that no refresh goes unobserved.
+	defaultHealthSampleInterval = defaultBootstrapHealthCheckFreq
 )
 
 var (
@@ -70,7 +106,170 @@ var (
 	loadModifySlots         int64
 	stateSyncMinBlocks      uint64
 	stateSyncCommitInterval uint64
+	stateScheme             string
+
+	// Derived from --state-scheme in main before the network is configured.
+	schemeConfig stateSchemeConfig
+
+	// saeCChain reports whether the C-Chain will be served by the SAE VM
+	// (vms/saevm/cchain) rather than by coreth. Derived from
+	// --activate-latest-after in main before the network is configured.
+	saeCChain bool
 )
+
+// Values reported by the C-Chain VM's health check that this harness asserts
+// on. See Health and engine.SyncStatus in graft/coreth/plugin/evm/health.go and
+// graft/evm/sync/engine/client.go respectively.
+const (
+	healthStateNormalOp = "normalOp"
+	syncStatusSyncing   = "syncing"
+	syncStatusSkipped   = "skipped"
+	syncStatusCompleted = "completed"
+	syncStatusFailed    = "failed"
+)
+
+// syncObservation is what the harness saw while polling the bootstrap node's
+// health as it bootstrapped.
+//
+// The VM does not time its own sync, so the harness derives the sync duration
+// from the health details it sampled. A node only refreshes its health checks
+// every [defaultBootstrapHealthCheckFreq], so syncingAt and terminalAt are the
+// node's own check times and each records a transition that happened at some
+// point in the preceding interval. The sync duration is therefore accurate to
+// within roughly that interval, whereas the bootstrap duration is measured
+// directly by the harness and is exact.
+type syncObservation struct {
+	// nodeStartedAt is when the harness started the bootstrap node and healthyAt
+	// is when the node first reported healthy.
+	nodeStartedAt time.Time
+	healthyAt     time.Time
+	// syncingAt is the health check time of the first observation of an
+	// in-progress sync, and terminalAt that of the first finished one.
+	syncingAt  time.Time
+	terminalAt time.Time
+	// terminalStatus is the sync status observed at terminalAt.
+	terminalStatus string
+}
+
+// record folds a health reply into the observation, ignoring replies whose VM
+// details are not available yet.
+func (o *syncObservation) record(reply *health.APIReply) {
+	vmHealth, checkedAt, err := chainVMHealth(reply)
+	if err != nil {
+		return
+	}
+	switch vmHealth.StateSync.Status {
+	case syncStatusSyncing:
+		if o.syncingAt.IsZero() {
+			o.syncingAt = checkedAt
+		}
+	case syncStatusCompleted, syncStatusSkipped, syncStatusFailed:
+		if o.terminalAt.IsZero() {
+			o.terminalAt = checkedAt
+			o.terminalStatus = vmHealth.StateSync.Status
+		}
+	}
+}
+
+// stateSyncDuration reports how long state sync took, and whether the harness
+// saw enough to measure it: a sync that starts and finishes within a single
+// health check interval is never observed in progress.
+func (o syncObservation) stateSyncDuration() (time.Duration, bool) {
+	if o.syncingAt.IsZero() || o.terminalAt.IsZero() {
+		return 0, false
+	}
+	return o.terminalAt.Sub(o.syncingAt), true
+}
+
+// bootstrapDuration reports how long the bootstrap node took to become healthy,
+// which covers node startup and post-sync bootstrapping as well as the sync.
+func (o syncObservation) bootstrapDuration() time.Duration {
+	return o.healthyAt.Sub(o.nodeStartedAt)
+}
+
+// chainHealth mirrors the JSON a chain reports through the node's health API.
+// The VM's own details are nested under the engine that is driving it.
+type chainHealth struct {
+	Engine engineHealth `json:"engine"`
+}
+
+type engineHealth struct {
+	VM vmHealth `json:"vm"`
+}
+
+type vmHealth struct {
+	State       string       `json:"state"`
+	StateScheme string       `json:"stateScheme"`
+	StateSync   vmSyncStatus `json:"stateSync"`
+}
+
+type vmSyncStatus struct {
+	Status        string `json:"status"`
+	SummaryHeight uint64 `json:"summaryHeight"`
+	SummaryHash   string `json:"summaryHash"`
+	Error         string `json:"error"`
+}
+
+// stateSchemeConfig captures everything that differs between the state schemes
+// this harness supports: the chain configuration the nodes must run with, and
+// the metrics proving the scheme's sync path was exercised.
+type stateSchemeConfig struct {
+	// chainConfig is the scheme-specific C-Chain configuration applied to both
+	// the serving nodes and the bootstrap node.
+	chainConfig tmpnet.ConfigMap
+	// bootstrapRequestMetric is a bootstrap-node metric proving that the
+	// scheme's state requests were made.
+	bootstrapRequestMetric string
+	// servingRequestMetrics are validator metrics proving that the scheme's
+	// state requests were served. Code and block serving evidence is checked
+	// for every scheme and so is not repeated here.
+	servingRequestMetrics []string
+}
+
+// newStateSchemeConfig returns the configuration for the requested state scheme.
+func newStateSchemeConfig(scheme string) (stateSchemeConfig, error) {
+	switch scheme {
+	case customrawdb.FirewoodScheme:
+		return stateSchemeConfig{
+			chainConfig: tmpnet.ConfigMap{
+				"state-scheme": customrawdb.FirewoodScheme,
+				// Firewood requires a disabled snapshot cache and unset
+				// missing-trie population or the VM fails to initialize.
+				//
+				// These stay set in SAE mode: transitionvm initializes coreth as
+				// the pre-transition VM even when Helicon is active at genesis,
+				// so coreth still enforces them. The SAE C-Chain ignores a
+				// Firewood snapshot cache itself (see saedb.Config.snapConfig)
+				// and ignores the keys it does not declare.
+				"snapshot-cache":         0,
+				"populate-missing-tries": nil,
+				// Firewood uses the state history as its in-memory revision count.
+				"state-history": defaultStateHistory,
+			},
+			bootstrapRequestMetric: "avalanche_evm_sync_firewood_sync_requests_made",
+			// Firewood range proofs are served over a dedicated p2p handler
+			// rather than the leafs request handler.
+			servingRequestMetrics: nil,
+		}, nil
+	case rawdb.HashScheme:
+		return stateSchemeConfig{
+			chainConfig: tmpnet.ConfigMap{
+				// Leave the snapshot cache at its default so the serving nodes
+				// can answer leafs requests from their snapshots.
+				"state-scheme": rawdb.HashScheme,
+			},
+			bootstrapRequestMetric: "avalanche_evm_eth_sync_state_trie_leaves_requested",
+			servingRequestMetrics:  []string{"avalanche_evm_eth_leafs_request_count"},
+		}, nil
+	default:
+		return stateSchemeConfig{}, fmt.Errorf(
+			"unsupported state scheme %q: must be one of %q or %q",
+			scheme,
+			customrawdb.FirewoodScheme,
+			rawdb.HashScheme,
+		)
+	}
+}
 
 type deployedContracts struct {
 	trieAddress common.Address
@@ -92,6 +291,9 @@ type workloadSnapshot struct {
 func init() {
 	flagVars = e2e.RegisterFlags(
 		e2e.WithDefaultOwner("avalanchego-msync-e2e"),
+		// Sync the latest state format by default rather than the previous
+		// upgrade's.
+		e2e.WithDefaultActivateLatestAfter(0),
 	)
 
 	flag.Int64Var(
@@ -142,6 +344,16 @@ func init() {
 		defaultStateSyncCommitInterval,
 		"state sync summary interval to use for validator nodes and the bootstrap node",
 	)
+	flag.StringVar(
+		&stateScheme,
+		"state-scheme",
+		defaultStateScheme,
+		fmt.Sprintf(
+			"state scheme to configure the network and bootstrap node with; one of %q or %q",
+			customrawdb.FirewoodScheme,
+			rawdb.HashScheme,
+		),
+	)
 
 	flag.Parse()
 }
@@ -160,6 +372,30 @@ func main() {
 	require.Positive(loadModifySlots, "load-modify-slots must be positive")
 	require.Positive(stateSyncMinBlocks, "state-sync-min-blocks must be positive")
 	require.Positive(stateSyncCommitInterval, "state-sync-commit-interval must be positive")
+
+	// tmpnet's --activate-latest-after schedules the latest upgrade, which is
+	// Helicon: the upgrade that transitions the C-Chain from coreth to the SAE
+	// VM. A negative value leaves it unscheduled, 0 activates it at genesis, and
+	// a positive value activates it that long after the network starts.
+	saeCChain = flagVars.ActivateLatestAfter() >= 0
+
+	var schemeErr error
+	schemeConfig, schemeErr = newStateSchemeConfig(stateScheme)
+	require.NoError(schemeErr, "newStateSchemeConfig()")
+	log.Info("configuring merkle sync harness",
+		zap.String("stateScheme", stateScheme),
+		zap.Bool("saeCChain", saeCChain),
+		zap.Duration("activateLatestAfter", flagVars.ActivateLatestAfter()),
+	)
+	if saeCChain {
+		// Skipping this evidence is the whole reason the run is cheaper than
+		// the coreth one, so say so rather than let a green run imply the sync
+		// path was covered.
+		log.Warn("the SAE C-Chain does not implement state sync (TODO #5513 in vms/saevm/cchain/sync.go), so this run validates bootstrap and post-bootstrap state only; state sync status, summary heights and sync metrics are not asserted",
+			zap.Uint64("stateSyncMinBlocks", stateSyncMinBlocks),
+			zap.Uint64("stateSyncCommitInterval", stateSyncCommitInterval),
+		)
+	}
 
 	network := newMerkleSyncNetwork(flagVars.NetworkOwner())
 	require.NoError(configureNetwork(tc, network))
@@ -184,6 +420,7 @@ func main() {
 	require.NoError(err)
 
 	contracts := deployContracts(tc, client, chainID, fundingKey)
+	requireGasLimitsFitBlock(tc, client)
 	issueAtomicExportTx(tc, network, fundingKey)
 	snapshot := generateWorkload(tc, client, chainID, fundingKey, transferRecipient, contracts, pathsToMeasure, initialSize, initialRecipientBalance)
 
@@ -194,11 +431,12 @@ func main() {
 	servingClient := newWSClient(tc, []*tmpnet.Node{generationNode})
 	expectedSummaryHeight := refreshStateSummaries(tc, servingClient, chainID, fundingKey, transferRecipient)
 
-	bootstrapNode := checkMerkleSyncBootstrap(tc, network)
+	bootstrapNode, syncObservation := checkMerkleSyncBootstrap(tc, network)
 	if bootstrapNode != nil {
 		bootstrapClient := newWSClient(tc, []*tmpnet.Node{bootstrapNode})
 		validatePostBootstrapState(tc, bootstrapClient, snapshot, contracts)
-		validateMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
+		syncHealth := validateMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
+		reportStateSyncDuration(tc, syncObservation, syncHealth)
 
 		// SimpleTestContext cleanup runs in registration order rather than LIFO,
 		// so the network-level cleanup may stop this ephemeral node before the
@@ -223,6 +461,21 @@ func configureNetwork(tc tests.TestContext, network *tmpnet.Network) error {
 		return err
 	}
 	network.DefaultRuntimeConfig = *runtimeConfig
+
+	upgrades := tmpnet.UpgradeConfig(flagVars.ActivateLatestAfter())
+	tc.Log().Info("setting upgrades",
+		zap.Reflect("upgrades", upgrades),
+	)
+	upgradeFlags, err := tmpnet.UpgradeFlags(upgrades)
+	if err != nil {
+		return err
+	}
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = upgradeFlags
+	} else {
+		network.DefaultFlags.SetDefaults(upgradeFlags)
+	}
+
 	if err := network.EnsureDefaultConfig(tc.DefaultContext(), tc.Log()); err != nil {
 		return err
 	}
@@ -336,6 +589,12 @@ func copyDir(sourceRoot string, targetRoot string) error {
 	})
 }
 
+// refreshStateSummaries advances the restarted serving topology past a fresh
+// state sync summary boundary and returns the height of the summary the
+// bootstrap node is expected to sync.
+//
+// The SAE C-Chain produces no state summaries (see #5513), so there it only
+// proves that the restarted topology still builds blocks and returns 0.
 func refreshStateSummaries(
 	tc tests.TestContext,
 	client *ethclient.Client,
@@ -358,7 +617,15 @@ func refreshStateSummaries(
 
 	updatedHeadBlock, err := client.BlockNumber(tc.DefaultContext())
 	require.NoError(err)
-	require.Greater(updatedHeadBlock, headBlock, "expected post-restart summary refresh to advance the head block")
+	require.Greater(updatedHeadBlock, headBlock, "expected post-restart blocks to advance the head block")
+	if saeCChain {
+		tc.Log().Info("forced post-restart blocks; the SAE C-Chain has no state summaries to refresh",
+			zap.Uint64("initialHeadBlock", headBlock),
+			zap.Uint64("updatedHeadBlock", updatedHeadBlock),
+		)
+		return 0
+	}
+
 	require.Zero(updatedHeadBlock%stateSyncCommitInterval, "expected refreshed head block to land on a state sync summary boundary")
 	tc.Log().Info("forced post-restart blocks to produce a fresh state summary",
 		zap.Uint64("initialHeadBlock", headBlock),
@@ -375,15 +642,18 @@ func newMerkleSyncPrimaryChainConfigs() map[string]tmpnet.ConfigMap {
 	}
 
 	maps.Copy(primaryChainConfigs[blockchainID], tmpnet.ConfigMap{
-		"state-scheme":               "firewood",
-		"snapshot-cache":             0,
-		"populate-missing-tries":     nil,
-		"pruning-enabled":            true,
-		"state-sync-enabled":         false,
-		"state-sync-commit-interval": stateSyncCommitInterval,
-		"commit-interval":            stateSyncCommitInterval,
-		"state-history":              defaultStateHistory,
+		"pruning-enabled": true,
+		"commit-interval": stateSyncCommitInterval,
 	})
+	if !saeCChain {
+		// The SAE C-Chain does not implement state sync (#5513) and so accepts
+		// none of these keys.
+		maps.Copy(primaryChainConfigs[blockchainID], tmpnet.ConfigMap{
+			"state-sync-enabled":         false,
+			"state-sync-commit-interval": stateSyncCommitInterval,
+		})
+	}
+	maps.Copy(primaryChainConfigs[blockchainID], schemeConfig.chainConfig)
 	return primaryChainConfigs
 }
 
@@ -410,20 +680,18 @@ func deployContracts(
 	fundingKey *secp256k1.PrivateKey,
 ) deployedContracts {
 	require := require.New(tc)
-	txOpts, err := newTxOpts(tc, chainID, fundingKey)
+	txOpts, err := newTxOpts(tc, chainID, fundingKey, deployGasLimit)
 	require.NoError(err)
 
 	trieAddress, trieTx, trieContract, err := contracts.DeployTrieStressTest(txOpts, client)
 	require.NoError(err)
-	_, err = bind.WaitDeployed(tc.DefaultContext(), client, trieTx)
-	require.NoError(err)
+	awaitDeployed(tc, client, trieTx, trieAddress)
 
-	txOpts, err = newTxOpts(tc, chainID, fundingKey)
+	txOpts, err = newTxOpts(tc, chainID, fundingKey, deployGasLimit)
 	require.NoError(err)
 	loadAddress, loadTx, loadContract, err := contracts.DeployLoadSimulator(txOpts, client)
 	require.NoError(err)
-	_, err = bind.WaitDeployed(tc.DefaultContext(), client, loadTx)
-	require.NoError(err)
+	awaitDeployed(tc, client, loadTx, loadAddress)
 
 	tc.Log().Info("deployed contracts for merkle sync workload",
 		zap.Stringer("trieStressAddress", trieAddress),
@@ -438,6 +706,40 @@ func deployContracts(
 		loadAddress: loadAddress,
 		load:        loadContract,
 	}
+}
+
+// awaitDeployed blocks until tx is mined and the deployed contract's code is
+// readable at the chain's latest state.
+//
+// bind.WaitDeployed is not used because it reads the code as soon as it sees a
+// receipt, which SAE does not guarantee is enough: execution is asynchronous and
+// streams per transaction, while the RPC resolves "latest" to the last fully
+// executed block (see vms/saevm/blocks/access.go), so a receipt can be served
+// before the state carrying it is what "latest" refers to. Polling closes that
+// window and is a no-op on coreth, where the receipt already implies the state.
+func awaitDeployed(
+	tc tests.TestContext,
+	client *ethclient.Client,
+	tx *types.Transaction,
+	address common.Address,
+) {
+	require := require.New(tc)
+
+	receipt, err := bind.WaitMined(tc.DefaultContext(), client, tx)
+	require.NoError(err, "bind.WaitMined()")
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status, "deployment of %s reverted", address)
+
+	var code []byte
+	deadline := time.Now().Add(e2e.DefaultTimeout)
+	for time.Now().Before(deadline) {
+		code, err = client.CodeAt(tc.DefaultContext(), address, nil)
+		require.NoError(err, "client.CodeAt()")
+		if len(code) > 0 {
+			return
+		}
+		time.Sleep(defaultStatePollInterval)
+	}
+	require.NotEmpty(code, "code for the contract deployed at %s never became readable", address)
 }
 
 func generateWorkload(
@@ -497,18 +799,18 @@ func generateWorkload(
 
 				lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 					return contracts.trie.WriteValues(txOpts, big.NewInt(writesPerTx))
-				}, chainID, fundingKey)
+				}, chainID, fundingKey, trieWriteGasLimit())
 				totalTrieWrites += writesPerTx
 
 				lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 					return contracts.load.Write(txOpts, big.NewInt(loadWriteSlots), latestWriteValue)
-				}, chainID, fundingKey)
+				}, chainID, fundingKey, loadWriteGasLimit())
 				totalLoadWrites += loadWriteSlots
 
 				if totalLoadWrites >= loadModifySlots {
 					lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 						return contracts.load.Modify(txOpts, big.NewInt(loadModifySlots), latestModifyValue)
-					}, chainID, fundingKey)
+					}, chainID, fundingKey, loadModifyGasLimit())
 				}
 
 				lastBlockNumber = issueTransfer(tc, client, chainID, fundingKey, transferRecipient, defaultTransferWei)
@@ -555,9 +857,10 @@ func issueContractTx(
 	issue func(*bind.TransactOpts) (*types.Transaction, error),
 	chainID *big.Int,
 	fundingKey *secp256k1.PrivateKey,
+	gasLimit uint64,
 ) uint64 {
 	require := require.New(tc)
-	txOpts, err := newTxOpts(tc, chainID, fundingKey)
+	txOpts, err := newTxOpts(tc, chainID, fundingKey, gasLimit)
 	require.NoError(err)
 
 	tx, err := issue(txOpts)
@@ -586,7 +889,7 @@ func issueTransfer(
 		ChainID:   chainID,
 		Nonce:     nonce,
 		To:        &to,
-		Gas:       21_000,
+		Gas:       transferGasLimit,
 		GasFeeCap: new(big.Int).Set(defaultGasFeeCap),
 		GasTipCap: new(big.Int).Set(defaultGasTipCap),
 		Value:     new(big.Int).Set(amount),
@@ -601,7 +904,7 @@ func issueTransfer(
 	return receipt.BlockNumber.Uint64()
 }
 
-func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
+func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*tmpnet.Node, syncObservation) {
 	require := require.New(tc)
 	tc.By("checking if Firewood merkle sync bootstrap is possible with the current network state")
 
@@ -611,6 +914,10 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 	flags := tmpnet.FlagsMap{
 		config.TrackSubnetsKey: strings.Join(subnetIDs, ","),
+		// The state sync duration is derived from the VM health details this
+		// node publishes, so check health more often than the tmpnet default to
+		// narrow the interval each observation is accurate to.
+		config.HealthCheckFreqKey: defaultBootstrapHealthCheckFreq.String(),
 	}
 
 	chainConfigContent, err := newBootstrapChainConfigContent(network)
@@ -618,6 +925,7 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 	flags[config.ChainConfigContentKey] = chainConfigContent
 
 	node := tmpnet.NewEphemeralNode(flags)
+	nodeStartedAt := time.Now()
 	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 	tc.DeferCleanup(func() {
@@ -626,7 +934,8 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 		require.NoError(node.Stop(ctx))
 	})
 
-	require.NoError(node.WaitForHealthy(tc.DefaultContext()))
+	observation, err := awaitBootstrapNode(tc, node, nodeStartedAt)
+	require.NoError(err, "awaitBootstrapNode()")
 
 	for _, validator := range network.Nodes {
 		if validator.IsEphemeral {
@@ -637,7 +946,44 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 		require.True(healthy, "primary validator %s is not healthy", validator.NodeID)
 	}
 
-	return node
+	return node, observation
+}
+
+// awaitBootstrapNode blocks until the bootstrap node reports healthy, sampling
+// the C-Chain VM's health as it goes so that the harness can report how long
+// state sync took. It mirrors [tmpnet.Node.WaitForHealthy], which cannot be used
+// here because it discards the health replies.
+func awaitBootstrapNode(tc tests.TestContext, node *tmpnet.Node, nodeStartedAt time.Time) (syncObservation, error) {
+	ctx := tc.DefaultContext()
+	observation := syncObservation{nodeStartedAt: nodeStartedAt}
+
+	ticker := time.NewTicker(defaultHealthSampleInterval)
+	defer ticker.Stop()
+
+	for {
+		reply, err := tmpnet.CheckNodeHealth(ctx, node.URI)
+		switch {
+		case errors.Is(err, tmpnet.ErrUnrecoverableNodeHealthCheck):
+			return observation, fmt.Errorf("node %s saw unrecoverable health check: %w", node.NodeID, err)
+		case err != nil:
+			tc.Log().Verbo("failed to query bootstrap node health",
+				zap.Stringer("nodeID", node.NodeID),
+				zap.Error(err),
+			)
+		default:
+			observation.record(reply)
+			if reply.Healthy {
+				observation.healthyAt = time.Now()
+				return observation, nil
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return observation, fmt.Errorf("failed to wait for health of node %s: %w", node.NodeID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
@@ -646,16 +992,19 @@ func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
 		nodeFlags := maps.Clone(flags)
 		if alias == blockchainID {
 			maps.Copy(nodeFlags, tmpnet.ConfigMap{
-				"state-scheme":               "firewood",
-				"snapshot-cache":             0,
-				"populate-missing-tries":     nil,
-				"pruning-enabled":            true,
-				"state-sync-enabled":         true,
-				"state-sync-min-blocks":      stateSyncMinBlocks,
-				"state-sync-commit-interval": stateSyncCommitInterval,
-				"commit-interval":            stateSyncCommitInterval,
-				"state-history":              defaultStateHistory,
+				"pruning-enabled": true,
+				"commit-interval": stateSyncCommitInterval,
 			})
+			if !saeCChain {
+				// The SAE C-Chain does not implement state sync (#5513) and so
+				// accepts none of these keys.
+				maps.Copy(nodeFlags, tmpnet.ConfigMap{
+					"state-sync-enabled":         true,
+					"state-sync-min-blocks":      stateSyncMinBlocks,
+					"state-sync-commit-interval": stateSyncCommitInterval,
+				})
+			}
+			maps.Copy(nodeFlags, schemeConfig.chainConfig)
 		}
 		marshaledFlags, err := json.Marshal(nodeFlags)
 		if err != nil {
@@ -746,32 +1095,46 @@ func issueAtomicExportTx(
 	)
 }
 
-func validateMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) {
+// validateMerkleSyncEvidence blocks until the bootstrap node reports the
+// expected sync evidence, and returns the VM health details that satisfied it.
+func validateMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) vmHealth {
 	require := require.New(tc)
 
 	deadline := time.Now().Add(e2e.DefaultTimeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		lastErr = checkMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
+		var health vmHealth
+		health, lastErr = checkMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
 		if lastErr == nil {
-			return
+			return health
 		}
 		time.Sleep(defaultPollingDelay)
 	}
 	require.NoError(lastErr)
+	return vmHealth{} // unreachable: the require above ends the test
 }
 
-func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) error {
+func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) (vmHealth, error) {
+	if saeCChain {
+		// Every check below observes state sync, which the SAE C-Chain does not
+		// implement (#5513): its health details carry no stateSync object and
+		// neither it nor its peers export coreth's sync metrics. What remains
+		// assertable is that the node reached normal operation on the requested
+		// state scheme; validatePostBootstrapState covers the synced state
+		// itself.
+		return checkBootstrapHealth(tc, bootstrapNode)
+	}
+
 	bootstrapMetrics, err := tests.GetNodeMetrics(tc.DefaultContext(), bootstrapNode.URI)
 	if err != nil {
-		return err
+		return vmHealth{}, err
 	}
-	firewoodRequests, ok := tests.GetMetricValue(bootstrapMetrics, "avalanche_evm_sync_firewood_sync_requests_made", prometheus.Labels{"chain": blockchainID})
+	stateRequests, ok := tests.GetMetricValue(bootstrapMetrics, schemeConfig.bootstrapRequestMetric, prometheus.Labels{"chain": blockchainID})
 	if !ok {
-		return errors.New("expected bootstrap node firewood sync metric")
+		return vmHealth{}, fmt.Errorf("expected bootstrap node state sync metric %q", schemeConfig.bootstrapRequestMetric)
 	}
-	if firewoodRequests <= 0 {
-		return errors.New("expected bootstrap node to make firewood proof requests")
+	if stateRequests <= 0 {
+		return vmHealth{}, fmt.Errorf("expected bootstrap node to make state sync requests reported by %q", schemeConfig.bootstrapRequestMetric)
 	}
 
 	validatorURIs := make([]string, 0, len(network.Nodes))
@@ -783,42 +1146,141 @@ func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, boot
 	}
 	validatorMetrics, err := tests.GetNodesMetrics(tc.DefaultContext(), validatorURIs)
 	if err != nil {
-		return err
+		return vmHealth{}, err
 	}
 	if sumMetric(validatorMetrics, "avalanche_evm_eth_code_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return errors.New("expected validators to serve code sync requests")
+		return vmHealth{}, errors.New("expected validators to serve code sync requests")
 	}
 	if sumMetric(validatorMetrics, "avalanche_evm_eth_block_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return errors.New("expected validators to serve block backfill requests")
+		return vmHealth{}, errors.New("expected validators to serve block backfill requests")
 	}
-
-	bootstrapLogPath := filepath.Join(bootstrapNode.DataDir, "logs", "C.log")
-	bootstrapLog, err := os.ReadFile(bootstrapLogPath)
-	if err != nil {
-		return err
-	}
-	bootstrapLogText := string(bootstrapLog)
-	for _, expectedText := range []string{
-		"Firewood state scheme is enabled",
-		"state sync started",
-		"accepted state summary",
-		"Firewood EVM State Syncer",
-		"Code Syncer",
-		"Block Syncer",
-		"all syncers completed successfully",
-	} {
-		if !strings.Contains(bootstrapLogText, expectedText) {
-			return fmt.Errorf("expected bootstrap log evidence %q", expectedText)
+	for _, metricName := range schemeConfig.servingRequestMetrics {
+		if sumMetric(validatorMetrics, metricName, prometheus.Labels{"chain": blockchainID}) <= 0 {
+			return vmHealth{}, fmt.Errorf("expected validators to serve state sync requests reported by %q", metricName)
 		}
 	}
-	heightPattern := regexp.MustCompile(fmt.Sprintf(`name="(Block Syncer|Code Syncer|Firewood EVM State Syncer)".*height=%d`, expectedSummaryHeight))
-	if !heightPattern.MatchString(bootstrapLogText) {
-		return errors.New("expected bootstrap syncer log line at refreshed summary height")
+
+	health, err := checkBootstrapHealth(tc, bootstrapNode)
+	if err != nil {
+		return vmHealth{}, err
 	}
-	if strings.Contains(bootstrapLogText, "last accepted too close to most recent syncable block, skipping state sync") {
-		return errors.New("unexpected bootstrap log evidence for skipping state sync")
+
+	// A completed sync also rules out the paths that would otherwise leave the
+	// harness validating a plain bootstrap: "disabled", "skipped" and "failed".
+	if health.StateSync.Status != syncStatusCompleted {
+		return vmHealth{}, fmt.Errorf(
+			"expected bootstrap node state sync status %q, got %q (error: %q)",
+			syncStatusCompleted,
+			health.StateSync.Status,
+			health.StateSync.Error,
+		)
 	}
-	return nil
+	if health.StateSync.SummaryHeight != expectedSummaryHeight {
+		return vmHealth{}, fmt.Errorf(
+			"expected bootstrap node to sync the refreshed summary at height %d, got %d",
+			expectedSummaryHeight,
+			health.StateSync.SummaryHeight,
+		)
+	}
+	return health, nil
+}
+
+// checkBootstrapHealth reads the bootstrap node's C-Chain VM health and returns
+// it once the VM reports normal operation on the requested state scheme. Both
+// C-Chain implementations report these two fields; see Health in
+// graft/coreth/plugin/evm/health.go and vms/saevm/sae/health.go.
+func checkBootstrapHealth(tc tests.TestContext, bootstrapNode *tmpnet.Node) (vmHealth, error) {
+	health, err := bootstrapVMHealth(tc, bootstrapNode)
+	if err != nil {
+		return vmHealth{}, err
+	}
+	tc.Log().Info("read bootstrap node C-Chain VM health",
+		zap.String("state", health.State),
+		zap.String("stateScheme", health.StateScheme),
+		zap.String("stateSyncStatus", health.StateSync.Status),
+		zap.Uint64("stateSyncSummaryHeight", health.StateSync.SummaryHeight),
+		zap.String("stateSyncError", health.StateSync.Error),
+	)
+	if health.State != healthStateNormalOp {
+		return vmHealth{}, fmt.Errorf("expected bootstrap node VM state %q, got %q", healthStateNormalOp, health.State)
+	}
+	if health.StateScheme != stateScheme {
+		return vmHealth{}, fmt.Errorf("expected bootstrap node state scheme %q, got %q", stateScheme, health.StateScheme)
+	}
+	return health, nil
+}
+
+// bootstrapVMHealth returns the C-Chain VM's health details from a fresh read of
+// the node's health API.
+func bootstrapVMHealth(tc tests.TestContext, bootstrapNode *tmpnet.Node) (vmHealth, error) {
+	reply, err := tmpnet.CheckNodeHealth(tc.DefaultContext(), bootstrapNode.URI)
+	if err != nil {
+		return vmHealth{}, err
+	}
+	health, _, err := chainVMHealth(reply)
+	return health, err
+}
+
+// chainVMHealth decodes the C-Chain VM's health details from a node health
+// reply, along with the time at which the node last ran the chain's check.
+func chainVMHealth(reply *health.APIReply) (vmHealth, time.Time, error) {
+	chainResult, ok := reply.Checks[blockchainID]
+	if !ok {
+		return vmHealth{}, time.Time{}, fmt.Errorf("expected a %q health check in %v", blockchainID, slices.Sorted(maps.Keys(reply.Checks)))
+	}
+	if chainResult.Error != nil {
+		return vmHealth{}, time.Time{}, fmt.Errorf("%q health check failed: %s", blockchainID, *chainResult.Error)
+	}
+
+	// The health API types the details as `any`, so round-trip the decoded JSON
+	// into the shape the chain reports.
+	rawDetails, err := json.Marshal(chainResult.Details)
+	if err != nil {
+		return vmHealth{}, time.Time{}, err
+	}
+	var details chainHealth
+	if err := json.Unmarshal(rawDetails, &details); err != nil {
+		return vmHealth{}, time.Time{}, fmt.Errorf("failed to decode %q health details %s: %w", blockchainID, rawDetails, err)
+	}
+	if details.Engine.VM.State == "" {
+		return vmHealth{}, time.Time{}, fmt.Errorf("expected VM health details in %q health details %s", blockchainID, rawDetails)
+	}
+	return details.Engine.VM, chainResult.Timestamp, nil
+}
+
+// reportStateSyncDuration reports how long the bootstrap node's state sync took.
+// See [syncObservation] for what the durations cover and how precise they are.
+func reportStateSyncDuration(tc tests.TestContext, observation syncObservation, health vmHealth) {
+	fields := []zap.Field{
+		zap.String("stateScheme", health.StateScheme),
+		zap.Uint64("summaryHeight", health.StateSync.SummaryHeight),
+		zap.Duration("bootstrapDuration", observation.bootstrapDuration()),
+	}
+
+	if saeCChain {
+		// The SAE C-Chain reports no sync status to sample (#5513), so the
+		// bootstrap duration is all that was measured.
+		tc.Log().Info("measured bootstrap duration; the SAE C-Chain reports no state sync status to time",
+			fields...,
+		)
+		return
+	}
+
+	stateSyncDuration, ok := observation.stateSyncDuration()
+	if !ok {
+		tc.Log().Warn("state sync was never observed in progress, so its duration could not be measured",
+			append(fields, zap.Time("firstObservedFinished", observation.terminalAt))...,
+		)
+		return
+	}
+	tc.Log().Info("measured state sync duration, accurate to within the node's health check frequency",
+		append(fields,
+			zap.Duration("stateSyncDuration", stateSyncDuration),
+			zap.Time("firstObservedSyncing", observation.syncingAt),
+			zap.Time("firstObservedFinished", observation.terminalAt),
+			zap.String("firstObservedFinishedStatus", observation.terminalStatus),
+		)...,
+	)
 }
 
 func sumMetric(allMetrics tests.NodesMetrics, metricName string, labels prometheus.Labels) float64 {
@@ -840,7 +1302,10 @@ func storageSlotBig(slotValue *big.Int) common.Hash {
 	return common.BigToHash(slotValue)
 }
 
-func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.PrivateKey) (*bind.TransactOpts, error) {
+// newTxOpts returns transact options that use the provided gas limit rather
+// than estimating one. See the gas limit constants for why estimation is
+// avoided.
+func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.PrivateKey, gasLimit uint64) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(fundingKey.ToECDSA(), chainID)
 	if err != nil {
 		return nil, err
@@ -848,7 +1313,67 @@ func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.Pri
 	txOpts.Context = tc.DefaultContext()
 	txOpts.GasFeeCap = new(big.Int).Set(defaultGasFeeCap)
 	txOpts.GasTipCap = new(big.Int).Set(defaultGasTipCap)
+	txOpts.GasLimit = gasLimit
 	return txOpts, nil
+}
+
+// trieWriteGasLimit returns the gas limit for a TrieStressTest.WriteValues call
+// of --writes-per-tx values.
+func trieWriteGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(writesPerTx)*trieWriteGasPerValue
+}
+
+// loadWriteGasLimit returns the gas limit for a LoadSimulator.Write call of
+// --load-write-slots slots.
+func loadWriteGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(loadWriteSlots)*loadWriteGasPerSlot
+}
+
+// loadModifyGasLimit returns the gas limit for a LoadSimulator.Modify call of
+// --load-modify-slots slots.
+func loadModifyGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(loadModifySlots)*loadModifyGasPerSlot
+}
+
+// requireGasLimitsFitBlock fails the test if the workload's largest transaction
+// could never be included in a block.
+//
+// The C-Chain implementations bound the per-block gas limit differently: coreth
+// reports ACP-176's max capacity while the SAE C-Chain reports the worst-case
+// block size derived from the gas rate (see vms/saevm/worstcase.State.GasLimit).
+// Reading it from the chain therefore avoids encoding either bound here, and
+// reports a misconfigured workload up front rather than as a rejected
+// transaction mid-run.
+//
+// It must run once the chain has built a block: the genesis header carries the
+// gas limit from the genesis file (100M for tmpnet) rather than the limit the
+// running chain enforces, which would make this check vacuous.
+func requireGasLimitsFitBlock(tc tests.TestContext, client *ethclient.Client) {
+	require := require.New(tc)
+
+	header, err := client.HeaderByNumber(tc.DefaultContext(), nil)
+	require.NoError(err, "client.HeaderByNumber()")
+
+	largestTxGasLimit := max(
+		deployGasLimit,
+		trieWriteGasLimit(),
+		loadWriteGasLimit(),
+		loadModifyGasLimit(),
+		transferGasLimit,
+	)
+	tc.Log().Info("sized workload transaction gas limits",
+		zap.Uint64("blockGasLimit", header.GasLimit),
+		zap.Uint64("largestTxGasLimit", largestTxGasLimit),
+		zap.Uint64("deployGasLimit", deployGasLimit),
+		zap.Uint64("trieWriteGasLimit", trieWriteGasLimit()),
+		zap.Uint64("loadWriteGasLimit", loadWriteGasLimit()),
+		zap.Uint64("loadModifyGasLimit", loadModifyGasLimit()),
+	)
+	require.LessOrEqual(
+		largestTxGasLimit,
+		header.GasLimit,
+		"workload transaction gas limit exceeds the chain's block gas limit; lower --writes-per-tx, --load-write-slots or --load-modify-slots",
+	)
 }
 
 func totalSize(paths ...string) (int64, error) {
