@@ -512,18 +512,14 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
   test-e2e-ci-post-latest:
-    desc: Runs e2e tests [serially with race detection enabled] and posts latest activation immediately
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled and posts latest activation immediately
     cmds:
       - task: build-race
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
 
   test-e2e-ci-schedule-latest:
-    desc: Runs e2e tests [serially with race detection enabled] and schedules latest activation after 4 minutes
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
     cmds:
       - task: build-race
       - task: build-xsvm

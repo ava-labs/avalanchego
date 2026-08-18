@@ -115,7 +115,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_schedule_latest:
-    runs-on: ubuntu-24.04
+    # The default free runners lack the resources for parallel execution, so a beefier
+    # runner is required.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
@@ -133,7 +135,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_latest:
-    runs-on: ubuntu-24.04
+    # The default free runners lack the resources for parallel execution, so a beefier
+    # runner is required.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
