@@ -115,11 +115,28 @@ var (
 	// (vms/saevm/cchain) rather than by coreth. Derived from
 	// --activate-latest-after in main before the network is configured.
 	saeCChain bool
+
+	// stateSyncSupported reports whether the C-Chain serving this run can state
+	// sync the requested state scheme. It drives both whether the bootstrap node
+	// is configured to sync and whether the sync is asserted: a run whose scheme
+	// cannot be synced validates a plain bootstrap instead.
+	//
+	// The SAE C-Chain syncs the hash scheme only, because
+	// statesync.SummaryHandler.StateSync builds a hashdb syncer unconditionally;
+	// see the Firewood TODO in vms/saevm/statesync/server.go.
+	stateSyncSupported bool
+
+	// assertSyncMetrics reports whether the run asserts the requesting- and
+	// serving-side sync metrics. Those are coreth metrics: the SAE C-Chain syncs
+	// over vms/evm/sync, which exports no equivalent, so an SAE run asserts the
+	// sync through the VM's health details alone.
+	assertSyncMetrics bool
 )
 
 // Values reported by the C-Chain VM's health check that this harness asserts
-// on. See Health and engine.SyncStatus in graft/coreth/plugin/evm/health.go and
-// graft/evm/sync/engine/client.go respectively.
+// on. The SAE C-Chain produces these in vms/saevm/sae/health.go and
+// vms/saevm/cchain/health.go; coreth reports no details at all (see
+// graft/coreth/plugin/evm/health.go).
 const (
 	healthStateNormalOp = "normalOp"
 	syncStatusSyncing   = "syncing"
@@ -378,6 +395,8 @@ func main() {
 	// VM. A negative value leaves it unscheduled, 0 activates it at genesis, and
 	// a positive value activates it that long after the network starts.
 	saeCChain = flagVars.ActivateLatestAfter() >= 0
+	stateSyncSupported = !saeCChain || stateScheme == rawdb.HashScheme
+	assertSyncMetrics = !saeCChain
 
 	var schemeErr error
 	schemeConfig, schemeErr = newStateSchemeConfig(stateScheme)
@@ -385,15 +404,25 @@ func main() {
 	log.Info("configuring merkle sync harness",
 		zap.String("stateScheme", stateScheme),
 		zap.Bool("saeCChain", saeCChain),
+		zap.Bool("stateSyncSupported", stateSyncSupported),
+		zap.Bool("assertSyncMetrics", assertSyncMetrics),
 		zap.Duration("activateLatestAfter", flagVars.ActivateLatestAfter()),
 	)
-	if saeCChain {
-		// Skipping this evidence is the whole reason the run is cheaper than
-		// the coreth one, so say so rather than let a green run imply the sync
-		// path was covered.
-		log.Warn("the SAE C-Chain does not implement state sync (TODO #5513 in vms/saevm/cchain/sync.go), so this run validates bootstrap and post-bootstrap state only; state sync status, summary heights and sync metrics are not asserted",
+	switch {
+	case !stateSyncSupported:
+		// Skipping the sync evidence is the whole reason such a run is cheaper
+		// than one that syncs, so say so rather than let a green run imply the
+		// sync path was covered.
+		log.Warn("the C-Chain serving this run cannot state sync the requested state scheme, so the run validates bootstrap and post-bootstrap state only; state sync status, summary heights and sync metrics are not asserted",
+			zap.String("stateScheme", stateScheme),
 			zap.Uint64("stateSyncMinBlocks", stateSyncMinBlocks),
 			zap.Uint64("stateSyncCommitInterval", stateSyncCommitInterval),
+		)
+	case !assertSyncMetrics:
+		// The sync itself is still asserted through the VM's health details.
+		log.Warn("the SAE C-Chain's sync path exports none of coreth's sync metrics, so the run asserts the state sync through the VM health details alone; the requesting- and serving-side metrics are not asserted",
+			zap.String("bootstrapRequestMetric", schemeConfig.bootstrapRequestMetric),
+			zap.Strings("servingRequestMetrics", schemeConfig.servingRequestMetrics),
 		)
 	}
 
@@ -593,8 +622,9 @@ func copyDir(sourceRoot string, targetRoot string) error {
 // state sync summary boundary and returns the height of the summary the
 // bootstrap node is expected to sync.
 //
-// The SAE C-Chain produces no state summaries (see #5513), so there it only
-// proves that the restarted topology still builds blocks and returns 0.
+// When the C-Chain cannot state sync the requested scheme there is no summary to
+// refresh, so this only proves that the restarted topology still builds blocks
+// and returns 0.
 func refreshStateSummaries(
 	tc tests.TestContext,
 	client *ethclient.Client,
@@ -618,8 +648,9 @@ func refreshStateSummaries(
 	updatedHeadBlock, err := client.BlockNumber(tc.DefaultContext())
 	require.NoError(err)
 	require.Greater(updatedHeadBlock, headBlock, "expected post-restart blocks to advance the head block")
-	if saeCChain {
-		tc.Log().Info("forced post-restart blocks; the SAE C-Chain has no state summaries to refresh",
+	if !stateSyncSupported {
+		tc.Log().Info("forced post-restart blocks; the C-Chain cannot state sync the requested state scheme, so there is no summary to refresh",
+			zap.String("stateScheme", stateScheme),
 			zap.Uint64("initialHeadBlock", headBlock),
 			zap.Uint64("updatedHeadBlock", updatedHeadBlock),
 		)
@@ -645,11 +676,15 @@ func newMerkleSyncPrimaryChainConfigs() map[string]tmpnet.ConfigMap {
 		"pruning-enabled": true,
 		"commit-interval": stateSyncCommitInterval,
 	})
+	// The serving nodes start from genesis and MUST NOT state sync; both C-Chain
+	// implementations accept this key.
+	maps.Copy(primaryChainConfigs[blockchainID], tmpnet.ConfigMap{
+		"state-sync-enabled": false,
+	})
 	if !saeCChain {
-		// The SAE C-Chain does not implement state sync (#5513) and so accepts
-		// none of these keys.
+		// The SAE C-Chain takes its summary heights from commit-interval, set
+		// above, and has no state-sync-commit-interval key.
 		maps.Copy(primaryChainConfigs[blockchainID], tmpnet.ConfigMap{
-			"state-sync-enabled":         false,
 			"state-sync-commit-interval": stateSyncCommitInterval,
 		})
 	}
@@ -995,11 +1030,16 @@ func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
 				"pruning-enabled": true,
 				"commit-interval": stateSyncCommitInterval,
 			})
+			// A scheme the C-Chain cannot sync leaves the bootstrap node to
+			// bootstrap from genesis instead.
+			maps.Copy(nodeFlags, tmpnet.ConfigMap{
+				"state-sync-enabled": stateSyncSupported,
+			})
 			if !saeCChain {
-				// The SAE C-Chain does not implement state sync (#5513) and so
-				// accepts none of these keys.
+				// The SAE C-Chain has neither key: it always offers to sync
+				// what it is given, and takes its summary heights from
+				// commit-interval, set above.
 				maps.Copy(nodeFlags, tmpnet.ConfigMap{
-					"state-sync-enabled":         true,
 					"state-sync-min-blocks":      stateSyncMinBlocks,
 					"state-sync-commit-interval": stateSyncCommitInterval,
 				})
@@ -1115,48 +1155,9 @@ func validateMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, b
 }
 
 func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) (vmHealth, error) {
-	if saeCChain {
-		// Every check below observes state sync, which the SAE C-Chain does not
-		// implement (#5513): its health details carry no stateSync object and
-		// neither it nor its peers export coreth's sync metrics. What remains
-		// assertable is that the node reached normal operation on the requested
-		// state scheme; validatePostBootstrapState covers the synced state
-		// itself.
-		return checkBootstrapHealth(tc, bootstrapNode)
-	}
-
-	bootstrapMetrics, err := tests.GetNodeMetrics(tc.DefaultContext(), bootstrapNode.URI)
-	if err != nil {
-		return vmHealth{}, err
-	}
-	stateRequests, ok := tests.GetMetricValue(bootstrapMetrics, schemeConfig.bootstrapRequestMetric, prometheus.Labels{"chain": blockchainID})
-	if !ok {
-		return vmHealth{}, fmt.Errorf("expected bootstrap node state sync metric %q", schemeConfig.bootstrapRequestMetric)
-	}
-	if stateRequests <= 0 {
-		return vmHealth{}, fmt.Errorf("expected bootstrap node to make state sync requests reported by %q", schemeConfig.bootstrapRequestMetric)
-	}
-
-	validatorURIs := make([]string, 0, len(network.Nodes))
-	for _, node := range network.Nodes {
-		if node.IsEphemeral {
-			continue
-		}
-		validatorURIs = append(validatorURIs, node.URI)
-	}
-	validatorMetrics, err := tests.GetNodesMetrics(tc.DefaultContext(), validatorURIs)
-	if err != nil {
-		return vmHealth{}, err
-	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_code_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return vmHealth{}, errors.New("expected validators to serve code sync requests")
-	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_block_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return vmHealth{}, errors.New("expected validators to serve block backfill requests")
-	}
-	for _, metricName := range schemeConfig.servingRequestMetrics {
-		if sumMetric(validatorMetrics, metricName, prometheus.Labels{"chain": blockchainID}) <= 0 {
-			return vmHealth{}, fmt.Errorf("expected validators to serve state sync requests reported by %q", metricName)
+	if assertSyncMetrics {
+		if err := checkSyncMetrics(tc, network, bootstrapNode); err != nil {
+			return vmHealth{}, err
 		}
 	}
 
@@ -1164,9 +1165,18 @@ func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, boot
 	if err != nil {
 		return vmHealth{}, err
 	}
+	if !stateSyncSupported {
+		// No sync was configured to happen, so the health details below have
+		// nothing to report. What remains asserted is that the node reached
+		// normal operation on the requested state scheme, which
+		// checkBootstrapHealth covers; validatePostBootstrapState covers the
+		// bootstrapped state itself.
+		return health, nil
+	}
 
 	// A completed sync also rules out the paths that would otherwise leave the
-	// harness validating a plain bootstrap: "disabled", "skipped" and "failed".
+	// harness validating a plain bootstrap: "disabled", "notStarted", "skipped"
+	// and "failed".
 	if health.StateSync.Status != syncStatusCompleted {
 		return vmHealth{}, fmt.Errorf(
 			"expected bootstrap node state sync status %q, got %q (error: %q)",
@@ -1183,6 +1193,47 @@ func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, boot
 		)
 	}
 	return health, nil
+}
+
+// checkSyncMetrics asserts that the bootstrap node made, and the validators
+// served, the state sync requests for the configured scheme. These are coreth
+// metrics; see [assertSyncMetrics].
+func checkSyncMetrics(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node) error {
+	bootstrapMetrics, err := tests.GetNodeMetrics(tc.DefaultContext(), bootstrapNode.URI)
+	if err != nil {
+		return err
+	}
+	stateRequests, ok := tests.GetMetricValue(bootstrapMetrics, schemeConfig.bootstrapRequestMetric, prometheus.Labels{"chain": blockchainID})
+	if !ok {
+		return fmt.Errorf("expected bootstrap node state sync metric %q", schemeConfig.bootstrapRequestMetric)
+	}
+	if stateRequests <= 0 {
+		return fmt.Errorf("expected bootstrap node to make state sync requests reported by %q", schemeConfig.bootstrapRequestMetric)
+	}
+
+	validatorURIs := make([]string, 0, len(network.Nodes))
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			continue
+		}
+		validatorURIs = append(validatorURIs, node.URI)
+	}
+	validatorMetrics, err := tests.GetNodesMetrics(tc.DefaultContext(), validatorURIs)
+	if err != nil {
+		return err
+	}
+	if sumMetric(validatorMetrics, "avalanche_evm_eth_code_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
+		return errors.New("expected validators to serve code sync requests")
+	}
+	if sumMetric(validatorMetrics, "avalanche_evm_eth_block_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
+		return errors.New("expected validators to serve block backfill requests")
+	}
+	for _, metricName := range schemeConfig.servingRequestMetrics {
+		if sumMetric(validatorMetrics, metricName, prometheus.Labels{"chain": blockchainID}) <= 0 {
+			return fmt.Errorf("expected validators to serve state sync requests reported by %q", metricName)
+		}
+	}
+	return nil
 }
 
 // checkBootstrapHealth reads the bootstrap node's C-Chain VM health and returns
@@ -1257,10 +1308,9 @@ func reportStateSyncDuration(tc tests.TestContext, observation syncObservation, 
 		zap.Duration("bootstrapDuration", observation.bootstrapDuration()),
 	}
 
-	if saeCChain {
-		// The SAE C-Chain reports no sync status to sample (#5513), so the
-		// bootstrap duration is all that was measured.
-		tc.Log().Info("measured bootstrap duration; the SAE C-Chain reports no state sync status to time",
+	if !stateSyncSupported {
+		// No sync happened, so the bootstrap duration is all that was measured.
+		tc.Log().Info("measured bootstrap duration; no state sync was configured to happen",
 			fields...,
 		)
 		return
