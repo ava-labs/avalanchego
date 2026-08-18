@@ -18,8 +18,8 @@ func (b *backend) ChainDb() ethdb.Database { //nolint:staticcheck // this name r
 	return b.DB()
 }
 
-func (b *backend) RPCTxFeeCap() float64 {
-	return b.config.TxFeeCap
+func (*backend) RPCTxFeeCap() float64 {
+	return TxFeeCap
 }
 
 func (b *backend) UnprotectedAllowed() bool {

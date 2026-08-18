@@ -99,7 +99,6 @@ go_library(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//eth/ethconfig",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",

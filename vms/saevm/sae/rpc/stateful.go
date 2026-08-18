@@ -50,12 +50,12 @@ func (noEndOfBlockOps) FinishExecutingBlock(*state.StateDB, *types.Block, types.
 	return nil
 }
 
-func (b *backend) RPCEVMTimeout() time.Duration {
-	return b.config.EVMTimeout
+func (*backend) RPCEVMTimeout() time.Duration {
+	return EVMTimeout
 }
 
-func (b *backend) RPCGasCap() uint64 {
-	return b.config.GasCap
+func (*backend) RPCGasCap() uint64 {
+	return GasCap
 }
 
 func (*backend) Engine() consensus.Engine {

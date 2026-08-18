@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -1206,36 +1207,32 @@ func TestEthSigningAPIs(t *testing.T) {
 }
 
 func TestRPCTxFeeCap(t *testing.T) {
+	// perAVAX is the gas price at which a [params.TxGas] transaction costs one
+	// AVAX.
+	const perAVAX = params.Ether / params.TxGas
+
 	tests := []struct {
 		name     string
-		cap      float64
-		gasPrice *big.Int
+		gasPrice uint64
 		wantErr  testerr.Want
 	}{
 		{
-			name:     "under_cap",
-			cap:      0.001,
-			gasPrice: big.NewInt(params.Wei), // fee = 21000 wei < 0.001 ETH
+			name:     "at_cap",
+			gasPrice: saerpc.TxFeeCap * perAVAX,
 		},
 		{
 			name:     "over_cap",
-			cap:      0.001,
-			gasPrice: big.NewInt(params.Ether), // fee = 21000 ETH > 0.001 ETH
+			gasPrice: (saerpc.TxFeeCap + 1) * perAVAX,
 			wantErr:  testerr.Contains("exceeds the configured cap"),
-		},
-		{
-			name:     "no_cap",
-			cap:      0, // 0 = no cap
-			gasPrice: big.NewInt(params.Ether),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, sut := newSUT(t, 1, withTxFeeCap(tt.cap))
+			_, sut := newSUT(t, 1)
 			tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 				To:       &zeroAddr,
 				Gas:      params.TxGas,
-				GasPrice: tt.gasPrice,
+				GasPrice: new(big.Int).SetUint64(tt.gasPrice),
 			})
 			err := sut.Client.SendTransaction(sut.context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
@@ -1617,12 +1614,6 @@ func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
 			want:   hexutil.Bytes(nil),
 		},
 	}...)
-}
-
-func withTxFeeCap(feeCap float64) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.TxFeeCap = feeCap
-	})
 }
 
 // withDebugAPI returns a sutOption that enables the debug API.
