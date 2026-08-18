@@ -90,8 +90,6 @@ var (
 )
 
 // Initialize initializes the VM.
-//
-// Initialize is NOT safe to be called concurrently with any other method.
 func (vm *VM) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
@@ -196,7 +194,7 @@ func (vm *VM) Initialize(
 		saeConfig := userConfig.saeConfig(vm.now)
 		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
-			return fmt.Errorf("setting up genesis: %w", err)
+			return fmt.Errorf("setting up genesis trie: %w", err)
 		}
 
 		// Uses of [sae.VM] are NOT protected by [VM.closeMu]. However,
