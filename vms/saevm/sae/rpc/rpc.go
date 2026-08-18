@@ -50,7 +50,7 @@ type Chain interface {
 	// Execution results and replay
 	saedb.StateDBOpener
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
-	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
+	NewBlock(eth *types.Block, parent *blocks.Block) (*blocks.Block, error)
 
 	// Subscriptions
 	SubscribeAcceptedBlocks(chan<- *blocks.Block) event.Subscription
