@@ -918,7 +918,7 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 
 	const (
 		numBlocks = 12
-		// The executor retains one commit interval of results for replay.
+		// Firewood persists a revision once per commit interval.
 		commitInterval = 6
 		// Allow each block to settle and commit its state.
 		blockTime = 850 * time.Millisecond
@@ -963,28 +963,8 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 	}))
 	addr := sut.wallet.Addresses()[0]
 
-	var missingState *blocks.Block
-	for h := 0; h < numBlocks; h++ {
-		candidate := blocksByHeight[h]
-		root := candidate.PostExecutionStateRoot()
-		_, err := sut.rawVM.exec.StateDB(root)
-		if err == nil {
-			continue
-		}
-		require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.StateDB() at height %d", candidate.Height())
-		_, release, err := sut.rawVM.exec.Reconstructing(root)
-		if err == nil {
-			release()
-			continue
-		}
-		require.ErrorIsf(t, err, saedb.ErrStateUnavailable, "Executor.Reconstructing() at height %d", candidate.Height())
-		missingState = candidate
-		break
-	}
-	require.NotNil(t, missingState, "a historical state requiring replay")
-
 	var replayTarget *blocks.Block
-	for h := uint64(2); h <= numBlocks && replayTarget == nil; h++ {
+	for h := uint64(2); h < numBlocks && replayTarget == nil; h++ {
 		candidate := blocksByHeight[h]
 		root := candidate.PostExecutionStateRoot()
 		if _, err := sut.rawVM.exec.StateDB(root); err == nil {
@@ -1022,7 +1002,7 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 		require.Equalf(t, h, got, "nonce of %s at height %d", addr, h)
 	}
 
-	traceTarget := blocksByHeight[missingState.Height()+1]
+	traceTarget := blocksByHeight[replayTarget.Height()+1]
 
 	want := []traceResult[*logger.ExecutionResult]{
 		{

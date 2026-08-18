@@ -83,6 +83,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	}
 
 	hdr := executedHeader(bl)
+	// The ethapi backend cannot return a release function. The reconstructed
+	// state releases its native view when it becomes unreachable.
 	sdb, _, err := b.reconstructState(ctx, bl, b.CommitInterval())
 	if err != nil {
 		return nil, nil, err

@@ -54,6 +54,8 @@ func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, re
 		return nil, nil, ctx.Err()
 	}
 
+	// Firewood guarantees a persisted reconstruction seed only within one commit
+	// interval, which can exceed the tracing API's requested replay allowance.
 	horizon := max(reexec, b.CommitInterval())
 	stateDB, release, seed, err := b.reconstructionSeed(ctx, target, horizon)
 	if err != nil {
@@ -75,8 +77,8 @@ func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, re
 		if err != nil {
 			return nil, nil, err
 		}
-		// Execution mutates consensus-derived fields on the wrapper. Always use
-		// a fresh wrapper so the restored canonical object remains unchanged.
+		// Restored settled blocks do not retain their parents. Rewrap the block
+		// with its replay parent so execution has the required ancestry.
 		replaying, err := b.NewBlock(restored.EthBlock(), parent, nil)
 		if err != nil {
 			return nil, nil, fmt.Errorf("constructing block %d for replay: %v", height, err)
