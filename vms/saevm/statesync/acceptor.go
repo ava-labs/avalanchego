@@ -83,11 +83,21 @@ func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, erro
 	}
 }
 
-// ShouldAcceptSummary returns true if the summary should be state synced to,
-// given the current disk state.
-//
-// TODO(alarso16): Find a way to wire through Firewood.
+// ShouldAcceptSummary reports whether the summary should be state synced to,
+// given the current disk state. Declining a summary is recorded for
+// [SummaryHandler.SyncProgressOf], so that a health check can distinguish a
+// chain that fell back to bootstrapping from one that has yet to be offered a
+// summary.
 func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
+	should, err := h.shouldAcceptSummary(s)
+	if err == nil && !should {
+		h.skipped.Set(true)
+	}
+	return should, err
+}
+
+// TODO(alarso16): Find a way to wire through Firewood.
+func (h *SummaryHandler) shouldAcceptSummary(s *Summary) (bool, error) {
 	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
 		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false, nil
@@ -125,6 +135,11 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		numBlocksToFetch   = 512 // min 256 for BLOCKHASH op, some extra for settlement...
 		maxLeafRequestSize = 1024
 	)
+
+	// Recorded here, rather than in [SummaryHandler.AcceptSummary], so that a
+	// sync started by a handler wrapping this one is also reported by
+	// [SummaryHandler.SyncProgressOf].
+	h.target.Set(s)
 
 	blockSyncer := syncblock.NewSyncer(
 		h.snowCtx.Log,

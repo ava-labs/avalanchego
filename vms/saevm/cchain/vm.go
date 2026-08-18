@@ -65,6 +65,11 @@ type VM struct {
 	metrics     *metrics
 	pending     *txpool.Pending
 
+	// stateScheme is the resolved trie database scheme, recorded by
+	// [VM.Initialize] so that [VM.HealthCheck] can report it before the
+	// [sae.VM] that owns the configuration exists.
+	stateScheme string
+
 	// TODO(alarso16): Remove from VM - only referenced in tests.
 	gossipSet *gossip.BloomSet[*gossipTx]
 
@@ -180,6 +185,9 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating summary handler: %w", err)
 	}
 	vm.onClose = append(vm.onClose, vm.SummaryHandler.Shutdown)
+
+	saeConfig := userConfig.saeConfig(vm.now)
+	vm.stateScheme = saeConfig.DBConfig.ResolvedScheme()
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
 	// [VM.finishInitialize] adds the [sae.VM] after all necessary state is available.
@@ -191,7 +199,6 @@ func (vm *VM) Initialize(
 			return errAlreadyClosed
 		}
 
-		saeConfig := userConfig.saeConfig(vm.now)
 		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 			return fmt.Errorf("setting up genesis trie: %w", err)
