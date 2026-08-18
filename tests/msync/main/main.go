@@ -619,8 +619,15 @@ func copyDir(sourceRoot string, targetRoot string) error {
 }
 
 // refreshStateSummaries advances the restarted serving topology past a fresh
-// state sync summary boundary and returns the height of the summary the
-// bootstrap node is expected to sync.
+// state sync summary boundary and returns that boundary, which the bootstrap
+// node is expected to sync at or above.
+//
+// The head is deliberately not driven onto a boundary by issuing a counted
+// number of transfers. One transfer does not reliably produce one block: the SAE
+// C-Chain packs transactions on its own gas-time schedule and resolves `latest`
+// to the last fully executed block, so the head both lags acceptance and moves
+// in steps larger than one. Instead this targets the next boundary above the
+// current head and issues transfers until the head has passed it.
 //
 // When the C-Chain cannot state sync the requested scheme there is no summary to
 // refresh, so this only proves that the restarted topology still builds blocks
@@ -636,17 +643,27 @@ func refreshStateSummaries(
 
 	headBlock, err := client.BlockNumber(tc.DefaultContext())
 	require.NoError(err)
-	blocksUntilSummary := stateSyncCommitInterval - (headBlock % stateSyncCommitInterval)
-	if blocksUntilSummary == 0 {
-		blocksUntilSummary = stateSyncCommitInterval
-	}
 
-	for range blocksUntilSummary {
+	// The first commit boundary strictly above the current head, and so one that
+	// only the post-restart blocks can produce.
+	refreshedBoundary := headBlock - headBlock%stateSyncCommitInterval + stateSyncCommitInterval
+
+	updatedHeadBlock := headBlock
+	deadline := time.Now().Add(e2e.DefaultTimeout)
+	for updatedHeadBlock < refreshedBoundary {
+		if time.Now().After(deadline) {
+			require.NoError(fmt.Errorf(
+				"head block reached %d within %s, short of the refreshed summary boundary %d",
+				updatedHeadBlock,
+				e2e.DefaultTimeout,
+				refreshedBoundary,
+			))
+		}
 		issueTransfer(tc, client, chainID, fundingKey, transferRecipient, big.NewInt(0))
+		updatedHeadBlock, err = client.BlockNumber(tc.DefaultContext())
+		require.NoError(err)
 	}
 
-	updatedHeadBlock, err := client.BlockNumber(tc.DefaultContext())
-	require.NoError(err)
 	require.Greater(updatedHeadBlock, headBlock, "expected post-restart blocks to advance the head block")
 	if !stateSyncSupported {
 		tc.Log().Info("forced post-restart blocks; the C-Chain cannot state sync the requested state scheme, so there is no summary to refresh",
@@ -657,13 +674,13 @@ func refreshStateSummaries(
 		return 0
 	}
 
-	require.Zero(updatedHeadBlock%stateSyncCommitInterval, "expected refreshed head block to land on a state sync summary boundary")
 	tc.Log().Info("forced post-restart blocks to produce a fresh state summary",
 		zap.Uint64("initialHeadBlock", headBlock),
 		zap.Uint64("updatedHeadBlock", updatedHeadBlock),
+		zap.Uint64("refreshedBoundary", refreshedBoundary),
 		zap.Uint64("stateSyncCommitInterval", stateSyncCommitInterval),
 	)
-	return updatedHeadBlock
+	return refreshedBoundary
 }
 
 func newMerkleSyncPrimaryChainConfigs() map[string]tmpnet.ConfigMap {
@@ -800,7 +817,7 @@ func generateWorkload(
 		lastBlockNumber      uint64
 	)
 
-	tc.By("generating mixed Firewood-backed workload until bootstrap thresholds are reached", func() {
+	tc.By("generating mixed workload until bootstrap thresholds are reached", func() {
 		for {
 			currentSize, err := totalSize(pathsToMeasure...)
 			require.NoError(err)
@@ -1185,11 +1202,22 @@ func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, boot
 			health.StateSync.Error,
 		)
 	}
-	if health.StateSync.SummaryHeight != expectedSummaryHeight {
+	// At or above, rather than equal: the serving nodes offer the highest commit
+	// boundary they have accepted, which can be past the boundary the harness
+	// forced if the chain kept building. Anything at or above that boundary
+	// still rules out a summary predating the serving restart.
+	if health.StateSync.SummaryHeight < expectedSummaryHeight {
 		return vmHealth{}, fmt.Errorf(
-			"expected bootstrap node to sync the refreshed summary at height %d, got %d",
+			"expected bootstrap node to sync a summary at or above the refreshed boundary %d, got %d",
 			expectedSummaryHeight,
 			health.StateSync.SummaryHeight,
+		)
+	}
+	if health.StateSync.SummaryHeight%stateSyncCommitInterval != 0 {
+		return vmHealth{}, fmt.Errorf(
+			"expected the synced summary height %d to be a multiple of the commit interval %d",
+			health.StateSync.SummaryHeight,
+			stateSyncCommitInterval,
 		)
 	}
 	return health, nil
