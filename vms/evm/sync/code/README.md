@@ -1,84 +1,43 @@
-# Code Sync
+# Code sync
 
-State sync references contract bytecode that it does not carry. This package
-resolves those references, and serves the same request for peers doing the same.
-
-```mermaid
-flowchart LR
-  Producer([Trie walker]) -->|AddCode| Syncer
-  Syncer <-->|GetCode| Peers[[Peers]]
-  Syncer -->|to-fetch markers, verified bytecode| Store[(Local store)]
-  Store --> Handler
-  Handler -->|stored bytecode| Peers
-```
-
-## Roles
-
-| | Owns | Does not |
-| --- | --- | --- |
-| **Handler** | answering a peer's request from local storage | fetch, verify, or write anything |
-| **Syncer** | every write this package makes, on both keys | decide which hashes are worth resolving |
-| **Producer** | discovering hashes and handing them to `AddCode` | touch the store, or live in this package |
-
-## Storage invariants
-
-Two keys exist per contract. The syncer writes both.
-
-| State | Written by | Meaning |
-| --- | --- | --- |
-| Bytecode | `Sync`, after verifying it | the contract is resolved |
-| To-fetch marker | `AddCode`, before queueing | the hash is still owed |
-
-The marker is the durable record of outstanding work. An interrupted sync
-resumes by iterating markers, so the store is the source of truth and the queue
-is only a hand-off.
-
-1. **A hash is marked before it is queued.** `AddCode` commits the marker
-   before enqueueing, so a crash in between costs a rediscovered hash, not a
-   lost one.
-
-2. **Bytecode and its marker clear commit together.** One batch, so recovery
-   sees both or neither, and code is never stored with its marker still set.
-
-3. **Nothing unverified is written.** Count and hash are checked before the
-   commit is reached. Size is not: rejecting an oversized contract would
-   reject the only answer a peer can give. (TODO: revisit for genesis
-   contracts too large for one message.)
-
-4. **A claim outlives its commit.** `AddCode` claims a hash before marking it
-   and releases the claim on failure or once the bytecode commits, so a
-   repeat defers to whoever holds it.
-
-5. **Code already stored is never marked or claimed.** `AddCode` reads the
-   store first, so shared bytecode costs neither a marker, a claim, nor a slot.
-
-6. **A repeat racing a commit is caught, not just tolerated.** `AddCode`
-   re-checks the store right after claiming, so code that lands between the
-   first read and the claim is still seen before a fetch is queued for it.
+An EVM account references its contract code by hash. The bytecode lives outside the account trie. As the account syncer discovers code hashes, it passes them to this package to resolve that code from peers. This package also defines how to respond to that same request for syncing peers.
 
 ```mermaid
 sequenceDiagram
-  participant P as Producer
-  participant A as Syncer.AddCode
-  participant C as Claims
-  participant B as Batcher
-  participant W as Worker
-  participant S as Store
-  P->>A: hashes
-  A->>S: read, skip what is already stored
-  A->>C: claim what is missing
-  A->>S: mark it, one batch
-  A->>B: queue it
-  B->>W: full batch
-  W->>W: GetCode, verify, else score down and retry elsewhere
-  W->>S: commit bytecode and marker clear together
-  W->>C: release the claim
+  participant A as Account syncer
+  participant S as Syncer
+  participant P as Peer
+  A->>S: AddCode(hashes)
+  S->>S: drop stored and in-flight hashes
+  S->>S: mark the rest to-fetch
+  S-->>A: return
+  S->>P: GetCode, a batch of hashes
+  P->>P: read each hash from its database
+  P-->>S: bytecode
+  S->>S: verify, commit code, clear markers
 ```
 
-## Lifecycle
+`AddCode` MUST NOT block on the network. It is called from the same message handlers that deliver the syncer's own responses, so a blocked add could deadlock the sync. To avoid this blocking, `AddCode` does not bound the amount of outstanding code to fetch.
 
-`NewSyncer` clears the markers of code that arrived before the last shutdown and
-re-queues the rest. `AddCode` accepts hashes without ever waiting on the network.
-`CloseInput` stops taking hashes, and `Sync` returns once what is queued has
-been fetched. `Sync` closes input on its way out, so a producer outliving it
-learns through `ErrInputClosed` rather than marking code nothing will fetch.
+## Crash recovery
+
+Once `AddCode` returns, the account syncer persists accounts that reference the code. The to-fetch marker records the pending download in case the node crashes before it completes.
+
+| Entry | Meaning | Written | Deleted |
+| --- | --- | --- | --- |
+| To-fetch marker | code is referenced but not yet downloaded | by `AddCode`, before it returns | in the same batch as the code write |
+| Code | verified bytecode | by `Sync`, after verification | never |
+
+`NewSyncer` re-queues any marked hash that still lacks code, resuming the download after a crash.
+
+## Duplicates
+
+Many accounts carry identical bytecode, so `AddCode` sees the same hash repeatedly. Repeats are dropped by an in-memory claim, taken before the disk read and released only after the code is committed, so the read cannot miss code from a racing fetch.
+
+## Verification
+
+A response is accepted only if it carries one entry per requested hash and every entry hashes to its request. Anything else de-scores the peer, and the batch is retried elsewhere.
+
+## Serving
+
+`RegisterHandler` installs the peer side of the exchange, answering `GetCode` from the node's database. A request is answered in full or rejected, since the syncer discards partial responses. Both sides cap a request at the number of maximum-size contracts that fit in one response.

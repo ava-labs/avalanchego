@@ -17,145 +17,63 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const numSyncWorkers = 5
-
-var (
-	// ErrInputClosed reports that nothing will fetch what the caller is offering.
-	ErrInputClosed = errors.New("code syncer input is closed")
-
-	errSyncAlreadyRun    = errors.New("code syncer has already run")
-	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
-	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
-)
-
-// Syncer resolves contract code by hash, and owns every write to both the
-// bytecode and the to-fetch marker.
-//
-// One goroutine batches queued hashes, numSyncWorkers others fetch.
+// Syncer resolves contract code by hash from peers.
 type Syncer struct {
-	log     logging.Logger
-	client  *Client
-	db      ethdb.KeyValueStore
-	q       *queue
-	claimed *claimSet
+	log    logging.Logger
+	client *Client
+	db     ethdb.KeyValueStore
 
+	claimed claimSet
 	started atomic.Bool
+
+	lock       sync.Mutex
+	cond       *lock.Cond
+	doneAdding bool
+	queued     []common.Hash
 }
 
-// NewSyncer returns a [Syncer] that writes verified code into db, fetching from
-// peers through c. An interrupted sync resumes from the markers it left.
+// NewSyncer returns a [Syncer] that downloads contract code through c and
+// writes it to db. A restarted sync resumes where the previous one left off.
 func NewSyncer(log logging.Logger, c *Client, db ethdb.KeyValueStore) (*Syncer, error) {
 	s := &Syncer{
-		log:     log,
-		client:  c,
-		db:      db,
-		q:       newQueue(),
-		claimed: &claimSet{},
+		log:    log,
+		client: c,
+		db:     db,
 	}
+	s.cond = lock.NewCond(&s.lock)
 	if err := s.requeueOutstanding(); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// AddCode marks hashes as outstanding and queues them, skipping code already
-// stored or already claimed by a repeat in flight.
-//
-// MUST never block: it shares the node's async App-message pool with the
-// GetCode responses this queues, so waiting on them here can deadlock it.
-func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
-	// Held across the write and the enqueue, so a refused call leaves nothing owed.
-	if !s.q.enter() {
-		return ErrInputClosed
-	}
-	defer s.q.exit()
-
-	batch := s.db.NewBatch()
-	missing := make([]common.Hash, 0, len(hashes))
-	// Released on any error, so a failed call leaves nothing claimed with no
-	// fetch coming for it.
-	defer func() {
-		if retErr != nil {
-			s.claimed.release(missing...)
-		}
-	}()
-
-	for _, codeHash := range hashes {
-		if rawdb.HasCode(s.db, codeHash) {
-			continue
-		}
-		// Claim before writing, so a repeat already claimed is skipped here
-		// instead of writing a duplicate marker or queuing a duplicate fetch.
-		if !s.claimed.claim(codeHash) {
-			continue
-		}
-		// A fetch that just released this claim already committed the code,
-		// so this catches it before requeuing.
-		if rawdb.HasCode(s.db, codeHash) {
-			s.claimed.release(codeHash)
-			continue
-		}
-		missing = append(missing, codeHash)
-		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
-			return fmt.Errorf("marking code to fetch: %w", err)
-		}
-	}
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("committing code to fetch markers: %w", err)
-	}
-
-	s.q.enqueue(missing)
-	return nil
-}
-
-// CloseInput stops taking hashes. [Syncer.Sync] returns once the queue drains.
-// Safe from any goroutine, more than once, and before Sync. Only the producer
-// calls this, never Sync, however Sync exits.
-func (s *Syncer) CloseInput() {
-	s.q.close()
-}
-
-// Sync fetches until input closes and the queue drains, or ctx ends. Runs once.
-func (s *Syncer) Sync(ctx context.Context) error {
-	if !s.started.CompareAndSwap(false, true) {
-		return errSyncAlreadyRun
-	}
-
-	eg, egCtx := errgroup.WithContext(ctx)
-	// A slot for the batcher, so numSyncWorkers fetches still run alongside it.
-	eg.SetLimit(numSyncWorkers + 1)
-
-	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
-	return eg.Wait()
-}
-
-// requeueOutstanding re-queues markers a previous run left, clearing ones
-// StateDB.Commit already satisfied. Runs before any producer holds the Syncer.
+// requeueOutstanding re-enqueues the code hashes a previous run marked but
+// never fetched, and deletes markers whose code is already on disk. It must
+// run before the Syncer is shared with other goroutines.
 func (s *Syncer) requeueOutstanding() error {
 	it := customrawdb.NewCodeToFetchIterator(s.db)
 	defer it.Release()
 
 	batch := s.db.NewBatch()
-	var outstanding []common.Hash
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
-		// Clear the CodeToFetch in case another part of the code wrote codehashes outside of the syncer.
-		stored, err := clearIfStored(s.db, batch, codeHash)
-		if err != nil {
-			return err
-		}
-		if !stored {
-			// Claimed here too, so a concurrent AddCode for the same hash defers
-			// to whichever of the two reaches the queue.
+		if !rawdb.HasCode(s.db, codeHash) {
 			s.claimed.claim(codeHash)
-			outstanding = append(outstanding, codeHash)
+			s.queued = append(s.queued, codeHash)
 			continue
+		}
+
+		// Another part of the node already wrote this code, so the fetch is
+		// no longer needed.
+		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
+			return fmt.Errorf("deleting stale code marker: %w", err)
 		}
 	}
 	if err := it.Error(); err != nil {
@@ -164,25 +82,134 @@ func (s *Syncer) requeueOutstanding() error {
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("committing recovered marker clears: %w", err)
 	}
-
-	s.q.enqueue(outstanding)
 	return nil
 }
 
-// batchHashes drains the queue, handing each full batch to a worker. Every
-// dequeued hash arrives already claimed by AddCode or recovery.
+var errDoneAdding = errors.New("code syncer is no longer accepting hashes")
+
+// AddCode marks code hashes to be fetched during syncing. If AddCode returns
+// nil, the code will be populated by the time [Syncer.Sync] returns nil, even
+// if the node crashes and the syncer restarts.
+//
+// AddCode NEVER blocks on the network, so it is safe to call from the VM's app
+// message handlers. If it did, those handlers could deadlock with the syncer's
+// own code requests.
+func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
+	batch := s.db.NewBatch()
+	missing := make([]common.Hash, 0, len(hashes))
+	// On error the missing hashes are never enqueued, so the fetcher will
+	// never release them. Release them here instead.
+	defer func() {
+		if retErr != nil {
+			s.claimed.release(missing...)
+		}
+	}()
+
+	for _, codeHash := range hashes {
+		// Claiming gives this goroutine sole ownership of the hash. Every
+		// successful claim MUST eventually be released.
+		if !s.claimed.claim(codeHash) {
+			continue
+		}
+		// Skip code that is already on disk.
+		if rawdb.HasCode(s.db, codeHash) {
+			s.claimed.release(codeHash)
+			continue
+		}
+		missing = append(missing, codeHash)
+		// Once AddCode returns, the account syncer will persist accounts that
+		// reference this code. The marker survives a crash, so a restarted
+		// sync still fetches the code.
+		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
+			return fmt.Errorf("marking code to fetch: %w", err)
+		}
+	}
+
+	// The lock is taken only now so the DB reads above run outside of it.
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.doneAdding {
+		return errDoneAdding
+	}
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("committing code to fetch markers: %w", err)
+	}
+
+	s.queued = append(s.queued, missing...)
+	s.cond.Broadcast()
+	return nil
+}
+
+// DoneAdding stops [Syncer.AddCode] from accepting new hashes and allows
+// [Syncer.Sync] to return once it finishes fetching the queued hashes.
+//
+// DoneAdding is idempotent and safe to call at any time.
+func (s *Syncer) DoneAdding() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.doneAdding = true
+	s.cond.Broadcast()
+}
+
+var errSyncAlreadyRun = errors.New("code syncer has already run")
+
+// Sync runs until [Syncer.DoneAdding] has been called and every hash given to
+// [Syncer.AddCode] has its code on disk, or until ctx is cancelled.
+//
+// Sync MUST be called at most once. A cancelled Sync leaves hashes claimed but
+// unfetched, and only the recovery in [NewSyncer] re-enqueues them, so each
+// attempt needs a fresh Syncer.
+func (s *Syncer) Sync(ctx context.Context) error {
+	if !s.started.CompareAndSwap(false, true) {
+		return errSyncAlreadyRun
+	}
+
+	eg, egCtx := errgroup.WithContext(ctx)
+	const numCodeFetchers = 5
+	// One extra slot for the batcher, so numCodeFetchers can run alongside it.
+	eg.SetLimit(numCodeFetchers + 1)
+
+	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
+	return eg.Wait()
+}
+
+// drainQueue blocks until at least one hash is queued or [Syncer.DoneAdding]
+// has been called, returning the queued hashes and whether adding is done.
+func (s *Syncer) drainQueue(ctx context.Context) ([]common.Hash, bool, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for len(s.queued) == 0 && !s.doneAdding {
+		if err := s.cond.Wait(ctx); err != nil {
+			return nil, false, err
+		}
+	}
+
+	pending := s.queued
+	s.queued = nil
+	return pending, s.doneAdding, nil
+}
+
+// batchHashes drains the queue, handing each batch to a worker. Every dequeued
+// hash arrives already claimed by AddCode or recovery.
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
 	fetch := func() {
-		full := batch
+		hashes := batch
 		eg.Go(func() error {
-			return s.fetchAndPersist(ctx, full)
+			return s.fetchAndPersist(ctx, hashes)
 		})
 		batch = make([]common.Hash, 0, maxHashesPerRequest)
 	}
 
 	for {
-		queued, closed := s.q.take()
+		queued, done, err := s.drainQueue(ctx)
+		if err != nil {
+			return err
+		}
+
 		for _, codeHash := range queued {
 			batch = append(batch, codeHash)
 			if len(batch) == maxHashesPerRequest {
@@ -190,22 +217,16 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 			}
 		}
 
-		if closed {
+		if done {
 			if len(batch) > 0 {
 				fetch()
 			}
 			return nil
 		}
-
-		// A wakeup already pending from work added mid-drain returns at once, so
-		// this never waits past hashes that arrived while queued was processed.
-		if err := s.q.wait(ctx); err != nil {
-			return err
-		}
 	}
 }
 
-// fetchAndPersist fetches code for hashes from the network and writes it to db.
+// fetchAndPersist downloads the code for hashes and writes it to disk.
 func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) error {
 	data, err := getCode(ctx, s.log, s.client, hashes)
 	if err != nil {
@@ -214,49 +235,40 @@ func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) erro
 	if err := persist(s.db, hashes, data); err != nil {
 		return err
 	}
-	// Released only after the commit, so a repeat is seen on disk instead.
+	// Released only after the commit, so a repeated hash finds the code on
+	// disk instead of fetching it again.
 	s.claimed.release(hashes...)
 	return nil
 }
 
-// claimSet holds the hashes accepted into the pipeline, until their code is
-// committed, so a repeat is not fetched twice. Bounded by the work outstanding.
+// claimSet holds each hash from acceptance until its code is committed, so a
+// repeated hash is not fetched twice. Its size is bounded by the outstanding
+// work.
 type claimSet struct {
 	m sync.Map
 }
 
-// claim reports whether codeHash was taken, and false if it was already held.
+// claim takes codeHash, returning true if it was successfully claimed.
 func (c *claimSet) claim(codeHash common.Hash) bool {
 	_, held := c.m.LoadOrStore(codeHash, struct{}{})
 	return !held
 }
 
+// release clears the claims on hashes.
 func (c *claimSet) release(hashes ...common.Hash) {
 	for _, codeHash := range hashes {
 		c.m.Delete(codeHash)
 	}
 }
 
-// clearIfStored deletes the to-fetch marker through w if the code is on disk,
-// reporting whether it was.
-func clearIfStored(r ethdb.KeyValueReader, w ethdb.KeyValueWriter, codeHash common.Hash) (bool, error) {
-	if !rawdb.HasCode(r, codeHash) {
-		return false, nil
-	}
-	if err := customrawdb.DeleteCodeToFetch(w, codeHash); err != nil {
-		return false, fmt.Errorf("deleting stale code marker: %w", err)
-	}
-	return true, nil
-}
-
 // persist writes the code and clears the to-fetch markers in one batch.
-func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
+func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 	batch := db.NewBatch()
 	for i, codeHash := range hashes {
 		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("deleting code to fetch marker: %w", err)
 		}
-		rawdb.WriteCode(batch, codeHash, data[i])
+		rawdb.WriteCode(batch, codeHash, codes[i])
 	}
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("writing fetched code: %w", err)
@@ -264,8 +276,8 @@ func persist(db ethdb.Batcher, hashes []common.Hash, data [][]byte) error {
 	return nil
 }
 
-// getCode requests hashes through c and verifies every blob against its hash,
-// scoring the peer.
+// getCode fetches the code for hashes through c, scoring each peer on its
+// response. It retries until a peer returns valid code or ctx is cancelled.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
 	for {
@@ -276,13 +288,15 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		resp := &syncpb.GetCodeResponse{}
 		outcome, err := c.Send(ctx, req, resp)
 		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			log.Debug("code request failed, re-requesting", zap.Error(err))
+			// Send already de-scored any peer it reached, re-request.
+			log.Debug("code request failed, re-requesting",
+				zap.Error(err),
+			)
 			continue
 		}
 
-		data := resp.GetData()
-		if err := verifyCode(hashes, data); err != nil {
+		codes := resp.GetData()
+		if err := verifyCode(hashes, codes); err != nil {
 			outcome.Failure()
 			log.Debug("invalid code response, re-requesting",
 				zap.Stringer("nodeID", outcome.NodeID()),
@@ -292,21 +306,21 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		}
 
 		outcome.Success()
-		return data, nil
+		return codes, nil
 	}
 }
 
-// verifyCode reports whether data is the code for hashes, in order.
-func verifyCode(hashes []common.Hash, data [][]byte) error {
-	if len(data) != len(hashes) {
-		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(data), len(hashes))
+var (
+	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
+	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
+)
+
+// verifyCode checks that codes match hashes, in count and in content.
+func verifyCode(hashes []common.Hash, codes [][]byte) error {
+	if len(codes) != len(hashes) {
+		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(codes), len(hashes))
 	}
-	for i, code := range data {
-		// Size is deliberately not checked. Contracts larger than MaxCodeSize
-		// exist, and rejecting one would reject the only answer a peer can give.
-		//
-		// TODO(powerslider): investigate oversized genesis contracts. getCode
-		// retries forever on one, de-scoring every peer that ever holds it.
+	for i, code := range codes {
 		if got := crypto.Keccak256Hash(code); got != hashes[i] {
 			return fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
 		}
