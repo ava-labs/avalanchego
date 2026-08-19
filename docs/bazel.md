@@ -600,14 +600,15 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
-In GitHub Actions, the Bazel jobs use the local
-`./.github/actions/setup-bazel` composite action. It prepares cache
-state for the dependencies those jobs are expected to need and sets
-`RUN_TASK_PREFER_BAZEL=1`. With that variable set, `run_task.sh` uses
-the Bazel-owned `//tools/external:task` target instead of bootstrapping
-`task` with `go tool` on runners where Go is already on `PATH`. That
-preference is only for CI; local developer use still defaults to the
-Go-based task bootstrap.
+In GitHub Actions, the Bazel jobs use the local `./.github/actions/setup-bazel`
+composite action. It applies the shared runner disk guard described in
+[CI disk space](./ci-disk-space.md) before Bazel cache restore and setup work. The
+Bazel-specific action then prepares cache state for the dependencies those jobs are
+expected to need and sets `RUN_TASK_PREFER_BAZEL=1`. With that variable set,
+`run_task.sh` uses the Bazel-owned `//tools/external:task` target instead of
+bootstrapping `task` with `go tool` on runners where Go is already on `PATH`. That
+preference is only for CI; local developer use still defaults to the Go-based task
+bootstrap.
 
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,

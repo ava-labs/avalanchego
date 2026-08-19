@@ -255,6 +255,18 @@ tasks:
     desc: Collects runner, Docker, kind, and Kubernetes diagnostics. Optional arg is output dir.
     cmd: '{{.NIX_RUN}} ./scripts/collect_kind_diagnostics.sh {{.CLI_ARGS}}'
 
+  log-ci-disk-state-bazel:
+    desc: Logs bounded CI disk diagnostics for Bazel jobs.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic --group bazel'
+
+  log-ci-disk-state-docker:
+    desc: Logs bounded CI disk diagnostics for Docker/image-building jobs.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic --group docker'
+
+  log-ci-disk-state-generic:
+    desc: Logs bounded generic CI root-disk diagnostics.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic'
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: '{{.NIX_RUN}} bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}'
@@ -359,6 +371,7 @@ tasks:
     deps:
       - lint-action
       - lint-shell
+      - test-ci-disk-space
       - check-go-version
       - check-require-directives
 
@@ -377,6 +390,7 @@ tasks:
       - task: lint-saevm
       - task: lint-action
       - task: lint-shell
+      - task: test-ci-disk-space
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -410,6 +424,12 @@ tasks:
       - cmd: '{{.NIX_RUN}} go mod download'
       # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  test-ci-disk-space:
+    desc: Tests CI disk-space check and diagnostics scripts
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/test_check_ci_disk_space.sh'
+      - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
