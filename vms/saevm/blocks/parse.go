@@ -6,7 +6,6 @@ package blocks
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -16,12 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
-var (
-	// maxUnixTime is the maximum parsable time for a block. This is
-	// unnecessarily strict, but ensures we don't overflow [time.Time]
-	// internals.
-	maxUnixTime = unix(time.Date(3000, time.January, 1, 0, 0, 0, 0, time.UTC))
+// maxUnixTime is the maximum parsable time for a block. This is unnecessarily
+// strict, but ensures we don't overflow [time.Time] internals.
+const maxUnixTime = 32503680000 // 01/01/3000 @ 12:00am (UTC)
 
+var (
 	errBlockTooFarInFuture    = errors.New("block too far in the future")
 	errBlockHeightNotUint64   = errors.New("block height not uint64")
 	errTxHashMismatch         = errors.New("transaction hash mismatch")
@@ -86,10 +84,6 @@ func parseEthBlock(buf []byte) (*types.Block, error) {
 		}
 	}
 	return b, nil
-}
-
-func unix(t time.Time) uint64 {
-	return uint64(t.Unix()) //#nosec G115 -- Guaranteed to be positive
 }
 
 func compareHashPtrs(a, b *common.Hash) bool {

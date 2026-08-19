@@ -140,7 +140,7 @@ func TestParseEthBlock(t *testing.T) {
 		{
 			name: "far_future_block_time",
 			mutate: func(h *types.Header) *types.Header {
-				h.Time = math.MaxInt64 // note this is still a valid argument to time.Unix
+				h.Time = math.MaxInt64
 				return h
 			},
 			wantErr: errBlockTooFarInFuture,

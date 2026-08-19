@@ -26,11 +26,6 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-var (
-	errBlockTooFarInFuture = errors.New("block too far in the future")
-	errBlockTooLarge       = errors.New("block size exceeds maximum")
-)
-
 // ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
 // block ancestry, which is done by [VM.VerifyBlock] i.f.f. verification
 // passes.
@@ -56,6 +51,7 @@ var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
 	errHashMismatch      = errors.New("hash mismatch")
+	errBlockTooLarge     = errors.New("block size exceeds maximum")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
