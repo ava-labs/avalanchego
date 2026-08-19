@@ -583,7 +583,7 @@ func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
 	currentTimestamp := e.state.GetTimestamp()
 	upgrades := e.backend.Config.UpgradeConfig
 	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return ErrDurangoUpgradeNotActive
+		return errDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
