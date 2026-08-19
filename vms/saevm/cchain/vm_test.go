@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"math"
 	"math/big"
@@ -100,6 +101,7 @@ type SUT struct {
 	sender    *saetest.Sender
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
+	logger    *loggingtest.Logger
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -107,15 +109,16 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		clock      *saetest.Clock
-		vmConfig   config
-		db         database.Database
-		state      snow.State
-		upgrades   upgrade.Config
+		genesis      core.Genesis
+		nodeID       ids.NodeID
+		networkID    uint32
+		validators   *warptest.Validators
+		clock        *saetest.Clock
+		vmConfig     config
+		db           database.Database
+		chainDataDir string
+		state        snow.State
+		upgrades     upgrade.Config
 
 		skipRPCTransport bool
 	}
@@ -156,6 +159,14 @@ func withoutRPCTransport() sutOption {
 func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
+	})
+}
+
+// withChainDataDir overrides the SUT's chain data directory, useful for
+// re-using the execution results DB.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
 	})
 }
 
@@ -277,6 +288,16 @@ var chainDBPrefix = []byte("chain")
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	sut, err := tryNewSUT(tb, opts...)
+	require.NoError(tb, err, "tryNewSUT()")
+	return sut.logger.CancelOnError(tb.Context()), sut
+}
+
+// tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
+// [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
+	tb.Helper()
+
 	// Run under the latest network upgrade rules by default.
 	chainConfig := cparams.Copy(saetest.ChainConfig())
 	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
@@ -290,14 +311,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb),
-			clock:      saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:       ids.GenerateTestNodeID(),
+			networkID:    constants.UnitTestID,
+			validators:   warptest.NewValidators(tb),
+			clock:        saetest.NewClock(testStartTime, time.Millisecond),
+			vmConfig:     defaultConfig(),
+			db:           memdb.New(),
+			chainDataDir: tb.TempDir(),
+			state:        snow.NormalOp,
+			upgrades:     upgradetest.GetConfig(upgradetest.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -311,6 +333,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	snowCtx.ChainDataDir = cfg.chainDataDir
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
@@ -331,7 +354,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -340,7 +363,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		configBytes,
 		nil, // fxs
 		appSender,
-	), "%T.Initialize()", vm)
+	); err != nil {
+		return nil, fmt.Errorf("%T.Initialize(): %w", vm, err)
+	}
 	tb.Cleanup(func() {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
@@ -365,6 +390,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 		clock:     cfg.clock,
+		logger:    log,
 	}
 
 	// Called from [SUT.SetState].
@@ -393,16 +419,20 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	if cfg.state == snow.NormalOp {
 		// The engine sets the preference to the last accepted block when entering
 		// normal operation. The bootstrapper will first set it to bootstrapping.
-		require.NoErrorf(tb, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", vm, snow.Bootstrapping)
+		if err := sut.SetState(ctx, snow.Bootstrapping); err != nil {
+			return nil, fmt.Errorf("%T.SetState(%s): %w", vm, snow.Bootstrapping, err)
+		}
 		lastAccepted, err := sut.LastAccepted(ctx)
 		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
 		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
 	}
-	require.NoErrorf(tb, sut.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+	if err := sut.SetState(ctx, cfg.state); err != nil {
+		return nil, fmt.Errorf("%T.SetState(%s): %w", vm, cfg.state, err)
+	}
 
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
-	return ctx, sut
+	return sut, nil
 }
 
 func (s *SUT) SetState(ctx context.Context, state snow.State) error {
@@ -1441,6 +1471,33 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
 		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
 	})
+}
+
+// Restarting with a settled asynchronous block requires the chain data
+// directory (home of the execution-results DB) to be carried over along with
+// the database; startup fails otherwise.
+func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	timeOpt, clock := withVMTime(testStartTime)
+	db := memdb.New()
+	dataDir := t.TempDir()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	w := newWallet(key, node.ctx, node.Client)
+
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.AdvanceToSettle(ctx, t, settled)
+	settler := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settles the first block")
+
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	_, err := tryNewSUT(t, alloc, timeOpt, withDB(db))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "restart without the chain data directory")
+
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
