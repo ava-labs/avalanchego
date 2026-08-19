@@ -462,7 +462,7 @@ func TestSyncer_AddCodeRacesDoneAdding(t *testing.T) {
 	sut.restart(t)
 	for i, hash := range hashes {
 		if errs[i] != nil {
-			assert.NoError(t, sut.AddCode([]common.Hash{hash}))
+			require.NoError(t, sut.AddCode([]common.Hash{hash}))
 		}
 	}
 	sut.DoneAdding()
