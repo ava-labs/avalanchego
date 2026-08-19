@@ -365,7 +365,8 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 
 			// The syncer only re-requests after rejecting, so a second request
 			// is the rejection signal and ends a sync that never converges.
-			guard := synctest.NewCancelAfter(&staticResponder{blocks: [][]byte{tt.served}}, 2, cancel)
+			recorder := synctest.NewRecordingResponder(&staticResponder{blocks: [][]byte{tt.served}})
+			guard := synctest.NewCancelAfter(recorder, 2, cancel)
 			net, tracker := synctest.ServeResponder(t, ctx, logging.NoLog{}, p2p.EVMBlockRequestHandlerID, guard)
 
 			var opts []SyncerOption
@@ -378,7 +379,7 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
 			require.Nil(t, rawdb.ReadBlock(target, tip.Hash(), tip.NumberU64()))
-			require.True(t, guard.Fired(), "the response was never rejected and re-requested")
+			require.Len(t, recorder.Requests(), 2, "the response was never rejected and re-requested")
 		})
 	}
 }
