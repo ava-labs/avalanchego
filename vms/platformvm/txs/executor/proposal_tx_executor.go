@@ -282,10 +282,11 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 }
 
 func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
-	switch {
-	case tx == nil:
-		return platform.ErrNilTx
-	case len(e.tx.Creds) != 0:
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if len(e.tx.Creds) != 0 {
 		return errWrongNumberOfCredentials
 	}
 
@@ -316,12 +317,11 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
 }
 
 func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) error {
-	switch {
-	case tx == nil:
-		return platform.ErrNilTx
-	case tx.TxID == ids.Empty:
-		return errInvalidID
-	case len(e.tx.Creds) != 0:
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if len(e.tx.Creds) != 0 {
 		return errWrongNumberOfCredentials
 	}
 
