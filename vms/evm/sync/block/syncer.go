@@ -12,9 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -23,35 +20,18 @@ import (
 )
 
 var (
-	errBlocksToFetchRequired   = errors.New("blocksToFetch must be greater than zero")
-	errFromHashRequired        = errors.New("fromHash must be non-zero when fromHeight is greater than zero")
-	errEmptyResponse           = errors.New("empty block response")
-	errTooManyBlocks           = errors.New("more blocks returned than requested")
-	errDecodeBlock             = errors.New("failed to decode block")
-	errBlockHashMismatch       = errors.New("block does not hash to the expected value")
-	errTxHashMismatch          = errors.New("transactions do not hash to the header value")
-	errUncleHashMismatch       = errors.New("uncles do not hash to the header value")
-	errWithdrawalsHashMismatch = errors.New("withdrawals do not hash to the header value")
-	errMissingWithdrawals      = errors.New("header commits to withdrawals but the body has none")
-	errUnexpectedWithdrawals   = errors.New("body has withdrawals but the header commits to none")
+	errBlocksToFetchRequired = errors.New("blocksToFetch must be greater than zero")
+	errFromHashRequired      = errors.New("fromHash must be non-zero when fromHeight is greater than zero")
+	errParseBlockRequired    = errors.New("parseBlock must be non-nil")
+	errEmptyResponse         = errors.New("empty block response")
+	errTooManyBlocks         = errors.New("more blocks returned than requested")
+	errParseBlock            = errors.New("failed to parse block")
+	errBlockHashMismatch     = errors.New("block does not hash to the expected value")
 )
 
-// BlockVerifier rejects a block for chain rules this package cannot know.
-type BlockVerifier func(*types.Block) error
-
-type syncerConfig struct {
-	verifyBlock BlockVerifier
-}
-
-// SyncerOption configures a [Syncer] at construction time.
-type SyncerOption = options.Option[syncerConfig]
-
-// WithBlockVerifier adds a chain-specific check, such as C-Chain ExtDataHash.
-func WithBlockVerifier(v BlockVerifier) SyncerOption {
-	return options.Func[syncerConfig](func(c *syncerConfig) {
-		c.verifyBlock = v
-	})
-}
+// BlockParser decodes a block and enforces every invariant it must satisfy,
+// including the header roots.
+type BlockParser func([]byte) (*types.Block, error)
 
 // Syncer fetches a contiguous run of blocks by walking parents from a known tip
 // and writes them to db. It skips blocks already on disk, verifies every
@@ -63,21 +43,21 @@ type Syncer struct {
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
-	verifyBlock   BlockVerifier // nil when the caller supplied no chain-specific check
+	parseBlock    BlockParser
 }
 
 // NewSyncer returns a [Syncer] that walks back from (fromHash, fromHeight),
 // which counts as the first of blocksToFetch.
-func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, fromHash common.Hash, fromHeight, blocksToFetch uint64, opts ...SyncerOption) (*Syncer, error) {
+func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, parse BlockParser, fromHash common.Hash, fromHeight, blocksToFetch uint64) (*Syncer, error) {
 	if blocksToFetch == 0 {
 		return nil, errBlocksToFetchRequired
 	}
 	if (fromHash == common.Hash{}) && fromHeight > 0 {
 		return nil, errFromHashRequired
 	}
-
-	var cfg syncerConfig
-	options.ApplyTo(&cfg, opts...)
+	if parse == nil {
+		return nil, errParseBlockRequired
+	}
 
 	return &Syncer{
 		log:           log,
@@ -86,18 +66,20 @@ func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, fromHash common
 		fromHash:      fromHash,
 		fromHeight:    fromHeight,
 		blocksToFetch: blocksToFetch,
-		verifyBlock:   cfg.verifyBlock,
+		parseBlock:    parse,
 	}, nil
 }
 
 // Sync stops at blocksToFetch, at genesis, or when ctx ends. A chain shorter
 // than blocksToFetch is not an error.
+//
+// Calling it again resumes from disk, so a cancelled sync can be retried on
+// the same [Syncer].
 func (s *Syncer) Sync(ctx context.Context) error {
 	nextHash := s.fromHash
 	nextHeight := s.fromHeight
 	toFetch := s.blocksToFetch
 
-	batch := s.db.NewBatch()
 	var fetchErr error
 	for toFetch > 0 && nextHash != (common.Hash{}) {
 		if err := ctx.Err(); err != nil {
@@ -114,13 +96,14 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			continue
 		}
 
-		want := uint16(min(toFetch, uint64(maxBlocksPerResponse)))
-		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, want, s.verifyBlock)
+		maxBlocks := uint16(min(toFetch, uint64(maxBlocksPerResponse)))
+		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, maxBlocks, s.parseBlock)
 		if err != nil {
 			fetchErr = fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
 			break
 		}
 
+		batch := s.db.NewBatch()
 		for _, block := range blocks {
 			rawdb.WriteBlock(batch, block)
 			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
@@ -134,19 +117,18 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		if err := batch.Write(); err != nil {
 			return fmt.Errorf("could not write blocks at %s: %w", nextHash, err)
 		}
-		batch.Reset()
 	}
 	return fetchErr
 }
 
-// getBlocks requests up to want blocks ending at (hash, height), verifies
+// getBlocks requests up to maxBlocks blocks ending at (hash, height), verifies
 // the returned chain links back from hash, scores the peer, and re-requests on
 // any network or verification failure until ctx ends.
-func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, want uint16, verify BlockVerifier) ([]*types.Block, error) {
+func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, maxBlocks uint16, parse BlockParser) ([]*types.Block, error) {
 	req := &syncpb.GetBlockRequest{
 		Height: height,
 		// The field counts parents, so it excludes the block at height.
-		NumParents: uint32(want - 1),
+		NumParents: uint32(maxBlocks - 1),
 	}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -160,7 +142,7 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 			continue
 		}
 
-		blocks, err := verifyBlocks(hash, want, resp.GetBlocks(), verify)
+		blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), parse)
 		if err != nil {
 			outcome.Failure()
 			log.Debug("invalid block response, re-requesting", zap.Error(err))
@@ -172,9 +154,9 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 	}
 }
 
-// verifyBlocks decodes raw and reports whether it is the parent chain ending at
+// verifyBlocks parses raw and reports whether it is the parent chain ending at
 // hash, in tip-first order.
-func verifyBlocks(hash common.Hash, maxBlocks uint16, raw [][]byte, verify BlockVerifier) ([]*types.Block, error) {
+func verifyBlocks(hash common.Hash, maxBlocks uint16, raw [][]byte, parse BlockParser) ([]*types.Block, error) {
 	if len(raw) == 0 {
 		return nil, errEmptyResponse
 	}
@@ -185,49 +167,15 @@ func verifyBlocks(hash common.Hash, maxBlocks uint16, raw [][]byte, verify Block
 	blocks := make([]*types.Block, len(raw))
 	want := hash
 	for i, blockBytes := range raw {
-		block := new(types.Block)
-		if err := rlp.DecodeBytes(blockBytes, block); err != nil {
-			return nil, fmt.Errorf("%w at index %d: %w", errDecodeBlock, i, err)
+		block, err := parse(blockBytes)
+		if err != nil {
+			return nil, fmt.Errorf("%w at index %d: %w", errParseBlock, i, err)
 		}
 		if got := block.Hash(); got != want {
 			return nil, fmt.Errorf("%w at index %d: got %s expected %s", errBlockHashMismatch, i, got, want)
-		}
-		if err := verifyBody(block); err != nil {
-			return nil, fmt.Errorf("at index %d: %w", i, err)
-		}
-		if verify != nil {
-			if err := verify(block); err != nil {
-				return nil, fmt.Errorf("at index %d: %w", i, err)
-			}
 		}
 		blocks[i] = block
 		want = block.ParentHash()
 	}
 	return blocks, nil
-}
-
-// verifyBody matches the body against the header roots. The block hash covers
-// the header alone, so decoding accepts any body until these are recomputed.
-func verifyBody(block *types.Block) error {
-	if got := types.CalcUncleHash(block.Uncles()); got != block.UncleHash() {
-		return fmt.Errorf("%w: got %s expected %s", errUncleHashMismatch, got, block.UncleHash())
-	}
-	hasher := trie.NewStackTrie(nil)
-	if got := types.DeriveSha(block.Transactions(), hasher); got != block.TxHash() {
-		return fmt.Errorf("%w: got %s expected %s", errTxHashMismatch, got, block.TxHash())
-	}
-
-	wantWithdrawals := block.Header().WithdrawalsHash
-	switch {
-	case wantWithdrawals != nil:
-		if block.Withdrawals() == nil {
-			return errMissingWithdrawals
-		}
-		if got := types.DeriveSha(block.Withdrawals(), hasher); got != *wantWithdrawals {
-			return fmt.Errorf("%w: got %s expected %s", errWithdrawalsHashMismatch, got, *wantWithdrawals)
-		}
-	case block.Withdrawals() != nil:
-		return errUnexpectedWithdrawals
-	}
-	return nil
 }

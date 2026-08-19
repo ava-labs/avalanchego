@@ -6,7 +6,6 @@ package block
 import (
 	"context"
 	"errors"
-	"math/big"
 	"sync/atomic"
 	"testing"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,7 +36,7 @@ func TestVerifyBlocks(t *testing.T) {
 		hash       common.Hash
 		numParents uint16
 		raw        [][]byte
-		verify     BlockVerifier
+		parseFails bool
 		wantErr    error
 	}{
 		{
@@ -48,34 +46,12 @@ func TestVerifyBlocks(t *testing.T) {
 			raw:        chain,
 		},
 		{
-			// The block hash still matches, so only the body roots catch this.
-			name:       "forged_transactions",
-			hash:       tip.Hash(),
-			numParents: 3,
-			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs}))},
-			wantErr:    errTxHashMismatch,
-		},
-		{
-			name:       "forged_uncles",
-			hash:       tip.Hash(),
-			numParents: 3,
-			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Uncles: forgedUncles}))},
-			wantErr:    errUncleHashMismatch,
-		},
-		{
-			name:       "chain_specific_verifier_rejects",
+			name:       "parser_rejects",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        chain,
-			verify:     func(*types.Block) error { return errTestVerifier },
-			wantErr:    errTestVerifier,
-		},
-		{
-			name:       "chain_specific_verifier_accepts",
-			hash:       tip.Hash(),
-			numParents: 3,
-			raw:        chain,
-			verify:     func(*types.Block) error { return nil },
+			parseFails: true,
+			wantErr:    errTestParser,
 		},
 		{
 			name:       "empty_response",
@@ -99,17 +75,21 @@ func TestVerifyBlocks(t *testing.T) {
 			wantErr:    errBlockHashMismatch,
 		},
 		{
-			name:       "undecodable_block",
+			name:       "unparsable_block",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        [][]byte{{0xff, 0xff}},
-			wantErr:    errDecodeBlock,
+			wantErr:    errParseBlock,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := verifyBlocks(tt.hash, tt.numParents, tt.raw, tt.verify)
+			parse := decodeBlock
+			if tt.parseFails {
+				parse = failingParser
+			}
+			got, err := verifyBlocks(tt.hash, tt.numParents, tt.raw, parse)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.Nil(t, got)
@@ -132,9 +112,8 @@ func TestSyncer(t *testing.T) {
 		fromHeight    uint64
 		blocksToFetch uint64
 		wantHeights   []int
-		txsPerBlock   int   // non-zero grows blocks so a long sync crosses the flush threshold
-		wantRequests  int   // requests the syncer must send to peers
-		wantVerified  int32 // blocks the verifier must see
+		txsPerBlock   int // non-zero grows blocks so a long sync crosses the flush threshold
+		wantRequests  int // requests the syncer must send to peers
 	}{
 		{
 			name:          "all_from_network",
@@ -200,8 +179,6 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			// Long enough to cross [ethdb.IdealBatchSize], so the batch flushes
-			// mid-run.
 			name:          "flushes_a_long_sync",
 			numBlocks:     400,
 			txsPerBlock:   4,
@@ -222,15 +199,6 @@ func TestSyncer(t *testing.T) {
 			wantHeights:   []int{1, 66, 67, 130},
 			wantRequests:  1,
 		},
-		{
-			name:          "accepting_verifier_sees_every_block",
-			numBlocks:     10,
-			fromHeight:    5,
-			blocksToFetch: 3,
-			wantHeights:   []int{3, 4, 5},
-			wantRequests:  1,
-			wantVerified:  3,
-		},
 	}
 
 	for _, tt := range tests {
@@ -245,23 +213,11 @@ func TestSyncer(t *testing.T) {
 
 			net, tracker, requests := countingNetwork(t, ctx, blocks)
 
-			var (
-				verified atomic.Int32
-				opts     []SyncerOption
-			)
-			if tt.wantVerified > 0 {
-				opts = append(opts, WithBlockVerifier(func(*types.Block) error {
-					verified.Add(1)
-					return nil
-				}))
-			}
-
 			tip := blocks[tt.fromHeight]
-			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch, opts...)
+			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, decodeBlock, tip.Hash(), tt.fromHeight, tt.blocksToFetch)
 			require.NoError(t, err)
 			require.NoError(t, syncer.Sync(ctx))
 
-			require.Equal(t, tt.wantVerified, verified.Load())
 			// Skipped blocks must never be requested from peers.
 			require.Len(t, requests.Requests(), tt.wantRequests)
 			for _, h := range tt.wantHeights {
@@ -277,11 +233,14 @@ func TestSyncer(t *testing.T) {
 func TestNewSyncer_Validation(t *testing.T) {
 	log := loggingtest.New(t, logging.Debug)
 	db := rawdb.NewMemoryDatabase()
-	_, err := NewSyncer(log, nil, db, common.Hash{}, 0, 0)
+	_, err := NewSyncer(log, nil, db, decodeBlock, common.Hash{}, 0, 0)
 	require.ErrorIs(t, err, errBlocksToFetchRequired)
 
-	_, err = NewSyncer(log, nil, db, common.Hash{}, 5, 3)
+	_, err = NewSyncer(log, nil, db, decodeBlock, common.Hash{}, 5, 3)
 	require.ErrorIs(t, err, errFromHashRequired)
+
+	_, err = NewSyncer(log, nil, db, nil, common.Hash{}, 0, 3)
+	require.ErrorIs(t, err, errParseBlockRequired)
 }
 
 func TestSyncer_ContextCancelled(t *testing.T) {
@@ -305,17 +264,17 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 
 			// Accept the batch, then cancel, so the loop reaches its guard with
 			// blocks already written.
-			var opts []SyncerOption
+			parse := decodeBlock
 			if tt.cancelAfterBatch {
-				opts = append(opts, WithBlockVerifier(func(*types.Block) error {
+				parse = func(b []byte) (*types.Block, error) {
 					cancel()
-					return nil
-				}))
+					return decodeBlock(b)
+				}
 			}
 
 			target := rawdb.NewMemoryDatabase()
 			tip := blocks[len(blocks)-1]
-			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 200, opts...)
+			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, parse, tip.Hash(), tip.NumberU64(), 200)
 			require.NoError(t, err)
 
 			if !tt.cancelAfterBatch {
@@ -340,22 +299,18 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 	tip := blocks[len(blocks)-1]
 
 	tests := []struct {
-		name   string
-		served []byte
-		verify BlockVerifier
+		name       string
+		served     []byte
+		parseFails bool
 	}{
 		{
 			name:   "block_does_not_hash_to_the_requested_tip",
 			served: encodeBlock(t, blocks[0]),
 		},
 		{
-			name:   "body_does_not_match_the_header",
-			served: encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs})),
-		},
-		{
-			name:   "chain_specific_verifier_rejects",
-			served: encodeBlock(t, tip),
-			verify: func(*types.Block) error { return errTestVerifier },
+			name:       "parser_rejects",
+			served:     encodeBlock(t, tip),
+			parseFails: true,
 		},
 	}
 
@@ -364,21 +319,20 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			// The syncer only re-requests after rejecting, so a second request
-			// is the rejection signal and ends a sync that never converges.
-			// Record before cancelling. CancelAfter cancels ahead of its inner
-			// responder, so recording inside it races Sync's return.
+			// A rejection re-requests forever, so the second request signals it
+			// and ends the sync. Record outside the guard, which cancels
+			// before delegating.
 			guard := synctest.NewCancelAfter(&staticResponder{blocks: [][]byte{tt.served}}, 2, cancel)
 			recorder := synctest.NewRecordingResponder(guard)
 			log := loggingtest.New(t, logging.Debug)
 			net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, recorder)
 
-			var opts []SyncerOption
-			if tt.verify != nil {
-				opts = append(opts, WithBlockVerifier(tt.verify))
+			parse := decodeBlock
+			if tt.parseFails {
+				parse = failingParser
 			}
 			target := rawdb.NewMemoryDatabase()
-			syncer, err := NewSyncer(log, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 1, opts...)
+			syncer, err := NewSyncer(log, NewClient(net, tracker), target, parse, tip.Hash(), tip.NumberU64(), 1)
 			require.NoError(t, err)
 
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
@@ -397,80 +351,10 @@ func (r *staticResponder) Respond(context.Context, ids.NodeID, *syncpb.GetBlockR
 	return &syncpb.GetBlockResponse{Blocks: r.blocks}, nil
 }
 
-var errTestVerifier = errors.New("chain-specific verifier rejected the block")
-
-var (
-	forgedTxs    = []*types.Transaction{types.NewTransaction(99, common.Address{0xff}, big.NewInt(1), 21_000, big.NewInt(1), nil)}
-	forgedUncles = []*types.Header{{Number: big.NewInt(1), Extra: []byte{}}}
-)
-
-// forgeBlock pairs header with a body it never committed to.
-func forgeBlock(header *types.Header, body types.Body) *types.Block {
-	return types.NewBlockWithHeader(header).WithBody(body).WithWithdrawals(body.Withdrawals)
-}
-
-// Driven directly because these cases change the header, which verifyBlocks
-// rejects on the hash before reaching verifyBody.
-func TestVerifyBody_Withdrawals(t *testing.T) {
-	withdrawals := []*types.Withdrawal{{Index: 1, Validator: 2, Amount: 3}}
-	committed := types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
-	empty := types.DeriveSha(types.Withdrawals{}, trie.NewStackTrie(nil))
-	other := common.Hash{0xab}
-
-	tests := []struct {
-		name    string
-		commits *common.Hash // header WithdrawalsHash
-		body    []*types.Withdrawal
-		wantErr error
-	}{
-		{
-			name:    "committed_and_present",
-			commits: &committed,
-			body:    withdrawals,
-		},
-		{
-			name:    "committed_but_body_has_none",
-			commits: &committed,
-			wantErr: errMissingWithdrawals,
-		},
-		{
-			// An empty body is not a missing one, so committing to the empty
-			// root must hold.
-			name:    "committed_to_empty_and_body_is_empty",
-			commits: &empty,
-			body:    []*types.Withdrawal{},
-		},
-		{
-			name:    "committed_to_a_different_root",
-			commits: &other,
-			body:    withdrawals,
-			wantErr: errWithdrawalsHashMismatch,
-		},
-		{
-			name:    "present_but_header_commits_to_none",
-			body:    withdrawals,
-			wantErr: errUnexpectedWithdrawals,
-		},
-	}
-
-	blocks := synctest.MakeChain(t, 2)
-	tip := blocks[len(blocks)-1]
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			header := tip.Header()
-			header.WithdrawalsHash = tt.commits
-
-			err := verifyBody(forgeBlock(header, types.Body{Withdrawals: tt.body}))
-			require.ErrorIs(t, err, tt.wantErr)
-		})
-	}
-}
+var errTestParser = errors.New("the parser rejected the block")
 
 type blockRecorder = synctest.RecordingResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
-// countingNetwork serves blocks on a loopback network and counts the requests,
-// so a test can assert the syncer never asked for blocks it already had.
 func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockRecorder) {
 	log := loggingtest.New(t, logging.Debug)
 	r := synctest.NewRecordingResponder(newResponder(log, synctest.NewBlockDB(blocks)))
@@ -510,4 +394,51 @@ func heights(from, to int) []int {
 		out = append(out, h)
 	}
 	return out
+}
+
+// decodeBlock stands in for the chain's parser, which owns block validity.
+func decodeBlock(b []byte) (*types.Block, error) {
+	block := new(types.Block)
+	if err := rlp.DecodeBytes(b, block); err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+func failingParser([]byte) (*types.Block, error) {
+	return nil, errTestParser
+}
+
+// countingDB counts the reads a sync performs.
+type countingDB struct {
+	ethdb.Database
+	reads atomic.Int32
+}
+
+func (d *countingDB) Get(key []byte) ([]byte, error) {
+	d.reads.Add(1)
+	return d.Database.Get(key)
+}
+
+func (d *countingDB) Has(key []byte) (bool, error) {
+	d.reads.Add(1)
+	return d.Database.Has(key)
+}
+
+// A cancelled context must stop the walk before it touches disk, since the
+// skip path returns to the top of the loop without reaching the fetch.
+func TestSyncer_CancelledBeforeSkippingOnDisk(t *testing.T) {
+	blocks := synctest.MakeChain(t, 20)
+	tip := blocks[len(blocks)-1]
+
+	db := &countingDB{Database: synctest.NewBlockDB(blocks)}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	log := loggingtest.New(t, logging.Debug)
+	syncer, err := NewSyncer(log, nil, db, decodeBlock, tip.Hash(), tip.NumberU64(), 20)
+	require.NoError(t, err)
+
+	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
+	require.Zero(t, db.reads.Load(), "a cancelled sync must not walk the on-disk run")
 }
