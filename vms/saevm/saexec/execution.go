@@ -297,7 +297,7 @@ func Execute(
 	}
 
 	baseFee := gasClock.BaseFee()
-	if hooks.SettledBy(header) == (hook.Settled{}) {
+	if hook.Synchronous(hooks, header) {
 		baseFee = b.WorstCaseBaseFee()
 	} else {
 		b.CheckBaseFeeBound(baseFee)
