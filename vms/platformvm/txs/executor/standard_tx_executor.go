@@ -95,6 +95,8 @@ func StandardTx(
 }
 
 type standardTxExecutor struct {
+	wrongTxType
+
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	state         *state.Diff // state is expected to be modified
@@ -105,14 +107,6 @@ type standardTxExecutor struct {
 	onAccept       func() // may be nil
 	inputs         set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests // may be nil
-}
-
-func (*standardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return ErrWrongTxType
-}
-
-func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return ErrWrongTxType
 }
 
 func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
@@ -1472,10 +1466,6 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRene
 	avax.Produce(e.state, e.tx.ID(), tx.Outs)
 
 	return nil
-}
-
-func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

@@ -43,6 +43,8 @@ func AtomicTx(
 }
 
 type atomicTxExecutor struct {
+	wrongTxType
+
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	feeCalculator fee.Calculator
@@ -54,90 +56,6 @@ type atomicTxExecutor struct {
 	onAccept       *state.Diff
 	inputs         set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests
-}
-
-func (*atomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) BaseTx(*txs.BaseTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
-	return ErrWrongTxType
-}
-
-func (*atomicTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
 }
 
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {

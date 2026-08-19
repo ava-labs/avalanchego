@@ -13,6 +13,7 @@ go_library(
         "state_changes.go",
         "subnet_tx_verification.go",
         "warp_verifier.go",
+        "wrong_tx_type.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor",
     visibility = ["//visibility:public"],

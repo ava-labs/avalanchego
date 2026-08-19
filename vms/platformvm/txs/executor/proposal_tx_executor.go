@@ -38,7 +38,6 @@ var (
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                  = errors.New("generated output isn't valid state")
-	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
@@ -79,6 +78,8 @@ func ProposalTx(
 }
 
 type proposalTxExecutor struct {
+	wrongTxType
+
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	feeCalculator fee.Calculator
@@ -90,74 +91,6 @@ type proposalTxExecutor struct {
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
 	onAbortState *state.Diff
-}
-
-func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) BaseTx(*txs.BaseTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
-	return ErrWrongTxType
 }
 
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
@@ -632,7 +565,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	//            AddSubnetValidatorTx.
 	vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
 	if !ok {
-		return ErrWrongTxType
+		return errWrongTxType
 	}
 
 	// Calculate split of reward between delegator/delegatee
