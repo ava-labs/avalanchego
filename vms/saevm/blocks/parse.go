@@ -29,8 +29,6 @@ var (
 
 // ParseEth parses the buffer as the [rlp] encoding of a [types.Block], enforces
 // the universal invariants that every block MUST satisfy.
-//
-// If the block is not yet accepted, there may be additional checks for the caller.
 func ParseEth(buf []byte, hooks hook.Points) (*types.Block, error) {
 	b, err := parseEthBlock(buf)
 	if err != nil {
