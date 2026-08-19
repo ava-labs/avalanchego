@@ -414,6 +414,7 @@ func forgeBlock(header *types.Header, body types.Body) *types.Block {
 func TestVerifyBody_Withdrawals(t *testing.T) {
 	withdrawals := []*types.Withdrawal{{Index: 1, Validator: 2, Amount: 3}}
 	committed := types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
+	empty := types.DeriveSha(types.Withdrawals{}, trie.NewStackTrie(nil))
 	other := common.Hash{0xab}
 
 	tests := []struct {
@@ -431,6 +432,13 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 			name:    "committed_but_body_has_none",
 			commits: &committed,
 			wantErr: errMissingWithdrawals,
+		},
+		{
+			// An empty body is not a missing one, so committing to the empty
+			// root must hold.
+			name:    "committed_to_empty_and_body_is_empty",
+			commits: &empty,
+			body:    []*types.Withdrawal{},
 		},
 		{
 			name:    "committed_to_a_different_root",

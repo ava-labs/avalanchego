@@ -114,8 +114,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			continue
 		}
 
-		parents := uint16(min(toFetch, uint64(maxParentsPerRequest)))
-		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, parents, s.verifyBlock)
+		want := uint16(min(toFetch, uint64(maxBlocksPerResponse)))
+		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, want, s.verifyBlock)
 		if err != nil {
 			fetchErr = fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
 			break
@@ -129,28 +129,24 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			toFetch--
 		}
 
-		if batch.ValueSize() < ethdb.IdealBatchSize {
-			continue
-		}
-		// Retrying the flush below would only fail again.
+		// Flushing each round keeps verified work on a restart. The response
+		// is already bounded, so the batch cannot grow past one of them.
 		if err := batch.Write(); err != nil {
 			return fmt.Errorf("could not write blocks at %s: %w", nextHash, err)
 		}
 		batch.Reset()
 	}
-
-	// Persist whatever is verified even when the fetch stops early, so a
-	// restart skips it instead of refetching.
-	return errors.Join(fetchErr, batch.Write())
+	return fetchErr
 }
 
-// getBlocks requests up to numParents blocks ending at (hash, height), verifies
+// getBlocks requests up to want blocks ending at (hash, height), verifies
 // the returned chain links back from hash, scores the peer, and re-requests on
 // any network or verification failure until ctx ends.
-func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, numParents uint16, verify BlockVerifier) ([]*types.Block, error) {
+func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, want uint16, verify BlockVerifier) ([]*types.Block, error) {
 	req := &syncpb.GetBlockRequest{
-		Height:     height,
-		NumParents: uint32(numParents),
+		Height: height,
+		// The field counts parents, so it excludes the block at height.
+		NumParents: uint32(want - 1),
 	}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -164,7 +160,7 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 			continue
 		}
 
-		blocks, err := verifyBlocks(hash, numParents, resp.GetBlocks(), verify)
+		blocks, err := verifyBlocks(hash, want, resp.GetBlocks(), verify)
 		if err != nil {
 			outcome.Failure()
 			log.Debug("invalid block response, re-requesting", zap.Error(err))
@@ -178,12 +174,12 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 
 // verifyBlocks decodes raw and reports whether it is the parent chain ending at
 // hash, in tip-first order.
-func verifyBlocks(hash common.Hash, numParents uint16, raw [][]byte, verify BlockVerifier) ([]*types.Block, error) {
+func verifyBlocks(hash common.Hash, maxBlocks uint16, raw [][]byte, verify BlockVerifier) ([]*types.Block, error) {
 	if len(raw) == 0 {
 		return nil, errEmptyResponse
 	}
-	if len(raw) > int(numParents) {
-		return nil, fmt.Errorf("%w: got %d requested %d", errTooManyBlocks, len(raw), numParents)
+	if len(raw) > int(maxBlocks) {
+		return nil, fmt.Errorf("%w: got %d requested %d", errTooManyBlocks, len(raw), maxBlocks)
 	}
 
 	blocks := make([]*types.Block, len(raw))
@@ -216,7 +212,8 @@ func verifyBody(block *types.Block) error {
 	if got := types.CalcUncleHash(block.Uncles()); got != block.UncleHash() {
 		return fmt.Errorf("%w: got %s expected %s", errUncleHashMismatch, got, block.UncleHash())
 	}
-	if got := types.DeriveSha(block.Transactions(), trie.NewStackTrie(nil)); got != block.TxHash() {
+	hasher := trie.NewStackTrie(nil)
+	if got := types.DeriveSha(block.Transactions(), hasher); got != block.TxHash() {
 		return fmt.Errorf("%w: got %s expected %s", errTxHashMismatch, got, block.TxHash())
 	}
 
@@ -226,7 +223,7 @@ func verifyBody(block *types.Block) error {
 		if block.Withdrawals() == nil {
 			return errMissingWithdrawals
 		}
-		if got := types.DeriveSha(block.Withdrawals(), trie.NewStackTrie(nil)); got != *wantWithdrawals {
+		if got := types.DeriveSha(block.Withdrawals(), hasher); got != *wantWithdrawals {
 			return fmt.Errorf("%w: got %s expected %s", errWithdrawalsHashMismatch, got, *wantWithdrawals)
 		}
 	case block.Withdrawals() != nil:

@@ -40,7 +40,7 @@ func TestResponder(t *testing.T) {
 			name:       "returns_requested_parents_tip_first",
 			chainLen:   10,
 			numParents: 5,
-			wantBlocks: 5,
+			wantBlocks: 6, // the block at height plus 5 parents
 		},
 		{
 			name:       "includes_genesis_then_stops",
@@ -50,9 +50,9 @@ func TestResponder(t *testing.T) {
 		},
 		{
 			name:       "caps_parents_at_max",
-			chainLen:   int(maxParentsPerRequest) + 10,
+			chainLen:   maxBlocksPerResponse + 10,
 			numParents: uint32(maxParentsPerRequest) + 50,
-			wantBlocks: int(maxParentsPerRequest),
+			wantBlocks: maxBlocksPerResponse,
 		},
 		{
 			name:       "missing_block_rejected",
@@ -77,10 +77,11 @@ func TestResponder(t *testing.T) {
 			wantErr:    errServingCancelled,
 		},
 		{
-			name:       "zero_parents_rejected",
+			// Zero parents is a valid request for the block alone.
+			name:       "zero_parents_serves_the_block_alone",
 			chainLen:   10,
 			numParents: 0,
-			wantErr:    errNoParentsRequested,
+			wantBlocks: 1,
 		},
 		{
 			name:       "budget_fits_three_blocks",
@@ -149,8 +150,7 @@ func TestResponder(t *testing.T) {
 
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errBlocksNotFound":     errBlocksNotFound,
-		"errNoParentsRequested": errNoParentsRequested,
-		"errServingCancelled":   errServingCancelled,
+		"errBlocksNotFound":   errBlocksNotFound,
+		"errServingCancelled": errServingCancelled,
 	})
 }

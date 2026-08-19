@@ -66,6 +66,9 @@ const (
 	// maxResponseBytes bounds the response itself.
 	maxParentsPerRequest = uint16(64)
 
+	// maxBlocksPerResponse counts the requested block alongside its parents.
+	maxBlocksPerResponse = int(maxParentsPerRequest) + 1
+
 	// defaultMaxResponseBytes is the conservative p2p budget. A chain with
 	// larger blocks must raise it through [WithMaxResponseBytes].
 	defaultMaxResponseBytes = constants.MaxContainersLen
@@ -80,33 +83,24 @@ var (
 		Code:    2000,
 		Message: "requested blocks not found",
 	}
-	errNoParentsRequested = &avacommon.AppError{
-		Code:    2001,
-		Message: "no parents requested",
-	}
 	errServingCancelled = &avacommon.AppError{
-		Code:    2002,
+		Code:    2001,
 		Message: "serving cancelled",
 	}
 )
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
-	parents := int(min(req.GetNumParents(), uint32(maxParentsPerRequest)))
-	if parents == 0 {
-		r.log.Debug("rejecting request, no parents requested",
-			zap.Stringer("nodeID", nodeID),
-		)
-		return nil, errNoParentsRequested
-	}
+	// The request counts parents, so the response carries one more block.
+	blocks := int(min(req.GetNumParents(), uint32(maxParentsPerRequest))) + 1
 
 	// [GetAncestors] re-derives the height from the hash, so this lookup is
 	// redundant with its own. An unknown height yields no blocks below.
 	hash := rawdb.ReadCanonicalHash(r.db, req.GetHeight())
-	blocks, err := GetAncestors(ctx, r.db, ids.ID(hash), parents, r.maxResponseBytes, maxBlocksRetrievalTime)
+	served, err := GetAncestors(ctx, r.db, ids.ID(hash), blocks, r.maxResponseBytes, maxBlocksRetrievalTime)
 	if err != nil {
 		return nil, handlers.Fault(r.log, nodeID, err)
 	}
-	if len(blocks) == 0 {
+	if len(served) == 0 {
 		// Tell the peer we gave up rather than that the blocks are missing.
 		if ctx.Err() != nil {
 			return nil, errServingCancelled
@@ -118,5 +112,5 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		)
 		return nil, errBlocksNotFound
 	}
-	return &syncpb.GetBlockResponse{Blocks: blocks}, nil
+	return &syncpb.GetBlockResponse{Blocks: served}, nil
 }
