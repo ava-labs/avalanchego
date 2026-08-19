@@ -230,7 +230,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:                nil,
 			AP3Time:              genesistest.DefaultValidatorStartTime,
-			expectedExecutionErr: ErrPeriodMismatch,
+			expectedExecutionErr: errPeriodMismatch,
 		},
 		{
 			description:          "validator not in the current or pending validator sets",
@@ -252,7 +252,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:                addMinStakeValidator,
 			AP3Time:              genesistest.DefaultValidatorStartTime,
-			expectedExecutionErr: ErrPeriodMismatch,
+			expectedExecutionErr: errPeriodMismatch,
 		},
 		{
 			description:          "delegator stops before validator",
@@ -263,7 +263,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:                addMinStakeValidator,
 			AP3Time:              genesistest.DefaultValidatorStartTime,
-			expectedExecutionErr: ErrPeriodMismatch,
+			expectedExecutionErr: errPeriodMismatch,
 		},
 		{
 			description:          "valid",
@@ -308,7 +308,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				require.NoError(t, env.state.Commit())
 			},
 			AP3Time:              genesistest.DefaultValidatorStartTime,
-			expectedExecutionErr: ErrFlowCheckFailed,
+			expectedExecutionErr: errFlowCheckFailed,
 		},
 		{
 			description:          "over delegation before AP3",
@@ -416,7 +416,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -503,7 +503,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrNotValidator)
+		require.ErrorIs(err, errNotValidator)
 	}
 
 	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
@@ -554,7 +554,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -586,7 +586,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -1022,7 +1022,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, errAlreadyValidator)
 	}
 
 	{
@@ -1061,7 +1061,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, errAlreadyValidator)
 	}
 
 	{
@@ -1101,7 +1101,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrFlowCheckFailed)
+		require.ErrorIs(err, errFlowCheckFailed)
 	}
 }
 
@@ -1143,7 +1143,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 
 				return tx
 			},
-			expectedErr: ErrAddValidatorTxPostDurango,
+			expectedErr: errAddValidatorTxPostDurango,
 		},
 		{
 			name: "AddDelegatorTx",
@@ -1177,7 +1177,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 
 				return tx
 			},
-			expectedErr: ErrAddDelegatorTxPostDurango,
+			expectedErr: errAddDelegatorTxPostDurango,
 		},
 	}
 
@@ -1864,7 +1864,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			expectedErr: ErrNotValidator,
+			expectedErr: errNotValidator,
 		},
 		{
 			name: "validator is permissionless",
@@ -1895,7 +1895,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			expectedErr: ErrRemovePermissionlessValidator,
+			expectedErr: errRemovePermissionlessValidator,
 		},
 		{
 			name: "can't find subnet",
@@ -2012,7 +2012,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			expectedErr: ErrFlowCheckFailed,
+			expectedErr: errFlowCheckFailed,
 		},
 	}
 
@@ -2241,7 +2241,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(ErrFlowCheckFailed)
+				).Return(errFlowCheckFailed)
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -2263,7 +2263,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			err: ErrFlowCheckFailed,
+			err: errFlowCheckFailed,
 		},
 		{
 			name: "invalid after subnet conversion",
@@ -4388,7 +4388,7 @@ func TestHeliconMinStakeDurationValidator(t *testing.T) {
 		{
 			name:        "pre-Helicon 12h stake rejected",
 			fork:        upgradetest.Granite,
-			expectedErr: ErrStakeTooShort,
+			expectedErr: errStakeTooShort,
 		},
 		{
 			name:        "post-Helicon 12h stake accepted",
@@ -4595,28 +4595,28 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
 			},
-			want: ErrWeightTooSmall,
+			want: errWeightTooSmall,
 		},
 		{
 			name: "weight_too_large",
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MaxValidatorStake + 1
 			},
-			want: ErrWeightTooLarge,
+			want: errWeightTooLarge,
 		},
 		{
 			name: "insufficient_delegation_fee",
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.DelegationShares = env.config.MinDelegationFee - 1
 			},
-			want: ErrInsufficientDelegationFee,
+			want: errInsufficientDelegationFee,
 		},
 		{
 			name: "stake_too_short",
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
-			want: ErrStakeTooShort,
+			want: errStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
@@ -4929,7 +4929,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
-			wantErr: ErrStakeTooShort,
+			wantErr: errStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
