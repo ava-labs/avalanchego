@@ -153,7 +153,7 @@ func TestIssueTxConcurrent(t *testing.T) {
 
 	for i, stx := range txs {
 		require.NoErrorf(t, errs[i], "%T.IssueTx(txs[%d])", sut.Client, i)
-		require.Truef(t, sut.txpool.Has(stx.ID()), "%T.Has(txs[%d])", sut.txpool, i)
+		require.Truef(t, sut.pending.Has(stx.ID()), "%T.Has(txs[%d])", sut.pending, i)
 	}
 }
 
