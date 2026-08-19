@@ -278,23 +278,67 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), err)
 	}
 
-	// Receipts may be empty if the block was state-synced.
-	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
-	if len(e.receipts) > 0 {
-		if err := e.receipts.DeriveFields(
-			chainConfig,
-			b.Hash(),
-			b.NumberU64(),
-			b.BuildTime(),
-			e.baseFee.ToBig(),
-			nil, // SAE does not support blob transactions.
-			b.Transactions(),
-		); err != nil {
-			return fmt.Errorf("deriving receipt fields: %v", err)
-		}
+	if err := b.readReceipts(e, db, chainConfig); err != nil {
+		return err
+	}
+	return b.markExecutedAfterDiskArtefacts(e, nil)
+}
+
+// RestoreExecutionArtefactsFromSettler restores b's post-execution artefacts
+// from the header of the block that settled it, without consulting the
+// [saetypes.ExecutionResults]. It exists for blocks whose execution results
+// were never persisted, which is the case for every block before the one a
+// state-synced node synced.
+//
+// The settler's header is the authoritative record of two of b's artefacts:
+// its post-execution state root and the gas time at which its execution
+// finished. The base fee charged during b's execution is not recorded
+// anywhere but the results that are missing, so it is left zero; no consumer
+// of a block restored by this method reads it. The receipt root is derived
+// from the receipts on disk, of which a state-synced node has none, rather
+// than compared against a persisted value.
+//
+// All the caveats of [Block.RestoreExecutionArtefacts] apply, including that
+// b's settlement state is NOT restored and that any error returned corrupts
+// b's in-memory state.
+func (b *Block) RestoreExecutionArtefactsFromSettler(hooks hook.Points, settler *types.Header, db ethdb.Database, chainConfig *params.ChainConfig) error {
+	byGas, err := hook.SettledGasTime(hooks, b.Header(), settler)
+	if err != nil {
+		return fmt.Errorf("%w: block %d (%#x) settled by %d: %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), settler.Number, err)
 	}
 
+	e := &executionResults{
+		byGas:         *byGas.Clone(),
+		stateRootPost: settler.Root,
+	}
+	if err := b.readReceipts(e, db, chainConfig); err != nil {
+		return err
+	}
+	e.receiptRoot = types.DeriveSha(e.receipts, trie.NewStackTrie(nil))
+
 	return b.markExecutedAfterDiskArtefacts(e, nil)
+}
+
+// readReceipts populates e's receipts from those persisted for b, deriving
+// their fields. The receipts MAY be empty, as they are neither fetched nor
+// recreated by a state sync.
+func (b *Block) readReceipts(e *executionResults, db ethdb.Database, chainConfig *params.ChainConfig) error {
+	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
+	if len(e.receipts) == 0 {
+		return nil
+	}
+	if err := e.receipts.DeriveFields(
+		chainConfig,
+		b.Hash(),
+		b.NumberU64(),
+		b.BuildTime(),
+		e.baseFee.ToBig(),
+		nil, // SAE does not support blob transactions.
+		b.Transactions(),
+	); err != nil {
+		return fmt.Errorf("deriving receipt fields: %v", err)
+	}
+	return nil
 }
 
 // synchronousExecutionResults derives the post-execution artefacts of a

@@ -20,14 +20,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/unwind"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -250,6 +247,42 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 	return nil
 }
 
+// restoreAncestor restores b, an ancestor of settler walked by
+// [recovery.populateConsensusCriticalBlocks], to the state that recovery
+// requires of it. settledHeight is the height of the block that settler
+// settled.
+//
+// Persisted execution results are used whenever they are available. A node
+// that state synced has none for the blocks before the one it synced, since
+// it never executed them, in which case:
+//
+//   - if b is the block that settler settled, its artefacts are derived from
+//     settler's header, which authoritatively records them. b is a
+//     consensus-critical block's last-settled ancestor, so its post-execution
+//     state root is read to check the ancestry's invariants; and
+//   - otherwise b is left unexecuted, as nothing reads the execution
+//     artefacts of a block in its position. It exists only to link the chain
+//     between the blocks that are read, all of which are at or after the
+//     block whose state recovery started from.
+func (rec *recovery) restoreAncestor(b, settler *blocks.Block, settledHeight uint64) error {
+	// Synchronous blocks never persist their results, deriving them from their
+	// own header instead, so their availability is not in question.
+	if hook.Synchronous(rec.hooks, b.Header()) {
+		return b.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig)
+	}
+
+	switch has, err := rec.xdb.Has(b.NumberU64()); {
+	case err != nil:
+		return fmt.Errorf("%T.Has(%d): %w", rec.xdb, b.NumberU64(), err)
+	case has:
+		return b.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig)
+	case b.Height() == settledHeight:
+		return b.RestoreExecutionArtefactsFromSettler(rec.hooks, settler.Header(), rec.db, rec.chainConfig)
+	default:
+		return nil
+	}
+}
+
 // lastOf returns the lastOf element in a slice, which MUST NOT be empty.
 func lastOf[E any](s []E) E {
 	return s[len(s)-1]
@@ -264,17 +297,21 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
-	// and including the block that it settled.
+	// and including the block that it settled, which settler's header records.
+	// The marker is the definition of what settler settled rather than a
+	// re-derivation of it: [VM.VerifyBlock] holds every block to it, whether
+	// by rebuilding the block and comparing hashes or, when bootstrapping, by
+	// comparing the marker against the settled block it derives from the
+	// execution gas times.
 	extend := func(settler *blocks.Block) error {
-		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
+		settledHeight := rec.hooks.SettledBy(settler.Header()).Height
 
 		for {
 			switch b := lastOf(chain); {
 			case b.Synchronous():
 				return nil
 
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
+			case b.Height() <= settledHeight:
 				if b.Settled() {
 					return nil
 				}
@@ -285,7 +322,7 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := rec.restoreAncestor(parent, settler, settledHeight); err != nil {
 					return err
 				}
 				chain = append(chain, parent)

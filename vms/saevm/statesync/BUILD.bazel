@@ -24,6 +24,7 @@ go_library(
         "//utils",
         "//vms/evm/sync/block",
         "//vms/evm/sync/code",
+        "//vms/evm/sync/customrawdb",
         "//vms/evm/sync/hashdb",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",

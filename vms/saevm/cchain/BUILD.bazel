@@ -75,6 +75,7 @@ go_library(
         "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
+        "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",

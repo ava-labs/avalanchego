@@ -309,3 +309,81 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 		}
 	})
 }
+
+// prunedHeightIndex wraps a [database.HeightIndex], reporting every height
+// below floor as absent. It models a database whose earlier execution results
+// were never persisted, as is the case after a state sync.
+type prunedHeightIndex struct {
+	database.HeightIndex
+	floor uint64
+}
+
+func (p prunedHeightIndex) Get(height uint64) ([]byte, error) {
+	if height < p.floor {
+		return nil, database.ErrNotFound
+	}
+	return p.HeightIndex.Get(height)
+}
+
+func (p prunedHeightIndex) Has(height uint64) (bool, error) {
+	if height < p.floor {
+		return false, nil
+	}
+	return p.HeightIndex.Has(height)
+}
+
+// TestRecoverWithoutHistoricalExecutionResults recovers a VM whose execution
+// results are only available from the last-settled block onwards. A
+// state-synced node is in exactly this position: it persists the results of
+// the block settled by the summary's block and has no history before it.
+// Recovery MUST NOT depend on results below the state it recovers from.
+func TestRecoverWithoutHistoricalExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// blockTime matches [TestRecoverAfterCrash], chosen so that multiple
+		// blocks settle with gaps between the settled heights.
+		blockTime      = 850 * time.Millisecond
+		commitInterval = 16
+		numBlocks      = commitInterval + 15
+	)
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	// The node is archival so that the settled state recovery starts from is on
+	// disk, as it is after a state sync. Recovery therefore has no reason to
+	// look below the last-settled block.
+	archival := options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.Archival = true
+		c.logLevel = logging.Warn
+	})
+
+	var srcDB database.Database
+	srcHDB := saetest.NewHeightIndexDB()
+	ctx, src := newSUT(t, 1, sutOpt, archival, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+	}))
+
+	for range numBlocks {
+		vmTime.Advance(blockTime)
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	}
+	src.close()
+
+	// A state sync persists the results of the block settled by the block it
+	// synced, which is the block recovery finds state for, and nothing earlier.
+	floor := src.rawVM.last.settled.Load().NumberU64()
+	require.NotZero(t, floor, "last-settled height of source VM")
+
+	xdb := prunedHeightIndex{HeightIndex: srcHDB.Clone(), floor: floor}
+	_, sut := newSUT(t, 1, sutOpt, archival, withExecResultsDB(xdb), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, srcDB)
+	}))
+
+	requireConsensusCriticalBlocks(t, src, sut)
+}
