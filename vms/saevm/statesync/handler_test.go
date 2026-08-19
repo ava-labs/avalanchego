@@ -133,6 +133,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		},
 		ethDB,
 		logger,
+		hooks,
 	)
 	require.NoError(t, err, "New()")
 

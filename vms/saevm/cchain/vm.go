@@ -8,7 +8,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,11 +17,8 @@ import (
 
 	"go.uber.org/zap"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -30,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -43,9 +38,7 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	ethcommon "github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -65,7 +58,6 @@ type VM struct {
 	now              func() time.Time
 	lastWaitForEvent utils.Atomic[time.Time]
 
-	ctx         *snow.Context
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
 	metrics     *metrics
@@ -111,8 +103,6 @@ func (vm *VM) Initialize(
 	if vm.closed {
 		return errAlreadyClosed
 	}
-
-	vm.ctx = snowCtx
 
 	userConfig, err := parseConfig(configBytes, snowCtx.NetworkID)
 	if err != nil {
@@ -297,83 +287,6 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-var (
-	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
-	// BlockBodyExtra carries a Version other than 0, the only supported version.
-	errInvalidBlockVersion = errors.New("invalid block version")
-	// errExtDataUnexpectedHash is returned by [VM.ParseBlock] when a block's
-	// extData does not correspond to the hardcoded ExtDataHash.
-	errExtDataUnexpectedHash = errors.New("extData hash does not match expected value")
-	// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's
-	// extData does not hash to the ExtDataHash committed in its header.
-	errExtDataHashMismatch = errors.New("extData hash does not match header")
-
-	//go:embed extdata-fuji.json
-	fujiExtDataHashes []byte
-	//go:embed extdata-mainnet.json
-	mainnetExtDataHashes []byte
-	extDataHashes        map[uint32]map[uint64]ethcommon.Hash
-)
-
-func init() {
-	mainnet := make(map[uint64]ethcommon.Hash)
-	if err := json.Unmarshal(mainnetExtDataHashes, &mainnet); err != nil {
-		panic(fmt.Errorf("unmarshalling extdata-mainnet.json: %w", err))
-	}
-	fuji := make(map[uint64]ethcommon.Hash)
-	if err := json.Unmarshal(fujiExtDataHashes, &fuji); err != nil {
-		panic(fmt.Errorf("unmarshalling extdata-fuji.json: %w", err))
-	}
-	extDataHashes = map[uint32]map[uint64]ethcommon.Hash{
-		constants.MainnetID: mainnet,
-		constants.FujiID:    fuji,
-	}
-}
-
-// ParseBlock parses buf via the embedded SAE VM and additionally performs the
-// C-Chain syntactic checks that the SAE VM is unaware of: that the block's
-// BlockBodyExtra Version is 0 (the only supported version) and that its extData
-// matches the ExtDataHash committed in the header.
-//
-// The block ID is the header hash. The header neither hashes the body's Version
-// nor its extData bytes (it commits only ExtDataHash), so a block with a
-// tampered Version or extData keeps the same ID. This override is the boundary
-// that rejects such blocks before they are accepted, persisted, or executed.
-func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
-	b, err := vm.VM.ParseBlock(ctx, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	eth := b.EthBlock()
-	if version := customtypes.BlockVersion(eth); version != 0 {
-		return nil, fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
-	}
-
-	var (
-		extData        = customtypes.BlockExtData(eth)
-		calculatedHash = customtypes.CalcExtDataHash(extData)
-		wantHeaderHash = calculatedHash
-	)
-	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
-	// expected to be empty with the actual data expected to be committed to in
-	// [extDataHashes].
-	if height := eth.NumberU64(); height == 0 || !corethparams.GetExtra(vm.chainConfig).IsApricotPhase1(eth.Time()) {
-		wantHash := customtypes.EmptyExtDataHash
-		if want, ok := extDataHashes[vm.ctx.NetworkID][height]; ok {
-			wantHash = want
-		}
-		if calculatedHash != wantHash {
-			return nil, fmt.Errorf("%w: have %x, want %x", errExtDataUnexpectedHash, calculatedHash, wantHash)
-		}
-		wantHeaderHash = ethcommon.Hash{}
-	}
-	if got := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash; got != wantHeaderHash {
-		return nil, fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
-	}
-	return b, nil
-}
-
 const (
 	avaxServiceName       = "avax"
 	avaxHTTPExtensionPath = "/" + avaxServiceName
@@ -417,6 +330,7 @@ var (
 )
 
 type stateDependent interface {
+	ParseBlock(context.Context, []byte) (*blocks.Block, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
 	LastAccepted(context.Context) (ids.ID, error)
@@ -427,6 +341,11 @@ func (vm *VM) activeHandler() stateDependent {
 		return vm.VM
 	}
 	return vm.SummaryHandler
+}
+
+// ParseBlock parses a block from bytes.
+func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (*blocks.Block, error) {
+	return vm.activeHandler().ParseBlock(ctx, blockBytes)
 }
 
 // GetBlock returns the [blocks.Block] with the given ID.
