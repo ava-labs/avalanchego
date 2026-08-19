@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"errors"
+	"math"
 	"math/big"
 	"testing"
 
@@ -136,6 +137,14 @@ func TestParseEthBlock(t *testing.T) {
 			},
 			withdrawals: withdrawals,
 		},
+		{
+			name: "far_future_block_time",
+			mutate: func(h *types.Header) *types.Header {
+				h.Time = math.MaxInt64 // note this is still a valid argument to time.Unix
+				return h
+			},
+			wantErr: errBlockTooFarInFuture,
+		},
 	}
 
 	for _, tt := range tests {
@@ -151,13 +160,13 @@ func TestParseEthBlock(t *testing.T) {
 
 			b, err := New(ethB, nil, nil, log)
 			require.NoError(t, err, "New()")
-			_, err = Parse(b.Bytes(), hookstest.NewStub(0))
+			_, err = ParseEth(b.Bytes(), hookstest.NewStub(0))
 			assert.ErrorIs(t, err, tt.wantErr, "Parse(#%v @ time %v)", hdr.Number, hdr.Time)
 		})
 	}
 }
 
-// TestParseVerifyBlockSyntax verifies that [Parse] applies the hook-specific
+// TestParseVerifyBlockSyntax verifies that [ParseEth] applies the hook-specific
 // checks and propagates any error.
 func TestParseVerifyBlockSyntax(t *testing.T) {
 	log := loggingtest.New(t, logging.Debug)
@@ -190,7 +199,7 @@ func TestParseVerifyBlockSyntax(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hooks := hookstest.NewStub(0)
 			hooks.VerifyBlockSyntaxFn = tt.verify
-			_, err := Parse(bytes, hooks)
+			_, err := ParseEth(bytes, hooks)
 			assert.ErrorIs(t, err, tt.wantErr, "Parse()")
 		})
 	}

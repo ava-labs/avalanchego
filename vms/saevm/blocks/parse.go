@@ -6,6 +6,7 @@ package blocks
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -16,17 +17,23 @@ import (
 )
 
 var (
+	// maxUnixTime is the maximum parsable time for a block. This is
+	// unnecessarily strict, but ensures we don't overflow [time.Time]
+	// internals.
+	maxUnixTime = unix(time.Date(3000, time.January, 1, 0, 0, 0, 0, time.UTC))
+
+	errBlockTooFarInFuture    = errors.New("block too far in the future")
 	errBlockHeightNotUint64   = errors.New("block height not uint64")
 	errTxHashMismatch         = errors.New("transaction hash mismatch")
 	errUncleHashMismatch      = errors.New("uncle hash mismatch")
 	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
 )
 
-// Parse parses the buffer as the [rlp] encoding of a [types.Block], enforces
+// ParseEth parses the buffer as the [rlp] encoding of a [types.Block], enforces
 // the universal invariants that every block MUST satisfy.
 //
 // If the block is not yet accepted, there may be additional checks for the caller.
-func Parse(buf []byte, hooks hook.Points) (*types.Block, error) {
+func ParseEth(buf []byte, hooks hook.Points) (*types.Block, error) {
 	b, err := parseEthBlock(buf)
 	if err != nil {
 		return nil, err
@@ -49,9 +56,13 @@ func parseEthBlock(buf []byte) (*types.Block, error) {
 		return nil, errBlockHeightNotUint64
 	}
 
+	hdr := b.Header()
+	if hdr.Time > maxUnixTime {
+		return nil, fmt.Errorf("%w: %d seconds provided", errBlockTooFarInFuture, hdr.Time)
+	}
+
 	// Block body must match what is declared by the header.
 	hasher := trie.NewStackTrie(nil)
-	hdr := b.Header()
 	if types.DeriveSha(b.Transactions(), hasher) != hdr.TxHash {
 		return nil, errTxHashMismatch
 	}
@@ -75,6 +86,10 @@ func parseEthBlock(buf []byte) (*types.Block, error) {
 		}
 	}
 	return b, nil
+}
+
+func unix(t time.Time) uint64 {
+	return uint64(t.Unix()) //#nosec G115 -- Guaranteed to be positive
 }
 
 func compareHashPtrs(a, b *common.Hash) bool {

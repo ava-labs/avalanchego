@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -27,32 +26,18 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// maxFutureBlockDuration is the maximum time from the current time allowed for
-// blocks before they're considered future blocks and fail parsing or
-// verification.
-const (
-	maxFutureBlockSeconds  uint64 = 10
-	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
-)
-
 var (
 	errBlockTooFarInFuture = errors.New("block too far in the future")
 	errBlockTooLarge       = errors.New("block size exceeds maximum")
 )
 
-// ParseBlock parses the buffer via [blocks.Parse]. It does NOT populate the
+// ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
 // block ancestry, which is done by [VM.VerifyBlock] i.f.f. verification
 // passes.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
-	b, err := blocks.Parse(buf, vm.hooks)
+	b, err := blocks.ParseEth(buf, vm.hooks)
 	if err != nil {
 		return nil, err
-	}
-
-	// The uint64 timestamp can't underflow [time.Time] but it can overflow so
-	// make this some future engineer's problem in a few millennia.
-	if b.Time() > unix(vm.config.Now())+maxFutureBlockSeconds {
-		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)

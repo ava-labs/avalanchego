@@ -882,56 +882,6 @@ func TestEmptyChainConfig(t *testing.T) {
 	}
 }
 
-func TestSyntacticBlockChecks(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
-
-	tests := []struct {
-		name string
-		// mutate will receive a valid header for an empty body and should return a mutated version of it.
-		mutate  func(*types.Header) *types.Header
-		wantErr error
-	}{
-		{
-			name:   "valid_header", // base case for test setup
-			mutate: func(h *types.Header) *types.Header { return h },
-		},
-		{
-			name: "block_time_at_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds
-				return h
-			},
-		},
-		{
-			name: "block_time_after_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds + 1
-				return h
-			},
-			wantErr: errBlockTooFarInFuture,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hdr := tt.mutate(&types.Header{
-				Number:    big.NewInt(1),
-				UncleHash: types.EmptyUncleHash,
-				TxHash:    types.EmptyTxsHash,
-			})
-			ethB := types.NewBlockWithHeader(hdr)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
-			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
-		})
-	}
-}
-
 func TestSemanticBlockChecks(t *testing.T) {
 	const now = 1e6
 	opt, _ := withVMTime(t, time.Unix(now, 0))
