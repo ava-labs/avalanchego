@@ -44,9 +44,12 @@ runs:
     - name: Reclaim disk space on Linux runners
       if: ${{ runner.os == 'Linux' && steps.initial-check.outputs.below_threshold == 'true' }}
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+      with:
+        tool-cache: true
+        docker-images: true
 
     - name: Re-check runner disk space
-      if: ${{ steps.initial-check.outputs.below_threshold == 'true' }}
+      if: ${{ always() && steps.initial-check.outputs.below_threshold == 'true' }}
       id: final-check
       shell: bash
       env:
