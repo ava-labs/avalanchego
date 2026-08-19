@@ -10,7 +10,7 @@ These guidelines apply to documentation for any repository content whose correct
 use, review, or evolution requires more context than code comments and tests
 alone can provide.
 
-## Index
+## Table of contents
 
 - [Motivation](#motivation)
 - [Definition](#definition)
