@@ -4,7 +4,6 @@
 package transitionvm
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -93,98 +92,6 @@ func TestHTTPHandlers(t *testing.T) {
 		sharedPath:  {wantCode: http.StatusOK, wantBody: sharedBodyPost},               // rebound
 		preOnlyPath: {wantCode: http.StatusNotFound, wantBody: "404 page not found\n"}, // dropped, now 404s
 	})
-}
-
-// TestHTTPHandlersBlockUnblock verifies that Block parks new requests until
-// Unblock releases them, at which point they serve whatever handler is then
-// installed, while in-flight requests are untouched.
-func TestHTTPHandlersBlockUnblock(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		handlers := newHTTPHandlers()
-		const (
-			path = "path"
-			body = "body"
-		)
-		handlers.set(map[string]http.Handler{
-			path: handler(body),
-		})
-		handler := handlers.routes[path]
-
-		// Served normally before block.
-		require.Equalf(t, body, recordNewResponse(handler).Body.String(), "serve(%T)", handler)
-
-		handlers.block()
-
-		// Cancelled requests exit gracefully while blocked.
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-		handler.ServeHTTP(
-			httptest.NewRecorder(),
-			httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx),
-		)
-
-		// The request parks while blocked instead of being served.
-		result := make(chan *httptest.ResponseRecorder, 1)
-		go func() {
-			result <- recordNewResponse(handler)
-		}()
-		synctest.Wait()
-		require.Emptyf(t, result, "serve(%T) was served while blocked", handler)
-		handlers.unblock()
-		require.Equalf(t, body, (<-result).Body.String(), "serve(%T)", handler)
-
-		// Served normally after unblock.
-		require.Equalf(t, body, recordNewResponse(handler).Body.String(), "serve(%T)", handler)
-	})
-}
-
-// TestHTTPHandlersDrain verifies that Drain blocks until the in-flight requests
-// have returned, and returns immediately when none are in flight.
-func TestHTTPHandlersDrain(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		release := make(chan struct{})
-		handlers := newHTTPHandlers()
-		const path = "path"
-		handlers.set(map[string]http.Handler{
-			path: blockingHandler{release: release},
-		})
-		route := handlers.routes[path]
-
-		// Draining with no in-flight requests returns immediately.
-		require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain()", handlers)
-
-		// Draining with in-flight requests blocks until the context is
-		// cancelled.
-		go recordNewResponse(route)
-		synctest.Wait() // The request is now in flight, blocked in the handler.
-
-		ctx, cancel := context.WithCancel(t.Context())
-		testUnblocking(t,
-			func(t *testing.T) {
-				require.ErrorIsf(t, handlers.drain(ctx), context.Canceled, "%T.drain() with cancelled context", handlers)
-			},
-			cancel,
-		)
-
-		testUnblocking(t,
-			func(t *testing.T) {
-				require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain() after final in-flight request", handlers)
-			},
-			func() {
-				close(release)
-			},
-		)
-	})
-}
-
-// testUnblocking first calls blocking, after it is blocked unblock is called.
-func testUnblocking(t *testing.T, blocking func(*testing.T), unblock func()) {
-	t.Helper()
-	go func() {
-		synctest.Wait()
-		unblock()
-	}()
-	blocking(t)
 }
 
 // TestTransitionAbandonsStuckAPIRequests verifies a transition proceeds past

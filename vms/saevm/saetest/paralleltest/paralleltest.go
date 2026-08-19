@@ -21,8 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
@@ -70,23 +68,23 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	stub.Register(tb)
 
 	hooks := saehookstest.NewStub(100e6)
-	hooks.BeforeExecutingBlockFn = func(r params.Rules, sdb *state.StateDB, _ *types.Header, b *types.Block) error {
+	hooks.StartExecutingBlockFn = func(r params.Rules, sdb *state.StateDB, _ *types.Header, b *types.Block) error {
 		return par.StartBlock(sdb, r, b)
 	}
-	hooks.AfterExecutingBlockFn = func(sdb *state.StateDB, b *types.Block, rs types.Receipts) error {
+	hooks.FinishExecutingBlockFn = func(sdb *state.StateDB, b *types.Block, rs types.Receipts) error {
 		par.FinishBlock(sdb, b, rs)
 		return nil
 	}
-
-	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
-	snowCtx.Log = logger
 
 	xdb := saetest.NewExecutionResultsDB()
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock).AsHeaderSource()
 	dbConfig := saedb.Config{CommitInterval: 4096}
 
-	exec, err := saexec.New(genesis, src, config, db, xdb, dbConfig, hooks, snowCtx, prometheus.NewRegistry())
+	tr, err := saedb.NewTracker(db, dbConfig, genesis.Hash(), tb.TempDir(), logger)
+	require.NoError(tb, err, "saedb.NewTracker()")
+
+	exec, err := saexec.New(genesis, src, config, db, xdb, tr, hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "saexec.New()")
 
 	tb.Cleanup(func() {

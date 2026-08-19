@@ -25,7 +25,7 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 //
 // AcceptSummary MUST only be called once.
 func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
-	if s.height == 0 {
+	if s.AcceptedHeight == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
 		return block.StateSyncSkipped, nil
 	}

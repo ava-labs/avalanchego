@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -61,7 +62,7 @@ type config struct {
 	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
-	// StateSyncEnabled *bool `json:"state-sync-enabled"`
+	StateSyncEnabled bool `json:"state-sync-enabled"`
 
 	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
@@ -82,6 +83,7 @@ type config struct {
 func defaultConfig() config {
 	return config{
 		Pruning:                      true,
+		StateSyncEnabled:             true,
 		CommitInterval:               saedb.DefaultCommitInterval,
 		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
 		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
@@ -142,6 +144,14 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,
+	}
+}
+
+func (c config) stateSyncConfig() statesync.Config {
+	saeCfg := c.saeConfig(nil)
+	return statesync.Config{
+		DBConfig: saeCfg.DBConfig,
+		Enabled:  c.StateSyncEnabled,
 	}
 }
 
