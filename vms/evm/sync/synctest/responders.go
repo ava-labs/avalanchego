@@ -95,7 +95,7 @@ func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.N
 	return resp, nil
 }
 
-// ErroringResponder rejects the first numBad requests without reaching inner,
+// ErroringResponder rejects the first numBad requests after reaching inner,
 // mirroring a peer that cannot serve the request.
 type ErroringResponder[Req, Resp proto.Message] struct {
 	inner  handlers.Responder[Req, Resp]
@@ -116,11 +116,12 @@ func NewErroringResponder[Req, Resp proto.Message](
 }
 
 func (e *ErroringResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+	resp, appErr := e.inner.Respond(ctx, nodeID, req)
 	if served := int(e.served.Add(1)); served <= e.numBad {
 		var zero Resp
 		return zero, e.err
 	}
-	return e.inner.Respond(ctx, nodeID, req)
+	return resp, appErr
 }
 
 // CancelAfter cancels once the at-th request arrives, ending a sync that would
