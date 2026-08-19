@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "acceptor.go",
         "handler.go",
+        "health.go",
         "server.go",
         "summary.canoto.go",
         "summary.go",
@@ -29,6 +30,7 @@ go_library(
         "//vms/saevm/cchain/state",
         "//vms/saevm/hook",
         "//vms/saevm/network",
+        "//vms/saevm/sae",
         "//vms/saevm/statesync",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -50,15 +51,18 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	ethB := types.NewBlock(
+	ethB, err := hookstest.BuildBlock(
 		&types.Header{
 			Number: big.NewInt(1),
 			Time:   42,
 		},
+		nil, // blockContext
 		txs,
-		nil, nil, // uncles, receipts
-		saetest.TrieHasher(),
+		nil, // receipts
+		nil, // ops
+		hook.Settled{Height: 1, GasUnix: 1},
 	)
+	require.NoError(t, err, "hookstest.BuildBlock()")
 	db := rawdb.NewMemoryDatabase()
 	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()
@@ -103,9 +107,7 @@ func TestMarkExecuted(t *testing.T) {
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	// This block is NOT synchronous, so no hooks are needed.
-	// NOTE: this pattern is only acceptable in tests.
-	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
+	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(hookstest.NewStub(1e6), db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool

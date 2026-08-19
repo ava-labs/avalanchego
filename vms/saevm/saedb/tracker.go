@@ -93,6 +93,17 @@ func (c Config) Verify() error {
 	return nil
 }
 
+// ResolvedScheme returns the trie database scheme in use, substituting the
+// default that [Config.Scheme] documents for an unset scheme. Callers that
+// report the scheme (such as a health check) MUST use this rather than
+// [Config.Scheme] so that an unset scheme is not reported as empty.
+func (c Config) ResolvedScheme() string {
+	if c.Scheme == "" {
+		return rawdb.HashScheme
+	}
+	return c.Scheme
+}
+
 // TrieDBConfig returns a config that can be used to create a [triedb.Database]
 // based on the [Config] parameters provided. All arguments MUST be provided.
 //
