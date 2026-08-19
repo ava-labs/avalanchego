@@ -64,47 +64,51 @@ jobs:
       - uses: ./.github/actions/setup-bazel
         with:
           initial-setup: true
+      - name: Log Bazel disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-bazel
 
   unit-main:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
       - name: Run unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh bazel-test-main
 
   unit-coreth:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh bazel-test-coreth
 
   unit-subnet-evm:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh bazel-test-subnet-evm
 
   e2e:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh bazel-test-e2e-ci
+          setup_bazel: 'true'
           artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
