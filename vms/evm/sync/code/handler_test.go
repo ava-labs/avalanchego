@@ -26,7 +26,7 @@ func TestResponder(t *testing.T) {
 	otherHash, other := randomCode(t)
 
 	db := memorydb.New()
-	writeCode(t, db, codes{
+	writeCode(db, codes{
 		codeHash:  codeBytes,
 		otherHash: other,
 	})

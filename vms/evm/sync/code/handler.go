@@ -40,8 +40,8 @@ func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responde
 	return &responder{log: log, codeReader: codeReader}
 }
 
-// maxHashesPerRequest caps the hashes per request, sized for contracts within
-// MaxCodeSize.
+// maxHashesPerRequest caps the hashes per request so that a response of
+// contracts up to [params.MaxCodeSize] fits in one message.
 //
 // TODO(powerslider): Oversized genesis code can exceed the message limit.
 // Either explicitly disallow genesis code larger than MaxCodeSize or

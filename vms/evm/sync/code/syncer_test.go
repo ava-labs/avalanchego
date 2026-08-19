@@ -51,9 +51,9 @@ type SUT struct {
 	// Used to support [SUT.restart].
 	log    *loggingtest.Logger
 	client *Client
-	db     ethdb.KeyValueStore
 
-	clientDB ethdb.KeyValueStore
+	// db views the syncer's store without [SUT.flakyDB]'s fault injection.
+	db       ethdb.KeyValueStore
 	flakyDB  *saetest.FlakyDB
 	recorder *codeRecorder
 }
@@ -107,7 +107,7 @@ func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
 	}, opts...)
 
 	clientDB := evmdb.New(memdb.New())
-	writeCode(t, clientDB, config.code)
+	writeCode(clientDB, config.code)
 
 	log := loggingtest.New(t, logging.Debug)
 	responder := newResponder(log, clientDB)
@@ -133,7 +133,6 @@ func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
 		Syncer:   syncer,
 		log:      log,
 		client:   client,
-		clientDB: clientDB,
 		db:       evmdb.New(avadb),
 		flakyDB:  flakydb,
 		recorder: recorder,
@@ -188,7 +187,7 @@ func randomCode(t *testing.T) (common.Hash, []byte) {
 	return hash, code
 }
 
-func writeCode(t *testing.T, db ethdb.KeyValueWriter, c codes) {
+func writeCode(db ethdb.KeyValueWriter, c codes) {
 	for h, code := range c {
 		rawdb.WriteCode(db, h, code)
 	}
@@ -231,7 +230,7 @@ func TestSyncer(t *testing.T) {
 			// The peer cannot serve localCode, so the syncer MUST NOT request
 			// code that is already on disk.
 			localCode := newCodes(t, tt.numOnDisk)
-			writeCode(t, sut.db, localCode)
+			writeCode(sut.db, localCode)
 
 			allCode := make(codes)
 			maps.Copy(allCode, clientCode)
@@ -241,8 +240,8 @@ func TestSyncer(t *testing.T) {
 			// along with the batcher.
 			var syncEG errgroup.Group
 			syncEG.Go(func() error {
-				// Deferred until every add returns, a later AddCode would be
-				// refused.
+				// Deferred until every add returns, since a later AddCode
+				// would be refused.
 				defer sut.DoneAdding()
 
 				var addEG errgroup.Group
@@ -279,31 +278,84 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
-func TestSyncer_RetriesTamperedResponse(t *testing.T) {
-	code := newCodes(t, 1)
-	// The syncer must retry tampered responses until a correct one arrives.
-	const tampered = 2
+func TestSyncer_Retries(t *testing.T) {
+	const failures = 2
+	tests := []struct {
+		name          string
+		wrapResponder func(codeResponder) codeResponder
+	}{
+		{
+			name: "tampered_response",
+			wrapResponder: func(cr codeResponder) codeResponder {
+				return synctest.NewMutatingResponder(cr, failures, func(resp *syncpb.GetCodeResponse) {
+					for i := range resp.GetData() {
+						resp.Data[i] = []byte("tampered")
+					}
+				})
+			},
+		},
+		{
+			name: "rejected_request",
+			wrapResponder: func(cr codeResponder) codeResponder {
+				return synctest.NewErroringResponder(cr, failures, errHashNotFound)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			code := newCodes(t, 1)
+			// The syncer must retry tampered responses until a correct one arrives.
+			sut := newSUT(t,
+				withCode(code),
+				withWrappedResponder(test.wrapResponder),
+			)
+
+			for hash := range code {
+				require.NoError(t, sut.AddCode([]common.Hash{hash}))
+			}
+			sut.DoneAdding()
+
+			ctx := t.Context()
+			require.NoError(t, sut.Sync(ctx))
+
+			sut.assertHasCode(t, code)
+			assert.Lenf(t, sut.recorder.Requests(), failures+1, "%d failed attempts and a correct response", failures)
+		})
+	}
+}
+
+func TestSyncer_SecondSyncRefused(t *testing.T) {
+	sut := newSUT(t)
+	sut.DoneAdding()
+
+	require.NoError(t, sut.Sync(t.Context()))
+	require.ErrorIs(t, sut.Sync(t.Context()), errSyncAlreadyRun)
+}
+
+// A cancelled Sync must leave the store recoverable, so a fresh syncer can
+// finish the job.
+func TestSyncer_ResumesAfterCancel(t *testing.T) {
+	// Two batches leave one in flight and one queued when the cancel fires.
+	code := newCodes(t, maxHashesPerRequest+1)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	sut := newSUT(t,
 		withCode(code),
 		withWrappedResponder(func(cr codeResponder) codeResponder {
-			return synctest.NewMutatingResponder(cr, tampered, func(resp *syncpb.GetCodeResponse) {
-				for i := range resp.GetData() {
-					resp.Data[i] = []byte("tampered")
-				}
-			})
+			return synctest.NewCancelAfter(cr, 1, cancel)
 		}),
 	)
 
-	for hash := range code {
-		require.NoError(t, sut.AddCode([]common.Hash{hash}))
-	}
-	sut.DoneAdding()
+	require.NoError(t, sut.AddCode(slices.Collect(maps.Keys(code))))
+	// DoneAdding is never called, so only the cancel can end this Sync.
+	require.ErrorIs(t, sut.Sync(ctx), context.Canceled)
 
-	ctx := t.Context()
-	require.NoError(t, sut.Sync(ctx))
+	sut.restart(t)
+	sut.DoneAdding()
+	require.NoError(t, sut.Sync(t.Context()))
 
 	sut.assertHasCode(t, code)
-	assert.Lenf(t, sut.recorder.Requests(), tampered+1, "%d tampered responses and a correct response", tampered)
+	sut.assertNoCodeToSync(t)
 }
 
 func TestClaimSet(t *testing.T) {

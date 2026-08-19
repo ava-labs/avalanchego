@@ -6,7 +6,6 @@ go_library(
     srcs = [
         "client.go",
         "handler.go",
-        "queue.go",
         "syncer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/code",
@@ -17,6 +16,7 @@ go_library(
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/constants",
+        "//utils/lock",
         "//utils/logging",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/sync/handlers",
@@ -39,7 +39,6 @@ go_test(
     ],
     embed = [":code"],
     deps = [
-        "//database",
         "//database/memdb",
         "//ids",
         "//network/p2p",
@@ -57,7 +56,7 @@ go_test(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//ethdb/memorydb",
-        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_x_sync//errgroup",

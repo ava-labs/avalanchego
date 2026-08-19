@@ -64,13 +64,14 @@ func (s *Syncer) requeueOutstanding() error {
 	batch := s.db.NewBatch()
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
-		// Skip fetching if another part of the node already wrote this code.
 		if !rawdb.HasCode(s.db, codeHash) {
 			s.claimed.claim(codeHash)
 			s.queued = append(s.queued, codeHash)
 			continue
 		}
 
+		// Another part of the node already wrote this code, so the fetch is
+		// no longer needed.
 		if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("deleting stale code marker: %w", err)
 		}
@@ -84,15 +85,15 @@ func (s *Syncer) requeueOutstanding() error {
 	return nil
 }
 
-var errDoneAdding = errors.New("code syncer input is closed")
+var errDoneAdding = errors.New("code syncer is no longer accepting hashes")
 
 // AddCode marks code hashes to be fetched during syncing. If AddCode returns
 // nil, the code will be populated by the time [Syncer.Sync] returns nil, even
 // if the node crashes and the syncer restarts.
 //
-// AddCode NEVER blocks, so it is safe to call from the VM's app message
-// handlers. If it blocked, those handlers could deadlock with the syncer's own
-// code requests.
+// AddCode NEVER blocks on the network, so it is safe to call from the VM's app
+// message handlers. If it did, those handlers could deadlock with the syncer's
+// own code requests.
 func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
 	batch := s.db.NewBatch()
 	missing := make([]common.Hash, 0, len(hashes))
@@ -116,7 +117,7 @@ func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
 			continue
 		}
 		missing = append(missing, codeHash)
-		// Once AddCode returns, the trie syncer will persist accounts that
+		// Once AddCode returns, the account syncer will persist accounts that
 		// reference this code. The marker survives a crash, so a restarted
 		// sync still fetches the code.
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
@@ -124,8 +125,7 @@ func (s *Syncer) AddCode(hashes []common.Hash) (retErr error) {
 		}
 	}
 
-	// We avoid grabbing the lock any earlier to avoid performing DB reads while
-	// the exclusive lock is held.
+	// The lock is taken only now so the DB reads above run outside of it.
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -157,10 +157,11 @@ var errSyncAlreadyRun = errors.New("code syncer has already run")
 
 // Sync runs until [Syncer.DoneAdding] has been called and every hash given to
 // [Syncer.AddCode] has its code on disk, or until ctx is cancelled.
+//
+// Sync MUST be called at most once. A cancelled Sync leaves hashes claimed but
+// unfetched, and only the recovery in [NewSyncer] re-enqueues them, so each
+// attempt needs a fresh Syncer.
 func (s *Syncer) Sync(ctx context.Context) error {
-	// A cancelled Sync leaves hashes claimed but unfetched, and only the
-	// recovery in [NewSyncer] re-enqueues them. Each attempt therefore needs
-	// a fresh Syncer.
 	if !s.started.CompareAndSwap(false, true) {
 		return errSyncAlreadyRun
 	}
@@ -174,6 +175,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
+// drainQueue blocks until at least one hash is queued or [Syncer.DoneAdding]
+// has been called, returning the queued hashes and whether adding is done.
 func (s *Syncer) drainQueue(ctx context.Context) ([]common.Hash, bool, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -194,15 +197,15 @@ func (s *Syncer) drainQueue(ctx context.Context) ([]common.Hash, bool, error) {
 func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 	batch := make([]common.Hash, 0, maxHashesPerRequest)
 	fetch := func() {
-		full := batch
+		hashes := batch
 		eg.Go(func() error {
-			return s.fetchAndPersist(ctx, full)
+			return s.fetchAndPersist(ctx, hashes)
 		})
 		batch = make([]common.Hash, 0, maxHashesPerRequest)
 	}
 
 	for {
-		queued, closed, err := s.drainQueue(ctx)
+		queued, done, err := s.drainQueue(ctx)
 		if err != nil {
 			return err
 		}
@@ -214,7 +217,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 			}
 		}
 
-		if closed {
+		if done {
 			if len(batch) > 0 {
 				fetch()
 			}
@@ -285,7 +288,7 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		resp := &syncpb.GetCodeResponse{}
 		outcome, err := c.Send(ctx, req, resp)
 		if err != nil {
-			// Send already de-scored the peer, re-request from another.
+			// Send already de-scored any peer it reached, re-request.
 			log.Debug("code request failed, re-requesting",
 				zap.Error(err),
 			)
