@@ -37,7 +37,6 @@ jobs:
         with:
           run: |
             ./scripts/run_task.sh build-antithesis-images-avalanchego
-            ./scripts/run_task.sh build-antithesis-images-xsvm
             ./scripts/run_task.sh build-antithesis-images-subnet-evm
         env:
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}

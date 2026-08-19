@@ -134,12 +134,6 @@ tasks:
       TEST_SETUP: subnet-evm
     cmd: '{{.NIX_RUN}} bash -x ./scripts/build_antithesis_images.sh'
 
-  build-antithesis-images-xsvm:
-    desc: Builds docker images for antithesis for the xsvm test setup
-    env:
-      TEST_SETUP: xsvm
-    cmd: '{{.NIX_RUN}} bash -x ./scripts/build_antithesis_images.sh'
-
   build-bootstrap-monitor:
     desc: Builds bootstrap-monitor
     cmd: '{{.NIX_RUN}} ./scripts/build_bootstrap_monitor.sh'
@@ -467,16 +461,6 @@ tasks:
       - task: build-race
       - task: build-subnet-evm
       - cmd: "{{.NIX_RUN}} bash -c 'cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --plugin-dir=../../build/plugins --duration=120s'"
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.build_antithesis_images.sh'
-
-  test-build-antithesis-images-xsvm:
-    desc: Tests the build of antithesis images for the xsvm test setup
-    env:
-      TEST_SETUP: xsvm
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s'
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.build_antithesis_images.sh'
 
   test-build-image:
