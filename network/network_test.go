@@ -347,6 +347,7 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := defaultConfig
+			config.PingFrequency = time.Hour
 			config.UptimeCalculator = uptime.TestCalculator{StartTime: tt.startTime}
 			config.UpgradeConfig.HeliconTime = heliconTime
 
