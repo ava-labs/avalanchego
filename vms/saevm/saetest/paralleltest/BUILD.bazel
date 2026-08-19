@@ -8,8 +8,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetest/paralleltest",
     visibility = ["//visibility:public"],
     deps = [
-        "//ids",
-        "//snow/snowtest",
         "//utils/logging",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
