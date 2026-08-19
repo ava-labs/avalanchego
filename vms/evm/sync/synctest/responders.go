@@ -93,11 +93,6 @@ func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.N
 	return resp, nil
 }
 
-// Served returns how many responses passed through, corrupted or not.
-func (m *MutatingResponder[Req, Resp]) Served() int {
-	return int(m.served.Load())
-}
-
 // CancelAfter cancels once the at-th request arrives, ending a sync that would
 // otherwise never converge.
 type CancelAfter[Req, Resp proto.Message] struct {
@@ -123,13 +118,7 @@ func (c *CancelAfter[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID,
 	return c.inner.Respond(ctx, nodeID, req)
 }
 
-// Fired reports whether the cancel was triggered.
-func (c *CancelAfter[Req, Resp]) Fired() bool {
-	return c.reached(int(c.seen.Load()))
-}
-
-// reached reports whether seen requests is enough to cancel. A non-positive at
-// never cancels.
+// reached reports whether seen requests is enough to cancel.
 func (c *CancelAfter[Req, Resp]) reached(seen int) bool {
-	return c.at > 0 && seen >= c.at
+	return seen >= c.at
 }

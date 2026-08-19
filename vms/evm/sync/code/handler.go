@@ -22,21 +22,6 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// maxHashesPerRequest caps the hashes per request, sized for contracts within
-// MaxCodeSize. Oversized genesis code can still outgrow the message limit.
-const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
-
-var (
-	errTooManyHashes = &avacommon.AppError{
-		Code:    1000,
-		Message: "too many code hashes requested",
-	}
-	errHashNotFound = &avacommon.AppError{
-		Code:    1001,
-		Message: "requested code not found",
-	}
-)
-
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
 func RegisterHandler(log logging.Logger, net *p2p.Network, codeReader ethdb.KeyValueReader) error {
 	h := handlers.NewHandler(log, newResponder(log, codeReader))
@@ -54,6 +39,25 @@ type responder struct {
 func newResponder(log logging.Logger, codeReader ethdb.KeyValueReader) *responder {
 	return &responder{log: log, codeReader: codeReader}
 }
+
+// maxHashesPerRequest caps the hashes per request, sized for contracts within
+// MaxCodeSize.
+//
+// TODO(powerslider): Oversized genesis code can exceed the message limit.
+// Either explicitly disallow genesis code larger than MaxCodeSize or
+// accommodate large code.
+const maxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
+
+var (
+	errTooManyHashes = &avacommon.AppError{
+		Code:    1000,
+		Message: "too many code hashes requested",
+	}
+	errHashNotFound = &avacommon.AppError{
+		Code:    1001,
+		Message: "requested code not found",
+	}
+)
 
 // Respond answers every requested hash, or rejects the whole request.
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {

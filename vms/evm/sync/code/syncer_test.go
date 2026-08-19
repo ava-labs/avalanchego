@@ -6,27 +6,24 @@ package code
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/ethdb/memorydb"
-	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -36,59 +33,164 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
 func TestMain(m *testing.M) {
-	// Importing saetest pulls in libevm packages that start goroutines at init,
-	// so ignore what exists before any test runs, not what a test leaks.
-	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
-func TestVerifyCode(t *testing.T) {
-	code := []byte("contract bytecode")
-	hash := crypto.Keccak256Hash(code)
+type (
+	codeResponder = handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+	codeRecorder  = synctest.RecordingResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+)
 
-	oversized := make([]byte, params.MaxCodeSize+1)
-	oversizedHash := crypto.Keccak256Hash(oversized)
+type SUT struct {
+	*Syncer
 
-	tests := []struct {
-		name    string
-		hashes  []common.Hash
-		data    [][]byte
-		wantErr error
-	}{
-		{
-			name:   "valid",
-			hashes: []common.Hash{hash},
-			data:   [][]byte{code},
-		},
-		{
-			name:    "count_mismatch",
-			hashes:  []common.Hash{hash},
-			data:    [][]byte{},
-			wantErr: errCodeCountMismatch,
-		},
-		{
-			name:    "hash_mismatch",
-			hashes:  []common.Hash{hash},
-			data:    [][]byte{[]byte("tampered")},
-			wantErr: errCodeHashMismatch,
-		},
-		{
-			// A size check would reject this forever, since re-requesting cannot
-			// change the answer. This case fails if one comes back.
-			name:   "oversized_but_honest",
-			hashes: []common.Hash{oversizedHash},
-			data:   [][]byte{oversized},
-		},
+	// Used to support [SUT.restart].
+	log    *loggingtest.Logger
+	client *Client
+	db     ethdb.KeyValueStore
+
+	clientDB ethdb.KeyValueStore
+	flakyDB  *saetest.FlakyDB
+	recorder *codeRecorder
+}
+
+// sutOption configures the SUT built by [newSUT] and [tryNewSUT].
+type sutOption = options.Option[sutConfig]
+
+type sutConfig struct {
+	code          codes
+	flake         int
+	wrapResponder func(codeResponder) codeResponder
+}
+
+// withCode seeds the peer's database with code for the syncer to fetch.
+func withCode(code codes) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.code = code
+	})
+}
+
+// withDBFlake fails the syncer's database mutations with
+// [saetest.ErrInjected] after flake of them succeed.
+func withDBFlake(flake int) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.flake = flake
+	})
+}
+
+// withWrappedResponder wraps the responder serving the syncer's requests.
+func withWrappedResponder(wrap func(codeResponder) codeResponder) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.wrapResponder = wrap
+	})
+}
+
+func newSUT(t *testing.T, opts ...sutOption) *SUT {
+	t.Helper()
+
+	sut, err := tryNewSUT(t, opts...)
+	require.NoError(t, err)
+	return sut
+}
+
+// tryNewSUT returns any [NewSyncer] error rather than failing t. On error the
+// SUT has a nil [Syncer], and [SUT.restart] can install a working one.
+func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
+	t.Helper()
+
+	config := options.ApplyTo(&sutConfig{
+		flake: math.MaxInt,
+	}, opts...)
+
+	clientDB := evmdb.New(memdb.New())
+	writeCode(t, clientDB, config.code)
+
+	log := loggingtest.New(t, logging.Debug)
+	responder := newResponder(log, clientDB)
+	recorder := synctest.NewRecordingResponder(responder)
+
+	var wrappedResponder codeResponder = recorder
+	if config.wrapResponder != nil {
+		wrappedResponder = config.wrapResponder(wrappedResponder)
 	}
+	client := NewClient(synctest.ServeResponder(
+		t,
+		t.Context(),
+		log,
+		p2p.EVMCodeRequestHandlerID,
+		wrappedResponder,
+	))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.ErrorIs(t, verifyCode(tt.hashes, tt.data), tt.wantErr)
-		})
+	avadb := memdb.New()
+	flakydb := saetest.NewFlakyDB(avadb, config.flake)
+	syncer, err := NewSyncer(log, client, evmdb.New(flakydb))
+
+	return &SUT{
+		Syncer:   syncer,
+		log:      log,
+		client:   client,
+		clientDB: clientDB,
+		db:       evmdb.New(avadb),
+		flakyDB:  flakydb,
+		recorder: recorder,
+	}, err
+}
+
+func (s *SUT) assertHasCode(t *testing.T, c codes) {
+	t.Helper()
+
+	for hash, code := range c {
+		assert.Equalf(t, code, rawdb.ReadCode(s.db, hash), "expecting code with hash %s", hash)
+	}
+}
+
+func (s *SUT) assertNoCodeToSync(t *testing.T) {
+	t.Helper()
+
+	it := customrawdb.NewCodeToFetchIterator(s.db)
+	defer it.Release()
+
+	assert.False(t, it.Next(), "expecting no code to fetch")
+}
+
+func (s *SUT) restart(t *testing.T) {
+	t.Helper()
+
+	syncer, err := NewSyncer(s.log, s.client, s.db)
+	require.NoError(t, err)
+	s.Syncer = syncer
+}
+
+type codes = map[common.Hash][]byte
+
+func newCodes(t *testing.T, num int) codes {
+	t.Helper()
+
+	c := make(codes, num)
+	for range num {
+		hash, code := randomCode(t)
+		c[hash] = code
+	}
+	return c
+}
+
+func randomCode(t *testing.T) (common.Hash, []byte) {
+	t.Helper()
+
+	code := make([]byte, 128)
+	_, err := rand.Read(code)
+	require.NoError(t, err)
+	hash := crypto.Keccak256Hash(code)
+	return hash, code
+}
+
+func writeCode(t *testing.T, db ethdb.KeyValueWriter, c codes) {
+	for h, code := range c {
+		rawdb.WriteCode(db, h, code)
 	}
 }
 
@@ -97,14 +199,15 @@ func TestSyncer(t *testing.T) {
 		name          string
 		numFromSource int
 		numOnDisk     int
-		copies        int // times each hash is enqueued, zero means once
+		// copies adds each hash this many times, expecting a single fetch.
+		// Zero is remapped to one.
+		copies int
 	}{
 		{name: "empty"},
 		{name: "single_blob", numFromSource: 1},
 		{name: "batches_across_requests", numFromSource: 3 * maxHashesPerRequest},
 		{name: "partial_final_batch", numFromSource: 2*maxHashesPerRequest + 1},
 		{name: "skips_code_already_on_disk", numFromSource: 3, numOnDisk: 2},
-		// Shared bytecode puts the same hash on the queue many times.
 		{name: "repeats_fetched_once", numFromSource: 1, copies: 200},
 		{name: "repeats_at_batch_boundary_fetched_once", numFromSource: maxHashesPerRequest, copies: 2},
 	}
@@ -113,609 +216,268 @@ func TestSyncer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			source := memorydb.New()
-			target := memorydb.New()
-			want := map[common.Hash][]byte{}
 
-			for range tt.numFromSource {
-				code := randomCode(t)
-				want[writeCode(t, source, code)] = code
-			}
-			// Only in the target, so skipping must avoid requesting them.
-			for range tt.numOnDisk {
-				code := randomCode(t)
-				want[writeCode(t, target, code)] = code
-			}
-
-			log := loggingtest.New(t, logging.Debug)
-			// Only the trailing batch can be short, so the count follows directly.
+			clientCode := newCodes(t, tt.numFromSource)
+			// Cancel if the syncer requests more batches than expected rather
+			// than re-requesting until the test timeout.
 			wantRequests := (tt.numFromSource + maxHashesPerRequest - 1) / maxHashesPerRequest
+			sut := newSUT(t,
+				withCode(clientCode),
+				withWrappedResponder(func(cr codeResponder) codeResponder {
+					return synctest.NewCancelAfter(cr, wantRequests+1, cancel)
+				}),
+			)
 
-			recorder := synctest.NewRecordingResponder(newResponder(log, source))
-			// A broken skip re-requests forever, so end the run.
-			guard := synctest.NewCancelAfter(recorder, wantRequests+1, cancel)
-			client := serve(t, ctx, log, guard)
+			// The peer cannot serve localCode, so the syncer MUST NOT request
+			// code that is already on disk.
+			localCode := newCodes(t, tt.numOnDisk)
+			writeCode(t, sut.db, localCode)
 
-			syncer, err := NewSyncer(log, client, target)
-			require.NoError(t, err)
+			allCode := make(codes)
+			maps.Copy(allCode, clientCode)
+			maps.Copy(allCode, localCode)
 
-			// Added while the syncer runs, so the batcher is woken mid-flight.
-			copies := max(tt.copies, 1)
-			var eg errgroup.Group
-			eg.Go(func() error {
-				defer syncer.CloseInput()
-				for hash := range want {
-					for range copies {
-						if err := syncer.AddCode([]common.Hash{hash}); err != nil {
-							return err
-						}
+			// Add concurrently while the syncer runs, so adds race each other
+			// along with the batcher.
+			var syncEG errgroup.Group
+			syncEG.Go(func() error {
+				// Deferred until every add returns, a later AddCode would be
+				// refused.
+				defer sut.DoneAdding()
+
+				var addEG errgroup.Group
+				for hash := range allCode {
+					for range max(tt.copies, 1) {
+						addEG.Go(func() error {
+							return sut.AddCode([]common.Hash{hash})
+						})
 					}
 				}
-				return nil
+				return addEG.Wait()
 			})
-			eg.Go(func() error { return syncer.Sync(ctx) })
+			syncEG.Go(func() error {
+				return sut.Sync(ctx)
+			})
 
-			err = eg.Wait()
-			require.False(t, guard.Fired(), "the syncer requested more than batching explains")
+			err := syncEG.Wait()
+			require.NoError(t, ctx.Err(), "syncer should not be cancelled")
 			require.NoError(t, err)
 
-			for hash, code := range want {
-				require.Equal(t, code, rawdb.ReadCode(target, hash))
-			}
+			sut.assertHasCode(t, allCode)
+			sut.assertNoCodeToSync(t)
 
-			require.Empty(t, markedHashes(t, target), "all to-fetch markers must be cleared")
-
-			sizes := requestSizes(recorder)
-			require.Len(t, sizes, wantRequests,
-				"only hashes that are missing and not already claimed are requested, and a full batch is sent as its own request")
+			requests := sut.recorder.Requests()
+			assert.Len(t, requests, wantRequests, "syncer sent wrong number of requests")
 			requested := 0
-			for _, size := range sizes {
-				// An overgrown batch costs the whole request, since the handler drops it.
-				require.LessOrEqual(t, size, maxHashesPerRequest, "a request outgrew the batch size")
+			for _, request := range requests {
+				size := len(request.GetHashes())
+				assert.LessOrEqual(t, size, maxHashesPerRequest, "syncer violated the request size limit")
 				requested += size
 			}
-			require.Equal(t, tt.numFromSource, requested, "every missing hash is requested once")
+			assert.Equal(t, tt.numFromSource, requested, "every missing hash should be requested exactly once")
 		})
 	}
 }
 
-// Code already on disk is neither marked nor requested, so a resumed sync takes
-// no ownership of what it has.
-func TestSyncer_SkipsStoredCode(t *testing.T) {
+func TestSyncer_RetriesTamperedResponse(t *testing.T) {
+	code := newCodes(t, 1)
+	// The syncer must retry tampered responses until a correct one arrives.
+	const tampered = 2
+	sut := newSUT(t,
+		withCode(code),
+		withWrappedResponder(func(cr codeResponder) codeResponder {
+			return synctest.NewMutatingResponder(cr, tampered, func(resp *syncpb.GetCodeResponse) {
+				for i := range resp.GetData() {
+					resp.Data[i] = []byte("tampered")
+				}
+			})
+		}),
+	)
+
+	for hash := range code {
+		require.NoError(t, sut.AddCode([]common.Hash{hash}))
+	}
+	sut.DoneAdding()
+
 	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	source, target := memorydb.New(), memorydb.New()
+	require.NoError(t, sut.Sync(ctx))
 
-	missing := writeRandomCode(t, source)
-	stored := writeRandomCode(t, target)
-
-	recorder := synctest.NewRecordingResponder(newResponder(log, source))
-	syncer, err := NewSyncer(log, serve(t, ctx, log, recorder), target)
-	require.NoError(t, err)
-	require.NoError(t, syncer.AddCode([]common.Hash{missing, stored}))
-
-	require.Equal(t, []common.Hash{missing}, markedHashes(t, target),
-		"only the missing hash is owed")
-
-	syncer.CloseInput()
-	require.NoError(t, syncer.Sync(ctx))
-	require.Equal(t, []int{1}, requestSizes(recorder), "stored code is never requested")
+	sut.assertHasCode(t, code)
+	assert.Lenf(t, sut.recorder.Requests(), tampered+1, "%d tampered responses and a correct response", tampered)
 }
 
 func TestClaimSet(t *testing.T) {
 	t.Parallel()
 
-	// A distinct hash per claim, so the count stays under what one byte holds.
-	const claims = 100
-
-	var c claimSet
-	batch := make([]common.Hash, 0, claims)
-	for i := range claims {
-		codeHash := common.Hash{byte(i)}
-		require.True(t, c.claim(codeHash))
-		require.False(t, c.claim(codeHash), "a held hash cannot be claimed again")
-		batch = append(batch, codeHash)
-	}
-	require.Equal(t, len(batch), held(&c))
-
-	c.release(batch...)
-	require.Zero(t, held(&c), "a released batch must leave nothing behind")
-	require.True(t, c.claim(batch[0]), "a released hash can be claimed again")
-}
-
-// held counts the claims, which [sync.Map] does not report.
-func held(c *claimSet) int {
-	n := 0
-	c.m.Range(func(_, _ any) bool {
-		n++
-		return true
-	})
-	return n
-}
-
-func TestSyncer_RepeatsOfStoredCodeNeverClaim(t *testing.T) {
-	const (
-		numHashes = 50
-		producers = 8
+	var (
+		c      claimSet
+		hashes = make([]common.Hash, 100)
 	)
-
-	log := loggingtest.New(t, logging.Debug)
-	db := memorydb.New()
-
-	stored := make([]common.Hash, numHashes)
-	for i := range stored {
-		stored[i] = writeRandomCode(t, db)
-	}
-
-	syncer, err := NewSyncer(log, nil, db)
-	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-	for range producers {
-		wg.Go(func() {
-			assert.NoError(t, syncer.AddCode(stored))
-		})
-	}
-	wg.Wait()
-
-	require.Zero(t, held(syncer.claimed), "already-stored code must never be claimed")
-	require.Empty(t, markedHashes(t, db), "already-stored code must never be marked")
-}
-
-// A write failure must release its claim, or the hash is stuck forever.
-func TestSyncer_ClaimReleasedOnWriteFailure(t *testing.T) {
-	log := loggingtest.New(t, logging.Debug)
-
-	syncer, err := NewSyncer(log, nil, memorydb.New())
-	require.NoError(t, err)
-
-	syncer.db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
-
-	hash := common.Hash{1}
-	require.ErrorIs(t, syncer.AddCode([]common.Hash{hash}), saetest.ErrInjected)
-	require.Zero(t, held(syncer.claimed), "a failed write must not leave a claim behind")
-}
-
-func TestSyncer_RejectsTamperedResponse(t *testing.T) {
-	// Enough bad answers to show a rejection is not a one-off.
-	const tampered = 2
-
-	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	source := memorydb.New()
-	code := randomCode(t)
-	hash := writeCode(t, source, code)
-
-	// Well-formed but wrong, so only the client's verification can reject it.
-	responder := synctest.NewMutatingResponder(newResponder(log, source), tampered, func(resp *syncpb.GetCodeResponse) {
-		for i := range resp.GetData() {
-			resp.Data[i] = []byte("tampered")
-		}
-	})
-	client := serve(t, ctx, log, responder)
-
-	got, err := getCode(ctx, log, client, []common.Hash{hash})
-	require.NoError(t, err)
-	require.Equal(t, [][]byte{code}, got, "tampered code must never be accepted")
-	require.Equal(t, tampered+1, responder.Served(), "every tampered response must cost a re-request")
-}
-
-// However input closed, a later AddCode must be refused and leave no marker.
-// A marker left behind is code owed with nothing running to fetch it.
-func TestSyncer_InputClosed(t *testing.T) {
-	log := loggingtest.New(t, logging.Debug)
-	db := memorydb.New()
-	syncer, err := NewSyncer(log, nil, db)
-	require.NoError(t, err)
-
-	syncer.CloseInput()
-
-	require.ErrorIs(t, syncer.AddCode([]common.Hash{{1}}), ErrInputClosed)
-	require.Empty(t, markedHashes(t, db), "a refused AddCode must not leave a marker behind")
-
-	// Zero hashes gets no special pass, closed is closed either way.
-	require.ErrorIs(t, syncer.AddCode(nil), ErrInputClosed)
-}
-
-// AddCode racing CloseInput has two outcomes: accepted and marked, or refused
-// and unmarked. A marker left by a refused call is code owed to nobody.
-func TestSyncer_AddCodeRacesCloseInput(t *testing.T) {
-	const producers = 50
-
-	log := loggingtest.New(t, logging.Debug)
-	db := memorydb.New()
-	syncer, err := NewSyncer(log, nil, db)
-	require.NoError(t, err)
-
-	hashes := make([]common.Hash, producers)
 	for i := range hashes {
-		hashes[i] = common.Hash{byte(i + 1)}
+		hash := common.Hash{byte(i)}
+		hashes[i] = hash
+
+		require.True(t, c.claim(hash))
+		require.False(t, c.claim(hash), "a held hash cannot be claimed again")
 	}
 
-	// One slot per producer, so each writes its own and Wait orders the reads.
-	errs := make([]error, producers)
-	var wg sync.WaitGroup
-	start := make(chan struct{})
-	for i, codeHash := range hashes {
-		wg.Go(func() {
-			<-start
-			errs[i] = syncer.AddCode([]common.Hash{codeHash})
-		})
+	c.release(hashes...)
+	for _, hash := range hashes {
+		require.True(t, c.claim(hash), "a released hash can be claimed again")
 	}
-	wg.Go(func() {
-		<-start
-		syncer.CloseInput()
-	})
-
-	close(start)
-	wg.Wait()
-
-	var accepted []common.Hash
-	for i, err := range errs {
-		if err == nil {
-			accepted = append(accepted, hashes[i])
-			continue
-		}
-		require.ErrorIs(t, err, ErrInputClosed, "AddCode is either accepted or refused as closed")
-	}
-
-	require.ElementsMatch(t, accepted, markedHashes(t, db),
-		"a marker exists exactly when AddCode accepted the hash")
 }
 
-func TestSyncer_DrainedQueueMeansEmpty(t *testing.T) {
-	t.Parallel()
-
-	log := loggingtest.New(t, logging.Debug)
+func TestVerifyCode(t *testing.T) {
+	hash, code := randomCode(t)
 
 	tests := []struct {
-		name          string
-		rounds        int
-		producers     int
-		hashesPerCall int
-		dbFails       bool
-		wantAccepted  bool // whether any AddCode is expected to succeed at all
+		name    string
+		codes   [][]byte
+		wantErr error
 	}{
-		{name: "one_producer", rounds: 20000, producers: 1, hashesPerCall: 1, wantAccepted: true},
-		{name: "many_producers", rounds: 2000, producers: 8, hashesPerCall: 1, wantAccepted: true},
-		{name: "batched_add_code", rounds: 2000, producers: 4, hashesPerCall: 5, wantAccepted: true},
-		{name: "db_fails", rounds: 100, producers: 4, hashesPerCall: 3, dbFails: true},
+		{
+			name:  "valid",
+			codes: [][]byte{code},
+		},
+		{
+			name:    "count_mismatch",
+			codes:   [][]byte{},
+			wantErr: errCodeCountMismatch,
+		},
+		{
+			name:    "hash_mismatch",
+			codes:   [][]byte{[]byte("tampered")},
+			wantErr: errCodeHashMismatch,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			offered := make([]common.Hash, tt.hashesPerCall)
-			for i := range offered {
-				offered[i] = common.Hash{byte(i + 1)}
-			}
-
-			everAccepted := false
-			for round := range tt.rounds {
-				syncer, err := NewSyncer(log, nil, memorydb.New())
-				require.NoError(t, err)
-				if tt.dbFails {
-					// Swapped in after construction, so every AddCode write
-					// this round is rejected, whatever recovery itself took.
-					syncer.db = evmdb.New(saetest.NewFlakyDB(memdb.New(), 0))
-				}
-
-				// Buffered to the producer count, so no AddCode waits to report.
-				results := make(chan error, tt.producers)
-
-				var wg sync.WaitGroup
-				for range tt.producers {
-					wg.Go(func() {
-						results <- syncer.AddCode(offered)
-					})
-				}
-				wg.Go(syncer.CloseInput)
-
-				// Sleeping on an empty drain keeps this from starving the producers.
-				drained := 0
-				for {
-					taken, closed := syncer.q.take()
-					drained += len(taken)
-					if len(taken) > 0 {
-						continue
-					}
-					if closed {
-						break
-					}
-					require.NoError(t, syncer.q.wait(t.Context()))
-				}
-				wg.Wait()
-				close(results)
-
-				// Same hashes for every producer, so nil just means admitted.
-				accepted := false
-				for err := range results {
-					if err == nil {
-						accepted = true
-						continue
-					}
-					require.Truef(t, errors.Is(err, ErrInputClosed) || errors.Is(err, saetest.ErrInjected),
-						"round %d: AddCode refused with an unexpected error: %v", round, err)
-				}
-
-				wantDrained := 0
-				if accepted {
-					wantDrained = len(offered)
-				}
-				require.Equalf(t, wantDrained, drained,
-					"round %d: a hash stayed queued after the drain reported empty and closed", round)
-				everAccepted = everAccepted || accepted
-			}
-
-			require.Equal(t, tt.wantAccepted, everAccepted,
-				"whether any AddCode is accepted is what the case is built to exercise")
+			require.ErrorIs(t, verifyCode([]common.Hash{hash}, tt.codes), tt.wantErr)
 		})
 	}
 }
 
-// markedHashes is every hash currently recorded as owed.
-func markedHashes(t *testing.T, db ethdb.Iteratee) []common.Hash {
-	t.Helper()
-	it := customrawdb.NewCodeToFetchIterator(db)
-	defer it.Release()
+// AddCode after DoneAdding must be refused and leave no marker. A leftover
+// marker is code owed with nothing running to fetch it.
+func TestSyncer_AddCodeAfterDoneAdding(t *testing.T) {
+	sut := newSUT(t)
+	sut.DoneAdding()
 
-	var marked []common.Hash
-	for it.Next() {
-		marked = append(marked, common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):]))
+	tests := []struct {
+		name   string
+		hashes []common.Hash
+	}{
+		{
+			name: "no_hashes",
+		},
+		{
+			name:   "single_hash",
+			hashes: []common.Hash{{1}},
+		},
+		{
+			name:   "multiple_hashes",
+			hashes: []common.Hash{{1}, {2}},
+		},
 	}
-	require.NoError(t, it.Error())
-	return marked
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.ErrorIs(t, sut.AddCode(test.hashes), errDoneAdding)
+			sut.assertNoCodeToSync(t)
+		})
+	}
 }
 
-// An interrupted run leaves markers, and the next syncer must fetch what is
-// still owed, not only clear what arrived.
-func TestSyncer_ResumesFromMarkers(t *testing.T) {
-	ctx := t.Context()
-	log := loggingtest.New(t, logging.Debug)
-	source, target := memorydb.New(), memorydb.New()
+// AddCode racing DoneAdding should maintain AddCode's invariant that all
+// successfully provided hashes will eventually be fetched.
+func TestSyncer_AddCodeRacesDoneAdding(t *testing.T) {
+	code := newCodes(t, 50)
+	sut := newSUT(t, withCode(code))
 
-	// Owed, so it must be fetched.
-	owed := writeRandomCode(t, source)
-	require.NoError(t, customrawdb.WriteCodeToFetch(target, owed))
-
-	// Marked but already stored, so its marker is cleared without a request.
-	arrived := writeRandomCode(t, target)
-	require.NoError(t, customrawdb.WriteCodeToFetch(target, arrived))
-
-	recorder := synctest.NewRecordingResponder(newResponder(log, source))
-	client := serve(t, ctx, log, recorder)
-
-	syncer, err := NewSyncer(log, client, target)
-	require.NoError(t, err)
-	syncer.CloseInput()
-	require.NoError(t, syncer.Sync(ctx))
-
-	require.Equal(t, rawdb.ReadCode(source, owed), rawdb.ReadCode(target, owed))
-	require.Equal(t, []int{1}, requestSizes(recorder), "only the hash still owed is requested")
-
-	require.Empty(t, markedHashes(t, target), "recovery must clear every marker it resolves")
-}
-
-// Concurrent repeats of an in-flight hash must cost no extra fetch.
-func TestSyncer_RepeatDuringFetch(t *testing.T) {
-	const concurrentRepeats = 20
-
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	log := loggingtest.New(t, logging.Debug)
-	source, target := memorydb.New(), memorydb.New()
-
-	// A full batch, so it dispatches while input stays open.
-	hashes := make([]common.Hash, maxHashesPerRequest)
-	for i := range hashes {
-		hashes[i] = writeRandomCode(t, source)
-	}
-	repeat := hashes[0]
-
-	held := newHoldingResponder(newResponder(log, source))
-	recorder := synctest.NewRecordingResponder(held)
-	// One request is all this should cost, so a second ends the run.
-	guard := synctest.NewCancelAfter(recorder, 2, cancel)
-	client := serve(t, ctx, log, guard)
-
-	syncer, err := NewSyncer(log, client, target)
-	require.NoError(t, err)
-	require.NoError(t, syncer.AddCode(hashes))
-
-	syncErr := make(chan error, 1)
-	go func() { syncErr <- syncer.Sync(ctx) }()
-
-	defer held.release()
-	require.NoError(t, held.wait(ctx), "the syncer never sent a request")
-
-	// Held in flight, so concurrent repeats must defer to it.
+	hashes := slices.Collect(maps.Keys(code))
+	errs := make([]error, len(hashes))
 	var wg sync.WaitGroup
-	for range concurrentRepeats {
+	for i, hash := range hashes {
 		wg.Go(func() {
-			assert.NoError(t, syncer.AddCode([]common.Hash{repeat}))
+			errs[i] = sut.AddCode([]common.Hash{hash})
 		})
 	}
+	wg.Go(sut.DoneAdding)
 	wg.Wait()
 
-	syncer.CloseInput()
-	held.release()
-	require.NoError(t, <-syncErr)
-
-	require.False(t, guard.Fired(), "a repeat must not cost a second request")
-	require.Equal(t, []int{len(hashes)}, requestSizes(recorder),
-		"a repeat must not cost a second fetch")
-	require.Equal(t, rawdb.ReadCode(source, repeat), rawdb.ReadCode(target, repeat))
-	require.Empty(t, markedHashes(t, target), "every marker must be cleared")
-}
-
-// holdingResponder holds its first response until released.
-type holdingResponder struct {
-	inner       handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-	holding     chan struct{}
-	released    chan struct{}
-	first       atomic.Bool
-	releaseOnce sync.Once
-}
-
-func newHoldingResponder(inner handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]) *holdingResponder {
-	return &holdingResponder{
-		inner:    inner,
-		holding:  make(chan struct{}),
-		released: make(chan struct{}),
+	// Restart recovers every hash that was added successfully. After re-adding
+	// the refused ones, a sync must fetch all the code.
+	sut.restart(t)
+	for i, hash := range hashes {
+		if errs[i] != nil {
+			assert.NoError(t, sut.AddCode([]common.Hash{hash}))
+		}
 	}
+	sut.DoneAdding()
+
+	require.NoError(t, sut.Sync(t.Context()))
+
+	sut.assertHasCode(t, code)
+	sut.assertNoCodeToSync(t)
 }
 
-func (h *holdingResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, *avacommon.AppError) {
-	// Later requests pass through, so a no-second-request assertion still finishes.
-	if !h.first.Swap(true) {
-		close(h.holding)
-		<-h.released
+// A crash at any single write must leave the store recoverable by a fresh
+// syncer plus a re-add of whatever AddCode refused.
+func TestSyncer_CrashRecovery(t *testing.T) {
+	// Multiple adds and multiple batches put concurrent worker commits in the
+	// op stream.
+	adds := []codes{
+		newCodes(t, maxHashesPerRequest),
+		newCodes(t, maxHashesPerRequest+1),
 	}
-	return h.inner.Respond(ctx, nodeID, req)
-}
-
-// wait blocks until a request is outstanding.
-func (h *holdingResponder) wait(ctx context.Context) error {
-	select {
-	case <-h.holding:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	allCode := make(codes)
+	for _, c := range adds {
+		maps.Copy(allCode, c)
 	}
-}
-
-// release lets the held response through. Idempotent, so a test can defer it.
-func (h *holdingResponder) release() {
-	h.releaseOnce.Do(func() {
-		close(h.released)
-	})
-}
-
-// A crash at any single write must leave the store recoverable by a fresh syncer
-// plus a re-add of whatever AddCode refused.
-func TestSyncer_WriteFailure(t *testing.T) {
-	log := loggingtest.New(t, logging.Debug)
-	source := memorydb.New()
-
-	// A full batch and a short one, so concurrent worker commits are in the stream.
-	hashes := make([]common.Hash, maxHashesPerRequest+1)
-	want := map[common.Hash][]byte{}
-	for i := range hashes {
-		code := randomCode(t)
-		hashes[i] = writeCode(t, source, code)
-		want[hashes[i]] = code
-	}
-	// Already stored on the target, so a stale-marker clear is in the stream too.
-	storedCode := randomCode(t)
-	storedHash := crypto.Keccak256Hash(storedCode)
-	want[storedHash] = storedCode
-
-	// Markers a previous run left, so recovery has a clear and a re-queue to
-	// crash during rather than an empty batch.
-	resumed := append([]common.Hash{storedHash}, hashes[:3]...)
-	hashes = hashes[3:]
 
 	// A clean run counts the ops, so the sweep can crash at every one of them.
 	ops := func() int {
-		counter := saetest.NewFlakyDB(newSeededDB(t, storedCode, resumed), math.MaxInt)
-		_, err := runSync(t, log, source, evmdb.New(counter), hashes)
-		require.NoError(t, err)
-		return counter.Calls()
+		sut := newSUT(t, withCode(allCode))
+		for _, c := range adds {
+			require.NoError(t, sut.AddCode(slices.Collect(maps.Keys(c))))
+		}
+		sut.DoneAdding()
+		require.NoError(t, sut.Sync(t.Context()))
+		return sut.flakyDB.Calls()
 	}()
 	require.Positive(t, ops)
 
 	for failAfter := range ops {
 		t.Run(fmt.Sprintf("fail_after_%d", failAfter), func(t *testing.T) {
-			raw := newSeededDB(t, storedCode, resumed)
-			flaky := evmdb.New(saetest.NewFlakyDB(raw, failAfter))
+			toAdd := slices.Clone(adds)
+			trySync := func(s *SUT) error {
+				for len(toAdd) > 0 {
+					c := toAdd[0]
+					if err := s.AddCode(slices.Collect(maps.Keys(c))); err != nil {
+						return err
+					}
+					// Only a successful AddCode promises a durable marker.
+					toAdd = toAdd[1:]
+				}
+				s.DoneAdding()
+				return s.Sync(t.Context())
+			}
 
-			// Only an accepted AddCode promises a durable marker.
-			reAdd, err := runSync(t, log, source, flaky, hashes)
+			sut, err := tryNewSUT(t,
+				withCode(allCode),
+				withDBFlake(failAfter),
+			)
+			if err == nil {
+				err = trySync(sut)
+			}
 			if err != nil {
 				require.ErrorIs(t, err, saetest.ErrInjected)
 			}
 
-			// A second syncer over the same store, now healthy, must converge.
-			target := evmdb.New(raw)
-			_, err = runSync(t, log, source, target, reAdd)
-			require.NoError(t, err)
-
-			for hash, code := range want {
-				require.Equalf(t, code, rawdb.ReadCode(target, hash), "code for %s", hash)
-			}
-			require.Empty(t, markedHashes(t, target), "every marker must be cleared")
+			sut.restart(t)
+			require.NoError(t, trySync(sut))
+			sut.assertHasCode(t, allCode)
+			sut.assertNoCodeToSync(t)
 		})
 	}
-}
-
-// newSeededDB returns a store holding stored code and a previous run's markers,
-// seeded before any fault injector wraps it.
-func newSeededDB(t *testing.T, stored []byte, marked []common.Hash) database.Database {
-	t.Helper()
-	raw := memdb.New()
-	db := evmdb.New(raw)
-	writeCode(t, db, stored)
-	for _, codeHash := range marked {
-		require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
-	}
-	return raw
-}
-
-// runSync adds hashes and runs one syncer over db, returning what it refused.
-func runSync(t *testing.T, log logging.Logger, source, db ethdb.KeyValueStore, hashes []common.Hash) ([]common.Hash, error) {
-	t.Helper()
-	ctx := t.Context()
-
-	syncer, err := NewSyncer(log, serve(t, ctx, log, newResponder(log, source)), db)
-	if err != nil {
-		return hashes, err
-	}
-	if err := syncer.AddCode(hashes); err != nil {
-		return hashes, err
-	}
-
-	// Sync returns once input closes and the queue drains, so close first.
-	syncer.CloseInput()
-	return nil, syncer.Sync(ctx)
-}
-
-// serve registers r on a single-node in-process network.
-func serve(t *testing.T, ctx context.Context, log logging.Logger, r handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]) *Client {
-	t.Helper()
-	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMCodeRequestHandlerID, r)
-	return NewClient(net, tracker)
-}
-
-type codeRecorder = synctest.RecordingResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-
-// requestSizes is the hash count of every request served, in order.
-func requestSizes(c *codeRecorder) []int {
-	reqs := c.Requests()
-	sizes := make([]int, len(reqs))
-	for i, req := range reqs {
-		sizes[i] = len(req.GetHashes())
-	}
-	return sizes
-}
-
-func writeCode(t *testing.T, db ethdb.KeyValueWriter, code []byte) common.Hash {
-	t.Helper()
-	hash := crypto.Keccak256Hash(code)
-	rawdb.WriteCode(db, hash, code)
-	return hash
-}
-
-// writeRandomCode stores a fresh blob and returns its hash.
-func writeRandomCode(t *testing.T, db ethdb.KeyValueWriter) common.Hash {
-	t.Helper()
-	return writeCode(t, db, randomCode(t))
-}
-
-func randomCode(t *testing.T) []byte {
-	t.Helper()
-	code := make([]byte, 128)
-	_, err := rand.Read(code)
-	require.NoError(t, err)
-	return code
 }

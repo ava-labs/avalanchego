@@ -22,28 +22,30 @@ import (
 func TestResponder(t *testing.T) {
 	t.Parallel()
 
-	db := memorydb.New()
-	codeBytes := []byte("contract bytecode")
-	codeHash := writeCode(t, db, codeBytes)
+	codeHash, codeBytes := randomCode(t)
+	otherHash, other := randomCode(t)
 
-	other := randomCode(t)
-	otherHash := writeCode(t, db, other)
+	db := memorydb.New()
+	writeCode(t, db, codes{
+		codeHash:  codeBytes,
+		otherHash: other,
+	})
 
 	tests := []struct {
-		name     string
-		hashes   []common.Hash
-		wantData [][]byte
-		wantErr  *avacommon.AppError
+		name      string
+		hashes    []common.Hash
+		wantCodes [][]byte
+		wantErr   *avacommon.AppError
 	}{
 		{
-			name:     "single_hash",
-			hashes:   []common.Hash{codeHash},
-			wantData: [][]byte{codeBytes},
+			name:      "single_hash",
+			hashes:    []common.Hash{codeHash},
+			wantCodes: [][]byte{codeBytes},
 		},
 		{
-			name:     "multiple_hashes_preserve_order",
-			hashes:   []common.Hash{codeHash, otherHash},
-			wantData: [][]byte{codeBytes, other},
+			name:      "multiple_hashes_preserve_order",
+			hashes:    []common.Hash{codeHash, otherHash},
+			wantCodes: [][]byte{codeBytes, other},
 		},
 		{
 			name:    "missing_hash_rejected",
@@ -51,9 +53,9 @@ func TestResponder(t *testing.T) {
 			wantErr: errHashNotFound,
 		},
 		{
-			name:     "duplicate_hashes_served",
-			hashes:   []common.Hash{codeHash, codeHash},
-			wantData: [][]byte{codeBytes, codeBytes},
+			name:      "duplicate_hashes_served",
+			hashes:    []common.Hash{codeHash, codeHash},
+			wantCodes: [][]byte{codeBytes, codeBytes},
 		},
 		{
 			name:    "too_many_hashes_rejected",
@@ -67,13 +69,8 @@ func TestResponder(t *testing.T) {
 			t.Parallel()
 
 			r := newResponder(loggingtest.New(t, logging.Debug), db)
-
-			rawHashes := make([][]byte, len(tt.hashes))
-			for i, h := range tt.hashes {
-				rawHashes[i] = h.Bytes()
-			}
-			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetCodeRequest{Hashes: rawHashes})
-
+			req := &syncpb.GetCodeRequest{Hashes: hashBytes(tt.hashes)}
+			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), req)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.Nil(t, resp, "a rejected request carries no response")
@@ -81,7 +78,7 @@ func TestResponder(t *testing.T) {
 			}
 			require.Nil(t, err)
 			require.NotNil(t, resp)
-			require.Equal(t, tt.wantData, resp.Data)
+			require.Equal(t, tt.wantCodes, resp.Data)
 		})
 	}
 }
