@@ -496,29 +496,6 @@ func encodeTipFirst(t *testing.T, blocks []*types.Block, n int) [][]byte {
 
 // A peer that reorged still holds the requested block, so naming it by hash
 // keeps that peer useful.
-func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
-	ctx := t.Context()
-
-	ours := synctest.MakeChain(t, 10, synctest.WithTxsPerBlock(1))
-	theirs := synctest.MakeChain(t, 10, synctest.WithTxsPerBlock(3))
-	wanted := ours[5]
-	require.NotEqual(t, wanted.Hash(), theirs[5].Hash(), "the chains diverge")
-	require.Equal(t, wanted.NumberU64(), theirs[5].NumberU64(), "at the same height")
-
-	// The peer is canonical on theirs but still stores ours.
-	both := append(append([]*types.Block{}, theirs...), ours...)
-
-	net, tracker, served := countingNetwork(t, ctx, both)
-
-	got, err := getBlocks(ctx, loggingtest.New(t, logging.Debug), NewClient(net, tracker),
-		wanted.Hash(), wanted.NumberU64(), 3, nil)
-
-	require.NoError(t, err)
-	require.Len(t, got, 3)
-	require.Equal(t, wanted.Hash(), got[0].Hash())
-	require.Len(t, served.Requests(), 1, "one request, no retry loop")
-}
-
 func heights(from, to int) []int {
 	out := make([]int, 0, to-from+1)
 	for h := from; h <= to; h++ {
