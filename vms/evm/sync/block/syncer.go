@@ -149,7 +149,6 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // any network or verification failure until ctx ends.
 func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, numParents uint16, verify BlockVerifier) ([]*types.Block, error) {
 	req := &syncpb.GetBlockRequest{
-		Hash:       hash.Bytes(),
 		Height:     height,
 		NumParents: uint32(numParents),
 	}

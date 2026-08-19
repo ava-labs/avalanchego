@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/trie"
 )
@@ -31,8 +33,8 @@ func WithTxsPerBlock(n int) ChainOption {
 
 // MakeChain builds n+1 blocks linked by ParentHash, with empty bodies by
 // default. blocks[0] is the genesis.
-func MakeChain(t *testing.T, n int, opts ...ChainOption) []*types.Block {
-	t.Helper()
+func MakeChain(tb testing.TB, n int, opts ...ChainOption) []*types.Block {
+	tb.Helper()
 
 	var cfg chainConfig
 	options.ApplyTo(&cfg, opts...)
@@ -73,23 +75,13 @@ func makeTxs(n int, height uint64) []*types.Transaction {
 	return txs
 }
 
-// BlockMap is an in-memory [block.Provider] keyed by hash.
-type BlockMap struct {
-	byHash map[common.Hash]*types.Block
-}
-
-func NewBlockMap(blocks []*types.Block) *BlockMap {
-	m := &BlockMap{byHash: make(map[common.Hash]*types.Block, len(blocks))}
+// NewBlockDB returns an in-memory database holding blocks as the canonical
+// chain, ready to be served by a block handler.
+func NewBlockDB(blocks []*types.Block) ethdb.Database {
+	db := rawdb.NewMemoryDatabase()
 	for _, b := range blocks {
-		m.byHash[b.Hash()] = b
+		rawdb.WriteBlock(db, b)
+		rawdb.WriteCanonicalHash(db, b.Hash(), b.NumberU64())
 	}
-	return m
-}
-
-func (m *BlockMap) GetBlock(hash common.Hash, height uint64) *types.Block {
-	b, ok := m.byHash[hash]
-	if !ok || b.NumberU64() != height {
-		return nil
-	}
-	return b
+	return db
 }

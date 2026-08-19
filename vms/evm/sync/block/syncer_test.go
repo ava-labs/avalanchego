@@ -49,21 +49,21 @@ func TestVerifyBlocks(t *testing.T) {
 		},
 		{
 			// The block hash still matches, so only the body roots catch this.
-			name:       "forged transactions",
+			name:       "forged_transactions",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs}))},
 			wantErr:    errTxHashMismatch,
 		},
 		{
-			name:       "forged uncles",
+			name:       "forged_uncles",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        [][]byte{encodeBlock(t, forgeBlock(tip.Header(), types.Body{Uncles: forgedUncles}))},
 			wantErr:    errUncleHashMismatch,
 		},
 		{
-			name:       "chain-specific verifier rejects",
+			name:       "chain_specific_verifier_rejects",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        chain,
@@ -71,35 +71,35 @@ func TestVerifyBlocks(t *testing.T) {
 			wantErr:    errTestVerifier,
 		},
 		{
-			name:       "chain-specific verifier accepts",
+			name:       "chain_specific_verifier_accepts",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        chain,
 			verify:     func(*types.Block) error { return nil },
 		},
 		{
-			name:       "empty response",
+			name:       "empty_response",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        nil,
 			wantErr:    errEmptyResponse,
 		},
 		{
-			name:       "too many blocks",
+			name:       "too_many_blocks",
 			hash:       tip.Hash(),
 			numParents: 1,
 			raw:        chain,
 			wantErr:    errTooManyBlocks,
 		},
 		{
-			name:       "wrong tip breaks the chain",
+			name:       "wrong_tip_breaks_the_chain",
 			hash:       blocks[0].Hash(),
 			numParents: 3,
 			raw:        chain,
 			wantErr:    errBlockHashMismatch,
 		},
 		{
-			name:       "undecodable block",
+			name:       "undecodable_block",
 			hash:       tip.Hash(),
 			numParents: 3,
 			raw:        [][]byte{{0xff, 0xff}},
@@ -137,7 +137,7 @@ func TestSyncer(t *testing.T) {
 		wantVerified  int32 // blocks the verifier must see
 	}{
 		{
-			name:          "all from network",
+			name:          "all_from_network",
 			numBlocks:     10,
 			fromHeight:    5,
 			blocksToFetch: 3,
@@ -145,7 +145,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			name:          "some already on disk",
+			name:          "some_already_on_disk",
 			numBlocks:     10,
 			onDisk:        []int{4, 5},
 			fromHeight:    5,
@@ -154,7 +154,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			name:          "all already on disk",
+			name:          "all_already_on_disk",
 			numBlocks:     10,
 			onDisk:        []int{3, 4, 5},
 			fromHeight:    5,
@@ -165,7 +165,7 @@ func TestSyncer(t *testing.T) {
 		{
 			// The tip is missing, so the skip stops immediately and the
 			// on-disk ancestors are refetched.
-			name:          "tip missing refetches suffix",
+			name:          "tip_missing_refetches_suffix",
 			numBlocks:     10,
 			onDisk:        []int{3, 4},
 			fromHeight:    5,
@@ -174,7 +174,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			name:          "single block",
+			name:          "single_block",
 			numBlocks:     10,
 			fromHeight:    7,
 			blocksToFetch: 1,
@@ -184,7 +184,7 @@ func TestSyncer(t *testing.T) {
 		{
 			// blocksToFetch exceeds maxParentsPerRequest, so this drives more
 			// than one request through the re-request loop.
-			name:          "batches across requests",
+			name:          "batches_across_requests",
 			numBlocks:     80,
 			fromHeight:    70,
 			blocksToFetch: 70,
@@ -192,7 +192,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  2,
 		},
 		{
-			name:          "stops at genesis",
+			name:          "stops_at_genesis",
 			numBlocks:     10,
 			fromHeight:    10,
 			blocksToFetch: 30,
@@ -202,7 +202,7 @@ func TestSyncer(t *testing.T) {
 		{
 			// Long enough to cross [ethdb.IdealBatchSize], so the batch flushes
 			// mid-run.
-			name:          "flushes a long sync",
+			name:          "flushes_a_long_sync",
 			numBlocks:     400,
 			txsPerBlock:   4,
 			fromHeight:    400,
@@ -214,7 +214,7 @@ func TestSyncer(t *testing.T) {
 			// An on-disk prefix sits behind a gap wider than one batch. The
 			// skip runs inside the fetch loop, so it is not limited to the
 			// leading run.
-			name:          "skips an on-disk prefix behind a gap",
+			name:          "skips_an_on_disk_prefix_behind_a_gap",
 			numBlocks:     130,
 			onDisk:        heights(1, 66),
 			fromHeight:    130,
@@ -223,7 +223,7 @@ func TestSyncer(t *testing.T) {
 			wantRequests:  1,
 		},
 		{
-			name:          "accepting verifier sees every block",
+			name:          "accepting_verifier_sees_every_block",
 			numBlocks:     10,
 			fromHeight:    5,
 			blocksToFetch: 3,
@@ -291,8 +291,8 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 		name             string
 		cancelAfterBatch bool
 	}{
-		{name: "before the skip walk"},
-		{name: "between batches", cancelAfterBatch: true},
+		{name: "before_the_skip_walk"},
+		{name: "between_batches", cancelAfterBatch: true},
 	}
 
 	for _, tt := range tests {
@@ -345,15 +345,15 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 		verify BlockVerifier
 	}{
 		{
-			name:   "block does not hash to the requested tip",
+			name:   "block_does_not_hash_to_the_requested_tip",
 			served: encodeBlock(t, blocks[0]),
 		},
 		{
-			name:   "body does not match the header",
+			name:   "body_does_not_match_the_header",
 			served: encodeBlock(t, forgeBlock(tip.Header(), types.Body{Transactions: forgedTxs})),
 		},
 		{
-			name:   "chain-specific verifier rejects",
+			name:   "chain_specific_verifier_rejects",
 			served: encodeBlock(t, tip),
 			verify: func(*types.Block) error { return errTestVerifier },
 		},
@@ -423,23 +423,23 @@ func TestVerifyBody_Withdrawals(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "committed and present",
+			name:    "committed_and_present",
 			commits: &committed,
 			body:    withdrawals,
 		},
 		{
-			name:    "committed but body has none",
+			name:    "committed_but_body_has_none",
 			commits: &committed,
 			wantErr: errMissingWithdrawals,
 		},
 		{
-			name:    "committed to a different root",
+			name:    "committed_to_a_different_root",
 			commits: &other,
 			body:    withdrawals,
 			wantErr: errWithdrawalsHashMismatch,
 		},
 		{
-			name:    "present but header commits to none",
+			name:    "present_but_header_commits_to_none",
 			body:    withdrawals,
 			wantErr: errUnexpectedWithdrawals,
 		},
@@ -465,7 +465,7 @@ type blockRecorder = synctest.RecordingResponder[*syncpb.GetBlockRequest, *syncp
 // so a test can assert the syncer never asked for blocks it already had.
 func countingNetwork(t *testing.T, ctx context.Context, blocks []*types.Block) (*p2p.Network, *p2p.PeerTracker, *blockRecorder) {
 	log := loggingtest.New(t, logging.Debug)
-	r := synctest.NewRecordingResponder(newResponder(log, synctest.NewBlockMap(blocks)))
+	r := synctest.NewRecordingResponder(newResponder(log, synctest.NewBlockDB(blocks)))
 	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, r)
 	return net, tracker, r
 }

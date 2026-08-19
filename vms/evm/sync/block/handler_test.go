@@ -5,10 +5,8 @@ package block
 
 import (
 	"context"
-	"math"
 	"testing"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
@@ -16,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -38,51 +37,60 @@ func TestResponder(t *testing.T) {
 		wantErr    *avacommon.AppError
 	}{
 		{
-			name:       "returns requested parents tip-first",
+			name:       "returns_requested_parents_tip_first",
 			chainLen:   10,
 			numParents: 5,
 			wantBlocks: 5,
 		},
 		{
-			name:       "includes genesis then stops",
+			name:       "includes_genesis_then_stops",
 			chainLen:   5,
 			numParents: 100, // more than the chain length
 			wantBlocks: 6,
 		},
 		{
-			name:       "caps parents at max",
+			name:       "caps_parents_at_max",
 			chainLen:   int(maxParentsPerRequest) + 10,
 			numParents: uint32(maxParentsPerRequest) + 50,
 			wantBlocks: int(maxParentsPerRequest),
 		},
 		{
-			name:       "missing block rejected",
+			name:       "missing_block_rejected",
 			noBlocks:   true,
 			numParents: 1,
 			wantErr:    errBlocksNotFound,
 		},
 		{
-			name:       "cancelled context rejected",
+			// [GetAncestors] serves the requested block even past its
+			// deadline, so a cancelled walk still returns it.
+			name:       "cancelled_context_still_serves_the_requested_block",
 			chainLen:   50,
+			numParents: 10,
+			cancelCtx:  true,
+			wantBlocks: 1,
+		},
+		{
+			name:       "cancelled_context_with_nothing_to_serve_rejected",
+			noBlocks:   true,
 			numParents: 10,
 			cancelCtx:  true,
 			wantErr:    errServingCancelled,
 		},
 		{
-			name:       "zero parents rejected",
+			name:       "zero_parents_rejected",
 			chainLen:   10,
 			numParents: 0,
 			wantErr:    errNoParentsRequested,
 		},
 		{
-			name:       "budget fits three blocks",
+			name:       "budget_fits_three_blocks",
 			chainLen:   10,
 			numParents: 5,
-			budget:     3 * blockBytes,
+			budget:     3 * (blockBytes + wrappers.IntLen),
 			wantBlocks: 3,
 		},
 		{
-			name:       "oversized block served alone",
+			name:       "oversized_block_served_alone",
 			chainLen:   10,
 			numParents: 5,
 			budget:     blockBytes / 2,
@@ -100,8 +108,7 @@ func TestResponder(t *testing.T) {
 			if tt.budget > 0 {
 				opts = append(opts, WithMaxResponseBytes(tt.budget))
 			}
-			provider := &recordingProvider{inner: synctest.NewBlockMap(blocks)}
-			r := newResponder(loggingtest.New(t, logging.Debug), provider, opts...)
+			r := newResponder(loggingtest.New(t, logging.Debug), synctest.NewBlockDB(blocks), opts...)
 
 			ctx := t.Context()
 			if tt.cancelCtx {
@@ -110,30 +117,22 @@ func TestResponder(t *testing.T) {
 				cancel() // cancel before the responder runs
 			}
 
-			var (
-				hash   = common.Hash{0xde, 0xad}
-				height = uint64(10)
-			)
+			height := uint64(10) // no such block when the chain is empty
 			if len(blocks) > 0 {
-				tip := blocks[len(blocks)-1]
-				hash, height = tip.Hash(), tip.NumberU64()
+				height = blocks[len(blocks)-1].NumberU64()
 			}
 
-			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-				Hash:       hash.Bytes(),
+			resp, appErr := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
 				Height:     height,
 				NumParents: tt.numParents,
 			})
-			// Genesis has no parent, so the walk must stop rather than ask for
-			// one at an underflowed height.
-			require.NotContains(t, provider.heights, uint64(math.MaxUint64))
-
 			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, appErr, tt.wantErr)
 				require.Nil(t, resp, "a rejected request carries no response")
 				return
 			}
-			require.Nil(t, err)
+			// A nil *AppError is not a nil error, so NoError would fail here.
+			require.Nil(t, appErr)
 			require.NotNil(t, resp)
 			require.Len(t, resp.Blocks, tt.wantBlocks)
 
@@ -154,15 +153,4 @@ func TestErrorSentinels(t *testing.T) {
 		"errNoParentsRequested": errNoParentsRequested,
 		"errServingCancelled":   errServingCancelled,
 	})
-}
-
-// recordingProvider records the heights it was asked for.
-type recordingProvider struct {
-	inner   Provider
-	heights []uint64
-}
-
-func (p *recordingProvider) GetBlock(hash common.Hash, height uint64) *types.Block {
-	p.heights = append(p.heights, height)
-	return p.inner.GetBlock(hash, height)
 }

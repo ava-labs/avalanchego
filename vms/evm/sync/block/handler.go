@@ -4,12 +4,11 @@
 package block
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"time"
 
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
 
@@ -23,6 +22,45 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+// RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
+func RegisterHandler(log logging.Logger, net *p2p.Network, db ethdb.Reader, opts ...HandlerOption) error {
+	h := handlers.NewHandler(log, newResponder(log, db, opts...))
+	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
+}
+
+type handlerConfig struct {
+	maxResponseBytes int
+}
+
+// HandlerOption configures [RegisterHandler].
+type HandlerOption = options.Option[handlerConfig]
+
+// WithMaxResponseBytes caps response bytes, at minimum the chain's max block
+// size. The default is below C-Chain's, so a single block can exceed it.
+func WithMaxResponseBytes(n int) HandlerOption {
+	return options.Func[handlerConfig](func(c *handlerConfig) {
+		if n > 0 {
+			c.maxResponseBytes = n
+		}
+	})
+}
+
+var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*responder)(nil)
+
+// responder serves the requested block and its accepted ancestors.
+type responder struct {
+	log              logging.Logger
+	db               ethdb.Reader
+	maxResponseBytes int
+}
+
+func newResponder(log logging.Logger, db ethdb.Reader, opts ...HandlerOption) *responder {
+	cfg := handlerConfig{maxResponseBytes: defaultMaxResponseBytes}
+	options.ApplyTo(&cfg, opts...)
+
+	return &responder{log: log, db: db, maxResponseBytes: cfg.maxResponseBytes}
+}
+
 const (
 	// maxParentsPerRequest caps the parent walk. Blocks vary in size, so
 	// maxResponseBytes bounds the response itself.
@@ -31,6 +69,10 @@ const (
 	// defaultMaxResponseBytes is the conservative p2p budget. A chain with
 	// larger blocks must raise it through [WithMaxResponseBytes].
 	defaultMaxResponseBytes = constants.MaxContainersLen
+
+	// maxBlocksRetrievalTime matches the node's default for the equivalent
+	// bootstrap GetAncestors operation.
+	maxBlocksRetrievalTime = 50 * time.Millisecond
 )
 
 var (
@@ -48,52 +90,8 @@ var (
 	}
 )
 
-type handlerConfig struct {
-	maxResponseBytes int
-}
-
-// HandlerOption configures [RegisterHandler].
-type HandlerOption = options.Option[handlerConfig]
-
-// WithMaxResponseBytes caps response bytes, ideally the chain's max block size.
-func WithMaxResponseBytes(n int) HandlerOption {
-	return options.Func[handlerConfig](func(c *handlerConfig) {
-		if n > 0 {
-			c.maxResponseBytes = n
-		}
-	})
-}
-
-// RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, blocks Provider, opts ...HandlerOption) error {
-	h := handlers.NewHandler(log, newResponder(log, blocks, opts...))
-	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
-}
-
-// Provider returns a block by (hash, height), canonical or not.
-// A nil return stops the parent walk.
-type Provider interface {
-	GetBlock(hash common.Hash, height uint64) *types.Block
-}
-
-var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*responder)(nil)
-
-// responder walks the parent chain from the requested block.
-type responder struct {
-	log              logging.Logger
-	blocks           Provider
-	maxResponseBytes int
-}
-
-func newResponder(log logging.Logger, blocks Provider, opts ...HandlerOption) *responder {
-	cfg := handlerConfig{maxResponseBytes: defaultMaxResponseBytes}
-	options.ApplyTo(&cfg, opts...)
-
-	return &responder{log: log, blocks: blocks, maxResponseBytes: cfg.maxResponseBytes}
-}
-
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *avacommon.AppError) {
-	parents := uint16(min(req.GetNumParents(), uint32(maxParentsPerRequest)))
+	parents := int(min(req.GetNumParents(), uint32(maxParentsPerRequest)))
 	if parents == 0 {
 		r.log.Debug("rejecting request, no parents requested",
 			zap.Stringer("nodeID", nodeID),
@@ -101,45 +99,14 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		return nil, errNoParentsRequested
 	}
 
-	encoded := make([][]byte, 0, parents)
-	totalBytes := 0
-
-	block := r.blocks.GetBlock(common.BytesToHash(req.GetHash()), req.GetHeight())
-	for range parents {
-		if ctx.Err() != nil {
-			break
-		}
-		if block == nil {
-			r.log.Debug("requested block not found, stopping parent walk",
-				zap.Stringer("nodeID", nodeID),
-			)
-			break
-		}
-
-		buf := new(bytes.Buffer)
-		if err := block.EncodeRLP(buf); err != nil {
-			return nil, handlers.Fault(r.log, nodeID,
-				fmt.Errorf("encoding block %s at height %d: %w", block.Hash(), block.NumberU64(), err))
-		}
-		// Serve an oversized block alone rather than stall.
-		if buf.Len()+totalBytes > r.maxResponseBytes && len(encoded) > 0 {
-			r.log.Debug("skipping block due to max total bytes size",
-				zap.Int("totalBlockDataSize", totalBytes),
-				zap.Int("blockSize", buf.Len()),
-				zap.Int("max", r.maxResponseBytes),
-			)
-			break
-		}
-
-		encoded = append(encoded, buf.Bytes())
-		totalBytes += buf.Len()
-		if block.NumberU64() == 0 {
-			break
-		}
-		block = r.blocks.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	// [GetAncestors] re-derives the height from the hash, so this lookup is
+	// redundant with its own. An unknown height yields no blocks below.
+	hash := rawdb.ReadCanonicalHash(r.db, req.GetHeight())
+	blocks, err := GetAncestors(ctx, r.db, ids.ID(hash), parents, r.maxResponseBytes, maxBlocksRetrievalTime)
+	if err != nil {
+		return nil, handlers.Fault(r.log, nodeID, err)
 	}
-
-	if len(encoded) == 0 {
+	if len(blocks) == 0 {
 		// Tell the peer we gave up rather than that the blocks are missing.
 		if ctx.Err() != nil {
 			return nil, errServingCancelled
@@ -151,5 +118,5 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		)
 		return nil, errBlocksNotFound
 	}
-	return &syncpb.GetBlockResponse{Blocks: encoded}, nil
+	return &syncpb.GetBlockResponse{Blocks: blocks}, nil
 }

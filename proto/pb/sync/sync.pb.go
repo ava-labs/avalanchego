@@ -246,13 +246,12 @@ func (x *GetCodeResponse) GetData() [][]byte {
 	return nil
 }
 
-// GetBlockRequest returns the block at (hash, height) plus num_parents
+// GetBlockRequest returns the block at height plus num_parents
 // ancestors: [height, height-1, ..., height-num_parents].
 type GetBlockRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Height        uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 	NumParents    uint32                 `protobuf:"varint,2,opt,name=num_parents,json=numParents,proto3" json:"num_parents,omitempty"`
-	Hash          []byte                 `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"` // names the block, so a non-canonical one is still servable
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -299,13 +298,6 @@ func (x *GetBlockRequest) GetNumParents() uint32 {
 		return x.NumParents
 	}
 	return 0
-}
-
-func (x *GetBlockRequest) GetHash() []byte {
-	if x != nil {
-		return x.Hash
-	}
-	return nil
 }
 
 type GetBlockResponse struct {
@@ -1077,12 +1069,11 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\x0eGetCodeRequest\x12\x16\n" +
 	"\x06hashes\x18\x01 \x03(\fR\x06hashes\"%\n" +
 	"\x0fGetCodeResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x03(\fR\x04data\"^\n" +
+	"\x04data\x18\x01 \x03(\fR\x04data\"J\n" +
 	"\x0fGetBlockRequest\x12\x16\n" +
 	"\x06height\x18\x01 \x01(\x04R\x06height\x12\x1f\n" +
 	"\vnum_parents\x18\x02 \x01(\rR\n" +
-	"numParents\x12\x12\n" +
-	"\x04hash\x18\x03 \x01(\fR\x04hash\"*\n" +
+	"numParents\"*\n" +
 	"\x10GetBlockResponse\x12\x16\n" +
 	"\x06blocks\x18\x01 \x03(\fR\x06blocks\"\x94\x01\n" +
 	"\fProofRequest\x12=\n" +
