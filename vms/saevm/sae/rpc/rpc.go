@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
@@ -76,17 +75,6 @@ type Config struct {
 
 	ResolvePendingToLastExecuted bool
 }
-
-const (
-	// EVMTimeout limits how long an eth_call runs.
-	EVMTimeout = 10 * time.Second
-	// GasCap limits the gas an eth_call can use. It matches
-	// https://github.com/ava-labs/libevm/blob/db6d70f2748e5e50fea36345f2204de97aa4acfc/eth/ethconfig/config.go#L66
-	GasCap = 50_000_000
-	// TxFeeCap limits the fee, in AVAX, of a transaction sent over RPC. The fee
-	// is the gas price times the gas limit.
-	TxFeeCap = 100
-)
 
 // ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
 var ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")

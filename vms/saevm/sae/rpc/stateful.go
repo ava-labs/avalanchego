@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -48,14 +47,6 @@ func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return n
 // FinishExecutingBlock always returns nil.
 func (noEndOfBlockOps) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
-}
-
-func (*backend) RPCEVMTimeout() time.Duration {
-	return EVMTimeout
-}
-
-func (*backend) RPCGasCap() uint64 {
-	return GasCap
 }
 
 func (*backend) Engine() consensus.Engine {
