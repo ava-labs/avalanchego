@@ -51,9 +51,20 @@ type PointsG[T Transaction] interface {
 	BlockRebuilderFrom(block *types.Block) (BlockBuilder[T], error)
 }
 
+// A SettlementPoint reports the settlement information encoded by a header.
+type SettlementPoint interface {
+	// SettledBy returns the extra information for the settled block of the
+	// provided header. It MUST match the value passed to
+	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
+	// executed (pre-SAE) headers.
+	SettledBy(*types.Header) Settled
+}
+
 // Points define user-injected hook points which do not depend on generic
 // types.
 type Points interface {
+	SettlementPoint
+
 	// ExecutionResultsDB opens and returns a height-indexed database, which
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
@@ -66,11 +77,6 @@ type Points interface {
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
-	// SettledBy returns the extra information for the settled block of the
-	// provided header. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
-	// executed (pre-SAE) headers.
-	SettledBy(*types.Header) Settled
 	// VerifyBlockSyntax checks chain-specific syntactic invariants of a parsed
 	// block, beyond the universal invariants enforced by [blocks.Parse]. It
 	// MUST be stateless.
@@ -231,7 +237,7 @@ type Settled struct {
 
 // Synchronous reports whether the header is that of a synchronously executed
 // (pre-SAE) block.
-func Synchronous(h Points, hdr *types.Header) bool {
+func Synchronous(h SettlementPoint, hdr *types.Header) bool {
 	return h.SettledBy(hdr) == (Settled{})
 }
 
