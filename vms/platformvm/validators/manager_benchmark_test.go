@@ -113,7 +113,7 @@ func addPrimaryValidator(
 	}
 
 	nodeID := ids.GenerateTestNodeID()
-	if err := s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		PublicKey:       sk.PublicKey(),
@@ -124,7 +124,7 @@ func addPrimaryValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
-	}); err != nil {
+	})); err != nil {
 		return ids.EmptyNodeID, err
 	}
 
@@ -146,7 +146,7 @@ func addSubnetValidator(
 	nodeID ids.NodeID,
 	height uint64,
 ) error {
-	if err := s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -156,7 +156,7 @@ func addSubnetValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        platform.SubnetPermissionlessValidatorCurrentPriority,
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 
@@ -180,7 +180,7 @@ func addSubnetDelegator(
 ) error {
 	i := rand.Intn(len(nodeIDs)) //#nosec G404
 	nodeID := nodeIDs[i]
-	if err := s.PutCurrentDelegator(&state.Staker{
+	if err := s.PutCurrentDelegator(statetest.CurrentDelegator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -190,7 +190,7 @@ func addSubnetDelegator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        platform.SubnetPermissionlessDelegatorCurrentPriority,
-	}); err != nil {
+	})); err != nil {
 		return fmt.Errorf("putting current delegator: %w", err)
 	}
 

@@ -673,7 +673,6 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	if err != nil {
 		return nil, err
 	}
-
 	switch stakerTx := tx.Unsigned.(type) {
 	case platform.ValidatorTx:
 		attr = &stakerAttributes{
@@ -796,7 +795,7 @@ func (s *Service) getL1Validators(
 func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]any, error) {
 	numNodeIDs := nodeIDs.Len()
 
-	targetStakers := make([]*state.Staker, 0, numNodeIDs)
+	targetStakers := make([]state.CurrentStaker, 0, numNodeIDs)
 
 	// Validator's node ID as string --> Delegators to them
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
@@ -811,7 +810,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 		// TODO: avoid iterating over delegators here.
 		for currentStakerIterator.Next() {
 			staker := currentStakerIterator.Value()
-			if subnetID != staker.SubnetID {
+			if subnetID != staker.Period().SubnetID() {
 				continue
 			}
 			targetStakers = append(targetStakers, staker)
@@ -844,18 +843,29 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 	}
 
 	for _, currentStaker := range targetStakers {
-		apiStaker := toPlatformStaker(currentStaker)
-		potentialReward := avajson.Uint64(currentStaker.PotentialReward)
+		period := currentStaker.Period()
+		apiStaker := toPlatformStakingPeriod(period)
+		potentialReward := avajson.Uint64(currentStaker.Reward())
 
-		stakingInfo, err := s.vm.state.GetStakingInfo(currentStaker.SubnetID, currentStaker.NodeID)
+		stakingInfo, err := s.vm.state.GetStakingInfo(period.SubnetID(), period.NodeID())
 		if err != nil {
 			return nil, err
 		}
 		jsonDelegateeReward := avajson.Uint64(stakingInfo.DelegateeReward)
 
-		switch currentStaker.Priority {
-		case platform.PrimaryNetworkValidatorCurrentPriority, platform.SubnetPermissionlessValidatorCurrentPriority:
-			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
+		switch currentStaker.(type) {
+		case state.CurrentValidator:
+			if period.SubnetID() != constants.PrimaryNetworkID {
+				_, err := s.vm.state.GetSubnetTransformation(period.SubnetID())
+				if err == database.ErrNotFound {
+					validators = append(validators, apiStaker)
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+			}
+			attr, err := s.loadStakerTxAttributes(period.TxID)
 			if err != nil {
 				return nil, err
 			}
@@ -867,7 +877,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				connected *bool
 			)
 			if subnetID == constants.PrimaryNetworkID {
-				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(currentStaker.NodeID, currentStaker.StartTime)
+				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(period.NodeID(), period.StartTime)
 				if err != nil {
 					return nil, err
 				}
@@ -877,7 +887,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
-				isConnected := s.vm.Network.Peers().Has(currentStaker.NodeID)
+				isConnected := s.vm.Network.Peers().Has(period.NodeID())
 				connected = &isConnected
 				uptime = &currentUptime
 			}
@@ -931,12 +941,12 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 
 			validators = append(validators, vdr)
 
-		case platform.PrimaryNetworkDelegatorCurrentPriority, platform.SubnetPermissionlessDelegatorCurrentPriority:
+		case state.CurrentDelegator:
 			var rewardOwner *platformapi.Owner
 			// If we are handling multiple nodeIDs, we don't return the
 			// delegator information.
 			if numNodeIDs == 1 {
-				attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
+				attr, err := s.loadStakerTxAttributes(period.TxID)
 				if err != nil {
 					return nil, err
 				}
@@ -956,11 +966,8 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 
-		case platform.SubnetPermissionedValidatorCurrentPriority:
-			validators = append(validators, apiStaker)
-
 		default:
-			return nil, fmt.Errorf("unexpected staker priority %d", currentStaker.Priority)
+			return nil, fmt.Errorf("unexpected current staker type %T", currentStaker)
 		}
 	}
 
@@ -1610,11 +1617,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
 
-		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+		if _, isValidator := staker.(state.CurrentValidator); args.ValidatorsOnly && !isValidator {
 			continue
 		}
+		period := staker.Period()
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		tx, _, err := s.vm.state.GetTx(period.TxID)
 		if err != nil {
 			return err
 		}
@@ -1631,11 +1639,12 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 	for pendingStakerIterator.Next() { // Iterates over pending stakers
 		staker := pendingStakerIterator.Value()
 
-		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
+		if _, isValidator := staker.(state.PendingValidator); args.ValidatorsOnly && !isValidator {
 			continue
 		}
+		period := staker.Period()
 
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
+		tx, _, err := s.vm.state.GetTx(period.TxID)
 		if err != nil {
 			return err
 		}
@@ -2173,5 +2182,15 @@ func toPlatformStaker(staker *state.Staker) platformapi.Staker {
 		EndTime:   avajson.Uint64(staker.EndTime.Unix()),
 		Weight:    avajson.Uint64(staker.Weight),
 		NodeID:    staker.NodeID,
+	}
+}
+
+func toPlatformStakingPeriod(staker state.StakingPeriod) platformapi.Staker {
+	return platformapi.Staker{
+		TxID:      staker.TxID,
+		StartTime: avajson.Uint64(staker.StartTime.Unix()),
+		EndTime:   avajson.Uint64(staker.EndTime.Unix()),
+		Weight:    avajson.Uint64(staker.Weight),
+		NodeID:    staker.NodeID(),
 	}
 }

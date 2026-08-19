@@ -164,7 +164,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	// Validator should now be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
-	require.Equal(txID, staker.TxID)
+	require.Equal(txID, staker.Period().TxID)
 
 	// Should be rewarded at the end of staking period
 	env.backend.Clk.Set(validatorEndTime)
@@ -182,7 +182,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Verify(t.Context()))
 		require.IsType(&platform.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
-		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
+		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.Period().TxID)
 		require.NoError(err)
 		require.Equal([]*platform.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
 
@@ -201,7 +201,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		env.blkManager.SetPreference(commit.ID(), nil)
 
 		// Stop rewarding once our staker is rewarded
-		if staker.TxID == txID {
+		if staker.Period().TxID == txID {
 			break
 		}
 	}
@@ -221,7 +221,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
 	require.NoError(err)
 	for _, staker := range iterator.ToSlice(currentStakerIterator) {
-		require.NoError(env.state.DeleteCurrentValidator(staker))
+		require.NoError(env.state.DeleteCurrentValidator(staker.Period().SubnetID(), staker.Period().NodeID()))
 	}
 
 	addTx := newAddAutoRenewedValidatorTx(t)
@@ -237,7 +237,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	staker, err := state.NewCurrentStaker(txID, validatorTx, startTime, endTime, validatorTx.Weight(), 0)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(staker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 	// The builder only needs the current staker to choose the reward tx type,
 	// but auto-renewed validators normally also have staking info. Keep the
 	// directly constructed state consistent with StandardTx execution.
@@ -278,10 +278,12 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	)
 
 	// Add a staker to [env.state]
-	require.NoError(env.state.PutCurrentValidator(&state.Staker{
-		NextTime: nextTime,
-		Priority: platform.PrimaryNetworkValidatorCurrentPriority,
-	}))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+		EndTime:  nextTime,
+		Priority: platform.SubnetPermissionedValidatorCurrentPriority,
+	})))
 
 	// Advance wall clock to [nextTime]
 	env.backend.Clk.Set(nextTime)
@@ -335,10 +337,12 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	)
 
 	// Add a staker to [env.state]
-	require.NoError(env.state.PutCurrentValidator(&state.Staker{
-		NextTime: nextTime,
-		Priority: platform.PrimaryNetworkValidatorCurrentPriority,
-	}))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+		EndTime:  nextTime,
+		Priority: platform.SubnetPermissionedValidatorCurrentPriority,
+	})))
 
 	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
 	env.backend.Clk.Set(nextTime.Add(txexecutor.SyncBound))
@@ -522,6 +526,15 @@ func TestGetNextStakerToReward(t *testing.T) {
 		now  = time.Now()
 		txID = ids.GenerateTestID()
 	)
+	newStateWithoutStakers := func() *state.State {
+		s := statetest.New(t, statetest.Config{})
+		currentStakerIterator, err := s.GetCurrentStakerIterator()
+		require.NoError(t, err)
+		for _, staker := range iterator.ToSlice(currentStakerIterator) {
+			require.NoError(t, s.DeleteCurrentValidator(staker.Period().SubnetID(), staker.Period().NodeID()))
+		}
+		return s
+	}
 
 	type test struct {
 		name                 string
@@ -542,36 +555,29 @@ func TestGetNextStakerToReward(t *testing.T) {
 		{
 			name:      "no stakers",
 			timestamp: now,
-			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				// statetest.New initializes the state with a genesis that contains validators.
-				// To test the case where there are no stakers, we need to delete the genesis validators.
-				currentStakerIterator, err := s.GetCurrentStakerIterator()
-				require.NoError(t, err)
-				for _, staker := range iterator.ToSlice(currentStakerIterator) {
-					require.NoError(t, s.DeleteCurrentValidator(staker))
-				}
-				return s
-			}(),
+			state:     newStateWithoutStakers(),
 		},
 		{
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
 			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
+				s := newStateWithoutStakers()
+				subnetID := ids.GenerateTestID()
 				staker1 := &state.Staker{
+					SubnetID: subnetID,
 					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
 				staker2 := &state.Staker{
 					TxID:     txID,
+					SubnetID: subnetID,
 					Priority: platform.SubnetPermissionlessDelegatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   staker1.NodeID,
 				}
-				require.NoError(t, s.PutCurrentValidator(staker1))
-				require.NoError(t, s.PutCurrentDelegator(staker2))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(staker1)))
+				require.NoError(t, s.PutCurrentDelegator(statetest.CurrentDelegator(staker2)))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -581,8 +587,9 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
 			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
+				s := newStateWithoutStakers()
 				staker1 := &state.Staker{
+					SubnetID: ids.GenerateTestID(),
 					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
@@ -593,8 +600,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(staker1))
-				require.NoError(t, s.PutCurrentValidator(staker2))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(staker1)))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(staker2)))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -604,20 +611,32 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
 			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
+				s := newStateWithoutStakers()
+				subnetID := ids.GenerateTestID()
+				nodeID := ids.GenerateTestNodeID()
+				primaryValidator := &state.Staker{
+					TxID:     ids.GenerateTestID(),
+					SubnetID: constants.PrimaryNetworkID,
+					Priority: platform.PrimaryNetworkValidatorCurrentPriority,
+					EndTime:  now.Add(time.Second),
+					NodeID:   nodeID,
+				}
 				staker1 := &state.Staker{
+					SubnetID: subnetID,
 					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
-					NodeID:   ids.GenerateTestNodeID(),
+					NodeID:   nodeID,
 				}
 				staker2 := &state.Staker{
 					TxID:     txID,
+					SubnetID: constants.PrimaryNetworkID,
 					Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now,
-					NodeID:   staker1.NodeID,
+					NodeID:   nodeID,
 				}
-				require.NoError(t, s.PutCurrentValidator(staker1))
-				require.NoError(t, s.PutCurrentDelegator(staker2))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(primaryValidator)))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(staker1)))
+				require.NoError(t, s.PutCurrentDelegator(statetest.CurrentDelegator(staker2)))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -627,14 +646,20 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network delegator",
 			timestamp: now,
 			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				require.NoError(t, s.PutCurrentDelegator(&state.Staker{
+				s := newStateWithoutStakers()
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+					NodeID:   genesistest.DefaultNodeIDs[0],
+					SubnetID: constants.PrimaryNetworkID,
+					Priority: platform.PrimaryNetworkValidatorCurrentPriority,
+					EndTime:  now.Add(2 * time.Second),
+				})))
+				require.NoError(t, s.PutCurrentDelegator(statetest.CurrentDelegator(&state.Staker{
 					TxID:     txID,
 					NodeID:   genesistest.DefaultNodeIDs[0],
 					SubnetID: constants.PrimaryNetworkID,
 					Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
-				}))
+				})))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -644,13 +669,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network validator",
 			timestamp: now,
 			state: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				require.NoError(t, s.PutCurrentValidator(&state.Staker{
+				s := newStateWithoutStakers()
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
 					TxID:     txID,
 					Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 					NodeID:   ids.GenerateTestNodeID(),
-				}))
+				})))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -661,7 +686,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, tt.state)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {

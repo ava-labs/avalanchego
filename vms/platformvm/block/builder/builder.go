@@ -12,10 +12,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -636,13 +638,22 @@ func getNextStakerToReward(
 
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
-		priority := currentStaker.Priority
-		// If the staker is a permissionless staker (not a permissioned subnet
-		// validator), it's the next staker we will want to remove with a
-		// RewardValidatorTx rather than an AdvanceTimeTx.
-		if priority != platform.SubnetPermissionedValidatorCurrentPriority {
-			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
+		period := currentStaker.Period()
+		switch currentStaker.(type) {
+		case state.CurrentValidator:
+			if period.SubnetID() == constants.PrimaryNetworkID {
+				break
+			}
+			_, err := preferredState.GetSubnetTransformation(period.SubnetID())
+			if err == database.ErrNotFound {
+				continue
+			}
+			if err != nil {
+				return ids.Empty, false, err
+			}
+		case state.CurrentDelegator:
 		}
+		return period.TxID, chainTimestamp.Equal(period.EndTime), nil
 	}
 	return ids.Empty, false, nil
 }

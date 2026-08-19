@@ -373,7 +373,7 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 
 // Regression test for a case where a pending delegator and validator are promoted to current stakers. Only Apricot can
 // trip this regression, because after Apricot pending validators always sort before pending delegators according to
-// platform.Priority.
+// state.Priority.
 func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	s := statetest.New(t, statetest.Config{})
 
@@ -383,7 +383,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		nodeID    = ids.GenerateTestNodeID()
 	)
 
-	require.NoError(t, s.PutPendingValidator(&state.Staker{
+	validator := &state.Staker{
 		TxID:     ids.GenerateTestID(),
 		NodeID:   nodeID,
 		SubnetID: constants.PrimaryNetworkID,
@@ -393,9 +393,8 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		EndTime:   endTime,
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
-	}))
-
-	s.PutPendingDelegator(&state.Staker{
+	}
+	delegator := &state.Staker{
 		TxID:     ids.GenerateTestID(),
 		NodeID:   nodeID,
 		SubnetID: constants.PrimaryNetworkID,
@@ -405,7 +404,10 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		EndTime:   endTime,
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
-	})
+	}
+	require.NoError(t, s.PutPendingValidator(statetest.PendingValidator(validator)))
+
+	require.NoError(t, s.PutPendingDelegator(statetest.PendingDelegator(delegator)))
 
 	updated, err := AdvanceTimeTo(
 		&Backend{
@@ -428,16 +430,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	require.True(t, updated)
 
 	// Check that the stakers got promoted to current
-	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
-	require.Equal(t, platform.PrimaryNetworkValidatorCurrentPriority, gotValidator.Priority)
 
 	currentDelegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	defer currentDelegatorItr.Release()
 
 	require.True(t, currentDelegatorItr.Next())
-	require.Equal(t, platform.PrimaryNetworkDelegatorCurrentPriority, currentDelegatorItr.Value().Priority)
 
 	// Check that they are no longer pending
 	_, err = s.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
@@ -463,7 +463,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		delegatorWeight = units.KiloAvax
 	)
 
-	require.NoError(t, s.PutPendingValidator(&state.Staker{
+	validator := &state.Staker{
 		TxID:      ids.GenerateTestID(),
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
@@ -472,9 +472,8 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		EndTime:   endTime,
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
-	}))
-
-	s.PutPendingDelegator(&state.Staker{
+	}
+	delegator := &state.Staker{
 		TxID:      ids.GenerateTestID(),
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
@@ -483,7 +482,10 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		EndTime:   endTime,
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
-	})
+	}
+	require.NoError(t, s.PutPendingValidator(statetest.PendingValidator(validator)))
+
+	require.NoError(t, s.PutPendingDelegator(statetest.PendingDelegator(delegator)))
 
 	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,

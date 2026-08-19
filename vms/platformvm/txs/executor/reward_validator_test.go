@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -334,12 +335,12 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	stakerToRemove := currentStakerIterator.Value()
 	currentStakerIterator.Release()
 
-	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
+	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.Period().TxID)
 	require.NoError(err)
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*platform.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
+	tx, err := newRewardValidatorTx(t, stakerToRemove.Period().TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
@@ -359,7 +360,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(stakerToRemove.EndTime)
+	env.state.SetTimestamp(stakerToRemove.Period().EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
@@ -381,7 +382,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
+	tx, err = newRewardValidatorTx(t, stakerToRemove.Period().TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
@@ -404,7 +405,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	nextToRemove := onCommitStakerIterator.Value()
 	onCommitStakerIterator.Release()
-	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
+	require.NotEqual(stakerToRemove.Period().TxID, nextToRemove.Period().TxID)
 
 	// check that stake/reward is given back
 	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
@@ -420,7 +421,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToRemove.Weight+38944, onCommitBalance)
+	require.Equal(oldBalance+stakerToRemove.Period().Weight+38944, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
@@ -435,12 +436,12 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	stakerToRemove := currentStakerIterator.Value()
 	currentStakerIterator.Release()
 
-	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
+	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.Period().TxID)
 	require.NoError(err)
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*platform.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
+	tx, err := newRewardValidatorTx(t, stakerToRemove.Period().TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
@@ -460,7 +461,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(stakerToRemove.EndTime)
+	env.state.SetTimestamp(stakerToRemove.Period().EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
@@ -476,7 +477,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
+	tx, err = newRewardValidatorTx(t, stakerToRemove.Period().TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
@@ -499,7 +500,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	nextToRemove := onAbortStakerIterator.Value()
 	onAbortStakerIterator.Release()
-	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
+	require.NotEqual(stakerToRemove.Period().TxID, nextToRemove.Period().TxID)
 
 	// check that stake/reward isn't given back
 	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
@@ -515,7 +516,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToRemove.Weight, onAbortBalance)
+	require.Equal(oldBalance+stakerToRemove.Period().Weight, onAbortBalance)
 }
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
@@ -586,9 +587,9 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(vdrStaker)))
 	env.state.AddTx(vdrTx, status.Committed)
-	require.NoError(env.state.PutCurrentDelegator(delStaker))
+	require.NoError(env.state.PutCurrentDelegator(statetest.CurrentDelegator(delStaker)))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -722,9 +723,9 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(vdrStaker)))
 	env.state.AddTx(vdrTx, status.Committed)
-	require.NoError(env.state.PutCurrentDelegator(delStaker))
+	require.NoError(env.state.PutCurrentDelegator(statetest.CurrentDelegator(delStaker)))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -951,9 +952,9 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(vdrStaker)))
 	env.state.AddTx(vdrTx, status.Committed)
-	require.NoError(env.state.PutCurrentDelegator(delStaker))
+	require.NoError(env.state.PutCurrentDelegator(statetest.CurrentDelegator(delStaker)))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(vdrEndTime), 0))
 	env.state.SetHeight(dummyHeight)
@@ -1124,9 +1125,9 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(vdrStaker)))
 	env.state.AddTx(vdrTx, status.Committed)
-	require.NoError(env.state.PutCurrentDelegator(delStaker))
+	require.NoError(env.state.PutCurrentDelegator(statetest.CurrentDelegator(delStaker)))
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)

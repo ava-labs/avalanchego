@@ -916,12 +916,24 @@ func (s *State) PutL1Validator(l1Validator L1Validator) error {
 	return s.l1ValidatorsDiff.putL1Validator(s, l1Validator)
 }
 
-func (s *State) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *State) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (CurrentValidator, error) {
+	staker, err := s.getCurrentValidator(subnetID, nodeID)
+	if err != nil {
+		return CurrentValidator{}, err
+	}
+	return currentValidator(staker), nil
+}
+
+func (s *State) getCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *State) PutCurrentValidator(staker *Staker) error {
-	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil && !errors.Is(err, database.ErrNotFound) {
+func (s *State) PutCurrentValidator(validator CurrentValidator) error {
+	return s.putCurrentValidator(currentStaker(validator.StakingPeriod, validator.publicKey, validator.PotentialReward))
+}
+
+func (s *State) putCurrentValidator(staker *Staker) error {
+	if _, err := s.getCurrentValidator(staker.SubnetID, staker.NodeID); err != nil && !errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf("getting current validator: %w", err)
 	} else if err == nil {
 		return fmt.Errorf("%w: %s", errUnexpectedStaker, staker.NodeID)
@@ -936,8 +948,16 @@ func (s *State) PutCurrentValidator(staker *Staker) error {
 	return nil
 }
 
-func (s *State) DeleteCurrentValidator(staker *Staker) error {
-	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+func (s *State) DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+	staker, err := s.getCurrentValidator(subnetID, nodeID)
+	if err != nil {
+		return fmt.Errorf("getting current validator: %w", err)
+	}
+	return s.deleteCurrentValidator(staker)
+}
+
+func (s *State) deleteCurrentValidator(staker *Staker) error {
+	if _, err := s.getCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
@@ -968,12 +988,24 @@ func verifyNoDelegators(cs CurrentStakers, subnetID ids.ID, nodeID ids.NodeID) e
 	return nil
 }
 
-func (s *State) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+func (s *State) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[CurrentDelegator], error) {
+	it, err := s.getCurrentDelegatorIterator(subnetID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	return currentDelegatorIterator{Iterator: it}, nil
+}
+
+func (s *State) getCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	return s.currentStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
-func (s *State) PutCurrentDelegator(staker *Staker) error {
-	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+func (s *State) PutCurrentDelegator(delegator CurrentDelegator) error {
+	return s.putCurrentDelegator(currentStaker(delegator.StakingPeriod, nil, delegator.PotentialReward))
+}
+
+func (s *State) putCurrentDelegator(staker *Staker) error {
+	if _, err := s.getCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
@@ -981,8 +1013,16 @@ func (s *State) PutCurrentDelegator(staker *Staker) error {
 	return nil
 }
 
-func (s *State) DeleteCurrentDelegator(staker *Staker) error {
-	if _, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
+func (s *State) DeleteCurrentDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error {
+	staker, err := getStakerByTxID(s.currentStakers.GetDelegatorIterator(subnetID, nodeID), txID)
+	if err != nil {
+		return err
+	}
+	return s.deleteCurrentDelegator(staker)
+}
+
+func (s *State) deleteCurrentDelegator(staker *Staker) error {
+	if _, err := s.getCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
@@ -990,36 +1030,95 @@ func (s *State) DeleteCurrentDelegator(staker *Staker) error {
 	return nil
 }
 
-func (s *State) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
+func (s *State) GetCurrentStakerIterator() (iterator.Iterator[CurrentStaker], error) {
+	it, err := s.getCurrentStakerIterator()
+	if err != nil {
+		return nil, err
+	}
+	return currentStakerIterator{Iterator: it}, nil
+}
+
+func (s *State) getCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	return s.currentStakers.GetStakerIterator(), nil
 }
 
-func (s *State) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+func (s *State) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (PendingValidator, error) {
+	staker, err := s.getPendingValidator(subnetID, nodeID)
+	if err != nil {
+		return PendingValidator{}, err
+	}
+	return pendingValidator(staker), nil
+}
+
+func (s *State) getPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *State) PutPendingValidator(staker *Staker) error {
+func (s *State) PutPendingValidator(validator PendingValidator) error {
+	return s.putPendingValidator(pendingStaker(validator.StakingPeriod, validator.publicKey))
+}
+
+func (s *State) putPendingValidator(staker *Staker) error {
 	s.pendingStakers.PutValidator(staker)
 	return nil
 }
 
-func (s *State) DeletePendingValidator(staker *Staker) {
+func (s *State) DeletePendingValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+	staker, err := s.getPendingValidator(subnetID, nodeID)
+	if err != nil {
+		return err
+	}
+	s.deletePendingValidator(staker)
+	return nil
+}
+
+func (s *State) deletePendingValidator(staker *Staker) {
 	s.pendingStakers.DeleteValidator(staker)
 }
 
-func (s *State) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
+func (s *State) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[PendingDelegator], error) {
+	it, err := s.getPendingDelegatorIterator(subnetID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	return pendingDelegatorIterator{Iterator: it}, nil
+}
+
+func (s *State) getPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	return s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), nil
 }
 
-func (s *State) PutPendingDelegator(staker *Staker) {
+func (s *State) PutPendingDelegator(delegator PendingDelegator) error {
+	s.putPendingDelegator(pendingStaker(delegator.StakingPeriod, nil))
+	return nil
+}
+
+func (s *State) putPendingDelegator(staker *Staker) {
 	s.pendingStakers.PutDelegator(staker)
 }
 
-func (s *State) DeletePendingDelegator(staker *Staker) {
+func (s *State) DeletePendingDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error {
+	staker, err := getStakerByTxID(s.pendingStakers.GetDelegatorIterator(subnetID, nodeID), txID)
+	if err != nil {
+		return err
+	}
+	s.deletePendingDelegator(staker)
+	return nil
+}
+
+func (s *State) deletePendingDelegator(staker *Staker) {
 	s.pendingStakers.DeleteDelegator(staker)
 }
 
-func (s *State) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
+func (s *State) GetPendingStakerIterator() (iterator.Iterator[PendingStaker], error) {
+	it, err := s.getPendingStakerIterator()
+	if err != nil {
+		return nil, err
+	}
+	return pendingStakerIterator{Iterator: it}, nil
+}
+
+func (s *State) getPendingStakerIterator() (iterator.Iterator[*Staker], error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
@@ -1747,10 +1846,10 @@ func (s *State) syncGenesis(genesisBlk platform.Block, genesis *genesis.Genesis)
 			return err
 		}
 
-		if err := s.PutCurrentValidator(staker); err != nil {
+		s.AddTx(vdrTx, status.Committed)
+		if err := s.PutCurrentValidator(currentValidator(staker)); err != nil {
 			return err
 		}
-		s.AddTx(vdrTx, status.Committed)
 		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}
 

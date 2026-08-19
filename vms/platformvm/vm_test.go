@@ -1412,12 +1412,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.True(currentStakerIterator.Next())
 
 	stakerToRemove := currentStakerIterator.Value()
-	rewardValidatorTx, err := blockbuilder.NewRewardValidatorTx(ctx, stakerToRemove.TxID)
+	period := stakerToRemove.Period()
+	rewardValidatorTx, err := blockbuilder.NewRewardValidatorTx(ctx, period.TxID)
 	require.NoError(err)
 	currentStakerIterator.Release()
 
 	rewardValidatorBlk, err := platform.NewBanffProposalBlock(
-		stakerToRemove.EndTime,
+		period.EndTime,
 		lastAcceptedID,
 		lastAccepted.Height()+1,
 		rewardValidatorTx,
@@ -1657,7 +1658,7 @@ func TestMaxStakeAmount(t *testing.T) {
 			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
-			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
+			amount, err := txexecutor.GetMaxWeight(vm.state, staker.StakingPeriod, test.startTime, test.endTime)
 			require.NoError(err)
 			require.Equal(genesistest.DefaultValidatorWeight, amount)
 		})
