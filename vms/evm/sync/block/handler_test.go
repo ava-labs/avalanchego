@@ -5,6 +5,7 @@ package block
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -98,7 +100,8 @@ func TestResponder(t *testing.T) {
 			if tt.budget > 0 {
 				opts = append(opts, WithMaxResponseBytes(tt.budget))
 			}
-			r := newResponder(logging.NoLog{}, synctest.NewBlockMap(blocks), opts...)
+			provider := &recordingProvider{inner: synctest.NewBlockMap(blocks)}
+			r := newResponder(loggingtest.New(t, logging.Debug), provider, opts...)
 
 			ctx := t.Context()
 			if tt.cancelCtx {
@@ -121,6 +124,10 @@ func TestResponder(t *testing.T) {
 				Height:     height,
 				NumParents: tt.numParents,
 			})
+			// Genesis has no parent, so the walk must stop rather than ask for
+			// one at an underflowed height.
+			require.NotContains(t, provider.heights, uint64(math.MaxUint64))
+
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.Nil(t, resp, "a rejected request carries no response")
@@ -147,4 +154,15 @@ func TestErrorSentinels(t *testing.T) {
 		"errNoParentsRequested": errNoParentsRequested,
 		"errServingCancelled":   errServingCancelled,
 	})
+}
+
+// recordingProvider records the heights it was asked for.
+type recordingProvider struct {
+	inner   Provider
+	heights []uint64
+}
+
+func (p *recordingProvider) GetBlock(hash common.Hash, height uint64) *types.Block {
+	p.heights = append(p.heights, height)
+	return p.inner.GetBlock(hash, height)
 }

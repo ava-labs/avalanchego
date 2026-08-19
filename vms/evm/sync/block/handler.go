@@ -78,8 +78,7 @@ type Provider interface {
 
 var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*responder)(nil)
 
-// responder walks the parent chain from the canonical block at the
-// requested height.
+// responder walks the parent chain from the requested block.
 type responder struct {
 	log              logging.Logger
 	blocks           Provider

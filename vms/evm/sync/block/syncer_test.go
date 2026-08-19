@@ -257,7 +257,7 @@ func TestSyncer(t *testing.T) {
 			}
 
 			tip := blocks[tt.fromHeight]
-			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch, opts...)
+			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch, opts...)
 			require.NoError(t, err)
 			require.NoError(t, syncer.Sync(ctx))
 
@@ -275,11 +275,12 @@ func TestSyncer(t *testing.T) {
 }
 
 func TestNewSyncer_Validation(t *testing.T) {
+	log := loggingtest.New(t, logging.Debug)
 	db := rawdb.NewMemoryDatabase()
-	_, err := NewSyncer(logging.NoLog{}, nil, db, common.Hash{}, 0, 0)
+	_, err := NewSyncer(log, nil, db, common.Hash{}, 0, 0)
 	require.ErrorIs(t, err, errBlocksToFetchRequired)
 
-	_, err = NewSyncer(logging.NoLog{}, nil, db, common.Hash{}, 5, 3)
+	_, err = NewSyncer(log, nil, db, common.Hash{}, 5, 3)
 	require.ErrorIs(t, err, errFromHashRequired)
 }
 
@@ -314,7 +315,7 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 
 			target := rawdb.NewMemoryDatabase()
 			tip := blocks[len(blocks)-1]
-			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 200, opts...)
+			syncer, err := NewSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 200, opts...)
 			require.NoError(t, err)
 
 			if !tt.cancelAfterBatch {
@@ -365,16 +366,19 @@ func TestSyncer_RejectsBadResponse(t *testing.T) {
 
 			// The syncer only re-requests after rejecting, so a second request
 			// is the rejection signal and ends a sync that never converges.
-			recorder := synctest.NewRecordingResponder(&staticResponder{blocks: [][]byte{tt.served}})
-			guard := synctest.NewCancelAfter(recorder, 2, cancel)
-			net, tracker := synctest.ServeResponder(t, ctx, logging.NoLog{}, p2p.EVMBlockRequestHandlerID, guard)
+			// Record before cancelling. CancelAfter cancels ahead of its inner
+			// responder, so recording inside it races Sync's return.
+			guard := synctest.NewCancelAfter(&staticResponder{blocks: [][]byte{tt.served}}, 2, cancel)
+			recorder := synctest.NewRecordingResponder(guard)
+			log := loggingtest.New(t, logging.Debug)
+			net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, recorder)
 
 			var opts []SyncerOption
 			if tt.verify != nil {
 				opts = append(opts, WithBlockVerifier(tt.verify))
 			}
 			target := rawdb.NewMemoryDatabase()
-			syncer, err := NewSyncer(logging.NoLog{}, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 1, opts...)
+			syncer, err := NewSyncer(log, NewClient(net, tracker), target, tip.Hash(), tip.NumberU64(), 1, opts...)
 			require.NoError(t, err)
 
 			require.ErrorIs(t, syncer.Sync(ctx), context.Canceled)
@@ -506,7 +510,7 @@ func TestSyncer_ServesNonCanonicalBlock(t *testing.T) {
 
 	net, tracker, served := countingNetwork(t, ctx, both)
 
-	got, err := getBlocks(ctx, logging.NoLog{}, NewClient(net, tracker),
+	got, err := getBlocks(ctx, loggingtest.New(t, logging.Debug), NewClient(net, tracker),
 		wanted.Hash(), wanted.NumberU64(), 3, nil)
 
 	require.NoError(t, err)
