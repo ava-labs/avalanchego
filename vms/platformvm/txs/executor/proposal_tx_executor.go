@@ -822,7 +822,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	rewards, err := GetRewardsCalculator(
+	rewards, err := getRewardsCalculator(
 		e.backend.Config.RewardConfig,
 		e.backend.Config.UpgradeConfig,
 		e.onCommitState,

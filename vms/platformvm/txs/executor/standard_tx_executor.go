@@ -33,15 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// TODO: Before Etna, ensure that the maximum number of expiries to track is
-// limited to a reasonable number by this window.
-const (
-	second                            = 1
-	minute                            = 60 * second
-	hour                              = 60 * minute
-	day                               = 24 * hour
-	RegisterL1ValidatorTxExpiryWindow = day
-)
+// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
+const registerL1ValidatorTxExpiryWindow = uint64(24 * time.Hour / time.Second)
 
 var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
@@ -130,8 +123,7 @@ func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	}
 
 	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	if e.backend.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.backend.Ctx.NodeID {
 		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
@@ -159,9 +151,7 @@ func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		return err
 	}
 
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -180,9 +170,7 @@ func (e *standardTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -235,10 +223,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 
 	txID := e.tx.ID()
 
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	// Add the new chain to the database
 	e.state.AddChain(e.tx)
 
@@ -295,10 +280,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 
 	txID := e.tx.ID()
 
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	// Add the new subnet to the database
 	e.state.AddSubnet(txID)
 	e.state.SetSubnetOwner(txID, tx.Owner)
@@ -453,10 +435,7 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 
 	txID := e.tx.ID()
 
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	// Note: We apply atomic requests even if we are not verifying atomic
 	// requests to ensure the shared state will be correct if we later start
@@ -522,9 +501,7 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 
 	// Invariant: There are no permissioned subnet delegators to remove.
 
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	return nil
 }
@@ -617,8 +594,7 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermis
 	}
 
 	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	if e.backend.Config.PartialSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
@@ -649,9 +625,7 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermis
 		return err
 	}
 
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -673,9 +647,7 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubn
 
 	e.state.SetSubnetOwner(tx.Subnet, tx.Owner)
 
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -849,12 +821,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		return err
 	}
 
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	// Track the subnet conversion in the database
 	e.state.SetSubnetToL1Conversion(
 		tx.Subnet,
@@ -941,8 +908,8 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterL1ValidatorTxExpiryWindow {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterL1ValidatorTxExpiryWindow)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -1164,10 +1131,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 		return err
 	}
 
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -1239,12 +1203,7 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL
 		return err
 	}
 
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 	return nil
 }
 
@@ -1379,7 +1338,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("getting current supply: %w", err)
 	}
 
-	rewards, err := GetRewardsCalculator(
+	rewards, err := getRewardsCalculator(
 		e.backend.Config.RewardConfig,
 		e.backend.Config.UpgradeConfig,
 		e.state,
@@ -1429,8 +1388,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("setting staking info: %w", err)
 	}
 
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	if e.backend.Config.PartialSyncPrimaryNetwork &&
 		tx.NodeID() == e.backend.Ctx.NodeID {
@@ -1463,10 +1421,15 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 		return fmt.Errorf("setting staking info: %w", err)
 	}
 
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+	e.applyBaseTx(&tx.BaseTx)
 
 	return nil
+}
+
+// applyBaseTx consumes the inputs and produces the outputs of tx.
+func (e *standardTxExecutor) applyBaseTx(tx *txs.BaseTx) {
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
@@ -1503,7 +1466,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 				return err
 			}
 
-			rewards, err := GetRewardsCalculator(
+			rewards, err := getRewardsCalculator(
 				e.backend.Config.RewardConfig,
 				e.backend.Config.UpgradeConfig,
 				e.state,
