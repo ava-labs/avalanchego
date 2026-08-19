@@ -394,7 +394,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					SubnetID: subnetID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(staker))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(staker)))
 				return s
 			}(),
 			sTxF: func() *platform.Tx {
@@ -429,7 +429,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(primaryNetworkVdr)))
 				return s
 			}(),
 			sTxF: func() *platform.Tx {
@@ -475,7 +475,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(primaryNetworkVdr)))
 				return s
 			}(),
 			sTxF: func() *platform.Tx {
@@ -520,7 +520,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
+				require.NoError(t, s.PutCurrentValidator(statetest.CurrentValidator(primaryNetworkVdr)))
 				return s
 			}(),
 			sTxF: func() *platform.Tx {

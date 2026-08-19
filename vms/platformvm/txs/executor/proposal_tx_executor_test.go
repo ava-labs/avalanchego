@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -67,7 +68,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(staker))
+		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -105,7 +106,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(staker))
+		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -436,7 +437,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(staker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
@@ -622,7 +623,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(staker))
+	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -662,7 +663,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
-	require.NoError(env.state.DeleteCurrentValidator(staker))
+	require.NoError(env.state.DeleteCurrentValidator(staker.SubnetID, staker.NodeID))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -778,7 +779,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(staker))
+		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -907,7 +908,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutPendingValidator(staker))
+		require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
 		env.state.AddTx(tx, status.Committed)
 		dummyHeight := uint64(1)
 		env.state.SetHeight(dummyHeight)

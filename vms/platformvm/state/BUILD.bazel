@@ -13,6 +13,7 @@ go_library(
         "metadata_delegator.go",
         "metadata_validator.go",
         "staker.go",
+        "staker_api.go",
         "staker_diff_iterator.go",
         "staker_status.go",
         "stakers.go",

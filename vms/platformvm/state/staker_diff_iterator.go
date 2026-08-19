@@ -32,7 +32,7 @@ type StakerDiffIterator interface {
 	// - The staker that is changing
 	// - True if the staker is being added to the current staker set, false if
 	//   the staker is being removed from the current staker set
-	Value() (*Staker, bool)
+	Value() (StakingPeriod, bool)
 	Release()
 }
 
@@ -47,7 +47,20 @@ type stakerDiffIterator struct {
 	isAdded        bool
 }
 
-func NewStakerDiffIterator(currentIterator, pendingIterator iterator.Iterator[*Staker]) StakerDiffIterator {
+func NewStakerDiffIterator(
+	currentIterator iterator.Iterator[CurrentDelegator],
+	pendingIterator iterator.Iterator[PendingDelegator],
+) StakerDiffIterator {
+	return newStakerDiffIterator(
+		adapterCurrentDelegatorIterator{Iterator: currentIterator},
+		adapterPendingDelegatorIterator{Iterator: pendingIterator},
+	)
+}
+
+func newStakerDiffIterator(
+	currentIterator iterator.Iterator[*Staker],
+	pendingIterator iterator.Iterator[*Staker],
+) StakerDiffIterator {
 	mutableCurrentIterator := newMutableStakerIterator(currentIterator)
 	return &stakerDiffIterator{
 		currentIteratorExhausted: !mutableCurrentIterator.Next(),
@@ -80,8 +93,11 @@ func (it *stakerDiffIterator) Next() bool {
 	return true
 }
 
-func (it *stakerDiffIterator) Value() (*Staker, bool) {
-	return it.modifiedStaker, it.isAdded
+func (it *stakerDiffIterator) Value() (StakingPeriod, bool) {
+	if it.isAdded {
+		return stakingPeriod(it.modifiedStaker), true
+	}
+	return stakingPeriod(it.modifiedStaker), false
 }
 
 func (it *stakerDiffIterator) Release() {
