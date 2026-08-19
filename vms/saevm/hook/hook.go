@@ -77,6 +77,10 @@ type Points interface {
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
+	// VerifyBlockSyntax checks chain-specific syntactic invariants of a parsed
+	// block, beyond the universal invariants enforced by [blocks.Parse]. It
+	// MUST be stateless.
+	VerifyBlockSyntax(*types.Block) error
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
