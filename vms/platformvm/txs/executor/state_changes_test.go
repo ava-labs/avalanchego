@@ -550,7 +550,7 @@ func TestGetRewardsCalculatorTransformedSubnetConfig(t *testing.T) {
 		MaximumSupply:      transformConfig.SupplyCap,
 	}})
 
-	rewards, err := GetRewardsCalculator(
+	rewards, err := getRewardsCalculator(
 		primaryConfig,
 		upgradeConfig,
 		transformedState,
