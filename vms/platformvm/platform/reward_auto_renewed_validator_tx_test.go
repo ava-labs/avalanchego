@@ -35,7 +35,7 @@ func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			tx: &RewardAutoRenewedValidatorTx{
 				Timestamp: 1,
 			},
-			want: errMissingTxID,
+			want: errMissingStakerTxID,
 		},
 		{
 			name: "valid",
