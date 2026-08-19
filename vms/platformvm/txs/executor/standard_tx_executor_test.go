@@ -5000,7 +5000,7 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
 		diff,
 	)
-	require.ErrorIs(t, err, ErrWrongTxType)
+	require.ErrorIs(t, err, errWrongTxType)
 }
 
 func must[T any](t require.TestingT) func(T, error) T {
