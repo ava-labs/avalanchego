@@ -17,7 +17,7 @@ sequenceDiagram
   S->>S: verify, commit code, clear markers
 ```
 
-The download runs inside `Sync`, which returns once `DoneAdding` has been called and every accepted hash has its code on disk.
+`AddCode` MUST NOT block on the network. It is called from the same message handlers that deliver the syncer's own responses, so a blocked add could deadlock the sync. To avoid this blocking, `AddCode` does not bound the amount of outstanding code to fetch.
 
 ## Crash recovery
 
