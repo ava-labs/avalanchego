@@ -7,14 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -29,80 +26,16 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// maxFutureBlockDuration is the maximum time from the current time allowed for
-// blocks before they're considered future blocks and fail parsing or
-// verification.
-const (
-	maxFutureBlockSeconds  uint64 = 10
-	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
-)
-
-var (
-	errBlockHeightNotUint64 = errors.New("block height not uint64")
-	errBlockTooFarInFuture  = errors.New("block too far in the future")
-	errBlockTooLarge        = errors.New("block size exceeds maximum")
-
-	errTxHashMismatch         = errors.New("transaction hash mismatch")
-	errUncleHashMismatch      = errors.New("uncle hash mismatch")
-	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
-)
-
-// ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
-// NOT populate the block ancestry, which is done by [VM.VerifyBlock] i.f.f.
-// verification passes.
+// ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
+// block ancestry, which is done by [VM.VerifyBlock] i.f.f. verification
+// passes.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
-	b := new(types.Block)
-	if err := rlp.DecodeBytes(buf, b); err != nil {
-		return nil, fmt.Errorf("rlp.DecodeBytes(..., %T): %v", b, err)
-	}
-
-	if !b.Number().IsUint64() {
-		return nil, errBlockHeightNotUint64
-	}
-	// The uint64 timestamp can't underflow [time.Time] but it can overflow so
-	// make this some future engineer's problem in a few millennia.
-	if b.Time() > unix(vm.config.Now())+maxFutureBlockSeconds {
-		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
-	}
-
-	// Block body must match what is declared by the header.
-	hasher := trie.NewStackTrie(nil)
-	hdr := b.Header()
-	if types.DeriveSha(b.Transactions(), hasher) != hdr.TxHash {
-		return nil, errTxHashMismatch
-	}
-	if types.CalcUncleHash(b.Uncles()) != hdr.UncleHash {
-		return nil, errUncleHashMismatch
-	}
-	{
-		// The withdrawals hash being set depends on the Ethereum hard fork.
-		var want *common.Hash
-		switch w := b.Withdrawals(); {
-		case w == nil:
-			want = nil
-		case len(w) == 0:
-			want = &types.EmptyWithdrawalsHash
-		default:
-			h := types.DeriveSha(w, hasher)
-			want = &h
-		}
-		if !compareHashPtrs(want, hdr.WithdrawalsHash) {
-			return nil, errWithdrawalHashMismatch
-		}
+	b, err := blocks.ParseEth(buf, vm.hooks)
+	if err != nil {
+		return nil, err
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)
-}
-
-func compareHashPtrs(a, b *common.Hash) bool {
-	switch an, bn := a == nil, b == nil; {
-	case an && bn:
-		return true
-	case an || bn:
-		return false
-	default:
-		return *a == *b
-	}
 }
 
 // BuildBlock builds a new block, using the last block passed to
@@ -118,6 +51,7 @@ var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
 	errHashMismatch      = errors.New("hash mismatch")
+	errBlockTooLarge     = errors.New("block size exceeds maximum")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.

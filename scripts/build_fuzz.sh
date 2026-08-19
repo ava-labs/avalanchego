@@ -48,7 +48,7 @@ do
         # cd into parentDir so packages in sub-modules (e.g. ./graft/coreth)
         # resolve against their own go.mod rather than the main module.
         # If any of the fuzz tests fail, return exit code 1
-        if ! ( cd "$parentDir" && go test -tags test -timeout="${timeout}s" . -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s ); then
+        if ! ( cd "$parentDir" && go test -timeout="${timeout}s" . -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s ); then
             failed=true
         fi
     done < <(grep -oP 'func \K(Fuzz\w*)' "$file")
