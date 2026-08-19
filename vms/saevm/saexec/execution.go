@@ -33,7 +33,7 @@ var (
 	errTransactionCountOutOfRange    = errors.New("transaction count out of range")
 	errPartialEndOfBlockExecution    = errors.New("end-of-block operations require all transactions")
 	errCanonicalWithoutEndOfBlockOps = errors.New("canonical execution requires end-of-block operations")
-	errCanonicalWithoutReceiptStore  = errors.New("canonical execution requires a receipt store")
+	errNilReceiptStore               = errors.New("receipt store is nil")
 )
 
 // queuedBlock pairs a queued block with the time it was enqueued so that
@@ -152,7 +152,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		e.chainContext,
 		log,
 		withCanonical(true),
-		withReceiptStore(e.receipts),
+		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
 		return err
@@ -212,7 +212,8 @@ func withCanonical(canonical bool) Option {
 	})
 }
 
-func withReceiptStore(receiptStore ReceiptStore) Option {
+// WithReceiptStore configures where Execute publishes transaction receipts.
+func WithReceiptStore(receiptStore ReceiptStore) Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.receiptStore = receiptStore
 	})
@@ -228,8 +229,8 @@ func (c *executionConfig) verify(numTxs int) error {
 	if c.canonical && !c.endOfBlockOps {
 		return errCanonicalWithoutEndOfBlockOps
 	}
-	if c.canonical && c.receiptStore == nil {
-		return errCanonicalWithoutReceiptStore
+	if c.receiptStore == nil {
+		return errNilReceiptStore
 	}
 	return nil
 }
@@ -263,7 +264,7 @@ func stateBeforeTransactions(hooks executionHooks, rules params.Rules, stateDB *
 // [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
 //
 // Execute does not call [blocks.Block.MarkExecuted]. Only canonical execution
-// records block progress and publishes receipts.
+// records block progress. Receipt publication is configured independently.
 func Execute(
 	b *blocks.Block,
 	stateDB *state.StateDB,
@@ -277,6 +278,7 @@ func Execute(
 	execConfig := options.ApplyTo(&executionConfig{
 		maxNumTxs:     len(txs),
 		endOfBlockOps: true,
+		receiptStore:  &NullReceiptStore{},
 	}, opts...)
 	if err := execConfig.verify(len(txs)); err != nil {
 		return nil, err
@@ -332,6 +334,10 @@ func Execute(
 		}
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
+		// Interim execution time reports live canonical progress. Historical
+		// execution can run only part of the same in-memory block and overwrite
+		// that progress with an earlier time. This violates monotonicity and can
+		// change the settlement decision made by LastToSettleAt.
 		if execConfig.canonical {
 			b.SetInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
@@ -353,10 +359,8 @@ func Execute(
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
-		if execConfig.canonical {
-			if r, ok := execConfig.receiptStore.Load(tx.Hash()); ok {
-				r.Put(&Receipt{receipt, signer, tx})
-			}
+		if r, ok := execConfig.receiptStore.Load(tx.Hash()); ok {
+			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
 	}
@@ -444,4 +448,14 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
 	return nil
+}
+
+// NullReceiptStore discards transaction receipts.
+type NullReceiptStore struct{}
+
+var _ ReceiptStore = (*NullReceiptStore)(nil)
+
+// Load always returns the zero value and false.
+func (*NullReceiptStore) Load(common.Hash) (eventual.Value[*Receipt], bool) {
+	return eventual.Value[*Receipt]{}, false
 }
