@@ -93,6 +93,7 @@ type SUT struct {
 	ethclient  *ethclient.Client
 	clientOnce func()
 
+	ctx       *snow.Context
 	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
@@ -358,6 +359,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:        vm,
 		db:        db,
+		ctx:       snowCtx,
 		memory:    memory,
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
@@ -1167,9 +1169,11 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
-// TestParseBlock verifies that the cchain ParseBlock override accepts
-// well-formed blocks and rejects blocks with an unsupported (non-zero) version
-// or whose extData does not match the ExtDataHash committed in the header.
+// TestParseBlock verifies that ParseBlock accepts well-formed blocks and
+// rejects blocks with an unsupported (non-zero) version or whose extData does
+// not match the ExtDataHash committed in the header, in every VM mode: both
+// before bootstrapping (via the statesync SummaryHandler) and after (via the
+// embedded SAE VM).
 func TestParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t, withNetworkID(constants.FujiID))
 
@@ -1280,18 +1284,31 @@ func TestParseBlock(t *testing.T) {
 			wantErr: errExtDataHashMismatch,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf, err := rlp.EncodeToBytes(tt.block)
-			require.NoError(t, err, "rlp.EncodeToBytes(block)")
 
-			got, err := sut.ParseBlock(ctx, buf)
-			require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
-			if tt.wantErr != nil {
-				return
+	states := []snow.State{
+		snow.Initializing,
+		snow.StateSyncing,
+		snow.Bootstrapping,
+		snow.NormalOp,
+	}
+
+	for _, mode := range states {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut.mode.Set(mode)
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					buf, err := rlp.EncodeToBytes(tt.block)
+					require.NoError(t, err, "rlp.EncodeToBytes(block)")
+
+					got, err := sut.ParseBlock(ctx, buf)
+					require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
+					if tt.wantErr != nil {
+						return
+					}
+
+					require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
+				})
 			}
-
-			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
 }

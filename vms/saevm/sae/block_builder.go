@@ -373,6 +373,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	return block, nil
 }
 
+// maxFutureBlockDuration is the maximum time from the current time allowed for
+// blocks before they're considered future blocks and fail parsing or
+// verification.
+const (
+	maxFutureBlockSeconds  uint64 = 10
+	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
+)
+
 func lastToSettle(
 	hooks hook.Points,
 	hdr *types.Header,

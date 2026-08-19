@@ -71,6 +71,10 @@ type Points interface {
 	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
 	// executed (pre-SAE) headers.
 	SettledBy(*types.Header) Settled
+	// VerifyBlockSyntax checks chain-specific syntactic invariants of a parsed
+	// block, beyond the universal invariants enforced by [blocks.Parse]. It
+	// MUST be stateless.
+	VerifyBlockSyntax(*types.Block) error
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
