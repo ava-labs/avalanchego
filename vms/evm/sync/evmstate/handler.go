@@ -388,7 +388,7 @@ func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 		}
 		return it, func() ([]byte, error) {
 			return types.FullAccountRLP(it.Account())
-	 	}, nil
+		}, nil
 	}
 
 	it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
