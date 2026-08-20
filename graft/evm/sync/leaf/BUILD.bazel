@@ -3,7 +3,7 @@ load("//.bazel:defs.bzl", "graft_go_test")
 
 go_library(
     name = "leaf",
-    srcs = ["syncer.go"],
+    srcs = ["syncer_legacy.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/leaf",
     visibility = ["//visibility:public"],
     deps = [
