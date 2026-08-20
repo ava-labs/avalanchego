@@ -155,11 +155,11 @@ func FuzzParseCompatibility(f *testing.F) {
 }
 
 func TestMarshalSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allTxs))
-	newTxs := make([]*Tx, len(allTxs))
-	for i, tx := range allTxs {
-		oldTxs[i] = tx.old
-		newTxs[i] = tx.new
+	oldTxs := make([]*atomic.Tx, 0, len(allTxs))
+	newTxs := make([]*Tx, 0, len(allTxs))
+	for _, tx := range allTxs {
+		oldTxs = append(oldTxs, tx.old)
+		newTxs = append(newTxs, tx.new)
 	}
 
 	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
@@ -189,11 +189,11 @@ func TestMarshalSlice(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allTxs))
-	newTxs := make([]*Tx, len(allTxs))
-	for i, tx := range allTxs {
-		oldTxs[i] = tx.old
-		newTxs[i] = tx.new
+	oldTxs := make([]*atomic.Tx, 0, len(allTxs))
+	newTxs := make([]*Tx, 0, len(allTxs))
+	for _, tx := range allTxs {
+		oldTxs = append(oldTxs, tx.old)
+		newTxs = append(newTxs, tx.new)
 	}
 
 	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
@@ -237,9 +237,9 @@ func TestParseSlice(t *testing.T) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		newTxs := make([]*Tx, len(allTxs))
-		for i, tx := range allTxs {
-			newTxs[i] = tx.new
+		newTxs := make([]*Tx, 0, len(allTxs))
+		for _, tx := range allTxs {
+			newTxs = append(newTxs, tx.new)
 		}
 		b, err := MarshalSlice(newTxs)
 		require.NoError(f, err, "MarshalSlice()")
@@ -262,9 +262,9 @@ func FuzzParseSliceRoundTrip(f *testing.F) {
 
 func FuzzParseSliceCompatibility(f *testing.F) {
 	{
-		newTxs := make([]*Tx, len(allTxs))
-		for i, tx := range allTxs {
-			newTxs[i] = tx.new
+		newTxs := make([]*Tx, 0, len(allTxs))
+		for _, tx := range allTxs {
+			newTxs = append(newTxs, tx.new)
 		}
 		b, err := MarshalSlice(newTxs)
 		require.NoError(f, err, "MarshalSlice()")

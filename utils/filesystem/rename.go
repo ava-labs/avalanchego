@@ -14,6 +14,7 @@ import (
 // It returns "false" and no error, if the file "a" does not exist.
 // It returns "false" and an error, if rename failed.
 func RenameIfExists(a, b string) (renamed bool, err error) {
+	//nolint:gosec // G703: the node operator supplies both paths, and no peer supplies them.
 	err = os.Rename(a, b)
 	renamed = err == nil
 	if errors.Is(err, fs.ErrNotExist) {

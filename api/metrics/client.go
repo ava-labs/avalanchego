@@ -47,7 +47,7 @@ func (c *Client) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
+	//nolint:bodyclose,gosec // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to issue request: %w", err)

@@ -123,7 +123,10 @@ linters:
     gosec:
       excludes:
         - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
-        - G115 # TODO(marun) Enable this ruleset in a follow-up PR
+        # Integer overflow when a conversion changes the integer type.
+        # https://securego.io/docs/rules/g115
+        # TODO(marun) Enable this ruleset in a follow-up PR
+        - G115
     importas:
       # Do not allow unaliased imports of aliased packages.
       no-unaliased: false

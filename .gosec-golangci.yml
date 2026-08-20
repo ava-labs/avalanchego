@@ -3,3 +3,10 @@ linters:
   default: none
   enable:
     - gosec
+  settings:
+    gosec:
+      excludes:
+        # Integer overflow when a conversion changes the integer type.
+        # https://securego.io/docs/rules/g115
+        # .golangci.yml also excludes G115. Enable both configs together.
+        - G115

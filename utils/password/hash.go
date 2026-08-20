@@ -12,7 +12,8 @@ import (
 
 // Hash of a password
 type Hash struct {
-	Password [32]byte `serialize:"true"` // The salted, hashed password
+	//nolint:gosec // G117: this field holds a salted hash, and never a plaintext password.
+	Password [32]byte `serialize:"true"`
 	Salt     [16]byte `serialize:"true"` // The salt
 }
 

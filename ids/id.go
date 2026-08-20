@@ -131,6 +131,7 @@ func (id ID) Append(suffixes ...uint32) ID {
 // Note: this id is not modified.
 func (id ID) XOR(other ID) ID {
 	for i, b := range other {
+		//nolint:gosec // G602: id and other are both ID arrays with the same length.
 		id[i] ^= b
 	}
 	return id

@@ -50,6 +50,7 @@ func NewBytesPool() *BytesPool {
 	for i := range p {
 		// uint is used here to avoid overflowing int during the shift
 		size := uint(1)<<i - 1
+		//nolint:gosec // G602: the loop over p limits i to the indexes of p.
 		p[i] = sync.Pool{
 			New: func() interface{} {
 				// Sync pool needs to return pointer-like values to avoid memory
