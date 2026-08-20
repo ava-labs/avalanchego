@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVerify(t *testing.T) {
@@ -26,7 +25,7 @@ func TestEqual(t *testing.T) {
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	tests := map[string]precompiletest.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
+			Config:   txallowlist.NewConfig(new(uint64(3)), admins, enableds, managers),
 			Other:    nil,
 			Expected: false,
 		},
@@ -36,13 +35,13 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
-			Other:    txallowlist.NewConfig(utils.PointerTo[uint64](4), admins, enableds, managers),
+			Config:   txallowlist.NewConfig(new(uint64(3)), admins, enableds, managers),
+			Other:    txallowlist.NewConfig(new(uint64(4)), admins, enableds, managers),
 			Expected: false,
 		},
 		"same config": {
-			Config:   txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
-			Other:    txallowlist.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers),
+			Config:   txallowlist.NewConfig(new(uint64(3)), admins, enableds, managers),
+			Other:    txallowlist.NewConfig(new(uint64(3)), admins, enableds, managers),
 			Expected: true,
 		},
 	}

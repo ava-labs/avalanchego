@@ -39,7 +39,6 @@ import (
 	_ "github.com/ava-labs/libevm/core/txpool"
 	_ "github.com/ava-labs/libevm/eth/filters"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -1105,9 +1104,9 @@ func TestFillTransaction(t *testing.T) {
 	}
 
 	args := ethapi.TransactionArgs{
-		From:  utils.PointerTo(sut.wallet.Addresses()[0]),
+		From:  new(sut.wallet.Addresses()[0]),
 		To:    &to,
-		Gas:   utils.PointerTo(hexutil.Uint64(gas)),
+		Gas:   new(hexutil.Uint64(gas)),
 		Value: hexBig(value),
 	}
 
@@ -1152,10 +1151,10 @@ func TestResend(t *testing.T) {
 		method: "eth_resend",
 		args: []any{
 			ethapi.TransactionArgs{
-				From:                 utils.PointerTo(sut.wallet.Addresses()[0]),
-				Nonce:                utils.PointerTo(hexutil.Uint64(tx.Nonce())),
+				From:                 new(sut.wallet.Addresses()[0]),
+				Nonce:                new(hexutil.Uint64(tx.Nonce())),
 				To:                   tx.To(),
-				Gas:                  utils.PointerTo(hexutil.Uint64(tx.Gas())),
+				Gas:                  new(hexutil.Uint64(tx.Gas())),
 				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
 				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
 			},
@@ -1174,10 +1173,10 @@ func TestEthSigningAPIs(t *testing.T) {
 	txFields := ethapi.TransactionArgs{
 		From:     &zeroAddr,
 		To:       &zeroAddr,
-		Gas:      utils.PointerTo(hexutil.Uint64(params.TxGas)),
+		Gas:      new(hexutil.Uint64(params.TxGas)),
 		GasPrice: hexBig(1),
 		Value:    hexBig(100),
-		Nonce:    utils.PointerTo(hexutil.Uint64(0)),
+		Nonce:    new(hexutil.Uint64(0)),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1671,7 +1670,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "both_num_and_hash",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockNumber: utils.PointerTo(rpc.LatestBlockNumber),
+				BlockNumber: new(rpc.LatestBlockNumber),
 				BlockHash:   &common.Hash{},
 			},
 			wantErr: blocks.ErrBothNumberAndHash,
@@ -1685,7 +1684,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_in_memory",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(accepted.Hash()),
+				BlockHash: new(accepted.Hash()),
 			},
 			wantNum:  accepted.NumberU64(),
 			wantHash: accepted.Hash(),
@@ -1693,7 +1692,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_on_disk",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(settled.Hash()),
+				BlockHash: new(settled.Hash()),
 			},
 			wantNum:  settled.NumberU64(),
 			wantHash: settled.Hash(),
@@ -1701,7 +1700,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_not_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(nonCanonical.Hash()),
+				BlockHash: new(nonCanonical.Hash()),
 			},
 			wantNum:  nonCanonical.NumberU64(),
 			wantHash: nonCanonical.Hash(),
@@ -1709,7 +1708,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash:        utils.PointerTo(nonCanonical.Hash()),
+				BlockHash:        new(nonCanonical.Hash()),
 				RequireCanonical: true,
 			},
 			wantErr: blocks.ErrNonCanonicalBlock,

@@ -53,7 +53,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -85,8 +84,8 @@ var (
 
 	activateCancun = func(cfg *params.ChainConfig) *params.ChainConfig {
 		cpy := *cfg
-		cpy.ShanghaiTime = utils.PointerTo[uint64](0)
-		cpy.CancunTime = utils.PointerTo[uint64](0)
+		cpy.ShanghaiTime = new(uint64(0))
+		cpy.CancunTime = new(uint64(0))
 		return &cpy
 	}
 )
@@ -1014,13 +1013,13 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: new(uint64(timestamp.UnixMilli())),
 		},
 		{
 			name:             "Fortuna with TimeMilliseconds",
 			fork:             upgradetest.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: new(uint64(timestamp.UnixMilli())),
 			expectedError:    customheader.ErrTimeMillisecondsBeforeGranite,
 		},
 		{
@@ -1034,14 +1033,14 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with mismatched TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
+			timeMilliseconds: new(uint64(timestamp.UnixMilli()) + 1000),
 			expectedError:    customheader.ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:             "Block too far in the future",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Add(2 * time.Hour).Unix()),
-			timeMilliseconds: utils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
+			timeMilliseconds: new(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
 			expectedError:    customheader.ErrBlockTooFarInFuture,
 		},
 	}
@@ -1106,7 +1105,7 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 		{
 			name:                     "granite_should_have_timestamp_milliseconds",
 			fork:                     upgradetest.Granite,
-			expectedTimeMilliseconds: utils.PointerTo(uint64(buildTime.UnixMilli())),
+			expectedTimeMilliseconds: new(uint64(buildTime.UnixMilli())),
 		},
 	}
 
@@ -2093,26 +2092,26 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "pre_granite_min_delay_excess",
 			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        utils.PointerTo[uint64](1000),
+			desiredMinDelay:        new(uint64(1000)),
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "granite_first_block_initial_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        nil,
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
+			expectedMinDelayExcess: new(acp226.InitialDelayExcess),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        utils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        new(uint64(4000)),
+			expectedMinDelayExcess: new(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        utils.PointerTo[uint64](0),
-			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        new(uint64(0)),
+			expectedMinDelayExcess: new(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}
 
@@ -2191,7 +2190,7 @@ func TestHeliconBlockValidation(t *testing.T) {
 
 	// Make malicious helicon block
 	header.Time = heliconTimestamp
-	customtypes.GetHeaderExtra(header).TimeMilliseconds = utils.PointerTo(heliconTimestamp * 1000)
+	customtypes.GetHeaderExtra(header).TimeMilliseconds = new(heliconTimestamp * 1000)
 	modifiedEthBlock := ethBlock.WithSeal(header)
 	modifiedBytes, err := rlp.EncodeToBytes(modifiedEthBlock)
 	require.NoError(t, err, "rlp.EncodeToBytes(%T)", modifiedEthBlock)

@@ -14,7 +14,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/utils",
     visibility = ["//visibility:public"],
     deps = [
-        "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//metrics",
         "@com_github_victoriametrics_fastcache//:fastcache",

@@ -21,11 +21,9 @@ func verifyInitializedStruct(tb testing.TB, s interface{}) {
 	structType := reflect.TypeOf(s)
 	require.Equal(reflect.Struct, structType.Kind())
 
-	v := reflect.ValueOf(s)
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		require.True(field.IsValid(), "invalid field: ", structType.Field(i).Name)
-		require.False(field.IsZero(), "zero field: ", structType.Field(i).Name)
+	for structField, field := range reflect.ValueOf(s).Fields() {
+		require.True(field.IsValid(), "invalid field: ", structField.Name)
+		require.False(field.IsZero(), "zero field: ", structField.Name)
 	}
 }
 

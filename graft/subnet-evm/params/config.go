@@ -31,7 +31,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -97,8 +96,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
-			CancunTime:          utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
+			CancunTime:          new(uint64(0)),
 		},
 		extras.TestChainConfig,
 	)
@@ -153,7 +152,7 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
 		},
 		extras.TestDurangoChainConfig,
 	)
@@ -172,8 +171,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
-			CancunTime:          utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
+			CancunTime:          new(uint64(0)),
 		},
 		extras.TestEtnaChainConfig,
 	)
@@ -192,8 +191,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
-			CancunTime:          utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
+			CancunTime:          new(uint64(0)),
 		},
 		extras.TestFortunaChainConfig,
 	)
@@ -212,8 +211,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
-			CancunTime:          utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
+			CancunTime:          new(uint64(0)),
 		},
 		extras.TestGraniteChainConfig,
 	)
@@ -232,8 +231,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.PointerTo[uint64](0),
-			CancunTime:          utils.PointerTo[uint64](0),
+			ShanghaiTime:        new(uint64(0)),
+			CancunTime:          new(uint64(0)),
 		},
 		extras.TestHeliconChainConfig,
 	)

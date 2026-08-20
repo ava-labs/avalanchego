@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -37,7 +36,7 @@ func TestDelayExponent(t *testing.T) {
 			name: "header_carries_excess",
 			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&customtypes.HeaderExtra{MinDelayExcess: utils.PointerTo[acp226.DelayExcess](42)},
+				&customtypes.HeaderExtra{MinDelayExcess: new(acp226.DelayExcess(42))},
 			),
 			want: dynamic.DelayExponent(42),
 		},
@@ -75,7 +74,7 @@ func TestBlockTime(t *testing.T) {
 			// TimeMilliseconds encodes 105.500s while Time says 100s (e.g. from
 			// a malicious peer). Only the 500ms sub-second remainder is honored.
 			name:      "milliseconds_disagreeing_on_second_ignored",
-			header:    customtypes.WithHeaderExtra(&types.Header{Time: 100}, &customtypes.HeaderExtra{TimeMilliseconds: utils.PointerTo[uint64](105_500)}),
+			header:    customtypes.WithHeaderExtra(&types.Header{Time: 100}, &customtypes.HeaderExtra{TimeMilliseconds: new(uint64(105_500))}),
 			wantMilli: 100_500,
 		},
 	}
@@ -172,7 +171,7 @@ func TestTargetExponent(t *testing.T) {
 			name: "header_carries_exponent",
 			header: customtypes.WithHeaderExtra(
 				&types.Header{Number: big.NewInt(1)},
-				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
+				&customtypes.HeaderExtra{TargetExponent: new(dynamic.TargetExponent(42))},
 			),
 			want: 42,
 		},
@@ -210,7 +209,7 @@ func TestTargetExponent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fortuna := &extras.ChainConfig{
 				NetworkUpgrades: extras.NetworkUpgrades{
-					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
+					FortunaTimestamp: new(uint64(fortunaTime)),
 				},
 			}
 			got, err := targetExponent(fortuna, tt.header)

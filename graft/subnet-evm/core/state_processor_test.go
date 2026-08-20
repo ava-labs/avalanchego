@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -385,7 +384,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
+		headerExtra.TimeMilliseconds = new(timeMS)
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {

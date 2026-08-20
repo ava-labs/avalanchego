@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -73,11 +72,11 @@ func SetEthUpgrades(c *ChainConfig) error {
 	extra := GetExtra(c)
 	// We only mark Eth upgrades as enabled if we have marked them as scheduled.
 	if durango := extra.DurangoTimestamp; durango != nil && *durango < unscheduledActivation {
-		c.ShanghaiTime = utils.PointerTo(*durango)
+		c.ShanghaiTime = new(*durango)
 	}
 
 	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
-		c.CancunTime = utils.PointerTo(*etna)
+		c.CancunTime = new(*etna)
 	}
 	return nil
 }

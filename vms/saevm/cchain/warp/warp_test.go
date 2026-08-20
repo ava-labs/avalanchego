@@ -145,7 +145,7 @@ func TestFromReceipts(t *testing.T) {
 // newRules returns rules with the warp precompile registered at each of the
 // given addresses.
 func newRules(contracts ...common.Address) *extras.Rules {
-	contract := corethwarp.NewDefaultConfig(utils.PointerTo[uint64](0))
+	contract := corethwarp.NewDefaultConfig(new(uint64(0)))
 
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {

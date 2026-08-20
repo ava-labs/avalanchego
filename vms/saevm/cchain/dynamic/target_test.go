@@ -7,7 +7,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
@@ -34,13 +33,13 @@ var targetReaderCases = []readerCase[TargetExponent, gas.Gas]{
 
 var targetTowardCases = []towardCase[TargetExponent]{
 	{name: "nil_unchanged", current: 13_605_152, want: 13_605_152},
-	{name: "no_change", current: 0, desired: utils.PointerTo[TargetExponent](0), want: 0},
-	{name: "increase_within_cap", current: 1000, desired: utils.PointerTo[TargetExponent](2000), want: 2000},
-	{name: "decrease_within_cap", current: 2000, desired: utils.PointerTo[TargetExponent](1000), want: 1000},
-	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[TargetExponent](1 << 15), want: 1 << 15},
-	{name: "decrease_at_cap", current: 1 << 15, desired: utils.PointerTo[TargetExponent](0), want: 0},
-	{name: "increase_capped", current: 0, desired: utils.PointerTo[TargetExponent]((1 << 15) + 1), want: 1 << 15},
-	{name: "decrease_capped", current: 1_000_000, desired: utils.PointerTo[TargetExponent](0), want: 1_000_000 - (1 << 15)},
+	{name: "no_change", current: 0, desired: new(TargetExponent(0)), want: 0},
+	{name: "increase_within_cap", current: 1000, desired: new(TargetExponent(2000)), want: 2000},
+	{name: "decrease_within_cap", current: 2000, desired: new(TargetExponent(1000)), want: 1000},
+	{name: "increase_at_cap", current: 0, desired: new(TargetExponent(1 << 15)), want: 1 << 15},
+	{name: "decrease_at_cap", current: 1 << 15, desired: new(TargetExponent(0)), want: 0},
+	{name: "increase_capped", current: 0, desired: new(TargetExponent((1 << 15) + 1)), want: 1 << 15},
+	{name: "decrease_capped", current: 1_000_000, desired: new(TargetExponent(0)), want: 1_000_000 - (1 << 15)},
 }
 
 func TestTarget(t *testing.T) {

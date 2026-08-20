@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -81,7 +80,7 @@ func TestSetupGenesis(t *testing.T) {
 
 func testSetupGenesis(t *testing.T, scheme string) {
 	preSubnetConfig := params.Copy(params.TestPreSubnetEVMChainConfig)
-	params.GetExtra(&preSubnetConfig).SubnetEVMTimestamp = utils.PointerTo[uint64](100)
+	params.GetExtra(&preSubnetConfig).SubnetEVMTimestamp = new(uint64(100))
 	var (
 		customghash = common.HexToHash("0x4a12fe7bf8d40d152d7e9de22337b115186a4662aa3a97217b36146202bbfc66")
 		customg     = Genesis{
@@ -95,7 +94,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 	)
 
 	rollbackpreSubnetConfig := params.Copy(&preSubnetConfig)
-	params.GetExtra(&rollbackpreSubnetConfig).SubnetEVMTimestamp = utils.PointerTo[uint64](90)
+	params.GetExtra(&rollbackpreSubnetConfig).SubnetEVMTimestamp = new(uint64(90))
 	oldcustomg.Config = &rollbackpreSubnetConfig
 
 	tests := []struct {
@@ -226,7 +225,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			getConfig: func() *params.ChainConfig {
 				config := params.Copy(params.TestChainConfig)
 				params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
-					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.PointerTo[uint64](0), []common.Address{addr}, nil, nil),
+					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(new(uint64(0)), []common.Address{addr}, nil, nil),
 				}
 				return &config
 			},
@@ -300,7 +299,7 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 	require.Greater(block.Time, bc.lastAccepted.Time())
 
 	activatedGenesisConfig := params.Copy(customg.Config)
-	contractDeployerConfig := deployerallowlist.NewConfig(utils.PointerTo[uint64](51), nil, nil, nil)
+	contractDeployerConfig := deployerallowlist.NewConfig(new(uint64(51)), nil, nil, nil)
 	params.GetExtra(&activatedGenesisConfig).UpgradeConfig.PrecompileUpgrades = []extras.PrecompileUpgrade{
 		{
 			Config: contractDeployerConfig,
@@ -341,7 +340,7 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 
 	params.GetExtra(genesis.Config).UpgradeConfig.PrecompileUpgrades = []extras.PrecompileUpgrade{
 		{
-			Config: deployerallowlist.NewConfig(utils.PointerTo[uint64](51), nil, nil, nil),
+			Config: deployerallowlist.NewConfig(new(uint64(51)), nil, nil, nil),
 		},
 	}
 	_, _, err = SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -81,7 +80,7 @@ func TestGenesisEthUpgrades(t *testing.T) {
 				MinBaseFee: big.NewInt(1),
 			},
 			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: new(uint64(0)),
 			},
 		},
 	)

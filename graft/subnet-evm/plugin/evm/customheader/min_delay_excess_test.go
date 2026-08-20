@@ -11,14 +11,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestMinDelayExcess(t *testing.T) {
 	activatingGraniteConfig := *extras.TestGraniteChainConfig
 	activatingGraniteTimestamp := uint64(1000)
-	activatingGraniteConfig.NetworkUpgrades.GraniteTimestamp = utils.PointerTo(activatingGraniteTimestamp)
+	activatingGraniteConfig.NetworkUpgrades.GraniteTimestamp = new(activatingGraniteTimestamp)
 
 	tests := []struct {
 		name                  string
@@ -51,7 +50,7 @@ func TestMinDelayExcess(t *testing.T) {
 			header: &types.Header{
 				Time: 1001,
 			},
-			desiredMinDelayExcess: utils.PointerTo(acp226.DelayExcess(1000)),
+			desiredMinDelayExcess: new(acp226.DelayExcess(1000)),
 			expectedDelayExcess:   nil,
 		},
 		{
@@ -64,7 +63,7 @@ func TestMinDelayExcess(t *testing.T) {
 				Time: activatingGraniteTimestamp + 1,
 			},
 			desiredMinDelayExcess: nil,
-			expectedDelayExcess:   utils.PointerTo(acp226.InitialDelayExcess),
+			expectedDelayExcess:   new(acp226.InitialDelayExcess),
 		},
 		{
 			name:   "granite_no_parent_min_delay_error",
@@ -87,7 +86,7 @@ func TestMinDelayExcess(t *testing.T) {
 				Time: 1001,
 			},
 			desiredMinDelayExcess: nil,
-			expectedDelayExcess:   utils.PointerTo(acp226.DelayExcess(500)),
+			expectedDelayExcess:   new(acp226.DelayExcess(500)),
 		},
 		{
 			name:   "granite_with_desired_min_delay_excess",
@@ -96,8 +95,8 @@ func TestMinDelayExcess(t *testing.T) {
 			header: &types.Header{
 				Time: 1001,
 			},
-			desiredMinDelayExcess: utils.PointerTo(acp226.DelayExcess(1000)),
-			expectedDelayExcess:   utils.PointerTo(acp226.DelayExcess(500 + acp226.MaxDelayExcessDiff)),
+			desiredMinDelayExcess: new(acp226.DelayExcess(1000)),
+			expectedDelayExcess:   new(acp226.DelayExcess(500 + acp226.MaxDelayExcessDiff)),
 		},
 		{
 			name:   "granite_with_zero_desired_value",
@@ -106,8 +105,8 @@ func TestMinDelayExcess(t *testing.T) {
 			header: &types.Header{
 				Time: 1001,
 			},
-			desiredMinDelayExcess: utils.PointerTo(acp226.DelayExcess(0)),
-			expectedDelayExcess:   utils.PointerTo(acp226.DelayExcess(500 - acp226.MaxDelayExcessDiff)),
+			desiredMinDelayExcess: new(acp226.DelayExcess(0)),
+			expectedDelayExcess:   new(acp226.DelayExcess(500 - acp226.MaxDelayExcessDiff)),
 		},
 	}
 

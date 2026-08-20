@@ -61,24 +61,24 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "block_building/min_price_target",
 			json: `{"min-price-target":1000}`,
-			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(1000)) }),
+			want: with(func(c *config) { c.PriceTarget = new(gas.Price(1000)) }),
 		},
 		{
 			// An explicit 0 is a vote for the minimum, distinct from an absent
 			// field, which is no vote.
 			name: "block_building/min_price_target_explicit_zero",
 			json: `{"min-price-target":0}`,
-			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
+			want: with(func(c *config) { c.PriceTarget = new(gas.Price(0)) }),
 		},
 		{
 			name: "block_building/gas_target",
 			json: `{"gas-target":1000}`,
-			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
+			want: with(func(c *config) { c.GasTarget = new(gas.Gas(1000)) }),
 		},
 		{
 			name: "block_building/min_delay_target",
 			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
+			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
 		},
 
 		// State & trie
@@ -206,9 +206,9 @@ func TestParseConfig(t *testing.T) {
 				"api-resolve-pending-to-last-executed":true
 			}`,
 			want: config{
-				PriceTarget:                  utils.PointerTo(gas.Price(500)),
-				GasTarget:                    utils.PointerTo(gas.Gas(1500)),
-				MinDelayTarget:               utils.PointerTo[uint64](3000),
+				PriceTarget:                  new(gas.Price(500)),
+				GasTarget:                    new(gas.Gas(1500)),
+				MinDelayTarget:               new(uint64(3000)),
 				Pruning:                      false,
 				StateScheme:                  customrawdb.FirewoodScheme,
 				CommitInterval:               256,

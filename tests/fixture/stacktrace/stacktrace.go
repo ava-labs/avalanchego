@@ -77,8 +77,7 @@ func Errorf(format string, args ...any) error {
 	newErr := fmt.Errorf(format, args...)
 
 	// If there's already a StackTraceError, preserve its stack but update the cause
-	var existingStackErr StackTraceError
-	if errors.As(err, &existingStackErr) {
+	if existingStackErr, ok := errors.AsType[StackTraceError](err); ok {
 		existingStackErr.Cause = newErr
 		return existingStackErr
 	}
@@ -102,8 +101,7 @@ func wrap(err error) error {
 	}
 
 	// If there's already a StackTraceError in the chain, just return it
-	var existingStackErr StackTraceError
-	if errors.As(err, &existingStackErr) {
+	if _, ok := errors.AsType[StackTraceError](err); ok {
 		return err
 	}
 

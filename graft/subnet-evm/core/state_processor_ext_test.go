@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -50,10 +49,10 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig: params.DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+					SubnetEVMTimestamp: new(uint64(0)),
 				},
 				GenesisPrecompiles: extras.Precompiles{
-					txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil),
+					txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64(0)), nil, nil, nil),
 				},
 			},
 		)
