@@ -70,6 +70,7 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	// Create the code fetcher.
 	fetcher, err := code.NewQueue(clientEthDB)
 	require.NoError(t, err, "failed to create code fetcher")
+	t.Cleanup(fetcher.Shutdown)
 
 	// Create the consumer code syncer.
 	codeSyncer, err := code.NewSyncer(mockClient, clientEthDB, fetcher.CodeHashes())

@@ -139,6 +139,16 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	return nil
 }
 
+// CloseInput signals that no more hashes will be added, without waiting for the
+// forwarder to drain. The consumer sees [Queue.CodeHashes] close once every
+// pending hash has been forwarded.
+func (q *Queue) CloseInput() {
+	q.markClosed()
+	q.closeInOnce.Do(func() {
+		close(q.in)
+	})
+}
+
 // Finalize waits for all pending hashes to be sent, then closes out.
 // Blocks if no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
 func (q *Queue) Finalize() error {
