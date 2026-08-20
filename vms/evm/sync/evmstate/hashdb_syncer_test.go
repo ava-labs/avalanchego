@@ -509,9 +509,8 @@ func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, t
 
 // leafHandlerFor returns the production leaf handler, for tests that wrap it.
 func leafHandlerFor(trieDB *triedb.Database) p2p.Handler {
-	return handlers.NewHandler(
+	return handlers.NewHandler[syncpb.GetLeafRequest](
 		logging.NoLog{},
-		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
 		newResponder(logging.NoLog{}, trieDB, common.HashLength, nil),
 	)
 
