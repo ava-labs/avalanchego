@@ -73,8 +73,11 @@ func AdvanceAccountTrie(t *testing.T, trieDB *triedb.Database, from common.Hash,
 	tr, err := trie.New(trie.TrieID(from), trieDB)
 	require.NoError(t, err)
 
+	// Past any nonce FillAccountTrie assigns, so every account really changes.
+	const nonceOffset = 1_000_000
+
 	for i := range numAccounts {
-		key, full, _ := accountLeaf(t, i, uint64(i+1)+advancedNonceOffset)
+		key, full, _ := accountLeaf(t, i, uint64(i+1)+nonceOffset)
 		tr.MustUpdate(key, full)
 	}
 
@@ -84,6 +87,3 @@ func AdvanceAccountTrie(t *testing.T, trieDB *triedb.Database, from common.Hash,
 	require.NoError(t, trieDB.Commit(root, false))
 	return root
 }
-
-// advancedNonceOffset keeps an advanced account distinct at any index.
-const advancedNonceOffset = 1_000_000
