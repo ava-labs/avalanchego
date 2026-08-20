@@ -33,10 +33,6 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Databa
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 
-// leafEncoder returns the trie-encoded value at an iterator's cursor. The
-// snapshot holds slim accounts where the trie holds full ones.
-type leafEncoder func() ([]byte, error)
-
 // SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather
 // than the requested root, which the tree retires before sync stops asking.
 type SnapshotReader interface {
@@ -374,6 +370,10 @@ func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byt
 	}
 	return q.wholeTrie(trieHasMore), nil
 }
+
+// leafEncoder returns the trie-encoded value at an iterator's cursor. The
+// snapshot holds slim accounts where the trie holds full ones.
+type leafEncoder func() ([]byte, error)
 
 // snapshotLeaves opens a disk-layer iterator over the account trie, or over
 // the request's storage trie, with the function that trie-encodes its values.
