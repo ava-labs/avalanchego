@@ -466,8 +466,12 @@ Use `bazel test //...` for broader Bazel validation. It runs
 `//:gazelle_test` and can run other non-Go, non-manual test rules.
 
 ```bash
-# Run all generated unit tests (shuffle enabled, race on)
+# Run all generated unit tests (no race, no shuffle)
 task bazel-test-unit-all           # or: bazel test //:unit_tests
+
+# CI uses race detection and shuffle.
+# Run all generated unit tests with this mode.
+task bazel-test-unit-all-race-shuffle  # or: bazel test --config=race-shuffle //:unit_tests
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -475,8 +479,11 @@ bazel test //utils/...
 # Run specific test functions (target:test_name + filter)
 bazel test //utils:set_test --test_filter=TestSet_Add
 
-# Fast local iteration (no race, no shuffle)
-task bazel-test-unit-all-fast      # or: bazel test --config=fast //:unit_tests
+# Run all generated unit tests with race detection
+task bazel-test-unit-all-race      # or: bazel test --config=race //:unit_tests
+
+# Run all generated unit tests with shuffle
+task bazel-test-unit-all-shuffle   # or: bazel test --config=shuffle //:unit_tests
 
 # Collect coverage
 bazel coverage //...
@@ -570,22 +577,34 @@ result. Run the check again.
 
 #### Test Options
 
-| Option | Default | Toggle with |
+Use shuffle configurations only with generated Go test suites. They pass
+`-test.shuffle=on` to every selected test. Do not use `--config=shuffle` or
+`--config=race-shuffle` with `bazel test //...`. That target set includes
+`//:gazelle_test`, which rejects Go test options.
+
+| Option | Default | Enable with |
 |--------|---------|-------------|
-| Race detection | ON | `--config=norace` (disable) |
-| Shuffle | ON | `--config=noshuffle` (disable) |
-| Fast mode | - | `--config=fast` (no shuffle, no race) |
+| Race detection | OFF | `--config=race` |
+| Shuffle | OFF | `--config=shuffle` |
+| Race detection and shuffle | OFF | `--config=race-shuffle` |
+
+Go does not cache a successful test result when the command uses `-race` or
+`-shuffle`. The [Go test cache documentation](https://pkg.go.dev/cmd/go#hdr-Test_packages)
+does not list either flag as cacheable. The race, shuffle, and race-shuffle
+configurations use `--nocache_test_results` to match this behavior. Bazel runs
+each selected test when you use one of these configurations. Use the default
+mode when you want cacheable test results.
 
 Examples:
 ```bash
-# Disable race detection
-bazel test --config=norace //:unit_tests
+# Enable race detection
+bazel test --config=race //:unit_tests
 
-# Disable shuffle only
-bazel test --config=noshuffle //:unit_tests
+# Enable shuffle only
+bazel test --config=shuffle //:unit_tests
 
-# Fast mode (no shuffle, no race)
-bazel test --config=fast //:unit_tests
+# Enable race detection and shuffle
+bazel test --config=race-shuffle //:unit_tests
 ```
 
 #### Test Timeouts
