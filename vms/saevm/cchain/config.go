@@ -27,6 +27,7 @@ import (
 type duration struct {
 	time.Duration
 }
+var _  json.Marshaler = (*duration)(nil)
 
 func (d *duration) UnmarshalJSON(b []byte) error {
 	var s string
