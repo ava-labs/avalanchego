@@ -160,12 +160,12 @@ func TestLeafFetch_Batching(t *testing.T) {
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, _ := synctest.FillTrie(t, trieDB, tt.numKeys)
-			counter := countingLeafResponder(t, trieDB)
+			recorder := recordingLeafResponder(t, trieDB)
 
 			tk := &recordingTask{root: root}
-			require.NoError(t, runLeafTask(t, ctx, counter, tk))
+			require.NoError(t, runLeafTask(t, ctx, recorder, tk))
 
-			require.Len(t, counter.Requests(), tt.wantRequests)
+			require.Len(t, recorder.Requests(), tt.wantRequests)
 			require.Equal(t, keys, tk.keys, "every leaf must be fetched in key order")
 			require.Equal(t, 1, tk.finished, "the task must finish exactly once")
 		})
@@ -178,7 +178,7 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	require.ErrorIs(t, runLeafTask(t, ctx, countingLeafResponder(t, trieDB), &recordingTask{root: root}), context.Canceled)
+	require.ErrorIs(t, runLeafTask(t, ctx, recordingLeafResponder(t, trieDB), &recordingTask{root: root}), context.Canceled)
 }
 
 // The re-request loop recovers from transient bad responses but never accepts a
@@ -243,11 +243,11 @@ func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash,
 type (
 	// leafResponder is the shape every leaf fixture composes over.
 	leafResponder = handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-	leafCounter   = synctest.RecordingResponder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+	leafRecorder  = synctest.RecordingResponder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 )
 
-// countingLeafResponder counts the leaf requests it serves.
-func countingLeafResponder(tb testing.TB, trieDB *triedb.Database) *leafCounter {
+// recordingLeafResponder records the leaf requests it serves.
+func recordingLeafResponder(tb testing.TB, trieDB *triedb.Database) *leafRecorder {
 	return synctest.NewRecordingResponder(newLeafResponder(tb, trieDB))
 }
 
