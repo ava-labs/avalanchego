@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -24,19 +23,23 @@ import (
 )
 
 // duration is a [time.Duration] that JSON-unmarshals from a duration string
-// (e.g. "10s") as well as from the bare number of nanoseconds that
-// [time.Duration] alone accepts. Operator configs use both.
+// (e.g. "10s").
 type duration struct {
 	time.Duration
 }
 
 func (d *duration) UnmarshalJSON(b []byte) error {
-	s, err := strconv.Unquote(string(b))
-	if err != nil { // not a JSON string, so the only other option is a number
-		return json.Unmarshal(b, &d.Duration)
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
 	}
-	d.Duration, err = time.ParseDuration(s)
-	return err
+
+	parsed, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.Duration = parsed
+	return nil
 }
 
 func (d duration) MarshalJSON() ([]byte, error) {

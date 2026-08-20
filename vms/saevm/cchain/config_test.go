@@ -163,9 +163,9 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.APIMaxDuration = duration{time.Minute} }),
 		},
 		{
-			name: "api/api_max_duration_nanoseconds",
-			json: `{"api-max-duration":5000000000}`,
-			want: with(func(c *config) { c.APIMaxDuration = duration{5 * time.Second} }),
+			name:    "api/api_max_duration_number",
+			json:    `{"api-max-duration":5000000000}`,
+			wantErr: errIsType[*json.UnmarshalTypeError](),
 		},
 		{
 			name:    "api/api_max_duration_unparseable",
@@ -174,7 +174,7 @@ func TestParseConfig(t *testing.T) {
 		},
 		{
 			name:    "api/api_max_duration_zero",
-			json:    `{"api-max-duration":0}`,
+			json:    `{"api-max-duration":"0s"}`,
 			wantErr: testerr.Is(rpc.ErrNonPositiveEVMTimeout),
 		},
 		{
@@ -262,34 +262,6 @@ func TestParseConfig(t *testing.T) {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
-		})
-	}
-}
-
-// TestConfigEVMTimeout asserts that api-max-duration reaches the RPC layer as
-// the EVM-execution timeout.
-func TestConfigEVMTimeout(t *testing.T) {
-	tests := []struct {
-		name string
-		json string
-		want time.Duration
-	}{
-		{
-			name: "default",
-			json: `{}`,
-			want: rpc.DefaultEVMTimeout,
-		},
-		{
-			name: "override",
-			json: `{"api-max-duration":"42s"}`,
-			want: 42 * time.Second,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c, err := parseConfig([]byte(tt.json), constants.UnitTestID)
-			require.NoError(t, err, "parseConfig(...)")
-			assert.Equal(t, tt.want, c.saeConfig(nil).RPCConfig.EVMTimeout, "saeConfig(nil).RPCConfig.EVMTimeout")
 		})
 	}
 }
