@@ -27,6 +27,64 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+// RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
+func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
+	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
+	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
+}
+
+// leafEncoder returns the trie-encoded value at an iterator's cursor. The
+// snapshot holds slim accounts where the trie holds full ones.
+type leafEncoder func() ([]byte, error)
+
+// SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather
+// than the requested root, which the tree retires before sync stops asking.
+type SnapshotReader interface {
+	DiskRoot() common.Hash
+	AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error)
+	StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error)
+}
+
+var (
+	_ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
+	_ SnapshotReader                                                      = (*snapshot.Tree)(nil)
+)
+
+// responder is bound to one (trieDB, key-length, snapshot) tuple.
+type responder struct {
+	log           logging.Logger
+	trieDB        *triedb.Database
+	snapshot      SnapshotReader // optional
+	trieKeyLength int
+}
+
+func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
+	var cfg handlerConfig
+	options.ApplyTo(&cfg, opts...)
+
+	return &responder{
+		log:           log,
+		trieDB:        trieDB,
+		snapshot:      cfg.snapshot,
+		trieKeyLength: trieKeyLength,
+	}
+}
+
+type handlerConfig struct {
+	snapshot SnapshotReader
+}
+
+// HandlerOption configures [RegisterHandler].
+type HandlerOption = options.Option[handlerConfig]
+
+// WithSnapshot serves leaves from the snapshot where it agrees with the trie,
+// falling back to trie iteration everywhere else.
+func WithSnapshot(s SnapshotReader) HandlerOption {
+	return options.Func[handlerConfig](func(c *handlerConfig) {
+		c.snapshot = s
+	})
+}
+
 var (
 	errInvalidRequest = &avacommon.AppError{
 		Code:    3000,
@@ -54,82 +112,6 @@ const (
 	// the snapshot slow path.
 	snapshotSegmentLen = 64
 )
-
-type handlerConfig struct {
-	snapshot SnapshotReader
-}
-
-// HandlerOption configures [RegisterHandler].
-type HandlerOption = options.Option[handlerConfig]
-
-// WithSnapshot serves leaves from the snapshot where it agrees with the trie,
-// falling back to trie iteration everywhere else.
-func WithSnapshot(s SnapshotReader) HandlerOption {
-	return options.Func[handlerConfig](func(c *handlerConfig) {
-		c.snapshot = s
-	})
-}
-
-// RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
-	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
-	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
-}
-
-// SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather
-// than the requested root, which the tree retires before sync stops asking.
-type SnapshotReader interface {
-	DiskRoot() common.Hash
-	AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error)
-	StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error)
-}
-
-// leafIterator is the shape shared by the account and storage snapshot
-// iterators, yielding trie-encoded values for either.
-type leafIterator interface {
-	Next() bool
-	Hash() common.Hash
-	Error() error
-	Release()
-
-	// leaf returns the trie-encoded value at the cursor.
-	leaf() ([]byte, error)
-}
-
-// accountLeaves converts slim snapshot accounts to full trie leaves.
-type accountLeaves struct{ snapshot.AccountIterator }
-
-func (a accountLeaves) leaf() ([]byte, error) { return types.FullAccountRLP(a.Account()) }
-
-// storageLeaves serves slots, which the snapshot already stores trie-encoded.
-type storageLeaves struct{ snapshot.StorageIterator }
-
-func (s storageLeaves) leaf() ([]byte, error) { return s.Slot(), nil }
-
-var (
-	_ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
-	_ SnapshotReader                                                      = (*snapshot.Tree)(nil)
-)
-
-// responder is bound to one (trieDB, key-length, snapshot) tuple.
-type responder struct {
-	log           logging.Logger
-	trieDB        *triedb.Database
-	snapshot      SnapshotReader // optional
-	trieKeyLength int
-}
-
-func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
-	var cfg handlerConfig
-	options.ApplyTo(&cfg, opts...)
-
-	return &responder{
-		log:           log,
-		trieDB:        trieDB,
-		snapshot:      cfg.snapshot,
-		trieKeyLength: trieKeyLength,
-	}
-}
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if reason := validateRequest(req, r.trieKeyLength); reason != "" {
@@ -394,24 +376,28 @@ func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byt
 }
 
 // snapshotLeaves opens a disk-layer iterator over the account trie, or over
-// [query.account]'s storage trie when the request names one.
-func (q *query) snapshotLeaves() (leafIterator, error) {
+// the request's storage trie, with the function that trie-encodes its values.
+func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 	diskRoot := q.snapshot.DiskRoot()
 	seek := common.BytesToHash(q.startKey)
 
 	if q.account == (common.Hash{}) {
 		it, err := q.snapshot.AccountIterator(diskRoot, seek)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return accountLeaves{it}, nil
+		return it, func() ([]byte, error) {
+			return types.FullAccountRLP(it.Account())
+	 	}, nil
 	}
 
 	it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return storageLeaves{it}, nil
+	return it, func() ([]byte, error) {
+		return it.Slot(), nil
+	}, nil
 }
 
 // abandonSnapshot gives up the fast path. A snapshot that never serves looks
@@ -428,7 +414,7 @@ func (q *query) abandonSnapshot(reason string, err error) {
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
 // are unvalidated, the caller range-proves them against the requested root.
 func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
-	it, err := q.snapshotLeaves()
+	it, leaf, err := q.snapshotLeaves()
 	if err != nil {
 		// [SnapshotReader.DiskRoot] and the iterator are separate calls, so a
 		// concurrent flatten can retire the root in between and land here.
@@ -447,7 +433,7 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 		if len(keys) >= int(q.limit) || ctx.Err() != nil {
 			break
 		}
-		v, err := it.leaf()
+		v, err := leaf()
 		if err != nil {
 			q.abandonSnapshot("leaf encoding failed", err)
 			return nil, nil
