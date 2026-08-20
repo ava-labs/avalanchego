@@ -17,7 +17,6 @@ go_library(
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
