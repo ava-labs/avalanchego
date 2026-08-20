@@ -223,31 +223,33 @@ func (q *query) collect(ctx context.Context) error {
 		if done {
 			return nil
 		}
-		// Snapshot didn't satisfy the response on its own. Trie
-		// iteration will regenerate the proof at the end.
-		q.resp.ProofVals = nil
 	}
 
+	// At the limit nothing established what lies past the response, so the
+	// range has to be proved.
+	more := true
 	if !q.atLimit() {
-		more, err := q.fillFromTrie(ctx, q.endKey)
-		if err != nil {
+		var err error
+		if more, err = q.fillFromTrie(ctx, q.endKey); err != nil {
 			return err
 		}
-		if q.wholeTrie(more) {
-			return nil
-		}
+	}
+	return q.attachProof(more)
+}
+
+// attachProof proves the response range, unless it spans the whole trie, which
+// the root alone attests.
+func (q *query) attachProof(more bool) error {
+	if q.wholeTrie(more) {
+		return nil
 	}
 
 	proofDB, err := q.generateRangeProof(q.startKey, q.resp.Keys)
 	if err != nil {
 		return err
 	}
-
 	q.resp.ProofVals, err = iteratorValues(proofDB)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // run executes the collect pipeline. A pipeline failure is a server fault,
