@@ -19,23 +19,12 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var (
-	errBlocksToFetchRequired = errors.New("blocksToFetch must be greater than zero")
-	errFromHashRequired      = errors.New("fromHash must be non-zero when fromHeight is greater than zero")
-	errParseBlockRequired    = errors.New("parseBlock must be non-nil")
-	errEmptyResponse         = errors.New("empty block response")
-	errTooManyBlocks         = errors.New("more blocks returned than requested")
-	errParseBlock            = errors.New("failed to parse block")
-	errBlockHashMismatch     = errors.New("block does not hash to the expected value")
-)
+// A Parser decodes a block and verifies that the body matches the header.
+type Parser func([]byte) (*types.Block, error)
 
-// BlockParser decodes a block and enforces every invariant it must satisfy,
-// including the header roots.
-type BlockParser func([]byte) (*types.Block, error)
-
-// Syncer fetches a contiguous run of blocks by walking parents from a known tip
-// and writes them to db. It skips blocks already on disk, verifies every
-// response links tip-to-parent, and re-requests on failure.
+// A Syncer downloads a contiguous chain of blocks from peers and persists it,
+// writing each fetched block with [rawdb.WriteBlock] and marking it canonical
+// with [rawdb.WriteCanonicalHash].
 type Syncer struct {
 	log           logging.Logger
 	client        *Client
@@ -43,52 +32,53 @@ type Syncer struct {
 	fromHash      common.Hash
 	fromHeight    uint64
 	blocksToFetch uint64
-	parseBlock    BlockParser
+	parseBlock    Parser
 }
 
-// NewSyncer returns a [Syncer] that walks back from (fromHash, fromHeight),
-// which counts as the first of blocksToFetch.
-func NewSyncer(log logging.Logger, c *Client, db ethdb.Database, parse BlockParser, fromHash common.Hash, fromHeight, blocksToFetch uint64) (*Syncer, error) {
-	if blocksToFetch == 0 {
-		return nil, errBlocksToFetchRequired
-	}
-	if (fromHash == common.Hash{}) && fromHeight > 0 {
-		return nil, errFromHashRequired
-	}
-	if parse == nil {
-		return nil, errParseBlockRequired
-	}
-
+// NewSyncer returns a [Syncer] that fetches the blocks with heights in the
+// half-open interval (fromHeight-blocksToFetch, fromHeight]. fromHash
+// identifies the block at fromHeight and, through its ancestry, every other
+// fetched block. blocksToFetch is capped at fromHeight+1 since no blocks
+// exist below genesis.
+func NewSyncer(
+	log logging.Logger,
+	c *Client,
+	db ethdb.Database,
+	parse Parser,
+	fromHash common.Hash,
+	fromHeight uint64,
+	blocksToFetch uint64,
+) *Syncer {
 	return &Syncer{
 		log:           log,
 		client:        c,
 		db:            db,
 		fromHash:      fromHash,
 		fromHeight:    fromHeight,
-		blocksToFetch: blocksToFetch,
+		blocksToFetch: min(blocksToFetch, fromHeight+1),
 		parseBlock:    parse,
-	}, nil
+	}
 }
 
-// Sync stops at blocksToFetch, at genesis, or when ctx ends. A chain shorter
-// than blocksToFetch is not an error.
+// maxBlocksPerResponse is the most blocks one response can carry, the
+// requested block plus [maxParentsPerRequest] parents.
+const maxBlocksPerResponse = maxParentsPerRequest + 1
+
+// Sync returns once all blocksToFetch blocks are persisted or ctx ends.
 //
-// Calling it again resumes from disk, so a cancelled sync can be retried on
-// the same [Syncer].
+// Sync may be called again after an interruption.
 func (s *Syncer) Sync(ctx context.Context) error {
 	nextHash := s.fromHash
 	nextHeight := s.fromHeight
 	toFetch := s.blocksToFetch
 
-	var fetchErr error
-	for toFetch > 0 && nextHash != (common.Hash{}) {
+	for toFetch > 0 {
 		if err := ctx.Err(); err != nil {
-			fetchErr = err
-			break
+			return err
 		}
 
-		// Skip anything already on disk, from the node's own chain or an
-		// interrupted sync.
+		// Avoid network fetches for blocks already on disk, whether from the
+		// node's own chain or an interrupted sync.
 		if blk := rawdb.ReadBlock(s.db, nextHash, nextHeight); blk != nil {
 			nextHash = blk.ParentHash()
 			nextHeight--
@@ -96,35 +86,32 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			continue
 		}
 
-		maxBlocks := uint16(min(toFetch, uint64(maxBlocksPerResponse)))
-		blocks, err := getBlocks(ctx, s.log, s.client, nextHash, nextHeight, maxBlocks, s.parseBlock)
+		maxBlocks := uint16(min(toFetch, maxBlocksPerResponse))
+		blocks, err := s.getBlocks(ctx, nextHash, nextHeight, maxBlocks)
 		if err != nil {
-			fetchErr = fmt.Errorf("could not get blocks at %s: %w", nextHash, err)
-			break
+			return fmt.Errorf("getting blocks at %d (%s): %w", nextHeight, nextHash, err)
 		}
 
 		batch := s.db.NewBatch()
 		for _, block := range blocks {
 			rawdb.WriteBlock(batch, block)
-			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
+			rawdb.WriteCanonicalHash(batch, nextHash, nextHeight)
+
 			nextHash = block.ParentHash()
 			nextHeight--
 			toFetch--
 		}
-
-		// Flushing each round keeps verified work on a restart. The response
-		// is already bounded, so the batch cannot grow past one of them.
 		if err := batch.Write(); err != nil {
-			return fmt.Errorf("could not write blocks at %s: %w", nextHash, err)
+			return fmt.Errorf("writing blocks after %d (%s): %w", nextHeight, nextHash, err)
 		}
 	}
-	return fetchErr
+	return nil
 }
 
-// getBlocks requests up to maxBlocks blocks ending at (hash, height), verifies
-// the returned chain links back from hash, scores the peer, and re-requests on
-// any network or verification failure until ctx ends.
-func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.Hash, height uint64, maxBlocks uint16, parse BlockParser) ([]*types.Block, error) {
+// getBlocks fetches the block with the given hash, followed by up to
+// maxBlocks-1 of its ancestors, in descending height order. It keeps
+// re-requesting from peers until a valid chain arrives or ctx ends.
+func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64, maxBlocks uint16) ([]*types.Block, error) {
 	req := &syncpb.GetBlockRequest{
 		Height: height,
 		// The field counts parents, so it excludes the block at height.
@@ -136,16 +123,22 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 		}
 
 		resp := &syncpb.GetBlockResponse{}
-		outcome, err := c.Send(ctx, req, resp)
+		outcome, err := s.client.Send(ctx, req, resp)
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
+			s.log.Debug("block request failed, re-requesting",
+				zap.Error(err),
+			)
 			continue
 		}
 
-		blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), parse)
+		blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
 		if err != nil {
 			outcome.Failure()
-			log.Debug("invalid block response, re-requesting", zap.Error(err))
+			s.log.Debug("invalid block response, re-requesting",
+				zap.Stringer("nodeID", outcome.NodeID()),
+				zap.Error(err),
+			)
 			continue
 		}
 
@@ -154,25 +147,32 @@ func getBlocks(ctx context.Context, log logging.Logger, c *Client, hash common.H
 	}
 }
 
-// verifyBlocks parses raw and reports whether it is the parent chain ending at
-// hash, in tip-first order.
-func verifyBlocks(hash common.Hash, maxBlocks uint16, raw [][]byte, parse BlockParser) ([]*types.Block, error) {
-	if len(raw) == 0 {
-		return nil, errEmptyResponse
+var (
+	errNoBlocks            = errors.New("no blocks")
+	errTooManyBlocks       = errors.New("too many blocks")
+	errParsingBlock        = errors.New("parsing block")
+	errUnexpectedBlockHash = errors.New("unexpected block hash")
+)
+
+// verifyBlocks parses blockBytes into a chain of blocks, verifying the first
+// block has the given hash and the rest link through parent references.
+func verifyBlocks(hash common.Hash, maxBlocks uint16, blockBytes [][]byte, parse Parser) ([]*types.Block, error) {
+	if len(blockBytes) == 0 {
+		return nil, errNoBlocks
 	}
-	if len(raw) > int(maxBlocks) {
-		return nil, fmt.Errorf("%w: got %d requested %d", errTooManyBlocks, len(raw), maxBlocks)
+	if len(blockBytes) > int(maxBlocks) {
+		return nil, fmt.Errorf("%w: got %d requested %d", errTooManyBlocks, len(blockBytes), maxBlocks)
 	}
 
-	blocks := make([]*types.Block, len(raw))
+	blocks := make([]*types.Block, len(blockBytes))
 	want := hash
-	for i, blockBytes := range raw {
-		block, err := parse(blockBytes)
+	for i, bytes := range blockBytes {
+		block, err := parse(bytes)
 		if err != nil {
-			return nil, fmt.Errorf("%w at index %d: %w", errParseBlock, i, err)
+			return nil, fmt.Errorf("%w at index %d: %w", errParsingBlock, i, err)
 		}
 		if got := block.Hash(); got != want {
-			return nil, fmt.Errorf("%w at index %d: got %s expected %s", errBlockHashMismatch, i, got, want)
+			return nil, fmt.Errorf("%w at index %d: got %s, expected %s", errUnexpectedBlockHash, i, got, want)
 		}
 		blocks[i] = block
 		want = block.ParentHash()
