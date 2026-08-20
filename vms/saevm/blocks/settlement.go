@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -60,7 +59,7 @@ func (b *Block) Settled() bool {
 // Synchronous reports whether the block was marked as synchronous during
 // [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
 func (b *Block) Synchronous() bool {
-	return hook.Synchronous(b.hooks, b.Header())
+	return b.synchronous
 }
 
 const (

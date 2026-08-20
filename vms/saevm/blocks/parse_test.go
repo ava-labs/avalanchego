@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -149,19 +150,16 @@ func TestParseEthBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log := loggingtest.New(t, logging.Debug)
-
 			hdr := tt.mutate(&types.Header{
 				Number:    big.NewInt(1),
 				UncleHash: types.EmptyUncleHash,
 				TxHash:    types.EmptyTxsHash,
 			})
 			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
+			bytes, err := rlp.EncodeToBytes(ethB)
+			require.NoError(t, err, "rlp.EncodeToBytes()")
 
-			hooks := hookstest.NewStub(0)
-			b, err := New(ethB, nil, hooks, log)
-			require.NoError(t, err, "New()")
-			_, err = ParseEth(b.Bytes(), hooks)
+			_, err = ParseEth(bytes, hookstest.NewStub(0))
 			assert.ErrorIs(t, err, tt.wantErr, "Parse(#%v @ time %v)", hdr.Number, hdr.Time)
 		})
 	}

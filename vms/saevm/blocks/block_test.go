@@ -68,7 +68,7 @@ func settledBy(lastSettled *Block) hook.Settled {
 func (bb *blockBuilder) newFromHooks(tb testing.TB, num, sec uint64, parent *Block, lastSettled *Block) *Block {
 	tb.Helper()
 
-	*bb.hookTime = time.Unix(int64(sec), 0)
+	*bb.hookTime = time.Unix(int64(sec), 0) //#nosec G115 -- block time is probably not that high.
 	var ethHdr *types.Header
 	if parent != nil {
 		var err error
