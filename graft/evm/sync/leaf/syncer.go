@@ -10,9 +10,8 @@ import (
 	"sort"
 
 	"github.com/ava-labs/libevm/common"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ava-labs/libevm/libevm/options"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )

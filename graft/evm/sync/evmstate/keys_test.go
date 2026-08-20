@@ -6,8 +6,9 @@ package evmstate
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 )
 
 func TestWithinRange(t *testing.T) {

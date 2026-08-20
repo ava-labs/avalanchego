@@ -21,12 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
-	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
 // A sync leaves goroutines behind if teardown breaks.
@@ -77,13 +78,12 @@ func withLeafFetcher(f types.LeafFetcher) sutOption {
 type SUT struct {
 	state  *HashDBSyncer
 	code   *code.Syncer
-	queue  *code.Queue
 	target ethdb.Database
 }
 
 // newSUT serves the trie at root over the message protocol, which is what the
 // engine wires by default. Pass [withLeafFetcher] to drive another transport.
-func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root common.Hash, opts ...sutOption) *SUT {
+func newSUT(t *testing.T, trieDB *triedb.Database, root common.Hash, opts ...sutOption) *SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
@@ -117,7 +117,7 @@ func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root com
 		state.threshold = cfg.threshold
 	}
 
-	return &SUT{state: state, code: codeSyncer, queue: queue, target: cfg.target}
+	return &SUT{state: state, code: codeSyncer, target: cfg.target}
 }
 
 // Target returns the database the syncers reconstruct state into.
@@ -180,7 +180,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 					opts = append(opts, withLeafFetcher(synctest.ServeLeaves(t, ctx, f.TrieDB)))
 				}
 
-				sut := newSUT(t, ctx, f.TrieDB, f.Root, opts...)
+				sut := newSUT(t, f.TrieDB, f.Root, opts...)
 				require.NoError(t, sut.sync(t, ctx))
 				target := sut.Target()
 
@@ -209,7 +209,7 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 	}
 
 	recorder := synctest.RecordLeaves(t, ctx, f.TrieDB)
-	sut := newSUT(t, ctx, f.TrieDB, f.Root,
+	sut := newSUT(t, f.TrieDB, f.Root,
 		withCodeDB(f.CodeDB),
 		withLeafFetcher(recorder),
 		withThreshold(1), // force the storage trie to segment
@@ -250,15 +250,15 @@ func TestHashDBSyncer_RejectsStaleSnapshot(t *testing.T) {
 	require.NotEqual(t, staleRoot, root)
 
 	target := rawdb.NewMemoryDatabase()
-	require.NoError(t, newSUT(t, ctx, trieDB, staleRoot, withTarget(target)).sync(t, ctx))
+	require.NoError(t, newSUT(t, trieDB, staleRoot, withTarget(target)).sync(t, ctx))
 
 	// The previous root's leaves count as resume progress.
-	err := newSUT(t, ctx, trieDB, root, withTarget(target)).sync(t, ctx)
+	err := newSUT(t, trieDB, root, withTarget(target)).sync(t, ctx)
 	require.ErrorIs(t, err, errRootMismatch)
 
 	// Wiping the snapshot is the caller's job, and it clears the stale progress.
 	wipeAccountSnapshot(t, target)
-	require.NoError(t, newSUT(t, ctx, trieDB, root, withTarget(target)).sync(t, ctx))
+	require.NoError(t, newSUT(t, trieDB, root, withTarget(target)).sync(t, ctx))
 	requireReconstructed(t, target, root, keys, vals)
 }
 
@@ -292,7 +292,7 @@ func TestHashDBSyncer_RecyclesTrieSlots(t *testing.T) {
 	f := synctest.NewStateFixture(t, descs)
 	require.Greater(t, len(f.Storage), defaultLeafWorkers, "the run must exceed the scheduler's slots")
 
-	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB))
+	sut := newSUT(t, f.TrieDB, f.Root, withCodeDB(f.CodeDB))
 	require.NoError(t, sut.sync(t, ctx))
 	requireStorageReconstructed(t, sut.Target(), f.Storage)
 }
@@ -439,7 +439,7 @@ func TestHashDBSyncer_CancelPropagates(t *testing.T) {
 	// Cancel as the first range is requested, so the sync cannot finish.
 	r := synctest.NewCancelAfterFetcher(synctest.ServeLeaves(t, ctx, f.TrieDB), 1, cancel)
 
-	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafFetcher(r))
+	sut := newSUT(t, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafFetcher(r))
 	require.ErrorIs(t, sut.sync(t, ctx), context.Canceled)
 }
 
@@ -478,7 +478,7 @@ func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, t
 	defer cancel()
 
 	recorder := synctest.RecordLeaves(t, ctx, trieDB)
-	sut := newSUT(t, ctx, trieDB, root,
+	sut := newSUT(t, trieDB, root,
 		withTarget(target),
 		withThreshold(1), // force segmentation
 		withLeafFetcher(synctest.NewCancelAfterFetcher(recorder, cancelAfter, cancel)),
