@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -30,7 +28,7 @@ import (
 //nolint:testableexamples // Output is meaningless
 func ExampleRange() {
 	parent := blockBuildingPreference()
-	settle, ok, err := LastToSettleAt(vmHooks(), time.Now().Add(-params.Tau), parent)
+	settle, ok, err := LastToSettleAt(time.Now().Add(-params.Tau), parent)
 	if err != nil {
 		// Due to a malformed input to block verification.
 		return // err
@@ -47,15 +45,14 @@ func ExampleRange() {
 	_ = Range(settle, parent)
 }
 
-// blockBuildingPreference and vmHooks exist only to allow examples to build.
+// blockBuildingPreference exists only to allow examples to build.
 func blockBuildingPreference() *Block { return nil }
-func vmHooks() hook.Points            { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 3, nil), nil, nil)
-
-	b := newBlock(t, newEthBlock(6, 10, parent.EthBlock()), parent, lastSettled)
+	bb := newBlockBuilder()
+	parent := bb.newFromHooks(t, 5, 5, nil, nil)
+	lastSettled := bb.newFromHooks(t, 3, 3, nil, nil)
+	b := bb.newFromHooks(t, 6, 10, parent, lastSettled)
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
@@ -153,7 +150,7 @@ func TestSettles(t *testing.T) {
 		8: nil,
 		9: {4, 5, 6, 7},
 	}
-	blocks := newChain(t, 0, 10, lastSettledAtHeight)
+	blocks := newBlockBuilder().newChain(t, 0, 10, lastSettledAtHeight)
 
 	numsToBlocks := func(nums ...uint64) []*Block {
 		bs := make([]*Block, len(nums))
@@ -220,7 +217,7 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newChain(t, 0, 30, nil)
+	blocks := newBlockBuilder().newChain(t, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
@@ -366,7 +363,7 @@ func TestLastToSettleAt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			settleAt := time.Unix(int64(tt.settleAt), 0) //#nosec G115 -- Hard-coded, non-overflowing values
-			got, gotOK, err := LastToSettleAt(hookstest.NewStub(0), settleAt, tt.parent)
+			got, gotOK, err := LastToSettleAt(settleAt, tt.parent)
 			if err != nil || gotOK != tt.wantOK {
 				t.Fatalf("LastToSettleAt(%d, [parent height %d]) got (_, %t, %v); want (_, %t, nil)", tt.settleAt, tt.parent.Height(), gotOK, err, tt.wantOK)
 			}
