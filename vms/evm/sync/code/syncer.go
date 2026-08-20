@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -162,12 +161,6 @@ var errSyncAlreadyRun = errors.New("code syncer has already run")
 // Sync MUST be called at most once. A cancelled Sync leaves hashes claimed but
 // unfetched, and only the recovery in [NewSyncer] re-enqueues them, so each
 // attempt needs a fresh Syncer.
-// Name returns a human-readable name for logging.
-func (*Syncer) Name() string { return "Code Syncer" }
-
-// ID returns the stable identifier used for deduplication and metrics.
-func (*Syncer) ID() string { return "state_code_sync" }
-
 func (s *Syncer) Sync(ctx context.Context) error {
 	if !s.started.CompareAndSwap(false, true) {
 		return errSyncAlreadyRun
@@ -303,8 +296,6 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 }
 
 var (
-	_ types.Syncer = (*Syncer)(nil)
-
 	errCodeCountMismatch = errors.New("code response count does not match requested hashes")
 	errCodeHashMismatch  = errors.New("code does not hash to the requested value")
 )
