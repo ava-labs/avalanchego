@@ -55,6 +55,7 @@ func accountLeaf(t *testing.T, storageRoot, codeHash common.Hash) []byte {
 
 // TestAccountLeaves_DecodesAndDiscovers checks a snapshot is written per leaf and only non-empty storage roots and code hashes are discovered.
 func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
+	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
 	reg := &fakeRegistry{}
@@ -90,6 +91,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 
 // TestAccountLeaves_RejectsMalformedAccount checks an undecodable account leaf errors and discovers nothing.
 func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
+	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
 	reg := &fakeRegistry{}
@@ -102,6 +104,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 }
 
 func TestAccountLeafIterator(t *testing.T) {
+	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 
 	hashes := []common.Hash{common.HexToHash("0x11"), common.HexToHash("0x33"), common.HexToHash("0x55")}
@@ -141,6 +144,7 @@ func TestAccountLeafIterator(t *testing.T) {
 }
 
 func TestStorageLeafIterator(t *testing.T) {
+	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	account := common.HexToHash("0xaa")
 	other := common.HexToHash("0xbb")
