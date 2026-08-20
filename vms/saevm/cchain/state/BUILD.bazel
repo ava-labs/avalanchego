@@ -68,6 +68,7 @@ go_test(
         "//vms/components/avax",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
+        "//vms/saevm/saetest",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary",
         "@com_github_ava_labs_libevm//common",

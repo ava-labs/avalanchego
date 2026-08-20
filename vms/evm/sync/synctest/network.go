@@ -4,14 +4,73 @@
 package synctest
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 )
+
+// NewSelfNetwork returns a single-node [p2p.Network] that loops requests back
+// to its own handlers, and a [p2p.PeerTracker] that selects that node.
+func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.Network, *p2p.PeerTracker) {
+	t.Helper()
+
+	log := loggingtest.New(t, logging.Debug)
+
+	sender := &enginetest.Sender{}
+	net, err := p2p.NewNetwork(log, sender, prometheus.NewRegistry(), "")
+	require.NoError(t, err)
+
+	// Waiting in cleanup keeps require on the test goroutine, where it is safe.
+	var deliveries errgroup.Group
+	t.Cleanup(func() {
+		require.NoError(t, deliveries.Wait(), "loopback delivery must not fail")
+	})
+
+	// Loop each send back into the same network asynchronously to avoid
+	// deadlocking when the response is delivered on the sending goroutine.
+	sender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+		for range nodeIDs {
+			deliveries.Go(func() error {
+				return net.AppRequest(ctx, nodeID, requestID, time.Time{}, requestBytes)
+			})
+		}
+		return nil
+	}
+	sender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
+		deliveries.Go(func() error {
+			return net.AppResponse(ctx, nodeID, requestID, responseBytes)
+		})
+		return nil
+	}
+	sender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, code int32, message string) error {
+		deliveries.Go(func() error {
+			return net.AppRequestFailed(ctx, nodeID, requestID, &common.AppError{Code: code, Message: message})
+		})
+		return nil
+	}
+
+	require.NoError(t, net.Connected(ctx, nodeID, version.Current))
+
+	tracker, err := p2p.NewPeerTracker(log, "synctest_peer_tracker", prometheus.NewRegistry(), nil, nil)
+	require.NoError(t, err)
+	tracker.Connected(nodeID, version.Current)
+
+	return net, tracker
+}
 
 // reserved is every [common.AppError] a sync handler can return without
 // declaring it, so a per-RPC sentinel must avoid all of them.

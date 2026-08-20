@@ -36,6 +36,7 @@ type Stub struct {
 	InvalidOpIDs            set.Set[ids.ID]
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
+	VerifyBlockSyntaxFn     func(*types.Block) error
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
 	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
@@ -231,6 +232,15 @@ func getHeaderExtra(hdr *types.Header) *extra {
 		panic(err)
 	}
 	return &e
+}
+
+// VerifyBlockSyntax proxies to [Stub.VerifyBlockSyntaxFn] if non-nil,
+// otherwise it accepts all blocks.
+func (s *Stub) VerifyBlockSyntax(b *types.Block) error {
+	if fn := s.VerifyBlockSyntaxFn; fn != nil {
+		return fn(b)
+	}
+	return nil
 }
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
