@@ -7,9 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"slices"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,18 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
-
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // A sync leaves goroutines behind if teardown breaks.
@@ -42,10 +36,10 @@ func TestMain(m *testing.M) {
 
 type (
 	sutConfig struct {
-		codeDB      ethdb.Database
-		target      ethdb.Database
-		threshold   uint64
-		leafHandler p2p.Handler
+		codeDB        ethdb.Database
+		target        ethdb.Database
+		threshold     uint64
+		leafResponder leafResponder
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -71,10 +65,10 @@ func withThreshold(n uint64) sutOption {
 	})
 }
 
-// withLeafHandler replaces the leaf handler, to count or tamper with responses.
-func withLeafHandler(h p2p.Handler) sutOption {
+// withLeafResponder replaces the leaf responder, to count or tamper with responses.
+func withLeafResponder(r leafResponder) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.leafHandler = h
+		c.leafResponder = r
 	})
 }
 
@@ -95,18 +89,20 @@ func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root com
 		target: rawdb.NewMemoryDatabase(),
 	}, opts...)
 
+	log := loggingtest.New(t, logging.Debug)
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	if cfg.leafHandler != nil {
-		require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, cfg.leafHandler))
+	if cfg.leafResponder != nil {
+		require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID,
+			handlers.NewHandler(log, cfg.leafResponder)))
 	} else {
-		require.NoError(t, RegisterHandler(logging.NoLog{}, net, trieDB, common.HashLength))
+		require.NoError(t, RegisterHandler(log, net, trieDB, common.HashLength))
 	}
-	require.NoError(t, code.RegisterHandler(logging.NoLog{}, net, cfg.codeDB))
+	require.NoError(t, code.RegisterHandler(log, net, cfg.codeDB))
 
-	codeSyncer, err := code.NewSyncer(logging.NoLog{}, code.NewClient(net, tracker), cfg.target)
+	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), code.NewClient(net, tracker), cfg.target)
 	require.NoError(t, err)
 
-	state, err := NewHashDBSyncer(logging.NoLog{}, NewClient(net, tracker), cfg.target, root, codeSyncer)
+	state, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), cfg.target, root, codeSyncer)
 	require.NoError(t, err)
 	if cfg.threshold > 0 {
 		state.threshold = cfg.threshold
@@ -135,20 +131,6 @@ func (s *SUT) sync(t *testing.T, ctx context.Context) error {
 	require.NoError(t, s.state.Finalize())
 
 	return syncErr
-}
-
-// cancelAfterN cancels once the n-th request arrives. A non-positive n never cancels.
-func cancelAfterN(inner p2p.Handler, n int32, cancel context.CancelFunc) (p2p.Handler, *atomic.Int32) {
-	var requests atomic.Int32
-	h := p2p.TestHandler{
-		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, b []byte) ([]byte, *avacommon.AppError) {
-			if got := requests.Add(1); n > 0 && got >= n {
-				cancel()
-			}
-			return inner.AppRequest(ctx, nodeID, deadline, b)
-		},
-	}
-	return h, &requests
 }
 
 func TestHashDBSyncer_Reconstruction(t *testing.T) {
@@ -206,10 +188,10 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 		storageRoot = root
 	}
 
-	handler, starts := recordLeafStarts(leafHandlerFor(f.TrieDB), storageRoot)
+	counter := countingLeafResponder(t, f.TrieDB)
 	sut := newSUT(t, ctx, f.TrieDB, f.Root,
 		withCodeDB(f.CodeDB),
-		withLeafHandler(handler),
+		withLeafResponder(counter),
 		withThreshold(1), // force the storage trie to segment
 	)
 	require.NoError(t, sut.sync(t, ctx))
@@ -223,38 +205,17 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 	}
 
 	var onBoundary int
-	for _, start := range starts() {
-		if boundaries.Contains(string(start)) {
+	for _, req := range counter.Requests() {
+		if !bytes.Equal(req.GetRootHash(), storageRoot.Bytes()) {
+			continue
+		}
+		if boundaries.Contains(string(req.GetStartKey())) {
 			onBoundary++
 		}
 	}
 	require.Positive(t, onBoundary, "the storage trie must have been fetched in segments")
 
 	requireStorageReconstructed(t, sut.Target(), f.Storage)
-}
-
-// recordLeafStarts records the StartKey of every leaf request for root.
-func recordLeafStarts(inner p2p.Handler, root common.Hash) (p2p.Handler, func() [][]byte) {
-	var (
-		lock   sync.Mutex
-		starts [][]byte
-	)
-	h := p2p.TestHandler{
-		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, b []byte) ([]byte, *avacommon.AppError) {
-			req := &syncpb.GetLeafRequest{}
-			if err := proto.Unmarshal(b, req); err == nil && bytes.Equal(req.GetRootHash(), root.Bytes()) {
-				lock.Lock()
-				starts = append(starts, req.GetStartKey())
-				lock.Unlock()
-			}
-			return inner.AppRequest(ctx, nodeID, deadline, b)
-		},
-	}
-	return h, func() [][]byte {
-		lock.Lock()
-		defer lock.Unlock()
-		return slices.Clone(starts)
-	}
 }
 
 // Another root's leaves in the snapshot must fail the root check, and pass once
@@ -351,7 +312,7 @@ func TestHashDBSyncer_StorageTrieDoneReturnsSlot(t *testing.T) {
 
 			s := &HashDBSyncer{
 				scheduler: scheduler,
-				stats:     newTrieSyncStats(logging.NoLog{}),
+				stats:     newTrieSyncStats(loggingtest.New(t, logging.Debug)),
 				trieQueue: newTrieQueue(db),
 			}
 
@@ -416,7 +377,7 @@ func requireStorageReconstructed(t *testing.T, target ethdb.Database, storage ma
 func TestNewHashDBSyncer_Validation(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
-	codeSyncer, err := code.NewSyncer(logging.NoLog{}, nil, db)
+	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), nil, db)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -430,7 +391,7 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewHashDBSyncer(logging.NoLog{}, nil, db, tt.root, tt.code)
+			_, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, tt.root, tt.code)
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
@@ -441,10 +402,10 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 func TestHashDBSyncer_FinalizeBeforeSync(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
-	codeSyncer, err := code.NewSyncer(logging.NoLog{}, nil, db)
+	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), nil, db)
 	require.NoError(t, err)
 
-	s, err := NewHashDBSyncer(logging.NoLog{}, nil, db, common.HexToHash("0xabc"), codeSyncer)
+	s, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), codeSyncer)
 	require.NoError(t, err)
 	require.NoError(t, s.Finalize())
 }
@@ -456,9 +417,9 @@ func TestHashDBSyncer_CancelPropagates(t *testing.T) {
 	f := synctest.NewStateFixture(t, []synctest.AccountDesc{{WithCode: true}, {WithCode: true}})
 
 	// Every response tampered, so only cancellation can end it.
-	handler, _ := cancelAfterN(flakyLeafHandler(f.TrieDB, -1), 5, cancel)
+	r := synctest.NewCancelAfter(flakyLeafResponder(t, f.TrieDB, -1), 5, cancel)
 
-	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafHandler(handler))
+	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafResponder(r))
 	require.ErrorIs(t, sut.sync(t, ctx), context.Canceled)
 }
 
@@ -474,7 +435,7 @@ func TestHashDBSyncer_ResumesAfterInterrupt(t *testing.T) {
 	require.NoError(t, err)
 	requireReconstructed(t, fresh, root, keys, vals)
 	requireAccountSnapshots(t, fresh, keys)
-	require.Greater(t, fullReqs, int32(4), "the trie must take several requests to segment and sync")
+	require.Greater(t, fullReqs, 4, "the trie must take several requests to segment and sync")
 
 	// Interrupt a fresh target partway through.
 	target := rawdb.NewMemoryDatabase()
@@ -491,27 +452,18 @@ func TestHashDBSyncer_ResumesAfterInterrupt(t *testing.T) {
 
 // runResumableSync syncs into target with segmentation forced on, cancelling after
 // cancelAfter requests when positive.
-func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, target ethdb.Database, cancelAfter int32) (int32, error) {
+func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, target ethdb.Database, cancelAfter int) (int, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	handler, requests := cancelAfterN(leafHandlerFor(trieDB), cancelAfter, cancel)
+	counter := countingLeafResponder(t, trieDB)
 	sut := newSUT(t, ctx, trieDB, root,
 		withTarget(target),
 		withThreshold(1), // force segmentation
-		withLeafHandler(handler),
+		withLeafResponder(synctest.NewCancelAfter(counter, cancelAfter, cancel)),
 	)
 
 	syncErr := sut.sync(t, ctx)
-	return requests.Load(), syncErr
-}
-
-// leafHandlerFor returns the production leaf handler, for tests that wrap it.
-func leafHandlerFor(trieDB *triedb.Database) p2p.Handler {
-	return handlers.NewHandler[syncpb.GetLeafRequest](
-		logging.NoLog{},
-		newResponder(logging.NoLog{}, trieDB, common.HashLength, nil),
-	)
-
+	return len(counter.Requests()), syncErr
 }
