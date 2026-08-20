@@ -46,7 +46,6 @@ var (
 	_ SnapshotReader                                                      = (*snapshot.Tree)(nil)
 )
 
-// responder is bound to one (trieDB, key-length, snapshot) tuple.
 type responder struct {
 	log           logging.Logger
 	trieDB        *triedb.Database
@@ -104,8 +103,6 @@ const (
 	// iteration, which only an invalid snapshot range forces.
 	snapshotReadDeadlinePercent = 75
 
-	// snapshotSegmentLen is the per-segment validation granularity for
-	// the snapshot slow path.
 	snapshotSegmentLen = 64
 )
 
@@ -207,13 +204,12 @@ func (q *query) wholeTrie(more bool) bool {
 	return len(q.startKey) == 0 && !more
 }
 
-// atLimit reports that the response holds every leaf the request allows.
 func (q *query) atLimit() bool {
 	return len(q.resp.Keys) >= int(q.limit)
 }
 
-// appendLeaves appends as many leaves as the limit allows, reporting how many
-// were kept so the caller can tell a whole segment from a trimmed one.
+// appendLeaves appends what the limit allows. kept below len(keys) means the
+// segment was trimmed.
 func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
 	kept = min(len(keys), int(q.limit)-len(q.resp.Keys))
 	q.resp.Keys = append(q.resp.Keys, keys[:kept]...)
@@ -316,10 +312,8 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	return q.fillFromSegments(ctx, snapKeys, snapVals)
 }
 
-// fillFromSegments serves the range one fixed-size segment at a time, for a
-// snapshot that diverges from the trie somewhere. A segment that proves against
-// the trie is appended, one that fails leaves a gap the next good segment
-// bridges by iterating the trie across it.
+// fillFromSegments serves a diverged snapshot one segment at a time. A segment
+// that fails leaves a gap the next good segment bridges from the trie.
 //
 // snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] diverged:
 //
@@ -329,10 +323,8 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 //	                append past E -> resp=[A B C D E]
 func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byte) (done bool, _ error) {
 	hasGap := false
-	// Whether the trie holds keys past the response. Only a proved segment
-	// answers it, so it starts pessimistic. A stale answer from an unproved
-	// trailing segment is safe, collect re-derives it whenever the response
-	// is short of the limit.
+	// Only a proved segment answers this, so it starts pessimistic. A stale
+	// answer is safe, collect re-derives it below the limit.
 	trieHasMore := true
 
 	for i := 0; i < len(snapKeys) && ctx.Err() == nil; i += snapshotSegmentLen {
@@ -472,8 +464,7 @@ func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ erro
 	return more, it.Err
 }
 
-// nextKey returns the trie iteration start: a byte-incremented copy
-// of the last response key, or the request start when empty.
+// nextKey returns where trie iteration resumes after the response.
 func (q *query) nextKey() []byte {
 	if len(q.resp.Keys) == 0 {
 		return q.startKey
@@ -511,9 +502,8 @@ func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proofDB *mem
 	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proofDB)
 }
 
-// isRangeValid range-proves keys/vals against the trie. hasGap starts the proof
-// at keys[0] so it stands alone, otherwise it starts at nextKey() so the keys
-// can be appended to the response directly.
+// isRangeValid range-proves keys/vals against the trie. hasGap proves from
+// keys[0] so the range stands alone rather than extending the response.
 func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (proofDB *memorydb.Database, valid, more bool, _ error) {
 	var startKey []byte
 	if hasGap {
@@ -530,7 +520,6 @@ func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (proofDB *memoryd
 	return proofDB, proofErr == nil, more, nil
 }
 
-// iteratorValues drains a memorydb iterator into a slice of values.
 func iteratorValues(db *memorydb.Database) ([][]byte, error) {
 	if db == nil {
 		return nil, nil
@@ -545,9 +534,8 @@ func iteratorValues(db *memorydb.Database) ([][]byte, error) {
 	return out, it.Error()
 }
 
-// incrementBytes adds 1 to b in place, with carry.
-// Example: [0x01, 0xff] becomes [0x02, 0x00].
-// All-0xff wraps to all-zeros.
+// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to
+// all-zeros.
 func incrementBytes(b []byte) {
 	for i := len(b) - 1; i >= 0; i-- {
 		if b[i] < 0xff {

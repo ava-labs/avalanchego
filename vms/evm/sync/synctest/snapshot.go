@@ -57,7 +57,6 @@ func RequireRootRetired(t *testing.T, tree *SnapshotTree, root common.Hash) {
 	}
 }
 
-// StaticPair is one key/value entry.
 type StaticPair struct {
 	K, V []byte
 }
@@ -94,7 +93,6 @@ func (s *StaticSnapshot) StorageIterator(root, account, seek common.Hash) (snaps
 	return &staticStorageIter{pairs: seekPairs(s.Storage[account], seek), idx: -1, err: s.IterErr}, nil
 }
 
-// seekPairs drops the entries ordered before seek.
 func seekPairs(pairs []StaticPair, seek common.Hash) []StaticPair {
 	i := 0
 	for i < len(pairs) && bytes.Compare(pairs[i].K, seek.Bytes()) < 0 {
@@ -160,7 +158,6 @@ type snapshotReads struct {
 	reads []SnapshotRead
 }
 
-// Reads returns every iterator opened, naming the layer each read.
 func (s *snapshotReads) Reads() []SnapshotRead {
 	s.mu.Lock()
 	defer s.mu.Unlock()
