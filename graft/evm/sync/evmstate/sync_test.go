@@ -37,8 +37,6 @@ import (
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
-const testRequestSize = 1024
-
 var errInterrupted = errors.New("interrupted sync")
 
 type syncTest struct {

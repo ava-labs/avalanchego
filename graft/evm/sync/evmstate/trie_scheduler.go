@@ -7,8 +7,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 )
 
 // trieScheduler admits tries to the shared leaf fetcher, feeding each one's segments

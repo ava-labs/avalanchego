@@ -16,8 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/leafproto"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+
 	vmsevmstate "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
@@ -28,8 +30,8 @@ func ServeLeaves(t *testing.T, ctx context.Context, trieDB *triedb.Database) typ
 	t.Helper()
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, vmsevmstate.RegisterHandler(log, net, trieDB, common.HashLength))
-	return leafproto.NewClient(log, vmsevmstate.NewClient(net, tracker))
+	require.NoError(t, vmsevmstate.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
+	return leafproto.NewClient(log, vmsevmstate.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker))
 }
 
 // RecordLeaves is [ServeLeaves] with every range recorded.
