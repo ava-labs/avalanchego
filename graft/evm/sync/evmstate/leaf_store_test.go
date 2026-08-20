@@ -10,12 +10,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 )
 
 type fakeCodeQueue struct {
@@ -42,7 +43,7 @@ func (f *fakeRegistry) RegisterStorageTrie(root, account common.Hash) error {
 
 func accountLeaf(t *testing.T, storageRoot, codeHash common.Hash) []byte {
 	t.Helper()
-	acc := types.StateAccount{
+	acc := ethtypes.StateAccount{
 		Nonce:    1,
 		Balance:  uint256.NewInt(1000),
 		Root:     storageRoot,
@@ -66,13 +67,13 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 
 	keys := [][]byte{synctest.HashedKey(1), synctest.HashedKey(2), synctest.HashedKey(3)}
 	vals := [][]byte{
-		accountLeaf(t, types.EmptyRootHash, types.EmptyCodeHash), // plain account
-		accountLeaf(t, storageRoot, types.EmptyCodeHash),         // storage only
-		accountLeaf(t, types.EmptyRootHash, codeHash),            // code only
+		accountLeaf(t, ethtypes.EmptyRootHash, ethtypes.EmptyCodeHash), // plain account
+		accountLeaf(t, storageRoot, ethtypes.EmptyCodeHash),            // storage only
+		accountLeaf(t, ethtypes.EmptyRootHash, codeHash),               // code only
 	}
 
 	batch := db.NewBatch()
-	require.NoError(t, leaves.writeLeaves(t.Context(), batch, leafBatch{keys: keys, vals: vals}))
+	require.NoError(t, leaves.writeLeaves(t.Context(), batch, types.Leaves{Keys: keys, Vals: vals}))
 
 	// Only the non-empty storage root is registered, keyed to its account.
 	require.Len(t, reg.tries, 1)
@@ -97,9 +98,9 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	reg := &fakeRegistry{}
 	leaves := newAccountLeafStore(db, queue, reg)
 
-	err := leaves.writeLeaves(t.Context(), db.NewBatch(), leafBatch{
-		keys: [][]byte{synctest.HashedKey(1)},
-		vals: [][]byte{[]byte("not-a-valid-rlp-account")},
+	err := leaves.writeLeaves(t.Context(), db.NewBatch(), types.Leaves{
+		Keys: [][]byte{synctest.HashedKey(1)},
+		Vals: [][]byte{[]byte("not-a-valid-rlp-account")},
 	})
 	require.ErrorIs(t, err, errDecodeAccount)
 	require.Empty(t, reg.tries, "a malformed account must register no storage trie")
@@ -111,16 +112,16 @@ func TestAccountLeafIterator(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 
 	hashes := []common.Hash{common.HexToHash("0x11"), common.HexToHash("0x33"), common.HexToHash("0x55")}
-	accounts := make(map[common.Hash]types.StateAccount, len(hashes))
+	accounts := make(map[common.Hash]ethtypes.StateAccount, len(hashes))
 	for i, h := range hashes {
-		acc := types.StateAccount{
+		acc := ethtypes.StateAccount{
 			Nonce:    uint64(i + 1),
 			Balance:  uint256.NewInt(uint64(i+1) * 100),
-			Root:     types.EmptyRootHash,
-			CodeHash: types.EmptyCodeHash.Bytes(),
+			Root:     ethtypes.EmptyRootHash,
+			CodeHash: ethtypes.EmptyCodeHash.Bytes(),
 		}
 		accounts[h] = acc
-		rawdb.WriteAccountSnapshot(db, h, types.SlimAccountRLP(acc))
+		rawdb.WriteAccountSnapshot(db, h, ethtypes.SlimAccountRLP(acc))
 	}
 
 	// Full walk yields sorted keys and full-RLP values that decode back.
@@ -131,7 +132,7 @@ func TestAccountLeafIterator(t *testing.T) {
 		key := common.BytesToHash(it.Key())
 		got = append(got, key)
 
-		var decoded types.StateAccount
+		var decoded ethtypes.StateAccount
 		require.NoError(t, rlp.DecodeBytes(it.Value(), &decoded))
 		require.Equal(t, accounts[key].Nonce, decoded.Nonce)
 		require.Equal(t, accounts[key].Balance, decoded.Balance)

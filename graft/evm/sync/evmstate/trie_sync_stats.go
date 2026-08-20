@@ -4,6 +4,7 @@
 package evmstate
 
 import (
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -98,7 +99,14 @@ func (t *trieSyncStats) estimateSegmentsInProgressTime() time.Duration {
 		}
 	}
 	perThreadRate := (t.leavesRate.Read() + epsilon) / float64(len(t.remainingLeaves))
-	return time.Duration(float64(maxLeaves)/perThreadRate) * time.Second
+
+	// A near-zero rate makes this exceed int64, which wraps to a negative
+	// duration, so saturate instead.
+	seconds := float64(maxLeaves) / perThreadRate
+	if seconds >= float64(math.MaxInt64/int64(time.Second)) {
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // updateETA refreshes the leaf rate and logs the current ETA.

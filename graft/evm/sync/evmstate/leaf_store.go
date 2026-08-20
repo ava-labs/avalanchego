@@ -10,7 +10,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 )
@@ -31,7 +33,7 @@ type storageRegistry interface {
 // leafStore is the seam the reconstruction writes leaves through, and reads them back
 // from in key order. What a leaf means differs for accounts and storage.
 type leafStore interface {
-	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error
+	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves types.Leaves) error
 	iterateLeaves(seek common.Hash) ethdb.Iterator
 }
 
@@ -52,25 +54,25 @@ func newAccountLeafStore(db ethdb.KeyValueStore, codeSyncer codeEnqueuer, trieQu
 
 // writeLeaves writes account snapshots, discovering storage tries and code as it goes.
 // Batch capping is the segment's job.
-func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves types.Leaves) error {
 	var codeHashes []common.Hash
-	for i, key := range batch.keys {
+	for i, key := range leaves.Keys {
 		accountHash := common.BytesToHash(key)
-		var acc types.StateAccount
-		if err := rlp.DecodeBytes(batch.vals[i], &acc); err != nil {
-			return fmt.Errorf("%w %s (len %d): %w", errDecodeAccount, accountHash, len(batch.vals[i]), err)
+		var acc ethtypes.StateAccount
+		if err := rlp.DecodeBytes(leaves.Vals[i], &acc); err != nil {
+			return fmt.Errorf("%w %s (len %d): %w", errDecodeAccount, accountHash, len(leaves.Vals[i]), err)
 		}
 
 		writeAccountSnapshot(db, accountHash, acc)
 
-		if acc.Root != (common.Hash{}) && acc.Root != types.EmptyRootHash {
+		if acc.Root != (common.Hash{}) && acc.Root != ethtypes.EmptyRootHash {
 			if err := s.trieQueue.RegisterStorageTrie(acc.Root, accountHash); err != nil {
 				return err
 			}
 		}
 
 		codeHash := common.BytesToHash(acc.CodeHash)
-		if codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash {
+		if codeHash != (common.Hash{}) && codeHash != ethtypes.EmptyCodeHash {
 			codeHashes = append(codeHashes, codeHash)
 		}
 	}
@@ -83,8 +85,8 @@ func (s *accountLeafStore) iterateLeaves(seek common.Hash) ethdb.Iterator {
 }
 
 // writeAccountSnapshot stores acc in slim form, omitting empty code and storage.
-func writeAccountSnapshot(db ethdb.KeyValueWriter, accHash common.Hash, acc types.StateAccount) {
-	rawdb.WriteAccountSnapshot(db, accHash, types.SlimAccountRLP(acc))
+func writeAccountSnapshot(db ethdb.KeyValueWriter, accHash common.Hash, acc ethtypes.StateAccount) {
+	rawdb.WriteAccountSnapshot(db, accHash, ethtypes.SlimAccountRLP(acc))
 }
 
 // storageLeafStore writes each leaf to every account sharing this trie's root.
@@ -102,13 +104,13 @@ func newStorageLeafStore(db ethdb.KeyValueStore, accounts []common.Hash) *storag
 
 // writeLeaves writes each leaf once per sharing account. Batch capping is the
 // segment's job.
-func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves types.Leaves) error {
 	for _, account := range s.accounts {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		for i, key := range batch.keys {
-			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), batch.vals[i])
+		for i, key := range leaves.Keys {
+			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), leaves.Vals[i])
 		}
 	}
 	return nil
@@ -144,7 +146,7 @@ func (it *accountLeafIterator) Next() bool {
 		it.val = nil
 		return false
 	}
-	it.val, it.err = types.FullAccountRLP(it.Iterator.Value())
+	it.val, it.err = ethtypes.FullAccountRLP(it.Iterator.Value())
 	return it.err == nil
 }
 
