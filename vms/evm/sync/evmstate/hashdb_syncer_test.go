@@ -188,10 +188,10 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 		storageRoot = root
 	}
 
-	counter := countingLeafResponder(t, f.TrieDB)
+	recorder := recordingLeafResponder(t, f.TrieDB)
 	sut := newSUT(t, ctx, f.TrieDB, f.Root,
 		withCodeDB(f.CodeDB),
-		withLeafResponder(counter),
+		withLeafResponder(recorder),
 		withThreshold(1), // force the storage trie to segment
 	)
 	require.NoError(t, sut.sync(t, ctx))
@@ -205,7 +205,7 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 	}
 
 	var onBoundary int
-	for _, req := range counter.Requests() {
+	for _, req := range recorder.Requests() {
 		if !bytes.Equal(req.GetRootHash(), storageRoot.Bytes()) {
 			continue
 		}
@@ -457,13 +457,13 @@ func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, t
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	counter := countingLeafResponder(t, trieDB)
+	recorder := recordingLeafResponder(t, trieDB)
 	sut := newSUT(t, ctx, trieDB, root,
 		withTarget(target),
 		withThreshold(1), // force segmentation
-		withLeafResponder(synctest.NewCancelAfter(counter, cancelAfter, cancel)),
+		withLeafResponder(synctest.NewCancelAfter(recorder, cancelAfter, cancel)),
 	)
 
 	syncErr := sut.sync(t, ctx)
-	return len(counter.Requests()), syncErr
+	return len(recorder.Requests()), syncErr
 }
