@@ -23,11 +23,13 @@ import (
 )
 
 // duration is a [time.Duration] that JSON-unmarshals from a duration string
-// (e.g. "10s").
+// parsed by [time.ParseDuration] (e.g. "10s", "2h45m"). Valid units are "ns",
+// "us", "ms", "s", "m" and "h".
 type duration struct {
 	time.Duration
 }
-var _  json.Marshaler = (*duration)(nil)
+
+var _ json.Marshaler = (*duration)(nil)
 
 func (d *duration) UnmarshalJSON(b []byte) error {
 	var s string
