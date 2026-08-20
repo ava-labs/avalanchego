@@ -280,6 +280,13 @@ func (c *client) startAsync(executor Executor, summary message.Syncable) block.S
 	go func() {
 		defer c.wg.Done()
 		defer cancel()
+		// The queue outlives the syncers that feed it, so release it here on
+		// every path rather than only at node shutdown.
+		defer func() {
+			if c.codeQueue != nil {
+				c.codeQueue.Shutdown()
+			}
+		}()
 
 		if err := executor.Execute(ctx, summary); err != nil {
 			c.err = err

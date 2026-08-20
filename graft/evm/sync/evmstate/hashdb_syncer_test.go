@@ -107,6 +107,7 @@ func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root com
 
 	queue, err := code.NewQueue(cfg.target)
 	require.NoError(t, err)
+	t.Cleanup(queue.Shutdown)
 	codeSyncer, err := code.NewSyncer(server, cfg.target, queue.CodeHashes())
 	require.NoError(t, err)
 
@@ -401,7 +402,7 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
 		root    common.Hash
-		code    *code.Queue
+		code    codeProducer
 		wantErr error
 	}{
 		{name: "zero_root", root: common.Hash{}, code: queue, wantErr: errRootRequired},

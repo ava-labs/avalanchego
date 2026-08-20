@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,6 +27,15 @@ var (
 	errCodeQueueRequired = errors.New("code queue is required")
 )
 
+// codeProducer is the producer side of the code sync. The engine owns the
+// queue's teardown, so this syncer only adds hashes and declares when it is done.
+type codeProducer interface {
+	codeEnqueuer
+	// CloseInput reports that no more hashes will be added. It must not block,
+	// because the consumer drains under the same context as this syncer.
+	CloseInput()
+}
+
 // HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
 // first, then every storage trie it discovers, each split into concurrently fetched
 // segments. Contract code goes to a [code.Queue] drained alongside Sync.
@@ -36,7 +44,7 @@ type HashDBSyncer struct {
 	fetcher   types.LeafFetcher
 	db        ethdb.Database
 	root      common.Hash
-	codeQueue *code.Queue
+	codeQueue codeProducer
 	trieQueue *trieQueue
 	stats     *trieSyncStats
 	threshold uint64 // leaf count above which a trie splits into segments
@@ -55,7 +63,7 @@ type HashDBSyncer struct {
 // The caller must wipe the account and storage snapshots in db unless this run resumes
 // the root already persisted there. Leaves left behind count as resume progress, so
 // another root's leaves would fail the final root check on every attempt.
-func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue *code.Queue) (*HashDBSyncer, error) {
+func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue codeProducer) (*HashDBSyncer, error) {
 	if root == (common.Hash{}) {
 		return nil, errRootRequired
 	}
@@ -82,9 +90,6 @@ func (*HashDBSyncer) ID() string { return "state_evm_state_sync" }
 // Sync reconstructs the account trie, then every discovered storage trie, verifying
 // each root.
 func (s *HashDBSyncer) Sync(ctx context.Context) error {
-	// No more code is discovered once Sync returns, however it ends.
-	defer s.codeQueue.Shutdown()
-
 	// Wipe stale markers so resume never builds on another target's progress.
 	if err := s.trieQueue.clearIfRootDoesNotMatch(s.root); err != nil {
 		return err
@@ -147,10 +152,8 @@ func (s *HashDBSyncer) Finalize() error {
 // onMainTrieDone runs when the account trie is verified. Only account leaves
 // carry code hashes, so it closes the code syncer's input and opens the gate
 // for storage tries.
-func (s *HashDBSyncer) onMainTrieDone(ctx context.Context) error {
-	if err := s.finalizeCodeQueue(ctx); err != nil {
-		return err
-	}
+func (s *HashDBSyncer) onMainTrieDone(context.Context) error {
+	s.codeQueue.CloseInput()
 
 	remaining, err := s.trieQueue.countTries()
 	if err != nil {
@@ -208,26 +211,5 @@ func (s *HashDBSyncer) storageTrieDone(root common.Hash) func(context.Context) e
 		}
 		s.stats.trieDone(root)
 		return nil
-	}
-}
-
-// finalizeCodeQueue drains the queue to completion, abandoning the drain if ctx
-// ends so a stopped consumer cannot wedge the sync. Unsent hashes stay on disk
-// as markers and recover on the next run.
-func (s *HashDBSyncer) finalizeCodeQueue(ctx context.Context) error {
-	done := make(chan struct{})
-	var finalizeErr error
-	go func() {
-		defer close(done)
-		finalizeErr = s.codeQueue.Finalize()
-	}()
-
-	select {
-	case <-done:
-		return finalizeErr
-	case <-ctx.Done():
-		s.codeQueue.Shutdown()
-		<-done
-		return ctx.Err()
 	}
 }
