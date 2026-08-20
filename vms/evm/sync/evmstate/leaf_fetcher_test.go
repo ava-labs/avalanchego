@@ -6,7 +6,6 @@ package evmstate
 import (
 	"bytes"
 	"context"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,18 +19,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestVerifyLeaves(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
-	r := newResponder(logging.NoLog{}, trieDB, common.HashLength)
+	r := newLeafResponder(t, trieDB)
 
 	// A fixture. TestResponder_Serves owns the partial-proof rule.
 	partial, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 20})
@@ -112,15 +111,16 @@ func (r *recordingTask) OnFinish(context.Context) error {
 }
 
 // runLeafTask drives one task through a single worker.
-func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk task) error {
+func runLeafTask(t *testing.T, ctx context.Context, r leafResponder, tk task) error {
 	t.Helper()
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
+	log := loggingtest.New(t, logging.Debug)
+	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID, r)
 
 	tasks := make(chan task, 1)
 	tasks <- tk
 	close(tasks)
-	return newLeafFetcher(logging.NoLog{}, NewClient(net, tracker), tasks, 1).sync(ctx)
+
+	return newLeafFetcher(log, NewClient(net, tracker), tasks, 1).sync(ctx)
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
@@ -128,7 +128,7 @@ func TestLeafFetch_Batching(t *testing.T) {
 	tests := []struct {
 		name         string
 		numKeys      int
-		wantRequests int32
+		wantRequests int
 	}{
 		{
 			name:         "single batch",
@@ -160,12 +160,12 @@ func TestLeafFetch_Batching(t *testing.T) {
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, _ := synctest.FillTrie(t, trieDB, tt.numKeys)
-			handler, requests := countingLeafHandler(trieDB)
+			counter := countingLeafResponder(t, trieDB)
 
 			tk := &recordingTask{root: root}
-			require.NoError(t, runLeafTask(t, ctx, handler, tk))
+			require.NoError(t, runLeafTask(t, ctx, counter, tk))
 
-			require.Equal(t, tt.wantRequests, requests.Load())
+			require.Len(t, counter.Requests(), tt.wantRequests)
 			require.Equal(t, keys, tk.keys, "every leaf must be fetched in key order")
 			require.Equal(t, 1, tk.finished, "the task must finish exactly once")
 		})
@@ -176,11 +176,9 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
-	handler, _ := countingLeafHandler(trieDB)
-
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	require.ErrorIs(t, runLeafTask(t, ctx, handler, &recordingTask{root: root}), context.Canceled)
+	require.ErrorIs(t, runLeafTask(t, ctx, countingLeafResponder(t, trieDB), &recordingTask{root: root}), context.Canceled)
 }
 
 // The re-request loop recovers from transient bad responses but never accepts a
@@ -191,8 +189,8 @@ func TestLeafFetch_BadResponses(t *testing.T) {
 	tests := []struct {
 		name string
 		// badResponses is how many responses to corrupt, negative for every one.
-		badResponses int32
-		cancelAfter  int32
+		badResponses int
+		cancelAfter  int
 		wantErr      error
 	}{
 		{
@@ -215,10 +213,10 @@ func TestLeafFetch_BadResponses(t *testing.T) {
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, _ := synctest.FillTrie(t, trieDB, 50)
-			handler, _ := cancelAfterN(flakyLeafHandler(trieDB, tt.badResponses), tt.cancelAfter, cancel)
+			r := synctest.NewCancelAfter(flakyLeafResponder(t, trieDB, tt.badResponses), tt.cancelAfter, cancel)
 
 			tk := &recordingTask{root: root}
-			err := runLeafTask(t, ctx, handler, tk)
+			err := runLeafTask(t, ctx, r, tk)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				require.Empty(t, tk.keys, "tampered leaves must not reach the task")
@@ -242,44 +240,26 @@ func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash,
 	}
 }
 
-// countingLeafHandler counts the requests it serves.
-func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
-	inner := handlers.NewHandler[syncpb.GetLeafRequest](
-		logging.NoLog{},
-		newResponder(logging.NoLog{}, trieDB, common.HashLength),
-	)
-	var requests atomic.Int32
-	h := p2p.TestHandler{
-		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
-			requests.Add(1)
-			return inner.AppRequest(c, n, d, b)
-		},
-	}
-	return h, &requests
+type (
+	// leafResponder is the shape every leaf fixture composes over.
+	leafResponder = handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+	leafCounter   = synctest.RecordingResponder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+)
+
+// countingLeafResponder counts the leaf requests it serves.
+func countingLeafResponder(tb testing.TB, trieDB *triedb.Database) *leafCounter {
+	return synctest.NewRecordingResponder(newLeafResponder(tb, trieDB))
 }
 
-// flakyLeafHandler corrupts the first badResponses responses. Negative corrupts all.
-func flakyLeafHandler(trieDB *triedb.Database, badResponses int32) p2p.Handler {
-	inner := newResponder(logging.NoLog{}, trieDB, common.HashLength)
-	var count atomic.Int32
-	return p2p.TestHandler{
-		AppRequestF: func(ctx context.Context, n ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *avacommon.AppError) {
-			req := &syncpb.GetLeafRequest{}
-			if err := proto.Unmarshal(requestBytes, req); err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			resp, appErr := inner.Respond(ctx, n, req)
-			if appErr != nil || resp == nil || len(resp.Values) == 0 {
-				return nil, avacommon.ErrUndefined
-			}
-			if seen := count.Add(1); badResponses < 0 || seen <= badResponses {
+// flakyLeafResponder corrupts the first badResponses responses. Negative corrupts all.
+func flakyLeafResponder(tb testing.TB, trieDB *triedb.Database, badResponses int) leafResponder {
+	return synctest.NewMutatingResponder(
+		newLeafResponder(tb, trieDB),
+		badResponses,
+		func(resp *syncpb.GetLeafResponse) {
+			if len(resp.GetValues()) > 0 {
 				resp.Values[0] = bytes.Repeat([]byte{0xff}, common.HashLength)
 			}
-			respBytes, err := proto.Marshal(resp)
-			if err != nil {
-				return nil, avacommon.ErrUndefined
-			}
-			return respBytes, nil
 		},
-	}
+	)
 }
