@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "leafproto",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/client/leafproto",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/sync/types",
+        "//proto/pb/sync",
+        "//utils/logging",
+        "//vms/evm/sync/network",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//trie",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "leafproto_test",
+    srcs = ["client_test.go"],
+    embed = [":leafproto"],
+    deps = [
+        "//graft/evm/sync/types",
+        "//ids",
+        "//proto/pb/sync",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//vms/evm/sync/evmstate",
+        "//vms/evm/sync/synctest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+    ],
+)
