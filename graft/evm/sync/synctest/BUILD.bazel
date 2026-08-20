@@ -16,6 +16,7 @@ go_library(
         "//graft/evm/sync/types",
         "//graft/evm/utils/utilstest",
         "//ids",
+        "//network/p2p",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/wrappers",

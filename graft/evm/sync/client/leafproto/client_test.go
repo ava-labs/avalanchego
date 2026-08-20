@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
@@ -29,8 +30,8 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database) *Client {
 	t.Helper()
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, evmstate.RegisterHandler(log, net, trieDB, common.HashLength))
-	return NewClient(log, evmstate.NewClient(net, tracker))
+	require.NoError(t, evmstate.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
+	return NewClient(log, evmstate.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker))
 }
 
 // rawResponse fetches a range at the wire level, so a test can build cases from
