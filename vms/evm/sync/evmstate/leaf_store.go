@@ -17,8 +17,7 @@ import (
 
 var errDecodeAccount = errors.New("could not decode account leaf")
 
-// codeEnqueuer enqueues contract-code hashes discovered while syncing the
-// account trie. Satisfied by [code.Syncer].
+// codeEnqueuer takes the code hashes discovered while syncing. Satisfied by [code.Syncer].
 type codeEnqueuer interface {
 	AddCode(ctx context.Context, hashes []common.Hash) error
 }
@@ -29,16 +28,14 @@ type storageRegistry interface {
 	RegisterStorageTrie(root, account common.Hash) error
 }
 
-// leafStore is the seam the segmented reconstruction uses: it writes
-// each verified batch to the passed segment batch (a snapshot write) and later
-// re-reads those leaves from the snapshot in key order to feed the StackTrie.
+// leafStore is the seam the reconstruction writes leaves through, and reads them back
+// from in key order. What a leaf means differs for accounts and storage.
 type leafStore interface {
-	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error
+	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error
 	iterateLeaves(seek common.Hash) ethdb.Iterator
 }
 
-// accountLeaves decodes account leaves, writes each account snapshot, registers
-// non-empty storage tries for a later sync, and enqueues non-empty code hashes.
+// accountLeaves writes each account's snapshot and discovers its storage trie and code.
 type accountLeaves struct {
 	db         ethdb.KeyValueStore
 	codeSyncer codeEnqueuer
@@ -53,15 +50,15 @@ func newAccountLeaves(db ethdb.KeyValueStore, codeSyncer codeEnqueuer, trieQueue
 	}
 }
 
-// writeLeaves decodes accounts and writes their snapshots to db, discovering
-// storage tries and code as it goes. Batch capping is the segment's job.
-func (s *accountLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
+// writeLeaves writes account snapshots, discovering storage tries and code as it goes.
+// Batch capping is the segment's job.
+func (s *accountLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
 	var codeHashes []common.Hash
-	for i, key := range keys {
+	for i, key := range batch.keys {
 		accountHash := common.BytesToHash(key)
 		var acc types.StateAccount
-		if err := rlp.DecodeBytes(vals[i], &acc); err != nil {
-			return fmt.Errorf("%w %s (len %d): %w", errDecodeAccount, accountHash, len(vals[i]), err)
+		if err := rlp.DecodeBytes(batch.vals[i], &acc); err != nil {
+			return fmt.Errorf("%w %s (len %d): %w", errDecodeAccount, accountHash, len(batch.vals[i]), err)
 		}
 
 		writeAccountSnapshot(db, accountHash, acc)
@@ -85,27 +82,12 @@ func (s *accountLeaves) iterateLeaves(seek common.Hash) ethdb.Iterator {
 	return newAccountLeafIterator(s.db, seek)
 }
 
-// flushIfFull writes and resets batch once it grows past [ethdb.IdealBatchSize],
-// capping memory during a long walk.
-func flushIfFull(batch ethdb.Batch) error {
-	if batch.ValueSize() <= ethdb.IdealBatchSize {
-		return nil
-	}
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	batch.Reset()
-	return nil
-}
-
-// writeAccountSnapshot stores acc to the snapshot at accHash in SlimAccountRLP
-// form, omitting empty code and storage.
+// writeAccountSnapshot stores acc in slim form, omitting empty code and storage.
 func writeAccountSnapshot(db ethdb.KeyValueWriter, accHash common.Hash, acc types.StateAccount) {
 	rawdb.WriteAccountSnapshot(db, accHash, types.SlimAccountRLP(acc))
 }
 
-// storageLeaves writes each verified storage leaf to the storage snapshot of
-// every account that shares this trie's root.
+// storageLeaves writes each leaf to every account sharing this trie's root.
 type storageLeaves struct {
 	db       ethdb.KeyValueStore
 	accounts []common.Hash
@@ -118,15 +100,15 @@ func newStorageLeaves(db ethdb.KeyValueStore, accounts []common.Hash) *storageLe
 	}
 }
 
-// writeLeaves writes each storage leaf to db for every account sharing the root.
-// Batch capping is the segment's job.
-func (s *storageLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
+// writeLeaves writes each leaf once per sharing account. Batch capping is the
+// segment's job.
+func (s *storageLeaves) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
 	for _, account := range s.accounts {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		for i, key := range keys {
-			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), vals[i])
+		for i, key := range batch.keys {
+			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), batch.vals[i])
 		}
 	}
 	return nil
@@ -138,9 +120,8 @@ func (s *storageLeaves) iterateLeaves(seek common.Hash) ethdb.Iterator {
 	return newStorageLeafIterator(s.db, s.accounts[0], seek)
 }
 
-// newAccountLeafIterator iterates the account snapshot from seek, yielding the
-// account hash as the trie key and the full-RLP account as the value. The
-// snapshot stores slim accounts, so each value is expanded on read.
+// newAccountLeafIterator yields the account hash as the trie key and the full-RLP
+// account as the value. The snapshot stores slim accounts, so values expand on read.
 func newAccountLeafIterator(db ethdb.Iteratee, seek common.Hash) *accountLeafIterator {
 	inner := rawdb.NewKeyLengthIterator(
 		db.NewIterator(rawdb.SnapshotAccountPrefix, seek.Bytes()),
@@ -180,8 +161,7 @@ func (it *accountLeafIterator) Error() error {
 	return it.Iterator.Error()
 }
 
-// newStorageLeafIterator iterates the storage snapshot of account from seek,
-// yielding the storage hash as the trie key and the slot value unchanged.
+// newStorageLeafIterator yields the slot hash as the trie key and the value unchanged.
 func newStorageLeafIterator(db ethdb.Iteratee, account, seek common.Hash) *storageLeafIterator {
 	prefix := append(append([]byte{}, rawdb.SnapshotStoragePrefix...), account.Bytes()...)
 	inner := rawdb.NewKeyLengthIterator(

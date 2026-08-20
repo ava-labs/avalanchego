@@ -64,7 +64,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	storageRoot := common.HexToHash("0xaa")
 	codeHash := common.HexToHash("0xbb")
 
-	keys := [][]byte{synctest.AccountKey(1), synctest.AccountKey(2), synctest.AccountKey(3)}
+	keys := [][]byte{synctest.HashedKey(1), synctest.HashedKey(2), synctest.HashedKey(3)}
 	vals := [][]byte{
 		accountLeaf(t, types.EmptyRootHash, types.EmptyCodeHash), // plain account
 		accountLeaf(t, storageRoot, types.EmptyCodeHash),         // storage only
@@ -72,7 +72,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	}
 
 	batch := db.NewBatch()
-	require.NoError(t, leaves.writeLeaves(t.Context(), batch, keys, vals))
+	require.NoError(t, leaves.writeLeaves(t.Context(), batch, leafBatch{keys: keys, vals: vals}))
 
 	// Only the non-empty storage root is registered, keyed to its account.
 	require.Len(t, reg.tries, 1)
@@ -97,7 +97,10 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	reg := &fakeRegistry{}
 	leaves := newAccountLeaves(db, queue, reg)
 
-	err := leaves.writeLeaves(t.Context(), db.NewBatch(), [][]byte{synctest.AccountKey(1)}, [][]byte{[]byte("not-a-valid-rlp-account")})
+	err := leaves.writeLeaves(t.Context(), db.NewBatch(), leafBatch{
+		keys: [][]byte{synctest.HashedKey(1)},
+		vals: [][]byte{[]byte("not-a-valid-rlp-account")},
+	})
 	require.ErrorIs(t, err, errDecodeAccount)
 	require.Empty(t, reg.tries, "a malformed account must register no storage trie")
 	require.Empty(t, queue.hashes, "a malformed account must enqueue no code")
