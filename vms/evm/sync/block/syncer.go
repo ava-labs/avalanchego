@@ -95,7 +95,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		batch := s.db.NewBatch()
 		for _, block := range blocks {
 			rawdb.WriteBlock(batch, block)
-			rawdb.WriteCanonicalHash(batch, nextHash, nextHeight)
+			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 
 			nextHash = block.ParentHash()
 			nextHeight--

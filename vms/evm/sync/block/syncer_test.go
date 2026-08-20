@@ -211,6 +211,51 @@ func TestSyncer(t *testing.T) {
 	}
 }
 
+// A cancelled sync persists the batch it verified and a restarted sync finishes
+// the sync.
+func TestSyncer_ResumesAfterCancellation(t *testing.T) {
+	blocks := synctest.MakeChain(t, 200)
+	tip := blocks[len(blocks)-1]
+
+	log := loggingtest.New(t, logging.Debug)
+	target := rawdb.NewMemoryDatabase()
+
+	// Cancel while the first batch is being verified, so the sync stops with
+	// that batch written and the rest of the chain unfetched. The network runs
+	// on the test ctx so it outlives the cancellation.
+	syncCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	parse := func(b []byte) (*types.Block, error) {
+		cancel()
+		return decodeBlock(b)
+	}
+
+	syncer := NewSyncer(
+		log,
+		NewClient(synctest.ServeResponder(
+			t,
+			t.Context(),
+			log,
+			p2p.EVMBlockRequestHandlerID,
+			&responder{
+				log: log,
+				db:  synctest.NewBlockDB(blocks),
+			},
+		)),
+		target,
+		parse,
+		tip.Hash(),
+		tip.NumberU64(),
+		200,
+	)
+	require.ErrorIs(t, syncer.Sync(syncCtx), context.Canceled)
+	assertBlocksSynced(t, target, blocks, tip.NumberU64(), maxBlocksPerResponse)
+
+	// The restart runs on a live ctx, making the cancel in parse a no-op.
+	require.NoError(t, syncer.Sync(t.Context()))
+	assertBlocksSynced(t, target, blocks, tip.NumberU64(), 200)
+}
+
 // A tampered response must be rejected and re-requested until a peer serves
 // honest blocks.
 func TestSyncer_RetriesBadResponses(t *testing.T) {
@@ -267,51 +312,6 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 			assertBlocksSynced(t, target, blocks, tip.NumberU64(), 1)
 		})
 	}
-}
-
-// A cancelled sync persists the batch it verified and a restarted sync finishes
-// the sync.
-func TestSyncer_ResumesAfterCancellation(t *testing.T) {
-	blocks := synctest.MakeChain(t, 200)
-	tip := blocks[len(blocks)-1]
-
-	log := loggingtest.New(t, logging.Debug)
-	target := rawdb.NewMemoryDatabase()
-
-	// Cancel while the first batch is being verified, so the sync stops with
-	// that batch written and the rest of the chain unfetched. The network runs
-	// on the test ctx so it outlives the cancellation.
-	syncCtx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	parse := func(b []byte) (*types.Block, error) {
-		cancel()
-		return decodeBlock(b)
-	}
-
-	syncer := NewSyncer(
-		log,
-		NewClient(synctest.ServeResponder(
-			t,
-			t.Context(),
-			log,
-			p2p.EVMBlockRequestHandlerID,
-			&responder{
-				log: log,
-				db:  synctest.NewBlockDB(blocks),
-			},
-		)),
-		target,
-		parse,
-		tip.Hash(),
-		tip.NumberU64(),
-		200,
-	)
-	require.ErrorIs(t, syncer.Sync(syncCtx), context.Canceled)
-	assertBlocksSynced(t, target, blocks, tip.NumberU64(), maxBlocksPerResponse)
-
-	// The restart runs on a live ctx, making the cancel in parse a no-op.
-	require.NoError(t, syncer.Sync(t.Context()))
-	assertBlocksSynced(t, target, blocks, tip.NumberU64(), 200)
 }
 
 // assertBlocksSynced asserts that every block in the half-open interval

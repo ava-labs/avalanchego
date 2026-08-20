@@ -100,8 +100,8 @@ func TestGetAncestors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetAncestors(t.Context(), db, tt.num, tt.maxNum, tt.maxSize)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.NoErrorf(t, err, "GetAncestors(%d, %d, %d)", tt.num, tt.maxNum, tt.maxSize)
+			require.Equalf(t, tt.want, got, "GetAncestors(%d, %d, %d)", tt.num, tt.maxNum, tt.maxSize)
 		})
 	}
 }
@@ -120,11 +120,7 @@ func BenchmarkGetAncestors(b *testing.B) {
 	})
 
 	const numTxs = 10
-	chain := synctest.MakeChain(
-		b,
-		defaultAncestorsMaxBlockCount,
-		synctest.WithTxsPerBlock(numTxs),
-	)
+	chain := synctest.MakeChain(b, defaultAncestorsMaxBlockCount, synctest.WithTxsPerBlock(numTxs))
 	for _, blk := range chain {
 		rawdb.WriteBlock(db, blk)
 		rawdb.WriteCanonicalHash(db, blk.Hash(), blk.NumberU64())
