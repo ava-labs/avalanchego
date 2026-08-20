@@ -102,6 +102,6 @@ func issueTransaction(
 	signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 	require.NoError(tc, err)
 
-	receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+	receipt := e2e.SendEthTransactionAndWait(tc, ethClient, signedTx)
 	require.Equal(tc, types.ReceiptStatusSuccessful, receipt.Status)
 }
