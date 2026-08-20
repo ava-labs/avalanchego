@@ -131,11 +131,11 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	// syncer sees, and cancelling ends a sync that never converges.
 	const attempts = 3
 	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), attempts, tamperLeaf)
-	guard := synctest.NewCancelAfter(tampering, attempts, cancel)
+	recording := synctest.NewRecordingResponder(tampering)
 
-	syncer, target := newSyncer(t, ctx, root, guard)
+	syncer, target := newSyncer(t, ctx, root, synctest.NewCancelAfter(recording, attempts, cancel))
 	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled, "tampered leaves must never be accepted")
-	require.True(t, guard.Fired(), "the sync ended for a reason other than the guard")
+	require.Len(t, recording.Requests(), attempts, "the sync ended before re-requesting every tampered response")
 
 	// Nothing accepted, target stays empty.
 	it := target.NewIterator(nil, nil)
