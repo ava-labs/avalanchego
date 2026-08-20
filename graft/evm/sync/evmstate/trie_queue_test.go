@@ -26,12 +26,12 @@ func TestTrieQueue_ClearIfRootDoesNotMatch(t *testing.T) {
 		wantKept   bool
 	}{
 		{
-			name:       "same root keeps markers",
+			name:       "same_root_keeps_markers",
 			storedRoot: target,
 			wantKept:   true,
 		},
 		{
-			name:       "root mismatch wipes markers",
+			name:       "root_mismatch_wipes_markers",
 			storedRoot: "0xdead",
 			wantKept:   false,
 		},
@@ -79,20 +79,20 @@ func TestTrieQueue_StorageTries(t *testing.T) {
 		want  []storageTrieRef
 	}{
 		{
-			name: "empty queue",
+			name: "empty_queue",
 		},
 		{
-			name:  "one trie, one account",
+			name:  "one_trie_one_account",
 			write: map[common.Hash][]common.Hash{rootA: {acct1}},
 			want:  []storageTrieRef{{root: rootA, accounts: []common.Hash{acct1}}},
 		},
 		{
-			name:  "accounts sharing a root are grouped",
+			name:  "accounts_sharing_a_root_are_grouped",
 			write: map[common.Hash][]common.Hash{rootA: {acct1, acct2}},
 			want:  []storageTrieRef{{root: rootA, accounts: []common.Hash{acct1, acct2}}},
 		},
 		{
-			name:  "two tries come back in root order",
+			name:  "two_tries_come_back_in_root_order",
 			write: map[common.Hash][]common.Hash{rootA: {acct1}, rootB: {acct2}},
 			want: []storageTrieRef{
 				{root: rootA, accounts: []common.Hash{acct1}},

@@ -6,35 +6,33 @@ package evmstate
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 )
 
 // TestStateTrie_SegmentedStorageReconstruct proves a storage trie split into concurrent segments reconstructs via snapshot re-read.
 func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	account := common.HexToHash("0xac")
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrieDistributed(t, trieDB, 3000)
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength))
+	fetcher := synctest.ServeLeaves(t, ctx, trieDB)
 
 	target := rawdb.NewMemoryDatabase()
 	leaves := newStorageLeafStore(target, []common.Hash{account})
 
-	tasks := make(chan task, 64)
+	tasks := make(chan leaf.Task, 64)
 	st, err := newStateTrie(target, root, account, leaves, stateTrieConfig{
 		numSegments: numStorageTrieSegments,
 		threshold:   1,
@@ -44,11 +42,23 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	require.NoError(t, err)
 	tasks <- st.segments[0]
 
-	require.NoError(t, newLeafFetcher(loggingtest.New(t, logging.Debug), NewClient(net, tracker), tasks, 4).sync(ctx))
+	require.NoError(t, leaf.NewSyncer(fetcher, tasks, leaf.WithNumWorkers(4)).Sync(ctx))
 
 	require.Greater(t, len(st.segments), 1, "the storage trie must have split into segments")
 	requireReconstructed(t, target, root, keys, vals)
 	for i, k := range keys {
 		require.Equal(t, vals[i], rawdb.ReadStorageSnapshot(target, account, common.BytesToHash(k)))
+	}
+}
+
+// requireReconstructed reads every pair back through the rebuilt trie.
+func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash, keys, vals [][]byte) {
+	t.Helper()
+	tr, err := trie.New(trie.TrieID(root), triedb.NewDatabase(target, nil))
+	require.NoError(t, err)
+	for i, k := range keys {
+		got, err := tr.Get(k)
+		require.NoError(t, err)
+		require.Equal(t, vals[i], got)
 	}
 }

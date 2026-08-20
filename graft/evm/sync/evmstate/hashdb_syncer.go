@@ -12,31 +12,34 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/types"
 )
+
+const defaultLeafWorkers = 8
 
 var (
 	_ types.Syncer    = (*HashDBSyncer)(nil)
 	_ types.Finalizer = (*HashDBSyncer)(nil)
 
-	errRootRequired       = errors.New("root must be non-zero")
-	errCodeSyncerRequired = errors.New("code syncer is required")
+	errRootRequired      = errors.New("root must be non-zero")
+	errCodeQueueRequired = errors.New("code queue is required")
 )
 
 // HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
 // first, then every storage trie it discovers, each split into concurrently fetched
-// segments. Contract code goes to a [code.Syncer] that must run alongside Sync.
+// segments. Contract code goes to a [code.Queue] drained alongside Sync.
 type HashDBSyncer struct {
-	log        logging.Logger
-	client     *Client
-	db         ethdb.Database
-	root       common.Hash
-	codeSyncer *code.Syncer
-	trieQueue  *trieQueue
-	stats      *trieSyncStats
-	threshold  uint64 // leaf count above which a trie splits into segments
+	log       logging.Logger
+	fetcher   types.LeafFetcher
+	db        ethdb.Database
+	root      common.Hash
+	codeQueue *code.Queue
+	trieQueue *trieQueue
+	stats     *trieSyncStats
+	threshold uint64 // leaf count above which a trie splits into segments
 
 	// scheduler owns the task channel and tracks what needs flushing on failure.
 	scheduler *trieScheduler
@@ -46,27 +49,27 @@ type HashDBSyncer struct {
 	completed    atomic.Bool
 }
 
-// NewHashDBSyncer returns a syncer for the account trie at root. codeSyncer must
+// NewHashDBSyncer returns a syncer for the account trie at root. codeQueue must
 // run concurrently with Sync.
 //
 // The caller must wipe the account and storage snapshots in db unless this run resumes
 // the root already persisted there. Leaves left behind count as resume progress, so
 // another root's leaves would fail the final root check on every attempt.
-func NewHashDBSyncer(log logging.Logger, client *Client, db ethdb.Database, root common.Hash, codeSyncer *code.Syncer) (*HashDBSyncer, error) {
+func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue *code.Queue) (*HashDBSyncer, error) {
 	if root == (common.Hash{}) {
 		return nil, errRootRequired
 	}
-	if codeSyncer == nil {
-		return nil, errCodeSyncerRequired
+	if codeQueue == nil {
+		return nil, errCodeQueueRequired
 	}
 	return &HashDBSyncer{
-		log:        log,
-		client:     client,
-		db:         db,
-		root:       root,
-		codeSyncer: codeSyncer,
-		trieQueue:  newTrieQueue(db),
-		threshold:  segmentThreshold,
+		log:       log,
+		fetcher:   fetcher,
+		db:        db,
+		root:      root,
+		codeQueue: codeQueue,
+		trieQueue: newTrieQueue(db),
+		threshold: segmentThreshold,
 	}, nil
 }
 
@@ -80,7 +83,7 @@ func (*HashDBSyncer) ID() string { return "state_evm_state_sync" }
 // each root.
 func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	// No more code is discovered once Sync returns, however it ends.
-	defer s.codeSyncer.CloseInput()
+	defer s.codeQueue.Shutdown()
 
 	// Wipe stale markers so resume never builds on another target's progress.
 	if err := s.trieQueue.clearIfRootDoesNotMatch(s.root); err != nil {
@@ -91,7 +94,7 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	s.mainTrieDone = make(chan struct{})
 	s.stats = newTrieSyncStats(s.log)
 
-	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeafStore(s.db, s.codeSyncer, s.trieQueue), stateTrieConfig{
+	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeafStore(s.db, s.codeQueue, s.trieQueue), stateTrieConfig{
 		numSegments: numMainTrieSegments,
 		threshold:   s.threshold,
 		tasks:       s.scheduler.tasks,
@@ -107,10 +110,10 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 		return err
 	}
 
-	fetcher := newLeafFetcher(s.log, s.client, s.scheduler.tasks, defaultLeafWorkers)
+	fetcher := leaf.NewSyncer(s.fetcher, s.scheduler.tasks, leaf.WithNumWorkers(defaultLeafWorkers))
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		if err := fetcher.sync(egCtx); err != nil {
+		if err := fetcher.Sync(egCtx); err != nil {
 			return err
 		}
 		return s.onSyncComplete()
@@ -145,9 +148,7 @@ func (s *HashDBSyncer) Finalize() error {
 // carry code hashes, so it closes the code syncer's input and opens the gate
 // for storage tries.
 func (s *HashDBSyncer) onMainTrieDone(ctx context.Context) error {
-	s.codeSyncer.CloseInput()
-
-	if err := ctx.Err(); err != nil {
+	if err := s.finalizeCodeQueue(ctx); err != nil {
 		return err
 	}
 
@@ -207,5 +208,26 @@ func (s *HashDBSyncer) storageTrieDone(root common.Hash) func(context.Context) e
 		}
 		s.stats.trieDone(root)
 		return nil
+	}
+}
+
+// finalizeCodeQueue drains the queue to completion, abandoning the drain if ctx
+// ends so a stopped consumer cannot wedge the sync. Unsent hashes stay on disk
+// as markers and recover on the next run.
+func (s *HashDBSyncer) finalizeCodeQueue(ctx context.Context) error {
+	done := make(chan struct{})
+	var finalizeErr error
+	go func() {
+		defer close(done)
+		finalizeErr = s.codeQueue.Finalize()
+	}()
+
+	select {
+	case <-done:
+		return finalizeErr
+	case <-ctx.Done():
+		s.codeQueue.Shutdown()
+		<-done
+		return ctx.Err()
 	}
 }

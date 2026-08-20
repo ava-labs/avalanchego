@@ -6,6 +6,7 @@ package evmstate
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,36 +22,36 @@ func TestWithinRange(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "nil end is unbounded",
+			name: "nil_end_is_unbounded",
 			key:  addPadding(0xffff, 0xff),
 			want: true,
 		},
 		{
-			name: "empty end is unbounded",
+			name: "empty_end_is_unbounded",
 			key:  addPadding(0xffff, 0xff),
 			end:  []byte{},
 			want: true,
 		},
 		{
-			name: "below end",
+			name: "below_end",
 			key:  addPadding(0x00fe, 0xff),
 			end:  end,
 			want: true,
 		},
 		{
-			name: "exactly at end is within",
+			name: "exactly_at_end_is_within",
 			key:  end,
 			end:  end,
 			want: true,
 		},
 		{
-			name: "one byte past end",
-			key:  nextRangeKey(end),
+			name: "one_byte_past_end",
+			key:  leaf.NextRangeKey(end),
 			end:  end,
 			want: false,
 		},
 		{
-			name: "well past end",
+			name: "well_past_end",
 			key:  addPadding(0xff00, 0x00),
 			end:  end,
 			want: false,
@@ -60,7 +61,7 @@ func TestWithinRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.want, withinRange(tt.key, tt.end))
+			require.Equal(t, tt.want, leaf.WithinRange(tt.key, tt.end))
 		})
 	}
 }
@@ -81,7 +82,7 @@ func TestSegmentRange(t *testing.T) {
 			for i := 1; i < numSegments; i++ {
 				_, prevEnd := segmentRange(i-1, numSegments)
 				start, _ := segmentRange(i, numSegments)
-				require.Equal(t, start, nextRangeKey(prevEnd), "split %d must start right after %d ends", i, i-1)
+				require.Equal(t, start, leaf.NextRangeKey(prevEnd), "split %d must start right after %d ends", i, i-1)
 			}
 		})
 	}

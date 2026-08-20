@@ -4,11 +4,9 @@
 package evmstate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -19,14 +17,16 @@ import (
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
+	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
 // A sync leaves goroutines behind if teardown breaks.
@@ -36,10 +36,10 @@ func TestMain(m *testing.M) {
 
 type (
 	sutConfig struct {
-		codeDB        ethdb.Database
-		target        ethdb.Database
-		threshold     uint64
-		leafResponder leafResponder
+		codeDB      ethdb.Database
+		target      ethdb.Database
+		threshold   uint64
+		leafFetcher types.LeafFetcher
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -65,22 +65,24 @@ func withThreshold(n uint64) sutOption {
 	})
 }
 
-// withLeafResponder replaces the leaf responder, to count or tamper with responses.
-func withLeafResponder(r leafResponder) sutOption {
+// withLeafFetcher replaces the leaf fetcher, to count or interrupt requests.
+func withLeafFetcher(f types.LeafFetcher) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.leafResponder = r
+		c.leafFetcher = f
 	})
 }
 
-// SUT is the system under test: both syncers wired to a loopback network. Prefer
-// [SUT.sync] and [SUT.Target] over reaching into the fields.
+// SUT is the system under test: the state and code syncers wired to an
+// in-process server. Prefer [SUT.sync] and [SUT.Target] over the fields.
 type SUT struct {
 	state  *HashDBSyncer
 	code   *code.Syncer
+	queue  *code.Queue
 	target ethdb.Database
 }
 
-// newSUT serves the trie at root on a loopback network.
+// newSUT serves the trie at root over the message protocol, which is what the
+// engine wires by default. Pass [withLeafFetcher] to drive another transport.
 func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root common.Hash, opts ...sutOption) *SUT {
 	t.Helper()
 
@@ -90,29 +92,31 @@ func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root com
 	}, opts...)
 
 	log := loggingtest.New(t, logging.Debug)
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	if cfg.leafResponder != nil {
-		require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID,
-			handlers.NewHandler(log, cfg.leafResponder)))
-	} else {
-		require.NoError(t, RegisterHandler(log, net, trieDB, common.HashLength))
-	}
-	require.NoError(t, code.RegisterHandler(log, net, cfg.codeDB))
+	c := message.SubnetEVMCodec
+	server := client.NewTestClient(
+		c,
+		handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, c, handlerstats.NewNoopHandlerStats()),
+		handlers.NewCodeRequestHandler(cfg.codeDB, c, handlerstats.NewNoopHandlerStats()),
+		nil,
+	)
 
-	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), code.NewClient(net, tracker), cfg.target)
+	fetcher := cfg.leafFetcher
+	if fetcher == nil {
+		fetcher = client.NewLeafFetcher(server, message.SubnetEVMLeafsRequestType, message.StateTrieNode)
+	}
+
+	queue, err := code.NewQueue(cfg.target)
+	require.NoError(t, err)
+	codeSyncer, err := code.NewSyncer(server, cfg.target, queue.CodeHashes())
 	require.NoError(t, err)
 
-	state, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), cfg.target, root, codeSyncer)
+	state, err := NewHashDBSyncer(log, fetcher, cfg.target, root, queue)
 	require.NoError(t, err)
 	if cfg.threshold > 0 {
 		state.threshold = cfg.threshold
 	}
 
-	return &SUT{
-		state:  state,
-		code:   codeSyncer,
-		target: cfg.target,
-	}
+	return &SUT{state: state, code: codeSyncer, queue: queue, target: cfg.target}
 }
 
 // Target returns the database the syncers reconstruct state into.
@@ -133,6 +137,16 @@ func (s *SUT) sync(t *testing.T, ctx context.Context) error {
 	return syncErr
 }
 
+// transports is the set the syncer must reconstruct identically over. The
+// message protocol is what the engine wires by default, proto is the new one.
+var transports = []struct {
+	name  string
+	proto bool
+}{
+	{name: "message"},
+	{name: "proto", proto: true},
+}
+
 func TestHashDBSyncer_Reconstruction(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -141,34 +155,40 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 		wantStorageTries int
 	}{
 		{
-			name:     "accounts with code",
+			name:     "accounts_with_code",
 			accounts: []synctest.AccountDesc{{WithCode: true}, {}, {WithCode: true}, {WithCode: true}, {}},
 		},
 		{
-			name:             "shared storage roots",
+			name:             "shared_storage_roots",
 			accounts:         []synctest.AccountDesc{{StorageSize: 5}, {StorageSize: 6, WithCode: true}, {StorageSize: 5}, {WithCode: true}, {}},
 			wantStorageTries: 2,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-			defer cancel()
+		for _, tr := range transports {
+			t.Run(tt.name+"_"+tr.name, func(t *testing.T) {
+				t.Parallel()
+				ctx := t.Context()
 
-			f := synctest.NewStateFixture(t, tt.accounts)
-			require.Len(t, f.Storage, tt.wantStorageTries)
+				f := synctest.NewStateFixture(t, tt.accounts)
+				require.Len(t, f.Storage, tt.wantStorageTries)
 
-			sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB))
-			require.NoError(t, sut.sync(t, ctx))
-			target := sut.Target()
+				opts := []sutOption{withCodeDB(f.CodeDB)}
+				if tr.proto {
+					opts = append(opts, withLeafFetcher(synctest.ServeLeaves(t, ctx, f.TrieDB)))
+				}
 
-			requireReconstructed(t, target, f.Root, f.AccKeys, f.AccVals)
-			requireAccountSnapshots(t, target, f.AccKeys)
-			requireCode(t, target, f.Codes)
-			requireStorageReconstructed(t, target, f.Storage)
-		})
+				sut := newSUT(t, ctx, f.TrieDB, f.Root, opts...)
+				require.NoError(t, sut.sync(t, ctx))
+				target := sut.Target()
+
+				requireReconstructed(t, target, f.Root, f.AccKeys, f.AccVals)
+				requireAccountSnapshots(t, target, f.AccKeys)
+				requireCode(t, target, f.Codes)
+				requireStorageReconstructed(t, target, f.Storage)
+			})
+		}
 	}
 }
 
@@ -176,8 +196,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 // only drives stateTrie directly.
 func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	// Big enough to span several requests, so the first segment triggers a split.
 	f := synctest.NewStateFixture(t, []synctest.AccountDesc{{StorageSize: 3000}, {}})
@@ -188,10 +207,10 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 		storageRoot = root
 	}
 
-	recorder := recordingLeafResponder(t, f.TrieDB)
+	recorder := synctest.RecordLeaves(t, ctx, f.TrieDB)
 	sut := newSUT(t, ctx, f.TrieDB, f.Root,
 		withCodeDB(f.CodeDB),
-		withLeafResponder(recorder),
+		withLeafFetcher(recorder),
 		withThreshold(1), // force the storage trie to segment
 	)
 	require.NoError(t, sut.sync(t, ctx))
@@ -206,10 +225,10 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 
 	var onBoundary int
 	for _, req := range recorder.Requests() {
-		if !bytes.Equal(req.GetRootHash(), storageRoot.Bytes()) {
+		if req.Root != storageRoot {
 			continue
 		}
-		if boundaries.Contains(string(req.GetStartKey())) {
+		if boundaries.Contains(string(req.Start)) {
 			onBoundary++
 		}
 	}
@@ -222,8 +241,7 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 // wiped. See the precondition on [NewHashDBSyncer].
 func TestHashDBSyncer_RejectsStaleSnapshot(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	trieDB := synctest.NewTrieDB()
 	staleRoot, _, _ := synctest.FillAccountTrieDistributed(t, trieDB, 200)
@@ -261,8 +279,7 @@ func wipeAccountSnapshot(t *testing.T, db ethdb.Database) {
 // come back. No other test exceeds that limit.
 func TestHashDBSyncer_RecyclesTrieSlots(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	// Distinct storage sizes give every account its own trie root.
 	const numTries = 3 * defaultLeafWorkers
@@ -289,10 +306,10 @@ func TestHashDBSyncer_StorageTrieDoneReturnsSlot(t *testing.T) {
 		failClear bool
 	}{
 		{
-			name: "clean completion",
+			name: "clean_completion",
 		},
 		{
-			name:      "failed marker clear",
+			name:      "failed_marker_clear",
 			failClear: true,
 		},
 	}
@@ -377,17 +394,18 @@ func requireStorageReconstructed(t *testing.T, target ethdb.Database, storage ma
 func TestNewHashDBSyncer_Validation(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
-	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), nil, db)
+	queue, err := code.NewQueue(db)
 	require.NoError(t, err)
+	defer queue.Shutdown()
 
 	tests := []struct {
 		name    string
 		root    common.Hash
-		code    *code.Syncer
+		code    *code.Queue
 		wantErr error
 	}{
-		{name: "zero root", root: common.Hash{}, code: codeSyncer, wantErr: errRootRequired},
-		{name: "nil code syncer", root: common.HexToHash("0x1"), code: nil, wantErr: errCodeSyncerRequired},
+		{name: "zero_root", root: common.Hash{}, code: queue, wantErr: errRootRequired},
+		{name: "nil_code_queue", root: common.HexToHash("0x1"), code: nil, wantErr: errCodeQueueRequired},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,10 +420,11 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 func TestHashDBSyncer_FinalizeBeforeSync(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
-	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), nil, db)
+	queue, err := code.NewQueue(db)
 	require.NoError(t, err)
+	defer queue.Shutdown()
 
-	s, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), codeSyncer)
+	s, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), queue)
 	require.NoError(t, err)
 	require.NoError(t, s.Finalize())
 }
@@ -416,11 +435,10 @@ func TestHashDBSyncer_CancelPropagates(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	f := synctest.NewStateFixture(t, []synctest.AccountDesc{{WithCode: true}, {WithCode: true}})
 
-	// Every response the guard allows is tampered, so only cancellation can end it.
-	const attempts = 5
-	r := synctest.NewCancelAfter(flakyLeafResponder(t, f.TrieDB, attempts), attempts, cancel)
+	// Cancel as the first range is requested, so the sync cannot finish.
+	r := synctest.NewCancelAfterFetcher(synctest.ServeLeaves(t, ctx, f.TrieDB), 1, cancel)
 
-	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafResponder(r))
+	sut := newSUT(t, ctx, f.TrieDB, f.Root, withCodeDB(f.CodeDB), withLeafFetcher(r))
 	require.ErrorIs(t, sut.sync(t, ctx), context.Canceled)
 }
 
@@ -455,14 +473,14 @@ func TestHashDBSyncer_ResumesAfterInterrupt(t *testing.T) {
 // cancelAfter requests when positive.
 func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, target ethdb.Database, cancelAfter int) (int, error) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	recorder := recordingLeafResponder(t, trieDB)
+	recorder := synctest.RecordLeaves(t, ctx, trieDB)
 	sut := newSUT(t, ctx, trieDB, root,
 		withTarget(target),
 		withThreshold(1), // force segmentation
-		withLeafResponder(synctest.NewCancelAfter(recorder, cancelAfter, cancel)),
+		withLeafFetcher(synctest.NewCancelAfterFetcher(recorder, cancelAfter, cancel)),
 	)
 
 	syncErr := sut.sync(t, ctx)

@@ -17,10 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+
+	syncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	syncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 )
 
 const (
@@ -34,7 +35,7 @@ const (
 var (
 	_ types.Syncer    = (*Syncer)(nil)
 	_ types.Finalizer = (*Syncer)(nil)
-	_ leaf.SyncTask   = (*syncerLeafTask)(nil)
+	_ leaf.Task       = (*syncerLeafTask)(nil)
 
 	errTargetHeightRequired = errors.New("target height must be > 0")
 )
@@ -82,7 +83,7 @@ type Syncer struct {
 	targetHeight uint64
 
 	// syncer is used to sync leaves from the network.
-	syncer *leaf.CallbackSyncer
+	syncer *leaf.Syncer
 
 	// lastHeight is the greatest height for which key / values
 	// were last inserted into the [atomicTrie]
@@ -116,21 +117,15 @@ func NewSyncer(client types.LeafClient, db *versiondb.Database, atomicTrie *atom
 		lastHeight:   lastCommit,
 	}
 
-	// Create tasks channel with capacity for the number of workers.
-	tasks := make(chan leaf.SyncTask, cfg.numWorkers)
-
-	// For atomic trie syncing, we typically want a single task since the trie is sequential.
-	// But we can create multiple tasks if needed for parallel processing of different ranges.
+	// The atomic trie is sequential, so one task covers it.
+	tasks := make(chan leaf.Task, 1)
 	tasks <- &syncerLeafTask{syncer: syncer}
 	close(tasks)
 
-	syncer.syncer = leaf.NewCallbackSyncer(
-		syncclient.NewLeafFetcher(client, message.CorethLeafsRequestType, TrieNode),
-		tasks,
-		&leaf.SyncerConfig{
-			RequestSize: cfg.requestSize,
-			NumWorkers:  cfg.numWorkers,
-		},
+	fetcher := syncclient.NewLeafFetcher(client, message.CorethLeafsRequestType, TrieNode)
+	syncer.syncer = leaf.NewSyncer(fetcher, tasks,
+		leaf.WithNumWorkers(cfg.numWorkers),
+		leaf.WithRequestSize(cfg.requestSize),
 	)
 
 	return syncer, nil
@@ -251,9 +246,8 @@ type syncerLeafTask struct {
 func (a *syncerLeafTask) Start() []byte                  { return addZeroes(a.syncer.lastHeight + 1) }
 func (*syncerLeafTask) End() []byte                      { return nil }
 func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFinish() }
-func (*syncerLeafTask) OnStart() (bool, error)           { return false, nil }
 func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }
 func (*syncerLeafTask) Account() common.Hash             { return common.Hash{} }
-func (a *syncerLeafTask) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
-	return a.syncer.onLeafs(ctx, keys, vals)
+func (a *syncerLeafTask) OnLeaves(ctx context.Context, leaves types.Leaves) error {
+	return a.syncer.onLeafs(ctx, leaves.Keys, leaves.Vals)
 }

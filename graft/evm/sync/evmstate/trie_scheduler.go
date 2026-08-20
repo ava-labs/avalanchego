@@ -7,16 +7,17 @@ import (
 	"context"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/libevm/common"
 )
 
 // trieScheduler admits tries to the shared leaf fetcher, feeding each one's segments
-// onto the task channel, tracking what needs flushing, and closing that channel once.
+// onto the leaf.Task channel, tracking what needs flushing, and closing that channel once.
 //
 // The bound and the close are one mechanism: a trie holds a slot while it runs, so
 // holding every slot proves nothing is running and the channel is safe to close.
 type trieScheduler struct {
-	tasks chan task
+	tasks chan leaf.Task
 	slots chan struct{}
 
 	lock  sync.Mutex
@@ -26,7 +27,7 @@ type trieScheduler struct {
 // newTrieScheduler admits workers tries at a time, buffering a full segment set each.
 func newTrieScheduler(workers, segmentsPerTrie int) *trieScheduler {
 	s := &trieScheduler{
-		tasks: make(chan task, workers*segmentsPerTrie),
+		tasks: make(chan leaf.Task, workers*segmentsPerTrie),
 		slots: make(chan struct{}, workers),
 		tries: make(map[common.Hash]*stateTrie),
 	}
@@ -63,7 +64,7 @@ func (s *trieScheduler) finishStorage(root common.Hash) {
 	s.slots <- struct{}{}
 }
 
-// closeWhenIdle waits for every started trie to finish, then closes the task channel
+// closeWhenIdle waits for every started trie to finish, then closes the leaf.Task channel
 // so the workers exit. Reclaiming all slots proves no worker can still split a trie
 // into fresh segments. A cancelled ctx leaves it open, and the workers exit via ctx.
 func (s *trieScheduler) closeWhenIdle(ctx context.Context) error {
