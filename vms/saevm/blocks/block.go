@@ -44,7 +44,6 @@ type Block struct {
 	ancestry atomic.Pointer[ancestry]
 	// Only the genesis block or the last pre-SAE block is synchronous. These
 	// are self-settling by definition so their `ancestry` MUST be nil.
-	// TODO(JonathanOppenheimer): remove this in favor of the settled hook.
 	synchronous bool
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.
@@ -80,7 +79,7 @@ func InMemoryBlockCount() int64 {
 // result in an invalid Block as it breaks important invariants. In such
 // situations, [Block.CopyAncestorsFrom] MUST then be called before further use
 // of the Block. In practice, this SHOULD only be done when parsing an encoded
-// Block.
+// Block. The provided `hooks` MUST NOT be nil.
 func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
 		b:           eth,
@@ -89,7 +88,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 		settled:     make(chan struct{}),
 		hooks:       hooks,
 		log: log.With(
-			zap.Uint64("block_height", eth.Number().Uint64()),
+			zap.Uint64("block_height", eth.NumberU64()),
 			zap.Stringer("block_hash", eth.Hash()),
 		),
 	}

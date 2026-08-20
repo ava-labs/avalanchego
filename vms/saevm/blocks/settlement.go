@@ -76,8 +76,8 @@ func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether the block was marked as synchronous during
-// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
+// Synchronous reports whether the block's header encodes no settled block (see
+// [hook.Synchronous]).
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }
@@ -183,7 +183,6 @@ func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ err
 		}
 	}()
 
-	hooks := parent.hooks // presumably all blocks use the same hooks
 	settleAtGasTime := proxytime.Of[gas.Gas](settleAt)
 
 	// A block can be the last to settle at some time i.f.f. two criteria are
@@ -225,7 +224,7 @@ func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ err
 			return block, known, nil
 		}
 
-		if startsNoEarlierThan := hooks.BlockTime(block.Header()); startsNoEarlierThan.Compare(settleAt) > 0 {
+		if startsNoEarlierThan := block.PreciseTime(); startsNoEarlierThan.Compare(settleAt) > 0 {
 			known = true
 			continue
 		}

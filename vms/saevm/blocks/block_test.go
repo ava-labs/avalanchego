@@ -18,20 +18,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 type blockBuilder struct {
-	hooks    *hookstest.Stub
-	hookTime *time.Time
+	hooks *hookstest.Stub
+	clock *saetest.Clock
 }
 
 func newBlockBuilder() *blockBuilder {
-	hookTime := new(time.Time)
+	clock := saetest.NewClock(time.Time{}, time.Nanosecond)
 	return &blockBuilder{
-		hooks: hookstest.NewStub(1e9, hookstest.WithNow(func() time.Time {
-			return *hookTime
-		})),
-		hookTime: hookTime,
+		hooks: hookstest.NewStub(1e9, hookstest.WithNow(clock.Now)),
+		clock: clock,
 	}
 }
 
@@ -76,7 +75,7 @@ func (bb *blockBuilder) newFromHooks(tb testing.TB, num, sec uint64, parent, las
 func (bb *blockBuilder) build(tb testing.TB, num, sec uint64, parent, lastSettled *Block, settled hook.Settled) *Block {
 	tb.Helper()
 
-	*bb.hookTime = time.Unix(int64(sec), 0) //#nosec G115 -- Hard-coded test values won't overflow
+	bb.clock.Set(time.Unix(int64(sec), 0)) //#nosec G115 -- Hard-coded test values won't overflow
 	var ethHdr *types.Header
 	if parent != nil {
 		var err error

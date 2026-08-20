@@ -247,9 +247,8 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.  If no execution results are found in
-// the [saetypes.ExecutionResults], they are instead inferred from the
-// block itself, and the block is marked as synchronous.
+// said function was originally called. If the block is synchronous, the
+// execution results are derived from the block header.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
@@ -265,8 +264,8 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 	if b.Synchronous() {
 		e, err = b.synchronousExecutionResults()
 	} else {
-		// TODO(JonathanOppenheimer): This error is not helpful. The entry may
-		// be missing due to state sync or database corruption.
+		// TODO(rahulmutt-ava): Provide more context in the error to aid users
+		// while debugging.
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
 	if err != nil {
@@ -316,10 +315,9 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 // predecessor clock to advance. Inverting the base fee only approximates the
 // excess.
 func (b *Block) synchronousGasTime() (*gastime.Time, error) {
-	hdr := b.Header()
-	target, cfg := b.hooks.GasConfigAfter(hdr)
+	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
-		b.hooks.BlockTime(hdr),
+		b.PreciseTime(),
 		target,
 		gas.Price(b.headerBaseFee()),
 		cfg,
