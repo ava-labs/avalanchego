@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
@@ -28,7 +29,7 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	root, keys, vals := synctest.FillTrieDistributed(t, trieDB, 3000)
 
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, RegisterHandler(logging.NoLog{}, net, trieDB, common.HashLength))
+	require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength))
 
 	target := rawdb.NewMemoryDatabase()
 	leaves := newStorageLeafStore(target, []common.Hash{account})
@@ -43,7 +44,7 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	require.NoError(t, err)
 	tasks <- st.segments[0]
 
-	require.NoError(t, newLeafFetcher(logging.NoLog{}, NewClient(net, tracker), tasks, 4).sync(ctx))
+	require.NoError(t, newLeafFetcher(loggingtest.New(t, logging.Debug), NewClient(net, tracker), tasks, 4).sync(ctx))
 
 	require.Greater(t, len(st.segments), 1, "the storage trie must have split into segments")
 	requireReconstructed(t, target, root, keys, vals)
