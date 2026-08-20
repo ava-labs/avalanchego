@@ -54,13 +54,6 @@ func TestResponder_ValidationRejects(t *testing.T) {
 			},
 		},
 		{
-			name: "key_limit_overflows_uint16",
-			req: &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				KeyLimit: math.MaxUint16 + 1,
-			},
-		},
-		{
 			name: "start_key_after_end_key",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
@@ -438,17 +431,38 @@ func TestResponder_BoundedRange(t *testing.T) {
 
 func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, int(MaxLeavesLimit)+200)
 
-	r := newLeafResponder(t, trieDB)
-	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: uint32(MaxLeavesLimit) + 200,
-	})
-	require.Nil(t, appErr)
-	require.NotNil(t, resp)
-	require.Len(t, resp.Keys, int(MaxLeavesLimit))
+	tests := []struct {
+		name     string
+		keyLimit uint32
+	}{
+		{
+			name:     "over_the_limit",
+			keyLimit: uint32(MaxLeavesLimit) + 200,
+		},
+		// Capping in uint16 would truncate this to 4 rather than clamp it.
+		{
+			name:     "overflows_uint16",
+			keyLimit: math.MaxUint16 + 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			trieDB := synctest.NewTrieDB()
+			root, _, _ := synctest.FillTrie(t, trieDB, int(MaxLeavesLimit)+200)
+
+			r := newLeafResponder(t, trieDB)
+			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				KeyLimit: tt.keyLimit,
+			})
+			require.Nil(t, appErr)
+			require.NotNil(t, resp)
+			require.Len(t, resp.Keys, int(MaxLeavesLimit))
+		})
+	}
 }
 
 // snapshotKinds is the leaf scopes every snapshot path must serve.

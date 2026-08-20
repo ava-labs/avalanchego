@@ -6,7 +6,6 @@ package evmstate
 import (
 	"bytes"
 	"context"
-	"math"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -124,11 +123,8 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 // validateRequest returns why req is malformed, empty when it is valid. The
 // reason is logged in place of the request, which may carry megabytes.
 func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
-	switch {
-	case req.GetKeyLimit() == 0:
+	if req.GetKeyLimit() == 0 {
 		return "zero key limit"
-	case req.GetKeyLimit() > math.MaxUint16:
-		return "key limit overflows uint16"
 	}
 
 	root := common.BytesToHash(req.GetRootHash())
@@ -179,7 +175,7 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		return nil, errRootNotFound
 	}
 
-	limit := min(uint16(req.GetKeyLimit()), MaxLeavesLimit)
+	limit := uint16(min(req.GetKeyLimit(), uint32(MaxLeavesLimit)))
 	return &query{
 		log:      r.log,
 		nodeID:   nodeID,
@@ -289,24 +285,13 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
-	proofDB, valid, more, err := q.isRangeValid(snapKeys, snapVals, false)
+	valid, more, err := q.isRangeValid(snapKeys, snapVals, false)
 	if err != nil {
 		return false, err
 	}
 	if valid {
 		q.resp.Keys, q.resp.Values = snapKeys, snapVals
-		if q.wholeTrie(more) {
-			return true, nil
-		}
-		if more {
-			// The trie fill extends the response, so collect proves it then.
-			return false, nil
-		}
-		q.resp.ProofVals, err = iteratorValues(proofDB)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return q.wholeTrie(more), nil
 	}
 
 	return q.fillFromSegments(ctx, snapKeys, snapVals)
@@ -329,7 +314,7 @@ func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byt
 
 	for i := 0; i < len(snapKeys) && ctx.Err() == nil; i += snapshotSegmentLen {
 		end := min(i+snapshotSegmentLen, len(snapKeys))
-		_, valid, more, err := q.isRangeValid(snapKeys[i:end], snapVals[i:end], hasGap)
+		valid, more, err := q.isRangeValid(snapKeys[i:end], snapVals[i:end], hasGap)
 		if err != nil {
 			return false, err
 		}
@@ -369,6 +354,9 @@ type leafEncoder func() ([]byte, error)
 
 // snapshotLeaves opens a disk-layer iterator over the account trie, or over
 // the request's storage trie, with the function that trie-encodes its values.
+//
+// DiskRoot and the iterator are separate calls, so a concurrent flatten can
+// retire the root in between and fail the open.
 func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 	diskRoot := q.snapshot.DiskRoot()
 	seek := common.BytesToHash(q.startKey)
@@ -408,8 +396,6 @@ func (q *query) abandonSnapshot(reason string, err error) {
 func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 	it, leaf, err := q.snapshotLeaves()
 	if err != nil {
-		// [SnapshotReader.DiskRoot] and the iterator are separate calls, so a
-		// concurrent flatten can retire the root in between and land here.
 		q.abandonSnapshot("iterator unavailable", err)
 		return nil, nil
 	}
@@ -474,8 +460,8 @@ func (q *query) nextKey() []byte {
 	return next
 }
 
-// generateRangeProof returns a Merkle range proof for [start, last].
-// Empty start substitutes the cached zero-key.
+// generateRangeProof returns a Merkle range proof for [start, last]. An absent
+// start means the trie's beginning, which Prove needs as a concrete key.
 func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
 	proofDB := memorydb.New()
 	if len(start) == 0 {
@@ -502,9 +488,9 @@ func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proofDB *mem
 	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proofDB)
 }
 
-// isRangeValid range-proves keys/vals against the trie. hasGap proves from
-// keys[0] so the range stands alone rather than extending the response.
-func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (proofDB *memorydb.Database, valid, more bool, _ error) {
+// isRangeValid range-proves keys/vals against the trie. Without a gap the proof
+// starts at nextKey, so the span back to the response is covered too.
+func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (valid, more bool, _ error) {
 	var startKey []byte
 	if hasGap {
 		startKey = keys[0]
@@ -514,10 +500,10 @@ func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (proofDB *memoryd
 
 	proofDB, err := q.generateRangeProof(startKey, keys)
 	if err != nil {
-		return nil, false, false, err
+		return false, false, err
 	}
 	more, proofErr := q.verifyRangeProof(keys, vals, startKey, proofDB)
-	return proofDB, proofErr == nil, more, nil
+	return proofErr == nil, more, nil
 }
 
 func iteratorValues(db *memorydb.Database) ([][]byte, error) {
