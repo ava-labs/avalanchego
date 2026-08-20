@@ -347,6 +347,9 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := defaultConfig
+			// Set the ping frequency to one hour so the explicit ping below should be the only
+			// ping sent during the test. Multiple in-flight pings can make a pong appear unexpected
+			// and disconnect the peer.
 			config.PingFrequency = time.Hour
 			config.UptimeCalculator = uptime.TestCalculator{StartTime: tt.startTime}
 			config.UpgradeConfig.HeliconTime = heliconTime
@@ -373,8 +376,7 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 
 			peerUptime := uint32(tt.peerUptime * 100)
 
-			// Send the uptime explicitly to avoid overlapping periodic pings.
-			// Multiple in-flight pings can make a pong appear unexpected and disconnect the peer.
+			// Send the uptime explicitly instead of relying on a periodic ping.
 			ping, err := sender.peerConfig.MessageCreator.Ping(peerUptime)
 			require.NoError(t, err)
 			require.True(t, peers[0].Send(t.Context(), ping))
