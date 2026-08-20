@@ -794,10 +794,10 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			}
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength))
+			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
 
 			resp := &syncpb.GetLeafResponse{}
-			outcome, err := NewClient(net, tracker).Send(ctx, &syncpb.GetLeafRequest{
+			outcome, err := NewClient(net, p2p.EVMLeafRequestHandlerID, tracker).Send(ctx, &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: startKey,
 				KeyLimit: tt.keyLimit,

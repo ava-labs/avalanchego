@@ -26,10 +26,11 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
+// RegisterHandler serves leaf-range requests at handlerID on net. The ID names
+// which trie is served.
+func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
 	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
-	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
+	return net.AddHandler(handlerID, h)
 }
 
 // SnapshotReader serves its reads as taking DiskRoot rather than the
