@@ -174,7 +174,7 @@ func TestParseVerifyBlockSyntax(t *testing.T) {
 		UncleHash: types.EmptyUncleHash,
 		TxHash:    types.EmptyTxsHash,
 	})
-	b, err := New(ethB, nil, nil, log)
+	b, err := New(ethB, nil, hookstest.NewStub(0), log)
 	require.NoError(t, err, "New()")
 	bytes := b.Bytes()
 

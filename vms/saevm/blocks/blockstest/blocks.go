@@ -107,7 +107,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent *blocks.Block, opts ...Blo
 		props.logger = loggingtest.New(tb, logging.Warn)
 	}
 
-	b, err := blocks.New(eth, parent, nil, props.logger)
+	b, err := blocks.New(eth, parent, hookstest.NewStub(0), props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }
