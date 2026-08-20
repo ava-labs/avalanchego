@@ -503,9 +503,7 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
   test-e2e-ci:
-    desc: Runs e2e tests [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled
     cmds:
       - task: build-race
       - task: build-xsvm
