@@ -15,6 +15,7 @@ import (
 
 // TestTrieQueue_ClearIfRootDoesNotMatch checks stale markers are wiped on a root mismatch and kept when the root matches.
 func TestTrieQueue_ClearIfRootDoesNotMatch(t *testing.T) {
+	t.Parallel()
 	const target = "0xbeef"
 	segmentTrie := common.HexToHash("0x33")
 
@@ -29,6 +30,7 @@ func TestTrieQueue_ClearIfRootDoesNotMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			db := rawdb.NewMemoryDatabase()
 			require.NoError(t, customrawdb.WriteSyncRoot(db, common.HexToHash(tt.storedRoot)))
 			require.NoError(t, customrawdb.WriteSyncStorageTrie(db, common.HexToHash("0x11"), common.HexToHash("0x22")))
