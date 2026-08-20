@@ -12,6 +12,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
@@ -44,21 +47,21 @@ func TestResponder_ValidationRejects(t *testing.T) {
 		req  *syncpb.GetLeafRequest
 	}{
 		{
-			name: "zero KeyLimit",
+			name: "zero_key_limit",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: 0,
 			},
 		},
 		{
-			name: "KeyLimit overflows uint16",
+			name: "key_limit_overflows_uint16",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: math.MaxUint16 + 1,
 			},
 		},
 		{
-			name: "StartKey > EndKey",
+			name: "start_key_after_end_key",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -67,7 +70,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 			},
 		},
 		{
-			name: "StartKey wrong length",
+			name: "start_key_wrong_length",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: []byte{0x01, 0x02},
@@ -75,7 +78,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 			},
 		},
 		{
-			name: "RootHash empty",
+			name: "root_hash_empty",
 			req: &syncpb.GetLeafRequest{
 				RootHash: common.Hash{}.Bytes(),
 				KeyLimit: 10,
@@ -102,8 +105,14 @@ func TestResponder_Serves(t *testing.T) {
 		name  string
 		limit uint32
 	}{
-		{name: "whole trie has no proof", limit: numKeys},
-		{name: "partial range includes proof", limit: numKeys / 2},
+		{
+			name:  "whole_trie_has_no_proof",
+			limit: numKeys,
+		},
+		{
+			name:  "partial_range_includes_proof",
+			limit: numKeys / 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -145,10 +154,25 @@ func TestResponder_Rejects(t *testing.T) {
 		cancelCtx   bool
 		wantErr     *avacommon.AppError
 	}{
-		{name: "missing root", limit: numKeys, badRoot: true, wantErr: errRootNotFound},
+		{
+			name:    "missing_root",
+			limit:   numKeys,
+			badRoot: true,
+			wantErr: errRootNotFound,
+		},
 		// A corrupt trie fails the proof step, a server fault.
-		{name: "corrupted trie", limit: numKeys / 2, corruptTrie: true, wantErr: p2p.ErrUnexpected},
-		{name: "cancelled context", limit: numKeys, cancelCtx: true, wantErr: errServingCancelled},
+		{
+			name:        "corrupted_trie",
+			limit:       numKeys / 2,
+			corruptTrie: true,
+			wantErr:     p2p.ErrUnexpected,
+		},
+		{
+			name:      "cancelled_context",
+			limit:     numKeys,
+			cancelCtx: true,
+			wantErr:   errServingCancelled,
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,13 +224,26 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 	const numAccounts = 300
 
 	shapes := []struct {
-		name  string
-		apply func(snapshotCase)
+		name        string
+		corruptFrom int
+		corruptTo   int
+		dropFrom    int
+		dropTo      int
 	}{
-		{name: "mirrors the trie", apply: func(snapshotCase) {}},
-		{name: "corrupt middle segment", apply: func(c snapshotCase) { c.corrupt(64, 128) }},
+		{
+			name: "mirrors_the_trie",
+		},
+		{
+			name:        "corrupt_middle_segment",
+			corruptFrom: 64,
+			corruptTo:   128,
+		},
 		// The only shape where the segment trim bites.
-		{name: "missing leaves", apply: func(c snapshotCase) { c.drop(1, 100) }},
+		{
+			name:     "missing_leaves",
+			dropFrom: 1,
+			dropTo:   100,
+		},
 	}
 
 	for _, limit := range []uint32{1, 63, 64, 65, 129, 200} {
@@ -215,7 +252,8 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 				t.Parallel()
 				trieDB := synctest.NewTrieDB()
 				c := newAccountCase(t, trieDB, numAccounts)
-				shape.apply(c)
+				c.corrupt(shape.corruptFrom, shape.corruptTo)
+				c.drop(shape.dropFrom, shape.dropTo)
 
 				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
@@ -238,19 +276,19 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 	const numAccounts = 300
 
 	divergences := map[string][2]int{
-		"mirrors the trie": {0, 0},
-		"head segment":     {0, 64},
-		"middle segment":   {64, 128},
-		"segment boundary": {63, 65},
-		"tail segment":     {236, numAccounts},
-		"every segment":    {0, numAccounts},
+		"mirrors_the_trie": {0, 0},
+		"head_segment":     {0, 64},
+		"middle_segment":   {64, 128},
+		"segment_boundary": {63, 65},
+		"tail_segment":     {236, numAccounts},
+		"every_segment":    {0, numAccounts},
 	}
 	limits := map[string]uint32{
-		"whole trie":      numAccounts,
-		"under a segment": 1,
-		"one segment":     64,
-		"past a segment":  65,
-		"over the cap":    uint32(MaxLeavesLimit) + 10,
+		"whole_trie":      numAccounts,
+		"under_a_segment": 1,
+		"one_segment":     64,
+		"past_a_segment":  65,
+		"over_the_cap":    uint32(MaxLeavesLimit) + 10,
 	}
 
 	for dname, diverge := range divergences {
@@ -418,8 +456,14 @@ var snapshotKinds = []struct {
 	name  string
 	build func(*testing.T, *triedb.Database, int) snapshotCase
 }{
-	{name: "account", build: newAccountCase},
-	{name: "storage", build: newStorageCase},
+	{
+		name:  "account",
+		build: newAccountCase,
+	},
+	{
+		name:  "storage",
+		build: newStorageCase,
+	},
 }
 
 // snapshotCase is a trie plus a snapshot mirroring it, for one kind of leaf.
@@ -435,11 +479,14 @@ type snapshotCase struct {
 
 // drop removes [from, to) from the snapshot only, so the trie holds leaves the
 // snapshot lacks and a bridge overshoots the snapshot index.
-func (c snapshotCase) drop(from, to int) {
+func (c *snapshotCase) drop(from, to int) {
 	kept := make([]synctest.StaticPair, 0, len(c.leaves))
 	kept = append(kept, c.leaves[:from]...)
 	kept = append(kept, c.leaves[to:]...)
 	c.snap.Accounts = kept
+	// leaves must keep aliasing the snapshot, otherwise a later corrupt
+	// mutates a slice the snapshot no longer holds.
+	c.leaves = kept
 }
 
 // corrupt points [from, to) at leaf 0's value, well formed but not matching the
@@ -488,13 +535,38 @@ func TestResponder_Snapshot(t *testing.T) {
 		corruptTo   int
 		err         bool
 	}{
-		{name: "fast path serves leaves"},
-		{name: "slow path bridges an invalid middle segment", corruptFrom: 64, corruptTo: 128},
-		{name: "invalid head segment", corruptFrom: 0, corruptTo: 64},
-		{name: "invalid tail segment", corruptFrom: 128, corruptTo: numLeaves},
-		{name: "invalid segment boundary", corruptFrom: 63, corruptTo: 65},
-		{name: "all invalid falls back to trie", corruptFrom: 0, corruptTo: numLeaves},
-		{name: "unavailable snapshot falls back to trie", err: true},
+		{
+			name: "fast_path_serves_leaves",
+		},
+		{
+			name:        "slow_path_bridges_an_invalid_middle_segment",
+			corruptFrom: 64,
+			corruptTo:   128,
+		},
+		{
+			name:        "invalid_head_segment",
+			corruptFrom: 0,
+			corruptTo:   64,
+		},
+		{
+			name:        "invalid_tail_segment",
+			corruptFrom: 128,
+			corruptTo:   numLeaves,
+		},
+		{
+			name:        "invalid_segment_boundary",
+			corruptFrom: 63,
+			corruptTo:   65,
+		},
+		{
+			name:        "all_invalid_falls_back_to_trie",
+			corruptFrom: 0,
+			corruptTo:   numLeaves,
+		},
+		{
+			name: "unavailable_snapshot_falls_back_to_trie",
+			err:  true,
+		},
 	}
 
 	for _, kind := range snapshotKinds {
@@ -562,10 +634,27 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 		iterErr  bool
 		wantLen  int
 	}{
-		{name: "every leaf", keyLimit: numLeaves, wantLen: numLeaves},
-		{name: "key limit truncates", keyLimit: 5, wantLen: 5},
-		{name: "end key truncates", keyLimit: numLeaves, endAt: 8, wantLen: 8},
-		{name: "iteration failure reads nothing", keyLimit: numLeaves, iterErr: true},
+		{
+			name:     "every_leaf",
+			keyLimit: numLeaves,
+			wantLen:  numLeaves,
+		},
+		{
+			name:     "key_limit_truncates",
+			keyLimit: 5,
+			wantLen:  5,
+		},
+		{
+			name:     "end_key_truncates",
+			keyLimit: numLeaves,
+			endAt:    8,
+			wantLen:  8,
+		},
+		{
+			name:     "iteration_failure_reads_nothing",
+			keyLimit: numLeaves,
+			iterErr:  true,
+		},
 	}
 
 	for _, kind := range snapshotKinds {
@@ -609,8 +698,14 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 		corruptFrom int
 		corruptTo   int
 	}{
-		{name: "whole range at once"},
-		{name: "bridged middle segment", corruptFrom: 64, corruptTo: 128},
+		{
+			name: "whole_range_at_once",
+		},
+		{
+			name:        "bridged_middle_segment",
+			corruptFrom: 64,
+			corruptTo:   128,
+		},
 	}
 
 	for _, kind := range snapshotKinds {
@@ -631,4 +726,108 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
+	t.Parallel()
+
+	const numLeaves = 50
+
+	tests := []struct {
+		name string
+		// startAt indexes the first leaf wanted, 0 leaves the start key unset.
+		startAt   int
+		keyLimit  uint32
+		wantLen   int
+		wantProof bool
+		wantMore  bool
+	}{
+		{
+			name:     "whole_trie_carries_no_proof",
+			keyLimit: numLeaves,
+			wantLen:  numLeaves,
+		},
+		{
+			name:      "partial_range_carries_a_proof",
+			keyLimit:  20,
+			wantLen:   20,
+			wantProof: true,
+			wantMore:  true,
+		},
+		// Only a range that starts at the trie's head may omit the proof, so
+		// reaching the end from a start key does not make the root sufficient.
+		{
+			name:      "range_to_the_end_still_carries_a_proof",
+			startAt:   10,
+			keyLimit:  numLeaves,
+			wantLen:   numLeaves - 10,
+			wantProof: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			trieDB := synctest.NewTrieDB()
+			root, keys, vals := synctest.FillTrie(t, trieDB, numLeaves)
+
+			firstKey := bytes.Repeat([]byte{0x00}, common.HashLength)
+			var startKey []byte
+			if tt.startAt > 0 {
+				startKey = keys[tt.startAt]
+				firstKey = startKey
+			}
+
+			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength))
+
+			resp := &syncpb.GetLeafResponse{}
+			outcome, err := NewClient(net, tracker).Send(ctx, &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				StartKey: startKey,
+				KeyLimit: tt.keyLimit,
+			}, resp)
+			require.NoError(t, err)
+			outcome.Success()
+
+			to := tt.startAt + tt.wantLen
+			require.Equal(t, keys[tt.startAt:to], resp.GetKeys())
+			require.Equal(t, vals[tt.startAt:to], resp.GetValues())
+			require.Equal(t, tt.wantProof, len(resp.GetProofVals()) > 0, "proof presence")
+
+			// libevm is the oracle for the proof the handler emits.
+			more, err := trie.VerifyRangeProof(root, firstKey,
+				resp.GetKeys(), resp.GetValues(), proofFrom(t, resp.GetProofVals()))
+			require.NoError(t, err)
+			require.Equal(t, tt.wantMore, more)
+		})
+	}
+}
+
+// proofFrom rebuilds proof nodes keyed by hash. Nil for a whole-trie response,
+// which VerifyRangeProof then checks against the root alone.
+func proofFrom(t *testing.T, vals [][]byte) ethdb.Database {
+	t.Helper()
+	if len(vals) == 0 {
+		return nil
+	}
+	db := rawdb.NewMemoryDatabase()
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	for _, v := range vals {
+		require.NoError(t, db.Put(crypto.Keccak256(v), v))
+	}
+	return db
+}
+
+func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
+	tb.Helper()
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
+}
+
+func accountBytes(account common.Hash) []byte {
+	if account == (common.Hash{}) {
+		return nil
+	}
+	return account.Bytes()
 }
