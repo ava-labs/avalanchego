@@ -33,8 +33,8 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, trieDB *triedb.Databa
 	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 
-// SnapshotReader is satisfied by [*snapshot.Tree]. Reads take DiskRoot rather
-// than the requested root, which the tree retires before sync stops asking.
+// SnapshotReader serves its reads as taking DiskRoot rather than the 
+// requested root, which the tree retires before sync stops asking.
 type SnapshotReader interface {
 	DiskRoot() common.Hash
 	AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error)
