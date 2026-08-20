@@ -5,6 +5,7 @@ package evmstate
 
 import (
 	"errors"
+	"iter"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -13,11 +14,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
-// trieQueue persists storage tries discovered while syncing the account trie and
-// hands them back grouped by root. Markers are durable so an interrupted sync resumes.
+// trieQueue persists the storage tries discovered while syncing the account trie and
+// hands them back grouped by root. Markers are durable, so an interrupted sync resumes.
 type trieQueue struct {
-	db              ethdb.Database
-	nextStorageRoot []byte
+	db ethdb.Database
+}
+
+// storageTrieRef is one queued storage trie and every account that references it.
+type storageTrieRef struct {
+	root common.Hash
+	// accounts is never empty for a yielded ref.
+	accounts []common.Hash
 }
 
 func newTrieQueue(db ethdb.Database) *trieQueue {
@@ -25,8 +32,10 @@ func newTrieQueue(db ethdb.Database) *trieQueue {
 }
 
 // clearIfRootDoesNotMatch wipes storage-trie and segment markers when the persisted
-// root differs from root, so a new target never resumes against stale progress. It
-// then records root as the current target.
+// root differs from root, then records root as the current target.
+//
+// It clears markers only. The snapshots are the caller's to wipe, see
+// [NewHashDBSyncer], because leaves left there still count as resume progress.
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	switch {
@@ -78,32 +87,48 @@ func (t *trieQueue) countTries() (int, error) {
 	return tries, it.Error()
 }
 
-// getNextTrie returns the next storage trie, every account referencing it, and
-// whether more remain. A non-empty root guarantees a non-empty account slice.
-func (t *trieQueue) getNextTrie() (common.Hash, []common.Hash, bool, error) {
-	it := customrawdb.NewSyncStorageTriesIterator(t.db, t.nextStorageRoot)
+// storageTries iterates the queued tries, grouped by root, in root order, yielding an
+// error and stopping if the scan fails.
+//
+// The scan reopens per trie so a consumer that blocks between them, as the syncer does
+// while waiting for a slot, never holds a database iterator open for the whole sync.
+func (t *trieQueue) storageTries() iter.Seq2[storageTrieRef, error] {
+	return func(yield func(storageTrieRef, error) bool) {
+		var cursor []byte
+		for {
+			ref, next, err := t.trieAt(cursor)
+			if err != nil {
+				yield(storageTrieRef{}, err)
+				return
+			}
+			if len(ref.accounts) == 0 {
+				return
+			}
+			if !yield(ref, nil) || next == nil {
+				return
+			}
+			cursor = next
+		}
+	}
+}
+
+// trieAt collects the accounts of the first trie at or after cursor, and where the next
+// one starts, or nil if this was the last.
+func (t *trieQueue) trieAt(cursor []byte) (storageTrieRef, []byte, error) {
+	it := customrawdb.NewSyncStorageTriesIterator(t.db, cursor)
 	defer it.Release()
 
-	var (
-		root     common.Hash
-		accounts []common.Hash
-		more     bool
-	)
-
+	var ref storageTrieRef
 	for it.Next() {
-		nextRoot, nextAccount := customrawdb.ParseSyncStorageTrieKey(it.Key())
-		if root == (common.Hash{}) {
-			root = nextRoot
+		root, account := customrawdb.ParseSyncStorageTrieKey(it.Key())
+		if len(ref.accounts) == 0 {
+			ref.root = root
 		}
-		// A new root means every account for the current root is collected.
-		// Remember where to resume.
-		if root != nextRoot {
-			t.nextStorageRoot = nextRoot[:]
-			more = true
-			break
+		if ref.root != root {
+			// A new root means every account for this trie is collected.
+			return ref, root[:], it.Error()
 		}
-		accounts = append(accounts, nextAccount)
+		ref.accounts = append(ref.accounts, account)
 	}
-
-	return root, accounts, more, it.Error()
+	return ref, nil, it.Error()
 }

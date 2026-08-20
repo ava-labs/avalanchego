@@ -33,13 +33,12 @@ func TestVerifyLeaves(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 	r := newResponder(logging.NoLog{}, trieDB, common.HashLength)
 
+	// A fixture. TestResponder_Serves owns the partial-proof rule.
 	partial, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 20})
 	require.Nil(t, appErr)
-	require.NotEmpty(t, partial.ProofVals, "partial range must carry a proof")
 
 	whole, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: 50})
 	require.Nil(t, appErr)
-	require.Empty(t, whole.ProofVals, "whole trie needs no proof")
 
 	tampered := proto.Clone(partial).(*syncpb.GetLeafResponse)
 	tampered.Values[0] = bytes.Repeat([]byte{0xff}, common.HashLength)
@@ -50,11 +49,30 @@ func TestVerifyLeaves(t *testing.T) {
 		wantMore bool
 		wantErr  error
 	}{
-		{name: "partial has more", resp: partial, wantMore: true},
-		{name: "whole has no more", resp: whole},
-		{name: "tampered value fails the proof", resp: tampered, wantErr: errInvalidRangeProof},
-		{name: "empty without proof", resp: &syncpb.GetLeafResponse{}, wantErr: errEmptyLeafResponse},
-		{name: "too many leaves", resp: &syncpb.GetLeafResponse{Keys: make([][]byte, MaxLeavesLimit+1)}, wantErr: errTooManyLeaves},
+		{
+			name:     "partial has more",
+			resp:     partial,
+			wantMore: true,
+		},
+		{
+			name: "whole has no more",
+			resp: whole,
+		},
+		{
+			name:    "tampered value fails the proof",
+			resp:    tampered,
+			wantErr: errInvalidRangeProof,
+		},
+		{
+			name:    "empty without proof",
+			resp:    &syncpb.GetLeafResponse{},
+			wantErr: errEmptyLeafResponse,
+		},
+		{
+			name:    "too many leaves",
+			resp:    &syncpb.GetLeafResponse{Keys: make([][]byte, MaxLeavesLimit+1)},
+			wantErr: errTooManyLeaves,
+		},
 	}
 
 	for _, tt := range tests {
@@ -71,7 +89,7 @@ func TestVerifyLeaves(t *testing.T) {
 	}
 }
 
-// recordingTask is a test [task] that records the verified leaves handed to it.
+// recordingTask records the leaves handed to it.
 type recordingTask struct {
 	root     common.Hash
 	keys     [][]byte
@@ -83,8 +101,8 @@ func (*recordingTask) Account() common.Hash { return common.Hash{} }
 func (*recordingTask) Start() []byte        { return nil }
 func (*recordingTask) End() []byte          { return nil }
 
-func (r *recordingTask) OnLeaves(_ context.Context, keys, _ [][]byte) error {
-	r.keys = append(r.keys, keys...)
+func (r *recordingTask) OnLeaves(_ context.Context, batch leafBatch) error {
+	r.keys = append(r.keys, batch.keys...)
 	return nil
 }
 
@@ -93,7 +111,7 @@ func (r *recordingTask) OnFinish(context.Context) error {
 	return nil
 }
 
-// runLeafTask drives one task through a single worker against a loopback handler.
+// runLeafTask drives one task through a single worker.
 func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk task) error {
 	t.Helper()
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
@@ -102,7 +120,7 @@ func runLeafTask(t *testing.T, ctx context.Context, handler p2p.Handler, tk task
 	tasks := make(chan task, 1)
 	tasks <- tk
 	close(tasks)
-	return newCallbackSyncer(logging.NoLog{}, NewClient(net, tracker), tasks, 1).sync(ctx)
+	return newLeafFetcher(logging.NoLog{}, NewClient(net, tracker), tasks, 1).sync(ctx)
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
@@ -112,10 +130,26 @@ func TestLeafFetch_Batching(t *testing.T) {
 		numKeys      int
 		wantRequests int32
 	}{
-		{name: "single batch", numKeys: 50, wantRequests: 1},
-		{name: "exact limit", numKeys: int(MaxLeavesLimit), wantRequests: 1},
-		{name: "multiple batches", numKeys: int(MaxLeavesLimit) + 50, wantRequests: 2},
-		{name: "many batches", numKeys: 5000, wantRequests: 5},
+		{
+			name:         "single batch",
+			numKeys:      50,
+			wantRequests: 1,
+		},
+		{
+			name:         "exact limit",
+			numKeys:      int(MaxLeavesLimit),
+			wantRequests: 1,
+		},
+		{
+			name:         "multiple batches",
+			numKeys:      int(MaxLeavesLimit) + 50,
+			wantRequests: 2,
+		},
+		{
+			name:         "many batches",
+			numKeys:      5000,
+			wantRequests: 5,
+		},
 	}
 
 	for _, tt := range tests {
@@ -149,46 +183,54 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 	require.ErrorIs(t, runLeafTask(t, ctx, handler, &recordingTask{root: root}), context.Canceled)
 }
 
-func TestLeafFetch_RejectsTamperedResponse(t *testing.T) {
+// The re-request loop recovers from transient bad responses but never accepts a
+// tampered one, so a peer that always tampers can only be ended by cancellation.
+func TestLeafFetch_BadResponses(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
 
-	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, 50)
-
-	// Every response tampered. Cancel after a few retries.
-	tampering := flakyLeafHandler(trieDB, -1)
-	var attempts atomic.Int32
-	handler := p2p.TestHandler{
-		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
-			if attempts.Add(1) >= 3 {
-				cancel()
-			}
-			return tampering.AppRequest(c, n, d, b)
+	tests := []struct {
+		name string
+		// badResponses is how many responses to corrupt, negative for every one.
+		badResponses int32
+		cancelAfter  int32
+		wantErr      error
+	}{
+		{
+			name:         "recovers after two bad responses",
+			badResponses: 2,
+		},
+		{
+			name:         "never accepts tampered leaves",
+			badResponses: -1,
+			cancelAfter:  3,
+			wantErr:      context.Canceled,
 		},
 	}
 
-	tk := &recordingTask{root: root}
-	require.ErrorIs(t, runLeafTask(t, ctx, handler, tk), context.Canceled, "tampered leaves must never be accepted")
-	require.Empty(t, tk.keys, "tampered responses must not be handed to the task")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+
+			trieDB := synctest.NewTrieDB()
+			root, keys, _ := synctest.FillTrie(t, trieDB, 50)
+			handler, _ := cancelAfterN(flakyLeafHandler(trieDB, tt.badResponses), tt.cancelAfter, cancel)
+
+			tk := &recordingTask{root: root}
+			err := runLeafTask(t, ctx, handler, tk)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Empty(t, tk.keys, "tampered leaves must not reach the task")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, keys, tk.keys)
+		})
+	}
 }
 
-func TestLeafFetch_RecoversAfterBadResponses(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-
-	trieDB := synctest.NewTrieDB()
-	root, keys, _ := synctest.FillTrie(t, trieDB, 50)
-
-	// Corrupt the first two responses, then serve correctly.
-	tk := &recordingTask{root: root}
-	require.NoError(t, runLeafTask(t, ctx, flakyLeafHandler(trieDB, 2), tk), "the re-request loop must recover")
-	require.Equal(t, keys, tk.keys)
-}
-
-// requireReconstructed asserts every pair is queryable through the trie rebuilt into target.
+// requireReconstructed reads every pair back through the rebuilt trie.
 func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash, keys, vals [][]byte) {
 	t.Helper()
 	tr, err := trie.New(trie.TrieID(root), triedb.NewDatabase(target, nil))
@@ -200,7 +242,7 @@ func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash,
 	}
 }
 
-// countingLeafHandler serves leaves and counts the requests it receives.
+// countingLeafHandler counts the requests it serves.
 func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
 	inner := handlers.NewHandler[syncpb.GetLeafRequest](
 		logging.NoLog{},
@@ -216,8 +258,7 @@ func countingLeafHandler(trieDB *triedb.Database) (p2p.Handler, *atomic.Int32) {
 	return h, &requests
 }
 
-// flakyLeafHandler fails the range proof on the first badResponses responses, then
-// serves correctly. A negative badResponses corrupts every response.
+// flakyLeafHandler corrupts the first badResponses responses. Negative corrupts all.
 func flakyLeafHandler(trieDB *triedb.Database, badResponses int32) p2p.Handler {
 	inner := newResponder(logging.NoLog{}, trieDB, common.HashLength)
 	var count atomic.Int32

@@ -6,7 +6,6 @@ package evmstate
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -22,13 +21,13 @@ var (
 	_ types.Syncer    = (*HashDBSyncer)(nil)
 	_ types.Finalizer = (*HashDBSyncer)(nil)
 
+	errRootRequired       = errors.New("root must be non-zero")
 	errCodeSyncerRequired = errors.New("code syncer is required")
 )
 
-// HashDBSyncer reconstructs an EVM state trie on the hashdb stack. A single
-// worker pool drives the account trie and then every discovered storage trie,
-// each split into segments that fetch concurrently. Contract code is fetched by
-// a separate [code.Syncer], which must run concurrently with Sync.
+// HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
+// first, then every storage trie it discovers, each split into concurrently fetched
+// segments. Contract code goes to a [code.Syncer] that must run alongside Sync.
 type HashDBSyncer struct {
 	log        logging.Logger
 	client     *Client
@@ -39,21 +38,20 @@ type HashDBSyncer struct {
 	stats      *trieSyncStats
 	threshold  uint64 // leaf count above which a trie splits into segments
 
-	segments           chan task
-	mainTrieDone       chan struct{}
-	storageTriesDone   chan struct{}
-	triesInProgressSem chan struct{}
+	// scheduler owns the task channel and tracks what needs flushing on failure.
+	scheduler *trieScheduler
 
-	mainTrie  *stateTrie
-	completed atomic.Bool
-
-	lock            sync.Mutex
-	triesInProgress map[common.Hash]*stateTrie
+	mainTrieDone chan struct{}
+	mainTrie     *stateTrie
+	completed    atomic.Bool
 }
 
-// NewHashDBSyncer returns a [HashDBSyncer] for the account trie at root. codeSyncer
-// receives the code hashes discovered while syncing and must be drained by a
-// concurrently running code [code.Syncer]. log reports sync progress.
+// NewHashDBSyncer returns a syncer for the account trie at root. codeSyncer must
+// run concurrently with Sync.
+//
+// The caller must wipe the account and storage snapshots in db unless this run resumes
+// the root already persisted there. Leaves left behind count as resume progress, so
+// another root's leaves would fail the final root check on every attempt.
 func NewHashDBSyncer(log logging.Logger, client *Client, db ethdb.Database, root common.Hash, codeSyncer *code.Syncer) (*HashDBSyncer, error) {
 	if root == (common.Hash{}) {
 		return nil, errRootRequired
@@ -75,33 +73,28 @@ func NewHashDBSyncer(log logging.Logger, client *Client, db ethdb.Database, root
 // Name returns a human-readable name for logging.
 func (*HashDBSyncer) Name() string { return "EVM State Syncer" }
 
-// ID returns the stable identifier used for deduplication and metrics.
+// ID returns the stable identifier for deduplication and metrics.
 func (*HashDBSyncer) ID() string { return "state_evm_state_sync" }
 
-// Sync reconstructs the account trie, then every discovered storage trie,
-// verifying each root. It records the target root on entry for a later resume
-// check.
+// Sync reconstructs the account trie, then every discovered storage trie, verifying
+// each root.
 func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	// No more code is discovered once Sync returns, however it ends.
 	defer s.codeSyncer.CloseInput()
 
-	// Records the target root, wiping stale markers if the previous sync targeted
-	// a different root, so resume never builds on another target's progress.
+	// Wipe stale markers so resume never builds on another target's progress.
 	if err := s.trieQueue.clearIfRootDoesNotMatch(s.root); err != nil {
 		return err
 	}
 
-	s.segments = make(chan task, defaultLeafWorkers*numStorageTrieSegments)
+	s.scheduler = newTrieScheduler(defaultLeafWorkers, numStorageTrieSegments)
 	s.mainTrieDone = make(chan struct{})
-	s.storageTriesDone = make(chan struct{})
-	s.triesInProgressSem = make(chan struct{}, defaultLeafWorkers)
-	s.triesInProgress = make(map[common.Hash]*stateTrie)
 	s.stats = newTrieSyncStats(s.log)
 
 	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeaves(s.db, s.codeSyncer, s.trieQueue), stateTrieConfig{
 		numSegments: numMainTrieSegments,
 		threshold:   s.threshold,
-		tasks:       s.segments,
+		tasks:       s.scheduler.tasks,
 		onDone:      s.onMainTrieDone,
 		isMainTrie:  true,
 		stats:       s.stats,
@@ -110,14 +103,14 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 		return err
 	}
 	s.mainTrie = mainTrie
-	if err := s.queueSegments(ctx, s.mainTrie); err != nil {
+	if err := s.scheduler.queueMain(ctx, s.root, s.mainTrie); err != nil {
 		return err
 	}
 
-	pool := newCallbackSyncer(s.log, s.client, s.segments, defaultLeafWorkers)
+	fetcher := newLeafFetcher(s.log, s.client, s.scheduler.tasks, defaultLeafWorkers)
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		if err := pool.sync(egCtx); err != nil {
+		if err := fetcher.sync(egCtx); err != nil {
 			return err
 		}
 		return s.onSyncComplete()
@@ -126,44 +119,26 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
-// onSyncComplete persists the account trie's node batch after every storage trie
-// has finished, so the state root never lands on disk ahead of the state it
-// commits to.
+// onSyncComplete persists the account trie's nodes only once every storage trie is
+// done, so the state root never lands on disk ahead of the state it commits to.
 func (s *HashDBSyncer) onSyncComplete() error {
-	if err := s.mainTrie.batch.Write(); err != nil {
+	if err := s.mainTrie.commitNodes(); err != nil {
 		return err
 	}
 	s.completed.Store(true)
 	return nil
 }
 
-// Finalize flushes the snapshot writes of every in-progress trie on a failed or
-// cancelled sync, so the next run resumes from the persisted progress rather
-// than re-fetching it. It is a no-op once the sync has completed.
+// Finalize flushes in-progress snapshot writes after a failed or cancelled sync, so
+// the next run resumes instead of re-fetching. A no-op once the sync completed.
+//
+// Call it only after [HashDBSyncer.Sync] returns: it writes without synchronizing
+// against the workers.
 func (s *HashDBSyncer) Finalize() error {
-	if s.completed.Load() {
+	if s.completed.Load() || s.scheduler == nil {
 		return nil
 	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	tries := make([]*stateTrie, 0, len(s.triesInProgress)+1)
-	if s.mainTrie != nil {
-		tries = append(tries, s.mainTrie)
-	}
-	for _, trie := range s.triesInProgress {
-		tries = append(tries, trie)
-	}
-
-	for _, trie := range tries {
-		for _, segment := range trie.segments {
-			if err := segment.batch.Write(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return s.scheduler.flush()
 }
 
 // onMainTrieDone runs when the account trie is verified. Only account leaves
@@ -186,10 +161,8 @@ func (s *HashDBSyncer) onMainTrieDone(ctx context.Context) error {
 	return nil
 }
 
-// storageTrieProducer waits for the account trie to finish, then feeds storage
-// tries into the shared pool, capping concurrent tries with the semaphore. It
-// closes the segments channel once the last storage trie has been queued and no
-// tries remain in progress.
+// storageTrieProducer waits for the account trie, then feeds every storage trie it
+// discovers to the scheduler.
 func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 	select {
 	case <-s.mainTrieDone:
@@ -197,92 +170,42 @@ func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	for {
+	for next, err := range s.trieQueue.storageTries() {
+		if err != nil {
+			return err
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		root, accounts, more, err := s.trieQueue.getNextTrie()
-		if err != nil {
-			return err
-		}
-		if root == (common.Hash{}) && !more {
-			// No storage tries at all.
-			close(s.segments)
-			return nil
-		}
-
-		select {
-		case s.triesInProgressSem <- struct{}{}:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-
-		storageTrie, err := newStateTrie(s.db, root, accounts[0], newStorageLeaves(s.db, accounts), stateTrieConfig{
+		storageTrie, err := newStateTrie(s.db, next.root, next.accounts[0], newStorageLeaves(s.db, next.accounts), stateTrieConfig{
 			numSegments: numStorageTrieSegments,
 			threshold:   s.threshold,
-			tasks:       s.segments,
-			onDone:      s.storageTrieDone(root),
+			tasks:       s.scheduler.tasks,
+			onDone:      s.storageTrieDone(next.root),
 			stats:       s.stats,
 		})
 		if err != nil {
 			return err
 		}
-		s.addTrieInProgress(root, storageTrie)
-		if !more {
-			close(s.storageTriesDone)
-		}
-		if err := s.queueSegments(ctx, storageTrie); err != nil {
+		if err := s.scheduler.queueStorage(ctx, next.root, storageTrie); err != nil {
 			return err
 		}
-		if !more {
-			return nil
-		}
 	}
+
+	return s.scheduler.closeWhenIdle(ctx)
 }
 
-// storageTrieDone returns the completion callback for a storage trie: it
-// releases the semaphore, clears the trie's markers, and closes the segments
-// channel once it is the last trie to finish.
+// storageTrieDone clears a finished trie's markers and hands its slot back.
 func (s *HashDBSyncer) storageTrieDone(root common.Hash) func(context.Context) error {
 	return func(context.Context) error {
-		<-s.triesInProgressSem
+		// Deferred so a failed trie still releases, or the scheduler never goes idle.
+		defer s.scheduler.finishStorage(root)
+
 		if err := s.trieQueue.StorageTrieDone(root); err != nil {
 			return err
 		}
 		s.stats.trieDone(root)
-
-		s.lock.Lock()
-		delete(s.triesInProgress, root)
-		remaining := len(s.triesInProgress)
-		s.lock.Unlock()
-
-		if remaining == 0 {
-			// Close only after the producer has queued the last trie.
-			select {
-			case <-s.storageTriesDone:
-				close(s.segments)
-			default:
-			}
-		}
 		return nil
 	}
-}
-
-// queueSegments feeds a trie's segments into the shared pool.
-func (s *HashDBSyncer) queueSegments(ctx context.Context, trie *stateTrie) error {
-	for _, seg := range trie.segments {
-		select {
-		case s.segments <- seg:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	return nil
-}
-
-func (s *HashDBSyncer) addTrieInProgress(root common.Hash, trie *stateTrie) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.triesInProgress[root] = trie
 }
