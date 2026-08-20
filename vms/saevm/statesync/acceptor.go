@@ -238,7 +238,7 @@ func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastA
 		retErr = errors.Join(retErr, xdb.Close())
 	}()
 
-	block, err := blocks.New(lastSettled, nil, nil, h.snowCtx.Log)
+	block, err := blocks.New(lastSettled, nil, h.hooks, h.snowCtx.Log)
 	if err != nil {
 		return fmt.Errorf("creating block for last settled: %w", err)
 	}

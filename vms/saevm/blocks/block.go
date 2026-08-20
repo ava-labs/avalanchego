@@ -45,7 +45,8 @@ type Block struct {
 	// an early warning system in case of near-miss incorrect predictions.
 	bounds *WorstCaseBounds
 	// Non-nil i.f.f. [Block.MarkExecuted] has returned without error.
-	execution atomic.Pointer[executionResults]
+	execution   atomic.Pointer[executionResults]
+	synchronous bool // set at construction
 
 	// Allows this block to be ruled out as able to be settled at a particular
 	// time (i.e. if this field is >= said time). The pointer MAY be nil if
@@ -77,10 +78,11 @@ func InMemoryBlockCount() int64 {
 // only be done when parsing an encoded Block.
 func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
-		b:        eth,
-		executed: make(chan struct{}),
-		settled:  make(chan struct{}),
-		hooks:    hooks,
+		b:           eth,
+		executed:    make(chan struct{}),
+		settled:     make(chan struct{}),
+		hooks:       hooks,
+		synchronous: hook.Synchronous(hooks, eth.Header()),
 	}
 
 	inMemoryBlockCount.Add(1)
