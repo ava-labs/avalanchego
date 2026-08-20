@@ -84,8 +84,7 @@ type config struct {
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
 	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs. It
-	// MUST be positive; 0 doesn't mean "no timeout" because unbounded execution
-	// is a DoS vector.
+	// MUST be positive.
 	APIMaxDuration               duration `json:"api-max-duration"`
 	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
