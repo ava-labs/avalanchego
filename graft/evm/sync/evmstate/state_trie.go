@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
@@ -43,7 +45,7 @@ type stateTrie struct {
 	stackTrie *trie.StackTrie
 
 	// tasks is the scheduler channel new segments are queued onto.
-	tasks       chan<- task
+	tasks       chan<- leaf.Task
 	numSegments int
 	threshold   uint64
 
@@ -65,7 +67,7 @@ type stateTrie struct {
 type stateTrieConfig struct {
 	numSegments int
 	threshold   uint64
-	tasks       chan<- task
+	tasks       chan<- leaf.Task
 	onDone      func(context.Context) error
 	isMainTrie  bool
 	stats       *trieSyncStats
@@ -140,7 +142,7 @@ func (t *stateTrie) loadSegmentPos(segment *stateSegment) error {
 
 	var lastKey []byte
 	for it.Next() {
-		if !withinRange(it.Key(), segment.end) {
+		if !leaf.WithinRange(it.Key(), segment.end) {
 			break
 		}
 		lastKey = common.CopyBytes(it.Key())
@@ -150,7 +152,7 @@ func (t *stateTrie) loadSegmentPos(segment *stateSegment) error {
 		return err
 	}
 	if lastKey != nil {
-		segment.pos = nextRangeKey(lastKey)
+		segment.pos = leaf.NextRangeKey(lastKey)
 	}
 	return nil
 }
@@ -235,7 +237,7 @@ func (t *stateTrie) hashSegment(ctx context.Context, segment *stateSegment) erro
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if !withinRange(it.Key(), segment.end) {
+		if !leaf.WithinRange(it.Key(), segment.end) {
 			// Belongs to the next segment.
 			break
 		}
@@ -319,19 +321,19 @@ func (s *stateSegment) Start() []byte {
 }
 
 // OnLeaves writes the batch, advances the resume position, and splits if grown.
-func (s *stateSegment) OnLeaves(ctx context.Context, batch leafBatch) error {
-	if err := s.trie.leaves.writeLeaves(ctx, s.batch, batch); err != nil {
+func (s *stateSegment) OnLeaves(ctx context.Context, leaves types.Leaves) error {
+	if err := s.trie.leaves.writeLeaves(ctx, s.batch, leaves); err != nil {
 		return err
 	}
 	if err := flushIfFull(s.batch); err != nil {
 		return err
 	}
-	s.leafCount += uint64(len(batch.keys))
-	if len(batch.keys) > 0 {
-		s.pos = nextRangeKey(batch.lastKey())
+	s.leafCount += uint64(len(leaves.Keys))
+	if len(leaves.Keys) > 0 {
+		s.pos = leaf.NextRangeKey(leaves.Keys[len(leaves.Keys)-1])
 	}
 	if s.trie.stats != nil {
-		s.trie.stats.incLeaves(s, uint64(len(batch.keys)), s.estimateSize())
+		s.trie.stats.incLeaves(s, uint64(len(leaves.Keys)), s.estimateSize())
 	}
 	return s.trie.createSegmentsIfNeeded(ctx, s)
 }
