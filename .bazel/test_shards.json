@@ -1,0 +1,19 @@
+{
+  "shards": [
+    {
+      "name": "avalanchego_unit_tests",
+      "description": "AvalancheGo unit-test shard. Includes root-module Go tests and the libevm patch test. Excludes graft modules and gazelle_test.",
+      "query": "tests((//... except //graft/... except //:gazelle_test) except kind(\"test_suite rule\", //:*))"
+    },
+    {
+      "name": "coreth_unit_tests",
+      "description": "Coreth and EVM graft-module unit tests.",
+      "query": "tests(//graft/coreth/... union //graft/evm/...)"
+    },
+    {
+      "name": "subnet_evm_unit_tests",
+      "description": "Subnet-EVM graft-module unit tests.",
+      "query": "tests(//graft/subnet-evm/...)"
+    }
+  ]
+}
