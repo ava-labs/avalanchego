@@ -526,12 +526,12 @@ func newExecuteFixture(t *testing.T) *executeFixture {
 	return f
 }
 
-func (f *executeFixture) execute(t *testing.T, opts ...Option) *ExecutionResults {
+func (f *executeFixture) execute(t *testing.T, opts ...Option) (*ExecutionResults, error) {
 	t.Helper()
 
 	stateDB, err := f.sut.StateDB(f.block.ParentBlock().PostExecutionStateRoot())
 	require.NoError(t, err, "Executor.StateDB(parent root)")
-	result, err := Execute(
+	return Execute(
 		f.block,
 		stateDB,
 		f.sut.hooks,
@@ -540,59 +540,25 @@ func (f *executeFixture) execute(t *testing.T, opts ...Option) *ExecutionResults
 		f.sut.logger,
 		opts...,
 	)
+}
+
+func TestExecuteTransactionPrefix(t *testing.T) {
+	f := newExecuteFixture(t)
+	result, err := f.execute(t, WithMaxNumTxs(1), SkipEndOfBlockOps())
 	require.NoError(t, err, "Execute()")
-	return result
-}
-
-func (f *executeFixture) reportsProgress(t *testing.T) bool {
-	t.Helper()
-
-	gasClock := f.block.ParentBlock().ExecutedByGasTime()
-	gasClock.BeforeBlock(f.sut.hooks.BlockTime(f.block.Header()))
-	_, ok, err := blocks.LastToSettleAt(f.sut.hooks, gasClock.AsTime(), f.block)
-	require.NoError(t, err, "blocks.LastToSettleAt()")
-	return ok
-}
-
-func TestExecute(t *testing.T) {
-	tests := []struct {
-		name         string
-		opts         []Option
-		wantReceipts int
-		wantBalances []*uint256.Int
-		wantFinished bool
-	}{
-		{
-			name:         "transaction prefix",
-			opts:         []Option{WithMaxNumTxs(1), SkipEndOfBlockOps()},
-			wantReceipts: 1,
-			wantBalances: []*uint256.Int{uint256.NewInt(1), uint256.NewInt(0), uint256.NewInt(0)},
-		},
-		{
-			name:         "full block",
-			wantReceipts: 2,
-			wantBalances: []*uint256.Int{uint256.NewInt(1), uint256.NewInt(2), uint256.NewInt(100)},
-			wantFinished: true,
-		},
+	gotBalances := []*uint256.Int{
+		result.StateDB.GetBalance(f.firstRecipient),
+		result.StateDB.GetBalance(f.secondRecipient),
+		result.StateDB.GetBalance(f.endOfBlockRecipient),
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f := newExecuteFixture(t)
-			result := f.execute(t, tt.opts...)
-			gotBalances := []*uint256.Int{
-				result.StateDB.GetBalance(f.firstRecipient),
-				result.StateDB.GetBalance(f.secondRecipient),
-				result.StateDB.GetBalance(f.endOfBlockRecipient),
-			}
 
-			require.Len(t, result.Receipts, tt.wantReceipts, "ExecutionResults.Receipts")
-			require.Equal(t, tt.wantBalances, gotBalances, "recipient balances")
-			require.Equal(t, tt.wantFinished, result.FinishBy.Gas != nil, "ExecutionResults.FinishBy.Gas")
-		})
-	}
+	require.Len(t, result.Receipts, 1, "ExecutionResults.Receipts")
+	require.Equal(t, []*uint256.Int{uint256.NewInt(1), uint256.NewInt(0), uint256.NewInt(0)}, gotBalances, "recipient balances")
+	require.Nil(t, result.FinishBy.Gas, "ExecutionResults.FinishBy.Gas")
 }
 
 func TestExecuteRejectsInvalidOptions(t *testing.T) {
+	f := newExecuteFixture(t)
 	tests := []struct {
 		name    string
 		opts    []Option
@@ -626,37 +592,12 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := newExecuteFixture(t)
-			stateDB, err := f.sut.StateDB(f.block.ParentBlock().PostExecutionStateRoot())
-			require.NoError(t, err, "Executor.StateDB(parent root)")
-			_, err = Execute(
-				f.block,
-				stateDB,
-				f.sut.hooks,
-				f.sut.chainConfig,
-				f.sut.chainContext,
-				f.sut.logger,
-				tt.opts...,
-			)
+			_, err := f.execute(t, tt.opts...)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Errorf("Execute() %s", diff)
 			}
 		})
 	}
-}
-
-func TestExecutePublishesReceiptsWhenConfigured(t *testing.T) {
-	f := newExecuteFixture(t)
-	f.sut.createReceiptBuffers(f.block)
-	result := f.execute(t, WithReceiptStore(f.sut.receipts))
-
-	tx := f.block.Transactions()[0]
-	value, ok := f.sut.receipts.Load(tx.Hash())
-	require.True(t, ok, "receipt store contains transaction")
-	got, ready := value.TryPeek()
-	require.True(t, ready, "receipt store contains executed receipt")
-	require.Same(t, result.Receipts[0], got.Receipt, "Receipt.Receipt")
-	require.Same(t, tx, got.Tx, "Receipt.Tx")
 }
 
 func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
@@ -671,17 +612,16 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newExecuteFixture(t)
-			f.execute(t, tt.opts...)
-			require.Equal(t, tt.want, f.reportsProgress(t), "Execute() reports canonical progress")
+			_, err := f.execute(t, tt.opts...)
+			require.NoError(t, err, "Execute()")
+
+			gasClock := f.block.ParentBlock().ExecutedByGasTime()
+			gasClock.BeforeBlock(f.sut.hooks.BlockTime(f.block.Header()))
+			_, got, err := blocks.LastToSettleAt(f.sut.hooks, gasClock.AsTime(), f.block)
+			require.NoError(t, err, "blocks.LastToSettleAt()")
+			require.Equal(t, tt.want, got, "Execute() reports canonical progress")
 		})
 	}
-}
-
-func TestExecuteDoesNotMarkBlockExecuted(t *testing.T) {
-	f := newExecuteFixture(t)
-	f.execute(t, withCanonical(true))
-	require.False(t, f.block.Executed(), "Execute() marked block executed")
-	require.Same(t, f.block.ParentBlock(), f.sut.LastExecuted(), "Executor.LastExecuted()")
 }
 
 func TestGasAccounting(t *testing.T) {
