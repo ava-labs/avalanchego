@@ -324,11 +324,15 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 		if q.wholeTrie(more) {
 			return true, nil
 		}
+		if more {
+			// The trie fill extends the response, so collect proves it then.
+			return false, nil
+		}
 		q.resp.ProofVals, err = iteratorValues(proofDB)
 		if err != nil {
 			return false, err
 		}
-		return !more, nil
+		return true, nil
 	}
 
 	return q.fillFromSegments(ctx, snapKeys, snapVals)

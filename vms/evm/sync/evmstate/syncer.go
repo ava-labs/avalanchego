@@ -93,6 +93,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			continue
 		}
 
+		// Verified ranges tile the trie, so a mismatch is unreachable today.
+		// Kept to fail loudly rather than commit a trie that does not match.
 		if root := stack.Commit(); root != s.root {
 			return fmt.Errorf("%w: got %x want %x", errRootMismatch, root, s.root)
 		}

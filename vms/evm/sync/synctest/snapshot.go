@@ -70,7 +70,8 @@ type StaticSnapshot struct {
 
 	Accounts []StaticPair
 	Storage  map[common.Hash][]StaticPair
-	Err      error
+	OpenErr  error
+	IterErr  error
 }
 
 // DiskRoot is the zero hash, never a valid requested root, so a test can tell a
@@ -79,18 +80,18 @@ func (*StaticSnapshot) DiskRoot() common.Hash { return common.Hash{} }
 
 func (s *StaticSnapshot) AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error) {
 	s.record(SnapshotRead{Root: root})
-	if s.Err != nil {
-		return nil, s.Err
+	if s.OpenErr != nil {
+		return nil, s.OpenErr
 	}
-	return &staticAccountIter{pairs: seekPairs(s.Accounts, seek), idx: -1}, nil
+	return &staticAccountIter{pairs: seekPairs(s.Accounts, seek), idx: -1, err: s.IterErr}, nil
 }
 
 func (s *StaticSnapshot) StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error) {
 	s.record(SnapshotRead{Root: root, Account: account})
-	if s.Err != nil {
-		return nil, s.Err
+	if s.OpenErr != nil {
+		return nil, s.OpenErr
 	}
-	return &staticStorageIter{pairs: seekPairs(s.Storage[account], seek), idx: -1}, nil
+	return &staticStorageIter{pairs: seekPairs(s.Storage[account], seek), idx: -1, err: s.IterErr}, nil
 }
 
 // seekPairs drops the entries ordered before seek.
@@ -105,6 +106,7 @@ func seekPairs(pairs []StaticPair, seek common.Hash) []StaticPair {
 type staticAccountIter struct {
 	pairs []StaticPair
 	idx   int
+	err   error
 }
 
 func (it *staticAccountIter) Next() bool {
@@ -120,12 +122,13 @@ func (it *staticAccountIter) Hash() common.Hash {
 }
 
 func (it *staticAccountIter) Account() []byte { return it.pairs[it.idx].V }
-func (*staticAccountIter) Error() error       { return nil }
+func (it *staticAccountIter) Error() error    { return it.err }
 func (*staticAccountIter) Release()           {}
 
 type staticStorageIter struct {
 	pairs []StaticPair
 	idx   int
+	err   error
 }
 
 func (it *staticStorageIter) Next() bool {
@@ -141,7 +144,7 @@ func (it *staticStorageIter) Hash() common.Hash {
 }
 
 func (it *staticStorageIter) Slot() []byte { return it.pairs[it.idx].V }
-func (*staticStorageIter) Error() error    { return nil }
+func (it *staticStorageIter) Error() error { return it.err }
 func (*staticStorageIter) Release()        {}
 
 // SnapshotRead is one iterator a handler opened.

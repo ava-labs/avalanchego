@@ -506,7 +506,7 @@ func TestResponder_Snapshot(t *testing.T) {
 
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 				if tt.err {
-					c.snap.Err = errors.New("snapshot unavailable")
+					c.snap.OpenErr = errors.New("snapshot unavailable")
 				}
 
 				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
@@ -532,4 +532,103 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 	require.NotNil(t, resp)
 	require.Equal(t, c.keys, resp.Keys)
 	require.Equal(t, c.vals, resp.Values)
+}
+
+// newSnapshotQuery opens a query over c's snapshot. The trie fallback hides the
+// snapshot from a response assertion, so these tests read it directly.
+func newSnapshotQuery(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int, endKey []byte) *query {
+	t.Helper()
+	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
+	q, appErr := newQuery(r, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+		RootHash:    c.root.Bytes(),
+		AccountHash: accountBytes(c.account),
+		EndKey:      endKey,
+		KeyLimit:    uint32(keyLimit),
+	})
+	require.Nil(t, appErr)
+	return q
+}
+
+func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
+	t.Parallel()
+
+	const numLeaves = 20
+
+	tests := []struct {
+		name string
+		// keyLimit and endAt bound the read, endAt indexing the last leaf wanted.
+		keyLimit int
+		endAt    int
+		iterErr  bool
+		wantLen  int
+	}{
+		{name: "every leaf", keyLimit: numLeaves, wantLen: numLeaves},
+		{name: "key limit truncates", keyLimit: 5, wantLen: 5},
+		{name: "end key truncates", keyLimit: numLeaves, endAt: 8, wantLen: 8},
+		{name: "iteration failure reads nothing", keyLimit: numLeaves, iterErr: true},
+	}
+
+	for _, kind := range snapshotKinds {
+		for _, tt := range tests {
+			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				trieDB := synctest.NewTrieDB()
+				c := kind.build(t, trieDB, numLeaves)
+				if tt.iterErr {
+					c.snap.IterErr = errors.New("iteration failed")
+				}
+
+				var endKey []byte
+				if tt.endAt > 0 {
+					endKey = c.keys[tt.endAt-1]
+				}
+
+				q := newSnapshotQuery(t, trieDB, c, tt.keyLimit, endKey)
+				keys, vals := q.readFromSnapshot(t.Context())
+
+				if tt.wantLen == 0 {
+					require.Empty(t, keys)
+					require.Empty(t, vals)
+					return
+				}
+				require.Equal(t, c.keys[:tt.wantLen], keys)
+				require.Equal(t, c.vals[:tt.wantLen], vals, "snapshot values must equal the trie leaves")
+			})
+		}
+	}
+}
+
+func TestQuery_SnapshotFillsResponse(t *testing.T) {
+	t.Parallel()
+
+	// 130 leaves spans three snapshotSegmentLen segments.
+	const numLeaves = 130
+
+	tests := []struct {
+		name        string
+		corruptFrom int
+		corruptTo   int
+	}{
+		{name: "whole range at once"},
+		{name: "bridged middle segment", corruptFrom: 64, corruptTo: 128},
+	}
+
+	for _, kind := range snapshotKinds {
+		for _, tt := range tests {
+			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				trieDB := synctest.NewTrieDB()
+				c := kind.build(t, trieDB, numLeaves)
+				c.corrupt(tt.corruptFrom, tt.corruptTo)
+
+				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
+				done, err := q.fillFromSnapshot(t.Context())
+				require.NoError(t, err)
+
+				require.True(t, done, "the snapshot must satisfy a whole-trie request")
+				require.Equal(t, c.keys, q.resp.Keys)
+				require.Equal(t, c.vals, q.resp.Values)
+			})
+		}
+	}
 }
