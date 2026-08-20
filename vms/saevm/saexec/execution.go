@@ -117,17 +117,6 @@ func (e *Executor) processQueue() {
 
 var errFatal = errors.New("fatal execution error")
 
-// executionHooks contains the hooks used while executing a block. It excludes
-// canonical-only hooks.
-type executionHooks interface {
-	GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig)
-	BlockTime(*types.Header) time.Time
-	SettledBy(*types.Header) hook.Settled
-	EndOfBlockOps(*types.Block) ([]hook.Op, error)
-	StartExecutingBlock(params.Rules, *state.StateDB, *types.Header, *types.Block) error
-	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
-}
-
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
@@ -167,10 +156,10 @@ type (
 	}
 
 	executionConfig struct {
-		maxNumTxs     int
-		endOfBlockOps bool
-		canonical     bool
-		receiptStore  ReceiptStore
+		maxNumTxs         int
+		skipEndOfBlockOps bool
+		canonical         bool
+		receiptStore      ReceiptStore
 	}
 
 	// ExecutionResults holds the outputs of [Execute].
@@ -191,18 +180,19 @@ type (
 // Option configures [Execute].
 type Option = options.Option[executionConfig]
 
-// WithMaxNumTxs limits execution to the first maxNumTxs transactions.
+// WithMaxNumTxs limits execution to maxNumTxs transactions from the start of
+// the block. A value of 0 executes no transactions.
 func WithMaxNumTxs(maxNumTxs int) Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.maxNumTxs = maxNumTxs
 	})
 }
 
-// WithEndOfBlockOps configures whether execution applies the block's
-// end-of-block operations and finish-executing-block hook.
-func WithEndOfBlockOps(enabled bool) Option {
+// SkipEndOfBlockOps prevents execution of the block's end-of-block operations
+// and finish-executing-block hook.
+func SkipEndOfBlockOps() Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
-		c.endOfBlockOps = enabled
+		c.skipEndOfBlockOps = true
 	})
 }
 
@@ -223,10 +213,10 @@ func (c *executionConfig) verify(numTxs int) error {
 	if c.maxNumTxs < 0 || c.maxNumTxs > numTxs {
 		return fmt.Errorf("%w: %d not in [0, %d]", errTransactionCountOutOfRange, c.maxNumTxs, numTxs)
 	}
-	if c.endOfBlockOps && c.maxNumTxs != numTxs {
+	if !c.skipEndOfBlockOps && c.maxNumTxs != numTxs {
 		return fmt.Errorf("%w: executing %d of %d transactions", errPartialEndOfBlockExecution, c.maxNumTxs, numTxs)
 	}
-	if c.canonical && !c.endOfBlockOps {
+	if c.canonical && c.skipEndOfBlockOps {
 		return errCanonicalWithoutEndOfBlockOps
 	}
 	if c.receiptStore == nil {
@@ -238,7 +228,7 @@ func (c *executionConfig) verify(numTxs int) error {
 // stateBeforeTransactions applies the state changes required before executing
 // b's transactions, specifically the start-executing-block hook and the
 // EIP-4788 beacon root, mirroring [core.StateProcessor.Process].
-func stateBeforeTransactions(hooks executionHooks, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
 		return fmt.Errorf("start-executing-block hook: %v", err)
 	}
@@ -268,7 +258,7 @@ func stateBeforeTransactions(hooks executionHooks, rules params.Rules, stateDB *
 func Execute(
 	b *blocks.Block,
 	stateDB *state.StateDB,
-	hooks executionHooks,
+	hooks hook.Points,
 	config *params.ChainConfig,
 	chainCtx core.ChainContext,
 	log logging.Logger,
@@ -276,9 +266,8 @@ func Execute(
 ) (*ExecutionResults, error) {
 	txs := b.Transactions()
 	execConfig := options.ApplyTo(&executionConfig{
-		maxNumTxs:     len(txs),
-		endOfBlockOps: true,
-		receiptStore:  &NullReceiptStore{},
+		maxNumTxs:    len(txs),
+		receiptStore: &NullReceiptStore{},
 	}, opts...)
 	if err := execConfig.verify(len(txs)); err != nil {
 		return nil, err
@@ -373,7 +362,7 @@ func Execute(
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 	}
-	if !execConfig.endOfBlockOps {
+	if execConfig.skipEndOfBlockOps {
 		return r, nil
 	}
 

@@ -564,7 +564,7 @@ func TestExecute(t *testing.T) {
 	}{
 		{
 			name:         "transaction prefix",
-			opts:         []Option{WithMaxNumTxs(1), WithEndOfBlockOps(false)},
+			opts:         []Option{WithMaxNumTxs(1), SkipEndOfBlockOps()},
 			wantReceipts: 1,
 			wantBalances: []*uint256.Int{uint256.NewInt(1), uint256.NewInt(0), uint256.NewInt(0)},
 		},
@@ -588,6 +588,59 @@ func TestExecute(t *testing.T) {
 			require.Len(t, result.Receipts, tt.wantReceipts, "ExecutionResults.Receipts")
 			require.Equal(t, tt.wantBalances, gotBalances, "recipient balances")
 			require.Equal(t, tt.wantFinished, result.FinishBy.Gas != nil, "ExecutionResults.FinishBy.Gas")
+		})
+	}
+}
+
+func TestExecuteRejectsInvalidOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    []Option
+		wantErr testerr.Want
+	}{
+		{
+			name:    "negative transaction count",
+			opts:    []Option{WithMaxNumTxs(-1)},
+			wantErr: testerr.Is(errTransactionCountOutOfRange),
+		},
+		{
+			name:    "excessive transaction count",
+			opts:    []Option{WithMaxNumTxs(3)},
+			wantErr: testerr.Is(errTransactionCountOutOfRange),
+		},
+		{
+			name:    "partial end-of-block execution",
+			opts:    []Option{WithMaxNumTxs(1)},
+			wantErr: testerr.Is(errPartialEndOfBlockExecution),
+		},
+		{
+			name:    "canonical without end-of-block operations",
+			opts:    []Option{withCanonical(true), SkipEndOfBlockOps()},
+			wantErr: testerr.Is(errCanonicalWithoutEndOfBlockOps),
+		},
+		{
+			name:    "nil receipt store",
+			opts:    []Option{WithReceiptStore(nil)},
+			wantErr: testerr.Is(errNilReceiptStore),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newExecuteFixture(t)
+			stateDB, err := f.sut.StateDB(f.block.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+			_, err = Execute(
+				f.block,
+				stateDB,
+				f.sut.hooks,
+				f.sut.chainConfig,
+				f.sut.chainContext,
+				f.sut.logger,
+				tt.opts...,
+			)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Errorf("Execute() %s", diff)
+			}
 		})
 	}
 }
