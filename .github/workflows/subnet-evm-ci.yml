@@ -133,7 +133,9 @@ jobs:
 
   test_build_antithesis_images:
     name: Build Antithesis images
-    runs-on: ubuntu-24.04
+    # Use a faster runner pending migration to bazel. The default free runners result
+    # in 20+ minute runtime, slowing down every PR and merge queue CI run.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
