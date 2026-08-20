@@ -6,62 +6,50 @@ package block
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// GetAncestors returns the blocks starting with the block with the given ID and
-// continuing with its ancestors, up to the given maximum number of blocks or
-// maximum total size of blocks. The returned blocks are in order from the
-// requested block to its ancestors. Only accepted blocks are served, any other
-// block is treated as not found. For more details about guarantees, see
-// [github.com/ava-labs/avalanchego/snow/engine/snowman/block.GetAncestors].
+// GetAncestors returns the accepted block at height num followed by its
+// ancestors, in descending height order.
 //
-// TODO(StephenButtolph): Expose this on the VM to back
-// [github.com/ava-labs/avalanchego/snow/engine/snowman/block.BatchedChainVM], so
-// the consensus engine and the sync handler share one walk.
+// The walk stops once any of the following conditions are met:
+//   - maxBlocks blocks have been served
+//   - the next block would push the total size past maxSize
+//   - ctx is done
+//
+// The first block is exempt from all three limits, so it is served whenever it
+// exists.
+//
+// A height with no accepted block yields no blocks and no error.
 func GetAncestors(
 	ctx context.Context,
 	db ethdb.Reader,
-	blkID ids.ID,
-	maxBlocksNum int,
-	maxBlocksSize int,
-	maxBlocksRetrievalTime time.Duration,
+	num uint64,
+	maxBlocks int,
+	maxSize int,
 ) ([][]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, maxBlocksRetrievalTime)
-	defer cancel()
-
-	hash := common.Hash(blkID)
-	requestedNum := rawdb.ReadHeaderNumber(db, hash)
-	if requestedNum == nil {
-		return nil, nil // hash is not accepted
-	}
-	num := *requestedNum
-	if rawdb.ReadCanonicalHash(db, *requestedNum) != hash {
-		return nil, nil // requested block is not canonical
+	hash := rawdb.ReadCanonicalHash(db, num)
+	if hash == (common.Hash{}) {
+		return nil, nil // no accepted block at this height
 	}
 
 	// TODO(StephenButtolph): Measure the performance impact of iterative
 	// fetching rather than using DB iterators on real databases.
 	var (
 		numBlocks = min(
-			uint64(max(maxBlocksNum, 1)), //#nosec G115 -- non-negative by max()
+			uint64(max(maxBlocks, 1)), //#nosec G115 -- non-negative by max()
 			num+1,
 		)
 		blocks = make([][]byte, 0, numBlocks)
 		size   int
 	)
 	for range numBlocks {
-		// Returning no blocks reports to the caller that we don't have the
-		// requested block. Even if we have exceeded the time limit, we should
-		// still attempt to return at least the requested block if it exists.
+		// An empty result tells the caller the requested block is missing, so
+		// serve it even past the deadline.
 		if len(blocks) > 0 && ctx.Err() != nil {
 			break
 		}
@@ -79,18 +67,18 @@ func GetAncestors(
 			return nil, fmt.Errorf("splicing stored block %d: %v", num, err)
 		}
 
-		// Even if the first block exceeds maxBlocksSize, we still return it to
-		// support very large blocks.
-		size += len(block) + wrappers.IntLen
-		if len(blocks) > 0 && size > maxBlocksSize {
+		// The first block is exempt from maxSize, so very large blocks remain
+		// servable.
+		size += len(block)
+		if len(blocks) > 0 && size > maxSize {
 			break
 		}
 		blocks = append(blocks, block)
 
-		// It is possible for the last iteration to underflow num, but the loop
-		// will exit before reading num again.
+		// Although the last iteration may underflow num, the loop will exit
+		// before reading num again.
 		num--
 		hash = types.HeaderParentHashFromRLP(header)
 	}
-	return blocks, nil
+	return blocks, nil //nolint:nilerr // a done ctx truncates the walk rather than failing it
 }
