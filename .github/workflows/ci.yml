@@ -98,8 +98,8 @@ jobs:
       fail-fast: false
       matrix:
         # The default free runners lack the resources for parallel execution, so
-        # beefier runners are required.
-        os: [blacksmith-4vcpu-ubuntu-2404, ubuntu-24.04-arm-4-core]
+        # a beefier runner is required.
+        os: [blacksmith-4vcpu-ubuntu-2404]
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
