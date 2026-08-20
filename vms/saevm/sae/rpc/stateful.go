@@ -170,7 +170,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		b.ChainContext(),
 		b.Logger(),
 		saexec.WithMaxNumTxs(txIndex),
-		saexec.WithEndOfBlockOps(false),
+		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
@@ -308,7 +308,7 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 		b.ChainContext(),
 		b.Logger(),
 		saexec.WithMaxNumTxs(0),
-		saexec.WithEndOfBlockOps(false),
+		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
 		return nil, nil, err
