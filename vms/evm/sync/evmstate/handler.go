@@ -50,6 +50,7 @@ type responder struct {
 	trieDB        *triedb.Database
 	snapshot      SnapshotReader // optional
 	trieKeyLength int
+	zeroKey       []byte // read-only stand-in for an absent start key
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
@@ -61,6 +62,7 @@ func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int
 		trieDB:        trieDB,
 		snapshot:      cfg.snapshot,
 		trieKeyLength: trieKeyLength,
+		zeroKey:       bytes.Repeat([]byte{0x00}, trieKeyLength),
 	}
 }
 
@@ -117,7 +119,7 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	if appErr != nil {
 		return nil, appErr
 	}
-	return q.run(ctx)
+	return q.run(ctx, nodeID)
 }
 
 // validateRequest returns why req is malformed, empty when it is valid. The
@@ -147,13 +149,12 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
 // query holds one in-flight leaf request.
 type query struct {
 	log      logging.Logger
-	nodeID   ids.NodeID
 	startKey []byte
 	endKey   []byte
 	rootHash common.Hash
 	account  common.Hash // empty for account trie, non-empty for storage trie
 	limit    uint16
-	zeroKey  []byte // cached for empty-start proofs
+	zeroKey  []byte
 
 	trie     *trie.Trie
 	snapshot SnapshotReader
@@ -178,13 +179,12 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 	limit := uint16(min(req.GetKeyLimit(), uint32(MaxLeavesLimit)))
 	return &query{
 		log:      r.log,
-		nodeID:   nodeID,
 		startKey: req.GetStartKey(),
 		endKey:   req.GetEndKey(),
 		rootHash: root,
 		account:  common.BytesToHash(req.GetAccountHash()),
 		limit:    limit,
-		zeroKey:  bytes.Repeat([]byte{0x00}, r.trieKeyLength),
+		zeroKey:  r.zeroKey,
 		trie:     t,
 		snapshot: r.snapshot,
 		resp: &syncpb.GetLeafResponse{
@@ -254,13 +254,13 @@ func (q *query) attachProof(more bool) error {
 
 // run executes the collect pipeline. A pipeline failure is a server fault,
 // a cancellation before any leaves were read tells the peer we gave up.
-func (q *query) run(ctx context.Context) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if err := q.collect(ctx); err != nil {
-		return nil, handlers.Fault(q.log, q.nodeID, err)
+		return nil, handlers.Fault(q.log, nodeID, err)
 	}
 	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
 		q.log.Debug("rejecting request",
-			zap.Stringer("nodeID", q.nodeID),
+			zap.Stringer("nodeID", nodeID),
 			zap.String("reason", "cancelled before any leaves were iterated"),
 			zap.Error(ctx.Err()),
 		)
@@ -274,9 +274,9 @@ func (q *query) run(ctx context.Context) (*syncpb.GetLeafResponse, *avacommon.Ap
 func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	snapCtx := ctx
 	if deadline, ok := ctx.Deadline(); ok {
-		bufferedDeadline := time.Now().Add(time.Until(deadline) * snapshotReadDeadlinePercent / 100)
 		var cancel context.CancelFunc
-		snapCtx, cancel = context.WithDeadline(ctx, bufferedDeadline)
+		budget := time.Until(deadline) * snapshotReadDeadlinePercent / 100
+		snapCtx, cancel = context.WithDeadline(ctx, time.Now().Add(budget))
 		defer cancel()
 	}
 
@@ -292,7 +292,7 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 		return false, err
 	}
 	if valid {
-		q.resp.Keys, q.resp.Values = snapKeys, snapVals
+		q.appendLeaves(snapKeys, snapVals)
 		return q.wholeTrie(more), nil
 	}
 
@@ -386,7 +386,6 @@ func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 // exactly like no snapshot at all, so every way of getting here is reported.
 func (q *query) abandonSnapshot(reason string, err error) {
 	q.log.Debug("snapshot read abandoned, falling back to the trie",
-		zap.Stringer("nodeID", q.nodeID),
 		zap.String("reason", reason),
 		zap.Stringer("account", q.account),
 		zap.Error(err),
