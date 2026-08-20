@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -21,6 +22,26 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
+
+// duration is a [time.Duration] that JSON-unmarshals from a duration string
+// (e.g. "10s") as well as from the bare number of nanoseconds that
+// [time.Duration] alone accepts. Operator configs use both.
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil { // not a JSON string, so the only other option is a number
+		return json.Unmarshal(b, &d.Duration)
+	}
+	d.Duration, err = time.ParseDuration(s)
+	return err
+}
+
+func (d duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
 // from the configBytes passed to [VM.Initialize].
@@ -58,8 +79,12 @@ type config struct {
 	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
-	BatchRequestLimit            uint64 `json:"batch-request-limit"`
-	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
+	BatchRequestLimit uint64 `json:"batch-request-limit"`
+	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs. It
+	// MUST be positive; 0 doesn't mean "no timeout" because unbounded execution
+	// is a DoS vector.
+	APIMaxDuration               duration `json:"api-max-duration"`
+	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -90,6 +115,7 @@ func defaultConfig() config {
 		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
 		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
+		APIMaxDuration:               duration{rpc.DefaultEVMTimeout},
 		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
 	}
 }
@@ -141,6 +167,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 		RPCConfig: rpc.Config{
 			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
 			BatchRequestLimit:            c.BatchRequestLimit,
+			EVMTimeout:                   c.APIMaxDuration.Duration,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,

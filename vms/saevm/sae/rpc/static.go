@@ -20,8 +20,9 @@ func (b *backend) ChainDb() ethdb.Database { //nolint:staticcheck // this name r
 }
 
 const (
-	// EVMTimeout limits how long an eth_call runs.
-	EVMTimeout = 10 * time.Second
+	// DefaultEVMTimeout is the [Config.EVMTimeout] used when an operator leaves
+	// it unset.
+	DefaultEVMTimeout = 10 * time.Second
 	// GasCap limits the gas an eth_call can use.
 	GasCap = 50_000_000
 	// TxFeeCap limits the fee, in AVAX, of a transaction sent over RPC. The fee
@@ -29,8 +30,8 @@ const (
 	TxFeeCap = 100
 )
 
-func (*backend) RPCEVMTimeout() time.Duration {
-	return EVMTimeout
+func (b *backend) RPCEVMTimeout() time.Duration {
+	return b.config.EVMTimeout
 }
 
 func (*backend) RPCGasCap() uint64 {
