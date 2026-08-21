@@ -487,138 +487,156 @@ func TestEndOfBlockOps(t *testing.T) {
 	})
 }
 
-type executeFixture struct {
-	sut                 *SUT
-	block               *blocks.Block
-	firstRecipient      common.Address
-	secondRecipient     common.Address
-	endOfBlockRecipient common.Address
-}
-
-func newExecuteFixture(t *testing.T) *executeFixture {
-	t.Helper()
-
+func TestExecuteTransactionPrefix(t *testing.T) {
 	_, sut := newSUT(t)
-	f := &executeFixture{
-		sut:                 sut,
-		firstRecipient:      common.Address{'f', 'i', 'r', 's', 't'},
-		secondRecipient:     common.Address{'s', 'e', 'c', 'o', 'n', 'd'},
-		endOfBlockRecipient: common.Address{'e', 'n', 'd'},
-	}
-	f.block = sut.chain.NewBlock(t, types.Transactions{
+	firstRecipient := common.Address{'f', 'i', 'r', 's', 't'}
+	secondRecipient := common.Address{'s', 'e', 'c', 'o', 'n', 'd'}
+	endOfBlockRecipient := common.Address{'e', 'n', 'd'}
+	b := sut.chain.NewBlock(t, types.Transactions{
 		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &f.firstRecipient,
+			To:       &firstRecipient,
 			Value:    big.NewInt(1),
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
 		}),
 		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &f.secondRecipient,
+			To:       &secondRecipient,
 			Value:    big.NewInt(2),
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
 		}),
 	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
+		Gas: 1,
 		Mint: []saehookstest.AccountCredit{{
-			Address: f.endOfBlockRecipient,
+			Address: endOfBlockRecipient,
 			Amount:  *uint256.NewInt(100),
 		}},
 	}})))
-	return f
-}
-
-func (f *executeFixture) execute(t *testing.T, opts ...Option) (*ExecutionResults, error) {
-	t.Helper()
-
-	stateDB, err := f.sut.StateDB(f.block.ParentBlock().PostExecutionStateRoot())
+	stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	require.NoError(t, err, "Executor.StateDB(parent root)")
-	return Execute(
-		f.block,
-		stateDB,
-		f.sut.hooks,
-		f.sut.chainConfig,
-		f.sut.chainContext,
-		f.sut.logger,
-		opts...,
-	)
-}
 
-func TestExecuteTransactionPrefix(t *testing.T) {
-	f := newExecuteFixture(t)
-	result, err := f.execute(t, WithMaxNumTxs(1), SkipEndOfBlockOps())
+	result, err := Execute(
+		b,
+		stateDB,
+		sut.hooks,
+		sut.chainConfig,
+		sut.chainContext,
+		sut.logger,
+		WithMaxNumTxs(1),
+		SkipEndOfBlockOps(),
+	)
 	require.NoError(t, err, "Execute()")
 	gotBalances := []*uint256.Int{
-		result.StateDB.GetBalance(f.firstRecipient),
-		result.StateDB.GetBalance(f.secondRecipient),
-		result.StateDB.GetBalance(f.endOfBlockRecipient),
+		result.StateDB.GetBalance(firstRecipient),
+		result.StateDB.GetBalance(secondRecipient),
+		result.StateDB.GetBalance(endOfBlockRecipient),
 	}
 
 	require.Len(t, result.Receipts, 1, "ExecutionResults.Receipts")
 	require.Equal(t, []*uint256.Int{uint256.NewInt(1), uint256.NewInt(0), uint256.NewInt(0)}, gotBalances, "recipient balances")
+	require.Equal(t, gas.Gas(params.TxGas), result.GasConsumed, "ExecutionResults.GasConsumed")
 	require.Nil(t, result.FinishBy.Gas, "ExecutionResults.FinishBy.Gas")
 }
 
 func TestExecuteRejectsInvalidOptions(t *testing.T) {
-	f := newExecuteFixture(t)
+	_, sut := newSUT(t)
+	b := sut.chain.NewBlock(t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{}),
+	})
 	tests := []struct {
 		name    string
 		opts    []Option
-		wantErr testerr.Want
+		wantErr error
 	}{
 		{
 			name:    "negative transaction count",
 			opts:    []Option{WithMaxNumTxs(-1)},
-			wantErr: testerr.Is(errTransactionCountOutOfRange),
+			wantErr: errTransactionCountOutOfRange,
 		},
 		{
 			name:    "excessive transaction count",
-			opts:    []Option{WithMaxNumTxs(3)},
-			wantErr: testerr.Is(errTransactionCountOutOfRange),
+			opts:    []Option{WithMaxNumTxs(2)},
+			wantErr: errTransactionCountOutOfRange,
 		},
 		{
 			name:    "partial end-of-block execution",
-			opts:    []Option{WithMaxNumTxs(1)},
-			wantErr: testerr.Is(errPartialEndOfBlockExecution),
+			opts:    []Option{WithMaxNumTxs(0)},
+			wantErr: errPartialEndOfBlockExecution,
 		},
 		{
 			name:    "canonical without end-of-block operations",
-			opts:    []Option{withCanonical(true), SkipEndOfBlockOps()},
-			wantErr: testerr.Is(errCanonicalWithoutEndOfBlockOps),
+			opts:    []Option{withCanonical(), SkipEndOfBlockOps()},
+			wantErr: errCanonicalWithoutEndOfBlockOps,
 		},
 		{
 			name:    "nil receipt store",
 			opts:    []Option{WithReceiptStore(nil)},
-			wantErr: testerr.Is(errNilReceiptStore),
+			wantErr: errNilReceiptStore,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := f.execute(t, tt.opts...)
-			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Errorf("Execute() %s", diff)
-			}
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.ErrorIs(t, err, tt.wantErr, "Execute() with %s options", tt.name)
 		})
 	}
 }
 
 func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 	tests := []struct {
-		name string
-		opts []Option
-		want bool
+		name   string
+		withTx bool
+		ops    []saehookstest.Op
+		opts   []Option
+		want   bool
 	}{
-		{name: "non-canonical"},
-		{name: "canonical", opts: []Option{withCanonical(true)}, want: true},
+		{
+			name:   "non-canonical transaction and end-of-block operation",
+			withTx: true,
+			ops:    []saehookstest.Op{{Gas: 1}},
+		},
+		{
+			name:   "canonical transaction",
+			withTx: true,
+			opts:   []Option{withCanonical()},
+			want:   true,
+		},
+		{
+			name: "canonical end-of-block operation",
+			ops:  []saehookstest.Op{{Gas: 1}},
+			opts: []Option{withCanonical()},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := newExecuteFixture(t)
-			_, err := f.execute(t, tt.opts...)
+			_, sut := newSUT(t)
+			var txs types.Transactions
+			if tt.withTx {
+				recipient := common.Address{}
+				txs = types.Transactions{sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+					To:       &recipient,
+					Gas:      params.TxGas,
+					GasPrice: big.NewInt(1),
+				})}
+			}
+			b := sut.chain.NewBlock(
+				t,
+				txs,
+				blockstest.WithEthBlockOptions(blockstest.WithOps(tt.ops)),
+			)
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
 			require.NoError(t, err, "Execute()")
 
-			gasClock := f.block.ParentBlock().ExecutedByGasTime()
-			gasClock.BeforeBlock(f.sut.hooks.BlockTime(f.block.Header()))
-			_, got, err := blocks.LastToSettleAt(f.sut.hooks, gasClock.AsTime(), f.block)
+			gasClock := b.ParentBlock().ExecutedByGasTime()
+			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
+			_, got, err := blocks.LastToSettleAt(sut.hooks, gasClock.AsTime(), b)
 			require.NoError(t, err, "blocks.LastToSettleAt()")
 			require.Equal(t, tt.want, got, "Execute() reports canonical progress")
 		})

@@ -140,7 +140,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		e.chainConfig,
 		e.chainContext,
 		log,
-		withCanonical(true),
+		withCanonical(),
 		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
@@ -196,9 +196,12 @@ func SkipEndOfBlockOps() Option {
 	})
 }
 
-func withCanonical(canonical bool) Option {
+// withCanonical marks execution as canonical. It is unexported because
+// canonical execution mutates the block's shared progress and is exclusive to
+// Executor.
+func withCanonical() Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
-		c.canonical = canonical
+		c.canonical = true
 	})
 }
 
@@ -373,7 +376,7 @@ func Execute(
 	}
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
-		blockGasConsumed += o.Gas
+		r.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
 		if execConfig.canonical {
 			b.SetInterimExecutionTime(perTxClock)
@@ -390,18 +393,17 @@ func Execute(
 
 	endTime := time.Now()
 	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(blockGasConsumed, target, gasCfg); err != nil {
+	if err := gasClock.AfterBlock(r.GasConsumed, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
 	log.Trace(
 		"Block execution complete",
-		zap.Uint64("gas_consumed", uint64(blockGasConsumed)),
+		zap.Uint64("gas_consumed", uint64(r.GasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),
 		zap.Time("wall_time", endTime),
 	)
 
-	r.GasConsumed = blockGasConsumed
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime
 	return r, nil
