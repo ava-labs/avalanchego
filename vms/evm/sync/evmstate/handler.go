@@ -414,6 +414,8 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 // fillFromTrie iterates the trie from [query.nextKey] up to end (exclusive).
 // more reports keys past the response, the inverse of fillFromSnapshot's done.
 func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ error) {
+	// While [trie.Trie.NodeIterator] documents that it starts iterating after
+	// the given key, it actually starts at the key if it exists.
 	nodeIt, err := q.trie.NodeIterator(q.nextKey())
 	if err != nil {
 		return false, err
