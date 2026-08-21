@@ -394,10 +394,8 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	vals := make([][]byte, 0, q.limit)
 	for it.Next() {
 		k := it.Hash().Bytes()
-		if len(q.endKey) > 0 && bytes.Compare(k, q.endKey) > 0 {
-			break
-		}
-		if len(keys) >= q.limit {
+		afterEnd := len(q.endKey) > 0 && bytes.Compare(k, q.endKey) > 0
+		if afterEnd || len(keys) >= q.limit {
 			break
 		}
 		v, err := leaf()
