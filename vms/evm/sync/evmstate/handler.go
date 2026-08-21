@@ -112,19 +112,20 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
 		return "zero key limit"
 	}
 
-	root := common.BytesToHash(req.GetRootHash())
-	if root == (common.Hash{}) || root == types.EmptyRootHash {
+	switch root := common.BytesToHash(req.GetRootHash()); root {
+	case common.Hash{}:
+		return "empty trie root"
+	case types.EmptyRootHash:
 		return "empty trie root"
 	}
 
-	startKey, endKey := req.GetStartKey(), req.GetEndKey()
-	switch {
-	case len(endKey) > 0 && bytes.Compare(startKey, endKey) > 0:
-		return "start key after end key"
-	case len(startKey) != 0 && len(startKey) != trieKeyLength:
+	switch start, end := req.GetStartKey(), req.GetEndKey(); {
+	case len(start) != 0 && len(start) != trieKeyLength:
 		return "start key length mismatch"
-	case len(endKey) != 0 && len(endKey) != trieKeyLength:
+	case len(end) != 0 && len(end) != trieKeyLength:
 		return "end key length mismatch"
+	case len(end) != 0 && bytes.Compare(start, end) > 0:
+		return "start key after end key"
 	}
 	return ""
 }
