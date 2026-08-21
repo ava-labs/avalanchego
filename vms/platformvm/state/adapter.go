@@ -66,25 +66,25 @@ func (s Adapter) GetCurrentPrimaryNetworkValidator(nodeID ids.NodeID) (CurrentPr
 // GetCurrentContinuousPrimaryNetworkValidator returns the current continuous
 // Primary Network validator with nodeID. It returns
 // [ErrNotContinuousPrimaryNetworkValidator] if the validator is bounded.
-func (s Adapter) GetCurrentContinuousPrimaryNetworkValidator(nodeID ids.NodeID) (CurrentContinuousPrimaryNetworkValidator, error) {
+func (s Adapter) GetCurrentContinuousPrimaryNetworkValidator(nodeID ids.NodeID) (AutoRenewedValidator, error) {
 	validator, err := s.GetCurrentPrimaryNetworkValidator(nodeID)
 	if err != nil {
-		return CurrentContinuousPrimaryNetworkValidator{}, err
+		return AutoRenewedValidator{}, err
 	}
 
 	tx, _, err := s.chain.GetTx(validator.TxID)
 	if err != nil {
-		return CurrentContinuousPrimaryNetworkValidator{}, err
+		return AutoRenewedValidator{}, err
 	}
 	if _, ok := tx.Unsigned.(*platform.AddAutoRenewedValidatorTx); !ok {
-		return CurrentContinuousPrimaryNetworkValidator{}, ErrNotContinuousPrimaryNetworkValidator
+		return AutoRenewedValidator{}, ErrNotContinuousPrimaryNetworkValidator
 	}
 
 	stakingInfo, err := s.chain.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
-		return CurrentContinuousPrimaryNetworkValidator{}, err
+		return AutoRenewedValidator{}, err
 	}
-	return CurrentContinuousPrimaryNetworkValidator{
+	return AutoRenewedValidator{
 		Validator: validator,
 		ContinuousValidatorMetadata: ContinuousValidatorMetadata{
 			AccruedValidationRewards: stakingInfo.AccruedValidationRewards,
@@ -124,9 +124,8 @@ func (s Adapter) PutCurrentPrimaryNetworkValidator(tx platform.Staker, validator
 	))
 }
 
-// PutCurrentContinuousPrimaryNetworkValidator adds a continuous Primary
-// Network validator and its continuous metadata.
-func (s Adapter) PutCurrentContinuousPrimaryNetworkValidator(tx *platform.AddAutoRenewedValidatorTx, validator CurrentContinuousPrimaryNetworkValidator) error {
+// PutAutoRenewedValidator adds an auto-renewed validator.
+func (s Adapter) PutAutoRenewedValidator(tx *platform.AddAutoRenewedValidatorTx, validator AutoRenewedValidator) error {
 	if err := s.PutCurrentPrimaryNetworkValidator(tx, validator.Validator); err != nil {
 		return err
 	}
@@ -200,8 +199,12 @@ func (s Adapter) PutCurrentDelegator(_ platform.Staker, delegator CurrentDelegat
 	))
 }
 
-func (s Adapter) DeleteCurrentDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error {
-	it, err := s.chain.GetCurrentDelegatorIterator(subnetID, nodeID)
+func (s Adapter) DeleteCurrentDelegator(txID ids.ID) error {
+	tx, err := s.GetStakerTx(txID)
+	if err != nil {
+		return err
+	}
+	it, err := s.chain.GetCurrentDelegatorIterator(tx.SubnetID(), tx.NodeID())
 	if err != nil {
 		return err
 	}
@@ -283,8 +286,12 @@ func (s Adapter) PutPendingDelegator(_ platform.Staker, delegator PendingDelegat
 	return nil
 }
 
-func (s Adapter) DeletePendingDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error {
-	it, err := s.chain.GetPendingDelegatorIterator(subnetID, nodeID)
+func (s Adapter) DeletePendingDelegator(txID ids.ID) error {
+	tx, err := s.GetStakerTx(txID)
+	if err != nil {
+		return err
+	}
+	it, err := s.chain.GetPendingDelegatorIterator(tx.SubnetID(), tx.NodeID())
 	if err != nil {
 		return err
 	}

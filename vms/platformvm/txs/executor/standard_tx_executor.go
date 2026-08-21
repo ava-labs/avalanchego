@@ -1424,7 +1424,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("creating staker: %w", err)
 	}
 
-	if err := state.NewAdapter(e.state).PutCurrentContinuousPrimaryNetworkValidator(tx, validator); err != nil {
+	if err := state.NewAdapter(e.state).PutAutoRenewedValidator(tx, validator); err != nil {
 		return fmt.Errorf("putting current validator: %w", err)
 	}
 

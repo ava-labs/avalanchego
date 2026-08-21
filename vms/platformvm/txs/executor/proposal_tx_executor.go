@@ -399,11 +399,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 		}
 
 		// Handle staker lifecycle.
-		if err := state.NewAdapter(e.onCommitState).DeleteCurrentDelegator(delegator.SubnetID(), delegator.NodeID(), delegator.TxID); err != nil {
+		if err := state.NewAdapter(e.onCommitState).DeleteCurrentDelegator(delegator.TxID); err != nil {
 			return fmt.Errorf("deleting current delegator from commit state: %w", err)
 		}
 
-		if err := state.NewAdapter(e.onAbortState).DeleteCurrentDelegator(delegator.SubnetID(), delegator.NodeID(), delegator.TxID); err != nil {
+		if err := state.NewAdapter(e.onAbortState).DeleteCurrentDelegator(delegator.TxID); err != nil {
 			return fmt.Errorf("deleting current delegator from abort state: %w", err)
 		}
 	default:
@@ -826,7 +826,7 @@ func (e *proposalTxExecutor) mintRewards(
 //  5. Updates the validator state
 func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
-	continuousValidator state.CurrentContinuousPrimaryNetworkValidator,
+	continuousValidator state.AutoRenewedValidator,
 ) error {
 	validator := continuousValidator.Validator
 	metadata := continuousValidator.ContinuousValidatorMetadata
@@ -983,7 +983,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	metadata.AccruedValidationRewards = newAccruedRewards
 	metadata.AccruedDelegateeRewards = newAccruedDelegateeRewards
 	renewedValidator.ContinuousValidatorMetadata = metadata
-	if err := stakingState.PutCurrentContinuousPrimaryNetworkValidator(addAutoRenewedValidatorTx, renewedValidator); err != nil {
+	if err := stakingState.PutAutoRenewedValidator(addAutoRenewedValidatorTx, renewedValidator); err != nil {
 		return fmt.Errorf("putting renewed validator: %w", err)
 	}
 

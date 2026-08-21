@@ -139,12 +139,12 @@ type ContinuousValidatorMetadata struct {
 	NextPeriod uint64
 }
 
-// CurrentContinuousPrimaryNetworkValidator is an active continuous Primary
+// AutoRenewedValidator is an active continuous Primary
 // Network validator.
 //
 // A continuous validator is also readable through
 // [CurrentPrimaryNetworkValidator], which exposes only its common fields.
-type CurrentContinuousPrimaryNetworkValidator struct {
+type AutoRenewedValidator struct {
 	Validator CurrentPrimaryNetworkValidator
 	ContinuousValidatorMetadata
 }
@@ -183,7 +183,7 @@ func NewCurrentContinuousPrimaryNetworkValidator(
 	staker *platform.AddAutoRenewedValidatorTx,
 	startTime, endTime time.Time,
 	weight, potentialReward uint64,
-) (CurrentContinuousPrimaryNetworkValidator, error) {
+) (AutoRenewedValidator, error) {
 	validator, err := NewCurrentPrimaryNetworkValidator(
 		txID,
 		staker,
@@ -192,7 +192,7 @@ func NewCurrentContinuousPrimaryNetworkValidator(
 		weight,
 		potentialReward,
 	)
-	return CurrentContinuousPrimaryNetworkValidator{
+	return AutoRenewedValidator{
 		Validator: validator,
 		ContinuousValidatorMetadata: ContinuousValidatorMetadata{
 			AutoCompoundRewardShares: staker.AutoCompoundRewardShares,

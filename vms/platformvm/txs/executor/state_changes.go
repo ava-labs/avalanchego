@@ -262,7 +262,7 @@ func advanceTimeTo(
 		if err := changesStakingState.PutCurrentDelegator(stakerTx, p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current delegator: %w", err)
 		}
-		if err := changesStakingState.DeletePendingDelegator(p.pending.SubnetID(), p.pending.NodeID(), p.pending.TxID); err != nil {
+		if err := changesStakingState.DeletePendingDelegator(p.pending.TxID); err != nil {
 			return nil, false, err
 		}
 	}
