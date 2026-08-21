@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"fmt"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
@@ -525,14 +524,4 @@ type adapterPendingDelegatorIterator struct {
 func (it adapterPendingDelegatorIterator) Value() *Staker {
 	delegator := it.Iterator.Value()
 	return pendingStaker(delegator.StakingPeriod, nil)
-}
-
-func getStakerByTxID(it iterator.Iterator[*Staker], txID ids.ID) (*Staker, error) {
-	defer it.Release()
-	for it.Next() {
-		if staker := it.Value(); staker.TxID == txID {
-			return staker, nil
-		}
-	}
-	return nil, database.ErrNotFound
 }

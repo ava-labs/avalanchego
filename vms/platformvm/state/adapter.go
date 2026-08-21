@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	"github.com/ava-labs/avalanchego/database"
 )
 
 // Adapter provides typed access to the current and pending staker sets.
@@ -301,6 +302,16 @@ func (s Adapter) DeletePendingDelegator(txID ids.ID) error {
 	}
 	s.chain.DeletePendingDelegator(staker)
 	return nil
+}
+
+func getStakerByTxID(it iterator.Iterator[*Staker], txID ids.ID) (*Staker, error) {
+	defer it.Release()
+	for it.Next() {
+		if staker := it.Value(); staker.TxID == txID {
+			return staker, nil
+		}
+	}
+	return nil, database.ErrNotFound
 }
 
 func (s Adapter) GetPendingStakerIterator() (iterator.Iterator[PendingStaker], error) {
