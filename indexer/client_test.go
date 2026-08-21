@@ -36,7 +36,7 @@ func TestIndexClient(t *testing.T) {
 			require:        require,
 			expectedMethod: "index.getIndex",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*GetIndexResponse)) = GetIndexResponse{Index: 5}
+				*reply.(*GetIndexResponse) = GetIndexResponse{Index: 5}
 				return nil
 			},
 		}
@@ -54,7 +54,7 @@ func TestIndexClient(t *testing.T) {
 			require:        require,
 			expectedMethod: "index.getLastAccepted",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*FormattedContainer)) = FormattedContainer{
+				*reply.(*FormattedContainer) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,
 					Index: json.Uint64(10),
@@ -78,7 +78,7 @@ func TestIndexClient(t *testing.T) {
 			require:        require,
 			expectedMethod: "index.getContainerRange",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*GetContainerRangeResponse)) = GetContainerRangeResponse{Containers: []FormattedContainer{{
+				*reply.(*GetContainerRangeResponse) = GetContainerRangeResponse{Containers: []FormattedContainer{{
 					ID:    id,
 					Bytes: bytesStr,
 				}}}
@@ -97,7 +97,7 @@ func TestIndexClient(t *testing.T) {
 			require:        require,
 			expectedMethod: "index.isAccepted",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*IsAcceptedResponse)) = IsAcceptedResponse{IsAccepted: true}
+				*reply.(*IsAcceptedResponse) = IsAcceptedResponse{IsAccepted: true}
 				return nil
 			},
 		}
@@ -115,7 +115,7 @@ func TestIndexClient(t *testing.T) {
 			require:        require,
 			expectedMethod: "index.getContainerByID",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*FormattedContainer)) = FormattedContainer{
+				*reply.(*FormattedContainer) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,
 					Index: json.Uint64(10),

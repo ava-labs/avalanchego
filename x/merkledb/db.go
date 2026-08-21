@@ -39,7 +39,7 @@ const (
 
 var (
 	_ MerkleDB                                 = (*merkleDB)(nil)
-	_ merklesync.DB[*RangeProof, *ChangeProof] = (MerkleDB)(nil)
+	_ merklesync.DB[*RangeProof, *ChangeProof] = MerkleDB(nil)
 
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}

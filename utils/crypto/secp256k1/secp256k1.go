@@ -181,7 +181,7 @@ func (k *PublicKey) Address() ids.ShortID {
 }
 
 func (k *PublicKey) EthAddress() common.Address {
-	return crypto.PubkeyToAddress(*(k.ToECDSA()))
+	return crypto.PubkeyToAddress(*k.ToECDSA())
 }
 
 func (k *PublicKey) Bytes() []byte {
@@ -209,7 +209,7 @@ func (k *PrivateKey) Address() ids.ShortID {
 }
 
 func (k *PrivateKey) EthAddress() common.Address {
-	return crypto.PubkeyToAddress(*(k.PublicKey().ToECDSA()))
+	return crypto.PubkeyToAddress(*k.PublicKey().ToECDSA())
 }
 
 func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {

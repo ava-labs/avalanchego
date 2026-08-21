@@ -2916,7 +2916,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 			}
 			return nil, database.ErrNotFound
 		},
-		LastAcceptedF: func(context.Context) (ids.ID, error) {
+		LastAcceptedF: func(context.Context) (ids.ID, error) { //nolint:unparam // the error return is required by [blocktest.VM.LastAcceptedF]
 			var (
 				lastAcceptedID     ids.ID
 				lastAcceptedHeight uint64
@@ -3048,7 +3048,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	innerBlock3 := snowmantest.BuildChild(innerBlock2)
 	innerVMBlks = append(innerVMBlks, innerBlock3)
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { //nolint:unparam // the error return is required by [blocktest.VM.BuildBlockF]
 		return innerBlock3, nil
 	}
 

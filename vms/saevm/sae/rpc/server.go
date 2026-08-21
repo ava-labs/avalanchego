@@ -17,6 +17,12 @@ import (
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
 
+// JSON-RPC namespaces registered by more than one handler below.
+const (
+	ethNamespace   = "eth"
+	debugNamespace = "debug"
+)
+
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
@@ -55,7 +61,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_maxPriorityFeePerGas
 		// - eth_feeHistory
 		// - eth_syncing
-		{"eth", ethapi.NewEthereumAPI(b)},
+		{ethNamespace, ethapi.NewEthereumAPI(b)},
 		// Standard Ethereum node APIs:
 		// - eth_blockNumber
 		// - eth_call
@@ -79,7 +85,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//
 		// Undocumented APIs:
 		// - eth_getBlockReceipts
-		{"eth", &blockChainAPI{ethapi.NewBlockChainAPI(b), b}},
+		{ethNamespace, &blockChainAPI{ethapi.NewBlockChainAPI(b), b}},
 		// Standard Ethereum node APIs:
 		// - eth_getBlockTransactionCountByHash
 		// - eth_getBlockTransactionCountByNumber
@@ -101,7 +107,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_pendingTransactions
 		// - eth_resend
 		{
-			"eth",
+			ethNamespace,
 			immediateReceipts{
 				b.RecentReceipt,
 				ethapi.NewTransactionAPI(b, new(ethapi.AddrLocker)),
@@ -121,7 +127,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
-		{"eth", filter},
+		{ethNamespace, filter},
 		// Avalanche-custom eth extensions:
 		// - eth_baseFee
 		// - eth_callDetailed
@@ -129,7 +135,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_suggestPriceOptions
 		// - eth_subscribe
 		//  - newAcceptedTransactions
-		{"eth", &customAPI{b}},
+		{ethNamespace, &customAPI{b}},
 	}
 
 	if b.config.EnableDBInspecting {
@@ -146,7 +152,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_getRawTransaction
 			// - debug_printBlock
 			// - debug_setHead          (no-op, logs info)
-			"debug", ethapi.NewDebugAPI(b),
+			debugNamespace, ethapi.NewDebugAPI(b),
 		})
 	}
 
@@ -173,7 +179,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_writeBlockProfile
 			// - debug_writeMemProfile
 			// - debug_writeMutexProfile
-			"debug", debug.Handler,
+			debugNamespace, debug.Handler,
 		})
 	}
 
@@ -191,7 +197,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_traceCall
 			// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
 			// - debug_traceTransaction
-			"debug", newTracerAPI(b),
+			debugNamespace, newTracerAPI(b),
 		})
 	}
 

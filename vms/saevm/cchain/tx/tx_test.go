@@ -965,7 +965,8 @@ func (s *asOpStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
 func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
 func largeBigInt() *big.Int      { return new(big.Int).Lsh(big.NewInt(1), 128) }
 
-func (s *asOpStateDB) GetNonce(addr common.Address) uint64                     { return s.initialNonces[addr] }
+func (s *asOpStateDB) GetNonce(addr common.Address) uint64 { return s.initialNonces[addr] }
+
 func (*asOpStateDB) GetBalance(common.Address) *uint256.Int                    { return largeUint256() }
 func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
 func (*asOpStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}

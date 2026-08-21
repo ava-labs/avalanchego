@@ -193,7 +193,7 @@ func addAutoRenewedValidator(t testing.TB, env *environment, tx *txs.Tx, cfg aut
 		stakingInfo.NextPeriod = uint64(env.config.MinStakeDuration / time.Second)
 	}
 
-	nodeID := (tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)).NodeID()
+	nodeID := tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).NodeID()
 	require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
 
 	require.NoError(t, diff.Apply(env.state))

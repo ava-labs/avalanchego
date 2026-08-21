@@ -9,6 +9,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// processIDLabel partitions resource metrics by the measured process.
+const processIDLabel = "processID"
+
 type metrics struct {
 	numCPUCycles       *prometheus.GaugeVec
 	numDiskReads       *prometheus.GaugeVec
@@ -24,35 +27,35 @@ func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 				Name: "num_cpu_cycles",
 				Help: "Total number of CPU cycles",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskReads: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_reads",
 				Help: "Total number of disk reads",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskReadBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_read_bytes",
 				Help: "Total number of disk read bytes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskWrites: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_writes",
 				Help: "Total number of disk writes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskWritesBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_write_bytes",
 				Help: "Total number of disk write bytes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 	}
 	err := errors.Join(

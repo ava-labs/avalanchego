@@ -137,6 +137,7 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 
 	// Create context with cancel
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	go func() {
 		// Blocks until we receive a SIGINT notification or if parent context is done

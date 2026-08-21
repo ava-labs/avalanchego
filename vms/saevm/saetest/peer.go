@@ -107,4 +107,5 @@ func (p *CapturingPeer) AppRequest(ctx context.Context, from ids.NodeID, request
 }
 
 func (*CapturingPeer) Connected(context.Context, ids.NodeID, *version.Application) error { return nil }
-func (*CapturingPeer) Disconnected(context.Context, ids.NodeID) error                    { return nil }
+
+func (*CapturingPeer) Disconnected(context.Context, ids.NodeID) error { return nil }

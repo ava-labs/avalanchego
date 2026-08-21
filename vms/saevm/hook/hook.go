@@ -216,7 +216,7 @@ func (o *Op) ApplyTo(stateDB *state.StateDB) error {
 // method on [params.RulesHooks]. The concrete type implementing the hooks MUST
 // propagate incoming and return arguments unchanged.
 func MinimumGasConsumption(txLimit uint64) uint64 {
-	_ = (params.RulesHooks)(nil) // keep the import to allow [] doc links
+	_ = params.RulesHooks(nil) // keep the import to allow [] doc links
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
 }
 

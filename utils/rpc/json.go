@@ -51,7 +51,7 @@ func SendJSONRequest(
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
 
-	//nolint:bodyclose,gosec // body is closed via CleanlyCloseBody
+	//nolint:bodyclose // body is closed via CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("failed to issue request: %w", err)

@@ -269,5 +269,6 @@ linters:
       # 4. Exclude any file suffixed with _test.go.
       - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
         linters:
+          - goconst
           - gosec
           - prealloc

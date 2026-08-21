@@ -22,7 +22,7 @@ const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cy
 
 var (
 	newCompressorFuncs = map[Type]func(maxSize int64) (Compressor, error){
-		TypeNone: func(int64) (Compressor, error) { //nolint:unparam // an error is needed to be returned to compile
+		TypeNone: func(int64) (Compressor, error) {
 			return NewNoCompressor(), nil
 		},
 		TypeZstd: NewZstdCompressor,
