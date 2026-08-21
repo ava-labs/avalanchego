@@ -498,14 +498,14 @@ tasks:
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0 {{.CLI_ARGS}}'
 
   test-e2e-ci-schedule-latest:
     desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m'
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m {{.CLI_ARGS}}'
 
   test-e2e-existing-ci:
     desc: Runs e2e tests with an existing network [serially with race detection enabled]

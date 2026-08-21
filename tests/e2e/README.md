@@ -13,6 +13,24 @@
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
 
+Prefer the task entrypoint, which builds the required binaries before invoking
+Ginkgo:
+
+```bash
+task test-e2e
+```
+
+Do not use `go test ./tests/e2e/...` to run this suite. The packages beneath
+`tests/e2e` register Ginkgo specs, but the suite executes only through the
+Ginkgo runner in `tests/e2e/e2e_test.go`.
+
+E2E specs are usually one per file. To run one spec through the task
+entrypoint, pass that file to Ginkgo:
+
+```bash
+task test-e2e -- --ginkgo.focus-file=c/interchain_workflow
+```
+
 ### Simplifying usage with direnv
 
 For repo-level `direnv` setup and behavior, see [CONTRIBUTING.md](../../CONTRIBUTING.md#direnv).
@@ -55,6 +73,26 @@ tests
 
 `x/transfer/virtuous.go` defines X-Chain transfer tests,
 labeled with `x`, which can be selected by `--label-filter=x`.
+
+### SAE C-Chain API ordering
+
+SAE can return an EVM transaction receipt when it marks a transaction
+executed, before the containing block is fully executed. The C-Chain `latest`
+state can therefore omit the transaction's nonce, balance changes, and other
+state changes. This ordering can occur even on a single node or when running a
+Ginkgo suite serially.
+
+The required synchronization depends on the assertion:
+
+- Use `SendEthTransactionAndWait` before a wallet snapshot or another read of
+  `latest`. It waits until the receipt block state is available.
+- `SendEthTransaction` waits only for a receipt. The code using it needs to
+  record a nonce from accepted state, then advances that nonce locally for
+  each transaction.
+- Use `WaitForEthBlockExecution` after a receipt obtained through another API.
+- When an assertion must read the state produced by one transaction, read
+  state at that transaction's inclusion height. This also waits for the
+  block's execution.
 
 ## Reusing temporary networks
 
