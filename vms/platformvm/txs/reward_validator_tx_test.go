@@ -11,10 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
+func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 	tests := []struct {
 		name string
-		tx   *RewardAutoRenewedValidatorTx
+		tx   *RewardValidatorTx
 		want error
 	}{
 		{
@@ -23,25 +23,14 @@ func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			want: ErrNilTx,
 		},
 		{
-			name: "missing_timestamp",
-			tx: &RewardAutoRenewedValidatorTx{
-				TxID:      ids.GenerateTestID(),
-				Timestamp: 0,
-			},
-			want: errMissingTimestamp,
-		},
-		{
 			name: "missing_tx_id",
-			tx: &RewardAutoRenewedValidatorTx{
-				Timestamp: 1,
-			},
+			tx:   &RewardValidatorTx{},
 			want: errMissingStakerTxID,
 		},
 		{
 			name: "valid",
-			tx: &RewardAutoRenewedValidatorTx{
-				TxID:      ids.GenerateTestID(),
-				Timestamp: 1,
+			tx: &RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
 			},
 			want: nil,
 		},
@@ -55,7 +44,7 @@ func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 	}
 }
 
-func TestRewardAutoRenewedValidatorTxSerialization(t *testing.T) {
+func TestRewardValidatorTxSerialization(t *testing.T) {
 	require := require.New(t)
 
 	txID := ids.ID{
@@ -65,23 +54,20 @@ func TestRewardAutoRenewedValidatorTxSerialization(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
 
-	rewardTx := &RewardAutoRenewedValidatorTx{
-		TxID:      txID,
-		Timestamp: 1234567890,
+	rewardTx := &RewardValidatorTx{
+		TxID: txID,
 	}
 
 	wantBytes := []byte{
 		// Codec version
 		0x00, 0x00,
-		// RewardAutoRenewedValidatorTx type ID
-		0x00, 0x00, 0x00, 0x2a,
-		// Referenced auto-renewed validator TxID
+		// RewardValidatorTx type ID
+		0x00, 0x00, 0x00, 0x14,
+		// Referenced validator TxID
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
-		// Timestamp (1234567890)
-		0x00, 0x00, 0x00, 0x00, 0x49, 0x96, 0x02, 0xd2,
 	}
 
 	var unsignedTx UnsignedTx = rewardTx
