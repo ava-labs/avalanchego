@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -116,12 +115,12 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	// Genesis validators have NextTime=DefaultValidatorEndTime (~1 year out), so our staker
 	// sorts first in the iterator, correctly marking nextStakerTime as the next staker event.
 	env.state.AddUTXO(utxo)
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		Priority: platform.PrimaryNetworkValidatorCurrentPriority,
-		EndTime:  nextStakerTime,
+		NextTime: nextStakerTime,
 		TxID:     ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
-	})))
+	}))
 
 	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
@@ -514,7 +513,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+				require.NoError(env.state.PutPendingValidator(staker))
 				env.state.AddTx(tx, status.Committed)
 			}
 			env.state.SetHeight( /*dummyHeight*/ 1)
@@ -613,7 +612,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -640,7 +639,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(env.state.PutPendingValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -715,7 +714,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+			require.NoError(env.state.PutPendingValidator(staker))
 			env.state.AddTx(tx, status.Committed)
 			require.NoError(env.state.Commit())
 
@@ -810,7 +809,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.state.PutPendingDelegator(statetest.PendingDelegator(staker))
+	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight( /*dummyHeight*/ uint64(1))
 	require.NoError(env.state.Commit())

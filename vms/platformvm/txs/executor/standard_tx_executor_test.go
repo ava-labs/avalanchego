@@ -162,7 +162,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+		require.NoError(env.state.PutCurrentValidator(staker))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -199,7 +199,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+		require.NoError(env.state.PutCurrentValidator(staker))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -517,7 +517,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
@@ -688,7 +688,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -725,7 +725,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
-	require.NoError(env.state.DeleteCurrentValidator(staker.SubnetID, staker.NodeID))
+	require.NoError(env.state.DeleteCurrentValidator(staker))
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -875,7 +875,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+		require.NoError(env.state.PutCurrentValidator(staker))
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
@@ -1012,7 +1012,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		require.NoError(onAcceptState.PutCurrentValidator(statetest.CurrentValidator(staker)))
+		require.NoError(onAcceptState.PutCurrentValidator(staker))
 		onAcceptState.AddTx(tx, status.Committed)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -1051,7 +1051,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		require.NoError(onAcceptState.PutPendingValidator(statetest.PendingValidator(staker)))
+		require.NoError(onAcceptState.PutPendingValidator(staker))
 		onAcceptState.AddTx(tx, status.Committed)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -1150,16 +1150,15 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 			buildTx: func(t *testing.T, env *environment) *platform.Tx {
 				require := require.New(t)
 
-				var primaryValidator *state.CurrentValidator
+				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(err)
 				for it.Next() {
 					staker := it.Value()
-					validator, ok := staker.(state.CurrentValidator)
-					if !ok || validator.SubnetID() != constants.PrimaryNetworkID {
+					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
 						continue
 					}
-					primaryValidator = &validator
+					primaryValidator = staker
 					break
 				}
 				it.Release()
@@ -1167,7 +1166,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 				wallet := newWallet(t, env, walletConfig{})
 				tx, err := wallet.IssueAddDelegatorTx(
 					&platform.Validator{
-						NodeID: primaryValidator.NodeID(),
+						NodeID: primaryValidator.NodeID,
 						Start:  0,
 						End:    uint64(primaryValidator.EndTime.Unix()),
 						Wght:   defaultMinValidatorStake,
@@ -1224,16 +1223,15 @@ func TestDurangoMemoField(t *testing.T) {
 			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
 				require := require.New(t)
 
-				var primaryValidator *state.CurrentValidator
+				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(err)
 				for it.Next() {
 					staker := it.Value()
-					validator, ok := staker.(state.CurrentValidator)
-					if !ok || validator.SubnetID() != constants.PrimaryNetworkID {
+					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
 						continue
 					}
-					primaryValidator = &validator
+					primaryValidator = staker
 					break
 				}
 				it.Release()
@@ -1245,7 +1243,7 @@ func TestDurangoMemoField(t *testing.T) {
 				tx, err := wallet.IssueAddSubnetValidatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID(),
+							NodeID: primaryValidator.NodeID,
 							Start:  0,
 							End:    uint64(primaryValidator.EndTime.Unix()),
 							Wght:   defaultMinValidatorStake,
@@ -1371,16 +1369,15 @@ func TestDurangoMemoField(t *testing.T) {
 			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
 				require := require.New(t)
 
-				var primaryValidator *state.CurrentValidator
+				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(err)
 				for it.Next() {
 					staker := it.Value()
-					validator, ok := staker.(state.CurrentValidator)
-					if !ok || validator.SubnetID() != constants.PrimaryNetworkID {
+					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
 						continue
 					}
-					primaryValidator = &validator
+					primaryValidator = staker
 					break
 				}
 				it.Release()
@@ -1394,7 +1391,7 @@ func TestDurangoMemoField(t *testing.T) {
 				subnetValTx, err := wallet.IssueAddSubnetValidatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID(),
+							NodeID: primaryValidator.NodeID,
 							Start:  0,
 							End:    uint64(endTime.Unix()),
 							Wght:   genesistest.DefaultValidatorWeight,
@@ -1417,7 +1414,7 @@ func TestDurangoMemoField(t *testing.T) {
 				require.NoError(err)
 
 				tx, err := wallet.IssueRemoveSubnetValidatorTx(
-					primaryValidator.NodeID(),
+					primaryValidator.NodeID,
 					subnetID,
 					common.WithMemo(memoField),
 				)
@@ -1503,16 +1500,15 @@ func TestDurangoMemoField(t *testing.T) {
 			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
 				require := require.New(t)
 
-				var primaryValidator *state.CurrentValidator
+				var primaryValidator *state.Staker
 				it, err := env.state.GetCurrentStakerIterator()
 				require.NoError(err)
 				for it.Next() {
 					staker := it.Value()
-					validator, ok := staker.(state.CurrentValidator)
-					if !ok || validator.SubnetID() != constants.PrimaryNetworkID {
+					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
 						continue
 					}
-					primaryValidator = &validator
+					primaryValidator = staker
 					break
 				}
 				it.Release()
@@ -1521,7 +1517,7 @@ func TestDurangoMemoField(t *testing.T) {
 				tx, err := wallet.IssueAddPermissionlessDelegatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID(),
+							NodeID: primaryValidator.NodeID,
 							Start:  0,
 							End:    uint64(primaryValidator.EndTime.Unix()),
 							Wght:   defaultMinValidatorStake,
@@ -1763,7 +1759,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state.SetTimestamp(env.latestForkTime)
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(env.staker)))
+				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 				// This isn't actually called, but is added here as a regression
@@ -1879,12 +1875,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				staker.Priority = platform.SubnetPermissionlessValidatorCurrentPriority
 
 				env.state.SetTimestamp(env.latestForkTime)
-				env.state.AddSubnetTransformation(&platform.Tx{
-					Unsigned: &platform.TransformSubnetTx{
-						Subnet: env.unsignedTx.Subnet,
-					},
-				})
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(&staker)))
+				require.NoError(t, env.state.PutCurrentValidator(&staker))
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1910,7 +1901,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(env.staker)))
+				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
@@ -1938,7 +1929,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(env.staker)))
+				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 
@@ -1966,7 +1957,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "no permission to remove validator",
 			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(env.staker)))
+				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
@@ -1995,7 +1986,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(statetest.CurrentValidator(env.staker)))
+				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
@@ -4543,8 +4534,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		NextTime:        env.state.GetTimestamp().Add(period),
 		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
 	}
-	wantPeriod := statetest.CurrentValidator(wantValidator)
-	require.Equal(t, wantPeriod, validator)
+	require.Equal(t, wantValidator, validator)
 
 	delegatorIt, err := env.state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
@@ -4552,7 +4542,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 
 	stakerIt, err := env.state.GetCurrentStakerIterator()
 	require.NoError(t, err)
-	require.Contains(t, iterator.ToSlice(stakerIt), wantPeriod)
+	require.Contains(t, iterator.ToSlice(stakerIt), wantValidator)
 
 	stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
@@ -4832,7 +4822,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 
 	validators := iterator.ToSlice(it)
 	require.NotEmpty(t, validators)
-	fixedStakerTxID := validators[0].Period().TxID
+	fixedStakerTxID := validators[0].TxID
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -4886,7 +4876,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	require.NoError(t, err)
 	diff.AddTx(addPastContValidatorTx, status.Committed)
 	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
-	require.NoError(t, diff.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(t, diff.PutCurrentValidator(staker))
 	require.NoError(t, diff.Apply(env.state))
 
 	tests := []struct {
@@ -4905,7 +4895,11 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		{
 			name: "stopped_validator",
 			updateState: func(t testing.TB, diff *state.Diff) {
-				require.NoError(t, diff.DeleteCurrentValidator(constants.PrimaryNetworkID, nodeID))
+				require.NoError(t, diff.DeleteCurrentValidator(&state.Staker{
+					TxID:     addAutoRenewedValidatorTx.ID(),
+					NodeID:   nodeID,
+					SubnetID: constants.PrimaryNetworkID,
+				}))
 			},
 			wantErr: database.ErrNotFound,
 		},

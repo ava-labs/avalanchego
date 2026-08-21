@@ -281,12 +281,13 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				uptimes := uptime.TestCalculator{Err: database.ErrNotFound}
 
@@ -338,6 +339,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.SubnetPermissionlessValidatorCurrentPriority,
 					}
 				)
 				uptimes := uptime.TestCalculator{}
@@ -345,7 +347,7 @@ func TestBlockOptions(t *testing.T) {
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
 
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				manager := &manager{
 					backend: &backend{
@@ -395,6 +397,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.SubnetPermissionlessValidatorCurrentPriority,
 					}
 					transformSubnetTx = &platform.Tx{
 						Unsigned: &platform.TransformSubnetTx{
@@ -408,7 +411,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
 
@@ -461,6 +464,7 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
 						SubnetID:  subnetID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 					transformSubnetTx = &platform.Tx{
 						Unsigned: &platform.TransformSubnetTx{
@@ -471,7 +475,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
 				uptimes := uptime.TestCalculator{Percent: .5}
@@ -519,12 +523,13 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				manager := &manager{
 					backend: &backend{
@@ -570,12 +575,13 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				require.NoError(t, state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(t, state.PutCurrentValidator(staker))
 
 				uptimes := uptime.TestCalculator{Percent: .5}
 
@@ -652,6 +658,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 				StartTime: tt.startTime,
 				NodeID:    nodeID,
 				SubnetID:  constants.PrimaryNetworkID,
+				Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 			}
 			proposalTimestamp = tt.startTime.Add(time.Hour)
 		)
@@ -670,7 +677,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 
 		chainState := statetest.New(t, statetest.Config{})
 		chainState.AddTx(stakerTx, status.Committed)
-		require.NoError(t, chainState.PutCurrentValidator(statetest.CurrentValidator(staker)))
+		require.NoError(t, chainState.PutCurrentValidator(staker))
 
 		ctx := snowtest.Context(t, snowtest.PChainID)
 

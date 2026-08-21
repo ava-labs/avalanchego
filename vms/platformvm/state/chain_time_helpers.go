@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -67,16 +68,15 @@ func GetNextStakerChangeTime(
 	}
 	defer pendingIterator.Release()
 
-	if currentIterator.Next() {
-		endTime := currentIterator.Value().Period().EndTime
-		if endTime.Before(nextTime) {
-			nextTime = endTime
+	for _, it := range []iterator.Iterator[*Staker]{currentIterator, pendingIterator} {
+		// If the iterator is empty, skip it
+		if !it.Next() {
+			continue
 		}
-	}
-	if pendingIterator.Next() {
-		startTime := pendingIterator.Value().Period().StartTime
-		if startTime.Before(nextTime) {
-			nextTime = startTime
+
+		time := it.Value().NextTime
+		if time.Before(nextTime) {
+			nextTime = time
 		}
 	}
 

@@ -551,7 +551,7 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(service.vm.state.PutCurrentDelegator(statetest.CurrentDelegator(staker)))
+	require.NoError(service.vm.state.PutCurrentDelegator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -604,7 +604,7 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(service.vm.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(service.vm.state.PutPendingValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -707,7 +707,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(service.vm.state.PutCurrentDelegator(statetest.CurrentDelegator(staker)))
+	require.NoError(service.vm.state.PutCurrentDelegator(staker))
 	service.vm.state.AddTx(delTx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -756,7 +756,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	tx, err := blockbuilder.NewRewardValidatorTx(service.vm.ctx, delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
-	require.NoError(service.vm.state.DeleteCurrentDelegator(staker.SubnetID, staker.NodeID, staker.TxID))
+	require.NoError(service.vm.state.DeleteCurrentDelegator(staker))
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{DelegateeReward: 100000}))
 	require.NoError(service.vm.state.Commit())
 
@@ -924,13 +924,13 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
-		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
+		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
 	}
 
 	diff, err := state.NewDiffOn(service.vm.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 	diff.AddTx(tx, status.Committed)
-	require.NoError(diff.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(diff.PutCurrentValidator(staker))
 	require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		NextPeriod:               periodSeconds,
@@ -1604,9 +1604,9 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					StartTime: staker.StartTime.Add(-time.Second),
 					Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 				}
-				require.NoError(service.vm.state.PutCurrentValidator(statetest.CurrentValidator(primaryStaker)))
+				require.NoError(service.vm.state.PutCurrentValidator(primaryStaker))
 				staker.Priority = platform.SubnetPermissionedValidatorCurrentPriority
-				require.NoError(service.vm.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+				require.NoError(service.vm.state.PutCurrentValidator(staker))
 
 				stakersByTxID[staker.TxID] = staker
 			}

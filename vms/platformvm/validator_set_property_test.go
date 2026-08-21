@@ -100,8 +100,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 
 			// insert validator sequence
 			var (
-				currentPrimaryValidator = (*state.CurrentValidator)(nil)
-				currentSubnetValidator  = (*state.CurrentValidator)(nil)
+				currentPrimaryValidator = (*state.Staker)(nil)
+				currentSubnetValidator  = (*state.Staker)(nil)
 			)
 			for _, ev := range validatorsTimes {
 				// at each step we remove at least a subnet validator
@@ -219,28 +219,25 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	}
 	defer stakerIt.Release()
 	for stakerIt.Next() {
-		v, ok := stakerIt.Value().(state.CurrentValidator)
+		v := stakerIt.Value()
+		validatorsSet, ok := validatorsSetBySubnet[v.SubnetID]
 		if !ok {
-			continue
-		}
-		validatorsSet, ok := validatorsSetBySubnet[v.SubnetID()]
-		if !ok {
-			validatorsSetBySubnet[v.SubnetID()] = make(map[ids.NodeID]*validators.GetValidatorOutput)
-			validatorsSet = validatorsSetBySubnet[v.SubnetID()]
+			validatorsSetBySubnet[v.SubnetID] = make(map[ids.NodeID]*validators.GetValidatorOutput)
+			validatorsSet = validatorsSetBySubnet[v.SubnetID]
 		}
 
-		blsKey := v.PublicKey()
-		if v.SubnetID() != constants.PrimaryNetworkID {
+		blsKey := v.PublicKey
+		if v.SubnetID != constants.PrimaryNetworkID {
 			// pick bls key from primary validator
-			s, err := vm.state.GetCurrentValidator(constants.PlatformChainID, v.NodeID())
+			s, err := vm.state.GetCurrentValidator(constants.PlatformChainID, v.NodeID)
 			if err != nil {
 				return err
 			}
-			blsKey = s.PublicKey()
+			blsKey = s.PublicKey
 		}
 
-		validatorsSet[v.NodeID()] = &validators.GetValidatorOutput{
-			NodeID:    v.NodeID(),
+		validatorsSet[v.NodeID] = &validators.GetValidatorOutput{
+			NodeID:    v.NodeID,
 			PublicKey: blsKey,
 			Weight:    v.Weight,
 		}
@@ -248,7 +245,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	return nil
 }
 
-func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID ids.ID) *state.CurrentValidator {
+func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID ids.ID) *state.Staker {
 	require := require.New(t)
 
 	wallet := newWallet(t, vm, walletConfig{
@@ -272,7 +269,7 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 	return staker
 }
 
-func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputData) *state.CurrentValidator {
+func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputData) *state.Staker {
 	require := require.New(t)
 
 	wallet := newWallet(t, vm, walletConfig{})
@@ -310,7 +307,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 	return staker
 }
 
-func internalAddValidator(vm *VM, signedTx *platform.Tx) (*state.CurrentValidator, error) {
+func internalAddValidator(vm *VM, signedTx *platform.Tx) (*state.Staker, error) {
 	vm.ctx.Lock.Unlock()
 	err := vm.issueTxFromRPC(signedTx)
 	vm.ctx.Lock.Lock()
@@ -334,11 +331,10 @@ func internalAddValidator(vm *VM, signedTx *platform.Tx) (*state.CurrentValidato
 	}
 
 	stakerTx := signedTx.Unsigned.(platform.Staker)
-	staker, err := vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
-	return &staker, err
+	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
-func terminateSubnetValidator(vm *VM, validator *state.CurrentValidator) error {
+func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 	currentTime := validator.EndTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
@@ -360,7 +356,7 @@ func terminateSubnetValidator(vm *VM, validator *state.CurrentValidator) error {
 	return nil
 }
 
-func terminatePrimaryValidator(vm *VM, validator *state.CurrentValidator) error {
+func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	currentTime := validator.EndTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)

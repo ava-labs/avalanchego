@@ -348,7 +348,7 @@ func addPendingValidator(
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(env.state.PutPendingValidator(staker))
 	env.state.AddTx(addValidatorTx, status.Committed)
 	env.state.SetHeight(1)
 	require.NoError(env.state.Commit())

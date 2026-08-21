@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -75,10 +74,10 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		onAbortState,
 	))
 
-	currentValidator, err := onCommitState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	validatorStaker, err := onCommitState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
-	require.Equal(addPendingValidatorTx.ID(), currentValidator.TxID)
-	require.Equal(uint64(1370), currentValidator.PotentialReward) // See rewards tests to explain why 1370
+	require.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
+	require.Equal(uint64(1370), validatorStaker.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = onCommitState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -86,9 +85,9 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	_, err = onAbortState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	pendingValidator, err := onAbortState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	validatorStaker, err = onAbortState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
-	require.Equal(addPendingValidatorTx.ID(), pendingValidator.TxID)
+	require.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
 
 	// Test VM validators
 	require.NoError(onCommitState.Apply(env.state))
@@ -407,7 +406,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+				require.NoError(env.state.PutPendingValidator(staker))
 				env.state.AddTx(tx, status.Committed)
 			}
 			env.state.SetHeight(dummyHeight)
@@ -513,7 +512,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -541,7 +540,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(env.state.PutPendingValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -624,7 +623,7 @@ func TestTrackedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+			require.NoError(env.state.PutPendingValidator(staker))
 			env.state.AddTx(tx, status.Committed)
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
@@ -733,7 +732,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.state.PutPendingDelegator(statetest.PendingDelegator(staker))
+	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -832,7 +831,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.state.PutPendingDelegator(statetest.PendingDelegator(staker))
+	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -955,7 +954,7 @@ func addPendingValidator(
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(env.state.PutPendingValidator(staker))
 	env.state.AddTx(addPendingValidatorTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
