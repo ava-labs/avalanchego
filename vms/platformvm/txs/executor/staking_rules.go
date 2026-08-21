@@ -4,7 +4,7 @@
 package executor
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,8 +22,6 @@ import (
 // validator's own stake that its total stake, including delegations, may
 // reach.
 const primaryNetworkMaxValidatorWeightFactor = 5
-
-var errIsNotTransformSubnetTx = errors.New("is not a transform subnet tx")
 
 type addValidatorRules struct {
 	assetID           ids.ID
@@ -44,7 +42,7 @@ func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSub
 
 	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 	if !ok {
-		return nil, errIsNotTransformSubnetTx
+		return nil, fmt.Errorf("expected tx type *txs.TransformSubnetTx but got %T", transformSubnetIntf.Unsigned)
 	}
 
 	return transformSubnet, nil
