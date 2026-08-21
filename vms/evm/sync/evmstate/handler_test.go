@@ -29,6 +29,16 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+// Snapshot fixture shapes, derived from snapshotSegmentLen so they survive a
+// change to it.
+const (
+	oneSegment  = snapshotSegmentLen
+	twoSegments = 2 * snapshotSegmentLen
+	// segmentedLeaves fills two segments and leaves a short third, so a tail
+	// case spans fewer leaves than a whole segment.
+	segmentedLeaves = twoSegments + 2
+)
+
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
 		"errInvalidRequest":   errInvalidRequest,
@@ -228,8 +238,8 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 		},
 		{
 			name:        "corrupt_middle_segment",
-			corruptFrom: 64,
-			corruptTo:   128,
+			corruptFrom: oneSegment,
+			corruptTo:   twoSegments,
 		},
 		// The only shape where the segment trim bites.
 		{
@@ -270,10 +280,10 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 
 	divergences := map[string][2]int{
 		"mirrors_the_trie": {0, 0},
-		"head_segment":     {0, 64},
-		"middle_segment":   {64, 128},
-		"segment_boundary": {63, 65},
-		"tail_segment":     {236, numAccounts},
+		"head_segment":     {0, oneSegment},
+		"middle_segment":   {oneSegment, twoSegments},
+		"segment_boundary": {oneSegment - 1, oneSegment + 1},
+		"tail_segment":     {numAccounts - oneSegment, numAccounts},
 		"every_segment":    {0, numAccounts},
 	}
 	limits := map[string]uint32{
@@ -342,6 +352,59 @@ func TestResponder_PartialResponseCarriesProof(t *testing.T) {
 			require.Less(t, len(resp.Keys), numAccounts, "the limit must leave leaves unserved")
 			require.NotEmpty(t, resp.ProofVals, "a partial response must carry a proof")
 		})
+	}
+}
+
+func TestResponder_SnapshotProofVerifies(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numLeaves = segmentedLeaves
+		keyLimit  = 100 // key limit leaves the range partial so a proof is required
+	)
+
+	tests := []struct {
+		name        string
+		corruptFrom int
+		corruptTo   int
+	}{
+		{
+			name: "snapshot_agrees_with_the_trie",
+		},
+		{
+			// The head segment fails, so the bridge finishes below the key limit
+			// and the append past the bridged key still runs.
+			name:        "bridges_a_diverged_segment",
+			corruptFrom: 0,
+			corruptTo:   snapshotSegmentLen,
+		},
+	}
+
+	for _, kind := range snapshotKinds {
+		for _, tt := range tests {
+			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				trieDB := synctest.NewTrieDB()
+				c := kind.build(t, trieDB, numLeaves)
+				c.corrupt(tt.corruptFrom, tt.corruptTo)
+
+				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
+				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+					RootHash:    c.root.Bytes(),
+					AccountHash: accountBytes(c.account),
+					KeyLimit:    keyLimit,
+				})
+				require.Nil(t, appErr)
+				require.NotNil(t, resp)
+				require.Equal(t, c.keys[:keyLimit], resp.GetKeys())
+				require.NotEmpty(t, resp.GetProofVals(), "a partial response must carry a proof")
+
+				more, err := trie.VerifyRangeProof(c.root, bytes.Repeat([]byte{0x00}, common.HashLength),
+					resp.GetKeys(), resp.GetValues(), proofFrom(t, resp.GetProofVals()))
+				require.NoError(t, err)
+				require.True(t, more, "leaves remain past a partial range")
+			})
+		}
 	}
 }
 
@@ -539,8 +602,7 @@ func newStorageCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
 func TestResponder_Snapshot(t *testing.T) {
 	t.Parallel()
 
-	// 130 leaves spans three snapshotSegmentLen segments.
-	const numLeaves = 130
+	const numLeaves = segmentedLeaves
 
 	tests := []struct {
 		name string
@@ -554,23 +616,23 @@ func TestResponder_Snapshot(t *testing.T) {
 		},
 		{
 			name:        "slow_path_bridges_an_invalid_middle_segment",
-			corruptFrom: 64,
-			corruptTo:   128,
+			corruptFrom: oneSegment,
+			corruptTo:   twoSegments,
 		},
 		{
 			name:        "invalid_head_segment",
 			corruptFrom: 0,
-			corruptTo:   64,
+			corruptTo:   oneSegment,
 		},
 		{
 			name:        "invalid_tail_segment",
-			corruptFrom: 128,
+			corruptFrom: twoSegments,
 			corruptTo:   numLeaves,
 		},
 		{
 			name:        "invalid_segment_boundary",
-			corruptFrom: 63,
-			corruptTo:   65,
+			corruptFrom: oneSegment - 1,
+			corruptTo:   oneSegment + 1,
 		},
 		{
 			name:        "all_invalid_falls_back_to_trie",
@@ -704,8 +766,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 func TestQuery_SnapshotFillsResponse(t *testing.T) {
 	t.Parallel()
 
-	// 130 leaves spans three snapshotSegmentLen segments.
-	const numLeaves = 130
+	const numLeaves = segmentedLeaves
 
 	tests := []struct {
 		name        string
@@ -717,8 +778,8 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 		},
 		{
 			name:        "bridged_middle_segment",
-			corruptFrom: 64,
-			corruptTo:   128,
+			corruptFrom: oneSegment,
+			corruptTo:   twoSegments,
 		},
 	}
 
@@ -755,6 +816,7 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 		wantLen   int
 		wantProof bool
 		wantMore  bool
+		snapshot  bool
 	}{
 		{
 			name:     "whole_trie_carries_no_proof",
@@ -777,6 +839,14 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			wantLen:   numLeaves - 10,
 			wantProof: true,
 		},
+		{
+			name:      "partial_range_from_a_snapshot_carries_a_proof",
+			keyLimit:  20,
+			wantLen:   20,
+			wantProof: true,
+			wantMore:  true,
+			snapshot:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -784,7 +854,14 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
 			trieDB := synctest.NewTrieDB()
-			root, keys, vals := synctest.FillTrie(t, trieDB, numLeaves)
+
+			c := newAccountCase(t, trieDB, numLeaves)
+			root, keys, vals := c.root, c.keys, c.vals
+
+			var opts []HandlerOption
+			if tt.snapshot {
+				opts = append(opts, WithSnapshot(c.snap))
+			}
 
 			firstKey := bytes.Repeat([]byte{0x00}, common.HashLength)
 			var startKey []byte
@@ -794,7 +871,7 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			}
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
+			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
 
 			resp := &syncpb.GetLeafResponse{}
 			outcome, err := NewClient(net, p2p.EVMLeafRequestHandlerID, tracker).Send(ctx, &syncpb.GetLeafRequest{
@@ -815,6 +892,12 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 				resp.GetKeys(), resp.GetValues(), proofFrom(t, resp.GetProofVals()))
 			require.NoError(t, err)
 			require.Equal(t, tt.wantMore, more)
+
+			if tt.snapshot {
+				// A read is recorded when the iterator is opened, so this shows
+				// the snapshot was consulted, not that it served the leaves.
+				require.NotEmpty(t, c.snap.Reads(), "the snapshot must be consulted")
+			}
 		})
 	}
 }
