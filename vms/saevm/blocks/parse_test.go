@@ -158,7 +158,7 @@ func TestParseEthBlock(t *testing.T) {
 			})
 			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
 
-			b, err := New(ethB, nil, nil, log)
+			b, err := New(ethB, nil, nil, hooks(), log)
 			require.NoError(t, err, "New()")
 			_, err = ParseEth(b.Bytes(), hookstest.NewStub(0))
 			assert.ErrorIs(t, err, tt.wantErr, "Parse(#%v @ time %v)", hdr.Number, hdr.Time)
@@ -175,7 +175,7 @@ func TestParseVerifyBlockSyntax(t *testing.T) {
 		UncleHash: types.EmptyUncleHash,
 		TxHash:    types.EmptyTxsHash,
 	})
-	b, err := New(ethB, nil, nil, log)
+	b, err := New(ethB, nil, nil, hooks(), log)
 	require.NoError(t, err, "New()")
 	bytes := b.Bytes()
 
