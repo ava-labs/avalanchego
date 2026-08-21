@@ -4,7 +4,6 @@
 package sae
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
@@ -49,7 +48,7 @@ func TestGasPriceAPIs(t *testing.T) {
 					To:        &zeroAddr,
 					Gas:       params.TxGas,
 					GasTipCap: new(big.Int).SetUint64(tip),
-					GasFeeCap: new(big.Int).SetUint64(math.MaxUint64),
+					GasFeeCap: big.NewInt(params.GWei),
 				}))
 			}
 
@@ -81,7 +80,7 @@ func TestFeeHistory(t *testing.T) {
 			To:        &zeroAddr,
 			Gas:       params.TxGas,
 			GasTipCap: new(big.Int).SetUint64(tip),
-			GasFeeCap: new(big.Int).SetUint64(math.MaxUint64),
+			GasFeeCap: big.NewInt(params.GWei),
 		}))
 	}
 	require.NoError(t, sut.lastAcceptedBlock(t).WaitUntilExecuted(ctx), "last-accepted Block.WaitUntilExecuted()")

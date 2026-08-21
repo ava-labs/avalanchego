@@ -6,6 +6,7 @@ package rpc
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
@@ -18,8 +19,27 @@ func (b *backend) ChainDb() ethdb.Database { //nolint:staticcheck // this name r
 	return b.DB()
 }
 
-func (b *backend) RPCTxFeeCap() float64 {
-	return b.config.TxFeeCap
+const (
+	// DefaultEVMTimeout is the [Config.EVMTimeout] used when an operator leaves
+	// it unset.
+	DefaultEVMTimeout = 10 * time.Second
+	// GasCap limits the gas an eth_call can use.
+	GasCap = 50_000_000
+	// TxFeeCap limits the fee, in AVAX, of a transaction sent over RPC. The fee
+	// is the gas price times the gas limit.
+	TxFeeCap = 100
+)
+
+func (b *backend) RPCEVMTimeout() time.Duration {
+	return b.config.EVMTimeout
+}
+
+func (*backend) RPCGasCap() uint64 {
+	return GasCap
+}
+
+func (*backend) RPCTxFeeCap() float64 {
+	return TxFeeCap
 }
 
 func (b *backend) UnprotectedAllowed() bool {
