@@ -91,3 +91,13 @@ type ParseFunc func(context.Context, []byte) (snowman.Block, error)
 func (f ParseFunc) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	return f(ctx, blockBytes)
 }
+
+// RetainsAcceptedBlocksVM defines the interface a ChainVM can optionally
+// implement to declare that it durably retains the bytes of every accepted
+// block, retrievable via GetBlock, forever.
+//
+// Wrappers of a VM (e.g. the proposervm) may rely on this to avoid persisting
+// a second copy of accepted blocks' bytes.
+type RetainsAcceptedBlocksVM interface {
+	RetainsAcceptedBlocks() bool
+}

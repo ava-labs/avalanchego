@@ -147,6 +147,9 @@ message InitializeResponse {
   uint64 height = 3;
   bytes bytes = 4;
   google.protobuf.Timestamp timestamp = 5;
+  // retains_accepted_blocks is true if the VM durably retains the bytes of
+  // every accepted block, retrievable via GetBlock, forever.
+  bool retains_accepted_blocks = 6;
 }
 
 message SetStateRequest {
