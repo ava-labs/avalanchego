@@ -18,7 +18,7 @@ import (
 )
 
 type ancestry struct {
-	parent, lastSettled *Block
+	parent *Block
 }
 
 var (
@@ -113,9 +113,14 @@ func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
 	}
-	return b.ancestor(getSettledOfSettledErrMsg, func(a *ancestry) *Block {
-		return a.lastSettled
-	})
+
+	n := b.hooks.SettledBy(b.Header()).Height
+	for p := b.ParentBlock(); p != nil; p = p.ParentBlock() {
+		if p.Height() == n {
+			return p
+		}
+	}
+	return nil
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by

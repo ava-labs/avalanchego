@@ -80,7 +80,7 @@ func InMemoryBlockCount() int64 {
 // situations, [Block.CopyAncestorsFrom] MUST then be called before further use
 // of the Block. In practice, this SHOULD only be done when parsing an encoded
 // Block. The provided `hooks` MUST NOT be nil.
-func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
+func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
 		b:        eth,
 		executed: make(chan struct{}),
@@ -97,7 +97,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 		inMemoryBlockCount.Add(-1)
 	}, struct{}{})
 
-	if err := b.SetAncestors(parent, lastSettled); err != nil {
+	if err := b.SetAncestors(parent); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -107,7 +107,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
 func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
-	b, err := New(eth, nil, nil, hooks, log)
+	b, err := New(eth, nil, hooks, log)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ var (
 )
 
 // SetAncestors sets the block's ancestry while enforcing invariants.
-func (b *Block) SetAncestors(parent, lastSettled *Block) error {
+func (b *Block) SetAncestors(parent *Block) error {
 	if parent != nil {
 		if got, want := parent.Hash(), b.ParentHash(); got != want {
 			return fmt.Errorf("%w: constructing Block with parent hash %v; expecting %v", errParentHashMismatch, got, want)
@@ -140,8 +140,7 @@ func (b *Block) SetAncestors(parent, lastSettled *Block) error {
 		}
 	}
 	b.ancestry.Store(&ancestry{
-		parent:      parent,
-		lastSettled: lastSettled,
+		parent: parent,
 	})
 	return nil
 }
@@ -158,7 +157,7 @@ func (b *Block) CopyAncestorsFrom(c *Block) error {
 		return fmt.Errorf("%w: copying internals from block %#x to %#x", errHashMismatch, from, to)
 	}
 	a := c.ancestry.Load()
-	return b.SetAncestors(a.parent, a.lastSettled)
+	return b.SetAncestors(a.parent)
 }
 
 // Signer returns the transaction signer for the block.

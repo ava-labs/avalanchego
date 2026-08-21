@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -49,23 +51,30 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	ethB := types.NewBlock(
-		&types.Header{
-			Number: big.NewInt(1),
-			Time:   42,
-		},
-		txs,
-		nil, nil, // uncles, receipts
-		saetest.TrieHasher(),
-	)
 	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()
-
-	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
 	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
+
+	settles := newBlock(t, newSynchronousEthBlock(t, 1, 0, nil), nil)
 	settles.markExecutedForTests(t, db, xdb, tm)
-	b := newBlock(t, ethB, nil, settles)
+
+	parent := newBlock(t, newEthBlock(t, 2, 10, settles.EthBlock(), settles), settles)
+
+	ethB, err := hookstest.BuildBlock(
+		&types.Header{
+			Number:     big.NewInt(3),
+			Time:       42,
+			ParentHash: parent.Hash(),
+		},
+		nil,
+		txs,
+		nil, // receipts
+		nil, // opts
+		hook.Settled{Height: settles.Height()},
+	)
+	require.NoError(t, err, "hookstest.BuildBlock(...)")
+	rawdb.WriteBlock(db, ethB)
+	b := newBlock(t, ethB, parent)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
@@ -101,7 +110,7 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
+	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock())
 	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
@@ -182,7 +191,7 @@ func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 
 	// An empty execution-results DB is what signals the block is synchronous.
 	xdb := saetest.NewExecutionResultsDB()
-	b := newBlock(t, ethB, nil, nil)
+	b := newBlock(t, ethB, nil)
 	require.NoErrorf(t, b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
 
 	assert.Truef(t, b.Executed(), "%T.Executed()", b)

@@ -62,6 +62,7 @@ go_test(
         "//vms/components/gas",
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
+        "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
