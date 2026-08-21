@@ -18,6 +18,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/blocks",
     visibility = ["//visibility:public"],
     deps = [
+        "//database",
         "//ids",
         "//utils/logging",
         "//vms/components/gas",
@@ -61,7 +62,6 @@ go_test(
         "//vms/components/gas",
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
-        "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
@@ -72,7 +72,6 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//params",
-        "@com_github_ava_labs_libevm//rlp",
         "@com_github_google_go_cmp//cmp",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//assert",

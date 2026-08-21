@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -148,16 +149,18 @@ func TestParseEthBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			log := loggingtest.New(t, logging.Debug)
+
 			hdr := tt.mutate(&types.Header{
 				Number:    big.NewInt(1),
 				UncleHash: types.EmptyUncleHash,
 				TxHash:    types.EmptyTxsHash,
 			})
 			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
-			bytes, err := rlp.EncodeToBytes(ethB)
-			require.NoError(t, err, "rlp.EncodeToBytes()")
 
-			_, err = ParseEth(bytes, hookstest.NewStub(0))
+			b, err := New(ethB, nil, nil, hooks(), log)
+			require.NoError(t, err, "New()")
+			_, err = ParseEth(b.Bytes(), hookstest.NewStub(0))
 			assert.ErrorIs(t, err, tt.wantErr, "Parse(#%v @ time %v)", hdr.Number, hdr.Time)
 		})
 	}
@@ -166,13 +169,15 @@ func TestParseEthBlock(t *testing.T) {
 // TestParseVerifyBlockSyntax verifies that [ParseEth] applies the hook-specific
 // checks and propagates any error.
 func TestParseVerifyBlockSyntax(t *testing.T) {
+	log := loggingtest.New(t, logging.Debug)
 	ethB := types.NewBlockWithHeader(&types.Header{
 		Number:    big.NewInt(1),
 		UncleHash: types.EmptyUncleHash,
 		TxHash:    types.EmptyTxsHash,
 	})
-	bytes, err := rlp.EncodeToBytes(ethB)
-	require.NoError(t, err, "rlp.EncodeToBytes()")
+	b, err := New(ethB, nil, nil, hooks(), log)
+	require.NoError(t, err, "New()")
+	bytes := b.Bytes()
 
 	errChainSpecific := errors.New("hook check rejected the block")
 	tests := []struct {

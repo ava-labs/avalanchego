@@ -49,26 +49,23 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	bb := newBlockBuilder()
+	ethB := types.NewBlock(
+		&types.Header{
+			Number: big.NewInt(1),
+			Time:   42,
+		},
+		txs,
+		nil, nil, // uncles, receipts
+		saetest.TrieHasher(),
+	)
 	db := rawdb.NewMemoryDatabase()
+	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()
 
-	settles := bb.newFromHooks(t, 0, 0, nil, nil)
+	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
 	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
 	settles.markExecutedForTests(t, db, xdb, tm)
-
-	ethB, err := bb.hooks.BuildBlock(
-		&types.Header{
-			ParentHash: settles.Hash(),
-			Number:     big.NewInt(1),
-			Time:       42,
-		},
-		nil, txs, nil, nil,
-		settledBy(settles),
-	)
-	require.NoErrorf(t, err, "%T.BuildBlock()", bb.hooks)
-	rawdb.WriteBlock(db, ethB)
-	b := bb.mustNew(t, ethB, nil, settles)
+	b := newBlock(t, ethB, nil, settles)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
@@ -104,7 +101,7 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	fromDB := bb.mustNew(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
+	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
 	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
@@ -183,10 +180,9 @@ func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	rawdb.WriteBlock(db, ethB)
 
-	// An empty [types.Header.Extra] encodes the zero-value [hook.Settled],
-	// which is what marks the block as synchronous.
-	b := newBlockBuilder().mustNew(t, ethB, nil, nil)
+	// An empty execution-results DB is what signals the block is synchronous.
 	xdb := saetest.NewExecutionResultsDB()
+	b := newBlock(t, ethB, nil, nil)
 	require.NoErrorf(t, b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
 
 	assert.Truef(t, b.Executed(), "%T.Executed()", b)

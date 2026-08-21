@@ -22,6 +22,7 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
@@ -247,8 +248,9 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called. If the block is synchronous, the
-// execution results are derived from the block header.
+// said function was originally called.  If no execution results are found in
+// the [saetypes.ExecutionResults], they are instead inferred from the
+// block itself, and the block is marked as synchronous.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
@@ -257,16 +259,14 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 //
 // Any error returned corrupts the block's in-memory state.
 func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
-	var (
-		e   *executionResults
-		err error
-	)
-	if b.Synchronous() {
+	e, err := loadExecutionResults(xdb, b.NumberU64())
+	if errors.Is(err, database.ErrNotFound) {
+		// TODO(JonathanOppenheimer): missing results result in us assuming
+		// "synchronous" here, so once state sync exist and the database can be
+		// pruned, this would result in async blocks being restored incorrectly.
+		// We can ask [hook.Synchronous] instead?
 		e, err = b.synchronousExecutionResults()
-	} else {
-		// TODO(rahulmutt-ava): Provide more context in the error to aid users
-		// while debugging.
-		e, err = loadExecutionResults(xdb, b.NumberU64())
+		b.synchronous = true
 	}
 	if err != nil {
 		return err
@@ -304,7 +304,7 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 		byGas:         *execTime.Clone(),
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
-		// receipts are populated in [Block.restoreExecutionArtefacts], which
+		// receipts are populated in [Block.RestoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
 	e.baseFee.SetUint64(b.headerBaseFee())

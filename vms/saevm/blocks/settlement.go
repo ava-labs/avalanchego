@@ -76,8 +76,8 @@ func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether the block's header encodes no settled block (see
-// [hook.Synchronous]).
+// Synchronous reports whether the block was marked as synchronous during
+// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }

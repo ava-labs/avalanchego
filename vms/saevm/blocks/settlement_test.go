@@ -49,10 +49,10 @@ func ExampleRange() {
 func blockBuildingPreference() *Block { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
-	bb := newBlockBuilder()
-	parent := bb.newFromHooks(t, 5, 5, nil, nil)
-	lastSettled := bb.newFromHooks(t, 3, 3, nil, nil)
-	b := bb.newFromHooks(t, 6, 10, parent, lastSettled)
+	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
+	lastSettled := newBlock(t, newEthBlock(3, 3, nil), nil, nil)
+
+	b := newBlock(t, newEthBlock(6, 10, parent.EthBlock()), parent, lastSettled)
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
@@ -150,7 +150,7 @@ func TestSettles(t *testing.T) {
 		8: nil,
 		9: {4, 5, 6, 7},
 	}
-	blocks := newBlockBuilder().newChain(t, 0, 10, lastSettledAtHeight)
+	blocks := newChain(t, 0, 10, lastSettledAtHeight)
 
 	numsToBlocks := func(nums ...uint64) []*Block {
 		bs := make([]*Block, len(nums))
@@ -217,7 +217,7 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newBlockBuilder().newChain(t, 0, 30, nil)
+	blocks := newChain(t, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
