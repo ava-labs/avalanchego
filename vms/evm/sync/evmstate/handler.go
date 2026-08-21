@@ -97,7 +97,7 @@ var (
 
 const (
 	// MaxLeavesLimit caps leaves per response.
-	MaxLeavesLimit = uint16(1024)
+	MaxLeavesLimit = 1024
 
 	// snapshotReadDeadlinePercent leaves enough deadline for a full trie
 	// iteration, which only an invalid snapshot range forces.
@@ -175,7 +175,7 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		return nil, errRootNotFound
 	}
 
-	limit := uint16(min(req.GetKeyLimit(), uint32(MaxLeavesLimit)))
+	limit := uint16(min(req.GetKeyLimit(), MaxLeavesLimit))
 	return &query{
 		log:      r.log,
 		startKey: req.GetStartKey(),

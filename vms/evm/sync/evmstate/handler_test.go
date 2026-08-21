@@ -291,7 +291,7 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 		"under_a_segment": 1,
 		"one_segment":     64,
 		"past_a_segment":  65,
-		"over_the_cap":    uint32(MaxLeavesLimit) + 10,
+		"over_the_cap":    MaxLeavesLimit + 10,
 	}
 
 	for dname, diverge := range divergences {
@@ -501,7 +501,7 @@ func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 	}{
 		{
 			name:     "over_the_limit",
-			keyLimit: uint32(MaxLeavesLimit) + 200,
+			keyLimit: MaxLeavesLimit + 200,
 		},
 		// Capping in uint16 would truncate this to 4 rather than clamp it.
 		{
@@ -514,7 +514,7 @@ func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			trieDB := synctest.NewTrieDB()
-			root, _, _ := synctest.FillTrie(t, trieDB, int(MaxLeavesLimit)+200)
+			root, _, _ := synctest.FillTrie(t, trieDB, MaxLeavesLimit+200)
 
 			r := newLeafResponder(t, trieDB)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
@@ -523,7 +523,7 @@ func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
 			})
 			require.Nil(t, appErr)
 			require.NotNil(t, resp)
-			require.Len(t, resp.Keys, int(MaxLeavesLimit))
+			require.Len(t, resp.Keys, MaxLeavesLimit)
 		})
 	}
 }
