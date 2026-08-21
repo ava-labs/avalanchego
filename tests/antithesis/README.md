@@ -32,8 +32,8 @@ on Macs, a local build will not be instrumented.
 
 ## Defining a new test setup
 
-When defining a new test setup - whether in the avalanchego repo or
-for a VM in another repo - following the example of an existing test
+When defining a new test setup - whether for avalanchego, Subnet-EVM,
+or a VM in another repo - following the example of an existing test
 setup is suggested. The following table enumerates the files defining
 a test setup:
 
@@ -60,8 +60,6 @@ Keep its workload and compose-config generator in
 `graft/subnet-evm/tests/antithesis/`. The root build scripts build these
 binaries from the graft module.
 
-Move the workload and compose-config generator to `vms/evm` when that
-folder replaces `graft/subnet-evm`.
 
 ### Use of a builder image
 
