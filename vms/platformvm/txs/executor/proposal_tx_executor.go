@@ -199,7 +199,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 		return err
 	}
 
-	if err := state.NewAdapter(e.onCommitState).PutPendingPrimaryNetworkValidator(tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingPrimaryNetworkValidator(e.tx, validator); err != nil {
 		return err
 	}
 
@@ -248,7 +248,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		return err
 	}
 
-	if err := state.NewAdapter(e.onCommitState).PutPendingSubnetValidator(tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingSubnetValidator(e.tx, validator); err != nil {
 		return err
 	}
 
@@ -298,7 +298,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 		return err
 	}
 
-	if err := state.NewAdapter(e.onCommitState).PutPendingDelegator(tx, delegator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingDelegator(e.tx, delegator); err != nil {
 		return err
 	}
 
@@ -460,9 +460,9 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	if !ok {
 		return errShouldBeAutoRenewedStaker
 	}
-	continuousValidator, err := state.NewAdapter(e.onCommitState).GetCurrentContinuousPrimaryNetworkValidator(validator.NodeID())
+	autoRenewedValidator, err := state.NewAdapter(e.onCommitState).GetCurrentAutoRenewedValidator(validator.NodeID())
 	if err != nil {
-		return fmt.Errorf("failed to get continuous validator: %w", err)
+		return fmt.Errorf("failed to get auto-renewed validator: %w", err)
 	}
 	stakingInfo, err := e.onCommitState.GetStakingInfo(validator.SubnetID(), validator.NodeID())
 	if err != nil {
@@ -484,17 +484,17 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 
 	// Abort: pay accrued validation + all delegatee rewards (the current
 	// cycle's potential reward is forfeited).
-	if err = e.mintRewardOnAbort(uStakerTx, continuousValidator.ContinuousValidatorMetadata, stakingInfo.DelegateeReward); err != nil {
+	if err = e.mintRewardOnAbort(uStakerTx, autoRenewedValidator.AutoRenewedValidatorMetadata, stakingInfo.DelegateeReward); err != nil {
 		return fmt.Errorf("minting reward on abort: %w", err)
 	}
 
-	if continuousValidator.NextPeriod > 0 {
+	if autoRenewedValidator.NextPeriod > 0 {
 		// The validator continues to the next cycle.
 
 		// Commit: restake rewards per AutoCompoundRewardShares and start the
 		// next cycle. The validator stays in the set, so its stake is not
 		// returned here.
-		return e.restakeAutoRenewedValidatorOnCommit(uStakerTx, continuousValidator)
+		return e.restakeAutoRenewedValidatorOnCommit(stakerTx, autoRenewedValidator)
 	}
 
 	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
@@ -508,7 +508,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 
 	// Commit: pay all rewards for the cycle — the current potential reward plus
 	// any accrued validation rewards.
-	totalValidationRewards, err := safemath.Add(validator.PotentialReward, continuousValidator.AccruedValidationRewards)
+	totalValidationRewards, err := safemath.Add(validator.PotentialReward, autoRenewedValidator.AccruedValidationRewards)
 	if err != nil {
 		return err
 	}
@@ -516,7 +516,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	// On graceful exit the validator receives all delegatee rewards: the pending
 	// commission from this cycle's completed delegations (DelegateeReward) plus the
 	// commission accrued and restaked in prior cycles (AccruedDelegateeRewards).
-	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, continuousValidator.AccruedDelegateeRewards)
+	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, autoRenewedValidator.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -754,7 +754,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) mintRewardOnAbort(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
-	metadata state.ContinuousValidatorMetadata,
+	metadata state.AutoRenewedValidatorMetadata,
 	delegateeReward uint64,
 ) error {
 	// DelegateeReward tracks pending commission from completed delegator periods.
@@ -825,11 +825,15 @@ func (e *proposalTxExecutor) mintRewards(
 //  4. Increases validator weight and accrued rewards by the restaking portion
 //  5. Updates the validator state
 func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
-	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
-	continuousValidator state.AutoRenewedValidator,
+	stakerTx *platform.Tx,
+	autoRenewedValidator state.AutoRenewedValidator,
 ) error {
-	validator := continuousValidator.Validator
-	metadata := continuousValidator.ContinuousValidatorMetadata
+	addAutoRenewedValidatorTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+	if !ok {
+		return errShouldBeAutoRenewedStaker
+	}
+	validator := autoRenewedValidator.CurrentPrimaryNetworkValidator
+	metadata := autoRenewedValidator.AutoRenewedValidatorMetadata
 	// Ignore the withdrawn portions from [reward.Split] because the restaked
 	// amounts may be capped below. Withdrawn rewards are computed later from the
 	// difference between total rewards and the amounts actually restaked.
@@ -968,12 +972,12 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	newEndTime := stakeStartTime.Add(duration)
 
 	// Update validator by deleting and putting back.
-	renewedValidator := continuousValidator
-	renewedValidator.Validator = validator
-	renewedValidator.Validator.StartTime = stakeStartTime
-	renewedValidator.Validator.EndTime = newEndTime
-	renewedValidator.Validator.PotentialReward = newPotentialReward
-	renewedValidator.Validator.Weight = newWeight
+	renewedValidator := autoRenewedValidator
+	renewedValidator.CurrentPrimaryNetworkValidator = validator
+	renewedValidator.StartTime = stakeStartTime
+	renewedValidator.EndTime = newEndTime
+	renewedValidator.PotentialReward = newPotentialReward
+	renewedValidator.Weight = newWeight
 
 	stakingState := state.NewAdapter(e.onCommitState)
 	if err := stakingState.DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
@@ -982,8 +986,8 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 
 	metadata.AccruedValidationRewards = newAccruedRewards
 	metadata.AccruedDelegateeRewards = newAccruedDelegateeRewards
-	renewedValidator.ContinuousValidatorMetadata = metadata
-	if err := stakingState.PutAutoRenewedValidator(addAutoRenewedValidatorTx, renewedValidator); err != nil {
+	renewedValidator.AutoRenewedValidatorMetadata = metadata
+	if err := stakingState.PutAutoRenewedValidator(stakerTx, renewedValidator); err != nil {
 		return fmt.Errorf("putting renewed validator: %w", err)
 	}
 

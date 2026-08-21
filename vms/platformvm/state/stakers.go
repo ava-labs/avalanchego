@@ -18,10 +18,10 @@ import (
 
 var (
 	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
-	// ErrNotContinuousPrimaryNetworkValidator is returned when a bounded
-	// Primary Network validator is used where a continuous validator is needed.
-	ErrNotContinuousPrimaryNetworkValidator = errors.New("not a continuous Primary Network validator")
-	errUnexpectedStaker                     = errors.New("unexpected staker")
+	// ErrNotAutoRenewedValidator is returned when a bounded validator is used
+	// where an auto-renewed validator is needed.
+	ErrNotAutoRenewedValidator = errors.New("not an auto-renewed validator")
+	errUnexpectedStaker        = errors.New("unexpected staker")
 )
 
 // StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.

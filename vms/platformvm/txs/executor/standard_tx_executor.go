@@ -1412,7 +1412,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 
 	endTime := stakeStartTime.Add(duration)
 
-	validator, err := state.NewCurrentContinuousPrimaryNetworkValidator(
+	validator, err := state.NewCurrentAutoRenewedValidator(
 		e.tx.ID(),
 		tx,
 		stakeStartTime,
@@ -1424,7 +1424,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("creating staker: %w", err)
 	}
 
-	if err := state.NewAdapter(e.state).PutAutoRenewedValidator(tx, validator); err != nil {
+	if err := state.NewAdapter(e.state).PutAutoRenewedValidator(e.tx, validator); err != nil {
 		return fmt.Errorf("putting current validator: %w", err)
 	}
 
@@ -1451,17 +1451,17 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 	}
 
 	stakingState := state.NewAdapter(e.state)
-	continuousValidator, err := stakingState.GetCurrentContinuousPrimaryNetworkValidator(validator.NodeID())
+	autoRenewedValidator, err := stakingState.GetCurrentAutoRenewedValidator(validator.NodeID())
 	if err != nil {
-		return fmt.Errorf("getting continuous validator: %w", err)
+		return fmt.Errorf("getting auto-renewed validator: %w", err)
 	}
 
-	metadata := continuousValidator.ContinuousValidatorMetadata
+	metadata := autoRenewedValidator.AutoRenewedValidatorMetadata
 	metadata.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
 	metadata.NextPeriod = tx.Period
 
-	if err := stakingState.SetCurrentContinuousPrimaryNetworkValidatorMetadata(continuousValidator.Validator.NodeID(), metadata); err != nil {
-		return fmt.Errorf("setting continuous validator metadata: %w", err)
+	if err := stakingState.SetCurrentAutoRenewedValidatorMetadata(autoRenewedValidator.NodeID(), metadata); err != nil {
+		return fmt.Errorf("setting auto-renewed validator metadata: %w", err)
 	}
 
 	avax.Consume(e.state, tx.Ins)
@@ -1540,20 +1540,20 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 			if err != nil {
 				return err
 			}
-			return state.NewAdapter(e.state).PutPendingDelegator(scheduledStaker, delegator)
+			return state.NewAdapter(e.state).PutPendingDelegator(e.tx, delegator)
 		case platform.ValidatorTx, *platform.AddSubnetValidatorTx:
 			if stakerTx.SubnetID() == constants.PrimaryNetworkID {
 				validator, err := state.NewPendingPrimaryNetworkValidator(txID, scheduledStaker)
 				if err != nil {
 					return err
 				}
-				return state.NewAdapter(e.state).PutPendingPrimaryNetworkValidator(scheduledStaker, validator)
+				return state.NewAdapter(e.state).PutPendingPrimaryNetworkValidator(e.tx, validator)
 			}
 			validator, err := state.NewPendingSubnetValidator(txID, scheduledStaker)
 			if err != nil {
 				return err
 			}
-			return state.NewAdapter(e.state).PutPendingSubnetValidator(scheduledStaker, validator)
+			return state.NewAdapter(e.state).PutPendingSubnetValidator(e.tx, validator)
 		default:
 			return fmt.Errorf("staker %s, unexpected type %T", txID, stakerTx)
 		}
@@ -1572,7 +1572,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		if err != nil {
 			return err
 		}
-		if err := state.NewAdapter(e.state).PutCurrentDelegator(stakerTx, delegator); err != nil {
+		if err := state.NewAdapter(e.state).PutCurrentDelegator(e.tx, delegator); err != nil {
 			return fmt.Errorf("putting delegator: %w", err)
 		}
 		return nil
@@ -1589,7 +1589,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 			if err != nil {
 				return err
 			}
-			return state.NewAdapter(e.state).PutCurrentPrimaryNetworkValidator(stakerTx, validator)
+			return state.NewAdapter(e.state).PutCurrentPrimaryNetworkValidator(e.tx, validator)
 		}
 		validator, err := state.NewCurrentSubnetValidator(
 			txID,
@@ -1602,7 +1602,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		if err != nil {
 			return err
 		}
-		return state.NewAdapter(e.state).PutCurrentSubnetValidator(stakerTx, validator)
+		return state.NewAdapter(e.state).PutCurrentSubnetValidator(e.tx, validator)
 	default:
 		return fmt.Errorf("staker %s, unexpected type %T", txID, stakerTx)
 	}

@@ -104,14 +104,14 @@ func getDelegatorRules(
 
 // GetValidator returns information about the given validator, which may be a
 // current validator or pending validator.
-//
-// Deprecated: executor code should use the typed state staking facade.
 func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
 	validator, err := state.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
+		// This node is currently validating the subnet.
 		return validator, nil
 	}
 	if err != database.ErrNotFound {
+		// Unexpected error occurred.
 		return nil, err
 	}
 	return state.GetPendingValidator(subnetID, nodeID)
@@ -153,8 +153,6 @@ func overDelegated(
 // time advances.
 // Invariant:
 // - [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
-//
-// Deprecated: executor code should use the typed state staking facade.
 func GetMaxWeight(
 	chainState state.Chain,
 	validator *state.Staker,
