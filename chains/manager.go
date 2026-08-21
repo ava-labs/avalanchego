@@ -205,6 +205,7 @@ type ManagerConfig struct {
 	NodeID                    ids.NodeID                 // The ID of this node
 	NetworkID                 uint32                     // ID of the network this node is connected to
 	PartialSyncPrimaryNetwork bool
+	PChainFollowOnly          bool
 	Server                    server.Server // Handles HTTP API calls
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
@@ -1400,6 +1401,7 @@ func (m *manager) createSnowmanChain(
 		DB:                             bootstrappingDB,
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
+		FollowOnly:                     m.PChainFollowOnly && ctx.ChainID == constants.PlatformChainID,
 	}
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
