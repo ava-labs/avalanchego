@@ -21,6 +21,7 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -117,6 +118,15 @@ func (e *Executor) processQueue() {
 
 var errFatal = errors.New("fatal execution error")
 
+const (
+	// triePrefetcherNamespace is the trie prefetcher's metrics namespace; it
+	// publishes statistics as `trie/prefetch/sae/*`.
+	triePrefetcherNamespace = "sae"
+	// triePrefetcherParallelism caps the trie prefetcher's concurrent disk
+	// reads.
+	triePrefetcherParallelism = 16
+)
+
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
@@ -133,6 +143,14 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	// StartPrefetcher does nothing without a snapshot. Firewood runs without
+	// one, because prefetching wouldn't help it anyway.
+	//
+	// The commit in [Executor.afterExecution] also stops the prefetcher, but
+	// only on the happy path; this covers every path that returns first.
+	stateDB.StartPrefetcher(triePrefetcherNamespace, utils.WithConcurrentWorkers(triePrefetcherParallelism))
+	defer stateDB.StopPrefetcher()
+
 	result, err := Execute(
 		b,
 		stateDB,
