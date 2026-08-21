@@ -47,11 +47,10 @@ var (
 )
 
 type responder struct {
-	log           logging.Logger
-	trieDB        *triedb.Database
-	snapshot      SnapshotReader // optional
-	trieKeyLength int
-	zeroKey       []byte // read-only stand-in for an absent start key
+	log      logging.Logger
+	trieDB   *triedb.Database
+	snapshot SnapshotReader // optional
+	zeroKey  []byte         // read-only stand-in for an absent start key
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
@@ -59,11 +58,10 @@ func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int
 	options.ApplyTo(&cfg, opts...)
 
 	return &responder{
-		log:           log,
-		trieDB:        trieDB,
-		snapshot:      cfg.snapshot,
-		trieKeyLength: trieKeyLength,
-		zeroKey:       bytes.Repeat([]byte{0x00}, trieKeyLength),
+		log:      log,
+		trieDB:   trieDB,
+		snapshot: cfg.snapshot,
+		zeroKey:  make([]byte, trieKeyLength),
 	}
 }
 
@@ -109,7 +107,7 @@ const (
 )
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if reason := validateRequest(req, r.trieKeyLength); reason != "" {
+	if reason := validateRequest(req, len(r.zeroKey)); reason != "" {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
 			zap.String("reason", reason),
