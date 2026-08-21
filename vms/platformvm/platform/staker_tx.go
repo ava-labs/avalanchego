@@ -45,11 +45,23 @@ type PermissionlessStaker interface {
 type Staker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
+	Weight() uint64
+	CurrentPriority() Priority
+}
+
+// KeyedStaker is a staker whose transaction can register a BLS key. Only
+// Primary Network validators can, so a caller that needs the key must
+// type-assert to this interface rather than accepting any [Staker].
+//
+// Satisfying KeyedStaker does not by itself mean the transaction is on the
+// Primary Network: AddPermissionlessValidatorTx serves both networks and
+// carries the network in a field. SyntacticVerify is what rejects a key on a
+// non-Primary-Network transaction.
+type KeyedStaker interface {
+	Staker
 	// PublicKey returns the BLS public key registered by this transaction. If
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)
-	Weight() uint64
-	CurrentPriority() Priority
 }
 
 type ScheduledStaker interface {

@@ -61,6 +61,7 @@ func (tx *AddValidatorTx) NodeID() ids.NodeID {
 	return tx.Validator.NodeID
 }
 
+// PublicKey always returns no key: AddValidatorTx predates BLS registration.
 func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return nil, false, nil
 }

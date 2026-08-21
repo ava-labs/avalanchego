@@ -194,12 +194,12 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	// Produce the UTXOs
 	avax.Produce(e.onCommitState, txID, tx.Outs)
 
-	validator, err := state.NewPendingPrimaryNetworkValidator(txID, tx)
+	validator, err := state.NewPendingValidator(txID, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := state.NewAdapter(e.onCommitState).PutPendingPrimaryNetworkValidator(e.tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx, validator); err != nil {
 		return err
 	}
 
@@ -243,12 +243,12 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 	// Produce the UTXOs
 	avax.Produce(e.onCommitState, txID, tx.Outs)
 
-	validator, err := state.NewPendingSubnetValidator(txID, tx)
+	validator, err := state.NewPendingValidator(txID, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := state.NewAdapter(e.onCommitState).PutPendingSubnetValidator(e.tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx, validator); err != nil {
 		return err
 	}
 
@@ -374,20 +374,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 		}
 
 		// Handle staker lifecycle.
-		if validator.SubnetID() == constants.PrimaryNetworkID {
-			if err := state.NewAdapter(e.onCommitState).DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
-				return fmt.Errorf("deleting current validator from commit state: %w", err)
-			}
-			if err := state.NewAdapter(e.onAbortState).DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
-				return fmt.Errorf("deleting current validator from abort state: %w", err)
-			}
-		} else {
-			if err := state.NewAdapter(e.onCommitState).DeleteCurrentSubnetValidator(validator.SubnetID(), validator.NodeID()); err != nil {
-				return fmt.Errorf("deleting current validator from commit state: %w", err)
-			}
-			if err := state.NewAdapter(e.onAbortState).DeleteCurrentSubnetValidator(validator.SubnetID(), validator.NodeID()); err != nil {
-				return fmt.Errorf("deleting current validator from abort state: %w", err)
-			}
+		if err := state.NewAdapter(e.onCommitState).DeleteCurrentValidator(validator.SubnetID(), validator.NodeID()); err != nil {
+			return fmt.Errorf("deleting current validator from commit state: %w", err)
+		}
+		if err := state.NewAdapter(e.onAbortState).DeleteCurrentValidator(validator.SubnetID(), validator.NodeID()); err != nil {
+			return fmt.Errorf("deleting current validator from abort state: %w", err)
 		}
 	case *platform.AddDelegatorTx, *platform.AddPermissionlessDelegatorTx:
 		delegator, ok := stakerToReward.(state.CurrentDelegator)
@@ -456,7 +447,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		return errShouldBeAutoRenewedStaker
 	}
 
-	validator, ok := staker.(state.CurrentPrimaryNetworkValidator)
+	validator, ok := staker.(state.CurrentValidator)
 	if !ok {
 		return errShouldBeAutoRenewedStaker
 	}
@@ -472,7 +463,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	// Build the abort branch (same for both configurations): remove the
 	// validator, return its principal, and undo the optimistic supply mint since
 	// the current cycle's potential reward is not granted on abort.
-	if err := state.NewAdapter(e.onAbortState).DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
+	if err := state.NewAdapter(e.onAbortState).DeleteCurrentValidator(constants.PrimaryNetworkID, validator.NodeID()); err != nil {
 		return fmt.Errorf("deleting current validator from abort state: %w", err)
 	}
 
@@ -499,7 +490,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 
 	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
 	// is removed on both branches.
-	if err := state.NewAdapter(e.onCommitState).DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
+	if err := state.NewAdapter(e.onCommitState).DeleteCurrentValidator(constants.PrimaryNetworkID, validator.NodeID()); err != nil {
 		return fmt.Errorf("deleting current validator from commit state: %w", err)
 	}
 
@@ -646,20 +637,11 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 	// We're (possibly) rewarding a delegator, so we need to fetch
 	// the validator they are delegated to.
 	stakingState := state.NewAdapter(e.onCommitState)
-	var validator state.StakingPeriod
-	if delegator.SubnetID() == constants.PrimaryNetworkID {
-		primaryNetworkValidator, err := stakingState.GetCurrentPrimaryNetworkValidator(delegator.NodeID())
-		if err != nil {
-			return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID(), err)
-		}
-		validator = primaryNetworkValidator.StakingPeriod
-	} else {
-		subnetValidator, err := stakingState.GetCurrentSubnetValidator(delegator.SubnetID(), delegator.NodeID())
-		if err != nil {
-			return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID(), err)
-		}
-		validator = subnetValidator.StakingPeriod
+	currentValidator, err := stakingState.GetCurrentValidator(delegator.SubnetID(), delegator.NodeID())
+	if err != nil {
+		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID(), err)
 	}
+	validator := currentValidator.StakingPeriod
 
 	vdrTxIntf, _, err := e.onCommitState.GetTx(validator.TxID)
 	if err != nil {
@@ -832,7 +814,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	if !ok {
 		return errShouldBeAutoRenewedStaker
 	}
-	validator := autoRenewedValidator.CurrentPrimaryNetworkValidator
+	validator := autoRenewedValidator.CurrentValidator
 	metadata := autoRenewedValidator.AutoRenewedValidatorMetadata
 	// Ignore the withdrawn portions from [reward.Split] because the restaked
 	// amounts may be capped below. Withdrawn rewards are computed later from the
@@ -973,14 +955,14 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 
 	// Update validator by deleting and putting back.
 	renewedValidator := autoRenewedValidator
-	renewedValidator.CurrentPrimaryNetworkValidator = validator
+	renewedValidator.CurrentValidator = validator
 	renewedValidator.StartTime = stakeStartTime
 	renewedValidator.EndTime = newEndTime
 	renewedValidator.PotentialReward = newPotentialReward
 	renewedValidator.Weight = newWeight
 
 	stakingState := state.NewAdapter(e.onCommitState)
-	if err := stakingState.DeleteCurrentPrimaryNetworkValidator(validator.NodeID()); err != nil {
+	if err := stakingState.DeleteCurrentValidator(constants.PrimaryNetworkID, validator.NodeID()); err != nil {
 		return fmt.Errorf("failed to delete validator from commit state: %w", err)
 	}
 

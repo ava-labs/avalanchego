@@ -518,11 +518,11 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 	}
 
 	if isCurrentValidator {
-		if err := state.NewAdapter(e.state).DeleteCurrentSubnetValidator(staker.SubnetID(), staker.NodeID()); err != nil {
+		if err := state.NewAdapter(e.state).DeleteCurrentValidator(staker.SubnetID(), staker.NodeID()); err != nil {
 			return fmt.Errorf("deleting current validator: %w", err)
 		}
 	} else {
-		if err := state.NewAdapter(e.state).DeletePendingSubnetValidator(staker.SubnetID(), staker.NodeID()); err != nil {
+		if err := state.NewAdapter(e.state).DeletePendingValidator(staker.SubnetID(), staker.NodeID()); err != nil {
 			return fmt.Errorf("deleting pending validator: %w", err)
 		}
 	}
@@ -1543,17 +1543,17 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 			return state.NewAdapter(e.state).PutPendingDelegator(e.tx, delegator)
 		case platform.ValidatorTx, *platform.AddSubnetValidatorTx:
 			if stakerTx.SubnetID() == constants.PrimaryNetworkID {
-				validator, err := state.NewPendingPrimaryNetworkValidator(txID, scheduledStaker)
+				validator, err := state.NewPendingValidator(txID, scheduledStaker)
 				if err != nil {
 					return err
 				}
-				return state.NewAdapter(e.state).PutPendingPrimaryNetworkValidator(e.tx, validator)
+				return state.NewAdapter(e.state).PutPendingValidator(e.tx, validator)
 			}
-			validator, err := state.NewPendingSubnetValidator(txID, scheduledStaker)
+			validator, err := state.NewPendingValidator(txID, scheduledStaker)
 			if err != nil {
 				return err
 			}
-			return state.NewAdapter(e.state).PutPendingSubnetValidator(e.tx, validator)
+			return state.NewAdapter(e.state).PutPendingValidator(e.tx, validator)
 		default:
 			return fmt.Errorf("staker %s, unexpected type %T", txID, stakerTx)
 		}
@@ -1578,7 +1578,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		return nil
 	case platform.ValidatorTx, *platform.AddSubnetValidatorTx:
 		if stakerTx.SubnetID() == constants.PrimaryNetworkID {
-			validator, err := state.NewCurrentPrimaryNetworkValidator(
+			validator, err := state.NewCurrentValidator(
 				txID,
 				stakerTx,
 				stakeStartTime,
@@ -1589,9 +1589,9 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 			if err != nil {
 				return err
 			}
-			return state.NewAdapter(e.state).PutCurrentPrimaryNetworkValidator(e.tx, validator)
+			return state.NewAdapter(e.state).PutCurrentValidator(e.tx, validator)
 		}
-		validator, err := state.NewCurrentSubnetValidator(
+		validator, err := state.NewCurrentValidator(
 			txID,
 			stakerTx,
 			stakeStartTime,
@@ -1602,7 +1602,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		if err != nil {
 			return err
 		}
-		return state.NewAdapter(e.state).PutCurrentSubnetValidator(e.tx, validator)
+		return state.NewAdapter(e.state).PutCurrentValidator(e.tx, validator)
 	default:
 		return fmt.Errorf("staker %s, unexpected type %T", txID, stakerTx)
 	}

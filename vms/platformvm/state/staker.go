@@ -108,7 +108,7 @@ func NewCurrentStaker(
 	weight uint64,
 	potentialReward uint64,
 ) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
+	publicKey, err := optionalPublicKey(staker)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func NewCurrentStaker(
 //
 // Deprecated: use a typed pending-staker constructor with [NewAdapter].
 func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
+	publicKey, err := optionalPublicKey(staker)
 	if err != nil {
 		return nil, err
 	}
@@ -147,4 +147,15 @@ func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, er
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
+}
+
+// optionalPublicKey returns the BLS key staker registers, or nil if its
+// transaction kind cannot register one.
+func optionalPublicKey(staker platform.Staker) (*bls.PublicKey, error) {
+	keyed, ok := staker.(platform.KeyedStaker)
+	if !ok {
+		return nil, nil
+	}
+	publicKey, _, err := keyed.PublicKey()
+	return publicKey, err
 }

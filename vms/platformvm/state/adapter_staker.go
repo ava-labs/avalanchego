@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
@@ -55,71 +54,36 @@ func (p StakingPeriod) IsPermissionedValidator() bool {
 }
 
 // PendingPrimaryNetworkValidator is a Primary Network validator waiting to
-// become current.
-type PendingPrimaryNetworkValidator struct {
+// become current. The network it validates comes from its staking period; the
+// Primary Network and subnets have no distinct pending representation.
+type PendingValidator struct {
 	StakingPeriod
 }
 
-func (PendingPrimaryNetworkValidator) pendingValidator() {}
-
 // Promote returns the current validator corresponding to v.
-func (v PendingPrimaryNetworkValidator) Promote(potentialReward uint64) CurrentValidator {
+func (v PendingValidator) Promote(potentialReward uint64) CurrentValidator {
 	period := v.StakingPeriod
 	period.priority = platform.PendingToCurrentPriorities[period.priority]
-	return CurrentPrimaryNetworkValidator{
+	return CurrentValidator{
 		StakingPeriod:   period,
 		PotentialReward: potentialReward,
 	}
 }
 
-// PendingSubnetValidator is a subnet validator waiting to become current.
-type PendingSubnetValidator struct {
-	StakingPeriod
-}
-
-func (PendingSubnetValidator) pendingValidator() {}
-
-// Promote returns the current validator corresponding to v.
-func (v PendingSubnetValidator) Promote(potentialReward uint64) CurrentValidator {
-	period := v.StakingPeriod
-	period.priority = platform.PendingToCurrentPriorities[period.priority]
-	return CurrentSubnetValidator{
-		StakingPeriod:   period,
-		PotentialReward: potentialReward,
-	}
-}
-
-// NewPendingPrimaryNetworkValidator returns a pending Primary Network
-// validator built from staker.
-func NewPendingPrimaryNetworkValidator(txID ids.ID, staker platform.ScheduledStaker) (PendingPrimaryNetworkValidator, error) {
-	if staker.SubnetID() != constants.PrimaryNetworkID {
-		return PendingPrimaryNetworkValidator{}, fmt.Errorf("%w: expected Primary Network validator", errUnexpectedStaker)
-	}
+// NewPendingValidator returns a pending validator built from staker.
+func NewPendingValidator(txID ids.ID, staker platform.ScheduledStaker) (PendingValidator, error) {
 	period, err := newPendingStakingPeriod(txID, staker)
-	return PendingPrimaryNetworkValidator{
+	return PendingValidator{
 		StakingPeriod: period,
 	}, err
 }
 
-// NewPendingSubnetValidator returns a pending subnet validator built from
-// staker.
-func NewPendingSubnetValidator(txID ids.ID, staker platform.ScheduledStaker) (PendingSubnetValidator, error) {
-	if staker.SubnetID() == constants.PrimaryNetworkID {
-		return PendingSubnetValidator{}, fmt.Errorf("%w: expected subnet validator", errUnexpectedStaker)
-	}
-	period, err := newPendingStakingPeriod(txID, staker)
-	return PendingSubnetValidator{
-		StakingPeriod: period,
-	}, err
-}
-
-// CurrentPrimaryNetworkValidator is an active Primary Network validator.
-type CurrentPrimaryNetworkValidator struct {
+// CurrentValidator is an active validator. The network it validates comes from
+// its staking period.
+type CurrentValidator struct {
 	StakingPeriod
 	PotentialReward uint64
 }
-
-func (CurrentPrimaryNetworkValidator) currentValidator() {}
 
 // AutoRenewedValidatorMetadata contains the mutable state of an auto-renewed
 // validator. It is not meaningful for bounded validators.
@@ -139,34 +103,22 @@ type AutoRenewedValidatorMetadata struct {
 
 // AutoRenewedValidator is an active auto-renewed Primary Network validator.
 //
-// An auto-renewed validator is also readable through
-// [CurrentPrimaryNetworkValidator], which exposes only its common fields.
+// An auto-renewed validator is also readable through [CurrentValidator], which
+// exposes only its common fields.
 type AutoRenewedValidator struct {
-	CurrentPrimaryNetworkValidator
+	CurrentValidator
 	AutoRenewedValidatorMetadata
 }
 
-// CurrentSubnetValidator is an active subnet validator.
-type CurrentSubnetValidator struct {
-	StakingPeriod
-	PotentialReward uint64
-}
-
-func (CurrentSubnetValidator) currentValidator() {}
-
-// NewCurrentPrimaryNetworkValidator returns a current Primary Network
-// validator built from staker.
-func NewCurrentPrimaryNetworkValidator(
+// NewCurrentValidator returns a current validator built from staker.
+func NewCurrentValidator(
 	txID ids.ID,
 	staker platform.Staker,
 	startTime, endTime time.Time,
 	weight, potentialReward uint64,
-) (CurrentPrimaryNetworkValidator, error) {
-	if staker.SubnetID() != constants.PrimaryNetworkID {
-		return CurrentPrimaryNetworkValidator{}, fmt.Errorf("%w: expected Primary Network validator", errUnexpectedStaker)
-	}
+) (CurrentValidator, error) {
 	period, err := newCurrentStakingPeriod(txID, staker, startTime, endTime, weight)
-	return CurrentPrimaryNetworkValidator{
+	return CurrentValidator{
 		StakingPeriod:   period,
 		PotentialReward: potentialReward,
 	}, err
@@ -180,7 +132,7 @@ func NewCurrentAutoRenewedValidator(
 	startTime, endTime time.Time,
 	weight, potentialReward uint64,
 ) (AutoRenewedValidator, error) {
-	validator, err := NewCurrentPrimaryNetworkValidator(
+	validator, err := NewCurrentValidator(
 		txID,
 		staker,
 		startTime,
@@ -189,29 +141,11 @@ func NewCurrentAutoRenewedValidator(
 		potentialReward,
 	)
 	return AutoRenewedValidator{
-		CurrentPrimaryNetworkValidator: validator,
+		CurrentValidator: validator,
 		AutoRenewedValidatorMetadata: AutoRenewedValidatorMetadata{
 			AutoCompoundRewardShares: staker.AutoCompoundRewardShares,
 			NextPeriod:               staker.Period,
 		},
-	}, err
-}
-
-// NewCurrentSubnetValidator returns a current subnet validator built from
-// staker.
-func NewCurrentSubnetValidator(
-	txID ids.ID,
-	staker platform.Staker,
-	startTime, endTime time.Time,
-	weight, potentialReward uint64,
-) (CurrentSubnetValidator, error) {
-	if staker.SubnetID() == constants.PrimaryNetworkID {
-		return CurrentSubnetValidator{}, fmt.Errorf("%w: expected subnet validator", errUnexpectedStaker)
-	}
-	period, err := newCurrentStakingPeriod(txID, staker, startTime, endTime, weight)
-	return CurrentSubnetValidator{
-		StakingPeriod:   period,
-		PotentialReward: potentialReward,
 	}, err
 }
 
@@ -257,7 +191,8 @@ func NewCurrentDelegator(
 }
 
 // CurrentStaker is the sealed sum of [CurrentValidator] and
-// [CurrentDelegator].
+// [CurrentDelegator]. Validator and delegator stay distinct because their legal
+// operations differ; the Primary Network and subnets do not.
 type CurrentStaker interface {
 	Period() StakingPeriod
 	Reward() uint64
@@ -266,20 +201,9 @@ type CurrentStaker interface {
 	currentStaker()
 }
 
-// CurrentValidator is the sealed sum of [CurrentPrimaryNetworkValidator] and
-// [CurrentSubnetValidator].
-type CurrentValidator interface {
-	CurrentStaker
-	currentValidator()
-}
-
-func (v CurrentPrimaryNetworkValidator) Period() StakingPeriod { return v.StakingPeriod }
-func (v CurrentPrimaryNetworkValidator) Reward() uint64        { return v.PotentialReward }
-func (CurrentPrimaryNetworkValidator) currentStaker()          {}
-
-func (v CurrentSubnetValidator) Period() StakingPeriod { return v.StakingPeriod }
-func (v CurrentSubnetValidator) Reward() uint64        { return v.PotentialReward }
-func (CurrentSubnetValidator) currentStaker()          {}
+func (v CurrentValidator) Period() StakingPeriod { return v.StakingPeriod }
+func (v CurrentValidator) Reward() uint64        { return v.PotentialReward }
+func (CurrentValidator) currentStaker()          {}
 
 func (d CurrentDelegator) Period() StakingPeriod { return d.StakingPeriod }
 func (d CurrentDelegator) Reward() uint64        { return d.PotentialReward }
@@ -293,29 +217,13 @@ type PendingStaker interface {
 	pendingStaker()
 }
 
-// PendingValidator is the sealed sum of [PendingPrimaryNetworkValidator] and
-// [PendingSubnetValidator].
-type PendingValidator interface {
-	PendingStaker
-	Promote(potentialReward uint64) CurrentValidator
-	pendingValidator()
-}
-
-func (v PendingPrimaryNetworkValidator) Period() StakingPeriod { return v.StakingPeriod }
-func (PendingPrimaryNetworkValidator) pendingStaker()          {}
-
-func (v PendingSubnetValidator) Period() StakingPeriod { return v.StakingPeriod }
-func (PendingSubnetValidator) pendingStaker()          {}
+func (v PendingValidator) Period() StakingPeriod { return v.StakingPeriod }
+func (PendingValidator) pendingStaker()          {}
 
 func (d PendingDelegator) Period() StakingPeriod { return d.StakingPeriod }
 func (PendingDelegator) pendingStaker()          {}
 
 func newPendingStakingPeriod(txID ids.ID, staker platform.ScheduledStaker) (StakingPeriod, error) {
-	// The key is re-read from the transaction at the write boundary; this call
-	// only preserves the existing error behavior.
-	if _, _, err := staker.PublicKey(); err != nil {
-		return StakingPeriod{}, err
-	}
 	return StakingPeriod{
 		TxID:      txID,
 		Weight:    staker.Weight(),
@@ -333,9 +241,6 @@ func newCurrentStakingPeriod(
 	startTime, endTime time.Time,
 	weight uint64,
 ) (StakingPeriod, error) {
-	if _, _, err := staker.PublicKey(); err != nil {
-		return StakingPeriod{}, err
-	}
 	return StakingPeriod{
 		TxID:      txID,
 		Weight:    weight,
@@ -376,14 +281,8 @@ func currentStaker(period StakingPeriod, publicKey *bls.PublicKey, potentialRewa
 	}
 }
 
-func pendingPrimaryNetworkValidator(staker *Staker) PendingPrimaryNetworkValidator {
-	return PendingPrimaryNetworkValidator{
-		StakingPeriod: stakingPeriod(staker),
-	}
-}
-
-func pendingSubnetValidator(staker *Staker) PendingSubnetValidator {
-	return PendingSubnetValidator{
+func pendingValidatorRecord(staker *Staker) PendingValidator {
+	return PendingValidator{
 		StakingPeriod: stakingPeriod(staker),
 	}
 }
@@ -392,15 +291,8 @@ func pendingDelegator(staker *Staker) PendingDelegator {
 	return PendingDelegator{StakingPeriod: stakingPeriod(staker)}
 }
 
-func currentPrimaryNetworkValidator(staker *Staker) CurrentPrimaryNetworkValidator {
-	return CurrentPrimaryNetworkValidator{
-		StakingPeriod:   stakingPeriod(staker),
-		PotentialReward: staker.PotentialReward,
-	}
-}
-
-func currentSubnetValidator(staker *Staker) CurrentSubnetValidator {
-	return CurrentSubnetValidator{
+func currentValidatorRecord(staker *Staker) CurrentValidator {
+	return CurrentValidator{
 		StakingPeriod:   stakingPeriod(staker),
 		PotentialReward: staker.PotentialReward,
 	}
@@ -433,11 +325,10 @@ func newCurrentStaker(staker *Staker) CurrentStaker {
 	case platform.PrimaryNetworkDelegatorCurrentPriority,
 		platform.SubnetPermissionlessDelegatorCurrentPriority:
 		return currentDelegator(staker)
-	case platform.PrimaryNetworkValidatorCurrentPriority:
-		return currentPrimaryNetworkValidator(staker)
-	case platform.SubnetPermissionedValidatorCurrentPriority,
+	case platform.PrimaryNetworkValidatorCurrentPriority,
+		platform.SubnetPermissionedValidatorCurrentPriority,
 		platform.SubnetPermissionlessValidatorCurrentPriority:
-		return currentSubnetValidator(staker)
+		return currentValidatorRecord(staker)
 	default:
 		panic(fmt.Sprintf("unexpected current staker priority %d", staker.Priority))
 	}
@@ -451,11 +342,10 @@ func newPendingStaker(staker *Staker) PendingStaker {
 		platform.PrimaryNetworkDelegatorBanffPendingPriority,
 		platform.SubnetPermissionlessDelegatorPendingPriority:
 		return pendingDelegator(staker)
-	case platform.PrimaryNetworkValidatorPendingPriority:
-		return pendingPrimaryNetworkValidator(staker)
-	case platform.SubnetPermissionedValidatorPendingPriority,
+	case platform.PrimaryNetworkValidatorPendingPriority,
+		platform.SubnetPermissionedValidatorPendingPriority,
 		platform.SubnetPermissionlessValidatorPendingPriority:
-		return pendingSubnetValidator(staker)
+		return pendingValidatorRecord(staker)
 	default:
 		panic(fmt.Sprintf("unexpected pending staker priority %d", staker.Priority))
 	}

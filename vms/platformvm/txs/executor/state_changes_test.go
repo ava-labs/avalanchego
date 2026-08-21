@@ -384,7 +384,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		nodeID    = ids.GenerateTestNodeID()
 	)
 
-	validatorTx := &platform.Tx{Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
+	validatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
 		NodeID: nodeID,
 		Start:  uint64(startTime.Unix()),
 		End:    uint64(endTime.Unix()),
@@ -403,7 +403,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	}))
 	s.AddTx(validatorTx, status.Committed)
 
-	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+	delegatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
 		NodeID: nodeID,
 		Start:  uint64(startTime.Unix()),
 		End:    uint64(endTime.Unix()),
@@ -478,7 +478,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		delegatorWeight = units.KiloAvax
 	)
 
-	validatorTx := &platform.Tx{Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
+	validatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
 		NodeID: nodeID,
 		Start:  uint64(startTime.Unix()),
 		End:    uint64(endTime.Unix()),
@@ -496,7 +496,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	}))
 	s.AddTx(validatorTx, status.Committed)
 
-	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+	delegatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
 		NodeID: nodeID,
 		Start:  uint64(startTime.Unix()),
 		End:    uint64(endTime.Unix()),

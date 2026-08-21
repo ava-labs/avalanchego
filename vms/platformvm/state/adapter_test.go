@@ -23,7 +23,7 @@ func TestStakingState(t *testing.T) {
 	nativeState := newTestState(t, memdb.New())
 	typedState := NewAdapter(nativeState)
 
-	primaryValidator, err := typedState.GetCurrentPrimaryNetworkValidator(defaultValidatorNodeID)
+	primaryValidator, err := typedState.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
 	require.Equal(t, constants.PrimaryNetworkID, primaryValidator.SubnetID())
 
@@ -38,11 +38,11 @@ func TestStakingState(t *testing.T) {
 		NextTime:  now.Add(time.Hour),
 		Priority:  platform.SubnetPermissionedValidatorCurrentPriority,
 	}
-	require.NoError(t, typedState.PutCurrentSubnetValidator(newTestStakerTx(subnetValidator), currentSubnetValidator(subnetValidator)))
+	require.NoError(t, typedState.PutCurrentValidator(newTestStakerTx(subnetValidator), currentValidatorRecord(subnetValidator)))
 
-	gotSubnetValidator, err := typedState.GetCurrentSubnetValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
+	gotSubnetValidator, err := typedState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
 	require.NoError(t, err)
-	require.Equal(t, currentSubnetValidator(subnetValidator), gotSubnetValidator)
+	require.Equal(t, currentValidatorRecord(subnetValidator), gotSubnetValidator)
 
 	gotNativeValidator, err := nativeState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
 	require.NoError(t, err)
@@ -73,9 +73,9 @@ func TestStakingState(t *testing.T) {
 	require.Equal(t, []CurrentDelegator{currentDelegator(delegator)}, iterator.ToSlice(delegatorIt))
 
 	require.NoError(t, typedState.DeleteCurrentDelegator(delegator.TxID))
-	require.NoError(t, typedState.DeleteCurrentSubnetValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
+	require.NoError(t, typedState.DeleteCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
 
-	_, err = typedState.GetCurrentSubnetValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
+	_, err = typedState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
 	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
@@ -154,13 +154,10 @@ func newTestStakerTx(staker *Staker) *platform.Tx {
 	}
 }
 
-// Embedding promotes the sum markers, so AutoRenewedValidator is also a
-// CurrentValidator. Type switches over the sum must not assume newCurrentStaker
+// Embedding promotes currentStaker, so AutoRenewedValidator also inhabits the
+// CurrentStaker sum. Type switches over it must not assume newCurrentStaker
 // produces its only inhabitants.
-var (
-	_ CurrentValidator = AutoRenewedValidator{}
-	_ CurrentStaker    = AutoRenewedValidator{}
-)
+var _ CurrentStaker = AutoRenewedValidator{}
 
 func TestNewCurrentStakerClassifiesEveryPriority(t *testing.T) {
 	tests := []struct {
@@ -169,9 +166,9 @@ func TestNewCurrentStakerClassifiesEveryPriority(t *testing.T) {
 	}{
 		{platform.PrimaryNetworkDelegatorCurrentPriority, CurrentDelegator{}},
 		{platform.SubnetPermissionlessDelegatorCurrentPriority, CurrentDelegator{}},
-		{platform.PrimaryNetworkValidatorCurrentPriority, CurrentPrimaryNetworkValidator{}},
-		{platform.SubnetPermissionedValidatorCurrentPriority, CurrentSubnetValidator{}},
-		{platform.SubnetPermissionlessValidatorCurrentPriority, CurrentSubnetValidator{}},
+		{platform.PrimaryNetworkValidatorCurrentPriority, CurrentValidator{}},
+		{platform.SubnetPermissionedValidatorCurrentPriority, CurrentValidator{}},
+		{platform.SubnetPermissionlessValidatorCurrentPriority, CurrentValidator{}},
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprint(test.priority), func(t *testing.T) {
@@ -188,9 +185,9 @@ func TestNewPendingStakerClassifiesEveryPriority(t *testing.T) {
 		{platform.PrimaryNetworkDelegatorApricotPendingPriority, PendingDelegator{}},
 		{platform.PrimaryNetworkDelegatorBanffPendingPriority, PendingDelegator{}},
 		{platform.SubnetPermissionlessDelegatorPendingPriority, PendingDelegator{}},
-		{platform.PrimaryNetworkValidatorPendingPriority, PendingPrimaryNetworkValidator{}},
-		{platform.SubnetPermissionedValidatorPendingPriority, PendingSubnetValidator{}},
-		{platform.SubnetPermissionlessValidatorPendingPriority, PendingSubnetValidator{}},
+		{platform.PrimaryNetworkValidatorPendingPriority, PendingValidator{}},
+		{platform.SubnetPermissionedValidatorPendingPriority, PendingValidator{}},
+		{platform.SubnetPermissionlessValidatorPendingPriority, PendingValidator{}},
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprint(test.priority), func(t *testing.T) {

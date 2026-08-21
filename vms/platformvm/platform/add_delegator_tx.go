@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -56,10 +55,6 @@ func (*AddDelegatorTx) SubnetID() ids.ID {
 
 func (tx *AddDelegatorTx) NodeID() ids.NodeID {
 	return tx.Validator.NodeID
-}
-
-func (*AddDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
-	return nil, false, nil
 }
 
 func (*AddDelegatorTx) PendingPriority() Priority {

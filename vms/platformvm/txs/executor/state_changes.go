@@ -228,28 +228,13 @@ func advanceTimeTo(
 		if err != nil {
 			return nil, false, fmt.Errorf("getting pending validator transaction: %w", err)
 		}
-		var putErr error
-		switch validator := p.current.(type) {
-		case state.CurrentPrimaryNetworkValidator:
-			putErr = changesStakingState.PutCurrentPrimaryNetworkValidator(stakerTx, validator)
-		case state.CurrentSubnetValidator:
-			putErr = changesStakingState.PutCurrentSubnetValidator(stakerTx, validator)
-		default:
-			return nil, false, fmt.Errorf("unexpected current validator type %T", validator)
+		if err := changesStakingState.PutCurrentValidator(stakerTx, p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current validator: %w", err)
 		}
-		if putErr != nil {
-			return nil, false, fmt.Errorf("putting current validator: %w", putErr)
-		}
-
-		switch validator := p.pending.(type) {
-		case state.PendingPrimaryNetworkValidator:
-			err = changesStakingState.DeletePendingPrimaryNetworkValidator(validator.NodeID())
-		case state.PendingSubnetValidator:
-			err = changesStakingState.DeletePendingSubnetValidator(validator.SubnetID(), validator.NodeID())
-		default:
-			return nil, false, fmt.Errorf("unexpected pending validator type %T", validator)
-		}
-		if err != nil {
+		if err := changesStakingState.DeletePendingValidator(
+			p.pending.SubnetID(),
+			p.pending.NodeID(),
+		); err != nil {
 			return nil, false, err
 		}
 	}
@@ -296,16 +281,10 @@ func advanceTimeTo(
 			// AdvanceTimeTx.
 			break
 		}
-		var err error
-		switch validator := validator.(type) {
-		case state.CurrentPrimaryNetworkValidator:
-			err = changesStakingState.DeleteCurrentPrimaryNetworkValidator(validator.NodeID())
-		case state.CurrentSubnetValidator:
-			err = changesStakingState.DeleteCurrentSubnetValidator(validator.SubnetID(), validator.NodeID())
-		default:
-			return nil, false, fmt.Errorf("unexpected current validator type %T", validator)
-		}
-		if err != nil {
+		if err := changesStakingState.DeleteCurrentValidator(
+			validator.SubnetID(),
+			validator.NodeID(),
+		); err != nil {
 			return nil, false, fmt.Errorf("deleting current validator: %w", err)
 		}
 		changed = true

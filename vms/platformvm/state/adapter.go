@@ -58,19 +58,19 @@ func NewAdapter(chain Chain) Adapter {
 	return Adapter{chain: chain}
 }
 
-func (s Adapter) GetCurrentPrimaryNetworkValidator(nodeID ids.NodeID) (CurrentPrimaryNetworkValidator, error) {
-	staker, err := s.chain.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+func (s Adapter) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (CurrentValidator, error) {
+	staker, err := s.chain.GetCurrentValidator(subnetID, nodeID)
 	if err != nil {
-		return CurrentPrimaryNetworkValidator{}, err
+		return CurrentValidator{}, err
 	}
-	return currentPrimaryNetworkValidator(staker), nil
+	return currentValidatorRecord(staker), nil
 }
 
 // GetCurrentAutoRenewedValidator returns the current auto-renewed validator
 // with nodeID. It returns [ErrNotAutoRenewedValidator] if the validator is
 // bounded.
 func (s Adapter) GetCurrentAutoRenewedValidator(nodeID ids.NodeID) (AutoRenewedValidator, error) {
-	validator, err := s.GetCurrentPrimaryNetworkValidator(nodeID)
+	validator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	if err != nil {
 		return AutoRenewedValidator{}, err
 	}
@@ -88,7 +88,7 @@ func (s Adapter) GetCurrentAutoRenewedValidator(nodeID ids.NodeID) (AutoRenewedV
 		return AutoRenewedValidator{}, err
 	}
 	return AutoRenewedValidator{
-		CurrentPrimaryNetworkValidator: validator,
+		CurrentValidator: validator,
 		AutoRenewedValidatorMetadata: AutoRenewedValidatorMetadata{
 			AccruedValidationRewards: stakingInfo.AccruedValidationRewards,
 			AccruedDelegateeRewards:  stakingInfo.AccruedDelegateeRewards,
@@ -96,14 +96,6 @@ func (s Adapter) GetCurrentAutoRenewedValidator(nodeID ids.NodeID) (AutoRenewedV
 			NextPeriod:               stakingInfo.NextPeriod,
 		},
 	}, nil
-}
-
-func (s Adapter) GetCurrentSubnetValidator(subnetID ids.ID, nodeID ids.NodeID) (CurrentSubnetValidator, error) {
-	staker, err := s.chain.GetCurrentValidator(subnetID, nodeID)
-	if err != nil {
-		return CurrentSubnetValidator{}, err
-	}
-	return currentSubnetValidator(staker), nil
 }
 
 // GetStakerTx returns the signed staking transaction with txID.
@@ -118,14 +110,14 @@ func (s Adapter) GetStakerTx(txID ids.ID) (*platform.Tx, error) {
 	return tx, nil
 }
 
-func (s Adapter) PutCurrentPrimaryNetworkValidator(tx *platform.Tx, validator CurrentPrimaryNetworkValidator) error {
-	staker, err := unsignedStaker(tx)
+func (s Adapter) PutCurrentValidator(tx *platform.Tx, validator CurrentValidator) error {
+	key, err := validatorPublicKey(tx, validator.SubnetID())
 	if err != nil {
 		return err
 	}
 	return s.chain.PutCurrentValidator(currentStaker(
 		withTxID(validator.StakingPeriod, tx.ID()),
-		publicKey(staker),
+		key,
 		validator.PotentialReward,
 	))
 }
@@ -139,7 +131,7 @@ func (s Adapter) PutAutoRenewedValidator(tx *platform.Tx, validator AutoRenewedV
 	if _, ok := staker.(*platform.AddAutoRenewedValidatorTx); !ok {
 		return fmt.Errorf("%w: %T", errUnexpectedStaker, staker)
 	}
-	if err := s.PutCurrentPrimaryNetworkValidator(tx, validator.CurrentPrimaryNetworkValidator); err != nil {
+	if err := s.PutCurrentValidator(tx, validator.CurrentValidator); err != nil {
 		return err
 	}
 	return s.chain.SetStakingInfo(
@@ -172,26 +164,7 @@ func (s Adapter) SetCurrentAutoRenewedValidatorMetadata(nodeID ids.NodeID, metad
 	return s.chain.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo)
 }
 
-func (s Adapter) PutCurrentSubnetValidator(tx *platform.Tx, validator CurrentSubnetValidator) error {
-	if _, err := unsignedStaker(tx); err != nil {
-		return err
-	}
-	return s.chain.PutCurrentValidator(currentStaker(
-		withTxID(validator.StakingPeriod, tx.ID()),
-		nil,
-		validator.PotentialReward,
-	))
-}
-
-func (s Adapter) DeleteCurrentPrimaryNetworkValidator(nodeID ids.NodeID) error {
-	return s.deleteCurrentValidator(constants.PrimaryNetworkID, nodeID)
-}
-
-func (s Adapter) DeleteCurrentSubnetValidator(subnetID ids.ID, nodeID ids.NodeID) error {
-	return s.deleteCurrentValidator(subnetID, nodeID)
-}
-
-func (s Adapter) deleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+func (s Adapter) DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) error {
 	staker, err := s.chain.GetCurrentValidator(subnetID, nodeID)
 	if err != nil {
 		return err
@@ -248,52 +221,26 @@ func (s Adapter) GetCurrentStakerIterator() (iterator.Iterator[CurrentStaker], e
 	return currentStakerIterator{Iterator: it}, nil
 }
 
-func (s Adapter) GetPendingPrimaryNetworkValidator(nodeID ids.NodeID) (PendingPrimaryNetworkValidator, error) {
-	staker, err := s.chain.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-	if err != nil {
-		return PendingPrimaryNetworkValidator{}, err
-	}
-	return pendingPrimaryNetworkValidator(staker), nil
-}
-
-func (s Adapter) GetPendingSubnetValidator(subnetID ids.ID, nodeID ids.NodeID) (PendingSubnetValidator, error) {
+func (s Adapter) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (PendingValidator, error) {
 	staker, err := s.chain.GetPendingValidator(subnetID, nodeID)
 	if err != nil {
-		return PendingSubnetValidator{}, err
+		return PendingValidator{}, err
 	}
-	return pendingSubnetValidator(staker), nil
+	return pendingValidatorRecord(staker), nil
 }
 
-func (s Adapter) PutPendingPrimaryNetworkValidator(tx *platform.Tx, validator PendingPrimaryNetworkValidator) error {
-	staker, err := unsignedStaker(tx)
+func (s Adapter) PutPendingValidator(tx *platform.Tx, validator PendingValidator) error {
+	key, err := validatorPublicKey(tx, validator.SubnetID())
 	if err != nil {
 		return err
 	}
 	return s.chain.PutPendingValidator(pendingStaker(
 		withTxID(validator.StakingPeriod, tx.ID()),
-		publicKey(staker),
+		key,
 	))
 }
 
-func (s Adapter) PutPendingSubnetValidator(tx *platform.Tx, validator PendingSubnetValidator) error {
-	if _, err := unsignedStaker(tx); err != nil {
-		return err
-	}
-	return s.chain.PutPendingValidator(pendingStaker(
-		withTxID(validator.StakingPeriod, tx.ID()),
-		nil,
-	))
-}
-
-func (s Adapter) DeletePendingPrimaryNetworkValidator(nodeID ids.NodeID) error {
-	return s.deletePendingValidator(constants.PrimaryNetworkID, nodeID)
-}
-
-func (s Adapter) DeletePendingSubnetValidator(subnetID ids.ID, nodeID ids.NodeID) error {
-	return s.deletePendingValidator(subnetID, nodeID)
-}
-
-func (s Adapter) deletePendingValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+func (s Adapter) DeletePendingValidator(subnetID ids.ID, nodeID ids.NodeID) error {
 	staker, err := s.chain.GetPendingValidator(subnetID, nodeID)
 	if err != nil {
 		return err
@@ -362,9 +309,23 @@ func (s Adapter) GetPendingStakerIterator() (iterator.Iterator[PendingStaker], e
 	return pendingStakerIterator{Iterator: it}, nil
 }
 
-func publicKey(staker platform.Staker) *bls.PublicKey {
-	publicKey, _, _ := staker.PublicKey()
-	return publicKey
+// validatorPublicKey returns the BLS key to store for a validator on subnetID.
+// Only Primary Network validators carry one, so a subnet validator gets nil
+// without consulting the transaction.
+func validatorPublicKey(tx *platform.Tx, subnetID ids.ID) (*bls.PublicKey, error) {
+	staker, err := unsignedStaker(tx)
+	if err != nil {
+		return nil, err
+	}
+	if subnetID != constants.PrimaryNetworkID {
+		return nil, nil
+	}
+	keyed, ok := staker.(platform.KeyedStaker)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T does not register a public key", errUnexpectedStaker, staker)
+	}
+	publicKey, _, _ := keyed.PublicKey()
+	return publicKey, nil
 }
 
 func unsignedStaker(tx *platform.Tx) (platform.Staker, error) {
