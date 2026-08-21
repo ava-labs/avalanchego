@@ -95,17 +95,6 @@ var (
 	}
 )
 
-const (
-	// MaxLeavesLimit caps leaves per response.
-	MaxLeavesLimit = 1024
-
-	// snapshotReadDeadlinePercent leaves enough deadline for a full trie
-	// iteration, which only an invalid snapshot range forces.
-	snapshotReadDeadlinePercent = 75
-
-	snapshotSegmentLen = 64
-)
-
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if reason := validateRequest(req, len(r.zeroKey)); reason != "" {
 		r.log.Debug("rejecting request",
@@ -160,6 +149,9 @@ type query struct {
 
 	resp *syncpb.GetLeafResponse
 }
+
+// MaxLeavesLimit caps leaves per response.
+const MaxLeavesLimit = 1024
 
 // newQuery opens the trie and returns a per-request query.
 func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*query, *avacommon.AppError) {
@@ -273,9 +265,13 @@ func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResp
 func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 	snapCtx := ctx
 	if deadline, ok := ctx.Deadline(); ok {
-		var cancel context.CancelFunc
+		// snapshotReadDeadlinePercent leaves enough deadline for a full trie
+		// iteration, which only an invalid snapshot range forces.
+		const snapshotReadDeadlinePercent = 75
 		budget := time.Until(deadline) * snapshotReadDeadlinePercent / 100
-		snapCtx, cancel = context.WithDeadline(ctx, time.Now().Add(budget))
+
+		var cancel context.CancelFunc
+		snapCtx, cancel = context.WithTimeout(ctx, budget)
 		defer cancel()
 	}
 
@@ -297,6 +293,8 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 
 	return q.fillFromSegments(ctx, snapKeys, snapVals)
 }
+
+const snapshotSegmentLen = 64
 
 // fillFromSegments serves a diverged snapshot one segment at a time. A segment
 // that fails leaves a gap the next good segment bridges from the trie.
