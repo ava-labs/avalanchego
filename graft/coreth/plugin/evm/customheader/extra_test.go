@@ -314,7 +314,7 @@ func TestExtraPrefix(t *testing.T) {
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
-			desiredTargetExcess: (*gas.Gas)(new(uint64(3))),
+			desiredTargetExcess: new(gas.Gas(3)),
 			want: (&acp176.State{
 				Gas: gas.State{
 					Capacity: acp176.MinMaxPerSecond - 3,
