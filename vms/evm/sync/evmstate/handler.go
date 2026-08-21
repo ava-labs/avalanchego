@@ -361,23 +361,12 @@ func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 	diskRoot := q.snapshot.DiskRoot()
 	seek := common.BytesToHash(q.startKey)
 
-	if !q.isStorage {
-		it, err := q.snapshot.AccountIterator(diskRoot, seek)
-		if err != nil {
-			return nil, nil, err
-		}
-		return it, func() ([]byte, error) {
-			return types.FullAccountRLP(it.Account())
-		}, nil
+	if q.isStorage {
+		it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
+		return it, func() ([]byte, error) { return it.Slot(), nil }, err
 	}
-
-	it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
-	if err != nil {
-		return nil, nil, err
-	}
-	return it, func() ([]byte, error) {
-		return it.Slot(), nil
-	}, nil
+	it, err := q.snapshot.AccountIterator(diskRoot, seek)
+	return it, func() ([]byte, error) { return types.FullAccountRLP(it.Account()) }, err
 }
 
 // abandonSnapshot gives up the fast path. A snapshot that never serves looks
