@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -41,9 +40,8 @@ const (
 
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errInvalidRequest":   errInvalidRequest,
-		"errRootNotFound":     errRootNotFound,
-		"errServingCancelled": errServingCancelled,
+		"errInvalidRequest": errInvalidRequest,
+		"errRootNotFound":   errRootNotFound,
 	})
 }
 
@@ -154,7 +152,6 @@ func TestResponder_Rejects(t *testing.T) {
 		limit       uint32
 		badRoot     bool
 		corruptTrie bool
-		cancelCtx   bool
 		wantErr     *avacommon.AppError
 	}{
 		{
@@ -169,12 +166,6 @@ func TestResponder_Rejects(t *testing.T) {
 			limit:       numKeys / 2,
 			corruptTrie: true,
 			wantErr:     p2p.ErrUnexpected,
-		},
-		{
-			name:      "cancelled_context",
-			limit:     numKeys,
-			cancelCtx: true,
-			wantErr:   errServingCancelled,
 		},
 	}
 
@@ -193,17 +184,11 @@ func TestResponder_Rejects(t *testing.T) {
 			if tt.badRoot {
 				rootHash = bytes.Repeat([]byte{0xab}, common.HashLength)
 			}
-			ctx := t.Context()
-			if tt.cancelCtx {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithCancel(ctx)
-				cancel()
-			}
 
 			// loggingtest.New fails the test on an ERROR, so record instead.
 			log := loggingtest.NewRecorder(logging.Debug)
 			r := newResponder(log, trieDB, common.HashLength)
-			resp, appErr := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: rootHash,
 				KeyLimit: tt.limit,
 			})
@@ -749,7 +734,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 				}
 
 				q := newSnapshotQuery(t, trieDB, c, tt.keyLimit, endKey)
-				keys, vals := q.readFromSnapshot(t.Context())
+				keys, vals := q.readFromSnapshot()
 
 				if tt.wantLen == 0 {
 					require.Empty(t, keys)
@@ -792,7 +777,7 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 
 				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
-				done, err := q.fillFromSnapshot(t.Context())
+				done, err := q.fillFromSnapshot()
 				require.NoError(t, err)
 
 				require.True(t, done, "the snapshot must satisfy a whole-trie request")

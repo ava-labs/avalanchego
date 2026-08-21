@@ -88,13 +88,9 @@ var (
 		Code:    3001,
 		Message: "requested trie root not found",
 	}
-	errServingCancelled = &avacommon.AppError{
-		Code:    3002,
-		Message: "serving cancelled",
-	}
 )
 
-func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
 	if reason := validateRequest(req, len(r.zeroKey)); reason != "" {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
@@ -106,7 +102,7 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 	if appErr != nil {
 		return nil, appErr
 	}
-	return q.run(ctx, nodeID)
+	return q.run(nodeID)
 }
 
 // validateRequest returns why req is malformed, empty when it is valid. The
@@ -204,9 +200,9 @@ func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
 }
 
 // collect fills [query.resp] with the leaf range and its proof.
-func (q *query) collect(ctx context.Context) error {
+func (q *query) collect() error {
 	if q.snapshot != nil {
-		done, err := q.fillFromSnapshot(ctx)
+		done, err := q.fillFromSnapshot()
 		if err != nil {
 			return err
 		}
@@ -220,7 +216,7 @@ func (q *query) collect(ctx context.Context) error {
 	more := true
 	if !q.atLimit() {
 		var err error
-		if more, err = q.fillFromTrie(ctx, q.endKey); err != nil {
+		if more, err = q.fillFromTrie(q.endKey); err != nil {
 			return err
 		}
 	}
@@ -242,27 +238,18 @@ func (q *query) attachProof(more bool) error {
 	return err
 }
 
-// run executes the collect pipeline. A pipeline failure is a server fault,
-// a cancellation before any leaves were read tells the peer we gave up.
-func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if err := q.collect(ctx); err != nil {
+// run executes the collect pipeline. A pipeline failure is a server fault.
+func (q *query) run(nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+	if err := q.collect(); err != nil {
 		return nil, handlers.Fault(q.log, nodeID, err)
-	}
-	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
-		q.log.Debug("rejecting request",
-			zap.Stringer("nodeID", nodeID),
-			zap.String("reason", "cancelled before any leaves were iterated"),
-			zap.Error(ctx.Err()),
-		)
-		return nil, errServingCancelled
 	}
 	return q.resp, nil
 }
 
 // fillFromSnapshot reads from the snapshot. done reports that the response
 // needs nothing further, the inverse of the more returned by [query.fillFromTrie].
-func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
-	snapKeys, snapVals := q.readFromSnapshot(ctx)
+func (q *query) fillFromSnapshot() (done bool, _ error) {
+	snapKeys, snapVals := q.readFromSnapshot()
 	if len(snapKeys) == 0 {
 		// Unavailable or empty here, use the trie.
 		return false, nil
@@ -278,7 +265,7 @@ func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
 		return q.wholeTrie(more), nil
 	}
 
-	return q.fillFromSegments(ctx, snapKeys, snapVals)
+	return q.fillFromSegments(snapKeys, snapVals)
 }
 
 const snapshotSegmentLen = 64
@@ -292,13 +279,13 @@ const snapshotSegmentLen = 64
 //	[C D] fails     mark the gap  -> resp=[A B]
 //	[E]   proves    bridge to E   -> resp=[A B C D]
 //	                append past E -> resp=[A B C D E]
-func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byte) (done bool, _ error) {
+func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ error) {
 	hasGap := false
 	// Only a proved segment answers this, so it starts pessimistic. A stale
 	// answer is safe, collect re-derives it below the limit.
 	trieHasMore := true
 
-	for i := 0; i < len(snapKeys) && ctx.Err() == nil; i += snapshotSegmentLen {
+	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
 		end := min(i+snapshotSegmentLen, len(snapKeys))
 		valid, more, err := q.isRangeValid(snapKeys[i:end], snapVals[i:end], hasGap)
 		if err != nil {
@@ -312,7 +299,7 @@ func (q *query) fillFromSegments(ctx context.Context, snapKeys, snapVals [][]byt
 		start := i
 		if hasGap {
 			// The bridge stops on snapKeys[i] inclusive, so skip it here.
-			if _, err := q.fillFromTrie(ctx, snapKeys[i]); err != nil {
+			if _, err := q.fillFromTrie(snapKeys[i]); err != nil {
 				return false, err
 			}
 			if q.atLimit() {
@@ -378,7 +365,7 @@ func (q *query) abandonSnapshot(reason string, err error) {
 
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
 // are unvalidated, the caller range-proves them against the requested root.
-func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
+func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	it, leaf, err := q.snapshotLeaves()
 	if err != nil {
 		q.abandonSnapshot("iterator unavailable", err)
@@ -393,7 +380,7 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 		if len(q.endKey) > 0 && bytes.Compare(k, q.endKey) > 0 {
 			break
 		}
-		if len(keys) >= int(q.limit) || ctx.Err() != nil {
+		if len(keys) >= int(q.limit) {
 			break
 		}
 		v, err := leaf()
@@ -413,7 +400,7 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 
 // fillFromTrie iterates the trie from [query.nextKey] up to end (inclusive).
 // more reports keys past the response, the inverse of fillFromSnapshot's done.
-func (q *query) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
+func (q *query) fillFromTrie(end []byte) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.
 	nodeIt, err := q.trie.NodeIterator(q.nextKey())
@@ -424,7 +411,7 @@ func (q *query) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
 
 	for it.Next() {
 		afterEnd := len(end) > 0 && bytes.Compare(it.Key, end) > 0
-		if afterEnd || q.atLimit() || ctx.Err() != nil {
+		if afterEnd || q.atLimit() {
 			return true, it.Err
 		}
 		q.resp.Keys = append(q.resp.Keys, it.Key)
