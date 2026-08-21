@@ -7,9 +7,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//api/metrics",
+        "//ids",
         "//network/p2p",
         "//snow",
         "//snow/engine/common",
         "//snow/validators",
+        "//utils/set",
     ],
 )

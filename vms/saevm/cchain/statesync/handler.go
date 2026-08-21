@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
@@ -38,14 +40,16 @@ type SummaryHandler struct {
 func New(
 	cfg statesync.Config,
 	db ethdb.Database,
+	snowCtx *snow.Context,
+	network *network.Network,
 	hooks hook.Points,
 	state *state.State,
-	log logging.Logger,
 ) (*SummaryHandler, error) {
 	inner, err := statesync.New(
 		cfg,
 		db,
-		log,
+		snowCtx,
+		network,
 		hooks,
 	)
 	if err != nil {
@@ -56,7 +60,7 @@ func New(
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
-		log:            log,
+		log:            snowCtx.Log,
 	}, nil
 }
 
