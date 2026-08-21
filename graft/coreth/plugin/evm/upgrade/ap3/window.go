@@ -77,7 +77,6 @@ func ParseWindow(bytes []byte) (Window, error) {
 	var window Window
 	for i := range window {
 		offset := i * wrappers.LongLen
-		//nolint:gosec // G602: the check above rejects a bytes slice that is too short.
 		window[i] = binary.BigEndian.Uint64(bytes[offset:])
 	}
 	return window, nil

@@ -220,8 +220,7 @@ func getHTTPSimpleRequest(w http.ResponseWriter, r *http.Request) (*httppb.Handl
 func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
 	grpcutils.SetHeaders(w.Header(), resp.Headers)
 	w.WriteHeader(grpcutils.EnsureValidResponseCode(int(resp.Code)))
-	//nolint:gosec // G705: this function copies the body from the VM's own HTTP handler.
-	_, err := w.Write(resp.Body)
+	_, err := w.Write(resp.Body) //#nosec G705 -- this function copies the body from the VM's own HTTP handler.
 	return err
 }
 

@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	{{- end}}
-
 	"go.uber.org/mock/gomock"
 )
 

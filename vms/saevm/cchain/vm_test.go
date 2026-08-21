@@ -870,13 +870,22 @@ func (w *wallet) sign(tb testing.TB, u tx.Unsigned, numCreds int) *tx.Tx {
 	}
 }
 
-// subNAVAX returns balance - nAVAX.
-func subNAVAX(tb testing.TB, balance uint256.Int, nAVAX uint64) uint256.Int {
+// addNAVAX returns balance + nAVAXDelta. nAVAXDelta MAY be negative.
+func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int {
 	tb.Helper()
 
-	delta := tx.ScaleAVAX(nAVAX)
-	_, underflow := balance.SubOverflow(&balance, &delta)
-	require.Falsef(tb, underflow, "subNAVAX(%s, %d) underflows uint256", balance, nAVAX)
+	var (
+		op       = balance.AddOverflow
+		absDelta = uint64(nAVAXDelta)
+	)
+	if nAVAXDelta < 0 {
+		op = balance.SubOverflow
+		absDelta = -absDelta
+	}
+
+	delta := tx.ScaleAVAX(absDelta)
+	_, overflow := op(&balance, &delta)
+	require.Falsef(tb, overflow, "addNAVAX(%s, %d) overflows uint256", balance, nAVAXDelta)
 	return balance
 }
 
@@ -908,7 +917,7 @@ func TestExport(t *testing.T) {
 		nonce        = 1
 		amountBurned = exportedAmount + txFee
 	)
-	sut.assertAccount(t, sender, nonce, subNAVAX(t, initialBalance, amountBurned))
+	sut.assertAccount(t, sender, nonce, addNAVAX(t, initialBalance, -amountBurned))
 	sut.assertUTXOsExist(t, destinationChain, sut.ctx.ChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
 }
 

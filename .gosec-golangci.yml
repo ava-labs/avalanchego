@@ -3,10 +3,10 @@ linters:
   default: none
   enable:
     - gosec
-  settings:
-    gosec:
-      excludes:
-        # Integer overflow when a conversion changes the integer type.
-        # https://securego.io/docs/rules/g115
-        # .golangci.yml also excludes G115. Enable both configs together.
-        - G115
+  exclusions:
+    rules:
+      # Mirrors the test exclusions in .golangci.yml. This config exists to run
+      # G115 over the saevm production code, which .golangci.yml still excludes.
+      - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
+        linters:
+          - gosec

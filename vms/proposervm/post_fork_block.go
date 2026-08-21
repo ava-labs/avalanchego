@@ -114,7 +114,6 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 			return [2]snowman.Block{}, err
 		}
 
-		//nolint:gosec // G602: innerOptions and outerOptions are both arrays of 2 blocks.
 		outerOptions[i] = &postForkOption{
 			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{

@@ -26,7 +26,6 @@ func (d Dimensions) Add(os ...*Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
 		for i := range o {
-			//nolint:gosec // G602: d and o are both Dimensions arrays with the same length.
 			d[i], err = math.Add(d[i], o[i])
 			if err != nil {
 				return d, err
@@ -43,7 +42,6 @@ func (d Dimensions) Sub(os ...*Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
 		for i := range o {
-			//nolint:gosec // G602: d and o are both Dimensions arrays with the same length.
 			d[i], err = math.Sub(d[i], o[i])
 			if err != nil {
 				return d, err
@@ -59,7 +57,6 @@ func (d Dimensions) Sub(os ...*Dimensions) (Dimensions, error) {
 func (d Dimensions) ToGas(weights Dimensions) (Gas, error) {
 	var res uint64
 	for i := range d {
-		//nolint:gosec // G602: d and weights are both Dimensions arrays with the same length.
 		v, err := math.Mul(d[i], weights[i])
 		if err != nil {
 			return 0, err
