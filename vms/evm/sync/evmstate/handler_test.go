@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
@@ -40,8 +41,13 @@ const (
 
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errInvalidRequest": errInvalidRequest,
-		"errRootNotFound":   errRootNotFound,
+		"errZeroKeyLimit":        errZeroKeyLimit,
+		"errMissingRoot":         errMissingRoot,
+		"errEmptyRoot":           errEmptyRoot,
+		"errWrongStartKeyLength": errWrongStartKeyLength,
+		"errWrongEndKeyLength":   errWrongEndKeyLength,
+		"errStartAfterEnd":       errStartAfterEnd,
+		"errRootNotFound":        errRootNotFound,
 	})
 }
 
@@ -51,8 +57,9 @@ func TestResponder_ValidationRejects(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
 
 	tests := []struct {
-		name string
-		req  *syncpb.GetLeafRequest
+		name    string
+		req     *syncpb.GetLeafRequest
+		wantErr *avacommon.AppError
 	}{
 		{
 			name: "zero_key_limit",
@@ -60,6 +67,41 @@ func TestResponder_ValidationRejects(t *testing.T) {
 				RootHash: root.Bytes(),
 				KeyLimit: 0,
 			},
+			wantErr: errZeroKeyLimit,
+		},
+		{
+			name: "missing_root_hash",
+			req: &syncpb.GetLeafRequest{
+				RootHash: common.Hash{}.Bytes(),
+				KeyLimit: 10,
+			},
+			wantErr: errMissingRoot,
+		},
+		{
+			name: "empty_root_hash",
+			req: &syncpb.GetLeafRequest{
+				RootHash: types.EmptyRootHash.Bytes(),
+				KeyLimit: 10,
+			},
+			wantErr: errEmptyRoot,
+		},
+		{
+			name: "start_key_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				StartKey: []byte{0x01, 0x02},
+				KeyLimit: 10,
+			},
+			wantErr: errWrongStartKeyLength,
+		},
+		{
+			name: "end_key_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				EndKey:   []byte{0x01, 0x02},
+				KeyLimit: 10,
+			},
+			wantErr: errWrongEndKeyLength,
 		},
 		{
 			name: "start_key_after_end_key",
@@ -69,21 +111,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 				EndKey:   bytes.Repeat([]byte{0x00}, common.HashLength),
 				KeyLimit: 10,
 			},
-		},
-		{
-			name: "start_key_wrong_length",
-			req: &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				StartKey: []byte{0x01, 0x02},
-				KeyLimit: 10,
-			},
-		},
-		{
-			name: "root_hash_empty",
-			req: &syncpb.GetLeafRequest{
-				RootHash: common.Hash{}.Bytes(),
-				KeyLimit: 10,
-			},
+			wantErr: errStartAfterEnd,
 		},
 	}
 
@@ -91,7 +119,7 @@ func TestResponder_ValidationRejects(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := newLeafResponder(t, trieDB)
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
-			require.ErrorIs(t, appErr, errInvalidRequest)
+			require.ErrorIs(t, appErr, tt.wantErr)
 			require.Nil(t, resp)
 		})
 	}

@@ -77,23 +77,43 @@ func WithSnapshot(s SnapshotReader) HandlerOption {
 }
 
 var (
-	errInvalidRequest = &avacommon.AppError{
+	errZeroKeyLimit = &avacommon.AppError{
 		Code:    3000,
-		Message: "invalid leaf request",
+		Message: "zero key limit",
+	}
+	errMissingRoot = &avacommon.AppError{
+		Code:    3001,
+		Message: "missing trie root",
+	}
+	errEmptyRoot = &avacommon.AppError{
+		Code:    3002,
+		Message: "empty trie root",
+	}
+	errWrongStartKeyLength = &avacommon.AppError{
+		Code:    3003,
+		Message: "start key length mismatch",
+	}
+	errWrongEndKeyLength = &avacommon.AppError{
+		Code:    3004,
+		Message: "end key length mismatch",
+	}
+	errStartAfterEnd = &avacommon.AppError{
+		Code:    3005,
+		Message: "start key after end key",
 	}
 	errRootNotFound = &avacommon.AppError{
-		Code:    3001,
+		Code:    3006,
 		Message: "requested trie root not found",
 	}
 )
 
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if reason := validateRequest(req, len(r.zeroKey)); reason != "" {
+	if appErr := validateRequest(req, len(r.zeroKey)); appErr != nil {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
-			zap.String("reason", reason),
+			zap.Error(appErr),
 		)
-		return nil, errInvalidRequest
+		return nil, appErr
 	}
 	q, appErr := newQuery(r, nodeID, req)
 	if appErr != nil {
@@ -102,29 +122,29 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	return q.run(nodeID)
 }
 
-// validateRequest returns why req is malformed, empty when it is valid. The
-// reason is logged in place of the request, which may carry megabytes.
-func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) string {
+// validateRequest returns the rejection for a malformed req, nil when it is
+// valid.
+func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.AppError {
 	if req.GetKeyLimit() == 0 {
-		return "zero key limit"
+		return errZeroKeyLimit
 	}
 
 	switch root := common.BytesToHash(req.GetRootHash()); root {
 	case common.Hash{}:
-		return "empty trie root"
+		return errMissingRoot
 	case types.EmptyRootHash:
-		return "empty trie root"
+		return errEmptyRoot
 	}
 
 	switch start, end := req.GetStartKey(), req.GetEndKey(); {
 	case len(start) != 0 && len(start) != trieKeyLength:
-		return "start key length mismatch"
+		return errWrongStartKeyLength
 	case len(end) != 0 && len(end) != trieKeyLength:
-		return "end key length mismatch"
+		return errWrongEndKeyLength
 	case len(end) != 0 && bytes.Compare(start, end) > 0:
-		return "start key after end key"
+		return errStartAfterEnd
 	}
-	return ""
+	return nil
 }
 
 // query holds one in-flight leaf request.
