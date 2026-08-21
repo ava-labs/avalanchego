@@ -41,13 +41,14 @@ const (
 
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errZeroKeyLimit":        errZeroKeyLimit,
-		"errMissingRoot":         errMissingRoot,
-		"errEmptyRoot":           errEmptyRoot,
-		"errWrongStartKeyLength": errWrongStartKeyLength,
-		"errWrongEndKeyLength":   errWrongEndKeyLength,
-		"errStartAfterEnd":       errStartAfterEnd,
-		"errRootNotFound":        errRootNotFound,
+		"errZeroKeyLimit":           errZeroKeyLimit,
+		"errMissingRoot":            errMissingRoot,
+		"errEmptyRoot":              errEmptyRoot,
+		"errWrongAccountHashLength": errWrongAccountHashLength,
+		"errWrongStartKeyLength":    errWrongStartKeyLength,
+		"errWrongEndKeyLength":      errWrongEndKeyLength,
+		"errStartAfterEnd":          errStartAfterEnd,
+		"errRootNotFound":           errRootNotFound,
 	})
 }
 
@@ -84,6 +85,15 @@ func TestResponder_ValidationRejects(t *testing.T) {
 				KeyLimit: 10,
 			},
 			wantErr: errEmptyRoot,
+		},
+		{
+			name: "account_hash_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash:    root.Bytes(),
+				AccountHash: []byte{0x01, 0x02},
+				KeyLimit:    10,
+			},
+			wantErr: errWrongAccountHashLength,
 		},
 		{
 			name: "start_key_wrong_length",
@@ -404,7 +414,7 @@ func TestResponder_SnapshotProofVerifies(t *testing.T) {
 				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 					RootHash:    c.root.Bytes(),
-					AccountHash: accountBytes(c.account),
+					AccountHash: c.accountHash,
 					KeyLimit:    keyLimit,
 				})
 				require.Nil(t, appErr)
@@ -437,7 +447,8 @@ func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 			require.Len(t, reads, 1)
 			require.Equal(t, c.snap.DiskRoot(), reads[0].Root, "must read the disk layer")
 			require.NotEqual(t, c.root, reads[0].Root, "must not read at the requested root")
-			require.Equal(t, c.account, reads[0].Account, "must read the requested scope")
+			require.Equal(t, common.BytesToHash(c.accountHash), reads[0].Account, "must read the requested scope")
+			require.Equal(t, len(c.accountHash) != 0, reads[0].Storage, "must read the requested trie kind")
 		})
 	}
 }
@@ -554,15 +565,19 @@ var snapshotKinds = []struct {
 		name:  "storage",
 		build: newStorageCase,
 	},
+	{
+		name:  "zero_account_storage",
+		build: newZeroAccountCase,
+	},
 }
 
 // snapshotCase is a trie plus a snapshot mirroring it, for one kind of leaf.
 type snapshotCase struct {
-	root    common.Hash
-	account common.Hash // zero for the account trie
-	keys    [][]byte
-	vals    [][]byte
-	snap    *synctest.StaticSnapshot
+	root        common.Hash
+	accountHash []byte // nil for the account trie
+	keys        [][]byte
+	vals        [][]byte
+	snap        *synctest.StaticSnapshot
 	// leaves aliases the snapshot's pairs, so mutating it desyncs from the trie.
 	leaves []synctest.StaticPair
 }
@@ -593,7 +608,16 @@ func newAccountCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
 }
 
 func newStorageCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
-	account := common.HexToHash("0xa11ce")
+	return newStorageCaseFor(t, trieDB, n, common.HexToHash("0xa11ce"))
+}
+
+// Genesis or a state upgrade can populate the zero account, so its storage
+// trie must be served rather than aliased to the account trie.
+func newZeroAccountCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
+	return newStorageCaseFor(t, trieDB, n, common.Hash{})
+}
+
+func newStorageCaseFor(t *testing.T, trieDB *triedb.Database, n int, account common.Hash) snapshotCase {
 	root, keys, vals := synctest.FillTrie(t, trieDB, n)
 
 	// Storage slots are already trie-encoded, so the snapshot mirrors the trie.
@@ -603,12 +627,12 @@ func newStorageCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
 	}
 	static := &synctest.StaticSnapshot{Storage: map[common.Hash][]synctest.StaticPair{account: leaves}}
 	return snapshotCase{
-		root:    root,
-		account: account,
-		keys:    keys,
-		vals:    vals,
-		snap:    static,
-		leaves:  leaves,
+		root:        root,
+		accountHash: account.Bytes(),
+		keys:        keys,
+		vals:        vals,
+		snap:        static,
+		leaves:      leaves,
 	}
 }
 
@@ -686,7 +710,7 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 	t.Helper()
 	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash:    c.root.Bytes(),
-		AccountHash: accountBytes(c.account),
+		AccountHash: c.accountHash,
 		KeyLimit:    uint32(len(c.keys)),
 	})
 	require.Nil(t, appErr)
@@ -702,7 +726,7 @@ func newSnapshotQuery(t *testing.T, trieDB *triedb.Database, c snapshotCase, key
 	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 	q, appErr := newQuery(r, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash:    c.root.Bytes(),
-		AccountHash: accountBytes(c.account),
+		AccountHash: c.accountHash,
 		EndKey:      endKey,
 		KeyLimit:    uint32(keyLimit),
 	})
@@ -933,11 +957,4 @@ func proofFrom(t *testing.T, vals [][]byte) ethdb.Database {
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
 	tb.Helper()
 	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
-}
-
-func accountBytes(account common.Hash) []byte {
-	if account == (common.Hash{}) {
-		return nil
-	}
-	return account.Bytes()
 }

@@ -89,20 +89,24 @@ var (
 		Code:    3002,
 		Message: "empty trie root",
 	}
-	errWrongStartKeyLength = &avacommon.AppError{
+	errWrongAccountHashLength = &avacommon.AppError{
 		Code:    3003,
+		Message: "account hash length mismatch",
+	}
+	errWrongStartKeyLength = &avacommon.AppError{
+		Code:    3004,
 		Message: "start key length mismatch",
 	}
 	errWrongEndKeyLength = &avacommon.AppError{
-		Code:    3004,
+		Code:    3005,
 		Message: "end key length mismatch",
 	}
 	errStartAfterEnd = &avacommon.AppError{
-		Code:    3005,
+		Code:    3006,
 		Message: "start key after end key",
 	}
 	errRootNotFound = &avacommon.AppError{
-		Code:    3006,
+		Code:    3007,
 		Message: "requested trie root not found",
 	}
 )
@@ -136,7 +140,9 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 		return errEmptyRoot
 	}
 
-	switch start, end := req.GetStartKey(), req.GetEndKey(); {
+	switch account, start, end := req.GetAccountHash(), req.GetStartKey(), req.GetEndKey(); {
+	case len(account) != 0 && len(account) != common.HashLength:
+		return errWrongAccountHashLength
 	case len(start) != 0 && len(start) != trieKeyLength:
 		return errWrongStartKeyLength
 	case len(end) != 0 && len(end) != trieKeyLength:
@@ -149,13 +155,14 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 
 // query holds one in-flight leaf request.
 type query struct {
-	log      logging.Logger
-	startKey []byte
-	endKey   []byte
-	rootHash common.Hash
-	account  common.Hash // empty for account trie, non-empty for storage trie
-	limit    int
-	zeroKey  []byte
+	log       logging.Logger
+	startKey  []byte
+	endKey    []byte
+	rootHash  common.Hash
+	account   common.Hash // populated when isStorage
+	isStorage bool
+	limit     int
+	zeroKey   []byte
 
 	trie     *trie.Trie
 	snapshot SnapshotReader
@@ -181,16 +188,18 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 	}
 
 	limit := int(min(req.GetKeyLimit(), MaxLeavesLimit))
+	account := req.GetAccountHash()
 	return &query{
-		log:      r.log,
-		startKey: req.GetStartKey(),
-		endKey:   req.GetEndKey(),
-		rootHash: root,
-		account:  common.BytesToHash(req.GetAccountHash()),
-		limit:    limit,
-		zeroKey:  r.zeroKey,
-		trie:     t,
-		snapshot: r.snapshot,
+		log:       r.log,
+		startKey:  req.GetStartKey(),
+		endKey:    req.GetEndKey(),
+		rootHash:  root,
+		account:   common.BytesToHash(account),
+		isStorage: len(account) != 0,
+		limit:     limit,
+		zeroKey:   r.zeroKey,
+		trie:      t,
+		snapshot:  r.snapshot,
 		resp: &syncpb.GetLeafResponse{
 			Keys:   make([][]byte, 0, limit),
 			Values: make([][]byte, 0, limit),
@@ -352,7 +361,7 @@ func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 	diskRoot := q.snapshot.DiskRoot()
 	seek := common.BytesToHash(q.startKey)
 
-	if q.account == (common.Hash{}) {
+	if !q.isStorage {
 		it, err := q.snapshot.AccountIterator(diskRoot, seek)
 		if err != nil {
 			return nil, nil, err
@@ -376,6 +385,7 @@ func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
 func (q *query) abandonSnapshot(reason string, err error) {
 	q.log.Debug("snapshot read abandoned, falling back to the trie",
 		zap.String("reason", reason),
+		zap.Bool("isStorage", q.isStorage),
 		zap.Stringer("account", q.account),
 		zap.Error(err),
 	)

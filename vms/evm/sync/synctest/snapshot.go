@@ -41,7 +41,7 @@ func (s *SnapshotTree) AccountIterator(root, seek common.Hash) (snapshot.Account
 }
 
 func (s *SnapshotTree) StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Root: root, Account: account})
+	s.record(SnapshotRead{Root: root, Account: account, Storage: true})
 	return s.tree.StorageIterator(root, account, seek)
 }
 
@@ -86,7 +86,7 @@ func (s *StaticSnapshot) AccountIterator(root, seek common.Hash) (snapshot.Accou
 }
 
 func (s *StaticSnapshot) StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Root: root, Account: account})
+	s.record(SnapshotRead{Root: root, Account: account, Storage: true})
 	if s.OpenErr != nil {
 		return nil, s.OpenErr
 	}
@@ -148,7 +148,8 @@ func (*staticStorageIter) Release()        {}
 // SnapshotRead is one iterator a handler opened.
 type SnapshotRead struct {
 	Root    common.Hash
-	Account common.Hash // zero for the account trie
+	Account common.Hash // Set when Storage
+	Storage bool
 }
 
 // snapshotReads is the read log every snapshot source here keeps, so a test can
