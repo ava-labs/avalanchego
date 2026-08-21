@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -103,9 +102,7 @@ func TestMarkExecuted(t *testing.T) {
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	// This block is NOT synchronous, so no hooks are needed.
-	// NOTE: this pattern is only acceptable in tests.
-	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
+	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool
@@ -185,9 +182,8 @@ func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 
 	// An empty execution-results DB is what signals the block is synchronous.
 	xdb := saetest.NewExecutionResultsDB()
-	hooks := hookstest.NewStub(1e6)
 	b := newBlock(t, ethB, nil, nil)
-	require.NoErrorf(t, b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
+	require.NoErrorf(t, b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
 
 	assert.Truef(t, b.Executed(), "%T.Executed()", b)
 	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
