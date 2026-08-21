@@ -137,7 +137,7 @@ type query struct {
 	endKey   []byte
 	rootHash common.Hash
 	account  common.Hash // empty for account trie, non-empty for storage trie
-	limit    uint16
+	limit    int
 	zeroKey  []byte
 
 	trie     *trie.Trie
@@ -163,7 +163,7 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		return nil, errRootNotFound
 	}
 
-	limit := uint16(min(req.GetKeyLimit(), MaxLeavesLimit))
+	limit := int(min(req.GetKeyLimit(), MaxLeavesLimit))
 	return &query{
 		log:      r.log,
 		startKey: req.GetStartKey(),
@@ -188,13 +188,13 @@ func (q *query) wholeTrie(more bool) bool {
 }
 
 func (q *query) atLimit() bool {
-	return len(q.resp.Keys) >= int(q.limit)
+	return len(q.resp.Keys) >= q.limit
 }
 
 // appendLeaves appends what the limit allows. kept below len(keys) means the
 // segment was trimmed.
 func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
-	kept = min(len(keys), int(q.limit)-len(q.resp.Keys))
+	kept = min(len(keys), q.limit-len(q.resp.Keys))
 	q.resp.Keys = append(q.resp.Keys, keys[:kept]...)
 	q.resp.Values = append(q.resp.Values, vals[:kept]...)
 	return kept
@@ -381,7 +381,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		if len(q.endKey) > 0 && bytes.Compare(k, q.endKey) > 0 {
 			break
 		}
-		if len(keys) >= int(q.limit) {
+		if len(keys) >= q.limit {
 			break
 		}
 		v, err := leaf()
