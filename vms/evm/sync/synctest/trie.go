@@ -32,22 +32,22 @@ func NewTrieDBWithDisk() (*triedb.Database, ethdb.Database) {
 }
 
 // FillTrie writes numKeys deterministic 32-byte pairs into trieDB and
-// returns the committed root with keys and values sorted ascending.
+// returns the committed root with keys and values sorted ascending. Keys are
+// unhashed, so they cluster at the start of the key space.
 func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
 	t.Helper()
 	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
 	require.NoError(t, err)
 
-	keys := make([][]byte, numKeys)
-	vals := make([][]byte, numKeys)
-	for i := 0; i < numKeys; i++ {
+	type row struct{ key, val []byte }
+	rows := make([]row, numKeys)
+	for i := range numKeys {
 		key := make([]byte, common.HashLength)
 		binary.BigEndian.PutUint64(key, uint64(i+1))
 		val := make([]byte, common.HashLength)
 		binary.BigEndian.PutUint64(val, uint64(i+1)*1000)
 		tr.MustUpdate(key, val)
-		keys[i] = key
-		vals[i] = val
+		rows[i] = row{key, val}
 	}
 
 	root, nodes, err := tr.Commit(false)
@@ -55,14 +55,11 @@ func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, 
 	require.NoError(t, trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil))
 	require.NoError(t, trieDB.Commit(root, false))
 
-	// Sort to match the responder's iteration order.
-	pairs := make([]struct{ k, v []byte }, numKeys)
-	for i := range keys {
-		pairs[i] = struct{ k, v []byte }{keys[i], vals[i]}
-	}
-	slices.SortFunc(pairs, func(a, b struct{ k, v []byte }) int { return bytes.Compare(a.k, b.k) })
-	for i := range pairs {
-		keys[i], vals[i] = pairs[i].k, pairs[i].v
+	slices.SortFunc(rows, func(a, b row) int { return bytes.Compare(a.key, b.key) })
+	keys := make([][]byte, numKeys)
+	vals := make([][]byte, numKeys)
+	for i, r := range rows {
+		keys[i], vals[i] = r.key, r.val
 	}
 	return root, keys, vals
 }

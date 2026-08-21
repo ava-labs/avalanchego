@@ -30,18 +30,20 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 )
 
-const testRequestSize = 1024
-
 var errInterrupted = errors.New("interrupted sync")
 
 type syncTest struct {
 	ctx               context.Context
-	prepareForTest    func(t *testing.T, r *rand.Rand) (clientDB state.Database, serverDB state.Database, syncRoot common.Hash)
+	clientDB          state.Database
+	serverDB          state.Database
+	root              common.Hash
 	expectedError     error
 	GetLeafsIntercept func(message.LeafsRequest, message.LeafsResponse) (message.LeafsResponse, error)
 	GetCodeIntercept  func([]common.Hash, [][]byte) ([][]byte, error)
@@ -53,13 +55,11 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	if test.ctx != nil {
 		ctx = test.ctx
 	}
-	r := rand.New(rand.NewSource(1))
-	clientDB, serverDB, root := test.prepareForTest(t, r)
-	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
-	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
+	clientEthDB, ok := test.clientDB.DiskDB().(ethdb.Database)
+	require.Truef(t, ok, "%T is not an ethdb.Database", test.clientDB.DiskDB())
 
-	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, c, handlerstats.NewNoopHandlerStats())
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), c, handlerstats.NewNoopHandlerStats())
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(test.serverDB.TrieDB(), message.StateTrieKeyLength, nil, c, handlerstats.NewNoopHandlerStats())
+	codeRequestHandler := handlers.NewCodeRequestHandler(test.serverDB.DiskDB(), c, handlerstats.NewNoopHandlerStats())
 	mockClient := client.NewTestClient(c, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
@@ -68,20 +68,19 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	// Create the code fetcher.
 	fetcher, err := code.NewQueue(clientEthDB)
 	require.NoError(t, err, "failed to create code fetcher")
+	t.Cleanup(fetcher.Shutdown)
 
 	// Create the consumer code syncer.
 	codeSyncer, err := code.NewSyncer(mockClient, clientEthDB, fetcher.CodeHashes())
 	require.NoError(t, err, "failed to create code syncer")
 
 	// Create the state syncer.
-	stateSyncer, err := NewSyncer(
-		mockClient,
+	stateSyncer, err := NewHashDBSyncer(
+		loggingtest.New(t, logging.Debug),
+		client.NewLeafFetcher(mockClient, leafReqType, message.StateTrieNode),
 		clientEthDB,
-		root,
+		test.root,
 		fetcher,
-		testRequestSize,
-		leafReqType,
-		WithBatchSize(1000), // Use a lower batch size in order to get test coverage of batches being written early.
 	)
 	require.NoError(t, err, "failed to create state syncer")
 
@@ -98,7 +97,7 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 		return
 	}
 
-	assertDBConsistency(t, root, clientDB, serverDB)
+	assertDBConsistency(t, test.root, test.clientDB, test.serverDB)
 }
 
 // testSyncResumes tests a series of syncTests work as expected, invoking a callback function after each
@@ -116,17 +115,19 @@ func TestSimpleSyncCases(t *testing.T) {
 		numAccountsSmall = 10
 		clientErr        = errors.New("dummy client error")
 	)
-	tests := map[string]syncTest{
+	// fill populates serverDB and returns the root to sync to.
+	tests := map[string]struct {
+		syncTest
+		fill func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash
+	}{
 		"accounts": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, nil)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
 		},
 		"accounts with code": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
@@ -139,63 +140,67 @@ func TestSimpleSyncCases(t *testing.T) {
 					}
 					return account
 				})
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
 		},
 		"accounts with code and storage": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccounts)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
 		},
 		"accounts with storage": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
 					if i%5 == 0 {
 						synctest.FillStorageForAccount(t, r, 16, addr, storageTr)
 					}
 					return account
 				})
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
 		},
 		"accounts with overlapping storage": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, numAccounts, 3)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
 		},
 		"failed to fetch leafs": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			syncTest: syncTest{
+				expectedError: clientErr,
+				GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
+					return message.LeafsResponse{}, clientErr
+				},
+			},
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, numAccountsSmall, nil)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
-			GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
-				return message.LeafsResponse{}, clientErr
-			},
-			expectedError: clientErr,
 		},
 		"failed to fetch code": {
-			prepareForTest: func(t *testing.T, r *rand.Rand) (state.Database, state.Database, common.Hash) {
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+			syncTest: syncTest{
+				expectedError: clientErr,
+				GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
+					return nil, clientErr
+				},
+			},
+			fill: func(t *testing.T, r *rand.Rand, serverDB state.Database) common.Hash {
 				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, numAccountsSmall)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
+				return root
 			},
-			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
-				return nil, clientErr
-			},
-			expectedError: clientErr,
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
-				testSync(t, test, c, leafReqType)
+				r := rand.New(rand.NewSource(1))
+				st := test.syncTest
+				st.serverDB = state.NewDatabase(rawdb.NewMemoryDatabase())
+				st.clientDB = state.NewDatabase(rawdb.NewMemoryDatabase())
+				st.root = test.fill(t, r, st.serverDB)
+				testSync(t, st, c, leafReqType)
 			})
 		})
 	}
@@ -208,14 +213,15 @@ func TestCancelSync(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		t.Cleanup(cancel)
 
+		// More than one leaf request, so the cancel lands mid-sync.
+		serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+		root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
+
 		testSync(t, syncTest{
-			ctx: ctx,
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				// Create trie with 2000 accounts (more than one leaf request)
-				serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
-				root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverDB, types.EmptyRootHash, 2000)
-				return state.NewDatabase(rawdb.NewMemoryDatabase()), serverDB, root
-			},
+			ctx:           ctx,
+			clientDB:      state.NewDatabase(rawdb.NewMemoryDatabase()),
+			serverDB:      serverDB,
+			root:          root,
 			expectedError: context.Canceled,
 			GetLeafsIntercept: func(_ message.LeafsRequest, lr message.LeafsResponse) (message.LeafsResponse, error) {
 				cancel()
@@ -258,9 +264,9 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 			interruptAfter: 1,
 		}
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB:          clientDB,
+			serverDB:          serverDB,
+			root:              root,
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
@@ -268,9 +274,9 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 		require.GreaterOrEqual(t, intercept.numRequests.Load(), uint32(2))
 
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root,
 		}, c, leafReqType)
 	})
 }
@@ -295,17 +301,17 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 			interruptAfter: 1,
 		}
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB:          clientDB,
+			serverDB:          serverDB,
+			root:              root,
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root,
 		}, c, leafReqType)
 	})
 }
@@ -337,9 +343,9 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 			interruptAfter: 1,
 		}
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root1
-			},
+			clientDB:          clientDB,
+			serverDB:          serverDB,
+			root:              root1,
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
@@ -347,9 +353,9 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 		<-snapshot.WipeSnapshot(clientDB.DiskDB(), false)
 
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root2
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root2,
 		}, c, leafReqType)
 	})
 }
@@ -374,17 +380,17 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 			interruptAfter: 1,
 		}
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB:          clientDB,
+			serverDB:          serverDB,
+			root:              root,
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root,
 		}, c, leafReqType)
 	})
 }
@@ -408,17 +414,17 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 			interruptAfter: 1,
 		}
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB:          clientDB,
+			serverDB:          serverDB,
+			root:              root,
 			expectedError:     errInterrupted,
 			GetLeafsIntercept: intercept.getLeafsIntercept,
 		}, c, leafReqType)
 
 		testSync(t, syncTest{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root,
 		}, c, leafReqType)
 	})
 }
@@ -516,14 +522,14 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 
 	testSyncResumes(t, []syncTest{
 		{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root1
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root1,
 		},
 		{
-			prepareForTest: func(*testing.T, *rand.Rand) (state.Database, state.Database, common.Hash) {
-				return clientDB, serverDB, root2
-			},
+			clientDB: clientDB,
+			serverDB: serverDB,
+			root:     root2,
 		},
 	}, func() {
 		// Only perform the delete stage once
