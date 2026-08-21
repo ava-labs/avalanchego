@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -31,6 +32,11 @@ func (b *Block) Body() *types.Body { return b.b.Body() }
 // the wrapped [types.Block].
 func (b *Block) SettledStateRoot() common.Hash {
 	return b.b.Root()
+}
+
+// PreciseTime returns the [hook.Points.BlockTime] of `b`.
+func (b *Block) PreciseTime() time.Time {
+	return b.hooks.BlockTime(b.Header())
 }
 
 // BuildTime returns the Unix timestamp of the block, which is the canonical

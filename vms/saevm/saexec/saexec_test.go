@@ -131,6 +131,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
+		blockstest.WithHooks(sutCfg.hooks),
 	)
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
