@@ -211,7 +211,7 @@ func TestVerifyTime(t *testing.T) {
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis-1),          // 1ms delay, meets zero requirement
+				new(timeMillis-1),       // 1ms delay, meets zero requirement
 				new(acp226.DelayExcess), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
@@ -225,7 +225,7 @@ func TestVerifyTime(t *testing.T) {
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),            // Same timestamp, zero delay
+				new(timeMillis),         // Same timestamp, zero delay
 				new(acp226.DelayExcess), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
