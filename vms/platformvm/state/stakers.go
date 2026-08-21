@@ -18,7 +18,10 @@ import (
 
 var (
 	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
-	errUnexpectedStaker          = errors.New("unexpected staker")
+	// ErrNotContinuousPrimaryNetworkValidator is returned when a bounded
+	// Primary Network validator is used where a continuous validator is needed.
+	ErrNotContinuousPrimaryNetworkValidator = errors.New("not a continuous Primary Network validator")
+	errUnexpectedStaker                     = errors.New("unexpected staker")
 )
 
 // StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.
@@ -36,19 +39,26 @@ type Stakers interface {
 }
 
 type CurrentStakers interface {
-	// GetCurrentValidator returns the current staking period for the validator on subnetID with nodeID.
+	// GetCurrentValidator returns the Staker describing the validator on subnetID with nodeID.
 	// [database.ErrNotFound] is returned if the validator is not in the validator set.
-	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (CurrentValidator, error)
-
-	// PutCurrentValidator adds period to the current validator set.
 	//
-	// This returns an error if the validator is already in the validator set.
-	PutCurrentValidator(validator CurrentValidator) error
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
 
-	// DeleteCurrentValidator removes the validator from the current validator set.
+	// PutCurrentValidator adds the Staker to the validator set.
 	//
-	// This returns an error if the validator is not already in the validator set or if it still has delegators.
-	DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) error
+	// This returns an error if staker is already in the validator set.
+	//
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	PutCurrentValidator(staker *Staker) error
+
+	// DeleteCurrentValidator removes the Staker from the validator set.
+	//
+	// This returns an error if staker is not already in the validator set or if there are delegators
+	// for staker still present.
+	//
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	DeleteCurrentValidator(staker *Staker) error
 
 	// SetStakingInfo updates the mutable staking info for nodeID on subnetID.
 	//
@@ -62,58 +72,86 @@ type CurrentStakers interface {
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
 	// validator on subnetID with nodeID. Delegators are sorted by their
-	// EndTime.
+	// removal from current staker set (i.e. Staker.NextTime).
 	//
 	// This returns an empty iterator if the validator is not in the validator set.
-	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[CurrentDelegator], error)
+	//
+	// Deprecated: use [Adapter.GetCurrentDelegatorIterator].
+	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error)
 
-	// PutCurrentDelegator adds period to the current delegator set.
+	// PutCurrentDelegator adds the staker describing a delegator to the
+	// staker set.
 	//
 	// This returns an error if the validator is not in the validator set.
 	//
-	// Invariant: period is not currently in the delegator set.
+	// Invariant: staker is not currently a CurrentDelegator
 	// TODO error if the delegator is already present
-	PutCurrentDelegator(delegator CurrentDelegator) error
+	//
+	// Deprecated: use [Adapter.PutCurrentDelegator].
+	PutCurrentDelegator(staker *Staker) error
 
-	// DeleteCurrentDelegator removes the delegation with txID from the current delegator set.
+	// DeleteCurrentDelegator removes the staker describing a delegator from
+	// the staker set.
 	//
 	// This returns an error if the validator is not in the validator set.
 	//
-	// Invariant: txID identifies a current delegation to the validator.
+	// Invariant: staker is currently a CurrentDelegator
 	// TODO error if the delegator was not present
-	DeleteCurrentDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error
+	//
+	// Deprecated: use [Adapter.DeleteCurrentDelegator].
+	DeleteCurrentDelegator(staker *Staker) error
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
 	// the current staker set.
-	GetCurrentStakerIterator() (iterator.Iterator[CurrentStaker], error)
+	//
+	// Deprecated: use [Adapter.GetCurrentStakerIterator].
+	GetCurrentStakerIterator() (iterator.Iterator[*Staker], error)
 }
 
 type PendingStakers interface {
-	// GetPendingValidator returns the pending staking period for the validator on
+	// GetPendingValidator returns the Staker describing the validator on
 	// [subnetID] with [nodeID]. If the validator does not exist,
 	// [database.ErrNotFound] is returned.
-	GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (PendingValidator, error)
+	//
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
 
-	// PutPendingValidator adds period to the pending validator set.
-	PutPendingValidator(validator PendingValidator) error
+	// PutPendingValidator adds the [staker] describing a validator to the
+	// staker set.
+	//
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	PutPendingValidator(staker *Staker) error
 
-	// DeletePendingValidator removes the validator from the pending validator set.
-	DeletePendingValidator(subnetID ids.ID, nodeID ids.NodeID) error
+	// DeletePendingValidator removes the [staker] describing a validator from
+	// the staker set.
+	//
+	// Deprecated: use [NewAdapter] and the typed validator accessors.
+	DeletePendingValidator(staker *Staker)
 
 	// GetPendingDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
 	// removal from pending staker set.
-	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[PendingDelegator], error)
+	//
+	// Deprecated: use [Adapter.GetPendingDelegatorIterator].
+	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error)
 
-	// PutPendingDelegator adds period to the pending delegator set.
-	PutPendingDelegator(delegator PendingDelegator) error
+	// PutPendingDelegator adds the [staker] describing a delegator to the
+	// staker set.
+	//
+	// Deprecated: use [Adapter.PutPendingDelegator].
+	PutPendingDelegator(staker *Staker)
 
-	// DeletePendingDelegator removes the delegation with txID from the pending delegator set.
-	DeletePendingDelegator(subnetID ids.ID, nodeID ids.NodeID, txID ids.ID) error
+	// DeletePendingDelegator removes the [staker] describing a delegator from
+	// the staker set.
+	//
+	// Deprecated: use [Adapter.DeletePendingDelegator].
+	DeletePendingDelegator(staker *Staker)
 
 	// GetPendingStakerIterator returns stakers in order of their removal from
 	// the pending staker set.
-	GetPendingStakerIterator() (iterator.Iterator[PendingStaker], error)
+	//
+	// Deprecated: use [Adapter.GetPendingStakerIterator].
+	GetPendingStakerIterator() (iterator.Iterator[*Staker], error)
 }
 
 type baseStakers struct {

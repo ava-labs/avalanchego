@@ -82,8 +82,8 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		s.AddStatelessBlock(blk)
 		s.SetLastAccepted(blk.ID())
 
-		require.NoError(s.PutCurrentValidator(statetest.CurrentValidator(primaryStaker)))
-		require.NoError(s.PutCurrentValidator(statetest.CurrentValidator(subnetStaker)))
+		require.NoError(s.PutCurrentValidator(primaryStaker))
+		require.NoError(s.PutCurrentValidator(subnetStaker))
 
 		require.NoError(s.Commit())
 	}
@@ -98,7 +98,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		s.AddStatelessBlock(blk)
 		s.SetLastAccepted(blk.ID())
 
-		require.NoError(s.DeleteCurrentValidator(subnetStaker.SubnetID, subnetStaker.NodeID))
+		require.NoError(s.DeleteCurrentValidator(subnetStaker))
 
 		require.NoError(s.Commit())
 	}
@@ -196,10 +196,10 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		s.SetLastAccepted(blk.ID())
 
 		for _, v := range newStakers {
-			require.NoError(s.PutCurrentValidator(statetest.CurrentValidator(v)))
+			require.NoError(s.PutCurrentValidator(v))
 		}
 		for _, v := range removedStakers {
-			require.NoError(s.DeleteCurrentValidator(v.SubnetID, v.NodeID))
+			require.NoError(s.DeleteCurrentValidator(v))
 		}
 		require.NoError(s.Commit())
 	}

@@ -4,6 +4,8 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "state",
     srcs = [
+        "adapter.go",
+        "adapter_staker.go",
         "chain_time_helpers.go",
         "diff.go",
         "disk_staker_diff_iterator.go",
@@ -13,7 +15,6 @@ go_library(
         "metadata_delegator.go",
         "metadata_validator.go",
         "staker.go",
-        "staker_api.go",
         "staker_diff_iterator.go",
         "staker_status.go",
         "stakers.go",
@@ -72,6 +73,7 @@ go_library(
 go_test(
     name = "state_test",
     srcs = [
+        "adapter_test.go",
         "chain_time_helpers_test.go",
         "diff_test.go",
         "disk_staker_diff_iterator_test.go",

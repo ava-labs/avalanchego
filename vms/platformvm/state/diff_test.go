@@ -349,9 +349,11 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 
 			state := newTestState(t, memdb.New())
 
-			require.NoError(state.PutCurrentValidator(
-				newTestCurrentValidator(l1Validator.SubnetID, defaultValidatorNodeID),
-			))
+			require.NoError(state.PutCurrentValidator(&Staker{
+				TxID:     ids.GenerateTestID(),
+				SubnetID: l1Validator.SubnetID,
+				NodeID:   defaultValidatorNodeID,
+			}))
 
 			l1Validator.EndAccumulatedFee = test.initialEndAccumulatedFee
 			require.NoError(state.PutL1Validator(l1Validator))
@@ -382,19 +384,23 @@ func TestDiffCurrentValidator(t *testing.T) {
 	require.NoError(err)
 
 	// Put a current validator
-	currentValidator := newTestCurrentValidator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	currentValidator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
 	require.NoError(d.PutCurrentValidator(currentValidator))
 
 	// Assert that we get the current validator back
-	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID(), currentValidator.NodeID())
+	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
 	require.NoError(err)
 	require.Equal(currentValidator, gotCurrentValidator)
 
 	// Delete the current validator
-	require.NoError(d.DeleteCurrentValidator(currentValidator.SubnetID(), currentValidator.NodeID()))
+	require.NoError(d.DeleteCurrentValidator(currentValidator))
 
 	// Make sure the deletion worked
-	_, err = d.GetCurrentValidator(currentValidator.SubnetID(), currentValidator.NodeID())
+	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -407,19 +413,23 @@ func TestDiffPendingValidator(t *testing.T) {
 	require.NoError(err)
 
 	// Put a pending validator
-	pendingValidator := newTestPendingValidator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	pendingValidator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
 	require.NoError(d.PutPendingValidator(pendingValidator))
 
 	// Assert that we get the pending validator back
-	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID(), pendingValidator.NodeID())
+	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
 	require.NoError(err)
 	require.Equal(pendingValidator, gotPendingValidator)
 
 	// Delete the pending validator
-	require.NoError(d.DeletePendingValidator(pendingValidator.SubnetID(), pendingValidator.NodeID()))
+	d.DeletePendingValidator(pendingValidator)
 
 	// Make sure the deletion worked
-	_, err = d.GetPendingValidator(pendingValidator.SubnetID(), pendingValidator.NodeID())
+	_, err = d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -432,25 +442,35 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	require.NoError(err)
 
 	// Put a current delegator
-	currentValidator := newTestCurrentValidator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	currentValidator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
+
 	require.NoError(d.PutCurrentValidator(currentValidator))
 
-	currentDelegator := newTestCurrentDelegator(currentValidator.SubnetID(), currentValidator.NodeID())
+	currentDelegator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: currentValidator.SubnetID,
+		NodeID:   currentValidator.NodeID,
+	}
+
 	require.NoError(d.PutCurrentDelegator(currentDelegator))
 
 	// Assert that we get the current delegator back
-	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID(), currentDelegator.NodeID())
+	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
 	require.True(gotCurrentDelegatorIter.Next())
 	require.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
 
 	// Delete the current delegator
-	require.NoError(d.DeleteCurrentDelegator(currentDelegator.SubnetID(), currentDelegator.NodeID(), currentDelegator.TxID))
+	require.NoError(d.DeleteCurrentDelegator(currentDelegator))
 
 	// Make sure the deletion worked.
 	// The iterator should have no elements.
-	gotCurrentDelegatorIter, err = d.GetCurrentDelegatorIterator(currentDelegator.SubnetID(), currentDelegator.NodeID())
+	gotCurrentDelegatorIter, err = d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
 	require.NoError(err)
 	require.False(gotCurrentDelegatorIter.Next())
 }
@@ -458,7 +478,11 @@ func TestDiffCurrentDelegator(t *testing.T) {
 func TestDiffPendingDelegator(t *testing.T) {
 	require := require.New(t)
 
-	pendingDelegator := newTestPendingDelegator(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	pendingDelegator := &Staker{
+		TxID:     ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		NodeID:   ids.GenerateTestNodeID(),
+	}
 
 	state := newTestState(t, memdb.New())
 
@@ -466,21 +490,21 @@ func TestDiffPendingDelegator(t *testing.T) {
 	require.NoError(err)
 
 	// Put a pending delegator
-	require.NoError(d.PutPendingDelegator(pendingDelegator))
+	d.PutPendingDelegator(pendingDelegator)
 
 	// Assert that we get the pending delegator back
-	gotPendingDelegatorIter, err := d.GetPendingDelegatorIterator(pendingDelegator.SubnetID(), pendingDelegator.NodeID())
+	gotPendingDelegatorIter, err := d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
 	require.True(gotPendingDelegatorIter.Next())
 	require.Equal(gotPendingDelegatorIter.Value(), pendingDelegator)
 
 	// Delete the pending delegator
-	require.NoError(d.DeletePendingDelegator(pendingDelegator.SubnetID(), pendingDelegator.NodeID(), pendingDelegator.TxID))
+	d.DeletePendingDelegator(pendingDelegator)
 
 	// Make sure the deletion worked.
 	// The iterator should have no elements.
-	gotPendingDelegatorIter, err = d.GetPendingDelegatorIterator(pendingDelegator.SubnetID(), pendingDelegator.NodeID())
+	gotPendingDelegatorIter, err = d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	require.NoError(err)
 	require.False(gotPendingDelegatorIter.Next())
 }

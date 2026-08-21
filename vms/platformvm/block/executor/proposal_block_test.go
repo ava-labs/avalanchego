@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -79,15 +78,15 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// setup state to validate proposal block transaction
 	env.state.AddTx(addValTx, status.Committed)
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		TxID:      addValTx.ID(),
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
 		NextTime:  chainTime,
-		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
-	})))
+	}))
 	require.NoError(env.state.Commit())
 
 	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
@@ -166,7 +165,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTxID := nextStakerTx.ID()
 
 	env.state.AddTx(nextStakerTx, status.Committed)
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(&state.Staker{
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		TxID:      nextStakerTxID,
 		NodeID:    unsignedNextStakerTx.NodeID(),
 		SubnetID:  unsignedNextStakerTx.SubnetID(),
@@ -174,7 +173,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		StartTime: nextStakerTime,
 		EndTime:   nextStakerTime,
 		NextTime:  nextStakerTime,
-	})))
+	}))
 	require.NoError(env.state.Commit())
 
 	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
@@ -505,7 +504,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+				require.NoError(env.state.PutPendingValidator(staker))
 				env.state.AddTx(tx, status.Committed)
 				require.NoError(env.state.Commit())
 			}
@@ -534,7 +533,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(subnetStaker)))
+				require.NoError(env.state.PutPendingValidator(subnetStaker))
 				env.state.AddTx(tx, status.Committed)
 				require.NoError(env.state.Commit())
 			}
@@ -575,7 +574,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker0)))
+				require.NoError(env.state.PutCurrentValidator(staker0))
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
 
@@ -680,7 +679,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -707,7 +706,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+	require.NoError(env.state.PutPendingValidator(staker))
 	env.state.AddTx(tx, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -750,7 +749,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -835,7 +834,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			require.NoError(env.state.PutPendingValidator(statetest.PendingValidator(staker)))
+			require.NoError(env.state.PutPendingValidator(staker))
 			env.state.AddTx(tx, status.Committed)
 			require.NoError(env.state.Commit())
 
@@ -874,7 +873,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+			require.NoError(env.state.PutCurrentValidator(staker))
 			env.state.AddTx(addStaker0, status.Committed)
 			require.NoError(env.state.Commit())
 
@@ -968,7 +967,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -1027,7 +1026,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.state.PutPendingDelegator(statetest.PendingDelegator(staker))
+	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight( /*dummyHeight*/ uint64(1))
 	require.NoError(env.state.Commit())
@@ -1059,7 +1058,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -1157,7 +1156,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
 
@@ -1216,7 +1215,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	env.state.PutPendingDelegator(statetest.PendingDelegator(staker))
+	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
 	env.state.SetHeight( /*dummyHeight*/ uint64(1))
 	require.NoError(env.state.Commit())
@@ -1248,7 +1247,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	require.NoError(env.state.PutCurrentValidator(statetest.CurrentValidator(staker)))
+	require.NoError(env.state.PutCurrentValidator(staker))
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
 

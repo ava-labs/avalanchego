@@ -97,7 +97,7 @@ func TestStakerDiffIterator(t *testing.T) {
 		},
 	}
 
-	it := newStakerDiffIterator(
+	it := NewStakerDiffIterator(
 		iterator.FromSlice(currentStakers...),
 		iterator.FromSlice(pendingStakers...),
 	)

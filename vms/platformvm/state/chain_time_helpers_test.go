@@ -95,7 +95,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		pending      []PendingValidator
+		pending      []*Staker
 		l1Validators []L1Validator
 		maxTime      time.Time
 		expected     time.Time
@@ -107,19 +107,17 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "current and pending validators",
-			pending: []PendingValidator{
+			pending: []*Staker{
 				{
-					Validator: Validator{
-						StakingPeriod: StakingPeriod{
-							TxID:      ids.GenerateTestID(),
-							Weight:    1,
-							StartTime: genesistest.DefaultValidatorStartTime.Add(time.Second),
-							EndTime:   genesistest.DefaultValidatorEndTime,
-							priority:  platform.PrimaryNetworkValidatorPendingPriority,
-							subnetID:  constants.PrimaryNetworkID,
-							nodeID:    ids.GenerateTestNodeID(),
-						},
-					},
+					TxID:      ids.GenerateTestID(),
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: nil,
+					SubnetID:  constants.PrimaryNetworkID,
+					Weight:    1,
+					StartTime: genesistest.DefaultValidatorStartTime.Add(time.Second),
+					EndTime:   genesistest.DefaultValidatorEndTime,
+					NextTime:  genesistest.DefaultValidatorStartTime.Add(time.Second),
+					Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 				},
 			},
 			maxTime:  mockable.MaxTime,

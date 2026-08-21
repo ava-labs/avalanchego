@@ -2607,7 +2607,7 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 
 	vdr, err := vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
-	require.Equal(nodeID, vdr.NodeID())
+	require.Equal(nodeID, vdr.NodeID)
 	require.Equal(uint64(10), vdr.Weight)
 	require.Equal(addTx.ID(), vdr.TxID)
 
