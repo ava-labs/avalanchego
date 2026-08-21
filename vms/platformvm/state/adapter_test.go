@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 func TestStakingState(t *testing.T) {
@@ -47,8 +48,15 @@ func TestStakingState(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, subnetValidator, gotNativeValidator)
 
+	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+		NodeID: defaultValidatorNodeID,
+		Start:  uint64(now.Unix()),
+		End:    uint64(now.Add(time.Minute).Unix()),
+		Wght:   1,
+	}}}
+	nativeState.AddTx(delegatorTx, status.Committed)
 	delegator := &Staker{
-		TxID:            ids.GenerateTestID(),
+		TxID:            delegatorTx.ID(),
 		NodeID:          defaultValidatorNodeID,
 		SubnetID:        constants.PrimaryNetworkID,
 		Weight:          1,
@@ -64,11 +72,7 @@ func TestStakingState(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []CurrentDelegator{currentDelegator(delegator)}, iterator.ToSlice(delegatorIt))
 
-	require.NoError(t, typedState.DeleteCurrentDelegator(
-		delegator.SubnetID,
-		delegator.NodeID,
-		delegator.TxID,
-	))
+	require.NoError(t, typedState.DeleteCurrentDelegator(delegator.TxID))
 	require.NoError(t, typedState.DeleteCurrentSubnetValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
 
 	_, err = typedState.GetCurrentSubnetValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
@@ -80,8 +84,15 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	typedState := NewAdapter(nativeState)
 
 	now := time.Now().Truncate(time.Second)
+	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+		NodeID: defaultValidatorNodeID,
+		Start:  uint64(now.Add(time.Hour).Unix()),
+		End:    uint64(now.Add(2 * time.Hour).Unix()),
+		Wght:   1,
+	}}}
+	nativeState.AddTx(delegatorTx, status.Committed)
 	delegator := &Staker{
-		TxID:      ids.GenerateTestID(),
+		TxID:      delegatorTx.ID(),
 		NodeID:    defaultValidatorNodeID,
 		SubnetID:  constants.PrimaryNetworkID,
 		Weight:    1,
@@ -100,11 +111,7 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []*Staker{delegator}, iterator.ToSlice(gotNativeDelegatorIt))
 
-	require.NoError(t, typedState.DeletePendingDelegator(
-		delegator.SubnetID,
-		delegator.NodeID,
-		delegator.TxID,
-	))
+	require.NoError(t, typedState.DeletePendingDelegator(delegator.TxID))
 }
 
 type testStakerTx struct {
