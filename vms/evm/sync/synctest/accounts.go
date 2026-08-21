@@ -26,12 +26,10 @@ func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (co
 	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
 	require.NoError(t, err)
 
-	type row struct{ key, full, slim []byte }
-	rows := make([]row, numAccounts)
+	rows := make([]accountRow, numAccounts)
 	for i := range numAccounts {
-		key, full, slim := accountLeaf(t, i, uint64(i+1))
-		tr.MustUpdate(key, full)
-		rows[i] = row{key, full, slim}
+		rows[i] = accountLeaf(t, i, uint64(i+1))
+		tr.MustUpdate(rows[i].key, rows[i].full)
 	}
 
 	root, nodes, err := tr.Commit(false)
@@ -39,7 +37,7 @@ func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (co
 	require.NoError(t, trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil))
 	require.NoError(t, trieDB.Commit(root, false))
 
-	slices.SortFunc(rows, func(a, b row) int { return bytes.Compare(a.key, b.key) })
+	slices.SortFunc(rows, func(a, b accountRow) int { return bytes.Compare(a.key, b.key) })
 	keys := make([][]byte, numAccounts)
 	vals := make([][]byte, numAccounts)
 	pairs := make([]StaticPair, numAccounts)
@@ -50,12 +48,15 @@ func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (co
 	return root, keys, vals, &StaticSnapshot{Accounts: pairs}
 }
 
-// accountLeaf is the deterministic account at index i, slim and full encoded.
-func accountLeaf(t *testing.T, i int, nonce uint64) (key, full, slim []byte) {
+// accountRow is one deterministic account in both encodings.
+type accountRow struct{ key, full, slim []byte }
+
+// accountLeaf is the deterministic account at index i.
+func accountLeaf(t *testing.T, i int, nonce uint64) accountRow {
 	t.Helper()
-	key = make([]byte, common.HashLength)
+	key := make([]byte, common.HashLength)
 	binary.BigEndian.PutUint64(key, uint64(i+1))
-	slim = types.SlimAccountRLP(types.StateAccount{
+	slim := types.SlimAccountRLP(types.StateAccount{
 		Nonce:    nonce,
 		Balance:  uint256.NewInt(uint64(i+1) * 1000),
 		Root:     types.EmptyRootHash,
@@ -63,7 +64,7 @@ func accountLeaf(t *testing.T, i int, nonce uint64) (key, full, slim []byte) {
 	})
 	full, err := types.FullAccountRLP(slim)
 	require.NoError(t, err)
-	return key, full, slim
+	return accountRow{key: key, full: full, slim: slim}
 }
 
 // AdvanceAccountTrie rewrites the first numAccounts accounts of from, returning
@@ -77,8 +78,8 @@ func AdvanceAccountTrie(t *testing.T, trieDB *triedb.Database, from common.Hash,
 	const nonceOffset = 1_000_000
 
 	for i := range numAccounts {
-		key, full, _ := accountLeaf(t, i, uint64(i+1)+nonceOffset)
-		tr.MustUpdate(key, full)
+		r := accountLeaf(t, i, uint64(i+1)+nonceOffset)
+		tr.MustUpdate(r.key, r.full)
 	}
 
 	root, nodes, err := tr.Commit(false)
