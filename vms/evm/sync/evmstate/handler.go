@@ -492,9 +492,6 @@ func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (valid, more bool
 }
 
 func iteratorValues(db *memorydb.Database) ([][]byte, error) {
-	if db == nil {
-		return nil, nil
-	}
 	it := db.NewIterator(nil, nil)
 	defer it.Release()
 
