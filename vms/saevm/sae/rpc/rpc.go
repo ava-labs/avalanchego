@@ -51,6 +51,7 @@ type Chain interface {
 	saedb.StateDBOpener
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
+	BlockProcessor() *saexec.BlockProcessor
 
 	// Subscriptions
 	SubscribeAcceptedBlocks(chan<- *blocks.Block) event.Subscription

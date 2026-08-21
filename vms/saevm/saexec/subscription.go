@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
-func (e *Executor) sendPostExecutionEvents(block *blocks.Block, results *ExecutionResults) {
+func (e *Executor) sendPostExecutionEvents(block *blocks.Block, results *executionResults) {
 	e.metrics.markExecuted(block, results)
 
 	b := block.EthBlock()

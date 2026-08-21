@@ -31,9 +31,6 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
-	// Imported for [saexec.Execute] comment resolution.
-	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -1042,10 +1039,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	}
 
 	rpc := sut.GethRPCBackends()
-	// To rebuild the state at a particular tx, the [saexec.Execute] method is
-	// called with all preceding transactions. In turn, this calls post-block
-	// hooks of which atomic-state application would be one, but must be
-	// excluded when tracing.
+	// Prefix execution MUST NOT apply canonical atomic state changes.
 	_, _, _, release, err := rpc.StateAtTransaction(ctx, blk.EthBlock(), 0, 0)
 	require.NoErrorf(t, err, "%T.StateAtTransaction(...)", rpc)
 	defer release()

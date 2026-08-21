@@ -71,6 +71,7 @@ type SUT struct {
 	saedbConfig  saedb.Config
 	chain        *blockstest.ChainBuilder
 	wallet       *saetest.Wallet
+	hooks        *saehookstest.Stub
 	logger       *loggingtest.Logger
 	db           ethdb.Database
 	chainDataDir string
@@ -150,6 +151,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		saedbConfig:  saedbConfig,
 		chain:        chain,
 		wallet:       wallet,
+		hooks:        sutCfg.hooks,
 		logger:       logger,
 		db:           db,
 		chainDataDir: chainDataDir,
@@ -485,6 +487,87 @@ func TestEndOfBlockOps(t *testing.T) {
 			t.Errorf("%T.ExecutedByGasTime() diff (-want +got):\n%s", b, diff)
 		}
 	})
+}
+
+func TestExecuteBlockUntil(t *testing.T) {
+	_, sut := newSUT(t)
+	firstRecipient := common.Address{'f', 'i', 'r', 's', 't'}
+	secondRecipient := common.Address{'s', 'e', 'c', 'o', 'n', 'd'}
+	b := sut.chain.NewBlock(t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &firstRecipient,
+			Value:    big.NewInt(1),
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &secondRecipient,
+			Value:    big.NewInt(2),
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
+		Mint: []saehookstest.AccountCredit{{
+			Address: firstRecipient,
+			Amount:  *uint256.NewInt(100),
+		}},
+	}})))
+
+	tests := []struct {
+		name       string
+		numTxs     int
+		wantFirst  *uint256.Int
+		wantSecond *uint256.Int
+		wantErr    bool
+	}{
+		{
+			name:       "no transactions",
+			wantFirst:  new(uint256.Int),
+			wantSecond: new(uint256.Int),
+		},
+		{
+			name:       "one transaction",
+			numTxs:     1,
+			wantFirst:  uint256.NewInt(1),
+			wantSecond: new(uint256.Int),
+		},
+		{
+			name:       "all transactions",
+			numTxs:     len(b.Transactions()),
+			wantFirst:  uint256.NewInt(1),
+			wantSecond: uint256.NewInt(2),
+		},
+		{
+			name:    "negative transaction count",
+			numTxs:  -1,
+			wantErr: true,
+		},
+		{
+			name:    "transaction count exceeds block",
+			numTxs:  len(b.Transactions()) + 1,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+			_, err = sut.BlockProcessor().ExecuteBlockUntil(b, stateDB, tt.numTxs)
+			if tt.wantErr {
+				require.ErrorIs(t, err, errTransactionCountOutOfRange, "BlockProcessor.ExecuteBlockUntil()")
+				return
+			}
+			require.NoError(t, err, "BlockProcessor.ExecuteBlockUntil()")
+			require.Equal(t, tt.wantFirst, stateDB.GetBalance(firstRecipient), "first recipient balance")
+			require.Equal(t, tt.wantSecond, stateDB.GetBalance(secondRecipient), "second recipient balance")
+
+			gasClock := b.ParentBlock().ExecutedByGasTime()
+			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
+			_, ok, err := blocks.LastToSettleAt(sut.hooks, gasClock.AsTime(), b)
+			require.NoError(t, err, "blocks.LastToSettleAt()")
+			require.False(t, ok, "prefix execution recorded canonical progress")
+		})
+	}
 }
 
 func TestGasAccounting(t *testing.T) {
@@ -1122,7 +1205,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				log := loggingtest.New(t, logging.Debug)
 				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
 				require.NoError(t, err, "saedb.NewTracker()")
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.ChainConfig(), sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)
