@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -176,7 +175,7 @@ var errIncompleteBlockHistory = errors.New("incomplete block history when determ
 //
 // See the Example for [Block.WhenChildSettles] for one usage of the returned
 // block.
-func LastToSettleAt(hooks hook.Points, settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
+func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
 	defer func() {
 		// Avoids having to perform this check at every return.
 		if !ok {
@@ -225,7 +224,7 @@ func LastToSettleAt(hooks hook.Points, settleAt time.Time, parent *Block) (b *Bl
 			return block, known, nil
 		}
 
-		if startsNoEarlierThan := hooks.BlockTime(block.Header()); startsNoEarlierThan.Compare(settleAt) > 0 {
+		if startsNoEarlierThan := block.PreciseTime(); startsNoEarlierThan.Compare(settleAt) > 0 {
 			known = true
 			continue
 		}

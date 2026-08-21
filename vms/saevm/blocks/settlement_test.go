@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -30,7 +28,7 @@ import (
 //nolint:testableexamples // Output is meaningless
 func ExampleRange() {
 	parent := blockBuildingPreference()
-	settle, ok, err := LastToSettleAt(vmHooks(), time.Now().Add(-params.Tau), parent)
+	settle, ok, err := LastToSettleAt(time.Now().Add(-params.Tau), parent)
 	if err != nil {
 		// Due to a malformed input to block verification.
 		return // err
@@ -47,9 +45,8 @@ func ExampleRange() {
 	_ = Range(settle, parent)
 }
 
-// blockBuildingPreference and vmHooks exist only to allow examples to build.
+// blockBuildingPreference exists only to allow examples to build.
 func blockBuildingPreference() *Block { return nil }
-func vmHooks() hook.Points            { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
 	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
@@ -366,7 +363,7 @@ func TestLastToSettleAt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			settleAt := time.Unix(int64(tt.settleAt), 0) //#nosec G115 -- Hard-coded, non-overflowing values
-			got, gotOK, err := LastToSettleAt(hookstest.NewStub(0), settleAt, tt.parent)
+			got, gotOK, err := LastToSettleAt(settleAt, tt.parent)
 			if err != nil || gotOK != tt.wantOK {
 				t.Fatalf("LastToSettleAt(%d, [parent height %d]) got (_, %t, %v); want (_, %t, nil)", tt.settleAt, tt.parent.Height(), gotOK, err, tt.wantOK)
 			}
