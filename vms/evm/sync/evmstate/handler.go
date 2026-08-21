@@ -6,7 +6,6 @@ package evmstate
 import (
 	"bytes"
 	"context"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -263,19 +262,7 @@ func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResp
 // fillFromSnapshot reads from the snapshot. done reports that the response
 // needs nothing further, the inverse of the more returned by [query.fillFromTrie].
 func (q *query) fillFromSnapshot(ctx context.Context) (done bool, _ error) {
-	snapCtx := ctx
-	if deadline, ok := ctx.Deadline(); ok {
-		// snapshotReadDeadlinePercent leaves enough deadline for a full trie
-		// iteration, which only an invalid snapshot range forces.
-		const snapshotReadDeadlinePercent = 75
-		budget := time.Until(deadline) * snapshotReadDeadlinePercent / 100
-
-		var cancel context.CancelFunc
-		snapCtx, cancel = context.WithTimeout(ctx, budget)
-		defer cancel()
-	}
-
-	snapKeys, snapVals := q.readFromSnapshot(snapCtx)
+	snapKeys, snapVals := q.readFromSnapshot(ctx)
 	if len(snapKeys) == 0 {
 		// Unavailable or empty here, use the trie.
 		return false, nil
