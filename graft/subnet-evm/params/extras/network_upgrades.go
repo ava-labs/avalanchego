@@ -237,7 +237,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 // Nil values are used to indicate optional upgrades.
 func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
-		SubnetEVMTimestamp: new(uint64(0)),
+		SubnetEVMTimestamp: new(uint64),
 		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM

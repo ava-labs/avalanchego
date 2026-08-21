@@ -225,7 +225,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			getConfig: func() *params.ChainConfig {
 				config := params.Copy(params.TestChainConfig)
 				params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
-					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(new(uint64(0)), []common.Address{addr}, nil, nil),
+					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(new(uint64), []common.Address{addr}, nil, nil),
 				}
 				return &config
 			},

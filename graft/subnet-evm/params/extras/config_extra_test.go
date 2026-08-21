@@ -28,7 +28,7 @@ func TestIsTimestampForked(t *testing.T) {
 			isForked: false,
 		},
 		"zero fork at genesis": {
-			fork:     new(uint64(0)),
+			fork:     new(uint64),
 			block:    0,
 			isForked: true,
 		},
@@ -70,7 +70,7 @@ func TestIsForkTransition(t *testing.T) {
 			transitioned: false,
 		},
 		"activate at genesis": {
-			fork:         new(uint64(0)),
+			fork:         new(uint64),
 			parent:       nil,
 			current:      0,
 			transitioned: true,

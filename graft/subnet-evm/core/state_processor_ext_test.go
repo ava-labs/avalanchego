@@ -49,10 +49,10 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig: params.DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: new(uint64(0)),
+					SubnetEVMTimestamp: new(uint64),
 				},
 				GenesisPrecompiles: extras.Precompiles{
-					txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64(0)), nil, nil, nil),
+					txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64), nil, nil, nil),
 				},
 			},
 		)

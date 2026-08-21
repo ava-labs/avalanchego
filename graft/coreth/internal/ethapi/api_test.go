@@ -795,8 +795,8 @@ func TestEstimateGas(t *testing.T) {
 func TestCall(t *testing.T) {
 	// Enable BLOBHASH opcode in Cancun
 	cfg := *params.TestChainConfig
-	cfg.ShanghaiTime = new(uint64(0))
-	cfg.CancunTime = new(uint64(0))
+	cfg.ShanghaiTime = new(uint64)
+	cfg.CancunTime = new(uint64)
 	t.Parallel()
 	// Initialize test accounts
 	var (

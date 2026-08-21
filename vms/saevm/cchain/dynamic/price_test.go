@@ -30,13 +30,13 @@ const priceMaxDiff = 80_063_993_375_475
 
 var priceTowardCases = []towardCase[PriceExponent]{
 	{name: "nil_unchanged", current: 1 << 40, want: 1 << 40},
-	{name: "no_change", current: 0, desired: new(PriceExponent(0)), want: 0},
+	{name: "no_change", current: 0, desired: new(PriceExponent), want: 0},
 	{name: "increase_within_cap", current: 1000, desired: new(PriceExponent(2000)), want: 2000},
 	{name: "decrease_within_cap", current: 2000, desired: new(PriceExponent(1000)), want: 1000},
 	{name: "increase_at_cap", current: 0, desired: new(PriceExponent(priceMaxDiff)), want: priceMaxDiff},
-	{name: "decrease_at_cap", current: priceMaxDiff, desired: new(PriceExponent(0)), want: 0},
+	{name: "decrease_at_cap", current: priceMaxDiff, desired: new(PriceExponent), want: 0},
 	{name: "increase_capped", current: 0, desired: new(PriceExponent(priceMaxDiff + 1)), want: priceMaxDiff},
-	{name: "decrease_capped", current: 2 * priceMaxDiff, desired: new(PriceExponent(0)), want: priceMaxDiff},
+	{name: "decrease_capped", current: 2 * priceMaxDiff, desired: new(PriceExponent), want: priceMaxDiff},
 }
 
 func TestPrice(t *testing.T) {

@@ -68,7 +68,7 @@ func TestParseConfig(t *testing.T) {
 			// field, which is no vote.
 			name: "block_building/min_price_target_explicit_zero",
 			json: `{"min-price-target":0}`,
-			want: with(func(c *config) { c.PriceTarget = new(gas.Price(0)) }),
+			want: with(func(c *config) { c.PriceTarget = new(gas.Price) }),
 		},
 		{
 			name: "block_building/gas_target",

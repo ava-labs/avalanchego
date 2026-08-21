@@ -47,27 +47,27 @@ var (
 	}
 
 	TestSubnetEVMChainConfig = copyAndSet(TestPreSubnetEVMChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.SubnetEVMTimestamp = new(uint64(0))
+		c.NetworkUpgrades.SubnetEVMTimestamp = new(uint64)
 	})
 
 	TestDurangoChainConfig = copyAndSet(TestSubnetEVMChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.DurangoTimestamp = new(uint64(0))
+		c.NetworkUpgrades.DurangoTimestamp = new(uint64)
 	})
 
 	TestEtnaChainConfig = copyAndSet(TestDurangoChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.EtnaTimestamp = new(uint64(0))
+		c.NetworkUpgrades.EtnaTimestamp = new(uint64)
 	})
 
 	TestFortunaChainConfig = copyAndSet(TestEtnaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.FortunaTimestamp = new(uint64(0))
+		c.NetworkUpgrades.FortunaTimestamp = new(uint64)
 	})
 
 	TestGraniteChainConfig = copyAndSet(TestFortunaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.GraniteTimestamp = new(uint64(0))
+		c.NetworkUpgrades.GraniteTimestamp = new(uint64)
 	})
 
 	TestHeliconChainConfig = copyAndSet(TestGraniteChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.HeliconTimestamp = new(uint64(0))
+		c.NetworkUpgrades.HeliconTimestamp = new(uint64)
 	})
 
 	TestChainConfig = copyConfig(TestHeliconChainConfig)
@@ -125,7 +125,7 @@ func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, he
 		// Return an error to prevent the chain from starting, just in case.
 		return ethparams.NewTimestampCompatError(
 			fmt.Sprintf("ChainConfig.Hooks() is not of the expected type *extras.ChainConfig, got %T", newConfig.Hooks()),
-			new(uint64(0)),
+			new(uint64),
 			nil,
 		)
 	}

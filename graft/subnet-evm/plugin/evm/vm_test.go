@@ -1753,7 +1753,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64(0)), testEthAddrs[0:1], nil, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64), testEthAddrs[0:1], nil, nil),
 	}
 	durangoTime := time.Now().Add(10 * time.Hour)
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTime)
@@ -1896,7 +1896,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64(0)), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
+		txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
 	}
 
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2048,7 +2048,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(new(uint64(0)), testEthAddrs[0:1], nil, nil, nil),
+		feemanager.ConfigKey: feemanager.NewConfig(new(uint64), testEthAddrs[0:1], nil, nil, nil),
 	}
 
 	// set a lower fee config now
@@ -2264,7 +2264,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(new(uint64(0)), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(new(uint64), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = true // enable this in genesis to test if this is recognized by the reward manager
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2408,7 +2408,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(new(uint64(0)), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(new(uint64), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
@@ -3564,7 +3564,7 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        new(uint64(0)),
+			desiredMinDelay:        new(uint64),
 			expectedMinDelayExcess: new(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}

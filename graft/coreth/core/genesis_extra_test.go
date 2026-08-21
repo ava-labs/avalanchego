@@ -67,8 +67,8 @@ func TestGenesisEthUpgrades(t *testing.T) {
 		},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp: new(uint64(0)),
-				ApricotPhase2BlockTimestamp: new(uint64(0)),
+				ApricotPhase1BlockTimestamp: new(uint64),
+				ApricotPhase2BlockTimestamp: new(uint64),
 			},
 		},
 	)

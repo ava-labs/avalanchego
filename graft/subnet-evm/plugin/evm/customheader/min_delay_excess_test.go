@@ -105,7 +105,7 @@ func TestMinDelayExcess(t *testing.T) {
 			header: &types.Header{
 				Time: 1001,
 			},
-			desiredMinDelayExcess: new(acp226.DelayExcess(0)),
+			desiredMinDelayExcess: new(acp226.DelayExcess),
 			expectedDelayExcess:   new(acp226.DelayExcess(500 - acp226.MaxDelayExcessDiff)),
 		},
 	}

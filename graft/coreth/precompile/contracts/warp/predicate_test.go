@@ -248,7 +248,7 @@ func createValidPredicateTest(
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
 	return precompiletest.PredicateTest{
-		Config: NewDefaultConfig(new(uint64(0))),
+		Config: NewDefaultConfig(new(uint64)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -333,7 +333,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	}
 
 	test := precompiletest.PredicateTest{
-		Config: NewConfig(new(uint64(0)), 0, requirePrimaryNetworkSigners),
+		Config: NewConfig(new(uint64), 0, requirePrimaryNetworkSigners),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -364,7 +364,7 @@ func TestInvalidPredicatePacking(t *testing.T) {
 	pred = append(pred, common.Hash{1}) // Invalidate the predicate byte packing
 
 	test := precompiletest.PredicateTest{
-		Config: NewDefaultConfig(new(uint64(0))),
+		Config: NewDefaultConfig(new(uint64)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -396,7 +396,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 	pred := predicate.New(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
-		Config: NewDefaultConfig(new(uint64(0))),
+		Config: NewDefaultConfig(new(uint64)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -441,7 +441,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	pred := predicate.New(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
-		Config: NewDefaultConfig(new(uint64(0))),
+		Config: NewDefaultConfig(new(uint64)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -487,7 +487,7 @@ func TestInvalidBitSet(t *testing.T) {
 	})
 	pred := predicate.New(msg.Bytes())
 	test := precompiletest.PredicateTest{
-		Config: NewDefaultConfig(new(uint64(0))),
+		Config: NewDefaultConfig(new(uint64)),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -535,7 +535,7 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 
 		tests[i] = precompiletest.PredicateTest{
 			Name:   fmt.Sprintf("default quorum %d signature(s)", numSigners),
-			Config: NewDefaultConfig(new(uint64(0))),
+			Config: NewDefaultConfig(new(uint64)),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
 				ProposerVMBlockCtx: &block.Context{
@@ -595,7 +595,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 
 			tests = append(tests, precompiletest.PredicateTest{
 				Name:   fmt.Sprintf("multiple predicates %v", validMessageIndices),
-				Config: NewDefaultConfig(new(uint64(0))),
+				Config: NewDefaultConfig(new(uint64)),
 				PredicateContext: &precompileconfig.PredicateContext{
 					SnowCtx: snowCtx,
 					ProposerVMBlockCtx: &block.Context{
@@ -647,7 +647,7 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 
 		tests[i] = precompiletest.PredicateTest{
 			Name:   fmt.Sprintf("non-default quorum %d signature(s)", numSigners),
-			Config: NewConfig(new(uint64(0)), uint64(nonDefaultQuorumNumerator), false),
+			Config: NewConfig(new(uint64), uint64(nonDefaultQuorumNumerator), false),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
 				ProposerVMBlockCtx: &block.Context{
@@ -667,7 +667,7 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 
 func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	var (
-		config            = NewConfig(new(uint64(0)), 0, false)
+		config            = NewConfig(new(uint64), 0, false)
 		proposervmContext = &block.Context{
 			PChainHeight: 1,
 		}

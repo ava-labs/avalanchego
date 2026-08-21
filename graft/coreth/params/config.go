@@ -95,8 +95,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
-			CancunTime:          new(uint64(0)),
+			ShanghaiTime:        new(uint64),
+			CancunTime:          new(uint64),
 		},
 		extras.TestChainConfig,
 	)
@@ -332,7 +332,7 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
+			ShanghaiTime:        new(uint64),
 		},
 		extras.TestDurangoChainConfig,
 	)
@@ -353,8 +353,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
-			CancunTime:          new(uint64(0)),
+			ShanghaiTime:        new(uint64),
+			CancunTime:          new(uint64),
 		},
 		extras.TestEtnaChainConfig,
 	)
@@ -375,8 +375,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
-			CancunTime:          new(uint64(0)),
+			ShanghaiTime:        new(uint64),
+			CancunTime:          new(uint64),
 		},
 		extras.TestFortunaChainConfig,
 	)
@@ -397,8 +397,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
-			CancunTime:          new(uint64(0)),
+			ShanghaiTime:        new(uint64),
+			CancunTime:          new(uint64),
 		},
 		extras.TestGraniteChainConfig,
 	)
@@ -419,8 +419,8 @@ func initialiseChainConfigs() {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        new(uint64(0)),
-			CancunTime:          new(uint64(0)),
+			ShanghaiTime:        new(uint64),
+			CancunTime:          new(uint64),
 		},
 		extras.TestHeliconChainConfig,
 	)

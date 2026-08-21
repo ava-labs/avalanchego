@@ -124,7 +124,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
-				StoredTime:   new(uint64(0)),
+				StoredTime:   new(uint64),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
 				RewindToTime: 0,
 			},
@@ -136,7 +136,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
-				StoredTime:   new(uint64(0)),
+				StoredTime:   new(uint64),
 				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
 				RewindToTime: 0,
 			},
@@ -188,7 +188,7 @@ func TestConfigUnmarshalJSON(t *testing.T) {
 		})
 
 	testContractNativeMinterConfig := nativeminter.NewConfig(
-		new(uint64(0)),
+		new(uint64),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
 		nil,
 		nil,
@@ -248,7 +248,7 @@ func TestActivePrecompiles(t *testing.T) {
 			UpgradeConfig: extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						Config: nativeminter.NewConfig(new(uint64(0)), nil, nil, nil, nil), // enable at genesis
+						Config: nativeminter.NewConfig(new(uint64), nil, nil, nil, nil), // enable at genesis
 					},
 					{
 						Config: nativeminter.NewDisableConfig(new(uint64(1))), // disable at timestamp 1
@@ -284,8 +284,8 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 				FeeConfig:          DefaultFeeConfig,
 				AllowFeeRecipients: false,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: new(uint64(0)),
-					DurangoTimestamp:   new(uint64(0)),
+					SubnetEVMTimestamp: new(uint64),
+					DurangoTimestamp:   new(uint64),
 				},
 				GenesisPrecompiles: extras.Precompiles{},
 			},

@@ -296,7 +296,7 @@ func TestRewardManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := rewardmanager.NewConfig(new(uint64(0)), []common.Address{adminAddress}, nil, nil, tc.initialRewardConfig)
+			cfg := rewardmanager.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil, tc.initialRewardConfig)
 			backend := utilstest.NewBackendWithPrecompile(t, cfg, []common.Address{adminAddress, unprivilegedAddress}, tc.backendOpts...)
 			defer backend.Close()
 
@@ -391,7 +391,7 @@ func TestIRewardManager_Events(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			backend := utilstest.NewBackendWithPrecompile(t, rewardmanager.NewConfig(new(uint64(0)), []common.Address{adminAddress}, nil, nil, nil), []common.Address{adminAddress, unprivilegedAddress})
+			backend := utilstest.NewBackendWithPrecompile(t, rewardmanager.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil, nil), []common.Address{adminAddress, unprivilegedAddress})
 			defer backend.Close()
 
 			rewardManager, err := rewardmanagerbindings.NewIRewardManager(rewardmanager.ContractAddress, backend.Client())
@@ -403,7 +403,7 @@ func TestIRewardManager_Events(t *testing.T) {
 }
 
 func TestIAllowList_Events(t *testing.T) {
-	precompileCfg := rewardmanager.NewConfig(new(uint64(0)), []common.Address{adminAddress}, nil, nil, nil)
+	precompileCfg := rewardmanager.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil, nil)
 	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 	allowlisttest.RunAllowListEventTests(t, precompileCfg, rewardmanager.ContractAddress, admin, adminAddress)
 }

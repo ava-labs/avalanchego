@@ -53,7 +53,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 		{
 			name: "upgrade block timestamp is zero",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: new(uint64(0)), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: errStateUpgradeTimestampZero,
 		},

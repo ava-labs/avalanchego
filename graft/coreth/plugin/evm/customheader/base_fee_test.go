@@ -429,7 +429,7 @@ func TestBaseFee(t *testing.T) {
 		{
 			name: "granite_first_block_after_fortuna",
 			upgrades: extras.NetworkUpgrades{
-				FortunaTimestamp: new(uint64(0)),
+				FortunaTimestamp: new(uint64),
 				GraniteTimestamp: new(uint64(1)),
 			},
 			parent: &types.Header{

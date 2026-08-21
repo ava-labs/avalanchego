@@ -59,7 +59,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 5: at the end",
 			completed:       1000,
 			timestamp:       now.Add(1 * time.Second),
-			expectedEta:     new(time.Duration(0)),
+			expectedEta:     new(time.Duration),
 			expectedPercent: 100.0,
 		},
 		{
@@ -67,7 +67,7 @@ func TestEtaTracker(t *testing.T) {
 			name:            "sample 6: past the end",
 			completed:       2000,
 			timestamp:       now.Add(1 * time.Second),
-			expectedEta:     new(time.Duration(0)),
+			expectedEta:     new(time.Duration),
 			expectedPercent: 100.0,
 		},
 		{

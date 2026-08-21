@@ -41,7 +41,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewDisableConfig(new(uint64(0))),
+					Config: txallowlist.NewDisableConfig(new(uint64)),
 				},
 			},
 		},

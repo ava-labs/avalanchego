@@ -1176,7 +1176,7 @@ func TestEthSigningAPIs(t *testing.T) {
 		Gas:      new(hexutil.Uint64(params.TxGas)),
 		GasPrice: hexBig(1),
 		Value:    hexBig(100),
-		Nonce:    new(hexutil.Uint64(0)),
+		Nonce:    new(hexutil.Uint64),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{

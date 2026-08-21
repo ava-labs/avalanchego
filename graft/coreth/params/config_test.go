@@ -118,7 +118,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   new(uint64(0)),
+				StoredTime:   new(uint64),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -130,7 +130,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   new(uint64(0)),
+				StoredTime:   new(uint64),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},

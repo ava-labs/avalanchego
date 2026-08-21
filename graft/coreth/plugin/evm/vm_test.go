@@ -84,8 +84,8 @@ var (
 
 	activateCancun = func(cfg *params.ChainConfig) *params.ChainConfig {
 		cpy := *cfg
-		cpy.ShanghaiTime = new(uint64(0))
-		cpy.CancunTime = new(uint64(0))
+		cpy.ShanghaiTime = new(uint64)
+		cpy.CancunTime = new(uint64)
 		return &cpy
 	}
 )
@@ -2110,7 +2110,7 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        new(uint64(0)),
+			desiredMinDelay:        new(uint64),
 			expectedMinDelayExcess: new(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}

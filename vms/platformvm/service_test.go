@@ -968,7 +968,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		ValidationRewardOwner:  wantRewardOwner,
 		DelegationRewardOwner:  wantRewardOwner,
 		PotentialReward:        new(avajson.Uint64(potentialReward)),
-		AccruedDelegateeReward: new(avajson.Uint64(0)),
+		AccruedDelegateeReward: new(avajson.Uint64),
 		DelegationFee:          avajson.Float32(100),
 		Uptime:                 new(avajson.Float32(100)),
 		Connected:              new(false),
@@ -984,8 +984,8 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			NextPeriod:               avajson.Uint64(periodSeconds),
 			AutoCompoundRewardShares: avajson.Uint32(autoCompoundRewardShares),
 		},
-		DelegatorCount:  new(avajson.Uint64(0)),
-		DelegatorWeight: new(avajson.Uint64(0)),
+		DelegatorCount:  new(avajson.Uint64),
+		DelegatorWeight: new(avajson.Uint64),
 		Delegators:      &[]pchainapi.PrimaryDelegator{},
 	}
 	require.Equal(wantValidator, gotValidator)

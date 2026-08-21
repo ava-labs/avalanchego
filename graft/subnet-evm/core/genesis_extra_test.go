@@ -80,7 +80,7 @@ func TestGenesisEthUpgrades(t *testing.T) {
 				MinBaseFee: big.NewInt(1),
 			},
 			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: new(uint64(0)),
+				SubnetEVMTimestamp: new(uint64),
 			},
 		},
 	)

@@ -93,7 +93,7 @@ func TestVerifyGasUsed(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				Time:    1,
@@ -205,12 +205,12 @@ func TestVerifyGasLimit(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				GasLimit: acp176.MinMaxPerSecond - 1,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			want: errInvalidGasLimit,
 		},
@@ -220,12 +220,12 @@ func TestVerifyGasLimit(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				GasLimit: acp176.MinMaxCapacity,
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 		},
 		{
@@ -389,7 +389,7 @@ func TestGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			timestamp: 1000,
 			want:      acp176.MinMaxPerSecond,
@@ -400,7 +400,7 @@ func TestGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			timestamp: 1500,
 			want:      acp176.MinMaxPerSecond * 3 / 2,
@@ -473,7 +473,7 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 			parent: customtypes.WithHeaderExtra(&types.Header{
 				Number: big.NewInt(0),
 			}, &customtypes.HeaderExtra{
-				TimeMilliseconds: new(uint64(0)),
+				TimeMilliseconds: new(uint64),
 			}),
 			header: customtypes.WithHeaderExtra(&types.Header{
 				Time:    1,
