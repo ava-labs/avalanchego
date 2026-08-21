@@ -53,13 +53,10 @@ type responder struct {
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
-	var cfg handlerConfig
-	options.ApplyTo(&cfg, opts...)
-
 	return &responder{
 		log:      log,
 		trieDB:   trieDB,
-		snapshot: cfg.snapshot,
+		snapshot: options.As(opts...).snapshot,
 		zeroKey:  make([]byte, trieKeyLength),
 	}
 }
