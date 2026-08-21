@@ -413,7 +413,7 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 
 // fillFromTrie iterates the trie from [query.nextKey] up to end (exclusive).
 // more reports keys past the response, the inverse of fillFromSnapshot's done.
-func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ error) {
+func (q *query) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.
 	nodeIt, err := q.trie.NodeIterator(q.nextKey())
@@ -423,18 +423,14 @@ func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ erro
 	it := trie.NewIterator(nodeIt)
 
 	for it.Next() {
-		if len(end) > 0 && bytes.Compare(it.Key, end) > 0 {
-			more = true
-			break
-		}
-		if q.atLimit() || ctx.Err() != nil {
-			more = true
-			break
+		afterEnd := len(end) > 0 && bytes.Compare(it.Key, end) > 0
+		if afterEnd || q.atLimit() || ctx.Err() != nil {
+			return true, it.Err
 		}
 		q.resp.Keys = append(q.resp.Keys, it.Key)
 		q.resp.Values = append(q.resp.Values, it.Value)
 	}
-	return more, it.Err
+	return false, it.Err
 }
 
 // nextKey returns where trie iteration resumes after the response.
