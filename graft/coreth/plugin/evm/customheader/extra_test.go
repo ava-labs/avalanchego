@@ -365,7 +365,7 @@ func TestExtraPrefix(t *testing.T) {
 					ExtDataGasUsed: big.NewInt(1),
 				},
 			),
-			desiredTargetExcess: (*gas.Gas)(new(uint64)),
+			desiredTargetExcess: new(gas.Gas),
 			want: (&acp176.State{
 				Gas: gas.State{
 					Capacity: 10_009_770,    // [acp176.MinMaxCapacity] * e^([acp176.MaxTargetExcessDiff] / [acp176.TargetConversion])
