@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 const (
@@ -33,7 +33,7 @@ var (
 var _ Metrics = (*metrics)(nil)
 
 type Block struct {
-	Block block.Block
+	Block platform.Block
 
 	GasConsumed gas.Gas
 	GasState    gas.State

@@ -17,12 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -32,11 +31,11 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	lastAcceptedID := ids.GenerateTestID()
 
-	blk, err := block.NewApricotProposalBlock(
+	blk, err := platform.NewApricotProposalBlock(
 		lastAcceptedID,
 		1,
-		&txs.Tx{
-			Unsigned: &txs.AddDelegatorTx{
+		&platform.Tx{
+			Unsigned: &platform.AddDelegatorTx{
 				// Without the line below, this function will error.
 				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
@@ -99,11 +98,11 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		validators: manager,
 	}
 
-	blk, err := block.NewApricotAtomicBlock(
+	blk, err := platform.NewApricotAtomicBlock(
 		parentID,
 		1,
-		&txs.Tx{
-			Unsigned: &txs.AddDelegatorTx{
+		&platform.Tx{
+			Unsigned: &platform.AddDelegatorTx{
 				// Without the line below, this function will error.
 				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
@@ -178,13 +177,13 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		validators: manager,
 	}
 
-	blk, err := block.NewBanffStandardBlock(
+	blk, err := platform.NewBanffStandardBlock(
 		clk.Time(),
 		parentID,
 		1,
-		[]*txs.Tx{
+		[]*platform.Tx{
 			{
-				Unsigned: &txs.AddDelegatorTx{
+				Unsigned: &platform.AddDelegatorTx{
 					// Without the line below, this function will error.
 					DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 				},
@@ -266,7 +265,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		validators: manager,
 	}
 
-	blk, err := block.NewApricotCommitBlock(parentID, 1 /*height*/)
+	blk, err := platform.NewApricotCommitBlock(parentID, 1 /*height*/)
 	require.NoError(err)
 
 	err = acceptor.ApricotCommitBlock(blk)
@@ -279,7 +278,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.NoError(err)
 	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
-	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{
@@ -374,7 +373,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		validators: manager,
 	}
 
-	blk, err := block.NewApricotAbortBlock(parentID, 1 /*height*/)
+	blk, err := platform.NewApricotAbortBlock(parentID, 1 /*height*/)
 	require.NoError(err)
 
 	err = acceptor.ApricotAbortBlock(blk)
@@ -387,7 +386,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.NoError(err)
 	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
-	parentStatelessBlk := block.NewMockBlock(ctrl)
+	parentStatelessBlk := platform.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	parentState := &blockState{

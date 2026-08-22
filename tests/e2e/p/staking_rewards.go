@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -120,8 +120,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: alphaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -153,8 +153,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: betaNodeID,
 						End:    uint64(betaValidatorEndTime.Unix()),
 						Wght:   weight,
@@ -190,8 +190,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: alphaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -217,8 +217,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: betaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
