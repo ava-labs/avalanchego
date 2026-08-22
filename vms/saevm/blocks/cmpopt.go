@@ -36,6 +36,7 @@ func CmpOpt() cmp.Option {
 		cmputils.Blocks(),
 		cmputils.Headers(),
 		cmputils.LoadAtomicPointers[ancestry](),
+		cmputils.LoadAtomicPointers[Block](),
 		cmputils.LoadAtomicPointers[executionResults](),
 		cmp.Comparer((*executionResults).equalForTests),
 	}

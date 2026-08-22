@@ -70,8 +70,10 @@ func TestSettlementInvariants(t *testing.T) {
 		if diff := cmp.Diff(parent, b.ParentBlock(), CmpOpt()); diff != "" {
 			t.Errorf("ParentBlock() diff (-constructor arg +got):\n%s", diff)
 		}
-		if diff := cmp.Diff(lastSettled, b.LastSettled(), CmpOpt()); diff != "" {
-			t.Errorf("LastSettled() diff (-constructor arg +got):\n%s", diff)
+		for i := range 2 { // values are cached
+			if diff := cmp.Diff(lastSettled, b.LastSettled(), CmpOpt()); diff != "" {
+				t.Errorf("LastSettled() call %d of 2; diff (-constructor arg +got):\n%s", i, diff)
+			}
 		}
 		assert.NoError(t, b.CheckInvariants(Executed), "CheckInvariants(Executed)")
 	})
@@ -112,10 +114,7 @@ func TestSettlementInvariants(t *testing.T) {
 			},
 			{
 				Level: logging.Error,
-				// Although we were getting the last-settled block, this is
-				// accessed by traversing ancestry so the error occurs on the
-				// first iteration.
-				Msg: getParentOfSettledErrMsg,
+				Msg:   getSettledOfSettledErrMsg,
 			},
 			{
 				Level: logging.Error,

@@ -18,7 +18,8 @@ import (
 )
 
 type ancestry struct {
-	parent *Block
+	parent            *Block
+	cachedLastSettled atomic.Pointer[Block]
 }
 
 var (
@@ -94,12 +95,17 @@ func (b *Block) ancestor(ifSettledErrMsg string, get func(*ancestry) *Block) *Bl
 const (
 	getParentOfSettledErrMsg  = "Get parent of settled block"
 	getSettledOfSettledErrMsg = "Get last-settled of settled block"
+	getSettledOfTooOldErrMsg  = "Get last-settled of block older than last-accepted"
 )
 
 // ParentBlock returns the block's parent unless [Block.MarkSettled] has been
 // called, in which case it returns nil and logs an error.
 func (b *Block) ParentBlock() *Block {
-	return b.ancestor(getParentOfSettledErrMsg, func(a *ancestry) *Block {
+	return b.parentBlock(getParentOfSettledErrMsg)
+}
+
+func (b *Block) parentBlock(ifSettledErrMsg string) *Block {
+	return b.ancestor(ifSettledErrMsg, func(a *ancestry) *Block {
 		return a.parent
 	})
 }
@@ -109,16 +115,34 @@ func (b *Block) ParentBlock() *Block {
 // logs an error. Note that this value might not be distinct between contiguous
 // blocks. If the block is synchronous, LastSettled always returns b itself,
 // without logging.
+//
+// It is only valid to call LastSettled for the first time on b if it is
+// currently the last-accepted block. This is because the value is computed by
+// traversing the ancestral lineage, which might not be available for older
+// blocks. The value is, however, cached until the b itself is settled, so
+// repeated calls are allowed.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
 	}
 
+	a := b.ancestry.Load()
+	if a == nil {
+		b.log.Error(getSettledOfSettledErrMsg)
+		return nil
+	}
+	cache := &a.cachedLastSettled
+	if s := cache.Load(); s != nil {
+		return s
+	}
+
 	n := b.hooks.SettledBy(b.Header()).Height
-	for p := b.ParentBlock(); p != nil; p = p.ParentBlock() {
-		if p.Height() == n {
-			return p
+	for p := a.parent; p != nil; p = p.parentBlock(getSettledOfTooOldErrMsg) {
+		if p.Height() > n {
+			continue
 		}
+		cache.Store(p)
+		return p
 	}
 	return nil
 }
