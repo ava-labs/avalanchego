@@ -22,7 +22,6 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
@@ -248,9 +247,7 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.  If no execution results are found in
-// the [saetypes.ExecutionResults], they are instead inferred from the
-// block itself, and the block is marked as synchronous.
+// said function was originally called.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
@@ -259,14 +256,14 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 //
 // Any error returned corrupts the block's in-memory state.
 func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
-	e, err := loadExecutionResults(xdb, b.NumberU64())
-	if errors.Is(err, database.ErrNotFound) {
-		// TODO(JonathanOppenheimer): missing results result in us assuming
-		// "synchronous" here, so once state sync exist and the database can be
-		// pruned, this would result in async blocks being restored incorrectly.
-		// We can ask [hook.Synchronous] instead?
+	var (
+		e   *executionResults
+		err error
+	)
+	if b.Synchronous() {
 		e, err = b.synchronousExecutionResults()
-		b.synchronous = true
+	} else {
+		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
 	if err != nil {
 		return err

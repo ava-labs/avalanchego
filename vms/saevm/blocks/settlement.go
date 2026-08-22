@@ -77,8 +77,8 @@ func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether the block was marked as synchronous during
-// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
+// Synchronous reports whether the block is a pre-SAE, synchronously executed
+// block, as defined by [hook.Synchronous].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }

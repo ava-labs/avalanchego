@@ -75,17 +75,21 @@ func InMemoryBlockCount() int64 {
 
 // New constructs a new Block.
 //
-// While both the `parent` and `lastSettled` arguments MAY be nil, this will
-// result in an invalid Block as it breaks important invariants. In such
-// situations, [Block.CopyAncestorsFrom] MUST then be called before further use
-// of the Block. In practice, this SHOULD only be done when parsing an encoded
-// Block. The provided `hooks` MUST NOT be nil.
+// The [types.Block] MUST carry all information pertaining to the last-settled
+// block of the one being constructed, such that it can be extracted with the
+// [hook.Points].
+//
+// While the `parent` argument MAY be nil, this will result in an invalid Block
+// as it breaks important invariants. In such situations, [Block.SetAncestors]
+// or [Block.CopyAncestorsFrom] MUST then be called before further use of the
+// Block. In practice, this SHOULD only be done when parsing an encoded Block.
 func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
-		b:        eth,
-		executed: make(chan struct{}),
-		settled:  make(chan struct{}),
-		hooks:    hooks,
+		b:           eth,
+		synchronous: hook.Synchronous(hooks, eth.Header()),
+		executed:    make(chan struct{}),
+		settled:     make(chan struct{}),
+		hooks:       hooks,
 		log: log.With(
 			zap.Uint64("block_height", eth.NumberU64()),
 			zap.Stringer("block_hash", eth.Hash()),
