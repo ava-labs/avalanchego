@@ -2172,7 +2172,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			err: txs.ErrNilTx,
+			err: avax.ErrNilTx,
 		},
 		{
 			name: "max stake duration too large",

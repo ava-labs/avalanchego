@@ -38,7 +38,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : unsigned tx is nil
 	err = addDelegatorTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilTx)
+	require.ErrorIs(err, avax.ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{

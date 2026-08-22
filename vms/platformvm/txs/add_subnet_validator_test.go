@@ -37,7 +37,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : unsigned tx is nil
 	err = addSubnetValidatorTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilTx)
+	require.ErrorIs(err, avax.ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}

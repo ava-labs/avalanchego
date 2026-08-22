@@ -18,8 +18,6 @@ import (
 var (
 	_ UnsignedTx = (*BaseTx)(nil)
 
-	ErrNilTx = errors.New("tx is nil")
-
 	errOutputsNotSorted      = errors.New("outputs not sorted")
 	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
 )
@@ -72,7 +70,7 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}

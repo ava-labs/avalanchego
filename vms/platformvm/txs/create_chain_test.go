@@ -42,7 +42,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			setup: func(*CreateChainTx) *CreateChainTx {
 				return nil
 			},
-			expectedErr: ErrNilTx,
+			expectedErr: avax.ErrNilTx,
 		},
 		{
 			description: "vm ID is empty",

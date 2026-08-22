@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -53,7 +54,7 @@ type CreateChainTx struct {
 func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.SubnetID == constants.PrimaryNetworkID:

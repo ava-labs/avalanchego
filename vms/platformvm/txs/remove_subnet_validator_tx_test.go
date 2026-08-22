@@ -559,7 +559,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
 				return nil
 			},
-			expectedErr: ErrNilTx,
+			expectedErr: avax.ErrNilTx,
 		},
 		{
 			name: "already verified",

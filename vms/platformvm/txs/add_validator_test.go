@@ -37,7 +37,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : unsigned tx is nil
 	err = addValidatorTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilTx)
+	require.ErrorIs(err, avax.ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	rewardAddress := preFundedKeys[0].Address()
