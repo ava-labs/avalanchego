@@ -38,4 +38,6 @@ jobs:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
       run_race_shuffle_unit_tests: true
+      # Run this daily validation without remote action or test results.
+      enable_remote_cache: false
     secrets: inherit

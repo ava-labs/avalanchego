@@ -658,8 +658,10 @@ The daily scheduled workflow runs full unit-test shards on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
 E2E smoke test on each platform. Scheduled unit tests use race detection and
 shuffled test order. They use `--nocache_test_results`. Thus, Bazel runs them
-again and does not use a cached random test result. Bazel can still use cached
-build actions.
+again and does not use a cached random test result.
+
+The scheduled workflow also disables the remote cache. This provides daily
+validation that does not depend on remote action or test results.
 
 The remote cache stores results from the cacheable pre-merge unit tests when
 CI provides the remote-cache URL and authorization header. This policy applies
@@ -691,9 +693,9 @@ settings:
 - `GOMODCACHE=...`
 
 The remote cache is separate from the GitHub Actions caches. Bazel reads it and
-writes to it during configured CI builds and tests. It stores action outputs and
-cacheable test results. Scheduled tests disable test-result caching, but they can
-still use cached build outputs.
+writes to it during configured pre-merge builds and tests. It stores action
+outputs and cacheable test results. The scheduled workflow does not read from or
+write to the remote cache.
 
 ### Cache key
 
@@ -716,7 +718,11 @@ That split is intentional:
 The remote cache does not use the GitHub Actions cache key. Bazel computes its
 remote keys from action inputs and build configuration. Platform and race
 configuration differences therefore produce different keys. CI configures this
-cache only when it receives both the remote URL and the authorization header.
+cache only when all these conditions are true:
+
+- the workflow enables the remote cache
+- CI provides the remote-cache URL
+- CI provides the authorization header
 
 ### Checked-in list of Bazel CI target patterns used to prepare the build dependency cache
 
@@ -775,7 +781,8 @@ preserve these invariants:
   by the Bazel CI reusable workflows
 - cache-prefetch behavior stays focused on external repositories and does not
   start depending on developer-specific workspace state
-- remote caching requires both the cache URL and the authorization header
+- remote caching requires the cache URL and the authorization header
+- the daily scheduled workflow disables remote caching
 - setup does not print the remote-cache authorization header
 
 Validate changes proportionally:
