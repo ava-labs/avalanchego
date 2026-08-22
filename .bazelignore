@@ -2,3 +2,4 @@
 .direnv
 .bazel/patches/build_files
 bazel-avalanchego
+tools/pgp-bridge
