@@ -1,0 +1,53 @@
+name: Add team items to project boards
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  route_team_items:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Determine author team membership
+        id: membership
+        env:
+          GH_TOKEN: ${{ secrets.TEAM_BOARDS_GH_PAT }}
+          AUTHOR: ${{ github.event.sender.login }}
+        run: |
+          is_active_member() {
+            [ "$(gh api "orgs/ava-labs/teams/$1/memberships/$AUTHOR" --jq .state 2>/dev/null)" = "active" ]
+          }
+          {
+            echo "avalanchego=$(is_active_member platform-avalanchego && echo true || echo false)"
+            echo "evm=$(is_active_member platform-evm && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Add to avalanchego board
+        if: steps.membership.outputs.avalanchego == 'true'
+        uses: actions/add-to-project@v2.0.0
+        with:
+          project-url: https://github.com/orgs/ava-labs/projects/23
+          github-token: ${{ secrets.TEAM_BOARDS_GH_PAT }}
+
+      - name: Add evm label
+        if: steps.membership.outputs.evm == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/$NUMBER/labels" -f "labels[]=evm"
+
+      - name: Add to EVM Team Board
+        if: steps.membership.outputs.evm == 'true'
+        uses: actions/add-to-project@v2.0.0
+        with:
+          project-url: https://github.com/orgs/ava-labs/projects/36
+          github-token: ${{ secrets.TEAM_BOARDS_GH_PAT }}
