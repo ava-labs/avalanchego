@@ -9,7 +9,7 @@ common --repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1
 common --repo_env=GOMODCACHE=${GO_MOD_CACHE_DIR}
 EOF
 
-if [[ -n "${BAZEL_REMOTE_CACHE_URL:-}" && -n "${BAZEL_REMOTE_CACHE_AUTH_HEADER:-}" ]]; then
+if [[ "${BAZEL_REMOTE_CACHE_ENABLED:-true}" == "true" && -n "${BAZEL_REMOTE_CACHE_URL:-}" && -n "${BAZEL_REMOTE_CACHE_AUTH_HEADER:-}" ]]; then
   cat >> "$HOME/.bazelrc" <<EOF
 # CI-only remote cache
 build --remote_cache=${BAZEL_REMOTE_CACHE_URL}
