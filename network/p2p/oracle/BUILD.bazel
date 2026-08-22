@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "oracle",
+    srcs = [
+        "errors.go",
+        "message.go",
+        "sidecar.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/oracle",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/hashing",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
