@@ -62,6 +62,7 @@ tasks:
     desc: Regenerate Bazel metadata for this source tree
     cmds:
       - task: bazel-gazelle-generate
+      - task: bazel-generate-unit-test-suites
       - task: bazel-fmt
       - task: bazel-generate-patches
       - task: bazel-sync-module-metadata
@@ -69,6 +70,10 @@ tasks:
   bazel-generate-patches:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
     cmd: '{{.NIX_RUN}} ./scripts/generate_bazel_patches.sh'
+
+  bazel-generate-unit-test-suites:
+    desc: Generate Bazel unit-test shard suites
+    cmd: '{{.NIX_RUN}} bazelisk run //tools/generate-bazel-unit-test-suites'
 
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
@@ -79,14 +84,6 @@ tasks:
     cmds:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
-
-  bazel-test:
-    desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //...'
-
-  bazel-test-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -106,17 +103,26 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
-  bazel-test-fast:
-    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
+  bazel-test-unit-all:
+    desc: Run all generated unit tests with Bazel (shuffle on, race on)
+    cmd: '{{.NIX_RUN}} bazelisk test //:unit_tests'
 
-  bazel-test-main:
-    desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+  # TODO(marun): Remove this task when bazel-test-unit-all uses the fast configuration.
+  bazel-test-unit-all-fast:
+    desc: Run all generated unit tests with Bazel (no race, no shuffle - faster local iteration)
+    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //:unit_tests'
 
-  bazel-test-subnet-evm:
+  bazel-test-unit-avalanchego:
+    desc: Run AvalancheGo unit tests with Bazel (excludes graft modules)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:avalanchego_unit_tests'
+
+  bazel-test-unit-coreth:
+    desc: Run coreth/evm unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:coreth_unit_tests'
+
+  bazel-test-unit-subnet-evm:
     desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //:subnet_evm_unit_tests'
 
   build:
     desc: Builds avalanchego
@@ -185,6 +191,12 @@ tasks:
     desc: Checks that generated patches are up-to-date (requires a clean working tree)
     cmds:
       - task: bazel-generate-patches
+      - task: check-clean-branch
+
+  check-bazel-generate-unit-test-suites:
+    desc: Checks that generated Bazel unit-test shard suites are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-unit-test-suites
       - task: check-clean-branch
 
   check-bazel-module-metadata:

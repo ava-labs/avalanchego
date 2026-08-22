@@ -27,6 +27,11 @@ if ! ./scripts/run_task.sh check-bazel-gazelle-generate; then
   exit 1
 fi
 
+if ! ./scripts/run_task.sh check-bazel-generate-unit-test-suites; then
+  print_help
+  exit 1
+fi
+
 if ! ./scripts/run_task.sh check-bazel-multiple-go-libraries; then
   exit 1
 fi
