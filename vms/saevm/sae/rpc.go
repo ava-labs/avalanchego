@@ -53,8 +53,8 @@ func (c chain) ResolvePendingToLastExecuted() bool {
 	return c.VM.config.RPCConfig.ResolvePendingToLastExecuted
 }
 
-func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return c.blockBuilder.new(eth, parent, lastSettled)
+func (c chain) NewBlock(eth *types.Block, parent *blocks.Block) (*blocks.Block, error) {
+	return c.blockBuilder.new(eth, parent)
 }
 
 func (c chain) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {

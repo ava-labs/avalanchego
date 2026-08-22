@@ -35,7 +35,7 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 		return nil, err
 	}
 
-	return vm.blockBuilder.new(b, nil, nil)
+	return vm.blockBuilder.new(b, nil)
 }
 
 // BuildBlock builds a new block, using the last block passed to
@@ -122,7 +122,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
-	if err := b.SetAncestors(parent, lastSettled); err != nil {
+	if err := b.SetAncestors(parent); err != nil {
 		return err
 	}
 

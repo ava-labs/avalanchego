@@ -60,7 +60,7 @@ func TestIntegration(t *testing.T) {
 	sdb, err := state.New(bc.Genesis().Root(), state.NewDatabase(db), nil)
 	require.NoError(t, err, "state.New(%T.Genesis().Root())", bc)
 
-	build := NewChainBuilder(NewBlock(t, bc.Genesis(), nil, nil))
+	build := NewChainBuilder(NewBlock(t, bc.Genesis(), nil))
 	dest := common.Address{'d', 'e', 's', 't'}
 	for i := range numBlocks {
 		// Genesis is block 0
