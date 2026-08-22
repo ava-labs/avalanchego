@@ -20,6 +20,7 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -111,6 +112,36 @@ func (e *Executor) processQueue() {
 
 var errFatal = errors.New("fatal execution error")
 
+const (
+	// triePrefetcherNamespace is the trie prefetcher's metrics namespace; it
+	// publishes statistics as `trie/prefetch/sae/*`.
+	triePrefetcherNamespace = "sae"
+	// triePrefetcherParallelism caps the trie prefetcher's concurrent disk
+	// reads.
+	triePrefetcherParallelism = 16
+)
+
+// A prefetchingOpener starts trie prefetching on each [state.StateDB] it
+// opens, making commit-time hashing cheaper.
+//
+// Reserved for the [Executor]: only [state.StateDB.Commit] and
+// [state.StateDB.StopPrefetcher] release the prefetcher's goroutines, so an
+// uncommitted [state.StateDB] leaks them.
+type prefetchingOpener struct {
+	saedb.StateDBOpener
+}
+
+func (o prefetchingOpener) StateDB(root common.Hash) (*state.StateDB, error) {
+	sdb, err := o.StateDBOpener.StateDB(root)
+	if err != nil {
+		return nil, err
+	}
+	// StartPrefetcher does nothing without a snapshot. Firewood runs without
+	// one, because prefetching wouldn't help it anyway.
+	sdb.StartPrefetcher(triePrefetcherNamespace, utils.WithConcurrentWorkers(triePrefetcherParallelism))
+	return sdb, nil
+}
+
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
@@ -123,10 +154,13 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
-	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	result, err := Execute(b, prefetchingOpener{e}, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
+	// Committing in [Executor.afterExecution] stops the prefetcher; this covers
+	// the paths that return before committing.
+	defer result.StateDB.StopPrefetcher()
 	return e.afterExecution(b, result)
 }
 
