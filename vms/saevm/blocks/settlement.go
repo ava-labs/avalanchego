@@ -119,8 +119,8 @@ func (b *Block) parentBlock(ifSettledErrMsg string) *Block {
 // It is only valid to call LastSettled for the first time on b if it is
 // currently the last-accepted block. This is because the value is computed by
 // traversing the ancestral lineage, which might not be available for older
-// blocks. The value is, however, cached until the b itself is settled, so
-// repeated calls are allowed.
+// blocks. The value is, however, cached until b itself is settled, so repeated
+// calls are allowed.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
@@ -148,12 +148,12 @@ func (b *Block) LastSettled() *Block {
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by
-// consensus. If `x` is the block height of the `b.ParentBlock().LastSettled()`
-// and `y` is the height of the `b.LastSettled()`, then Settles returns the
-// contiguous, half-open range (x,y] or an empty slice i.f.f. x==y. Every block
-// therefore returns a disjoint (and possibly empty) set of historical blocks.
+// consensus. If `x` is the block height of `b.ParentBlock().LastSettled()` and
+// `y` is the height of `b.LastSettled()`, then Settles returns the contiguous,
+// half-open range (x,y] or an empty slice i.f.f. x==y. Every block therefore
+// returns a disjoint (and possibly empty) set of historical blocks.
 //
-// It is not valid to call Settles after a call to [Block.MarkSettled] on either
+// It is not valid to call Settles if [Block.LastSettled] returns nil for either
 // b or its parent. If the block is synchronous, Settles always returns a
 // single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {
