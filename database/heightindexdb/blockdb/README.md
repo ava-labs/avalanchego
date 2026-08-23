@@ -141,7 +141,7 @@ BlockDB does not support concurrent access from multiple processes. It acquires 
 ```go
 import (
     "errors"
-    "github.com/ava-labs/avalanchego/x/blockdb"
+    "github.com/ava-labs/avalanchego/database/heightindexdb/blockdb"
 )
 
 config := blockdb.DefaultConfig().
