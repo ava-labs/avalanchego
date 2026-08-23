@@ -114,7 +114,7 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 	return blocks
 }
 
-func TestSetAncestors(t *testing.T) {
+func TestSetParent(t *testing.T) {
 	lastSettled := newBlock(t, newSynchronousEthBlock(t, 3, 0, nil), nil)
 	parent := newBlock(t, newEthBlock(t, 5, 5, nil, lastSettled), nil)
 	child := newEthBlock(t, 6, 6, parent.EthBlock(), lastSettled)
@@ -135,15 +135,15 @@ func TestSetAncestors(t *testing.T) {
 		t.FailNow()
 	}
 
-	require.NoError(t, dest.CopyAncestorsFrom(source), "CopyAncestorsFrom()")
+	require.NoError(t, dest.CopyParentFrom(source), "CopyParentFrom()")
 	if diff := cmp.Diff(source, dest, CmpOpt()); diff != "" {
-		t.Errorf("After %T.CopyAncestorsFrom(); diff (-want +got):\n%s", dest, diff)
+		t.Errorf("After %T.CopyParentFrom(); diff (-want +got):\n%s", dest, diff)
 	}
 
 	t.Run("incompatible_destination_block", func(t *testing.T) {
 		ethB := newEthBlock(t, source.Height(), source.BuildTime()+1 /*hash mismatch*/, parent.EthBlock(), lastSettled)
 		dest := newBlock(t, ethB, nil)
-		require.ErrorIs(t, dest.CopyAncestorsFrom(source), errHashMismatch)
+		require.ErrorIs(t, dest.CopyParentFrom(source), errHashMismatch)
 	})
 
 	t.Run("not_incrementing_height", func(t *testing.T) {

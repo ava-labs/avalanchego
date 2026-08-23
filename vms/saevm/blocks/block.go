@@ -80,8 +80,8 @@ func InMemoryBlockCount() int64 {
 // [hook.Points].
 //
 // While the `parent` argument MAY be nil, this will result in an invalid Block
-// as it breaks important invariants. In such situations, [Block.SetAncestors]
-// or [Block.CopyAncestorsFrom] MUST then be called before further use of the
+// as it breaks important invariants. In such situations, [Block.SetParent]
+// or [Block.CopyParentFrom] MUST then be called before further use of the
 // Block. In practice, this SHOULD only be done when parsing an encoded Block.
 func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
@@ -101,7 +101,7 @@ func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger)
 		inMemoryBlockCount.Add(-1)
 	}, struct{}{})
 
-	if err := b.SetAncestors(parent); err != nil {
+	if err := b.SetParent(parent); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -133,8 +133,8 @@ var (
 	errHashMismatch               = errors.New("block hash mismatch")
 )
 
-// SetAncestors sets the block's ancestry while enforcing invariants.
-func (b *Block) SetAncestors(parent *Block) error {
+// SetParent sets the block's parent while enforcing invariants.
+func (b *Block) SetParent(parent *Block) error {
 	if parent != nil {
 		if got, want := parent.Hash(), b.ParentHash(); got != want {
 			return fmt.Errorf("%w: constructing Block with parent hash %v; expecting %v", errParentHashMismatch, got, want)
@@ -149,19 +149,18 @@ func (b *Block) SetAncestors(parent *Block) error {
 	return nil
 }
 
-// CopyAncestorsFrom populates the [Block.ParentBlock] and [Block.LastSettled]
-// values, typically only required during database recovery or block
-// verification. The source block MUST have the same hash as b.
+// CopyParentFrom populates the [Block.ParentBlock] value, typically only
+// required during database recovery or block verification. The source block
+// MUST have the same hash as b.
 //
-// Although the individual ancestral blocks are shallow copied, calling
-// [Block.MarkSettled] on either the source or destination will NOT clear the
-// pointers of the other.
-func (b *Block) CopyAncestorsFrom(c *Block) error {
+// Although the parent is shallow copied, calling [Block.MarkSettled] on either
+// the source or destination will NOT clear the pointers of the other.
+func (b *Block) CopyParentFrom(c *Block) error {
 	if from, to := c.Hash(), b.Hash(); from != to {
 		return fmt.Errorf("%w: copying internals from block %#x to %#x", errHashMismatch, from, to)
 	}
 	a := c.ancestry.Load()
-	return b.SetAncestors(a.parent)
+	return b.SetParent(a.parent)
 }
 
 // Signer returns the transaction signer for the block.

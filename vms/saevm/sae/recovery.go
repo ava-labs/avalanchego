@@ -289,7 +289,7 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
-				if err := b.SetAncestors(parent); err != nil {
+				if err := b.SetParent(parent); err != nil {
 					return err
 				}
 				chain = append(chain, parent)

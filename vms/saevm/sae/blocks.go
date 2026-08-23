@@ -79,9 +79,9 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 	if err != nil {
 		return err
 	}
-	// Although this is also checked in [blocks.Block.CopyAncestorsFrom], it is
-	// key to the purpose of this method so included here to be defensive. It
-	// also provides a clearer failure message.
+	// Although this is also checked in [blocks.Block.CopyParentFrom], it is key
+	// to the purpose of this method so included here to be defensive. It also
+	// provides a clearer failure message.
 	if reH, verH := rebuilt.Hash(), b.Hash(); reH != verH {
 		vm.log().Debug("block verification failed",
 			zap.Reflect("block", b.Header()),
@@ -89,7 +89,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		)
 		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}
-	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
+	if err := b.CopyParentFrom(rebuilt); err != nil {
 		return err
 	}
 	b.SetWorstCaseBounds(rebuilt.WorstCaseBounds())
@@ -122,7 +122,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
-	if err := b.SetAncestors(parent); err != nil {
+	if err := b.SetParent(parent); err != nil {
 		return err
 	}
 
