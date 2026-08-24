@@ -368,10 +368,6 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ erro
 	return q.wholeTrie(trieHasMore), nil
 }
 
-// leafEncoder returns the trie-encoded value at an iterator's cursor. The
-// snapshot holds slim accounts where the trie holds full ones.
-type leafEncoder func() ([]byte, error)
-
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
 // are unvalidated, the caller range-proves them against the requested root.
 func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
@@ -380,7 +376,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		zap.Stringer("account", q.account),
 	)
 
-	it, leaf, err := q.snapshotLeaves()
+	it, err := q.newSnapshotIterator()
 	if err != nil {
 		log.Debug("snapshot read abandoned",
 			zap.String("reason", "iterator unavailable"),
@@ -397,7 +393,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		if bytes.Compare(k, q.endKey) > 0 || len(keys) >= q.limit {
 			break
 		}
-		v, err := leaf()
+		v, err := it.Value()
 		if err != nil {
 			log.Debug("snapshot read abandoned",
 				zap.String("reason", "leaf encoding failed"),
@@ -418,21 +414,36 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	return keys, vals
 }
 
-// snapshotLeaves opens a disk-layer iterator over the account trie, or over
-// the request's storage trie, with the function that trie-encodes its values.
+// iterator walks snapshot leaves. Value returns the trie-encoded value at the
+// cursor.
+type iterator interface {
+	snapshot.Iterator
+	Value() ([]byte, error)
+}
+
+type accountIterator struct{ snapshot.AccountIterator }
+type storageIterator struct{ snapshot.StorageIterator }
+
+func (it accountIterator) Value() ([]byte, error) { return types.FullAccountRLP(it.Account()) }
+func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
+
+// newSnapshotIterator returns an iterator over accounts, or over the requested
+// account's storage. The iterator serves some recent state, not necessarily
+// the state rooted at [query.rootHash].
 //
-// DiskRoot and the iterator are separate calls, so a concurrent flatten can
-// retire the root in between and fail the open.
-func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
+// If a nil error is returned, the iterator MUST be released.
+func (q *query) newSnapshotIterator() (iterator, error) {
+	// DiskRoot and grabbing the iterator are separate calls, so a concurrent
+	// snapshot flattening can retire the root in between and fail the open.
 	diskRoot := q.snapshot.DiskRoot()
 	seek := common.BytesToHash(q.startKey)
 
 	if q.isStorage {
 		it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
-		return it, func() ([]byte, error) { return it.Slot(), nil }, err
+		return storageIterator{it}, err
 	}
 	it, err := q.snapshot.AccountIterator(diskRoot, seek)
-	return it, func() ([]byte, error) { return types.FullAccountRLP(it.Account()) }, err
+	return accountIterator{it}, err
 }
 
 // fillFromTrie iterates the trie from [query.nextKey] up to end (inclusive).
