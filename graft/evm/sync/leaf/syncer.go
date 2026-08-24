@@ -66,9 +66,8 @@ func WithRequestSize(n uint16) Option {
 	})
 }
 
-// Syncer pulls tasks off a channel and fetches each one's leaves with a pool of
-// workers, handing every batch to the task, which is what reconstructs. Batches
-// are verified in the fetch path, not in the transport.
+// Syncer fetches each task's leaves with a pool of workers and hands every batch to
+// the task, which is what reconstructs. Batches arrive verified.
 type Syncer struct {
 	fetcher types.LeafFetcher
 	tasks   <-chan Task

@@ -31,10 +31,8 @@ const (
 
 var errRootMismatch = errors.New("reconstructed root does not match target")
 
-// stateTrie reconstructs one EVM trie (account or storage) from concurrently fetched
-// segments. Segments write verified leaves to the snapshot in any order, and the
-// snapshot is then re-read in key order to feed a single StackTrie. That indirection
-// is what lets out-of-order fetch still reconstruct in order.
+// stateTrie reconstructs one EVM trie from concurrently fetched segments. Leaves
+// land in the snapshot in any order, then feed a StackTrie re-read in key order.
 type stateTrie struct {
 	db      ethdb.KeyValueStore
 	root    common.Hash
@@ -263,9 +261,8 @@ func (t *stateTrie) createSegmentsIfNeeded(ctx context.Context, segment *stateSe
 	return t.createSegments(ctx)
 }
 
-// createSegments splits the prefix space into numSegments ranges, extends the first
-// segment to its range end, and queues the rest. Only one goroutine touches this trie
-// while it runs, so it needs no lock.
+// createSegments splits the prefix space, extends the first segment, and queues the
+// rest. One goroutine owns the trie while it runs, so it needs no lock.
 func (t *stateTrie) createSegments(ctx context.Context) error {
 	first := t.segments[0]
 

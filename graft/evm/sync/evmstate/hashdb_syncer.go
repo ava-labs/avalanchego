@@ -26,16 +26,14 @@ var (
 // CodeProducer is the producer side of the code sync. The engine owns the
 // queue's teardown, so this syncer only adds hashes and says when it is done.
 type CodeProducer interface {
-	// AddCode takes the code hashes discovered while syncing.
 	AddCode(hashes []common.Hash) error
 	// DoneAdding reports that no more hashes will be added. It must not block,
 	// because the consumer drains under the same context as this syncer.
 	DoneAdding()
 }
 
-// HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
-// first, then every storage trie it discovers, each split into concurrently fetched
-// segments. Contract code goes to a [code.Queue] drained alongside Sync.
+// HashDBSyncer reconstructs EVM state on the hashdb stack: the account trie, then
+// every storage trie it finds, each split into concurrently fetched segments.
 type HashDBSyncer struct {
 	log       logging.Logger
 	fetcher   types.LeafFetcher
@@ -55,11 +53,10 @@ type HashDBSyncer struct {
 }
 
 // NewHashDBSyncer returns a syncer for the account trie at root. codeQueue must
-// run concurrently with Sync.
+// drain concurrently with Sync.
 //
-// The caller must wipe the account and storage snapshots in db unless this run resumes
-// the root already persisted there. Leaves left behind count as resume progress, so
-// another root's leaves would fail the final root check on every attempt.
+// Unless this run resumes the root already in db, the caller must wipe its
+// snapshots. Stale leaves count as progress and fail the final root check.
 func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue CodeProducer) *HashDBSyncer {
 	return &HashDBSyncer{
 		log:       log,
@@ -72,14 +69,10 @@ func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Dat
 	}
 }
 
-// Name returns a human-readable name for logging.
 func (*HashDBSyncer) Name() string { return "EVM State Syncer" }
 
-// ID returns the stable identifier for deduplication and metrics.
 func (*HashDBSyncer) ID() string { return "state_evm_state_sync" }
 
-// Sync reconstructs the account trie, then every discovered storage trie, verifying
-// each root.
 func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	// Wipe stale markers so resume never builds on another target's progress.
 	if err := s.trieQueue.clearIfRootDoesNotMatch(s.root); err != nil {
@@ -128,11 +121,10 @@ func (s *HashDBSyncer) onSyncComplete() error {
 	return nil
 }
 
-// Finalize flushes in-progress snapshot writes after a failed or cancelled sync, so
-// the next run resumes instead of re-fetching. A no-op once the sync completed.
+// Finalize flushes in-progress snapshot writes so the next run resumes instead of
+// re-fetching. A no-op once the sync completed.
 //
-// Call it only after [HashDBSyncer.Sync] returns: it writes without synchronizing
-// against the workers.
+// Call it only after Sync returns, since it writes without taking any lock.
 func (s *HashDBSyncer) Finalize() error {
 	if s.completed.Load() || s.scheduler == nil {
 		return nil
@@ -140,9 +132,8 @@ func (s *HashDBSyncer) Finalize() error {
 	return s.scheduler.flush()
 }
 
-// onMainTrieDone runs when the account trie is verified. Only account leaves
-// carry code hashes, so it closes the code syncer's input and opens the gate
-// for storage tries.
+// onMainTrieDone runs when the account trie is verified. Only account leaves carry
+// code hashes, so this is where the code input closes and storage tries start.
 func (s *HashDBSyncer) onMainTrieDone(context.Context) error {
 	s.codeQueue.DoneAdding()
 
@@ -156,8 +147,7 @@ func (s *HashDBSyncer) onMainTrieDone(context.Context) error {
 	return nil
 }
 
-// storageTrieProducer waits for the account trie, then feeds every storage trie it
-// discovers to the scheduler.
+// storageTrieProducer feeds the scheduler every storage trie the account trie found.
 func (s *HashDBSyncer) storageTrieProducer(ctx context.Context) error {
 	select {
 	case <-s.mainTrieDone:
