@@ -371,23 +371,6 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ erro
 // snapshot holds slim accounts where the trie holds full ones.
 type leafEncoder func() ([]byte, error)
 
-// snapshotLeaves opens a disk-layer iterator over the account trie, or over
-// the request's storage trie, with the function that trie-encodes its values.
-//
-// DiskRoot and the iterator are separate calls, so a concurrent flatten can
-// retire the root in between and fail the open.
-func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
-	diskRoot := q.snapshot.DiskRoot()
-	seek := common.BytesToHash(q.startKey)
-
-	if q.isStorage {
-		it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
-		return it, func() ([]byte, error) { return it.Slot(), nil }, err
-	}
-	it, err := q.snapshot.AccountIterator(diskRoot, seek)
-	return it, func() ([]byte, error) { return types.FullAccountRLP(it.Account()) }, err
-}
-
 // abandonSnapshot gives up the fast path. A snapshot that never serves looks
 // exactly like no snapshot at all, so every way of getting here is reported.
 func (q *query) abandonSnapshot(reason string, err error) {
@@ -429,6 +412,23 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		return nil, nil
 	}
 	return keys, vals
+}
+
+// snapshotLeaves opens a disk-layer iterator over the account trie, or over
+// the request's storage trie, with the function that trie-encodes its values.
+//
+// DiskRoot and the iterator are separate calls, so a concurrent flatten can
+// retire the root in between and fail the open.
+func (q *query) snapshotLeaves() (snapshot.Iterator, leafEncoder, error) {
+	diskRoot := q.snapshot.DiskRoot()
+	seek := common.BytesToHash(q.startKey)
+
+	if q.isStorage {
+		it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
+		return it, func() ([]byte, error) { return it.Slot(), nil }, err
+	}
+	it, err := q.snapshot.AccountIterator(diskRoot, seek)
+	return it, func() ([]byte, error) { return types.FullAccountRLP(it.Account()) }, err
 }
 
 // fillFromTrie iterates the trie from [query.nextKey] up to end (inclusive).
