@@ -122,9 +122,8 @@ func NewStateFixture(t *testing.T, descs []AccountDesc) *StateFixture {
 	return f
 }
 
-// HashedKey returns the 32-byte trie key for the i-th entry. Keys are hashed so they
-// spread across the key space, matching real account and slot keys, which is what
-// makes prefix segmentation meaningful.
+// HashedKey returns the 32-byte trie key for the i-th entry. Hashing spreads them
+// across the key space like real keys, so prefix segmentation is meaningful.
 func HashedKey(i uint64) []byte {
 	var idx [8]byte
 	binary.BigEndian.PutUint64(idx[:], i)

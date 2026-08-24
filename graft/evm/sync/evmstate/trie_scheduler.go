@@ -65,9 +65,8 @@ func (s *trieScheduler) finishStorage(root common.Hash) {
 	s.slots <- struct{}{}
 }
 
-// closeWhenIdle waits for every started trie to finish, then closes the leaf.Task channel
-// so the workers exit. Reclaiming all slots proves no worker can still split a trie
-// into fresh segments. A cancelled ctx leaves it open, and the workers exit via ctx.
+// closeWhenIdle reclaims every slot, which proves no worker can still split a trie,
+// then closes the task channel. A cancelled ctx leaves it open for ctx to stop them.
 func (s *trieScheduler) closeWhenIdle(ctx context.Context) error {
 	for range cap(s.slots) {
 		select {
