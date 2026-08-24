@@ -83,6 +83,7 @@ func run() error {
 		keep        = flag.Bool("keep", false, "Leave the devnet running after the benchmark")
 		profileDir  = flag.String("profile-dir", "", "If set, nodes run subnet-evm's continuous CPU profiler (45s windows) writing here; use with -nodes 1")
 		stateScheme = flag.String("state-scheme", "hashdb", "State database scheme: hashdb or firewood")
+		blockGas    = flag.Uint64("block-gas", 20_000_000, "Block gas limit; the block builder's execution time budget. Keep blocks under ~0.5s of execution on multi-node devnets or validators race sibling variants")
 	)
 	flag.Parse()
 
@@ -111,7 +112,7 @@ func run() error {
 		recipients[i] = crypto.PubkeyToAddress(benchKey("recipient", i).PublicKey)
 	}
 
-	genesisBytes, err := chainGenesis(treasury, senders)
+	genesisBytes, err := chainGenesis(treasury, senders, *blockGas)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func run() error {
 				// Millisecond proposer timestamps; a 2s window budgets for the
 				// worst-case block build so validators do not propose
 				// competing sibling blocks.
-				"proposerWindowMilliseconds":    100,
+				"proposerWindowMilliseconds":    2000,
 				"proposerMillisecondTimestamps": true,
 			},
 			Chains: []*tmpnet.Chain{{
@@ -330,7 +331,7 @@ func chainConfig(profileDir, stateScheme string) string {
 // (200M gas blocks, flat 1 wei base fee, 25ms ACP-226 seed), the bench
 // precompile is active from genesis with the treasury as owner, and native
 // coin is allocated to every account that must pay for gas.
-func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]byte, error) {
+func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey, blockGas uint64) ([]byte, error) {
 	nativeBalance := "0xd3c21bcecceda1000000" // 10^24 wei
 	alloc := map[string]any{
 		crypto.PubkeyToAddress(treasury.PublicKey).Hex(): map[string]any{"balance": nativeBalance},
@@ -344,7 +345,7 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 			"graniteTimestamp":  0,
 			"initialMinDelayMS": 25,
 			"feeConfig": map[string]any{
-				"gasLimit":                 50_000_000,
+				"gasLimit":                 blockGas,
 				"targetBlockRate":          1,
 				"minBaseFee":               1,
 				"targetGas":                uint64(1<<64 - 1),
@@ -367,7 +368,7 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 		// blocks at 200 excess units per block.
 		"timestamp": fmt.Sprintf("0x%x", time.Now().Add(-time.Minute).Unix()),
 		"extraData":  "0x00",
-		"gasLimit":   "0x2faf080",
+		"gasLimit":   fmt.Sprintf("0x%x", blockGas),
 		"difficulty": "0x0",
 		"mixHash":    "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"coinbase":   "0x0000000000000000000000000000000000000000",
@@ -761,6 +762,9 @@ func senderLoop(
 			}
 		}
 	}
+	// Resubmit the stalled head of the window to EVERY node: under sibling
+	// variant races a tx can be dropped from one node's pool while another
+	// node's preferred chain needs it.
 	resubmitHead := func() {
 		raws := make([][]byte, 0, rpcBatch)
 		for n := minedNonce; n < nonce && len(raws) < rpcBatch; n++ {
@@ -768,7 +772,20 @@ func senderLoop(
 				raws = append(raws, raw)
 			}
 		}
-		sendRaws(raws)
+		if len(raws) == 0 {
+			return
+		}
+		for _, c := range cfg.clients {
+			elems := make([]rpc.BatchElem, len(raws))
+			for i, raw := range raws {
+				elems[i] = rpc.BatchElem{
+					Method: "eth_sendRawTransaction",
+					Args:   []any{hexutil.Encode(raw)},
+					Result: new(common.Hash),
+				}
+			}
+			_ = c.BatchCallContext(ctx, elems)
+		}
 	}
 
 	lastProgress := time.Now()
