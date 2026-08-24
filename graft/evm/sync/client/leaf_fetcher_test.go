@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
 var errStub = errors.New("network down")
@@ -38,10 +38,10 @@ func TestLeafFetcher(t *testing.T) {
 		name     string
 		reqType  message.LeafsRequestType
 		nodeType message.NodeType
-		req      types.LeafRange
+		req      evmstate.LeafRange
 		resp     message.LeafsResponse
 		err      error
-		want     types.Leaves
+		want     evmstate.Leaves
 		wantMore bool
 		wantErr  error
 	}{
@@ -49,33 +49,33 @@ func TestLeafFetcher(t *testing.T) {
 			name:     "account_trie_subnet_evm",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req:      types.LeafRange{Root: root, Limit: 1024},
+			req:      evmstate.LeafRange{Root: root, Limit: 1024},
 		},
 		{
 			name:     "storage_trie_coreth",
 			reqType:  message.CorethLeafsRequestType,
 			nodeType: message.NodeType(2),
-			req:      types.LeafRange{Root: root, Account: account, Start: []byte{0x01}, End: []byte{0x02}, Limit: 16},
+			req:      evmstate.LeafRange{Root: root, Account: account, Start: []byte{0x01}, End: []byte{0x02}, Limit: 16},
 		},
 		{
 			name:     "proof_never_reaches_caller",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req:      types.LeafRange{Root: root, Limit: 8},
+			req:      evmstate.LeafRange{Root: root, Limit: 8},
 			resp: message.LeafsResponse{
 				Keys:      [][]byte{{0x01}, {0x02}},
 				Vals:      [][]byte{{0x0a}, {0x0b}},
 				More:      true,
 				ProofVals: [][]byte{{0xff}},
 			},
-			want:     types.Leaves{Keys: [][]byte{{0x01}, {0x02}}, Vals: [][]byte{{0x0a}, {0x0b}}},
+			want:     evmstate.Leaves{Keys: [][]byte{{0x01}, {0x02}}, Vals: [][]byte{{0x0a}, {0x0b}}},
 			wantMore: true,
 		},
 		{
 			name:     "client_error_propagates",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req:      types.LeafRange{Root: root, Limit: 8},
+			req:      evmstate.LeafRange{Root: root, Limit: 8},
 			err:      errStub,
 			wantErr:  errStub,
 		},

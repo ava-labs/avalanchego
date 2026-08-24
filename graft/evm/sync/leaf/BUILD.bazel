@@ -11,6 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/sync/types",
+        "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//libevm/options",
         "@org_golang_x_sync//errgroup",
@@ -24,6 +25,7 @@ graft_go_test(
     deps = [
         "//graft/evm/sync/synctest",
         "//graft/evm/sync/types",
+        "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	syncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
@@ -247,6 +248,6 @@ func (*syncerLeafTask) End() []byte                      { return nil }
 func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFinish() }
 func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }
 func (*syncerLeafTask) Account() common.Hash             { return common.Hash{} }
-func (a *syncerLeafTask) OnLeaves(ctx context.Context, leaves types.Leaves) error {
+func (a *syncerLeafTask) OnLeaves(ctx context.Context, leaves evmstate.Leaves) error {
 	return a.syncer.onLeafs(ctx, leaves.Keys, leaves.Vals)
 }

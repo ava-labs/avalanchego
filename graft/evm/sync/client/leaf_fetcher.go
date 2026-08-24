@@ -8,9 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
-
-var _ types.LeafFetcher = (*LeafFetcher)(nil)
 
 // LeafFetcher reads leaf ranges over the message protocol.
 //
@@ -26,17 +25,17 @@ func NewLeafFetcher(c types.LeafClient, reqType message.LeafsRequestType, nodeTy
 	return &LeafFetcher{client: c, reqType: reqType, nodeType: nodeType}
 }
 
-func (f *LeafFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
+func (f *LeafFetcher) FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
 	leafsReq, err := message.NewLeafsRequest(
 		f.reqType, req.Root, req.Account, req.Start, req.End, req.Limit, f.nodeType,
 	)
 	if err != nil {
-		return types.Leaves{}, false, err
+		return evmstate.Leaves{}, false, err
 	}
 
 	resp, err := f.client.GetLeafs(ctx, leafsReq)
 	if err != nil {
-		return types.Leaves{}, false, err
+		return evmstate.Leaves{}, false, err
 	}
-	return types.Leaves{Keys: resp.Keys, Vals: resp.Vals}, resp.More, nil
+	return evmstate.Leaves{Keys: resp.Keys, Vals: resp.Vals}, resp.More, nil
 }

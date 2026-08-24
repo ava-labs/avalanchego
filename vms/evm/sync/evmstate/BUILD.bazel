@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "client.go",
         "handler.go",
+        "leaves.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
     visibility = ["//visibility:public"],
@@ -18,8 +19,11 @@ go_library(
         "//vms/evm/sync/handlers",
         "//vms/evm/sync/network",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//ethdb/memorydb",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//trie",
@@ -30,7 +34,10 @@ go_library(
 
 go_test(
     name = "evmstate_test",
-    srcs = ["handler_test.go"],
+    srcs = [
+        "client_test.go",
+        "handler_test.go",
+    ],
     embed = [":evmstate"],
     deps = [
         "//ids",

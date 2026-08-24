@@ -13,14 +13,13 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/client/leafproto"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 
-	vmsevmstate "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
@@ -30,8 +29,8 @@ func ServeLeaves(t *testing.T, ctx context.Context, trieDB *triedb.Database) typ
 	t.Helper()
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, vmsevmstate.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
-	return leafproto.NewClient(log, vmsevmstate.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker))
+	require.NoError(t, evmstate.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength))
+	return evmstate.NewClient(log, net, p2p.EVMLeafRequestHandlerID, tracker)
 }
 
 // RecordLeaves is [ServeLeaves] with every range recorded.
@@ -45,14 +44,14 @@ type RecordingFetcher struct {
 	inner types.LeafFetcher
 
 	lock     sync.Mutex
-	requests []types.LeafRange
+	requests []evmstate.LeafRange
 }
 
 func NewRecordingFetcher(inner types.LeafFetcher) *RecordingFetcher {
 	return &RecordingFetcher{inner: inner}
 }
 
-func (r *RecordingFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
+func (r *RecordingFetcher) FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
 	r.lock.Lock()
 	r.requests = append(r.requests, req)
 	r.lock.Unlock()
@@ -60,10 +59,10 @@ func (r *RecordingFetcher) FetchLeaves(ctx context.Context, req types.LeafRange)
 }
 
 // Requests returns the ranges fetched so far, in arrival order.
-func (r *RecordingFetcher) Requests() []types.LeafRange {
+func (r *RecordingFetcher) Requests() []evmstate.LeafRange {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	return append([]types.LeafRange(nil), r.requests...)
+	return append([]evmstate.LeafRange(nil), r.requests...)
 }
 
 // CancelAfterFetcher cancels once the at-th range arrives, ending a sync that
@@ -80,7 +79,7 @@ func NewCancelAfterFetcher(inner types.LeafFetcher, at int, cancel context.Cance
 	return &CancelAfterFetcher{inner: inner, cancel: cancel, at: at}
 }
 
-func (c *CancelAfterFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
+func (c *CancelAfterFetcher) FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
 	if seen := int(c.seen.Add(1)); c.at > 0 && seen >= c.at {
 		c.cancel()
 	}

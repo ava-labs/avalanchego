@@ -13,7 +13,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/synctest",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/evm/sync/client/leafproto",
         "//graft/evm/sync/types",
         "//graft/evm/utils/utilstest",
         "//ids",

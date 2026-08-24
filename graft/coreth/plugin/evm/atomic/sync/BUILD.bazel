@@ -29,6 +29,7 @@ go_library(
         "//ids",
         "//snow/engine/snowman/block",
         "//utils/wrappers",
+        "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",

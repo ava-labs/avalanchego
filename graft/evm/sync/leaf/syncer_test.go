@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
 // recordingTask records the leaves handed to it.
@@ -26,7 +27,7 @@ func (*recordingTask) Account() common.Hash { return common.Hash{} }
 func (*recordingTask) Start() []byte        { return nil }
 func (*recordingTask) End() []byte          { return nil }
 
-func (r *recordingTask) OnLeaves(_ context.Context, leaves types.Leaves) error {
+func (r *recordingTask) OnLeaves(_ context.Context, leaves evmstate.Leaves) error {
 	r.keys = append(r.keys, leaves.Keys...)
 	return nil
 }
@@ -40,9 +41,9 @@ func (r *recordingTask) OnFinish(context.Context) error {
 // advance the range nowhere and loop forever.
 type moreWithoutKeysFetcher struct{ calls int }
 
-func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, types.LeafRange) (types.Leaves, bool, error) {
+func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, evmstate.LeafRange) (evmstate.Leaves, bool, error) {
 	f.calls++
-	return types.Leaves{}, true, nil
+	return evmstate.Leaves{}, true, nil
 }
 
 // runLeafTask drives one Task through a single worker.
@@ -111,9 +112,9 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 // limitFetcher records the Limit of every range it is asked for.
 type limitFetcher struct{ limits []uint16 }
 
-func (f *limitFetcher) FetchLeaves(_ context.Context, req types.LeafRange) (types.Leaves, bool, error) {
+func (f *limitFetcher) FetchLeaves(_ context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
 	f.limits = append(f.limits, req.Limit)
-	return types.Leaves{Keys: [][]byte{{1}}, Vals: [][]byte{{1}}}, false, nil
+	return evmstate.Leaves{Keys: [][]byte{{1}}, Vals: [][]byte{{1}}}, false, nil
 }
 
 func TestLeafFetch_RequestSize(t *testing.T) {
