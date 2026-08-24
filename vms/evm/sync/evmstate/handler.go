@@ -295,7 +295,7 @@ func (q *query) fillFromSnapshot() (bool, error) {
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
-	valid, more, err := q.isRangeValid(snapKeys, snapVals, false)
+	valid, more, err := q.isRangeValid(q.startKey, snapKeys, snapVals)
 	if err != nil {
 		return false, err
 	}
@@ -326,8 +326,16 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (bool, error) {
 	trieHasMore := true
 
 	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
+		// Without a gap the proof starts at nextKey, so the span back to the
+		// response is covered too.
+		var startKey []byte
+		if hasGap {
+			startKey = snapKeys[i]
+		} else {
+			startKey = q.nextKey()
+		}
 		end := min(i+snapshotSegmentLen, len(snapKeys))
-		valid, more, err := q.isRangeValid(snapKeys[i:end], snapVals[i:end], hasGap)
+		valid, more, err := q.isRangeValid(startKey, snapKeys[i:end], snapVals[i:end])
 		if err != nil {
 			return false, err
 		}
@@ -484,16 +492,9 @@ func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Datab
 	return proofDB, nil
 }
 
-// isRangeValid range-proves keys/vals against the trie. Without a gap the proof
-// starts at nextKey, so the span back to the response is covered too.
-func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (valid, more bool, _ error) {
-	var startKey []byte
-	if hasGap {
-		startKey = keys[0]
-	} else {
-		startKey = q.nextKey()
-	}
-
+// isRangeValid range-proves keys/vals against the trie from startKey. valid
+// reports the proof succeeded, more reports the trie holds leaves past keys.
+func (q *query) isRangeValid(startKey []byte, keys, vals [][]byte) (valid, more bool, _ error) {
 	proofDB, err := q.generateRangeProof(startKey, keys)
 	if err != nil {
 		return false, false, err
