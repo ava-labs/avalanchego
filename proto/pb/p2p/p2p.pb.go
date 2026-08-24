@@ -1978,7 +1978,7 @@ type PushQuery struct {
 	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	// Container being gossiped
 	Container []byte `protobuf:"bytes,4,opt,name=container,proto3" json:"container,omitempty"`
-	// Requesting peer's last accepted height
+	// Requesting peer's next preferred height (one above its current preference)
 	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -2062,7 +2062,7 @@ type PullQuery struct {
 	Deadline uint64 `protobuf:"varint,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	// Container id being gossiped
 	ContainerId []byte `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	// Requesting peer's last accepted height
+	// Requesting peer's next preferred height (one above its current preference)
 	RequestedHeight uint64 `protobuf:"varint,6,opt,name=requested_height,json=requestedHeight,proto3" json:"requested_height,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
