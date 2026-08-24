@@ -74,7 +74,7 @@ func TestSettlementInvariants(t *testing.T) {
 		if diff := cmp.Diff(lastSettled, b.LastSettled(), CmpOpt()); diff != "" {
 			t.Errorf("LastSettled() first ever call (i.e. computes value); diff (-constructor arg +got):\n%s", diff)
 		}
-		require.NoErrorf(t, b.ParentBlock().MarkSettled(&atomic.Pointer[Block]{}), "%T.ParentBlock().MarkSettled()")
+		require.NoErrorf(t, b.ParentBlock().MarkSettled(&atomic.Pointer[Block]{}), "%T.ParentBlock().MarkSettled()", b)
 		if diff := cmp.Diff(lastSettled, b.LastSettled(), CmpOpt()); diff != "" {
 			t.Errorf("LastSettled() with severed ancestry because parent settled (i.e. cached value); diff (-constructor arg +got):\n%s", diff)
 		}
