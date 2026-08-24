@@ -305,7 +305,7 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 			"graniteTimestamp":  0,
 			"initialMinDelayMS": 25,
 			"feeConfig": map[string]any{
-				"gasLimit":                 200_000_000,
+				"gasLimit":                 1_000_000_000,
 				"targetBlockRate":          1,
 				"minBaseFee":               1,
 				"targetGas":                uint64(1<<64 - 1),
@@ -323,7 +323,7 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 		"nonce":      "0x0",
 		"timestamp":  "0x0",
 		"extraData":  "0x00",
-		"gasLimit":   "0xbebc200",
+		"gasLimit":   "0x3b9aca00",
 		"difficulty": "0x0",
 		"mixHash":    "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"coinbase":   "0x0000000000000000000000000000000000000000",

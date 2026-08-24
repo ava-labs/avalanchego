@@ -15,6 +15,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"runtime"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -318,42 +320,68 @@ func batchTransfer(accessibleState contract.AccessibleState, _ common.Address, _
 	if len(records)%RecordLen != 0 {
 		return nil, remainingGas, fmt.Errorf("%w: %d", ErrBadRecordLen, len(records))
 	}
+	count := len(records) / RecordLen
+	if remainingGas, err = contract.DeductGas(remainingGas, uint64(count)*BatchPerTransferGasCost); err != nil {
+		return nil, 0, err
+	}
+
+	// Verify every signature concurrently before touching state. Signature
+	// checks read only the record bytes, so this is deterministic; it is also
+	// where native code beats the EVM, which has no way to use more than one
+	// core. State changes are applied serially below.
+	type record struct {
+		from, to common.Address
+		value    *big.Int
+		nonce    common.Hash
+	}
+	parsed := make([]record, count)
+	badSig := make([]bool, count)
+	var wg sync.WaitGroup
+	workers := min(runtime.NumCPU(), 8)
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(w int) {
+			defer wg.Done()
+			for i := w; i < count; i += workers {
+				raw := records[i*RecordLen : (i+1)*RecordLen]
+				from := common.BytesToAddress(raw[0:20])
+				to := common.BytesToAddress(raw[20:40])
+				value := new(big.Int).SetBytes(raw[40:72])
+				nonce := common.BytesToHash(raw[72:104])
+				parsed[i] = record{from: from, to: to, value: value, nonce: nonce}
+
+				sig := make([]byte, 65)
+				copy(sig, raw[105:169])
+				v := raw[104]
+				if v >= 27 {
+					v -= 27
+				}
+				sig[64] = v
+				pubKey, err := crypto.SigToPub(AuthDigest(from, to, value, nonce).Bytes(), sig)
+				badSig[i] = err != nil || crypto.PubkeyToAddress(*pubKey) != from
+			}
+		}(w)
+	}
+	wg.Wait()
+
 	stateDB := accessibleState.GetStateDB()
-	for offset := 0; offset < len(records); offset += RecordLen {
-		if remainingGas, err = contract.DeductGas(remainingGas, BatchPerTransferGasCost); err != nil {
-			return nil, 0, err
+	for i, rec := range parsed {
+		if badSig[i] {
+			return nil, remainingGas, fmt.Errorf("%w: record %d", ErrBadSignature, i)
 		}
-		record := records[offset : offset+RecordLen]
-		from := common.BytesToAddress(record[0:20])
-		to := common.BytesToAddress(record[20:40])
-		value := new(big.Int).SetBytes(record[40:72])
-		nonce := common.BytesToHash(record[72:104])
-
-		sig := make([]byte, 65)
-		copy(sig, record[105:169])
-		v := record[104]
-		if v >= 27 {
-			v -= 27
-		}
-		sig[64] = v
-		pubKey, err := crypto.SigToPub(AuthDigest(from, to, value, nonce).Bytes(), sig)
-		if err != nil || crypto.PubkeyToAddress(*pubKey) != from {
-			return nil, remainingGas, fmt.Errorf("%w: record at offset %d", ErrBadSignature, offset)
-		}
-
-		nonceSlot := authNonceSlot(from, nonce)
+		nonceSlot := authNonceSlot(rec.from, rec.nonce)
 		if stateDB.GetState(ContractAddress, nonceSlot) != (common.Hash{}) {
-			return nil, remainingGas, fmt.Errorf("%w: %s", ErrNonceUsed, nonce)
+			return nil, remainingGas, fmt.Errorf("%w: %s", ErrNonceUsed, rec.nonce)
 		}
 		stateDB.SetState(ContractAddress, nonceSlot, oneHash)
 
-		if err := checkGuards(stateDB, from, to); err != nil {
+		if err := checkGuards(stateDB, rec.from, rec.to); err != nil {
 			return nil, remainingGas, err
 		}
-		if err := moveBalance(stateDB, from, to, value); err != nil {
+		if err := moveBalance(stateDB, rec.from, rec.to, rec.value); err != nil {
 			return nil, remainingGas, err
 		}
-		addTransferLog(accessibleState, from, to, value)
+		addTransferLog(accessibleState, rec.from, rec.to, rec.value)
 	}
 	return []byte{}, remainingGas, nil
 }
