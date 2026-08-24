@@ -6,6 +6,7 @@ package trace
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -15,18 +16,66 @@ const (
 	HTTP
 )
 
-var (
-	errUnknownExporterType = errors.New("unknown exporter type")
-	errMissingQuotes       = errors.New("first and last characters should be quotes")
+const (
+	disabledStr = "disabled"
+	grpcStr     = "grpc"
+	httpStr     = "http"
 )
+
+// Standard OTel autoconfiguration variables, from
+// https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/.
+const (
+	tracesExporterKey     = "OTEL_TRACES_EXPORTER"
+	otlpProtocolKey       = "OTEL_EXPORTER_OTLP_PROTOCOL"
+	otlpTracesProtocolKey = "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"
+)
+
+var (
+	errUnknownExporterType       = errors.New("unknown exporter type")
+	errMissingQuotes             = errors.New("first and last characters should be quotes")
+	errUnsupportedTracesExporter = errors.New(`unsupported ` + tracesExporterKey + ` (only "otlp" and "none" are supported)`)
+	errUnsupportedOTLPProtocol   = errors.New(`unsupported OTLP protocol (only "grpc" and "http/protobuf" are supported)`)
+)
+
+// ExporterTypeFromEnv returns the [ExporterType] configured by the standard
+// OTel [tracesExporterKey] variable, resolving the OTLP transport from
+// [otlpTracesProtocolKey] or [otlpProtocolKey]. It returns [Disabled] when
+// [tracesExporterKey] is unset, keeping tracing opt-in.
+func ExporterTypeFromEnv() (ExporterType, error) {
+	exporter, ok := os.LookupEnv(tracesExporterKey)
+	if !ok {
+		return Disabled, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(exporter)) {
+	case "none":
+		return Disabled, nil
+	case "otlp":
+	default:
+		return 0, fmt.Errorf("%w: %q", errUnsupportedTracesExporter, exporter)
+	}
+
+	protocol := os.Getenv(otlpTracesProtocolKey)
+	if protocol == "" {
+		protocol = os.Getenv(otlpProtocolKey)
+	}
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case grpcStr:
+		return GRPC, nil
+	case "", "http/protobuf":
+		// http/protobuf is the default protocol recommended by the OTel spec.
+		return HTTP, nil
+	default:
+		return 0, fmt.Errorf("%w: %q", errUnsupportedOTLPProtocol, protocol)
+	}
+}
 
 func ExporterTypeFromString(exporterTypeStr string) (ExporterType, error) {
 	switch strings.ToLower(exporterTypeStr) {
-	case "disabled":
+	case disabledStr:
 		return Disabled, nil
-	case "grpc":
+	case grpcStr:
 		return GRPC, nil
-	case "http":
+	case httpStr:
 		return HTTP, nil
 	default:
 		return 0, fmt.Errorf("%w: %q", errUnknownExporterType, exporterTypeStr)
@@ -73,11 +122,11 @@ func (t ExporterType) String() string {
 func (t ExporterType) toString() (string, bool) {
 	switch t {
 	case Disabled:
-		return "disabled", true
+		return disabledStr, true
 	case GRPC:
-		return "grpc", true
+		return grpcStr, true
 	case HTTP:
-		return "http", true
+		return httpStr, true
 	default:
 		return "unknown", false
 	}

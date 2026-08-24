@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
@@ -1319,6 +1320,51 @@ func TestResolveConsensusMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
+		})
+	}
+}
+
+func TestGetTraceConfigOTelEnvFallback(t *testing.T) {
+	tests := []struct {
+		name         string
+		env          map[string]string
+		explicitFlag string
+		want         trace.ExporterType
+	}{
+		{
+			name: "disabled_by_default",
+			want: trace.Disabled,
+		},
+		{
+			name: "env_enables_when_flag_unset",
+			env: map[string]string{
+				"OTEL_TRACES_EXPORTER":        "otlp",
+				"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+			},
+			want: trace.GRPC,
+		},
+		{
+			name:         "explicit_flag_overrides_env",
+			env:          map[string]string{"OTEL_TRACES_EXPORTER": "otlp"},
+			explicitFlag: "disabled",
+			want:         trace.Disabled,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			v := setupViperFlags()
+			if tt.explicitFlag != "" {
+				v.Set(TracingExporterTypeKey, tt.explicitFlag)
+			}
+
+			got, err := getTraceConfig(v)
+			require.NoError(t, err, "getTraceConfig()")
+			require.Equal(t, tt.want, got.ExporterConfig.Type, "getTraceConfig() exporter type")
 		})
 	}
 }
