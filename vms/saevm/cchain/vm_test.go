@@ -908,7 +908,7 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 
 	var (
 		op       = balance.AddOverflow
-		absDelta = uint64(nAVAXDelta)
+		absDelta = uint64(nAVAXDelta) //#nosec G115 -- the branch below negates a negative delta, so the round-trip is intentional.
 	)
 	if nAVAXDelta < 0 {
 		op = balance.SubOverflow

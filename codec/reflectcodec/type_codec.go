@@ -116,7 +116,7 @@ func (c *genericCodec) size(
 		return wrappers.BoolLen, true, nil
 	case reflect.String:
 		return wrappers.StringLen(value.String()), false, nil
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if value.IsNil() {
 			return 0, false, codec.ErrMarshalNil
 		}
@@ -337,7 +337,7 @@ func (c *genericCodec) marshal(
 	case reflect.Bool:
 		p.PackBool(value.Bool())
 		return p.Err
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if value.IsNil() {
 			return codec.ErrMarshalNil
 		}
@@ -503,7 +503,7 @@ func (c *genericCodec) UnmarshalFrom(p *wrappers.Packer, dest interface{}) error
 	}
 
 	destPtr := reflect.ValueOf(dest)
-	if destPtr.Kind() != reflect.Ptr {
+	if destPtr.Kind() != reflect.Pointer {
 		return errNeedPointer
 	}
 	return c.unmarshal(p, destPtr.Elem(), nil /*=typeStack*/)
@@ -666,7 +666,7 @@ func (c *genericCodec) unmarshal(
 			}
 		}
 		return nil
-	case reflect.Ptr:
+	case reflect.Pointer:
 		// Get the type this pointer points to
 		t := value.Type().Elem()
 		// Create a new pointer to a new value of the underlying type
