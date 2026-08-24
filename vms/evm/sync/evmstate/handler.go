@@ -371,23 +371,20 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ erro
 // snapshot holds slim accounts where the trie holds full ones.
 type leafEncoder func() ([]byte, error)
 
-// abandonSnapshot gives up the fast path. A snapshot that never serves looks
-// exactly like no snapshot at all, so every way of getting here is reported.
-func (q *query) abandonSnapshot(reason string, err error) {
-	q.log.Debug("snapshot read abandoned, falling back to the trie",
-		zap.String("reason", reason),
-		zap.Bool("isStorage", q.isStorage),
-		zap.Stringer("account", q.account),
-		zap.Error(err),
-	)
-}
-
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
 // are unvalidated, the caller range-proves them against the requested root.
 func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
+	log := q.log.With(
+		zap.Bool("isStorage", q.isStorage),
+		zap.Stringer("account", q.account),
+	)
+
 	it, leaf, err := q.snapshotLeaves()
 	if err != nil {
-		q.abandonSnapshot("iterator unavailable", err)
+		log.Debug("snapshot read abandoned",
+			zap.String("reason", "iterator unavailable"),
+			zap.Error(err),
+		)
 		return nil, nil
 	}
 	defer it.Release()
@@ -401,14 +398,20 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		}
 		v, err := leaf()
 		if err != nil {
-			q.abandonSnapshot("leaf encoding failed", err)
+			log.Debug("snapshot read abandoned",
+				zap.String("reason", "leaf encoding failed"),
+				zap.Error(err),
+			)
 			return nil, nil
 		}
 		keys = append(keys, k)
 		vals = append(vals, v)
 	}
 	if err := it.Error(); err != nil {
-		q.abandonSnapshot("iteration failed", err)
+		log.Debug("snapshot read abandoned",
+			zap.String("reason", "iteration failed"),
+			zap.Error(err),
+		)
 		return nil, nil
 	}
 	return keys, vals
