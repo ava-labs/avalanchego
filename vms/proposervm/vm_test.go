@@ -240,7 +240,7 @@ func (vm *VM) waitForProposerWindow() error {
 	)
 	for {
 		now := vm.Clock.Time().Truncate(time.Second)
-		slot := proposer.TimeToSlot(parentTimestamp, now)
+		slot := proposer.TimeToSlot(parentTimestamp, now, vm.WindowDuration)
 		delay, err := vm.MinDelayForProposer(
 			ctx,
 			childBlockHeight,
@@ -2521,7 +2521,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		t.Context(),
 		statefulBlock.Height()+1,
 		statelessBlock.PChainHeight(),
-		proposer.TimeToSlot(parentTimestamp, currentTime),
+		proposer.TimeToSlot(parentTimestamp, currentTime, proVM.WindowDuration),
 		parentTimestamp,
 	)
 	require.NoError(err)
