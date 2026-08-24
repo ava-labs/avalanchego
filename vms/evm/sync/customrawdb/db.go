@@ -22,7 +22,16 @@ func ParseStateScheme(provided string, db ethdb.Database) (string, error) {
 	// Check for custom scheme
 	if provided == FirewoodScheme {
 		if diskScheme := rawdb.ReadStateScheme(db); diskScheme != "" {
-			// Valid scheme on db mismatched
+			// A chain whose head is still the genesis block has no history to
+			// misread, so allow switching it to Firewood; genesis state is
+			// re-committed by SetupGenesisBlock because the Firewood database
+			// does not have the genesis root. This covers tmpnet, which
+			// initializes a chain once with default config before restarting
+			// nodes with the real chain config.
+			headHash := rawdb.ReadHeadHeaderHash(db)
+			if number := rawdb.ReadHeaderNumber(db, headHash); number == nil || *number == 0 {
+				return FirewoodScheme, nil
+			}
 			return "", errStateSchemeConflict
 		}
 		// If no conflicting scheme is found, is valid.

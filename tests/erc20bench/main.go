@@ -16,6 +16,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
@@ -54,7 +55,7 @@ const (
 	gasPrice        = 1_000_000_000 // 1 gwei against a flat 1 wei base fee
 	transferGas     = 90_000
 	setupGas        = 3_000_000
-	maxInflight     = 2048 // per sender: issued nonces ahead of last mined; 64 senders stay under the 262144 pending-pool slots
+	maxInflight     = 64 // per sender: issued nonces ahead of last mined. The block builder waits for the txpool to finish reorging to each new head, and that reorg is O(pending), so the pending pool must stay shallow: 64 senders x 64 = ~4k pending, a few blocks of backlog
 	sendBatchSize   = 128  // eth_sendRawTransaction calls per JSON-RPC batch
 	warmupSeconds   = 5
 	oneToken        = 1 // amount moved per transfer
@@ -80,6 +81,8 @@ func run() error {
 		avagoPath   = flag.String("avalanchego", "build/avalanchego", "avalanchego binary (built by run.sh)")
 		pluginDir   = flag.String("plugin-dir", "build/plugins", "Plugin dir holding the subnet-evm binary (built by run.sh)")
 		keep        = flag.Bool("keep", false, "Leave the devnet running after the benchmark")
+		profileDir  = flag.String("profile-dir", "", "If set, nodes run subnet-evm's continuous CPU profiler (45s windows) writing here; use with -nodes 1")
+		stateScheme = flag.String("state-scheme", "hashdb", "State database scheme: hashdb or firewood")
 	)
 	flag.Parse()
 
@@ -126,20 +129,31 @@ func run() error {
 					"k":               *nodeCount,
 					"alphaPreference": *nodeCount/2 + 1,
 					"alphaConfidence": *nodeCount/2 + 1,
-					"beta":            8,
+					"beta":            4,
 				},
-				// Sub-second blocks, as in the delivery fleet: millisecond
-				// proposer timestamps plus a 100ms proposer window.
+				// Millisecond proposer timestamps; a 2s window budgets for the
+				// worst-case block build so validators do not propose
+				// competing sibling blocks.
 				"proposerWindowMilliseconds":    100,
 				"proposerMillisecondTimestamps": true,
 			},
 			Chains: []*tmpnet.Chain{{
 				VMID:    constants.SubnetEVMID,
 				Genesis: genesisBytes,
-				Config:  chainConfigJSON,
+				Config:  chainConfig(*profileDir, *stateScheme),
 			}},
 			ValidatorIDs: tmpnet.NodesToIDs(nodes...),
 		}},
+		// Multi-MB blocks queue behind the default bandwidth throttler; give
+		// the local devnet enough headroom that gossip is never the limiter.
+		DefaultFlags: tmpnet.FlagsMap{
+			"log-level":                                  cmp.Or(os.Getenv("ERC20BENCH_LOG_LEVEL"), "info"),
+			"consensus-frontier-poll-frequency":          "10ms",
+			"throttler-inbound-bandwidth-refill-rate":    "67108864",
+			"throttler-inbound-bandwidth-max-burst-size": "134217728",
+			"throttler-outbound-at-large-alloc-size":     "134217728",
+			"throttler-outbound-node-max-at-large-bytes": "67108864",
+		},
 		DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
 			Process: &tmpnet.ProcessRuntimeConfig{
 				AvalancheGoPath: absAvago,
@@ -281,11 +295,36 @@ const chainConfigJSON = `{
 	"tx-pool-global-slots": 262144,
 	"tx-pool-account-queue": 131072,
 	"tx-pool-global-queue": 512000,
-	"tx-pool-lifetime": "1m",
+	"tx-pool-lifetime": "10m",
 	"trie-clean-cache": 512,
 	"trie-dirty-cache": 512,
 	"snapshot-cache": 512
 }`
+
+// chainConfig returns chainConfigJSON, optionally with subnet-evm's
+// continuous CPU profiler enabled (it runs in the plugin process, which the
+// avalanchego admin profiler cannot see).
+func chainConfig(profileDir, stateScheme string) string {
+	cfg := map[string]any{}
+	if err := json.Unmarshal([]byte(chainConfigJSON), &cfg); err != nil {
+		panic(err)
+	}
+	if profileDir != "" {
+		cfg["continuous-profiler-dir"] = profileDir
+		cfg["continuous-profiler-frequency"] = "45s"
+		cfg["continuous-profiler-max-files"] = 20
+	}
+	if stateScheme != "hashdb" {
+		cfg["state-scheme"] = stateScheme
+		// Firewood has no iterator support, so the snapshot layer must be off.
+		cfg["snapshot-cache"] = 0
+	}
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
+}
 
 // chainGenesis produces the L1 genesis: gas can never be the bottleneck
 // (200M gas blocks, flat 1 wei base fee, 25ms ACP-226 seed), the bench
@@ -305,7 +344,7 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 			"graniteTimestamp":  0,
 			"initialMinDelayMS": 25,
 			"feeConfig": map[string]any{
-				"gasLimit":                 1_000_000_000,
+				"gasLimit":                 50_000_000,
 				"targetBlockRate":          1,
 				"minBaseFee":               1,
 				"targetGas":                uint64(1<<64 - 1),
@@ -319,11 +358,16 @@ func chainGenesis(treasury *ecdsa.PrivateKey, senders []*ecdsa.PrivateKey) ([]by
 				"owner":          crypto.PubkeyToAddress(treasury.PublicKey).Hex(),
 			},
 		},
-		"alloc":      alloc,
-		"nonce":      "0x0",
-		"timestamp":  "0x0",
+		"alloc": alloc,
+		"nonce": "0x0",
+		// Granite must be active AT the genesis timestamp or the
+		// initialMinDelayMS seed is skipped (IsGranite(genesisTime) is false
+		// for a 1970 genesis even on local networks) and the chain starts at
+		// the ~2000ms ACP-226 default, converging to 25ms only after ~23k
+		// blocks at 200 excess units per block.
+		"timestamp": fmt.Sprintf("0x%x", time.Now().Add(-time.Minute).Unix()),
 		"extraData":  "0x00",
-		"gasLimit":   "0x3b9aca00",
+		"gasLimit":   "0x2faf080",
 		"difficulty": "0x0",
 		"mixHash":    "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"coinbase":   "0x0000000000000000000000000000000000000000",
@@ -620,7 +664,7 @@ func senderLoop(
 	inflight := uint64(maxInflight)
 	rpcBatch := sendBatchSize
 	if level == 3 {
-		inflight = max(2048/uint64(len(cfg.senders)), 32)
+		inflight = max(1024/uint64(len(cfg.senders)), 4)
 		rpcBatch = max(sendBatchSize/8, 8)
 	}
 

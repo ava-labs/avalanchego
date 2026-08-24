@@ -302,6 +302,39 @@ func setBlocklisted(accessibleState contract.AccessibleState, caller common.Addr
 	return []byte{}, remainingGas, nil
 }
 
+// sigCache memoizes signature recovery by digest. Every batch record is
+// executed at least twice per node (block build, then block verify), and
+// ecrecover is the largest CPU item in the profile; the recovery of a fixed
+// (digest, sig) pair is a pure function, so caching it is deterministic.
+var sigCache = struct {
+	mu sync.RWMutex
+	m  map[common.Hash]common.Address
+}{m: make(map[common.Hash]common.Address, 1<<20)}
+
+// checkAuthSig reports whether sig over digest recovers to from, consulting
+// the cache first. Only successful recoveries are cached.
+func checkAuthSig(digest common.Hash, sig []byte, from common.Address) bool {
+	key := crypto.Keccak256Hash(digest.Bytes(), sig)
+	sigCache.mu.RLock()
+	cached, ok := sigCache.m[key]
+	sigCache.mu.RUnlock()
+	if ok {
+		return cached == from
+	}
+	pubKey, err := crypto.SigToPub(digest.Bytes(), sig)
+	if err != nil {
+		return false
+	}
+	recovered := crypto.PubkeyToAddress(*pubKey)
+	sigCache.mu.Lock()
+	if len(sigCache.m) >= 1<<21 {
+		sigCache.m = make(map[common.Hash]common.Address, 1<<20)
+	}
+	sigCache.m[key] = recovered
+	sigCache.mu.Unlock()
+	return recovered == from
+}
+
 // batchTransfer applies a batch of EIP-712-signed transfer authorizations.
 // Anyone may submit the batch (the relayer pays gas); authority comes from
 // each record's signature. Any invalid record fails the whole call.
@@ -357,14 +390,42 @@ func batchTransfer(accessibleState contract.AccessibleState, _ common.Address, _
 					v -= 27
 				}
 				sig[64] = v
-				pubKey, err := crypto.SigToPub(AuthDigest(from, to, value, nonce).Bytes(), sig)
-				badSig[i] = err != nil || crypto.PubkeyToAddress(*pubKey) != from
+				badSig[i] = !checkAuthSig(AuthDigest(from, to, value, nonce), sig, from)
 			}
 		}(w)
 	}
 	wg.Wait()
 
+	// Apply state changes with per-batch caching: the pause switch is read
+	// once, each address's blocklist flag is read once, and each address's
+	// balance is read and written once with the batch's net delta. A transfer
+	// that overdraws mid-batch but nets out is accepted; with per-batch
+	// balance dedup only the net position is checkable, which is fine for a
+	// settlement batch.
 	stateDB := accessibleState.GetStateDB()
+	if stateDB.GetState(ContractAddress, pausedSlot) != (common.Hash{}) {
+		return nil, remainingGas, ErrPaused
+	}
+	blocked := map[common.Address]bool{}
+	isBlocked := func(addr common.Address) bool {
+		if cached, ok := blocked[addr]; ok {
+			return cached
+		}
+		result := stateDB.GetState(ContractAddress, blockedSlot(addr)) != (common.Hash{})
+		blocked[addr] = result
+		return result
+	}
+	deltas := map[common.Address]*big.Int{}
+	order := make([]common.Address, 0, 2*len(parsed))
+	addDelta := func(addr common.Address, amount *big.Int) {
+		delta, ok := deltas[addr]
+		if !ok {
+			delta = new(big.Int)
+			deltas[addr] = delta
+			order = append(order, addr)
+		}
+		delta.Add(delta, amount)
+	}
 	for i, rec := range parsed {
 		if badSig[i] {
 			return nil, remainingGas, fmt.Errorf("%w: record %d", ErrBadSignature, i)
@@ -375,13 +436,25 @@ func batchTransfer(accessibleState contract.AccessibleState, _ common.Address, _
 		}
 		stateDB.SetState(ContractAddress, nonceSlot, oneHash)
 
-		if err := checkGuards(stateDB, rec.from, rec.to); err != nil {
-			return nil, remainingGas, err
+		if isBlocked(rec.from) || isBlocked(rec.to) {
+			return nil, remainingGas, fmt.Errorf("%w: record %d", ErrBlocklisted, i)
 		}
-		if err := moveBalance(stateDB, rec.from, rec.to, rec.value); err != nil {
-			return nil, remainingGas, err
-		}
+		addDelta(rec.from, new(big.Int).Neg(rec.value))
+		addDelta(rec.to, rec.value)
 		addTransferLog(accessibleState, rec.from, rec.to, rec.value)
+	}
+	// order preserves first-touch order, so iteration is deterministic.
+	for _, addr := range order {
+		delta := deltas[addr]
+		if delta.Sign() == 0 {
+			continue
+		}
+		balance := getBalance(stateDB, addr)
+		balance.Add(balance, delta)
+		if balance.Sign() < 0 {
+			return nil, remainingGas, fmt.Errorf("%w: %s nets to %s", ErrInsufficient, addr, balance)
+		}
+		stateDB.SetState(ContractAddress, balanceSlot(addr), common.BigToHash(balance))
 	}
 	return []byte{}, remainingGas, nil
 }
