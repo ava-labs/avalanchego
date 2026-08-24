@@ -31,9 +31,9 @@ var (
 // queue's teardown, so this syncer only adds hashes and declares when it is done.
 type codeProducer interface {
 	codeEnqueuer
-	// CloseInput reports that no more hashes will be added. It must not block,
+	// DoneAdding reports that no more hashes will be added. It must not block,
 	// because the consumer drains under the same context as this syncer.
-	CloseInput()
+	DoneAdding()
 }
 
 // HashDBSyncer reconstructs an EVM state trie on the hashdb stack: the account trie
@@ -153,7 +153,7 @@ func (s *HashDBSyncer) Finalize() error {
 // carry code hashes, so it closes the code syncer's input and opens the gate
 // for storage tries.
 func (s *HashDBSyncer) onMainTrieDone(context.Context) error {
-	s.codeQueue.CloseInput()
+	s.codeQueue.DoneAdding()
 
 	remaining, err := s.trieQueue.countTries()
 	if err != nil {

@@ -24,12 +24,10 @@ type LeafRange struct {
 type Leaves struct {
 	Keys [][]byte
 	Vals [][]byte
-	// More reports whether leaves remain to the right of the last key.
-	More bool
 }
 
 // LeafFetcher reads leaf ranges from the network. Implementations own range
 // proof verification, so a caller never sees an unproven range.
 type LeafFetcher interface {
-	FetchLeaves(ctx context.Context, req LeafRange) (Leaves, error)
+	FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, error)
 }

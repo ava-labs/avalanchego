@@ -95,7 +95,7 @@ func TestCodeQueue(t *testing.T) {
 
 			// AddCode is non-blocking, safe to call on main goroutine.
 			for _, add := range tt.addCode {
-				require.NoError(t, q.AddCode(t.Context(), add))
+				require.NoError(t, q.AddCode(add))
 			}
 
 			// Consumer runs in background, collects values.
@@ -104,7 +104,7 @@ func TestCodeQueue(t *testing.T) {
 			if tt.shutdownInsteadOfFinalize {
 				q.Shutdown()
 				<-got.done
-				err := q.AddCode(t.Context(), tt.addCodeAfter)
+				err := q.AddCode(tt.addCodeAfter)
 				require.ErrorIs(t, err, ErrQueueClosed)
 			} else {
 				require.NoError(t, q.Finalize())
@@ -154,7 +154,7 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 	hashes := makeHashes(numHashes)
 
 	// AddCode returns immediately despite capacity=1.
-	require.NoError(t, q.AddCode(t.Context(), hashes))
+	require.NoError(t, q.AddCode(hashes))
 
 	// Consumer in background, Finalize on main goroutine.
 	got := drainAsync(q.CodeHashes())
@@ -173,7 +173,7 @@ func TestShutdownUnblocksGoroutines(t *testing.T) {
 	require.NoError(t, err)
 
 	// Goroutines will block on send because capacity=1 and no consumer.
-	require.NoError(t, q.AddCode(t.Context(), makeHashes(100)))
+	require.NoError(t, q.AddCode(makeHashes(100)))
 
 	q.Shutdown()
 
@@ -185,7 +185,7 @@ func TestShutdownUnblocksGoroutines(t *testing.T) {
 	require.NoError(t, q.Finalize())
 
 	// AddCode after Shutdown must return ErrQueueClosed.
-	err = q.AddCode(t.Context(), []common.Hash{{}})
+	err = q.AddCode([]common.Hash{{}})
 	require.ErrorIs(t, err, ErrQueueClosed)
 }
 
@@ -217,7 +217,7 @@ func TestShutdownAndAddCodeRace(t *testing.T) {
 				ready.Done()
 				<-start
 				// May succeed or return ErrQueueClosed depending on timing.
-				_ = q.AddCode(t.Context(), []common.Hash{{}})
+				_ = q.AddCode([]common.Hash{{}})
 				return nil
 			})
 
@@ -248,7 +248,7 @@ func TestConcurrentAddCodeAndConsume(t *testing.T) {
 			for j := range hashes {
 				hashes[j] = crypto.Keccak256Hash([]byte{byte(i), byte(j)})
 			}
-			return q.AddCode(t.Context(), hashes)
+			return q.AddCode(hashes)
 		})
 	}
 

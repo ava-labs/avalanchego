@@ -52,7 +52,7 @@ func NewRecordingFetcher(inner types.LeafFetcher) *RecordingFetcher {
 	return &RecordingFetcher{inner: inner}
 }
 
-func (r *RecordingFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, error) {
+func (r *RecordingFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
 	r.lock.Lock()
 	r.requests = append(r.requests, req)
 	r.lock.Unlock()
@@ -80,7 +80,7 @@ func NewCancelAfterFetcher(inner types.LeafFetcher, at int, cancel context.Cance
 	return &CancelAfterFetcher{inner: inner, cancel: cancel, at: at}
 }
 
-func (c *CancelAfterFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, error) {
+func (c *CancelAfterFetcher) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
 	if seen := int(c.seen.Add(1)); c.at > 0 && seen >= c.at {
 		c.cancel()
 	}
