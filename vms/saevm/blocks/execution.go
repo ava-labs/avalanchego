@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -259,14 +258,14 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // SHOULD consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if errors.Is(err, database.ErrNotFound) {
 		// TODO(JonathanOppenheimer): missing results result in us assuming
 		// "synchronous" here, so once state sync exist and the database can be
 		// pruned, this would result in async blocks being restored incorrectly.
 		// We can ask [hook.Synchronous] instead?
-		e, err = b.synchronousExecutionResults(hooks)
+		e, err = b.synchronousExecutionResults()
 		b.synchronous = true
 	}
 	if err != nil {
@@ -292,10 +291,10 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // synchronous block. Unlike asynchronously executed blocks, synchronous blocks
 // do not persist their execution results in the [saetypes.ExecutionResults]
 // database, thus they are extracted from the header.
-func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
+func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
 	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
-	execTime, err := b.synchronousGasTime(hooks)
+	execTime, err := b.synchronousGasTime()
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +304,7 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 		byGas:         *execTime.Clone(),
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
-		// receipts are populated in [Block.restoreExecutionArtefacts], which
+		// receipts are populated in [Block.RestoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
 	e.baseFee.SetUint64(b.headerBaseFee())
@@ -315,11 +314,10 @@ func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResult
 // synchronousGasTime derives the gas time of a synchronous block, which has no
 // predecessor clock to advance. Inverting the base fee only approximates the
 // excess.
-func (b *Block) synchronousGasTime(hooks hook.Points) (*gastime.Time, error) {
-	hdr := b.Header()
-	target, cfg := hooks.GasConfigAfter(hdr)
+func (b *Block) synchronousGasTime() (*gastime.Time, error) {
+	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
-		hooks.BlockTime(hdr),
+		b.PreciseTime(),
 		target,
 		gas.Price(b.headerBaseFee()),
 		cfg,

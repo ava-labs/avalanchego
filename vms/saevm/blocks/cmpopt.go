@@ -22,6 +22,7 @@ func CmpOpt() cmp.Option {
 		cmpopts.IgnoreFields(
 			Block{},
 			"bounds",
+			"hooks",
 			"interimExecutionTime",
 		),
 		cmputils.IfIn[Block](cmputils.NilSlicesAreEmpty[types.Transactions]()),
