@@ -75,9 +75,17 @@ type handlerConfig struct {
 type HandlerOption = options.Option[handlerConfig]
 
 // WithSnapshot serves leaves from the snapshot where it agrees with the trie,
-// falling back to trie iteration everywhere else.
-func WithSnapshot(s SnapshotReader) HandlerOption {
+// falling back to trie iteration everywhere else. Pass the concrete type, so a
+// nil snapshot is dropped rather than panicking on the first request.
+func WithSnapshot[T interface {
+	SnapshotReader
+	comparable
+}](s T) HandlerOption {
 	return options.Func[handlerConfig](func(c *handlerConfig) {
+		var unset T
+		if s == unset {
+			return
+		}
 		c.snapshot = s
 	})
 }

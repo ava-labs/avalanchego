@@ -350,6 +350,28 @@ func TestResponder_PartialResponseCarriesProof(t *testing.T) {
 	}
 }
 
+// A nil snapshot reaches the handler as a non-nil interface holding a nil
+// pointer, which would pass the nil check and panic on the first request.
+func TestResponder_NilSnapshotServesFromTrie(t *testing.T) {
+	t.Parallel()
+
+	trieDB := synctest.NewTrieDB()
+	root, keys, vals := synctest.FillTrie(t, trieDB, 20)
+
+	var absent *synctest.StaticSnapshot
+	r := newLeafResponder(t, trieDB, WithSnapshot(absent))
+	require.Nil(t, r.snapshot, "a nil snapshot must not be stored")
+
+	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+		RootHash: root.Bytes(),
+		KeyLimit: uint32(len(keys)),
+	})
+	require.Nil(t, appErr)
+	require.NotNil(t, resp)
+	require.Equal(t, keys, resp.GetKeys())
+	require.Equal(t, vals, resp.GetValues())
+}
+
 func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
 	t.Parallel()
 
