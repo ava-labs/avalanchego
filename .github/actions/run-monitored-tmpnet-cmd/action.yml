@@ -14,6 +14,9 @@ inputs:
   setup_bazel:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
+  cache_go_with_nix:
+    description: 'Whether install-nix manages standalone Go caches'
+    default: 'true'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -66,6 +69,8 @@ runs:
       if: ${{ inputs.setup_bazel == 'true' }}
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
+      with:
+        cache_go: ${{ inputs.cache_go_with_nix }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash

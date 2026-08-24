@@ -14,6 +14,11 @@ if [[ -n "${NO_RACE:-}" ]]; then
     race=""
 fi
 
+shuffle="-shuffle=on"
+if [[ -n "${NO_SHUFFLE:-}" ]]; then
+    shuffle=""
+fi
+
 cd "$REPO_ROOT/graft/subnet-evm"
 # shellcheck disable=SC2046
-go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/subnet-evm/tests)
+go test ${shuffle:-} ${race:-} -timeout="${TIMEOUT:-900s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list .//... | grep -v github.com/ava-labs/avalanchego/graft/subnet-evm/tests)

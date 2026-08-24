@@ -352,6 +352,10 @@ tasks:
       # Update use_repo() in MODULE.bazel to match go.mod dependencies
       - cmd: '{{.NIX_RUN}} bazelisk mod tidy'
 
+  download-go-dependencies:
+    desc: Downloads every Go module dependency graph used by CI
+    cmd: '{{.NIX_RUN}} ./scripts/download_go_dependencies.sh'
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: '{{.NIX_RUN}} ./scripts/install_nix.sh'
@@ -386,6 +390,7 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-download-go-dependencies
       - check-go-version
       - check-require-directives
 
@@ -405,6 +410,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: test-ci-disk-space
+      - task: test-download-go-dependencies
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -620,21 +626,30 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
 
+  test-download-go-dependencies:
+    desc: Tests the workspace dependency-download module list and command
+    cmd: '{{.NIX_RUN}} ./scripts/test_download_go_dependencies.sh'
+
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
   test-unit:
-    desc: Runs unit tests
+    desc: Runs cacheable unit tests without race detection or shuffled order
     # Invoking with bash ensures compatibility with CI execution on Windows
+    env:
+      NO_SHUFFLE: TRUE
+      NO_RACE: TRUE
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
 
-  test-unit-fast:
-    desc: Runs unit tests
-    env:
-      NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Tests are much faster without race detection
+  test-unit-race-shuffle:
+    desc: Runs unit tests with race detection and shuffled order
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+
+  # Tests ./ids TestID as a cross-platform unit-test smoke check.
+  test-unit-smoke:
+    desc: Runs the cacheable ids TestID unit-test smoke check
+    cmd: '{{.NIX_RUN}} go test ./ids -run "^TestID$"'
 
   test-upgrade:
     desc: Runs upgrade tests

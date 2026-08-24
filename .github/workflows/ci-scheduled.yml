@@ -1,0 +1,42 @@
+name: Scheduled Tests
+
+# Full non-Bazel Go platform coverage stays separate from pre-merge CI so
+# scheduled-only jobs do not appear as skipped pull-request checks.
+on:
+  schedule:
+    - cron: '0 10 * * *' # Runs every day at 10:00 UTC
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full:
+    name: ${{ matrix.platform_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform_name: ubuntu-22.04-amd64
+            runner: ubuntu-22.04
+          - platform_name: ubuntu-22.04-arm64
+            runner: ubuntu-22.04-arm
+          - platform_name: ubuntu-24.04-amd64
+            runner: ubuntu-24.04
+          - platform_name: ubuntu-24.04-arm64
+            runner: ubuntu-24.04-arm
+          - platform_name: macos-26-arm64
+            runner: macos-26
+    uses: ./.github/workflows/go-ci.yml
+    with:
+      platform_name: ${{ matrix.platform_name }}
+      runner: ${{ matrix.runner }}
+      run_race_shuffle_unit_tests: true
+      run_premerge_jobs: false
+    secrets: inherit

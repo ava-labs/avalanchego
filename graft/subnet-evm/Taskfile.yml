@@ -28,9 +28,21 @@ tasks:
     desc: Build multi-platform Docker image with avalanchego integration and optional publishing
     cmd: '{{.NIX_RUN}} ./scripts/build_docker_image.sh' # publish_docker.yml
 
-  build-test:
-    desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
+  test-unit:
+    desc: Runs cacheable unit tests without race detection or shuffled order
+    env:
+      NO_RACE: TRUE
+      NO_SHUFFLE: TRUE
     cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unit tests with race detection and shuffled order
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  # Tests precompile/allowlist TestIsNoRole as a cross-platform smoke check.
+  test-unit-smoke:
+    desc: Runs the cacheable allowlist unit-test smoke check
+    cmd: '{{.NIX_RUN}} go test ./precompile/allowlist -run "^TestIsNoRole$"'
 
   check-clean-branch:
     desc: Checks that the git working tree is clean

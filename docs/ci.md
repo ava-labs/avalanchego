@@ -19,6 +19,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
+- [Test platforms and test configuration](#test-platforms-and-test-configuration)
 - [Validation](#validation)
 
 ## Principles
@@ -107,13 +108,21 @@ reserved for jobs with dependencies that another setup action does not provide.
 
 | Dependency | Provisioning mechanism | Use when |
 | --- | --- | --- |
-| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use Nix or Bazel to provide it. |
+| Go in unified CI | [`setup-go-for-ci`](../.github/actions/setup-go-for-ci/) | A unified Go workflow setup or consumer job needs the prepared workspace dependency cache. |
+| Go in other workflows | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use unified Go CI, Nix, or Bazel to provide it. |
 | Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel, which also provides Go. |
 | Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency supplied by the Nix dev shell, which also provides Go. |
 
-`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
-provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide.
+Outside unified Go CI, `setup-go-for-project`, `setup-bazel`, and `install-nix`
+are alternative Go provisioning mechanisms. A job that uses `setup-bazel` can
+also use `install-nix` for dependencies that Bazel does not provide.
+
+Unified Go CI is an intentional exception. Its Go-consuming Nix jobs restore the
+prepared workspace module cache before installing Nix. They disable
+`install-nix`'s standalone Go caches so two cache actions do not restore or save
+the same `GOMODCACHE` or `GOCACHE` paths. Docker-only image builds remain
+independent because their module downloads occur inside Docker build layers,
+not in the runner's prepared `GOMODCACHE`.
 
 ## Using Nix in GitHub Actions
 
@@ -225,6 +234,134 @@ When adding or upgrading a third-party action, review its source and its
 dependencies. Prefer actions that pin the third-party actions they invoke. Consider
 the action's permissions and the job's sensitivity when deciding how much review is
 needed.
+
+## Test platforms and test configuration
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) is the unified
+non-Bazel Go pre-merge entrypoint for avalanchego, Coreth, EVM, and Subnet-EVM.
+It runs for pull requests, merge groups, pushes to `master` and `dev`, and tag
+pushes. It calls the reusable full workflow for Ubuntu 24.04 AMD64 and the
+reusable smoke workflow for macOS 26 ARM64. The full workflow also contains the
+four suites' pre-merge lint, generation, image, E2E, load, and upgrade jobs.
+
+[`.github/workflows/go-ci.yml`](../.github/workflows/go-ci.yml) accepts a runner
+and platform name. Each invocation prepares dependencies once and then fans out
+the four full unit suites. Its `run_race_shuffle_unit_tests` input selects either
+`test-unit` or `test-unit-race-shuffle`. Its `run_premerge_jobs` input prevents
+pre-merge-only jobs from running on every scheduled platform.
+[`.github/workflows/go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml)
+uses the same runner and platform inputs and fans out the four
+`test-unit-smoke` tasks.
+
+Pre-merge CI uses fewer unit-test jobs to reduce failures from hosted runners.
+It runs the four full cacheable unit suites on Ubuntu 24.04 AMD64. It runs one
+small smoke test from each suite on macOS 26 ARM64. The smoke tests prove that
+Go can build and run tests on macOS. They do not provide full macOS coverage.
+
+[`.github/workflows/ci-scheduled.yml`](../.github/workflows/ci-scheduled.yml)
+is the single daily non-Bazel Go entrypoint. It calls the reusable full workflow
+for Ubuntu 22.04 and 24.04 on AMD64 and ARM64, and for macOS 26 ARM64. Every
+scheduled invocation runs all four full suites with race detection and shuffled
+order. Scheduled workflows stay separate from pull-request and merge-group
+workflows so scheduled-only jobs do not appear as skipped checks.
+
+Each reusable workflow invocation runs one setup job before its Go jobs fan out.
+The setup job uses `scripts/download_go_dependencies.sh` to download the root,
+Coreth, EVM, Subnet-EVM, and repository Go-tool module graphs with `GOWORK=off`.
+It saves one platform-specific workspace `GOMODCACHE`. Consumer jobs restore
+that cache read-only. The cache key covers the Go version source, workspace
+files, every listed module file, and the dependency-download implementation.
+
+Dependency and test-result caching are separate. Each cacheable pre-merge full
+or smoke job manages its own suite- and platform-specific `GOCACHE`. The primary
+key includes `github.sha`, and a platform/suite prefix supplies a warm start from
+an earlier revision. Scheduled race/shuffle jobs do not restore or save
+`GOCACHE`, so their tests execute on every run.
+
+### Go cache lifecycle and trust boundary
+
+GitHub Actions scopes caches by Git ref. A pull request can restore matching
+caches from its base branch, but a cache saved by the pull request remains in
+the pull request's merge-ref scope. It cannot replace a cache used by `master`,
+another branch, or another pull request. Merging a pull request does not promote
+its caches. The post-merge `master` workflow must succeed and save its own cache
+before later pull requests can restore the merged cache state. Cache actions
+save only after their job succeeds, and cache entries are immutable for a given
+key.
+
+For `GOCACHE`, a new pull request revision normally misses the primary key
+because it contains the pull request merge SHA. The restore prefix then selects
+a recent accessible cache for the same suite and platform, normally from an
+earlier revision of that pull request or from `master`. Go, not the workflow,
+decides package-level reuse. It reuses only successful test results whose
+compiled test inputs, dependencies, cacheable flags, relevant environment, and
+observed file inputs still match. Changed packages and packages affected by
+changed dependencies run again. The job saves the resulting cache under its new
+revision-specific key.
+
+For `GOMODCACHE`, unchanged workspace dependency inputs produce an exact key
+match. Setup still runs the complete dependency-download command, which should
+find all required modules locally. If module inputs change, setup restores a
+recent same-platform cache as a warm start, downloads the missing module
+versions, and saves the completed cache under the new dependency key. Old module
+versions can remain in the cache; avoiding repeated downloads takes priority
+over minimizing cache size. Consumer jobs use `actions/cache/restore`, so they
+cannot save a partial or competing dependency cache.
+
+Pull requests can read base-branch caches. Never put credentials, private source,
+or other secrets in either Go cache. This repository caches public Go modules
+and derived build/test artifacts only. The workflows use `pull_request`, not the
+privileged `pull_request_target` event, and protected secrets are not available
+to untrusted pull request jobs. A pull request can affect cache contents within
+its own scope, but those entries do not become trusted-branch caches.
+
+When reviewing or changing this implementation:
+
+- keep dependency keys tied to the Go version source, every workspace and tool
+  module file, and the dependency-download script and action
+- update `scripts/test_download_go_dependencies.sh` when adding or removing a Go
+  module; the test must continue to compare the checked-in list with every
+  `go.mod` in the repository
+- keep dependency setup as the only `GOMODCACHE` writer and keep consumers on
+  restore-only behavior
+- keep `GOCACHE` keys revision-, suite-, and platform-specific, with a
+  suite/platform restore prefix
+- do not enable `GOCACHE` restore or save for scheduled race/shuffle tests
+- do not allow `install-nix` or a nested action to restore a second cache into a
+  path already managed by `setup-go-for-ci`
+- verify cold, warm, same-revision, post-merge `master`, and scheduled behavior
+  in CI logs after changing cache keys or scope
+
+The top-level `go-required` job replaces `tests-required`, `coreth-required`,
+`evm-shared-required`, and `subnet-evm-required`. Branch protection must remove
+the four old checks only after a pull request shows the exact displayed name of
+the new top-level check and confirms that it fails when either reusable call
+fails or is skipped. This repository-setting migration cannot be completed in
+workflow code.
+
+The migration retains these job destinations:
+
+- avalanchego full workflow: `Fuzz`, `e2e`, `e2e_schedule_latest`,
+  `e2e_post_latest`, `e2e_kube`, `e2e_existing_network`, `Upgrade`, `Lint`,
+  `tausecondslint`, `links-lint`, `check_generated_protobuf`, `check_mockgen`,
+  `check_canotogen`, `check_contract_bindings`, `check_go_mod_tidy`,
+  `test_build_image`, `test_build_antithesis_avalanchego_images`,
+  `e2e_bootstrap_monitor`, `load`, and `robustness`
+- Coreth full workflow: `lint-coreth` and `e2e-warp-coreth`
+- EVM full workflow: `lint-evm`
+- Subnet-EVM full workflow: `lint-subnet-evm`, `e2e-warp-subnet-evm`,
+  `e2e-load-subnet-evm`, `test-build-image-subnet-evm`, and
+  `test-build-antithesis-images-subnet-evm`
+- reusable full workflow: `unit-avalanchego`, `unit-coreth`, `unit-evm`, and
+  `unit-subnet-evm`, including all four former scheduled matrices
+- reusable smoke workflow: `smoke-avalanchego`, `smoke-coreth`, `smoke-evm`,
+  and `smoke-subnet-evm`
+
+`load_kube_kind` remains commented out. Do not enable it while changing this
+workflow structure.
+
+When you change a test platform or test configuration, update this policy and
+the related workflow and task entrypoints together.
 
 ## Validation
 

@@ -1,0 +1,79 @@
+name: 'Set up Go for CI'
+description: 'Install Go and manage separate workspace dependency and per-job build caches'
+
+inputs:
+  platform_name:
+    description: 'Stable platform identifier used in cache keys'
+    required: true
+  initial_setup:
+    description: 'Populate and save the workspace dependency cache'
+    required: false
+    default: 'false'
+  cache_build_results:
+    description: 'Restore and save GOCACHE for a cacheable test job'
+    required: false
+    default: 'false'
+  build_cache_scope:
+    description: 'Suite-specific GOCACHE namespace'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        {
+          echo "module=$(go env GOMODCACHE)"
+          echo "build=$(go env GOCACHE)"
+        } >> "$GITHUB_OUTPUT"
+
+    # This step saves only after the setup job completes. Consumers wait for
+    # that job, so they cannot observe or save a partially populated cache.
+    - name: Restore and save workspace Go dependencies
+      if: ${{ inputs.initial_setup == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.module }}
+        key: go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum', 'go.work', 'go.work.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/download_go_dependencies.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        restore-keys: |
+          go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Restore workspace Go dependencies
+      if: ${{ inputs.initial_setup != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.module }}
+        key: go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum', 'go.work', 'go.work.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/download_go_dependencies.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        restore-keys: |
+          go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Download workspace Go dependencies
+      if: ${{ inputs.initial_setup == 'true' }}
+      shell: bash
+      run: ./scripts/download_go_dependencies.sh
+
+    - name: Validate build-cache inputs
+      if: ${{ inputs.cache_build_results == 'true' && inputs.build_cache_scope == '' }}
+      shell: bash
+      run: |
+        echo 'build_cache_scope is required when cache_build_results is true' >&2
+        exit 1
+
+    # Scheduled race/shuffle callers leave cache_build_results false. Only
+    # cacheable pre-merge jobs restore and save test results.
+    - name: Restore and save Go build and test results
+      if: ${{ inputs.cache_build_results == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.build }}
+        key: go-build-${{ inputs.build_cache_scope }}-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        restore-keys: |
+          go-build-${{ inputs.build_cache_scope }}-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
