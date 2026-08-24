@@ -10,7 +10,7 @@ go_library(
         "errors.go",
         "lock.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/x/blockdb",
+    importpath = "github.com/ava-labs/avalanchego/database/heightindexdb/blockdb",
     visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
