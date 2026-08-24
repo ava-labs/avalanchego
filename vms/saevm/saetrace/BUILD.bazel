@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "saetrace",
+    srcs = ["saetrace.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetrace",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel//codes",
+        "@io_opentelemetry_go_otel_trace//:trace",
+    ],
+)

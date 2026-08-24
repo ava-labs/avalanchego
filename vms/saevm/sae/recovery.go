@@ -172,6 +172,7 @@ func recoverExecutor(
 		rec.xdb,
 		tracker,
 		rec.hooks,
+		rec.snowCtx.Tracer,
 		rec.snowCtx.Log,
 		reg,
 	)

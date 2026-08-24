@@ -14,12 +14,15 @@ import (
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
@@ -145,9 +148,21 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
 	builder hook.BlockBuilder[T],
 	blockByteBudget uint64,
-) (*blocks.Block, error) {
-	hdr, err := builder.BuildHeader(parent.Header())
-	if err != nil {
+) (_ *blocks.Block, retErr error) {
+	ctx, span := saetrace.TracerFrom(ctx, tracerName).Start(ctx, spanBuildBlock)
+	defer span.End()
+	defer func() {
+		if retErr != nil {
+			span.SetStatus(codes.Error, retErr.Error())
+		}
+	}()
+
+	var hdr *types.Header
+	if err := traced(ctx, spanBuildHeaderHook, func(context.Context) error {
+		var err error
+		hdr, err = builder.BuildHeader(parent.Header())
+		return err
+	}); err != nil {
 		return nil, err
 	}
 
@@ -185,50 +200,55 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 
 	unsettled := blocks.Range(lastSettled, parent)
-	for _, block := range unsettled {
-		blockLog := log.With(
-			zap.Uint64("block_height", block.Height()),
-			zap.Stringer("block_hash", block.Hash()),
-		)
-		if err := state.StartBlock(block.Header()); err != nil {
-			blockLog.Warn("Could not start historical worst-case calculation",
-				zap.Error(err),
+	if err := traced(ctx, spanWorstcaseReplay, func(context.Context) error {
+		for _, block := range unsettled {
+			blockLog := log.With(
+				zap.Uint64("block_height", block.Height()),
+				zap.Stringer("block_hash", block.Hash()),
 			)
-			return nil, fmt.Errorf("starting worst-case state for block %d: %v", block.Height(), err)
-		}
-		for i, tx := range block.Transactions() {
-			if err := state.ApplyTx(tx); err != nil {
-				blockLog.Warn("Could not apply tx during historical worst-case calculation",
-					zap.Int("tx_index", i),
-					zap.Stringer("tx_hash", tx.Hash()),
+			if err := state.StartBlock(block.Header()); err != nil {
+				blockLog.Warn("Could not start historical worst-case calculation",
 					zap.Error(err),
 				)
-				return nil, fmt.Errorf("applying tx %#x in block %d to worst-case state: %v", tx.Hash(), block.Height(), err)
+				return fmt.Errorf("starting worst-case state for block %d: %v", block.Height(), err)
 			}
-		}
-		ops, err := b.hooks.EndOfBlockOps(block.EthBlock())
-		if err != nil {
-			blockLog.Warn("Could not extract ops during historical worst-case calculation",
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("extracting ops of block %d to worst-case state: %v", block.Height(), err)
-		}
-		for i, op := range ops {
-			if err := state.Apply(op); err != nil {
-				blockLog.Warn("Could not apply op during historical worst-case calculation",
-					zap.Int("op_index", i),
-					zap.Stringer("op_id", op.ID),
+			for i, tx := range block.Transactions() {
+				if err := state.ApplyTx(tx); err != nil {
+					blockLog.Warn("Could not apply tx during historical worst-case calculation",
+						zap.Int("tx_index", i),
+						zap.Stringer("tx_hash", tx.Hash()),
+						zap.Error(err),
+					)
+					return fmt.Errorf("applying tx %#x in block %d to worst-case state: %v", tx.Hash(), block.Height(), err)
+				}
+			}
+			ops, err := b.hooks.EndOfBlockOps(block.EthBlock())
+			if err != nil {
+				blockLog.Warn("Could not extract ops during historical worst-case calculation",
 					zap.Error(err),
 				)
-				return nil, fmt.Errorf("applying op at end of block %d to worst-case state: %v", block.Height(), err)
+				return fmt.Errorf("extracting ops of block %d to worst-case state: %v", block.Height(), err)
+			}
+			for i, op := range ops {
+				if err := state.Apply(op); err != nil {
+					blockLog.Warn("Could not apply op during historical worst-case calculation",
+						zap.Int("op_index", i),
+						zap.Stringer("op_id", op.ID),
+						zap.Error(err),
+					)
+					return fmt.Errorf("applying op at end of block %d to worst-case state: %v", block.Height(), err)
+				}
+			}
+			if _, err := state.FinishBlock(); err != nil {
+				blockLog.Warn("Could not finish historical worst-case calculation",
+					zap.Error(err),
+				)
+				return fmt.Errorf("finishing worst-case state for block %d: %v", block.Height(), err)
 			}
 		}
-		if _, err := state.FinishBlock(); err != nil {
-			blockLog.Warn("Could not finish historical worst-case calculation",
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("finishing worst-case state for block %d: %v", block.Height(), err)
-		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	hdr.Root = lastSettled.PostExecutionStateRoot()
@@ -248,6 +268,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	hdr.GasLimit = state.GasLimit()
 	hdr.BaseFee = state.BaseFee().ToBig()
 
+	// The transaction- and op-selection loops below only skip problematic
+	// entries (no early returns), so their spans are ended inline.
+	_, selectSpan := saetrace.TracerFrom(ctx, tracerName).Start(ctx, spanSelectTransactions)
 	var (
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
@@ -297,8 +320,11 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		included = append(included, tx)
 		includedBytes += txBytes
 	}
+	selectSpan.End()
+
+	opsCtx, opsSpan := saetrace.TracerFrom(ctx, tracerName).Start(ctx, spanPotentialEndOfBlockOp)
 	var includedOps []T
-	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {
+	for tx := range builder.PotentialEndOfBlockOps(opsCtx, hdr, lastSettled.Hash(), b.source) {
 		// TODO(StephenButtolph): Return additional information from
 		// [hook.PointsG.PotentialEndOfBlockOps] to terminate the loop early
 		// when there is insufficient block space remaining.
@@ -328,6 +354,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		includedOps = append(includedOps, tx)
 		includedBytes += opBytes
 	}
+	opsSpan.End()
+	span.SetAttributes(
+		attribute.Int("saevm.builder.included_txs", len(included)),
+		attribute.Int("saevm.builder.included_ops", len(includedOps)),
+	)
+
 	hdr.GasUsed = state.GasUsed()
 
 	bounds, err := state.FinishBlock()
@@ -360,8 +392,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, errZeroSettledMarker
 	}
 
-	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
-	if err != nil {
+	var ethB *types.Block
+	if err := traced(ctx, spanBuildBlockHook, func(context.Context) error {
+		var err error
+		ethB, err = builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
+		return err
+	}); err != nil {
 		return nil, err
 	}
 

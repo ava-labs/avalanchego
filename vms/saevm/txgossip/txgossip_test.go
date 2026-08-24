@@ -112,6 +112,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		xdb,
 		tr,
 		hookstest.NewStub(gasTarget),
+		nil, // tracer
 		logger,
 		prometheus.NewRegistry(),
 	)
