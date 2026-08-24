@@ -146,12 +146,11 @@ func (kc *Keychain) PrefixedString(prefix string) string {
 		// We assume that the maximum size of a byte slice that
 		// can be stringified is at least the length of a SECP256K1 private key
 		keyStr, _ := formatting.Encode(formatting.HexNC, key.Bytes())
-		sb.WriteString(fmt.Sprintf(format,
+		fmt.Fprintf(&sb, format,
 			prefix,
 			i,
 			keyStr,
-			key.PublicKey().Address(),
-		))
+			key.PublicKey().Address())
 	}
 
 	return strings.TrimSuffix(sb.String(), "\n")

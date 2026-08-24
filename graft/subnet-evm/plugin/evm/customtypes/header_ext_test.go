@@ -143,7 +143,7 @@ func allFieldsSet[T interface {
 			fieldValue := v.Field(i)
 			if !field.IsExported() {
 				// Note: we need to check unexported fields especially for [Block].
-				if fieldValue.Kind() == reflect.Ptr {
+				if fieldValue.Kind() == reflect.Pointer {
 					require.Falsef(t, fieldValue.IsNil(), "field %q is nil", field.Name)
 				}
 				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem()
