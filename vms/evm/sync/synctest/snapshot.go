@@ -33,16 +33,14 @@ func NewSnapshotTree(t *testing.T, disk ethdb.Database, trieDB *triedb.Database,
 	return &SnapshotTree{tree: tree}
 }
 
-func (s *SnapshotTree) DiskRoot() common.Hash { return s.tree.DiskRoot() }
-
-func (s *SnapshotTree) AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error) {
-	s.record(SnapshotRead{Root: root})
-	return s.tree.AccountIterator(root, seek)
+func (s *SnapshotTree) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
+	s.record(SnapshotRead{})
+	return s.tree.AccountIterator(s.tree.DiskRoot(), start)
 }
 
-func (s *SnapshotTree) StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Root: root, Account: account, Storage: true})
-	return s.tree.StorageIterator(root, account, seek)
+func (s *SnapshotTree) StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error) {
+	s.record(SnapshotRead{Account: account, Storage: true})
+	return s.tree.StorageIterator(s.tree.DiskRoot(), account, start)
 }
 
 // RequireRootRetired asserts tree cannot serve root. libevm reports the miss
@@ -73,24 +71,20 @@ type StaticSnapshot struct {
 	IterErr  error
 }
 
-// DiskRoot is the zero hash, never a valid requested root, so a test can tell a
-// disk read from a root-scoped one.
-func (*StaticSnapshot) DiskRoot() common.Hash { return common.Hash{} }
-
-func (s *StaticSnapshot) AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error) {
-	s.record(SnapshotRead{Root: root})
+func (s *StaticSnapshot) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
+	s.record(SnapshotRead{})
 	if s.OpenErr != nil {
 		return nil, s.OpenErr
 	}
-	return &staticAccountIter{pairs: seekPairs(s.Accounts, seek), idx: -1, err: s.IterErr}, nil
+	return &staticAccountIter{pairs: seekPairs(s.Accounts, start), idx: -1, err: s.IterErr}, nil
 }
 
-func (s *StaticSnapshot) StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Root: root, Account: account, Storage: true})
+func (s *StaticSnapshot) StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error) {
+	s.record(SnapshotRead{Account: account, Storage: true})
 	if s.OpenErr != nil {
 		return nil, s.OpenErr
 	}
-	return &staticStorageIter{pairs: seekPairs(s.Storage[account], seek), idx: -1, err: s.IterErr}, nil
+	return &staticStorageIter{pairs: seekPairs(s.Storage[account], start), idx: -1, err: s.IterErr}, nil
 }
 
 func seekPairs(pairs []StaticPair, seek common.Hash) []StaticPair {
@@ -147,7 +141,6 @@ func (*staticStorageIter) Release()        {}
 
 // SnapshotRead is one iterator a handler opened.
 type SnapshotRead struct {
-	Root    common.Hash
 	Account common.Hash // Set when Storage
 	Storage bool
 }

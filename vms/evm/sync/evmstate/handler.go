@@ -33,18 +33,16 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, tri
 	return net.AddHandler(handlerID, h)
 }
 
-// SnapshotReader serves its reads as taking DiskRoot rather than the
-// requested root, which the tree retires before sync stops asking.
+// SnapshotReader opens flat iterators over the snapshot leaves. The
+// implementation does not need to guarantee anything about the state it
+// serves. A state that happens to match a request speeds up the response but
+// never changes it.
 type SnapshotReader interface {
-	DiskRoot() common.Hash
-	AccountIterator(root, seek common.Hash) (snapshot.AccountIterator, error)
-	StorageIterator(root, account, seek common.Hash) (snapshot.StorageIterator, error)
+	AccountIterator(start common.Hash) (snapshot.AccountIterator, error)
+	StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error)
 }
 
-var (
-	_ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
-	_ SnapshotReader                                                      = (*snapshot.Tree)(nil)
-)
+var _ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
 
 type responder struct {
 	log      logging.Logger
@@ -433,16 +431,12 @@ func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
 //
 // If a nil error is returned, the iterator MUST be released.
 func (q *query) newSnapshotIterator() (iterator, error) {
-	// DiskRoot and grabbing the iterator are separate calls, so a concurrent
-	// snapshot flattening can retire the root in between and fail the open.
-	diskRoot := q.snapshot.DiskRoot()
-	seek := common.BytesToHash(q.startKey)
-
+	start := common.BytesToHash(q.startKey)
 	if q.isStorage {
-		it, err := q.snapshot.StorageIterator(diskRoot, q.account, seek)
+		it, err := q.snapshot.StorageIterator(q.account, start)
 		return storageIterator{it}, err
 	}
-	it, err := q.snapshot.AccountIterator(diskRoot, seek)
+	it, err := q.snapshot.AccountIterator(start)
 	return accountIterator{it}, err
 }
 
@@ -479,8 +473,7 @@ func (q *query) nextKey() []byte {
 	return next
 }
 
-// generateRangeProof returns a Merkle range proof for [start, last]. An absent
-// start means the trie's beginning, which Prove needs as a concrete key.
+// generateRangeProof returns a Merkle range proof for [start, last].
 func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
 	proofDB := memorydb.New()
 	if err := q.trie.Prove(start, proofDB); err != nil {
