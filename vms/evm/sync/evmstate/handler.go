@@ -135,7 +135,10 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	if appErr != nil {
 		return nil, appErr
 	}
-	return q.run(nodeID)
+	if err := q.collect(); err != nil {
+		return nil, handlers.Fault(q.log, nodeID, err)
+	}
+	return q.resp, nil
 }
 
 // validateRequest returns the rejection for a malformed req, nil when it is
@@ -275,14 +278,6 @@ func (q *query) attachProof(more bool) error {
 	}
 	q.resp.ProofVals, err = iteratorValues(proofDB)
 	return err
-}
-
-// run executes the collect pipeline. A pipeline failure is a server fault.
-func (q *query) run(nodeID ids.NodeID) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if err := q.collect(); err != nil {
-		return nil, handlers.Fault(q.log, nodeID, err)
-	}
-	return q.resp, nil
 }
 
 // fillFromSnapshot reads from the snapshot. done reports that the response
