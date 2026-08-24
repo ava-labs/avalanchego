@@ -478,12 +478,6 @@ func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Datab
 	return proofDB, nil
 }
 
-// verifyRangeProof reports whether the trie has more keys past the last
-// verified key. more carries the same meaning as in [query.fillFromTrie].
-func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proofDB *memorydb.Database) (more bool, _ error) {
-	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proofDB)
-}
-
 // isRangeValid range-proves keys/vals against the trie. Without a gap the proof
 // starts at nextKey, so the span back to the response is covered too.
 func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (valid, more bool, _ error) {
@@ -498,7 +492,7 @@ func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (valid, more bool
 	if err != nil {
 		return false, false, err
 	}
-	more, proofErr := q.verifyRangeProof(keys, vals, startKey, proofDB)
+	more, proofErr := trie.VerifyRangeProof(q.rootHash, startKey, keys, vals, proofDB)
 	return proofErr == nil, more, nil
 }
 
