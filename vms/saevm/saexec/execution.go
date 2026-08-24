@@ -21,9 +21,9 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -148,7 +148,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	//
 	// The commit in [Executor.afterExecution] also stops the prefetcher, but
 	// only on the happy path; this covers every path that returns first.
-	stateDB.StartPrefetcher(triePrefetcherNamespace, utils.WithConcurrentWorkers(triePrefetcherParallelism))
+	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
 	defer stateDB.StopPrefetcher()
 
 	result, err := Execute(

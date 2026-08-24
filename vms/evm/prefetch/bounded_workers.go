@@ -1,14 +1,14 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package utils
+package prefetch
 
 import (
 	"sync"
 	"sync/atomic"
 )
 
-type BoundedWorkers struct {
+type boundedWorkers struct {
 	workerCount        atomic.Int32
 	workerSpawner      chan struct{}
 	outstandingWorkers sync.WaitGroup
@@ -17,10 +17,10 @@ type BoundedWorkers struct {
 	workClose sync.Once
 }
 
-// NewBoundedWorkers returns an instance of [BoundedWorkers] that
+// newBoundedWorkers returns an instance of [boundedWorkers] that
 // will spawn up to count goroutines.
-func NewBoundedWorkers(count int) *BoundedWorkers {
-	return &BoundedWorkers{
+func newBoundedWorkers(count int) *boundedWorkers {
+	return &boundedWorkers{
 		workerSpawner: make(chan struct{}, count),
 		work:          make(chan func()),
 	}
@@ -28,7 +28,7 @@ func NewBoundedWorkers(count int) *BoundedWorkers {
 
 // startWorker creates a new goroutine to execute [f] immediately and then keeps the goroutine
 // alive to continue executing new work.
-func (b *BoundedWorkers) startWorker(f func()) {
+func (b *boundedWorkers) startWorker(f func()) {
 	b.workerCount.Add(1)
 	b.outstandingWorkers.Add(1)
 
@@ -48,7 +48,7 @@ func (b *BoundedWorkers) startWorker(f func()) {
 // or return if the context is canceled.
 //
 // Execute must not be called after Wait, otherwise it might panic.
-func (b *BoundedWorkers) Execute(f func()) {
+func (b *boundedWorkers) Execute(f func()) {
 	// Ensure we feed idle workers first
 	select {
 	case b.work <- f:
@@ -72,7 +72,7 @@ func (b *BoundedWorkers) Execute(f func()) {
 //
 // It is safe to call Wait multiple times but not safe to call [Execute]
 // after [Wait] has been called.
-func (b *BoundedWorkers) Wait() int {
+func (b *boundedWorkers) Wait() int {
 	b.workClose.Do(func() {
 		close(b.work)
 	})
