@@ -16,6 +16,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
@@ -1122,6 +1123,26 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 
 	wantBalance := new(uint256.Int).Sub(&preBalance, uint256.NewInt(totalCharged))
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
+}
+
+func TestEstimateGasIgnoresMinimumGasConsumption(t *testing.T) {
+	const (
+		gasLimit    = uint64(100_000_000)
+		minEstimate = ethparams.TxGasContractCreation
+		// The RPC estimator may stop its binary search once it is within 1.5%
+		// of the exact estimate.
+		maxEstimate = minEstimate * 1_015 / 1_000
+	)
+	from := common.Address{'m', 'e'}
+	ctx, sut := newSUT(t, withMaxAllocFor(from))
+
+	got, err := sut.ethclient.EstimateGas(ctx, ethereum.CallMsg{
+		From: from,
+		Gas:  gasLimit,
+	})
+	require.NoError(t, err, "%T.EstimateGas(...)", sut.ethclient)
+	require.GreaterOrEqual(t, got, minEstimate, "%T.EstimateGas(...)", sut.ethclient)
+	require.LessOrEqual(t, got, maxEstimate, "%T.EstimateGas(...)", sut.ethclient)
 }
 
 // TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
