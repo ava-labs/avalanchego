@@ -31,11 +31,8 @@ func newTrieQueue(db ethdb.Database) *trieQueue {
 	return &trieQueue{db: db}
 }
 
-// clearIfRootDoesNotMatch wipes storage-trie and segment markers when the persisted
-// root differs from root, then records root as the current target.
-//
-// It clears markers only. The snapshots are the caller's to wipe, see
-// [NewHashDBSyncer], because leaves left there still count as resume progress.
+// clearIfRootDoesNotMatch wipes the markers of a different target, then records root.
+// Markers only: the snapshots are the caller's to wipe, see [NewHashDBSyncer].
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	switch {
@@ -87,11 +84,8 @@ func (t *trieQueue) countTries() (int, error) {
 	return tries, it.Error()
 }
 
-// storageTries iterates the queued tries, grouped by root, in root order, yielding an
-// error and stopping if the scan fails.
-//
-// The scan reopens per trie so a consumer that blocks between them, as the syncer does
-// while waiting for a slot, never holds a database iterator open for the whole sync.
+// storageTries yields the queued tries grouped by root, in root order. The scan
+// reopens per trie, so a consumer blocking between them holds no iterator open.
 func (t *trieQueue) storageTries() iter.Seq2[storageTrieRef, error] {
 	return func(yield func(storageTrieRef, error) bool) {
 		var cursor []byte

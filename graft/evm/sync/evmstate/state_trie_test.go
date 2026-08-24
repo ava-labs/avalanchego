@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 )
 
-// TestStateTrie_SegmentedStorageReconstruct proves a storage trie split into concurrent segments reconstructs via snapshot re-read.
+// A storage trie split into concurrent segments reconstructs via snapshot re-read.
 func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

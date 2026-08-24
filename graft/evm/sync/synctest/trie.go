@@ -12,14 +12,18 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -28,16 +32,14 @@ func NewTrieDB() *triedb.Database {
 	return triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 }
 
-// NewTrieDBWithDisk returns an in-memory [triedb.Database] and its
-// backing [ethdb.Database].
+// NewTrieDBWithDisk returns an in-memory [triedb.Database] and its backing disk.
 func NewTrieDBWithDisk() (*triedb.Database, ethdb.Database) {
 	db := rawdb.NewMemoryDatabase()
 	return triedb.NewDatabase(db, nil), db
 }
 
-// FillTrie writes numKeys deterministic 32-byte pairs into trieDB and
-// returns the committed root with keys and values sorted ascending. Keys are
-// unhashed, so they cluster at the start of the key space.
+// FillTrie writes numKeys deterministic 32-byte pairs, returning the root and the
+// pairs sorted ascending. Keys are unhashed, so they cluster low in the key space.
 func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
 	t.Helper()
 	return fill(t, trieDB, numKeys, sequentialKey, func(i int) []byte {
@@ -47,9 +49,8 @@ func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, 
 	})
 }
 
-// FillTrieDistributed writes numKeys pairs whose keys are hashed, so they spread
-// across the key space and segmentation by 2-byte prefix has data in every range.
-// Values are 8 bytes.
+// FillTrieDistributed is [FillTrie] with hashed keys and 8-byte values, so every
+// 2-byte prefix segment has data.
 func FillTrieDistributed(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
 	t.Helper()
 	return fill(t, trieDB, numKeys, hashedKey, func(i int) []byte {
@@ -87,9 +88,8 @@ func hashedKey(i int) []byte {
 	return HashedKey(uint64(i + 1))
 }
 
-// fill writes n pairs built by keyOf and valueOf into trieDB and returns the
-// committed root with keys and values sorted ascending, matching the responder's
-// iteration order.
+// fill writes n pairs from keyOf and valueOf, returning the root and the pairs
+// sorted ascending to match the responder's iteration order.
 func fill(t *testing.T, trieDB *triedb.Database, n int, keyOf, valueOf func(i int) []byte) (common.Hash, [][]byte, [][]byte) {
 	t.Helper()
 	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
@@ -115,6 +115,36 @@ func fill(t *testing.T, trieDB *triedb.Database, n int, keyOf, valueOf func(i in
 		keys[i], vals[i] = r.key, r.val
 	}
 	return root, keys, vals
+}
+
+// FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
+// and commits it to [trieDB]. For each 3 accounts created:
+// - One does not have a storage trie,
+// - One has a storage trie shared with other accounts (total number of shared storage tries [numOverlappingStorageRoots]),
+// - One has a uniquely generated storage trie,
+// returns the new trie root and a map of funded keys to StateAccount structs.
+// This is only safe for HashDB, as path-based DBs do not share storage tries.
+func FillAccountsWithOverlappingStorage(
+	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
+) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
+	for i := 0; i < numOverlappingStorageRoots; i++ {
+		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
+		storageRoots = append(storageRoots, storageRoot)
+	}
+	storageRootIndex := 0
+	return FillAccounts(t, r, s, root, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+		switch i % 3 {
+		case 0: // unmodified account
+		case 1: // account with overlapping storage root
+			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
+			storageRootIndex++
+		case 2: // account with unique storage root
+			FillStorageForAccount(t, r, 16, addr, storageTr)
+		}
+
+		return account
+	})
 }
 
 // GenerateIndependentTrie creates a trie with [numKeys] random key-value pairs inside of [trieDB].
@@ -215,4 +245,108 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 	}
 	require.NoError(t, nodeIt.Error())
 	require.NoError(t, batch.Write())
+}
+
+// FillAccounts adds [numAccounts] randomly generated accounts to the secure trie at [root] and commits it to [trieDB].
+// [onAccount] is called if non-nil so the caller can modify the account before it is stored in the trie.
+// If the trie in the callback is used (i.e. tr.Hash() doesn't return the empty root), the account's storage root will be updated to match.
+// Returns the new trie root and a map of funded keys to StateAccount structs.
+func FillAccounts(
+	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int,
+	onAccount func(*testing.T, int, common.Address, types.StateAccount, state.Trie) types.StateAccount,
+) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	var (
+		minBalance  = uint256.NewInt(3000000000000000000)
+		randBalance = uint256.NewInt(1000000000000000000)
+		maxNonce    = 10
+		accounts    = make(map[*utilstest.Key]*types.StateAccount, numAccounts)
+		mergedSet   = trienode.NewMergedNodeSet()
+	)
+
+	tr, err := s.OpenTrie(root)
+	require.NoError(t, err)
+
+	for i := 0; i < numAccounts; i++ {
+		key := utilstest.NewKey(t)
+		acc := types.StateAccount{
+			Nonce:    uint64(r.Intn(maxNonce)),
+			Balance:  new(uint256.Int).Add(minBalance, randBalance),
+			CodeHash: types.EmptyCodeHash[:],
+			Root:     types.EmptyRootHash,
+		}
+		if onAccount != nil {
+			storageTr, err := s.OpenStorageTrie(root, key.Address, types.EmptyRootHash, tr)
+			require.NoError(t, err)
+			acc = onAccount(t, i, key.Address, acc, storageTr)
+			root, nodes, err := storageTr.Commit(false)
+			require.NoError(t, err)
+			// If the storage trie was used, update the account's storage root and pass nodes to TrieDB.
+			if nodes != nil {
+				require.NoError(t, mergedSet.Merge(nodes))
+				acc.Root = root
+			}
+		}
+
+		require.NoError(t, tr.UpdateAccount(key.Address, &acc))
+		accounts[key] = &acc
+	}
+
+	newRoot, nodes, err := tr.Commit(true)
+	require.NoError(t, err)
+	require.NoError(t, mergedSet.Merge(nodes))
+	updateOpts := stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{}) // block hashes required for Firewood
+	require.NoError(t, s.TrieDB().Update(newRoot, root, 0, mergedSet, nil, updateOpts))
+	require.NoError(t, s.TrieDB().Commit(newRoot, false))
+	return newRoot, accounts
+}
+
+// FillAccountsWithStorageAndCode is a helper function that calls [FillAccounts] with an [onAccount] callback that randomly assigns accounts to have code and storage.
+// Approximately half of accounts created will have unrunnable contracts and non-empty storage tries, and the other half will be EOAs.
+func FillAccountsWithStorageAndCode(t *testing.T, r *rand.Rand, serverDB state.Database, root common.Hash, numAccounts int) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
+	return FillAccounts(t, r, serverDB, root, numAccounts, func(t *testing.T, _ int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
+		if r.Intn(2) == 0 {
+			codeBytes := make([]byte, 256)
+			_, err := r.Read(codeBytes)
+			require.NoError(t, err, "error reading random code bytes")
+
+			codeHash := crypto.Keccak256Hash(codeBytes)
+			rawdb.WriteCode(serverDB.DiskDB(), codeHash, codeBytes)
+			account.CodeHash = codeHash[:]
+
+			FillStorageForAccount(t, r, 16, addr, storageTr)
+		}
+		return account
+	})
+}
+
+// FillStorageForAccount adds [numStorageKeys] random key-value pairs to the storage trie for [addr] in [storageTr].
+func FillStorageForAccount(
+	t *testing.T, r *rand.Rand, numStorageKeys int,
+	addr common.Address, storageTr state.Trie,
+) {
+	keys, values := makeKeyValues(t, r, numStorageKeys, common.HashLength)
+	for i := range numStorageKeys {
+		require.NoError(t, storageTr.UpdateStorage(addr, keys[i], values[i]))
+	}
+}
+
+func makeKeyValues(t *testing.T, r *rand.Rand, numKeys, keySize int) ([][]byte, [][]byte) {
+	keys := make([][]byte, 0, numKeys)
+	values := make([][]byte, 0, numKeys)
+
+	// Generate key-value pairs
+	for range numKeys {
+		key := make([]byte, keySize)
+		_, err := r.Read(key)
+		require.NoError(t, err)
+
+		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 255 bytes
+		_, err = r.Read(value)
+		require.NoError(t, err)
+
+		keys = append(keys, key)
+		values = append(values, value)
+	}
+
+	return keys, values
 }

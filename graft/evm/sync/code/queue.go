@@ -136,8 +136,7 @@ func (q *Queue) AddCode(codeHashes []common.Hash) error {
 }
 
 // DoneAdding signals that no more hashes will be added, without waiting for the
-// forwarder to drain. The consumer sees [Queue.CodeHashes] close once every
-// pending hash has been forwarded.
+// drain. [Queue.CodeHashes] closes once every pending hash has been forwarded.
 func (q *Queue) DoneAdding() {
 	q.markClosed()
 	q.closeInput()

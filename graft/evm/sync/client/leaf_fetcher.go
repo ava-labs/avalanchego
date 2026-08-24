@@ -11,10 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
-// LeafFetcher reads leaf ranges over the message protocol.
-//
-// One [Client] serves both the state and atomic tries, which ask for different
-// node types, so the pair is fixed per syncer rather than on the client.
+// LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both
+// the state and atomic tries, so the node type is fixed per syncer, not per client.
 type LeafFetcher struct {
 	client   types.LeafClient
 	reqType  message.LeafsRequestType

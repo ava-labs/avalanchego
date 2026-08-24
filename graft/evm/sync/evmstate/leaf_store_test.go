@@ -54,7 +54,8 @@ func accountLeaf(t *testing.T, storageRoot, codeHash common.Hash) []byte {
 	return val
 }
 
-// TestAccountLeaves_DecodesAndDiscovers checks a snapshot is written per leaf and only non-empty storage roots and code hashes are discovered.
+// One snapshot per leaf, and only non-empty storage roots and code hashes are
+// discovered.
 func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
@@ -90,7 +91,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	}
 }
 
-// TestAccountLeaves_RejectsMalformedAccount checks an undecodable account leaf errors and discovers nothing.
+// An undecodable account leaf errors and discovers nothing.
 func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()

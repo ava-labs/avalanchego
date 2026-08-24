@@ -31,8 +31,8 @@ type storageRegistry interface {
 	RegisterStorageTrie(root, account common.Hash) error
 }
 
-// leafStore is the seam the reconstruction writes leaves through, and reads them back
-// from in key order. What a leaf means differs for accounts and storage.
+// leafStore is the seam leaves are written through and read back in key order. What a
+// leaf means differs for accounts and storage. Batch capping is the segment's job.
 type leafStore interface {
 	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves evmstate.Leaves) error
 	iterateLeaves(seek common.Hash) ethdb.Iterator
@@ -54,7 +54,6 @@ func newAccountLeafStore(db ethdb.KeyValueStore, codeSyncer codeEnqueuer, trieQu
 }
 
 // writeLeaves writes account snapshots, discovering storage tries and code as it goes.
-// Batch capping is the segment's job.
 func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves evmstate.Leaves) error {
 	var codeHashes []common.Hash
 	for i, key := range leaves.Keys {
@@ -103,8 +102,7 @@ func newStorageLeafStore(db ethdb.KeyValueStore, accounts []common.Hash) *storag
 	}
 }
 
-// writeLeaves writes each leaf once per sharing account. Batch capping is the
-// segment's job.
+// writeLeaves writes each leaf once per sharing account.
 func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, leaves evmstate.Leaves) error {
 	for _, account := range s.accounts {
 		if err := ctx.Err(); err != nil {
