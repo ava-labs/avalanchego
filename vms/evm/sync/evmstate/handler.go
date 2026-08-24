@@ -385,7 +385,12 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		zap.Stringer("account", q.account),
 	)
 
-	it, err := newSnapshotIterator(q.snapshot, q.isStorage, q.account, common.BytesToHash(q.startKey))
+	it, err := newSnapshotIterator(
+		q.snapshot,
+		q.isStorage,
+		q.account,
+		common.BytesToHash(q.startKey),
+	)
 	if err != nil {
 		log.Debug("snapshot read abandoned",
 			zap.String("reason", "iterator unavailable"),
