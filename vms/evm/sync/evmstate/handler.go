@@ -277,7 +277,7 @@ func (q *query) attachProof(more bool) error {
 		return nil
 	}
 
-	proofDB, err := q.generateRangeProof(q.startKey, q.resp.Keys)
+	proofDB, err := generateRangeProof(q.trie, q.startKey, q.resp.Keys)
 	if err != nil {
 		return err
 	}
@@ -477,30 +477,34 @@ func (q *query) nextKey() []byte {
 	return next
 }
 
-// generateRangeProof returns a Merkle range proof for [start, last].
-func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
-	proofDB := memorydb.New()
-	if err := q.trie.Prove(start, proofDB); err != nil {
-		return nil, err
-	}
-	if len(keys) > 0 {
-		end := keys[len(keys)-1]
-		if err := q.trie.Prove(end, proofDB); err != nil {
-			return nil, err
-		}
-	}
-	return proofDB, nil
-}
-
 // isRangeValid range-proves keys/vals against the trie from startKey. valid
 // reports the proof succeeded, more reports the trie holds leaves past keys.
 func (q *query) isRangeValid(startKey []byte, keys, vals [][]byte) (valid, more bool, _ error) {
-	proofDB, err := q.generateRangeProof(startKey, keys)
+	proofDB, err := generateRangeProof(q.trie, startKey, keys)
 	if err != nil {
 		return false, false, err
 	}
 	more, proofErr := trie.VerifyRangeProof(q.rootHash, startKey, keys, vals, proofDB)
 	return proofErr == nil, more, nil
+}
+
+// generateRangeProof returns a Merkle range proof for [start, last].
+func generateRangeProof(
+	trie *trie.Trie,
+	start []byte,
+	keys [][]byte,
+) (*memorydb.Database, error) {
+	proofDB := memorydb.New()
+	if err := trie.Prove(start, proofDB); err != nil {
+		return nil, err
+	}
+	if len(keys) > 0 {
+		end := keys[len(keys)-1]
+		if err := trie.Prove(end, proofDB); err != nil {
+			return nil, err
+		}
+	}
+	return proofDB, nil
 }
 
 func iteratorValues(db *memorydb.Database) ([][]byte, error) {
