@@ -812,17 +812,13 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 				firstKey = startKey
 			}
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
-
-			resp := &syncpb.GetLeafResponse{}
-			outcome, err := NewClient(net, p2p.EVMLeafRequestHandlerID, tracker).Send(ctx, &syncpb.GetLeafRequest{
+			// The wire response carries the proof, which the verified client
+			// consumes rather than returns, so this asserts at the transport.
+			resp := rawResponse(t, ctx, serve(t, ctx, trieDB, opts...), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: startKey,
 				KeyLimit: tt.keyLimit,
-			}, resp)
-			require.NoError(t, err)
-			outcome.Success()
+			})
 
 			to := tt.startAt + tt.wantLen
 			require.Equal(t, keys[tt.startAt:to], resp.GetKeys())
@@ -862,11 +858,4 @@ func proofFrom(t *testing.T, vals [][]byte) ethdb.Database {
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
 	tb.Helper()
 	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
-}
-
-func accountBytes(account common.Hash) []byte {
-	if account == (common.Hash{}) {
-		return nil
-	}
-	return account.Bytes()
 }
