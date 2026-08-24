@@ -49,7 +49,8 @@ type responder struct {
 	log      logging.Logger
 	trieDB   *triedb.Database
 	snapshot SnapshotReader // optional
-	zeroKey  []byte         // read-only stand-in for an absent start key
+	minKey   []byte         // read-only stand-in for an absent start key
+	maxKey   []byte         // read-only stand-in for an absent end key
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
@@ -57,7 +58,8 @@ func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int
 		log:      log,
 		trieDB:   trieDB,
 		snapshot: options.As(opts...).snapshot,
-		zeroKey:  make([]byte, trieKeyLength),
+		minKey:   make([]byte, trieKeyLength),
+		maxKey:   bytes.Repeat([]byte{0xff}, trieKeyLength),
 	}
 }
 
@@ -124,7 +126,7 @@ var (
 )
 
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if appErr := validateRequest(req, len(r.zeroKey)); appErr != nil {
+	if appErr := validateRequest(req, len(r.minKey)); appErr != nil {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(appErr),
@@ -177,10 +179,10 @@ type query struct {
 	account   common.Hash // populated when isStorage
 	isStorage bool
 	limit     int
-	zeroKey   []byte
 
 	trie     *trie.Trie
 	snapshot SnapshotReader
+	minKey   []byte
 
 	resp *syncpb.GetLeafResponse
 }
@@ -202,19 +204,29 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		return nil, errRootNotFound
 	}
 
-	limit := int(min(req.GetKeyLimit(), MaxLeavesLimit))
+	start := req.GetStartKey()
+	if len(start) == 0 {
+		start = r.minKey
+	}
+	end := req.GetEndKey()
+	if len(end) == 0 {
+		end = r.maxKey
+	}
 	account := req.GetAccountHash()
+	limit := int(min(req.GetKeyLimit(), MaxLeavesLimit))
 	return &query{
 		log:       r.log,
-		startKey:  req.GetStartKey(),
-		endKey:    req.GetEndKey(),
+		startKey:  start,
+		endKey:    end,
 		rootHash:  root,
 		account:   common.BytesToHash(account),
 		isStorage: len(account) != 0,
 		limit:     limit,
-		zeroKey:   r.zeroKey,
-		trie:      t,
-		snapshot:  r.snapshot,
+
+		trie:     t,
+		snapshot: r.snapshot,
+		minKey:   r.minKey,
+
 		resp: &syncpb.GetLeafResponse{
 			Keys:   make([][]byte, 0, limit),
 			Values: make([][]byte, 0, limit),
@@ -225,7 +237,7 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 // wholeTrie reports that the response spans the trie end to end, which the root
 // alone attests, so no range proof is needed.
 func (q *query) wholeTrie(more bool) bool {
-	return len(q.startKey) == 0 && !more
+	return bytes.Equal(q.startKey, q.minKey) && !more
 }
 
 func (q *query) atLimit() bool {
@@ -401,8 +413,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	vals := make([][]byte, 0, q.limit)
 	for it.Next() {
 		k := it.Hash().Bytes()
-		afterEnd := len(q.endKey) != 0 && bytes.Compare(k, q.endKey) > 0
-		if afterEnd || len(keys) >= q.limit {
+		if bytes.Compare(k, q.endKey) > 0 || len(keys) >= q.limit {
 			break
 		}
 		v, err := leaf()
@@ -432,8 +443,7 @@ func (q *query) fillFromTrie(end []byte) (bool, error) {
 	it := trie.NewIterator(nodeIt)
 
 	for it.Next() {
-		afterEnd := len(end) != 0 && bytes.Compare(it.Key, end) > 0
-		if afterEnd || q.atLimit() {
+		if bytes.Compare(it.Key, end) > 0 || q.atLimit() {
 			return true, it.Err
 		}
 		q.resp.Keys = append(q.resp.Keys, it.Key)
@@ -456,9 +466,6 @@ func (q *query) nextKey() []byte {
 // start means the trie's beginning, which Prove needs as a concrete key.
 func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
 	proofDB := memorydb.New()
-	if len(start) == 0 {
-		start = q.zeroKey
-	}
 	if err := q.trie.Prove(start, proofDB); err != nil {
 		return nil, err
 	}
@@ -474,9 +481,6 @@ func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Datab
 // verifyRangeProof reports whether the trie has more keys past the last
 // verified key. more carries the same meaning as in [query.fillFromTrie].
 func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proofDB *memorydb.Database) (more bool, _ error) {
-	if len(start) == 0 {
-		start = q.zeroKey
-	}
 	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proofDB)
 }
 
