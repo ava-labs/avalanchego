@@ -94,32 +94,36 @@ var (
 		Code:    3000,
 		Message: "zero key limit",
 	}
-	errMissingRoot = &avacommon.AppError{
+	errWrongRootLength = &avacommon.AppError{
 		Code:    3001,
+		Message: "root length mismatch",
+	}
+	errMissingRoot = &avacommon.AppError{
+		Code:    3002,
 		Message: "missing trie root",
 	}
 	errEmptyRoot = &avacommon.AppError{
-		Code:    3002,
+		Code:    3003,
 		Message: "empty trie root",
 	}
 	errWrongAccountHashLength = &avacommon.AppError{
-		Code:    3003,
-		Message: "account hash length mismatch",
+		Code:    3004,
+		Message: "account length mismatch",
 	}
 	errWrongStartKeyLength = &avacommon.AppError{
-		Code:    3004,
+		Code:    3005,
 		Message: "start key length mismatch",
 	}
 	errWrongEndKeyLength = &avacommon.AppError{
-		Code:    3005,
+		Code:    3006,
 		Message: "end key length mismatch",
 	}
 	errStartAfterEnd = &avacommon.AppError{
-		Code:    3006,
+		Code:    3007,
 		Message: "start key after end key",
 	}
 	errRootNotFound = &avacommon.AppError{
-		Code:    3007,
+		Code:    3008,
 		Message: "requested trie root not found",
 	}
 )
@@ -149,7 +153,11 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 		return errZeroKeyLimit
 	}
 
-	switch root := common.BytesToHash(req.GetRootHash()); root {
+	root := req.GetRootHash()
+	if len(root) != common.HashLength {
+		return errWrongRootLength
+	}
+	switch common.BytesToHash(root) {
 	case common.Hash{}:
 		return errMissingRoot
 	case types.EmptyRootHash:

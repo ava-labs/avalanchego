@@ -51,6 +51,7 @@ func TestErrorSentinels(t *testing.T) {
 		"errWrongEndKeyLength":      errWrongEndKeyLength,
 		"errStartAfterEnd":          errStartAfterEnd,
 		"errRootNotFound":           errRootNotFound,
+		"errWrongRootHashLength":    errWrongRootLength,
 	})
 }
 
@@ -71,6 +72,14 @@ func TestResponder_ValidationRejects(t *testing.T) {
 				KeyLimit: 0,
 			},
 			wantErr: errZeroKeyLimit,
+		},
+		{
+			name: "root_hash_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash: []byte{0x01, 0x02},
+				KeyLimit: 10,
+			},
+			wantErr: errWrongRootLength,
 		},
 		{
 			name: "missing_root_hash",
