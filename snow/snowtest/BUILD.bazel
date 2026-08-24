@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "snowtest",
@@ -17,12 +18,24 @@ go_library(
         "//snow",
         "//snow/validators",
         "//snow/validators/validatorstest",
+        "//trace",
         "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/logging",
         "//vms/platformvm/warp",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "snowtest_test",
+    srcs = ["context_test.go"],
+    embed = [":snowtest"],
+    deps = [
+        "//ids",
+        "//trace",
         "@com_github_stretchr_testify//require",
     ],
 )
