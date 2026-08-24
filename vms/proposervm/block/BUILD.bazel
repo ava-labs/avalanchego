@@ -29,6 +29,7 @@ go_test(
         "block_test.go",
         "build_test.go",
         "header_test.go",
+        "millis_test.go",
         "parse_test.go",
     ],
     embed = [":block"],

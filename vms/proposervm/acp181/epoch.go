@@ -13,6 +13,9 @@ import (
 )
 
 // NewEpoch returns a child block's epoch based on its parent.
+//
+// Epoch start times are always unix-seconds, even on chains with millisecond
+// block timestamps; they are only ever compared as decoded time.Time values.
 func NewEpoch(
 	upgrades upgrade.Config,
 	parentPChainHeight uint64,

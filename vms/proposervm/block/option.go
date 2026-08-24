@@ -32,7 +32,8 @@ func (b *option) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *option) initialize(bytes []byte) error {
+// initialize ignores millisecondTimestamps: options carry no timestamp.
+func (b *option) initialize(bytes []byte, _ bool) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 	return nil
