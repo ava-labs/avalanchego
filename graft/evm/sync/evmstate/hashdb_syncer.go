@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -22,15 +21,13 @@ const defaultLeafWorkers = 8
 var (
 	_ types.Syncer    = (*HashDBSyncer)(nil)
 	_ types.Finalizer = (*HashDBSyncer)(nil)
-
-	errRootRequired      = errors.New("root must be non-zero")
-	errCodeQueueRequired = errors.New("code queue is required")
 )
 
-// codeProducer is the producer side of the code sync. The engine owns the
-// queue's teardown, so this syncer only adds hashes and declares when it is done.
-type codeProducer interface {
-	codeEnqueuer
+// CodeProducer is the producer side of the code sync. The engine owns the
+// queue's teardown, so this syncer only adds hashes and says when it is done.
+type CodeProducer interface {
+	// AddCode takes the code hashes discovered while syncing.
+	AddCode(hashes []common.Hash) error
 	// DoneAdding reports that no more hashes will be added. It must not block,
 	// because the consumer drains under the same context as this syncer.
 	DoneAdding()
@@ -44,7 +41,7 @@ type HashDBSyncer struct {
 	fetcher   types.LeafFetcher
 	db        ethdb.Database
 	root      common.Hash
-	codeQueue codeProducer
+	codeQueue CodeProducer
 	trieQueue *trieQueue
 	stats     *trieSyncStats
 	threshold uint64 // leaf count above which a trie splits into segments
@@ -63,13 +60,7 @@ type HashDBSyncer struct {
 // The caller must wipe the account and storage snapshots in db unless this run resumes
 // the root already persisted there. Leaves left behind count as resume progress, so
 // another root's leaves would fail the final root check on every attempt.
-func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue codeProducer) (*HashDBSyncer, error) {
-	if root == (common.Hash{}) {
-		return nil, errRootRequired
-	}
-	if codeQueue == nil {
-		return nil, errCodeQueueRequired
-	}
+func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue CodeProducer) *HashDBSyncer {
 	return &HashDBSyncer{
 		log:       log,
 		fetcher:   fetcher,
@@ -78,7 +69,7 @@ func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Dat
 		codeQueue: codeQueue,
 		trieQueue: newTrieQueue(db),
 		threshold: segmentThreshold,
-	}, nil
+	}
 }
 
 // Name returns a human-readable name for logging.

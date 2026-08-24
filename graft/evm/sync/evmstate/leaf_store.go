@@ -20,7 +20,7 @@ import (
 
 var errDecodeAccount = errors.New("could not decode account leaf")
 
-// codeEnqueuer takes the code hashes discovered while syncing. Satisfied by [code.Syncer].
+// codeEnqueuer is the leaf store's half of [CodeProducer].
 type codeEnqueuer interface {
 	AddCode(hashes []common.Hash) error
 }

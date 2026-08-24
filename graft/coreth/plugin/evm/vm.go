@@ -654,20 +654,21 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	}
 
 	// Initialize the state sync client
+	leafClient := client.New(&client.Config{
+		Network:          vm.Network,
+		Codec:            vm.networkCodec,
+		Stats:            stats.NewClientSyncerStats(leafMetricsNames),
+		StateSyncNodeIDs: stateSyncIDs,
+		BlockParser:      vm,
+	})
+
 	vm.Client = engine.NewClient(&engine.ClientConfig{
-		StateSyncDone: vm.stateSyncDone,
-		Chain:         newChainContextAdapter(vm.eth),
-		State:         vm.State,
-		SnowCtx:       vm.ctx,
-		Client: client.New(
-			&client.Config{
-				Network:          vm.Network,
-				Codec:            vm.networkCodec,
-				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
-				StateSyncNodeIDs: stateSyncIDs,
-				BlockParser:      vm,
-			},
-		),
+		StateSyncDone:       vm.stateSyncDone,
+		Chain:               newChainContextAdapter(vm.eth),
+		State:               vm.State,
+		SnowCtx:             vm.ctx,
+		Client:              leafClient,
+		LeafFetcher:         client.NewLeafFetcher(leafClient, message.CorethLeafsRequestType, message.StateTrieNode),
 		Enabled:             stateSyncEnabled,
 		SkipResume:          vm.config.StateSyncSkipResume,
 		MinBlocks:           vm.config.StateSyncMinBlocks,

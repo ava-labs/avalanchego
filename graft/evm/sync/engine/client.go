@@ -121,21 +121,9 @@ type ClientConfig struct {
 	Enabled            bool
 	SkipResume         bool
 
-	// LeafsRequestType specifies the wire format for leafs requests.
-	// Must be set explicitly by the caller.
-	LeafsRequestType message.LeafsRequestType
-
-	// LeafFetcher selects the leaf transport. A nil LeafFetcher uses the message
-	// protocol built from Client and LeafsRequestType.
+	// LeafFetcher is the leaf transport and must be set. [client.NewLeafFetcher]
+	// speaks the message protocol, the vms/evm/sync/evmstate client speaks proto.
 	LeafFetcher types.LeafFetcher
-}
-
-// leafFetcher resolves the configured leaf transport.
-func (c *ClientConfig) leafFetcher() types.LeafFetcher {
-	if c.LeafFetcher != nil {
-		return c.LeafFetcher
-	}
-	return syncclient.NewLeafFetcher(c.Client, c.LeafsRequestType, message.StateTrieNode)
 }
 
 type client struct {
@@ -278,14 +266,14 @@ func (c *client) startAsync(executor Executor, summary message.Syncable) block.S
 
 	c.wg.Add(1)
 	go func() {
-		defer c.wg.Done()
-		defer cancel()
 		// The queue outlives the syncers that feed it, so release it here on
 		// every path rather than only at node shutdown.
 		defer func() {
 			if c.codeQueue != nil {
 				c.codeQueue.Shutdown()
 			}
+			cancel()
+			c.wg.Done()
 		}()
 
 		if err := executor.Execute(ctx, summary); err != nil {
@@ -445,13 +433,10 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			return nil, fmt.Errorf("failed to create firewood syncer: %w", err)
 		}
 	} else {
-		stateSyncer, err = evmstate.NewHashDBSyncer(
-			c.config.SnowCtx.Log, c.config.leafFetcher(), c.config.ChainDB,
+		stateSyncer = evmstate.NewHashDBSyncer(
+			c.config.SnowCtx.Log, c.config.LeafFetcher, c.config.ChainDB,
 			summary.GetBlockRoot(), codeQueue,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
-		}
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}

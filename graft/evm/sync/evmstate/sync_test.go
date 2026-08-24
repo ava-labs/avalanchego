@@ -75,14 +75,13 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	require.NoError(t, err, "failed to create code syncer")
 
 	// Create the state syncer.
-	stateSyncer, err := NewHashDBSyncer(
+	stateSyncer := NewHashDBSyncer(
 		loggingtest.New(t, logging.Debug),
 		client.NewLeafFetcher(mockClient, leafReqType, message.StateTrieNode),
 		clientEthDB,
 		test.root,
 		fetcher,
 	)
-	require.NoError(t, err, "failed to create state syncer")
 
 	// Run both syncers concurrently and wait for the first error.
 	eg, egCtx := errgroup.WithContext(ctx)

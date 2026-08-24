@@ -13,8 +13,8 @@ import (
 
 // LeafFetcher reads leaf ranges over the message protocol.
 //
-// The request and node types are fixed for the life of a syncer, so they are
-// construction config rather than travelling with every range.
+// One [Client] serves both the state and atomic tries, which ask for different
+// node types, so the pair is fixed per syncer rather than on the client.
 type LeafFetcher struct {
 	client   types.LeafClient
 	reqType  message.LeafsRequestType

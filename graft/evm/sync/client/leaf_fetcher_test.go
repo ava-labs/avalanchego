@@ -29,7 +29,8 @@ func (s *stubLeafClient) GetLeafs(_ context.Context, req message.LeafsRequest) (
 	return s.resp, s.err
 }
 
-func TestLeafFetcher(t *testing.T) {
+// The stub returns nothing, so only the request the range becomes is checked.
+func TestLeafFetcher_TranslatesRange(t *testing.T) {
 	t.Parallel()
 	root := common.HexToHash("0xbb")
 	account := common.HexToHash("0xaa")
@@ -39,11 +40,6 @@ func TestLeafFetcher(t *testing.T) {
 		reqType  message.LeafsRequestType
 		nodeType message.NodeType
 		req      evmstate.LeafRange
-		resp     message.LeafsResponse
-		err      error
-		want     evmstate.Leaves
-		wantMore bool
-		wantErr  error
 	}{
 		{
 			name:     "account_trie_subnet_evm",
@@ -57,11 +53,41 @@ func TestLeafFetcher(t *testing.T) {
 			nodeType: message.NodeType(2),
 			req:      evmstate.LeafRange{Root: root, Account: account, Start: []byte{0x01}, End: []byte{0x02}, Limit: 16},
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stub := &stubLeafClient{}
+			_, _, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).FetchLeaves(t.Context(), tt.req)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.req.Root, stub.got.RootHash())
+			require.Equal(t, tt.req.Account, stub.got.AccountHash())
+			require.Equal(t, tt.req.Start, stub.got.StartKey())
+			require.Equal(t, tt.req.End, stub.got.EndKey())
+			require.Equal(t, tt.req.Limit, stub.got.KeyLimit())
+			// The node type comes from construction, not from the range.
+			require.Equal(t, tt.nodeType, stub.got.LeafType())
+		})
+	}
+}
+
+func TestLeafFetcher_UnpacksResponse(t *testing.T) {
+	t.Parallel()
+	root := common.HexToHash("0xbb")
+
+	tests := []struct {
+		name     string
+		resp     message.LeafsResponse
+		err      error
+		want     evmstate.Leaves
+		wantMore bool
+		wantErr  error
+	}{
 		{
-			name:     "proof_never_reaches_caller",
-			reqType:  message.SubnetEVMLeafsRequestType,
-			nodeType: message.StateTrieNode,
-			req:      evmstate.LeafRange{Root: root, Limit: 8},
+			// The proof is verified by the client, so it never reaches the caller.
+			name: "proof_never_reaches_caller",
 			resp: message.LeafsResponse{
 				Keys:      [][]byte{{0x01}, {0x02}},
 				Vals:      [][]byte{{0x0a}, {0x0b}},
@@ -72,12 +98,9 @@ func TestLeafFetcher(t *testing.T) {
 			wantMore: true,
 		},
 		{
-			name:     "client_error_propagates",
-			reqType:  message.SubnetEVMLeafsRequestType,
-			nodeType: message.StateTrieNode,
-			req:      evmstate.LeafRange{Root: root, Limit: 8},
-			err:      errStub,
-			wantErr:  errStub,
+			name:    "client_error_propagates",
+			err:     errStub,
+			wantErr: errStub,
 		},
 	}
 
@@ -85,15 +108,8 @@ func TestLeafFetcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			stub := &stubLeafClient{resp: tt.resp, err: tt.err}
-			got, more, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).FetchLeaves(t.Context(), tt.req)
-
-			require.Equal(t, tt.req.Root, stub.got.RootHash())
-			require.Equal(t, tt.req.Account, stub.got.AccountHash())
-			require.Equal(t, tt.req.Start, stub.got.StartKey())
-			require.Equal(t, tt.req.End, stub.got.EndKey())
-			require.Equal(t, tt.req.Limit, stub.got.KeyLimit())
-			// The node type comes from construction, not from the range.
-			require.Equal(t, tt.nodeType, stub.got.LeafType())
+			got, more, err := NewLeafFetcher(stub, message.SubnetEVMLeafsRequestType, message.StateTrieNode).
+				FetchLeaves(t.Context(), evmstate.LeafRange{Root: root, Limit: 8})
 
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Equal(t, tt.want, got)
