@@ -636,7 +636,7 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 
 			gasClock := b.ParentBlock().ExecutedByGasTime()
 			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
-			_, got, err := blocks.LastToSettleAt(sut.hooks, gasClock.AsTime(), b)
+			_, got, err := blocks.LastToSettleAt(gasClock.AsTime(), b)
 			require.NoError(t, err, "blocks.LastToSettleAt()")
 			require.Equal(t, tt.want, got, "Execute() reports canonical progress")
 		})
