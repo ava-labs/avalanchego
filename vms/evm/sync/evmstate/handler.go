@@ -6,6 +6,7 @@ package evmstate
 import (
 	"bytes"
 	"context"
+	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -460,7 +461,9 @@ func (q *query) nextKey() []byte {
 	if len(q.resp.Keys) == 0 {
 		return q.startKey
 	}
-	next := common.CopyBytes(q.resp.Keys[len(q.resp.Keys)-1])
+
+	last := q.resp.Keys[len(q.resp.Keys)-1]
+	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
 }
