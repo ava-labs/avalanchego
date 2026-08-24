@@ -40,9 +40,9 @@ func (r *recordingTask) OnFinish(context.Context) error {
 // advance the range nowhere and loop forever.
 type moreWithoutKeysFetcher struct{ calls int }
 
-func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, types.LeafRange) (types.Leaves, error) {
+func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, types.LeafRange) (types.Leaves, bool, error) {
 	f.calls++
-	return types.Leaves{More: true}, nil
+	return types.Leaves{}, true, nil
 }
 
 // runLeafTask drives one Task through a single worker.
@@ -111,9 +111,9 @@ func TestLeafFetch_ContextCancelled(t *testing.T) {
 // limitFetcher records the Limit of every range it is asked for.
 type limitFetcher struct{ limits []uint16 }
 
-func (f *limitFetcher) FetchLeaves(_ context.Context, req types.LeafRange) (types.Leaves, error) {
+func (f *limitFetcher) FetchLeaves(_ context.Context, req types.LeafRange) (types.Leaves, bool, error) {
 	f.limits = append(f.limits, req.Limit)
-	return types.Leaves{Keys: [][]byte{{1}}, Vals: [][]byte{{1}}}, nil
+	return types.Leaves{Keys: [][]byte{{1}}, Vals: [][]byte{{1}}}, false, nil
 }
 
 func TestLeafFetch_RequestSize(t *testing.T) {

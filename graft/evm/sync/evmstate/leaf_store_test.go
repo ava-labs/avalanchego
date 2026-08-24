@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -24,7 +23,7 @@ type fakeCodeQueue struct {
 	hashes []common.Hash
 }
 
-func (f *fakeCodeQueue) AddCode(_ context.Context, hashes []common.Hash) error {
+func (f *fakeCodeQueue) AddCode(hashes []common.Hash) error {
 	f.hashes = append(f.hashes, hashes...)
 	return nil
 }
