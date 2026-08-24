@@ -42,7 +42,6 @@ type stateTrie struct {
 	batch     ethdb.Batch
 	stackTrie *trie.StackTrie
 
-	// tasks is the scheduler channel new segments are queued onto.
 	tasks       chan<- leaf.Task
 	numSegments int
 	threshold   uint64
@@ -51,7 +50,6 @@ type stateTrie struct {
 	// persisted before its storage tries finish.
 	isMainTrie bool
 
-	// onDone runs after the trie's root is verified and committed.
 	onDone func(context.Context) error
 
 	stats *trieSyncStats
@@ -178,14 +176,13 @@ func (t *stateTrie) flushProgress() error {
 	return nil
 }
 
-// commitNodes writes the StackTrie's buffered nodes, including the root. A main trie
-// defers this to its caller, so the root never lands ahead of the state it commits to.
+// commitNodes writes the StackTrie's buffered nodes, including the root.
 func (t *stateTrie) commitNodes() error {
 	return t.batch.Write()
 }
 
-// segmentFinished hashes every contiguous finished segment into the StackTrie in key
-// order, then verifies and commits the root once all segments are done.
+// segmentFinished hashes every contiguous finished segment in key order, then
+// verifies and commits the root once all segments are done.
 func (t *stateTrie) segmentFinished(ctx context.Context, idx int) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -294,8 +291,7 @@ func (t *stateTrie) createSegments(ctx context.Context) error {
 	return nil
 }
 
-// stateSegment is one contiguous key range of a [stateTrie], the unit the fetcher
-// consumes.
+// stateSegment is one contiguous key range of a [stateTrie].
 type stateSegment struct {
 	trie      *stateTrie
 	start     []byte
@@ -317,7 +313,6 @@ func (s *stateSegment) Start() []byte {
 	return s.start
 }
 
-// OnLeaves writes the batch, advances the resume position, and splits if grown.
 func (s *stateSegment) OnLeaves(ctx context.Context, leaves evmstate.Leaves) error {
 	if err := s.trie.leaves.writeLeaves(ctx, s.batch, leaves); err != nil {
 		return err
@@ -335,13 +330,12 @@ func (s *stateSegment) OnLeaves(ctx context.Context, leaves evmstate.Leaves) err
 	return s.trie.createSegmentsIfNeeded(ctx, s)
 }
 
-// OnFinish marks this segment done and drives in-order reconstruction.
 func (s *stateSegment) OnFinish(ctx context.Context) error {
 	return s.trie.segmentFinished(ctx, s.idx)
 }
 
-// estimateSize approximates the trie's leaf count from the prefix density covered so
-// far, assuming uniform keys. It returns 0 before any progress.
+// estimateSize approximates the leaf count from the prefix density covered so far,
+// assuming uniform keys. Returns 0 before any progress.
 func (s *stateSegment) estimateSize() uint64 {
 	start, pos, end := uint16(0), uint16(0), uint16(0xffff)
 	if len(s.start) > 0 {

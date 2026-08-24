@@ -17,12 +17,12 @@ func WithinRange(key, end []byte) bool {
 // NextRangeKey returns the next range's start, one past k.
 func NextRangeKey(k []byte) []byte {
 	next := common.CopyBytes(k)
-	IncrementBytes(next)
+	incrementBytes(next)
 	return next
 }
 
-// IncrementBytes adds 1 to b in place. All-0xff wraps to all-zeros.
-func IncrementBytes(b []byte) {
+// incrementBytes adds 1 to b in place. All-0xff wraps to all-zeros.
+func incrementBytes(b []byte) {
 	for i := len(b) - 1; i >= 0; i-- {
 		if b[i] < 0xff {
 			b[i]++

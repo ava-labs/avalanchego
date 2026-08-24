@@ -52,11 +52,8 @@ type HashDBSyncer struct {
 	completed    atomic.Bool
 }
 
-// NewHashDBSyncer returns a syncer for the account trie at root. codeQueue must
-// drain concurrently with Sync.
-//
-// Unless this run resumes the root already in db, the caller must wipe its
-// snapshots. Stale leaves count as progress and fail the final root check.
+// NewHashDBSyncer syncs the account trie at root. codeQueue must drain concurrently
+// with Sync, and the caller must wipe the snapshots unless resuming this same root.
 func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue CodeProducer) *HashDBSyncer {
 	return &HashDBSyncer{
 		log:       log,
@@ -121,10 +118,8 @@ func (s *HashDBSyncer) onSyncComplete() error {
 	return nil
 }
 
-// Finalize flushes in-progress snapshot writes so the next run resumes instead of
-// re-fetching. A no-op once the sync completed.
-//
-// Call it only after Sync returns, since it writes without taking any lock.
+// Finalize flushes in-progress writes so the next run resumes instead of re-fetching.
+// A no-op once synced, and lock-free, so call it only after Sync returns.
 func (s *HashDBSyncer) Finalize() error {
 	if s.completed.Load() || s.scheduler == nil {
 		return nil

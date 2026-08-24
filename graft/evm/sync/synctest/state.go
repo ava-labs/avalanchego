@@ -27,8 +27,7 @@ type AccountDesc struct {
 	StorageSize int
 }
 
-// StorageFixture is one reconstructed storage trie plus the accounts that
-// reference it.
+// StorageFixture is one storage trie plus the accounts referencing it.
 type StorageFixture struct {
 	Root       common.Hash
 	Keys, Vals [][]byte
@@ -47,8 +46,8 @@ type StateFixture struct {
 	Storage map[common.Hash]*StorageFixture
 }
 
-// NewStateFixture builds an account trie from descs, committing every account,
-// storage trie, and code blob so the leaf and code handlers can serve a full sync.
+// NewStateFixture commits every account, storage trie, and code blob from descs, so
+// the leaf and code handlers can serve a full sync.
 func NewStateFixture(t *testing.T, descs []AccountDesc) *StateFixture {
 	t.Helper()
 

@@ -73,16 +73,16 @@ func withLeafFetcher(f types.LeafFetcher) sutOption {
 	})
 }
 
-// SUT is the system under test: the state and code syncers wired to an
-// in-process server. Prefer [SUT.sync] and [SUT.Target] over the fields.
+// SUT is the state and code syncers wired to an in-process server. Prefer
+// [SUT.sync] and [SUT.Target] over the fields.
 type SUT struct {
 	state  *HashDBSyncer
 	code   *code.Syncer
 	target ethdb.Database
 }
 
-// newSUT serves the trie at root over the message protocol, which is what the
-// engine wires by default. Pass [withLeafFetcher] to drive another transport.
+// newSUT serves root over the message protocol, the engine's default. Pass
+// [withLeafFetcher] to drive another transport.
 func newSUT(t *testing.T, trieDB *triedb.Database, root common.Hash, opts ...sutOption) *SUT {
 	t.Helper()
 
@@ -119,7 +119,6 @@ func newSUT(t *testing.T, trieDB *triedb.Database, root common.Hash, opts ...sut
 	return &SUT{state: state, code: codeSyncer, target: cfg.target}
 }
 
-// Target returns the database the syncers reconstruct state into.
 func (s *SUT) Target() ethdb.Database { return s.target }
 
 // sync runs both syncers, finalizes so a later run can resume, and asserts teardown.
@@ -137,8 +136,8 @@ func (s *SUT) sync(t *testing.T, ctx context.Context) error {
 	return syncErr
 }
 
-// transports is the set the syncer must reconstruct identically over. The
-// message protocol is what the engine wires by default, proto is the new one.
+// transports the syncer must reconstruct identically over. Message is the
+// engine's default, proto is the new one.
 var transports = []struct {
 	name  string
 	proto bool
@@ -193,7 +192,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 }
 
 // Segmentation through the orchestrator. TestStateTrie_SegmentedStorageReconstruct
-// only drives stateTrie directly.
+// drives stateTrie directly.
 func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -377,7 +376,6 @@ func requireCode(t *testing.T, target ethdb.Database, codes map[common.Hash][]by
 	}
 }
 
-// requireStorageReconstructed asserts every storage trie and its snapshots reconstruct into target.
 func requireStorageReconstructed(t *testing.T, target ethdb.Database, storage map[common.Hash]*synctest.StorageFixture) {
 	t.Helper()
 	for storageRoot, st := range storage {
@@ -444,8 +442,8 @@ func TestHashDBSyncer_ResumesAfterInterrupt(t *testing.T) {
 	require.Less(t, resumeReqs, fullReqs, "resume must skip the persisted progress")
 }
 
-// runResumableSync syncs into target with segmentation forced on, cancelling after
-// cancelAfter requests when positive.
+// runResumableSync syncs into target with segmentation forced on, cancelling
+// after cancelAfter requests when positive.
 func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, target ethdb.Database, cancelAfter int) (int, error) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())

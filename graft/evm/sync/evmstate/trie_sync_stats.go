@@ -47,7 +47,7 @@ func newTrieSyncStats(log logging.Logger) *trieSyncStats {
 	}
 }
 
-// incLeaves records count leaves synced for segment and periodically logs an ETA.
+// incLeaves records count leaves synced for segment.
 func (t *trieSyncStats) incLeaves(segment *stateSegment, count, remaining uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -63,7 +63,7 @@ func (t *trieSyncStats) incLeaves(segment *stateSegment, count, remaining uint64
 	}
 }
 
-// trieDone records a completed trie and drops its segments from the estimate.
+// trieDone drops the finished trie's segments from the estimate.
 func (t *trieSyncStats) trieDone(root common.Hash) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -109,7 +109,6 @@ func (t *trieSyncStats) estimateSegmentsInProgressTime() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// updateETA refreshes the leaf rate and logs the current ETA.
 func (t *trieSyncStats) updateETA(sinceUpdate time.Duration, now time.Time) {
 	leavesRate := float64(t.leavesSinceUpdate) / sinceUpdate.Seconds()
 	if t.leavesRate == nil {

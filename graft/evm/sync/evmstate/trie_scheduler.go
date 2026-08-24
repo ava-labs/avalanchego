@@ -12,11 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 )
 
-// trieScheduler admits tries to the shared leaf fetcher, feeding each one's segments
-// onto the leaf.Task channel, tracking what needs flushing, and closing that channel once.
-//
-// The bound and the close are one mechanism: a trie holds a slot while it runs, so
-// holding every slot proves nothing is running and the channel is safe to close.
+// trieScheduler feeds each trie's segments onto the leaf.Task channel and closes it
+// once. A trie holds a slot while it runs, so holding every slot proves none is.
 type trieScheduler struct {
 	tasks chan leaf.Task
 	slots chan struct{}
