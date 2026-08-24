@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -73,7 +73,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	}
 
 	batch := db.NewBatch()
-	require.NoError(t, leaves.writeLeaves(t.Context(), batch, types.Leaves{Keys: keys, Vals: vals}))
+	require.NoError(t, leaves.writeLeaves(t.Context(), batch, evmstate.Leaves{Keys: keys, Vals: vals}))
 
 	// Only the non-empty storage root is registered, keyed to its account.
 	require.Len(t, reg.tries, 1)
@@ -98,7 +98,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	reg := &fakeRegistry{}
 	leaves := newAccountLeafStore(db, queue, reg)
 
-	err := leaves.writeLeaves(t.Context(), db.NewBatch(), types.Leaves{
+	err := leaves.writeLeaves(t.Context(), db.NewBatch(), evmstate.Leaves{
 		Keys: [][]byte{synctest.HashedKey(1)},
 		Vals: [][]byte{[]byte("not-a-valid-rlp-account")},
 	})

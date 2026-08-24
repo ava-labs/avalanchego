@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
 const (
@@ -321,7 +321,7 @@ func (s *stateSegment) Start() []byte {
 }
 
 // OnLeaves writes the batch, advances the resume position, and splits if grown.
-func (s *stateSegment) OnLeaves(ctx context.Context, leaves types.Leaves) error {
+func (s *stateSegment) OnLeaves(ctx context.Context, leaves evmstate.Leaves) error {
 	if err := s.trie.leaves.writeLeaves(ctx, s.batch, leaves); err != nil {
 		return err
 	}

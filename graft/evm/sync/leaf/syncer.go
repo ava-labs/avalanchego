@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
 const (
@@ -36,7 +37,7 @@ type Task interface {
 	Start() []byte
 	// End is the inclusive last key of the range, or nil for the whole trie.
 	End() []byte
-	OnLeaves(ctx context.Context, leaves types.Leaves) error
+	OnLeaves(ctx context.Context, leaves evmstate.Leaves) error
 	OnFinish(ctx context.Context) error
 }
 
@@ -116,7 +117,7 @@ func (s *Syncer) syncTask(ctx context.Context, t Task) error {
 			return err
 		}
 
-		leaves, more, err := s.fetcher.FetchLeaves(ctx, types.LeafRange{
+		leaves, more, err := s.fetcher.FetchLeaves(ctx, evmstate.LeafRange{
 			Root:    t.Root(),
 			Account: t.Account(),
 			Start:   start,
@@ -146,13 +147,13 @@ func (s *Syncer) syncTask(ctx context.Context, t Task) error {
 }
 
 // lastKey returns the highest key, the next request's start. Not valid when empty.
-func lastKey(leaves types.Leaves) []byte {
+func lastKey(leaves evmstate.Leaves) []byte {
 	return leaves.Keys[len(leaves.Keys)-1]
 }
 
 // truncate drops leaves past end and reports whether it cut any, meaning the
 // range is exhausted. An empty end is a no-op.
-func truncate(leaves *types.Leaves, end []byte) bool {
+func truncate(leaves *evmstate.Leaves, end []byte) bool {
 	if len(end) == 0 {
 		return false
 	}

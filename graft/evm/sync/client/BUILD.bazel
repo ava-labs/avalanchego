@@ -47,7 +47,6 @@ graft_go_test(
         "//graft/evm/sync/handlers",
         "//graft/evm/sync/handlers/stats",
         "//graft/evm/sync/synctest",
-        "//graft/evm/sync/types",
         "//ids",
         "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",

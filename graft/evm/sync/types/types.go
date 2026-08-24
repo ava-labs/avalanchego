@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
 // Syncer is the common interface for all sync operations.
@@ -39,6 +40,14 @@ type LeafClient interface {
 	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error.
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
+}
+
+// LeafFetcher reads leaf ranges from the network. Implementations own range
+// proof verification, so a caller never sees an unproven range.
+type LeafFetcher interface {
+	// FetchLeaves re-requests from other peers until a range proves out or ctx
+	// ends. Slices stay valid after it returns, and more implies non-empty keys.
+	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (leaves evmstate.Leaves, more bool, err error)
 }
 
 // Extender is an interface that allows for extending the state sync process.
