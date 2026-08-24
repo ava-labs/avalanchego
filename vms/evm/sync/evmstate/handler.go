@@ -233,12 +233,6 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 	}, nil
 }
 
-// wholeTrie reports that the response spans the trie end to end, which the root
-// alone attests, so no range proof is needed.
-func (q *query) wholeTrie(more bool) bool {
-	return bytes.Equal(q.startKey, q.minKey) && !more
-}
-
 func (q *query) atLimit() bool {
 	return len(q.resp.Keys) >= q.limit
 }
@@ -254,32 +248,32 @@ func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
 
 // collect fills [query.resp] with the leaf range and its proof.
 func (q *query) collect() error {
+	var (
+		// Only a proof establishes what lies past the response, so more starts
+		// pessimistic.
+		more = true
+		err  error
+	)
 	if q.snapshot != nil {
-		done, err := q.fillFromSnapshot()
+		more, err = q.fillFromSnapshot()
 		if err != nil {
 			return err
 		}
-		if done {
-			return nil
-		}
 	}
-
-	// At the limit nothing established what lies past the response, so the
-	// range has to be proved.
-	more := true
-	if !q.atLimit() {
-		var err error
-		if more, err = q.fillFromTrie(q.endKey); err != nil {
+	if more && !q.atLimit() {
+		more, err = q.fillFromTrie(q.endKey)
+		if err != nil {
 			return err
 		}
 	}
 	return q.attachProof(more)
 }
 
-// attachProof proves the response range, unless it spans the whole trie, which
-// the root alone attests.
+// attachProof proves the response range.
 func (q *query) attachProof(more bool) error {
-	if q.wholeTrie(more) {
+	// [trie.VerifyRangeProof] allows an empty proof when proving a full trie.
+	// This uses less bandwidth and is faster to verify.
+	if bytes.Equal(q.startKey, q.minKey) && !more {
 		return nil
 	}
 
@@ -291,13 +285,13 @@ func (q *query) attachProof(more bool) error {
 	return err
 }
 
-// fillFromSnapshot reads from the snapshot. done reports that the response
-// needs nothing further, the inverse of the more returned by [query.fillFromTrie].
-func (q *query) fillFromSnapshot() (done bool, _ error) {
+// fillFromSnapshot appends the snapshot leaves that were able to be proven
+// as correct to [query.resp]. It returns whether the trie may hold leaves past
+// the last key appended to the response.
+func (q *query) fillFromSnapshot() (bool, error) {
 	snapKeys, snapVals := q.readFromSnapshot()
 	if len(snapKeys) == 0 {
-		// Unavailable or empty here, use the trie.
-		return false, nil
+		return true, nil // Unavailable or empty here, use the trie.
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
@@ -307,7 +301,7 @@ func (q *query) fillFromSnapshot() (done bool, _ error) {
 	}
 	if valid {
 		q.appendLeaves(snapKeys, snapVals)
-		return q.wholeTrie(more), nil
+		return more, nil
 	}
 
 	return q.fillFromSegments(snapKeys, snapVals)
@@ -315,8 +309,9 @@ func (q *query) fillFromSnapshot() (done bool, _ error) {
 
 const snapshotSegmentLen = 64
 
-// fillFromSegments serves a diverged snapshot one segment at a time. A segment
-// that fails leaves a gap the next good segment bridges from the trie.
+// fillFromSegments appends the segments of snapKeys and snapVals that prove
+// against the trie to [query.resp], bridging failed segments with leaves from
+// the trie. It returns whether the trie may hold leaves past the response.
 //
 // snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] diverged:
 //
@@ -324,7 +319,7 @@ const snapshotSegmentLen = 64
 //	[C D] fails     mark the gap  -> resp=[A B]
 //	[E]   proves    bridge to E   -> resp=[A B C D]
 //	                append past E -> resp=[A B C D E]
-func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ error) {
+func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (bool, error) {
 	hasGap := false
 	// Only a proved segment answers this, so it starts pessimistic. A stale
 	// answer is safe, collect re-derives it below the limit.
@@ -363,7 +358,7 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (done bool, _ erro
 			break
 		}
 	}
-	return q.wholeTrie(trieHasMore), nil
+	return trieHasMore, nil
 }
 
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
@@ -440,8 +435,9 @@ func (q *query) newSnapshotIterator() (iterator, error) {
 	return accountIterator{it}, err
 }
 
-// fillFromTrie iterates the trie from [query.nextKey] up to end (inclusive).
-// more reports keys past the response, the inverse of fillFromSnapshot's done.
+// fillFromTrie appends trie leaves from [query.nextKey] through end to
+// [query.resp], up to [query.limit]. It returns whether the trie holds leaves
+// past the response.
 func (q *query) fillFromTrie(end []byte) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.

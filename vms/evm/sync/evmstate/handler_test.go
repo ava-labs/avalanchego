@@ -824,10 +824,10 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 
 				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
-				done, err := q.fillFromSnapshot()
+				more, err := q.fillFromSnapshot()
 				require.NoError(t, err)
 
-				require.True(t, done, "the snapshot must satisfy a whole-trie request")
+				require.False(t, more, "the snapshot must satisfy a whole-trie request")
 				require.Equal(t, c.keys, q.resp.Keys)
 				require.Equal(t, c.vals, q.resp.Values)
 			})
