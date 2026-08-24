@@ -833,12 +833,13 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 
 				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
-				more, err := q.fillFromSnapshot()
+				leaves := newLeafRange(q.startKey, q.limit)
+				more, err := q.fillFromSnapshot(leaves)
 				require.NoError(t, err)
 
 				require.False(t, more, "the snapshot must satisfy a whole-trie request")
-				require.Equal(t, c.keys, q.resp.Keys)
-				require.Equal(t, c.vals, q.resp.Values)
+				require.Equal(t, c.keys, leaves.keys)
+				require.Equal(t, c.vals, leaves.vals)
 			})
 		}
 	}

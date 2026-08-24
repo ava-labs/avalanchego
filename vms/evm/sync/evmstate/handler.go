@@ -140,10 +140,11 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	if appErr != nil {
 		return nil, appErr
 	}
-	if err := q.collect(); err != nil {
+	resp, err := q.collect()
+	if err != nil {
 		return nil, handlers.Fault(q.log, nodeID, err)
 	}
-	return q.resp, nil
+	return resp, nil
 }
 
 // validateRequest returns the rejection for a malformed req, nil when it is
@@ -177,12 +178,11 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 	return nil
 }
 
-// query holds one in-flight leaf request.
+// query holds the read-only inputs of a request.
 type query struct {
 	log       logging.Logger
 	startKey  []byte
 	endKey    []byte
-	rootHash  common.Hash
 	account   common.Hash // populated when isStorage
 	isStorage bool
 	limit     int
@@ -190,8 +190,6 @@ type query struct {
 	trie     *trie.Trie
 	snapshot SnapshotReader
 	minKey   []byte
-
-	resp *syncpb.GetLeafResponse
 }
 
 // MaxLeavesLimit caps leaves per response.
@@ -220,83 +218,64 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		end = r.maxKey
 	}
 	account := req.GetAccountHash()
-	limit := int(min(req.GetKeyLimit(), MaxLeavesLimit))
 	return &query{
 		log:       r.log,
 		startKey:  start,
 		endKey:    end,
-		rootHash:  root,
 		account:   common.BytesToHash(account),
 		isStorage: len(account) != 0,
-		limit:     limit,
+		limit:     int(min(req.GetKeyLimit(), MaxLeavesLimit)),
 
 		trie:     t,
 		snapshot: r.snapshot,
 		minKey:   r.minKey,
-
-		resp: &syncpb.GetLeafResponse{
-			Keys:   make([][]byte, 0, limit),
-			Values: make([][]byte, 0, limit),
-		},
 	}, nil
 }
 
-func (q *query) atLimit() bool {
-	return len(q.resp.Keys) >= q.limit
-}
-
-// appendLeaves appends what the limit allows. kept below len(keys) means the
-// segment was trimmed.
-func (q *query) appendLeaves(keys, vals [][]byte) (kept int) {
-	kept = min(len(keys), q.limit-len(q.resp.Keys))
-	q.resp.Keys = append(q.resp.Keys, keys[:kept]...)
-	q.resp.Values = append(q.resp.Values, vals[:kept]...)
-	return kept
-}
-
-// collect fills [query.resp] with the leaf range and its proof.
-func (q *query) collect() error {
+// collect returns the response holding the leaf range and its proof.
+func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 	var (
+		leaves = newLeafRange(q.startKey, q.limit)
 		// Only a proof establishes what lies past the response, so more starts
 		// pessimistic.
 		more = true
 		err  error
 	)
 	if q.snapshot != nil {
-		more, err = q.fillFromSnapshot()
+		more, err = q.fillFromSnapshot(leaves)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	if more && !q.atLimit() {
-		more, err = q.fillFromTrie(q.endKey)
+	if more && !leaves.full() {
+		more, err = q.fillFromTrie(leaves, q.endKey)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return q.attachProof(more)
-}
 
-// attachProof proves the response range.
-func (q *query) attachProof(more bool) error {
+	resp := &syncpb.GetLeafResponse{
+		Keys:   leaves.keys,
+		Values: leaves.vals,
+	}
 	// [trie.VerifyRangeProof] allows an empty proof when proving a full trie.
 	// This uses less bandwidth and is faster to verify.
 	if bytes.Equal(q.startKey, q.minKey) && !more {
-		return nil
+		return resp, nil
 	}
 
-	proofDB, err := newRangeProof(q.trie, q.startKey, q.resp.Keys)
+	proofDB, err := newRangeProof(q.trie, q.startKey, leaves.keys)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	q.resp.ProofVals, err = dbValues(proofDB)
-	return err
+	resp.ProofVals = dbValues(proofDB)
+	return resp, nil
 }
 
 // fillFromSnapshot appends the snapshot leaves that were able to be proven
-// as correct to [query.resp]. It returns whether the trie may hold leaves past
-// the last key appended to the response.
-func (q *query) fillFromSnapshot() (bool, error) {
+// as correct to leaves. It returns whether the trie may hold leaves past the
+// last key appended.
+func (q *query) fillFromSnapshot(leaves *leafRange) (bool, error) {
 	snapKeys, snapVals := q.readFromSnapshot()
 	if len(snapKeys) == 0 {
 		return true, nil // Unavailable or empty here, use the trie.
@@ -308,39 +287,39 @@ func (q *query) fillFromSnapshot() (bool, error) {
 		return false, err
 	}
 	if valid {
-		q.appendLeaves(snapKeys, snapVals)
+		leaves.append(snapKeys, snapVals)
 		return more, nil
 	}
 
-	return q.fillFromSegments(snapKeys, snapVals)
+	return q.fillFromSegments(leaves, snapKeys, snapVals)
 }
 
 const snapshotSegmentLen = 64
 
 // fillFromSegments appends the segments of snapKeys and snapVals that prove
-// against the trie to [query.resp], bridging failed segments with leaves from
-// the trie. It returns whether the trie may hold leaves past the response.
+// against the trie to leaves, bridging failed segments with leaves from the
+// trie. It returns whether the trie may hold leaves past the response.
 //
 // snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] diverged:
 //
-//	[A B] proves    append        -> resp=[A B]
-//	[C D] fails     mark the gap  -> resp=[A B]
-//	[E]   proves    bridge to E   -> resp=[A B C D]
-//	                append past E -> resp=[A B C D E]
-func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (bool, error) {
+//	[A B] proves    append        -> leaves=[A B]
+//	[C D] fails     mark the gap  -> leaves=[A B]
+//	[E]   proves    bridge to E   -> leaves=[A B C D]
+//	                append past E -> leaves=[A B C D E]
+func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte) (bool, error) {
 	hasGap := false
 	// Only a proved segment answers this, so it starts pessimistic. A stale
 	// answer is safe, collect re-derives it below the limit.
 	trieHasMore := true
 
 	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
-		// Without a gap the proof starts at nextKey, so the span back to the
-		// response is covered too.
+		// Without a gap the proof starts at leaves.next, so the span back to
+		// the response is covered too.
 		var startKey []byte
 		if hasGap {
 			startKey = snapKeys[i]
 		} else {
-			startKey = q.nextKey()
+			startKey = leaves.next()
 		}
 		end := min(i+snapshotSegmentLen, len(snapKeys))
 		valid, more, err := isRangeValid(q.trie, startKey, snapKeys[i:end], snapVals[i:end])
@@ -355,10 +334,10 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (bool, error) {
 		start := i
 		if hasGap {
 			// The bridge stops on snapKeys[i] inclusive, so skip it here.
-			if _, err := q.fillFromTrie(snapKeys[i]); err != nil {
+			if _, err := q.fillFromTrie(leaves, snapKeys[i]); err != nil {
 				return false, err
 			}
-			if q.atLimit() {
+			if leaves.full() {
 				break
 			}
 			start = i + 1
@@ -367,10 +346,10 @@ func (q *query) fillFromSegments(snapKeys, snapVals [][]byte) (bool, error) {
 
 		// The response now ends where this segment was proved, so the segment's
 		// verdict carries. A trimmed segment leaves the rest of the trie to come.
-		kept := q.appendLeaves(snapKeys[start:end], snapVals[start:end])
+		kept := leaves.append(snapKeys[start:end], snapVals[start:end])
 		trieHasMore = more || kept < end-start
 
-		if q.atLimit() {
+		if leaves.full() {
 			break
 		}
 	}
@@ -428,35 +407,72 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	return keys, vals
 }
 
-// fillFromTrie appends trie leaves from [query.nextKey] through end to
-// [query.resp], up to [query.limit]. It returns whether the trie holds leaves
-// past the response.
-func (q *query) fillFromTrie(end []byte) (bool, error) {
+// fillFromTrie appends trie leaves from [leafRange.next] through end to
+// leaves, up to the limit. It returns whether the trie holds leaves past the
+// response.
+func (q *query) fillFromTrie(leaves *leafRange, end []byte) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.
-	nodeIt, err := q.trie.NodeIterator(q.nextKey())
+	nodeIt, err := q.trie.NodeIterator(leaves.next())
 	if err != nil {
 		return false, err
 	}
 	it := trie.NewIterator(nodeIt)
 
 	for it.Next() {
-		if bytes.Compare(it.Key, end) > 0 || q.atLimit() {
+		if bytes.Compare(it.Key, end) > 0 || leaves.full() {
 			return true, it.Err
 		}
-		q.resp.Keys = append(q.resp.Keys, it.Key)
-		q.resp.Values = append(q.resp.Values, it.Value)
+		leaves.add(it.Key, it.Value)
 	}
 	return false, it.Err
 }
 
-// nextKey returns where trie iteration resumes after the response.
-func (q *query) nextKey() []byte {
-	if len(q.resp.Keys) == 0 {
-		return q.startKey
+// leafRange accumulates the leaves of one response.
+type leafRange struct {
+	start []byte // start of the requested range
+	limit int    // maximum number of leaves
+	keys  [][]byte
+	vals  [][]byte
+}
+
+// newLeafRange returns an empty range starting at start, capped at limit.
+func newLeafRange(start []byte, limit int) *leafRange {
+	return &leafRange{
+		start: start,
+		limit: limit,
+		keys:  make([][]byte, 0, limit),
+		vals:  make([][]byte, 0, limit),
+	}
+}
+
+// full reports whether the limit has been reached.
+func (l *leafRange) full() bool {
+	return len(l.keys) >= l.limit
+}
+
+// append appends what the limit allows. kept below len(keys) means the leaves
+// were trimmed.
+func (l *leafRange) append(keys, vals [][]byte) (kept int) {
+	kept = min(len(keys), l.limit-len(l.keys))
+	l.keys = append(l.keys, keys[:kept]...)
+	l.vals = append(l.vals, vals[:kept]...)
+	return kept
+}
+
+// add appends one leaf, ignoring the limit.
+func (l *leafRange) add(key, val []byte) {
+	l.keys = append(l.keys, key)
+	l.vals = append(l.vals, val)
+}
+
+// next returns where trie iteration resumes after the appended leaves.
+func (l *leafRange) next() []byte {
+	if len(l.keys) == 0 {
+		return l.start
 	}
 
-	last := q.resp.Keys[len(q.resp.Keys)-1]
+	last := l.keys[len(l.keys)-1]
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
@@ -469,8 +485,10 @@ type iterator interface {
 	Value() ([]byte, error)
 }
 
-type accountIterator struct{ snapshot.AccountIterator }
-type storageIterator struct{ snapshot.StorageIterator }
+type (
+	accountIterator struct{ snapshot.AccountIterator }
+	storageIterator struct{ snapshot.StorageIterator }
+)
 
 func (it accountIterator) Value() ([]byte, error) { return types.FullAccountRLP(it.Account()) }
 func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
@@ -529,7 +547,7 @@ func newRangeProof(
 	return proofDB, nil
 }
 
-func dbValues(db *memorydb.Database) ([][]byte, error) {
+func dbValues(db *memorydb.Database) [][]byte {
 	it := db.NewIterator(nil, nil)
 	defer it.Release()
 
@@ -537,7 +555,7 @@ func dbValues(db *memorydb.Database) ([][]byte, error) {
 	for it.Next() {
 		out = append(out, it.Value())
 	}
-	return out, it.Error()
+	return out
 }
 
 // incrementBytes adds 1 to b in place, with carry. All-0xff wraps to
