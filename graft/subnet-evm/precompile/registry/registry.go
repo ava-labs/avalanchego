@@ -9,6 +9,7 @@ package registry
 import (
 	// TODO(JonathanOppenheimer): Uncomment when gaspricemanager init() registration is enabled.
 	// _ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/bencherc20"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
