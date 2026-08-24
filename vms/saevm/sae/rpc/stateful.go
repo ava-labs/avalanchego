@@ -180,7 +180,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
+	return msg, result.BlockCtx, stateDB, noopRelease, nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
@@ -300,7 +300,7 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
-	result, err := saexec.Execute(
+	_, err = saexec.Execute(
 		block,
 		sdb,
 		b.Hooks(),
@@ -313,7 +313,7 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	if err != nil {
 		return nil, nil, err
 	}
-	return result.StateDB, noopRelease, nil
+	return sdb, noopRelease, nil
 }
 
 // StateAtTransaction returns the state served by [backend.StateAtTransaction]

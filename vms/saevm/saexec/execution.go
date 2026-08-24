@@ -146,7 +146,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	return e.afterExecution(b, result)
+	return e.afterExecution(b, stateDB, result)
 }
 
 type (
@@ -165,7 +165,6 @@ type (
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
 		BaseFee     *uint256.Int
-		StateDB     *state.StateDB
 		Signer      types.Signer
 		BlockCtx    vm.BlockContext
 		Receipts    types.Receipts
@@ -189,7 +188,8 @@ func WithMaxNumTxs(maxNumTxs int) Option {
 }
 
 // SkipEndOfBlockOps prevents execution of the block's end-of-block operations
-// and finish-executing-block hook.
+// and finish-executing-block hook. [ExecutionResults.FinishBy] is not populated
+// because execution does not complete the block.
 func SkipEndOfBlockOps() Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.skipEndOfBlockOps = true
@@ -359,7 +359,6 @@ func Execute(
 
 	r := &ExecutionResults{
 		BaseFee:     baseFee,
-		StateDB:     stateDB,
 		Signer:      signer,
 		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts:    receipts,
@@ -409,16 +408,16 @@ func Execute(
 	return r, nil
 }
 
-func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
+func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *ExecutionResults) error {
 	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
 		return fmt.Errorf("after-executing-block hook: %v", err)
 	}
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
-	root, err := r.StateDB.Commit(b.NumberU64(), true)
+	root, err := stateDB.Commit(b.NumberU64(), true)
 	if err != nil {
-		return fmt.Errorf("%T.Commit() at end of block %d: %w", r.StateDB, b.NumberU64(), err)
+		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
 	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err

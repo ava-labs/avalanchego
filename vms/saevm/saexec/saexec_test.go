@@ -487,20 +487,20 @@ func TestEndOfBlockOps(t *testing.T) {
 	})
 }
 
+// TestExecuteTransactionPrefix verifies that executing a transaction prefix
+// does not execute later transactions or end-of-block operations.
 func TestExecuteTransactionPrefix(t *testing.T) {
 	_, sut := newSUT(t)
-	firstRecipient := common.Address{'f', 'i', 'r', 's', 't'}
-	secondRecipient := common.Address{'s', 'e', 'c', 'o', 'n', 'd'}
-	endOfBlockRecipient := common.Address{'e', 'n', 'd'}
+	recipient := common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
 	b := sut.chain.NewBlock(t, types.Transactions{
 		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &firstRecipient,
+			To:       &recipient,
 			Value:    big.NewInt(1),
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
 		}),
 		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &secondRecipient,
+			To:       &recipient,
 			Value:    big.NewInt(2),
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
@@ -508,7 +508,7 @@ func TestExecuteTransactionPrefix(t *testing.T) {
 	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
 		Gas: 1,
 		Mint: []saehookstest.AccountCredit{{
-			Address: endOfBlockRecipient,
+			Address: recipient,
 			Amount:  *uint256.NewInt(100),
 		}},
 	}})))
@@ -526,14 +526,9 @@ func TestExecuteTransactionPrefix(t *testing.T) {
 		SkipEndOfBlockOps(),
 	)
 	require.NoError(t, err, "Execute()")
-	gotBalances := []*uint256.Int{
-		result.StateDB.GetBalance(firstRecipient),
-		result.StateDB.GetBalance(secondRecipient),
-		result.StateDB.GetBalance(endOfBlockRecipient),
-	}
 
 	require.Len(t, result.Receipts, 1, "ExecutionResults.Receipts")
-	require.Equal(t, []*uint256.Int{uint256.NewInt(1), uint256.NewInt(0), uint256.NewInt(0)}, gotBalances, "recipient balances")
+	require.Equal(t, uint256.NewInt(1), stateDB.GetBalance(recipient), "recipient balance")
 	require.Equal(t, gas.Gas(params.TxGas), result.GasConsumed, "ExecutionResults.GasConsumed")
 	require.Nil(t, result.FinishBy.Gas, "ExecutionResults.FinishBy.Gas")
 }
@@ -585,6 +580,9 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 	}
 }
 
+// TestExecuteRecordsOnlyCanonicalProgress verifies that non-canonical execution
+// does not overwrite an in-memory block's canonical progress and change the
+// settlement decision made by LastToSettleAt.
 func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -616,9 +614,8 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 			_, sut := newSUT(t)
 			var txs types.Transactions
 			if tt.withTx {
-				recipient := common.Address{}
 				txs = types.Transactions{sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-					To:       &recipient,
+					To:       &common.Address{},
 					Gas:      params.TxGas,
 					GasPrice: big.NewInt(1),
 				})}
