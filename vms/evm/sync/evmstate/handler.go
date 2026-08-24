@@ -401,7 +401,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	vals := make([][]byte, 0, q.limit)
 	for it.Next() {
 		k := it.Hash().Bytes()
-		afterEnd := len(q.endKey) > 0 && bytes.Compare(k, q.endKey) > 0
+		afterEnd := len(q.endKey) != 0 && bytes.Compare(k, q.endKey) > 0
 		if afterEnd || len(keys) >= q.limit {
 			break
 		}
@@ -432,7 +432,7 @@ func (q *query) fillFromTrie(end []byte) (bool, error) {
 	it := trie.NewIterator(nodeIt)
 
 	for it.Next() {
-		afterEnd := len(end) > 0 && bytes.Compare(it.Key, end) > 0
+		afterEnd := len(end) != 0 && bytes.Compare(it.Key, end) > 0
 		if afterEnd || q.atLimit() {
 			return true, it.Err
 		}
