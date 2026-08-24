@@ -547,6 +547,8 @@ func newRangeProof(
 	return proofDB, nil
 }
 
+// dbValues returns all values stored in the given memorydb.Database. It never
+// returns an error, because the database is in-memory and cannot fail.
 func dbValues(db *memorydb.Database) [][]byte {
 	it := db.NewIterator(nil, nil)
 	defer it.Release()
