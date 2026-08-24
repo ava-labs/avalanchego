@@ -47,7 +47,7 @@ func NewClient(log logging.Logger, s sender) *Client {
 
 // FetchLeaves re-requests from another peer until the range proves out or ctx
 // ends, so an unproven range never surfaces.
-func (c *Client) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, error) {
+func (c *Client) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Leaves, bool, error) {
 	pbReq := &syncpb.GetLeafRequest{
 		RootHash:    req.Root.Bytes(),
 		AccountHash: accountBytes(req.Account),
@@ -58,7 +58,7 @@ func (c *Client) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Le
 
 	for {
 		if err := ctx.Err(); err != nil {
-			return types.Leaves{}, err
+			return types.Leaves{}, false, err
 		}
 
 		pbResp := &syncpb.GetLeafResponse{}
@@ -76,7 +76,7 @@ func (c *Client) FetchLeaves(ctx context.Context, req types.LeafRange) (types.Le
 		}
 
 		outcome.Success()
-		return types.Leaves{Keys: pbResp.GetKeys(), Vals: pbResp.GetValues(), More: more}, nil
+		return types.Leaves{Keys: pbResp.GetKeys(), Vals: pbResp.GetValues()}, more, nil
 	}
 }
 

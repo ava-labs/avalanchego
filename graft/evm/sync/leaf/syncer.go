@@ -116,7 +116,7 @@ func (s *Syncer) syncTask(ctx context.Context, t Task) error {
 			return err
 		}
 
-		leaves, err := s.fetcher.FetchLeaves(ctx, types.LeafRange{
+		leaves, more, err := s.fetcher.FetchLeaves(ctx, types.LeafRange{
 			Root:    t.Root(),
 			Account: t.Account(),
 			Start:   start,
@@ -134,7 +134,7 @@ func (s *Syncer) syncTask(ctx context.Context, t Task) error {
 			return err
 		}
 
-		if exhausted || !leaves.More {
+		if exhausted || !more {
 			return t.OnFinish(ctx)
 		}
 		if len(leaves.Keys) == 0 {

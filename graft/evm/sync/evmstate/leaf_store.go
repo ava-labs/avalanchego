@@ -22,7 +22,7 @@ var errDecodeAccount = errors.New("could not decode account leaf")
 
 // codeEnqueuer takes the code hashes discovered while syncing. Satisfied by [code.Syncer].
 type codeEnqueuer interface {
-	AddCode(ctx context.Context, hashes []common.Hash) error
+	AddCode(hashes []common.Hash) error
 }
 
 // storageRegistry records storage tries that must be synced for an account.
@@ -77,7 +77,7 @@ func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWri
 			codeHashes = append(codeHashes, codeHash)
 		}
 	}
-	return s.codeSyncer.AddCode(ctx, codeHashes)
+	return s.codeSyncer.AddCode(codeHashes)
 }
 
 // iterateLeaves re-reads the account snapshot from seek as full-RLP trie leaves.

@@ -42,6 +42,7 @@ func TestLeafFetcher(t *testing.T) {
 		resp     message.LeafsResponse
 		err      error
 		want     types.Leaves
+		wantMore bool
 		wantErr  error
 	}{
 		{
@@ -67,7 +68,8 @@ func TestLeafFetcher(t *testing.T) {
 				More:      true,
 				ProofVals: [][]byte{{0xff}},
 			},
-			want: types.Leaves{Keys: [][]byte{{0x01}, {0x02}}, Vals: [][]byte{{0x0a}, {0x0b}}, More: true},
+			want:     types.Leaves{Keys: [][]byte{{0x01}, {0x02}}, Vals: [][]byte{{0x0a}, {0x0b}}},
+			wantMore: true,
 		},
 		{
 			name:     "client_error_propagates",
@@ -83,7 +85,7 @@ func TestLeafFetcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			stub := &stubLeafClient{resp: tt.resp, err: tt.err}
-			got, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).FetchLeaves(t.Context(), tt.req)
+			got, more, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).FetchLeaves(t.Context(), tt.req)
 
 			require.Equal(t, tt.req.Root, stub.got.RootHash())
 			require.Equal(t, tt.req.Account, stub.got.AccountHash())
@@ -95,6 +97,7 @@ func TestLeafFetcher(t *testing.T) {
 
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.wantMore, more)
 		})
 	}
 }

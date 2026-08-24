@@ -68,12 +68,12 @@ func TestClient_FetchLeaves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
 
-			got, err := serve(t, ctx, trieDB).FetchLeaves(ctx, types.LeafRange{Root: root, Limit: tt.limit})
+			got, more, err := serve(t, ctx, trieDB).FetchLeaves(ctx, types.LeafRange{Root: root, Limit: tt.limit})
 			require.NoError(t, err)
 
 			require.Equal(t, keys[:tt.wantLen], got.Keys)
 			require.Equal(t, vals[:tt.wantLen], got.Vals)
-			require.Equal(t, tt.wantMore, got.More)
+			require.Equal(t, tt.wantMore, more)
 		})
 	}
 }

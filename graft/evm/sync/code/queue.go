@@ -97,13 +97,9 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 // AddCode persists code hashes as durable disk markers and enqueues them
 // for the forwarder goroutine. Never blocks the caller.
 // Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
-func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
+func (q *Queue) AddCode(codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
 	}
 
 	q.closeMu.RLock()
@@ -139,11 +135,16 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	return nil
 }
 
-// CloseInput signals that no more hashes will be added, without waiting for the
+// DoneAdding signals that no more hashes will be added, without waiting for the
 // forwarder to drain. The consumer sees [Queue.CodeHashes] close once every
 // pending hash has been forwarded.
-func (q *Queue) CloseInput() {
+func (q *Queue) DoneAdding() {
 	q.markClosed()
+	q.closeInput()
+}
+
+// closeInput signals the forwarder that no more work is coming, at most once.
+func (q *Queue) closeInput() {
 	q.closeInOnce.Do(func() {
 		close(q.in)
 	})
@@ -176,9 +177,7 @@ func (q *Queue) stop(shouldCancel bool) {
 	if shouldCancel {
 		q.cancel()
 	}
-	q.closeInOnce.Do(func() {
-		close(q.in)
-	})
+	q.closeInput()
 	<-q.forwardDone
 }
 
@@ -237,9 +236,9 @@ func (q *Queue) init() error {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
 
-	// context.Background: init runs during construction before sync starts,
-	// the queue is not closed yet so AddCode will always succeed.
-	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
+	// init runs during construction, before the queue can be closed, so
+	// AddCode always succeeds here.
+	if err := q.AddCode(dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
 
