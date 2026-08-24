@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -744,7 +746,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 		// keyLimit and endAt bound the read, endAt indexing the last leaf wanted.
 		keyLimit int
 		endAt    int
-		iterErr  bool
+		iterErr  error
 		wantLen  int
 	}{
 		{
@@ -766,7 +768,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 		{
 			name:     "iteration_failure_reads_nothing",
 			keyLimit: numLeaves,
-			iterErr:  true,
+			iterErr:  errors.New("iteration failed"),
 		},
 	}
 
@@ -776,9 +778,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 				t.Parallel()
 				trieDB := synctest.NewTrieDB()
 				c := kind.build(t, trieDB, numLeaves)
-				if tt.iterErr {
-					c.snap.IterErr = errors.New("iteration failed")
-				}
+				c.snap.IterErr = tt.iterErr
 
 				var endKey []byte
 				if tt.endAt > 0 {
@@ -788,13 +788,12 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 				q := newSnapshotQuery(t, trieDB, c, tt.keyLimit, endKey)
 				keys, vals := q.readFromSnapshot()
 
-				if tt.wantLen == 0 {
-					require.Empty(t, keys)
-					require.Empty(t, vals)
-					return
+				if diff := cmp.Diff(c.keys[:tt.wantLen], keys, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("readFromSnapshot() keys diff (-want +got):\n%s", diff)
 				}
-				require.Equal(t, c.keys[:tt.wantLen], keys)
-				require.Equal(t, c.vals[:tt.wantLen], vals, "snapshot values must equal the trie leaves")
+				if diff := cmp.Diff(c.vals[:tt.wantLen], vals, cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("readFromSnapshot() values diff (-want +got):\n%s", diff)
+				}
 			})
 		}
 	}
