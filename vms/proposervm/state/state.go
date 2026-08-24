@@ -70,6 +70,14 @@ func (s *state) VerifyTimestampUnit(millisecondTimestamps bool) error {
 	case err != nil:
 		return err
 	case !bytes.Equal(stored, unit):
+		// A chain with no blocks cannot be misparsed, so allow the unit to
+		// change. This happens when a chain is initialized once before its
+		// subnet config is in place (e.g. tmpnet's pre-restart bootstrap).
+		if _, err := s.GetLastAccepted(); errors.Is(err, database.ErrNotFound) {
+			return s.db.Put(timestampUnitKey, unit)
+		} else if err != nil {
+			return err
+		}
 		return errTimestampUnitMismatch
 	}
 	return nil

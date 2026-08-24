@@ -128,6 +128,10 @@ func run() error {
 					"alphaConfidence": *nodeCount/2 + 1,
 					"beta":            8,
 				},
+				// Sub-second blocks, as in the delivery fleet: millisecond
+				// proposer timestamps plus a 100ms proposer window.
+				"proposerWindowMilliseconds":    100,
+				"proposerMillisecondTimestamps": true,
 			},
 			Chains: []*tmpnet.Chain{{
 				VMID:    constants.SubnetEVMID,
@@ -522,6 +526,11 @@ func runLevel(ctx context.Context, level int, cfg levelConfig) (levelResult, err
 	if err != nil {
 		return levelResult{}, err
 	}
+	if len(stats) > 0 {
+		first, last := stats[0], stats[len(stats)-1]
+		fmt.Printf("observed %d blocks, ts %d..%d (%.1fs), txs total %d\n",
+			len(stats), first.tsMS, last.tsMS, float64(last.tsMS-first.tsMS)/1000, totalTxs(stats))
+	}
 	if err := firstErr.get(); err != nil {
 		return levelResult{}, err
 	}
@@ -604,6 +613,17 @@ func senderLoop(
 	eth := ethclient.NewClient(client)
 	signer := types.LatestSignerForChainID(chainID)
 
+	// A level-3 transaction carries batchSize transfers, so shrink the nonce
+	// window and the RPC batch accordingly: target a total backlog of ~2048
+	// batch transactions (about five 200M-gas blocks) across all relayers,
+	// enough to keep blocks full without an unflushable mempool tail.
+	inflight := uint64(maxInflight)
+	rpcBatch := sendBatchSize
+	if level == 3 {
+		inflight = max(2048/uint64(len(cfg.senders)), 32)
+		rpcBatch = max(sendBatchSize/8, 8)
+	}
+
 	nonce, err := eth.NonceAt(ctx, address, nil)
 	if err != nil {
 		return err
@@ -652,13 +672,74 @@ func senderLoop(
 		}
 	}
 
-	for time.Now().Before(deadline) {
-		if nonce-minedNonce > maxInflight {
-			minedNonce, err = eth.NonceAt(ctx, address, nil)
-			if err != nil {
-				return err
+	// Signed-but-unmined raw txs by nonce. Under saturation the preference can
+	// flap between duplicate block variants and the txpool transiently rejects
+	// or drops transactions; a sender must tolerate send errors and resubmit,
+	// or one lost tx wedges its whole nonce chain.
+	pending := map[uint64][]byte{}
+	sendRaws := func(raws [][]byte) {
+		if len(raws) == 0 {
+			return
+		}
+		elems := make([]rpc.BatchElem, len(raws))
+		for i, raw := range raws {
+			elems[i] = rpc.BatchElem{
+				Method: "eth_sendRawTransaction",
+				Args:   []any{hexutil.Encode(raw)},
+				Result: new(common.Hash),
 			}
-			if nonce-minedNonce > maxInflight {
+		}
+		if err := client.BatchCallContext(ctx, elems); err != nil {
+			sendErrs.Add(1)
+			return
+		}
+		for _, elem := range elems {
+			// Resubmission races produce "already known" and "nonce too low";
+			// neither is a lost transaction.
+			if elem.Error != nil &&
+				!strings.Contains(elem.Error.Error(), "already known") &&
+				!strings.Contains(elem.Error.Error(), "nonce too low") {
+				sendErrs.Add(1)
+			}
+		}
+	}
+	trimMined := func() {
+		mined, err := eth.NonceAt(ctx, address, nil)
+		if err != nil {
+			return
+		}
+		if mined > minedNonce {
+			minedNonce = mined
+			for n := range pending {
+				if n < minedNonce {
+					delete(pending, n)
+				}
+			}
+		}
+	}
+	resubmitHead := func() {
+		raws := make([][]byte, 0, rpcBatch)
+		for n := minedNonce; n < nonce && len(raws) < rpcBatch; n++ {
+			if raw, ok := pending[n]; ok {
+				raws = append(raws, raw)
+			}
+		}
+		sendRaws(raws)
+	}
+
+	lastProgress := time.Now()
+	for time.Now().Before(deadline) {
+		if nonce-minedNonce > inflight {
+			before := minedNonce
+			trimMined()
+			if minedNonce > before {
+				lastProgress = time.Now()
+			}
+			if nonce-minedNonce > inflight {
+				if time.Since(lastProgress) > 3*time.Second {
+					resubmitHead()
+					lastProgress = time.Now()
+				}
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -668,8 +749,8 @@ func senderLoop(
 			}
 		}
 
-		elems := make([]rpc.BatchElem, 0, sendBatchSize)
-		for range sendBatchSize {
+		raws := make([][]byte, 0, rpcBatch)
+		for range rpcBatch {
 			to, data, gas, err := buildPayload()
 			if err != nil {
 				return err
@@ -689,27 +770,46 @@ func senderLoop(
 			if err != nil {
 				return err
 			}
+			pending[nonce] = raw
 			nonce++
 			if sent.Add(1)%sampleEveryNSent == 1 {
 				recordSample(tx.Hash())
 			}
-			elems = append(elems, rpc.BatchElem{
-				Method: "eth_sendRawTransaction",
-				Args:   []any{hexutil.Encode(raw)},
-				Result: new(common.Hash),
-			})
+			raws = append(raws, raw)
 		}
-		if err := client.BatchCallContext(ctx, elems); err != nil {
-			return fmt.Errorf("batch send: %w", err)
+		sendRaws(raws)
+	}
+
+	// Flush: make sure everything issued actually mines, resubmitting stalled
+	// nonces, so the drain and the receipt sampling see a settled chain.
+	flushDeadline := deadline.Add(90 * time.Second)
+	for minedNonce < nonce && time.Now().Before(flushDeadline) {
+		before := minedNonce
+		trimMined()
+		if minedNonce > before {
+			lastProgress = time.Now()
+		} else if time.Since(lastProgress) > 3*time.Second {
+			resubmitHead()
+			lastProgress = time.Now()
 		}
-		for _, elem := range elems {
-			if elem.Error != nil {
-				sendErrs.Add(1)
-				firstErr.set(fmt.Errorf("sendRawTransaction: %w", elem.Error))
-			}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
+	if minedNonce < nonce {
+		return fmt.Errorf("sender %d: %d txs still unmined 90s after deadline", senderIndex, nonce-minedNonce)
+	}
 	return nil
+}
+
+func totalTxs(stats []blockStat) int {
+	total := 0
+	for _, s := range stats {
+		total += s.txs
+	}
+	return total
 }
 
 // firstError keeps the first error any sender goroutine hit.
@@ -744,7 +844,7 @@ type rpcBlock struct {
 func watchBlocks(ctx context.Context, client *rpc.Client, startBlock uint64, deadline time.Time) ([]blockStat, error) {
 	var stats []blockStat
 	next := startBlock
-	drainUntil := deadline.Add(10 * time.Second)
+	drainUntil := deadline.Add(120 * time.Second)
 	for {
 		var block *rpcBlock
 		err := client.CallContext(ctx, &block, "eth_getBlockByNumber", hexutil.EncodeUint64(next), false)

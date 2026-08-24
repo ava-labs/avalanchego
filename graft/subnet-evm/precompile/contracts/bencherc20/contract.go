@@ -33,16 +33,17 @@ const EVMChainID = 77777
 // from(20) + to(20) + value(32) + nonce(32) + v(1) + r(32) + s(32).
 const RecordLen = 169
 
-// Gas costs approximate the state work each call performs. They are far below
-// the Solidity equivalents on purpose: the point of the benchmark genesis is
-// that gas never becomes the throughput cap.
+// Gas costs are deliberately small, in line with what the native code
+// actually does (the stock ecrecover precompile charges 3000): the benchmark
+// must show the execution ceiling, so the 200M block gas limit must never be
+// the binding constraint on the precompile levels.
 const (
 	BalanceOfGasCost        = 2_100
-	TransferGasCost         = 30_000
+	TransferGasCost         = 5_000
 	MintGasCost             = 30_000
 	SetterGasCost           = 25_000
 	BatchBaseGasCost        = 3_000
-	BatchPerTransferGasCost = 35_000
+	BatchPerTransferGasCost = 6_000
 )
 
 const rawABI = `[
