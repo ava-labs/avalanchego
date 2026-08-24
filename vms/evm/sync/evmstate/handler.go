@@ -68,11 +68,23 @@ type handlerConfig struct {
 // HandlerOption configures [RegisterHandler].
 type HandlerOption = options.Option[handlerConfig]
 
+// SnapshotReaderPointer is a type constraint for a pointer that implements
+// [SnapshotReader].
+//
+// It can be used to avoid typed-nil interface panics.
+type SnapshotReaderPointer[V any] interface {
+	SnapshotReader
+	*V
+}
+
 // WithSnapshot serves leaves from the snapshot where it agrees with the trie,
-// falling back to trie iteration everywhere else.
-func WithSnapshot(s SnapshotReader) HandlerOption {
+// falling back to trie iteration everywhere else. A nil snapshot is equivalent
+// to not providing this option.
+func WithSnapshot[V any, P SnapshotReaderPointer[V]](s P) HandlerOption {
 	return options.Func[handlerConfig](func(c *handlerConfig) {
-		c.snapshot = s
+		if s != nil {
+			c.snapshot = s
+		}
 	})
 }
 
