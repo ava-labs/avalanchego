@@ -534,13 +534,15 @@ func newRangeProof(
 	start []byte,
 	keys [][]byte,
 ) (*memorydb.Database, error) {
+	// [trie.VerifyRangeProof] requires the proof to resolve a full path for
+	// each edge key, even when the leaves would otherwise prove the range.
 	proofDB := memorydb.New()
 	if err := t.Prove(start, proofDB); err != nil {
 		return nil, err
 	}
 	if len(keys) > 0 {
-		end := keys[len(keys)-1]
-		if err := t.Prove(end, proofDB); err != nil {
+		last := keys[len(keys)-1]
+		if err := t.Prove(last, proofDB); err != nil {
 			return nil, err
 		}
 	}
