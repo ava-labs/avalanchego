@@ -377,7 +377,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		zap.Stringer("account", q.account),
 	)
 
-	it, err := q.newSnapshotIterator()
+	it, err := newSnapshotIterator(q.snapshot, q.isStorage, q.account, common.BytesToHash(q.startKey))
 	if err != nil {
 		log.Debug("snapshot read abandoned",
 			zap.String("reason", "iterator unavailable"),
@@ -415,34 +415,6 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 	return keys, vals
 }
 
-// iterator walks snapshot leaves. Value returns the trie-encoded value at the
-// cursor.
-type iterator interface {
-	snapshot.Iterator
-	Value() ([]byte, error)
-}
-
-type accountIterator struct{ snapshot.AccountIterator }
-type storageIterator struct{ snapshot.StorageIterator }
-
-func (it accountIterator) Value() ([]byte, error) { return types.FullAccountRLP(it.Account()) }
-func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
-
-// newSnapshotIterator returns an iterator over accounts, or over the requested
-// account's storage. The iterator serves some recent state, not necessarily
-// the state rooted at [query.rootHash].
-//
-// If a nil error is returned, the iterator MUST be released.
-func (q *query) newSnapshotIterator() (iterator, error) {
-	start := common.BytesToHash(q.startKey)
-	if q.isStorage {
-		it, err := q.snapshot.StorageIterator(q.account, start)
-		return storageIterator{it}, err
-	}
-	it, err := q.snapshot.AccountIterator(start)
-	return accountIterator{it}, err
-}
-
 // fillFromTrie appends trie leaves from [query.nextKey] through end to
 // [query.resp], up to [query.limit]. It returns whether the trie holds leaves
 // past the response.
@@ -475,6 +447,37 @@ func (q *query) nextKey() []byte {
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
+}
+
+// iterator walks snapshot leaves. Value returns the trie-encoded value at the
+// cursor.
+type iterator interface {
+	snapshot.Iterator
+	Value() ([]byte, error)
+}
+
+type accountIterator struct{ snapshot.AccountIterator }
+type storageIterator struct{ snapshot.StorageIterator }
+
+func (it accountIterator) Value() ([]byte, error) { return types.FullAccountRLP(it.Account()) }
+func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
+
+// newSnapshotIterator returns an iterator starting at start over the account
+// trie or over the account's storage when isStorage is true.
+//
+// If a nil error is returned, the iterator MUST be released.
+func newSnapshotIterator(
+	s SnapshotReader,
+	isStorage bool,
+	account common.Hash,
+	start common.Hash,
+) (iterator, error) {
+	if isStorage {
+		it, err := s.StorageIterator(account, start)
+		return storageIterator{it}, err
+	}
+	it, err := s.AccountIterator(start)
+	return accountIterator{it}, err
 }
 
 // isRangeValid range-proves keys/vals against the trie from start. valid
