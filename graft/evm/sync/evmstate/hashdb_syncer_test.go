@@ -111,8 +111,7 @@ func newSUT(t *testing.T, trieDB *triedb.Database, root common.Hash, opts ...sut
 	codeSyncer, err := code.NewSyncer(server, cfg.target, queue.CodeHashes())
 	require.NoError(t, err)
 
-	state, err := NewHashDBSyncer(log, fetcher, cfg.target, root, queue)
-	require.NoError(t, err)
+	state := NewHashDBSyncer(log, fetcher, cfg.target, root, queue)
 	if cfg.threshold > 0 {
 		state.threshold = cfg.threshold
 	}
@@ -392,30 +391,6 @@ func requireStorageReconstructed(t *testing.T, target ethdb.Database, storage ma
 	}
 }
 
-func TestNewHashDBSyncer_Validation(t *testing.T) {
-	t.Parallel()
-	db := rawdb.NewMemoryDatabase()
-	queue, err := code.NewQueue(db)
-	require.NoError(t, err)
-	defer queue.Shutdown()
-
-	tests := []struct {
-		name    string
-		root    common.Hash
-		code    codeProducer
-		wantErr error
-	}{
-		{name: "zero_root", root: common.Hash{}, code: queue, wantErr: errRootRequired},
-		{name: "nil_code_queue", root: common.HexToHash("0x1"), code: nil, wantErr: errCodeQueueRequired},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, tt.root, tt.code)
-			require.ErrorIs(t, err, tt.wantErr)
-		})
-	}
-}
-
 // Sync builds the state Finalize walks, so calling it first must find nothing rather
 // than panic on the unset fields.
 func TestHashDBSyncer_FinalizeBeforeSync(t *testing.T) {
@@ -425,8 +400,7 @@ func TestHashDBSyncer_FinalizeBeforeSync(t *testing.T) {
 	require.NoError(t, err)
 	defer queue.Shutdown()
 
-	s, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), queue)
-	require.NoError(t, err)
+	s := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), queue)
 	require.NoError(t, s.Finalize())
 }
 
