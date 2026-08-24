@@ -16,7 +16,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
@@ -75,6 +74,7 @@ import (
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -1137,8 +1137,9 @@ func TestEstimateGasIgnoresMinimumGasConsumption(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(from))
 
 	got, err := sut.ethclient.EstimateGas(ctx, ethereum.CallMsg{
-		From: from,
-		Gas:  gasLimit,
+		From:      from,
+		Gas:       gasLimit,
+		GasFeeCap: big.NewInt(1),
 	})
 	require.NoError(t, err, "%T.EstimateGas(...)", sut.ethclient)
 	require.GreaterOrEqual(t, got, minEstimate, "%T.EstimateGas(...)", sut.ethclient)
