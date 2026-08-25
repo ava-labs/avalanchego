@@ -123,7 +123,7 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	}
 	resp, err := q.collect()
 	if err != nil {
-		return nil, handlers.Fault(q.log, nodeID, err)
+		return nil, handlers.Fault(r.log, nodeID, err)
 	}
 	return resp, nil
 }
@@ -161,7 +161,6 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 
 // query holds the read-only inputs of a request.
 type query struct {
-	log      logging.Logger
 	startKey []byte
 	endKey   []byte
 	limit    int
@@ -210,7 +209,6 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 		}
 	}
 	return &query{
-		log:      r.log,
 		startKey: start,
 		endKey:   end,
 		limit:    int(min(req.GetKeyLimit(), MaxLeavesLimit)),
