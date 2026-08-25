@@ -19,9 +19,7 @@ import (
 
 const defaultQueueCapacity = 5000
 
-var (
-	ErrQueueClosed = errors.New("code queue is closed")
-)
+var ErrQueueClosed = errors.New("code queue is closed")
 
 // Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
 // and the code syncer consumer. Producers call [Queue.AddCode] which persists durable
