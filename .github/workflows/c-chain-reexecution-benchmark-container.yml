@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Check AWS Role Availability
         id: check-aws-role
-        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE_BUT_WRONG_HAHAHA != '' }}" >> "$GITHUB_OUTPUT"
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
