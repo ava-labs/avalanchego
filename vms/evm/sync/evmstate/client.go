@@ -22,28 +22,34 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// sender is the transport a [Client] sends over.
+// sender is the transport a [Client] sends requests over.
 type sender = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-
-// newSender binds the leaf transport to handlerID on n.
-func newSender(n *p2p.Network, handlerID uint64, peers *p2p.PeerTracker) *sender {
-	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		n,
-		handlerID,
-		peers,
-	)
-}
 
 // Client reads verified leaf ranges over the proto protocol. A caller never
 // sees a range that failed its proof.
 type Client struct {
 	log    logging.Logger
 	sender *sender
+	minKey []byte // read-only stand-in for an absent start key
 }
 
 // NewClient returns a [Client] reading handlerID's trie from n's peers.
-func NewClient(log logging.Logger, n *p2p.Network, handlerID uint64, peers *p2p.PeerTracker) *Client {
-	return &Client{log: log, sender: newSender(n, handlerID, peers)}
+func NewClient(
+	log logging.Logger,
+	n *p2p.Network,
+	handlerID uint64,
+	trieKeyLength int,
+	peers *p2p.PeerTracker,
+) *Client {
+	return &Client{
+		log: log,
+		sender: network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+			n,
+			handlerID,
+			peers,
+		),
+		minKey: make([]byte, trieKeyLength),
+	}
 }
 
 // LeafRange is a run of leaves to fetch from one trie.
@@ -72,6 +78,14 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		reqPB.AccountHash = req.Account.Bytes()
 	}
 
+	// If we are asking for the first key, [trie.VerifyRangeProof] expects a
+	// zero-padded key. We only swap this out AFTER making the proto request to
+	// avoid sending unecessary bytes over the wire.
+	startKey := req.Start
+	if len(startKey) == 0 {
+		startKey = c.minKey
+	}
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return Leaves{}, false, err
@@ -87,7 +101,7 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 			continue
 		}
 
-		more, err := verifyRange(req, &resp)
+		more, err := verifyRange(req.Root, startKey, req.Limit, &resp)
 		if err != nil {
 			outcome.Failure()
 			c.log.Debug("invalid leaf response, re-requesting",
@@ -110,10 +124,15 @@ var (
 )
 
 // verifyRange reports whether more leaves remain to the right of resp.
-func verifyRange(req LeafRange, resp *syncpb.GetLeafResponse) (bool, error) {
+func verifyRange(
+	root common.Hash,
+	start []byte,
+	limit uint16,
+	resp *syncpb.GetLeafResponse,
+) (bool, error) {
 	keys := resp.GetKeys()
-	if uint(len(keys)) > uint(req.Limit) {
-		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), req.Limit)
+	if uint(len(keys)) > uint(limit) {
+		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), limit)
 	}
 
 	// A whole-trie response carries no proof, so VerifyRangeProof asserts the
@@ -128,15 +147,9 @@ func verifyRange(req LeafRange, resp *syncpb.GetLeafResponse) (bool, error) {
 		}
 	}
 
-	// A nil start means the trie's beginning, which VerifyRangeProof wants zero-padded.
-	firstKey := req.Start
-	if firstKey == nil && len(keys) > 0 {
-		firstKey = make([]byte, len(keys[0]))
-	}
-
 	more, err := trie.VerifyRangeProof(
-		req.Root,
-		firstKey,
+		root,
+		start,
 		keys,
 		resp.GetValues(),
 		proof,

@@ -28,7 +28,7 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...H
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
-	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, tracker)
+	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
 }
 
 // rawResponse fetches a range at the wire level, so a test can build cases from
@@ -140,7 +140,7 @@ func TestVerifyRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			more, err := verifyRange(LeafRange{Root: root, Limit: maxLimit}, tt.resp)
+			more, err := verifyRange(root, make([]byte, common.HashLength), maxLimit, tt.resp)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Equal(t, tt.wantMore, more)
 		})
@@ -174,7 +174,7 @@ func TestClient_RejectsTamperedRange(t *testing.T) {
 	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID,
 		synctest.NewCancelAfter(recording, attempts, cancel))
 
-	got, _, err := NewClient(log, net, p2p.EVMLeafRequestHandlerID, tracker).
+	got, _, err := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker).
 		FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 	require.ErrorIs(t, err, context.Canceled, "a tampered range must never be returned")
 	require.Empty(t, got.Keys)
