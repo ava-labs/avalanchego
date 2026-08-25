@@ -35,7 +35,6 @@ type CodeProducer interface {
 // HashDBSyncer reconstructs EVM state on the hashdb stack: the account trie, then
 // every storage trie it finds, each split into concurrently fetched segments.
 type HashDBSyncer struct {
-	log       logging.Logger
 	fetcher   types.LeafFetcher
 	db        ethdb.Database
 	root      common.Hash
@@ -54,13 +53,16 @@ type HashDBSyncer struct {
 // with Sync, and the caller must wipe the snapshots unless resuming this same root.
 func NewHashDBSyncer(log logging.Logger, fetcher types.LeafFetcher, db ethdb.Database, root common.Hash, codeQueue CodeProducer) *HashDBSyncer {
 	return &HashDBSyncer{
-		log:       log,
 		fetcher:   fetcher,
 		db:        db,
 		root:      root,
 		codeQueue: codeQueue,
 		trieQueue: newTrieQueue(db),
 		threshold: segmentThreshold,
+
+		scheduler:    newTrieScheduler(defaultLeafWorkers, numStorageTrieSegments),
+		mainTrieDone: make(chan struct{}),
+		stats:        newTrieSyncStats(log),
 	}
 }
 
@@ -73,10 +75,6 @@ func (s *HashDBSyncer) Sync(ctx context.Context) error {
 	if err := s.trieQueue.clearIfRootDoesNotMatch(s.root); err != nil {
 		return err
 	}
-
-	s.scheduler = newTrieScheduler(defaultLeafWorkers, numStorageTrieSegments)
-	s.mainTrieDone = make(chan struct{})
-	s.stats = newTrieSyncStats(s.log)
 
 	mainTrie, err := newStateTrie(s.db, s.root, common.Hash{}, newAccountLeafStore(s.db, s.codeQueue, s.trieQueue), stateTrieConfig{
 		numSegments: numMainTrieSegments,
@@ -119,7 +117,7 @@ func (s *HashDBSyncer) onSyncComplete() error {
 // Finalize flushes in-progress writes so the next run resumes instead of re-fetching.
 // A no-op once synced, and lock-free, so call it only after Sync returns.
 func (s *HashDBSyncer) Finalize() error {
-	if s.completed.Load() || s.scheduler == nil {
+	if s.completed.Load() {
 		return nil
 	}
 	return s.scheduler.flush()
