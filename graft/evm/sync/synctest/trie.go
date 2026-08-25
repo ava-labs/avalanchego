@@ -27,12 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// NewTrieDB returns an in-memory [triedb.Database].
 func NewTrieDB() *triedb.Database {
 	return triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 }
 
-// NewTrieDBWithDisk returns an in-memory [triedb.Database] and its backing disk.
 func NewTrieDBWithDisk() (*triedb.Database, ethdb.Database) {
 	db := rawdb.NewMemoryDatabase()
 	return triedb.NewDatabase(db, nil), db
@@ -76,14 +74,12 @@ func FillAccountTrieDistributed(t *testing.T, trieDB *triedb.Database, numAccoun
 	})
 }
 
-// sequentialKey returns the unhashed 32-byte trie key for the i-th entry.
 func sequentialKey(i int) []byte {
 	key := make([]byte, common.HashLength)
 	binary.BigEndian.PutUint64(key, uint64(i+1))
 	return key
 }
 
-// hashedKey returns the hashed 32-byte trie key for the i-th entry.
 func hashedKey(i int) []byte {
 	return HashedKey(uint64(i + 1))
 }
