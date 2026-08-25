@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -19,15 +18,23 @@ var (
 	_ verify.Verifiable = (*WarpCredential)(nil)
 
 	ErrNilWarpCredential    = errors.New("nil warp credential")
-	ErrWrongWarpPayload     = errors.New("warp payload is not the unsigned tx hash")
+	ErrWrongWarpPayload     = errors.New("warp payload is not owner || unsigned tx bytes")
 	ErrWrongWarpSourceAddr  = errors.New("warp source address is not an owner")
 	ErrWrongWarpSourceAddrL = errors.New("warp source address has wrong length")
+
+	// WarpHelperAddress is the C-chain contract trusted to name the real
+	// owner in the payload (it calls sendWarpMessage on the owner's behalf,
+	// so the warp source address is the helper, not the owner).
+	// ponytail: package var placeholder, becomes the Nick-deployed address
+	// once the helper contract is deployed.
+	WarpHelperAddress = ids.ShortID{0x50, 0x43, 0x48, 0x41, 0x49, 0x4e} // "PCHAIN"
 )
 
-// WarpCredential authorizes an input on behalf of the 20-byte address that
-// sent the warp message. The message payload must be an AddressedCall whose
-// Payload is sha256(unsigned tx bytes). BLS quorum and source chain are
-// verified by the tx executor, not here.
+// WarpCredential authorizes an input on behalf of a 20-byte owner address.
+// The message payload must be an AddressedCall whose Payload is
+// owner || unsigned tx bytes, sent either by the owner itself or by
+// WarpHelperAddress. BLS quorum and source chain are verified by the tx
+// executor, not here.
 type WarpCredential struct {
 	Message []byte `serialize:"true" json:"message"`
 }
@@ -63,17 +70,21 @@ func (fx *Fx) VerifyWarpCredential(utx UnsignedTx, in *Input, cred *WarpCredenti
 	if len(call.SourceAddress) != ids.ShortIDLen {
 		return fmt.Errorf("%w: %d", ErrWrongWarpSourceAddrL, len(call.SourceAddress))
 	}
-	if !bytes.Equal(call.Payload, hashing.ComputeHash256(utx.Bytes())) {
+	if len(call.Payload) < ids.ShortIDLen || !bytes.Equal(call.Payload[ids.ShortIDLen:], utx.Bytes()) {
 		return ErrWrongWarpPayload
 	}
-
+	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
 	sender := ids.ShortID(call.SourceAddress)
+	if sender != owner && sender != WarpHelperAddress {
+		return fmt.Errorf("%w: %s is neither %s nor the helper", ErrWrongWarpSourceAddr, sender, owner)
+	}
+
 	for _, index := range in.SigIndices {
 		if index >= uint32(len(out.Addrs)) {
 			return ErrInputOutputIndexOutOfBounds
 		}
-		if out.Addrs[index] != sender {
-			return fmt.Errorf("%w: expected %s but got %s", ErrWrongWarpSourceAddr, out.Addrs[index], sender)
+		if out.Addrs[index] != owner {
+			return fmt.Errorf("%w: expected %s but got %s", ErrWrongWarpSourceAddr, out.Addrs[index], owner)
 		}
 	}
 	return nil

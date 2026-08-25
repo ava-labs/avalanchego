@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -79,10 +78,9 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 		}},
 	}}
 	require.NoError((&txs.Tx{Unsigned: unsigned}).Initialize(txs.Codec))
-	txHash := hashing.ComputeHash256(unsigned.Bytes())
 
-	newTx := func(sender ids.ShortID) *txs.Tx {
-		call, err := payload.NewAddressedCall(sender[:], txHash)
+	newTx := func(sender, claimedOwner ids.ShortID) *txs.Tx {
+		call, err := payload.NewAddressedCall(sender[:], append(claimedOwner[:], unsigned.Bytes()...))
 		require.NoError(err)
 		unsignedMsg, err := warp.NewUnsignedMessage(vm.ctx.NetworkID, vm.ctx.CChainID, call.Bytes())
 		require.NoError(err)
@@ -99,10 +97,11 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 	}
 
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTxFromRPC(newTx(ids.GenerateTestShortID()))
-	require.ErrorIs(err, secp256k1fx.ErrWrongWarpSourceAddr)
+	// A stranger claiming to be the owner, and the helper naming a stranger.
+	require.ErrorIs(vm.issueTxFromRPC(newTx(ids.GenerateTestShortID(), owner)), secp256k1fx.ErrWrongWarpSourceAddr)
+	require.ErrorIs(vm.issueTxFromRPC(newTx(secp256k1fx.WarpHelperAddress, ids.GenerateTestShortID())), secp256k1fx.ErrWrongWarpSourceAddr)
 
-	spendTx := newTx(owner)
+	spendTx := newTx(owner, owner)
 	require.NoError(vm.issueTxFromRPC(spendTx))
 	vm.ctx.Lock.Lock()
 	require.NoError(buildAndAcceptStandardBlock(vm))
