@@ -75,6 +75,8 @@ type Config struct {
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
 	AllowUnprotectedTxs bool
+
+	ResolvePendingToLastExecuted bool
 }
 
 var (

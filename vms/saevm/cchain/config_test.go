@@ -8,7 +8,11 @@ import (
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -170,6 +174,16 @@ func TestParseConfig(t *testing.T) {
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
+		{
+			name: "api/enable_map_pending_to_last_executed",
+			json: `{"api-resolve-pending-to-last-executed":true}`,
+			want: with(func(c *config) { c.ResolvePendingToLastExecuted = true }),
+		},
+		{
+			name: "api/disable_map_pending_to_last_executed",
+			json: `{"api-resolve-pending-to-last-executed":false}`,
+			want: with(func(c *config) { c.ResolvePendingToLastExecuted = false }),
+		},
 
 		// Warp
 		{
@@ -178,6 +192,13 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) {
 				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
 			}),
+		},
+
+		// State sync
+		{
+			name: "state_sync_enabled",
+			json: `{"state-sync-enabled":false}`,
+			want: with(func(c *config) { c.StateSyncEnabled = false }),
 		},
 
 		// All active fields
@@ -199,25 +220,29 @@ func TestParseConfig(t *testing.T) {
 				"apis":["chain","trace"],
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
-				"warp-off-chain-messages":["0x1234"]
+				"state-sync-enabled":false,
+				"warp-off-chain-messages":["0x1234"],
+				"api-resolve-pending-to-last-executed":true
 			}`,
 			want: config{
-				PriceTarget:          utils.PointerTo(gas.Price(500)),
-				GasTarget:            utils.PointerTo(gas.Gas(1500)),
-				MinDelayTarget:       utils.PointerTo[uint64](3000),
-				Pruning:              false,
-				StateScheme:          customrawdb.FirewoodScheme,
-				CommitInterval:       256,
-				TrieCleanCache:       256,
-				SnapshotCache:        128,
-				AllowMissingTries:    true,
-				LocalTxsEnabled:      true,
-				TxPoolAccountSlots:   8,
-				TxPoolGlobalSlots:    2048,
-				APIs:                 set.Of(rpc.APIChain, rpc.APITrace),
-				AllowUnprotectedTxs:  true,
-				BatchRequestLimit:    50,
-				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
+				PriceTarget:                  utils.PointerTo(gas.Price(500)),
+				GasTarget:                    utils.PointerTo(gas.Gas(1500)),
+				MinDelayTarget:               utils.PointerTo[uint64](3000),
+				Pruning:                      false,
+				StateScheme:                  customrawdb.FirewoodScheme,
+				CommitInterval:               256,
+				TrieCleanCache:               256,
+				SnapshotCache:                128,
+				AllowMissingTries:            true,
+				LocalTxsEnabled:              true,
+				TxPoolAccountSlots:           8,
+				TxPoolGlobalSlots:            2048,
+				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
+				AllowUnprotectedTxs:          true,
+				BatchRequestLimit:            50,
+				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
+				ResolvePendingToLastExecuted: true,
+				StateSyncEnabled:             false,
 			},
 		},
 	}
@@ -278,6 +303,58 @@ func TestConfig_WarpMessages(t *testing.T) {
 			got, err := c.WarpMessages()
 			require.ErrorIsf(t, err, test.wantErr, "%T.WarpMessages()", c)
 			require.Equalf(t, test.want, got, "%T.WarpMessages()", c)
+		})
+	}
+}
+
+func TestConfigResolvePendingToLastExecuted(t *testing.T) {
+	// This test only exercises plumbing of the config. A full test of
+	// functionality is performed in the SAE code.
+
+	tests := []struct {
+		name    string
+		opt     func(*sutConfig)
+		wantErr testerr.Want
+	}{
+		{
+			name: "default_config",
+			opt:  func(*sutConfig) {},
+		},
+		{
+			name: "explicitly_enable_mapping",
+			opt: func(c *sutConfig) {
+				c.vmConfig.ResolvePendingToLastExecuted = true
+			},
+		},
+		{
+			name: "explicitly_disable_mapping",
+			opt: func(c *sutConfig) {
+				c.vmConfig.ResolvePendingToLastExecuted = false
+			},
+			wantErr: testerr.Contains("pending"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr := common.Address{'S', 't', 'e', 'p', 'h', 'e', 'n'}
+			code := []byte{42}
+
+			ctx, sut := newSUT(t,
+				withAccount(addr, types.Account{
+					Code: code,
+				}),
+				options.Func[sutConfig](tt.opt),
+			)
+
+			got, err := sut.ethclient.PendingCodeAt(ctx, addr)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("%T.PendingCodeAt(%v): %s", sut.ethclient, addr, diff)
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			assert.Equalf(t, code, got, "%T.PendingCodeAt(%v)", sut.ethclient, addr)
 		})
 	}
 }

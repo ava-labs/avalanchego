@@ -3,6 +3,67 @@
 This document explains how Bazel is configured and used in the
 avalanchego monorepo.
 
+## Table of contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Why Bazel?](#why-bazel)
+- [Architecture Overview](#architecture-overview)
+  - [Toolchain Strategy](#toolchain-strategy)
+  - [Version Pinning](#version-pinning)
+  - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
+  - [Why Bazel 8?](#why-bazel-8)
+  - [Multi-Module Structure](#multi-module-structure)
+  - [Key Configuration Files](#key-configuration-files)
+  - [BUILD.bazel Files with Custom Content](#buildbazel-files-with-custom-content)
+- [Gazelle](#gazelle)
+  - [Where Gazelle Comes From](#where-gazelle-comes-from)
+  - [When to Run Gazelle](#when-to-run-gazelle)
+  - [How Gazelle Handles Multiple Modules](#how-gazelle-handles-multiple-modules)
+  - [Custom Test Macros via `gazelle:map_kind`](#custom-test-macros-via-gazellemap_kind)
+- [External Dependency Handling](#external-dependency-handling)
+  - [Go Dependencies](#go-dependencies)
+  - [Patched Dependencies](#patched-dependencies)
+    - [Patching strategies](#patching-strategies)
+    - [libevm (secp256k1)](#libevm-secp256k1)
+    - [firewood-go-ethhash FFI](#firewood-go-ethhash-ffi)
+    - [blst (BLS Signatures)](#blst-bls-signatures)
+    - [gnark-crypto (BLS12-381 for KZG)](#gnark-crypto-bls12-381-for-kzg)
+  - [Protocol Buffers](#protocol-buffers)
+- [Common Tasks](#common-tasks)
+  - [Building](#building)
+  - [Testing](#testing)
+    - [Test Options](#test-options)
+    - [Test Timeouts](#test-timeouts)
+    - [Non-Unit Tests and the `manual` Tag](#non-unit-tests-and-the-manual-tag)
+  - [Maintenance](#maintenance)
+- [Bazel CI External Dependency Caching](#bazel-ci-external-dependency-caching)
+  - [Why this exists](#why-this-exists)
+  - [What is cached](#what-is-cached)
+  - [Cache key](#cache-key)
+  - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
+  - [Enforcement](#enforcement)
+  - [Changing this safely](#changing-this-safely)
+  - [Apple CommandLineTools](#apple-commandlinetools)
+  - [The macOS C compiler](#the-macos-c-compiler)
+- [Adding a New Go Module](#adding-a-new-go-module)
+- [Troubleshooting](#troubleshooting)
+  - ["no such package" or import errors](#no-such-package-or-import-errors)
+  - [Missing external dependency](#missing-external-dependency)
+  - [CGO compilation errors](#cgo-compilation-errors)
+  - [gnark-crypto assembly errors](#gnark-crypto-assembly-errors)
+  - [Build cache issues](#build-cache-issues)
+  - ["duplicate target" errors](#duplicate-target-errors)
+- [CGO Configuration](#cgo-configuration)
+- [Version Stamping](#version-stamping)
+- [Known Limitations](#known-limitations)
+- [Future Improvements](#future-improvements)
+  - [Remote Caching and Execution](#remote-caching-and-execution)
+  - [CI Integration](#ci-integration)
+  - [Patch Maintenance](#patch-maintenance)
+  - [Test Configuration](#test-configuration)
+- [References](#references)
+
 ## Prerequisites
 
 The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
@@ -399,8 +460,6 @@ bazel build //...
 By default, `bazel test` matches `scripts/build_test.sh` behavior,
 with a few exceptions:
 
-- The script passes `-tags test` to `go test`; currently there are no
-  `//go:build test` files in this repo, so it has no effect.
 - The script excludes several directories via `go list | grep -v ...`;
   Bazel instead relies on `tags = ["manual"]` to keep non-unit tests
   out of `bazel test //...`.
@@ -539,14 +598,15 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
-In GitHub Actions, the Bazel jobs use the local
-`./.github/actions/setup-bazel` composite action. It prepares cache
-state for the dependencies those jobs are expected to need and sets
-`RUN_TASK_PREFER_BAZEL=1`. With that variable set, `run_task.sh` uses
-the Bazel-owned `//tools/external:task` target instead of bootstrapping
-`task` with `go tool` on runners where Go is already on `PATH`. That
-preference is only for CI; local developer use still defaults to the
-Go-based task bootstrap.
+In GitHub Actions, the Bazel jobs use the local `./.github/actions/setup-bazel`
+composite action. It applies the shared runner disk guard described in
+[CI disk space](./ci-disk-space.md) before Bazel cache restore and setup work. The
+Bazel-specific action then prepares cache state for the dependencies those jobs are
+expected to need and sets `RUN_TASK_PREFER_BAZEL=1`. With that variable set,
+`run_task.sh` uses the Bazel-owned `//tools/external:task` target instead of
+bootstrapping `task` with `go tool` on runners where Go is already on `PATH`. That
+preference is only for CI; local developer use still defaults to the Go-based task
+bootstrap.
 
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,
@@ -713,10 +773,24 @@ directory and macOS SDK and writes those values to `.bazelrc.local`.
 The script can also be run directly and is invoked automatically by
 direnv.
 
+Both entrypoints run inside the nix dev shell, whose `DEVELOPER_DIR`
+and `SDKROOT` would make `xcode-select` and `xcrun` report nix's SDK.
+The script clears them and calls those binaries by absolute path, so a
+hand-exported `DEVELOPER_DIR` is ignored — use `sudo xcode-select -s`.
+
 When invoked by direnv, generation is best-effort: failures are shown
 as warnings during shell entry but do not prevent entering the repo.
 When run directly, the script exits non-zero on discovery failures so
 manual setup problems remain actionable.
+
+### The macOS C compiler
+
+`.bazelrc` pins `--repo_env=CC=/usr/bin/clang`. Bazel resolves the
+compiler from `CC` in the client environment, which in the nix dev
+shell is nix's clang wrapper; that wrapper takes its sysroot from
+`NIX_CFLAGS_COMPILE`, which Bazel strips from action environments,
+failing the cgo stdlib build on a missing `resolv.h`. `DEVELOPER_DIR`
+and `SDKROOT` do not help — they select an SDK, not a compiler.
 
 ## Adding a New Go Module
 

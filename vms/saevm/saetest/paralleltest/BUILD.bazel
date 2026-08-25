@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "paralleltest",
+    testonly = True,
+    srcs = ["paralleltest.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetest/paralleltest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "//vms/saevm/blocks",
+        "//vms/saevm/blocks/blockstest",
+        "//vms/saevm/hook/hookstest",
+        "//vms/saevm/saedb",
+        "//vms/saevm/saetest",
+        "//vms/saevm/saexec",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/hookstest",
+        "@com_github_ava_labs_libevm//libevm/precompiles/parallel",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "paralleltest_test",
+    srcs = ["paralleltest_test.go"],
+    embed = [":paralleltest"],
+    deps = [
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//vms/saevm/cmputils",
+        "//vms/saevm/saetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/precompiles/parallel",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

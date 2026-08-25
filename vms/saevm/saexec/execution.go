@@ -153,10 +153,34 @@ type (
 	}
 )
 
+// StartExecutingBlock applies the state changes required before executing b's
+// transactions, specifically the start-executing-block hook and the EIP-4788
+// beacon root, mirroring [core.StateProcessor.Process].
+func StartExecutingBlock(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
+		return fmt.Errorf("start-executing-block hook: %v", err)
+	}
+
+	core.SetBeaconBlockRoot(stateDB, b.Header())
+
+	// SetBeaconRoot only finalizes when it applies the root, so we want to
+	// finalize last. This mirrors the finalization performed by
+	// [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
+	return nil
+}
+
 // Execute executes the transactions in the [blocks.Block], beginning from the
 // post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
 // the number of transactions to process, allowing partial execution for
 // intra-block inspection.
+//
+// The gas clock and base fee come from the parent's post-execution clock,
+// except pre-SAE blocks, which use their own header's fee.
+//
+// Execute only runs the deterministic hooks, so it is also safe to use for
+// historical execution. Canonical-only side effects belong in
+// [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
 //
 // Although Execute does not call [blocks.Block.MarkExecuted] it does mutate
 // consensus-critical internal values (e.g. interim execution time). A "live"
@@ -177,7 +201,7 @@ func Execute(
 	parent := b.ParentBlock()
 	header := b.Header()
 
-	gasClock := parent.ExecutedByGasTime().Clone()
+	gasClock := parent.ExecutedByGasTime()
 	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
@@ -186,21 +210,18 @@ func Execute(
 		return nil, err
 	}
 
-	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
-		return nil, fmt.Errorf("before-block hook: %v", err)
+	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
+	if err := StartExecutingBlock(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+		return nil, err
 	}
-	// Finalise any state changes made by the hook, mirroring the finalisation
-	// performed by [core.ApplyTransaction].
-	stateDB.Finalise(rules.IsEIP158)
 
 	baseFee := gasClock.BaseFee()
-	b.CheckBaseFeeBound(baseFee)
+	if hook.Synchronous(hooks, header) {
+		baseFee = b.WorstCaseBaseFee()
+	} else {
+		b.CheckBaseFeeBound(baseFee)
+	}
 	header.BaseFee = baseFee.ToBig()
-
-	// EIP-4788: before processing any transactions, store the parent beacon
-	// block root, mirroring [core.StateProcessor.Process].
-	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
@@ -272,8 +293,8 @@ func Execute(
 		}
 	}
 
-	if err := hooks.AfterExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
-		return nil, fmt.Errorf("after-block hook: %v", err)
+	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
 	endTime := time.Now()
@@ -303,6 +324,10 @@ func Execute(
 }
 
 func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
+	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
+		return fmt.Errorf("after-executing-block hook: %v", err)
+	}
+
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
 	root, err := r.StateDB.Commit(b.NumberU64(), true)
@@ -326,7 +351,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.sendPostExecutionEvents(b.EthBlock(), r) // (3)
+	e.sendPostExecutionEvents(b, r) // (3)
 	return nil
 }
 

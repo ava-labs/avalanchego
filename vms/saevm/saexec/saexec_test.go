@@ -36,8 +36,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -101,6 +99,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	logger := loggingtest.New(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
+	chainDataDir := tb.TempDir()
 
 	sutCfg := options.ApplyTo(&sutConfig{
 		hooks:          defaultHooks(),
@@ -116,10 +115,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
-	snowCtx.Log = logger
 
-	tdbCfg := saedbConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	tdbCfg := saedbConfig.TrieDBConfig(chainDataDir, logger)
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
@@ -134,11 +131,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
+		blockstest.WithHooks(sutCfg.hooks),
 	)
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, snowCtx, prometheus.NewRegistry())
+	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, logger)
+	require.NoError(tb, err, "saedb.NewTracker()")
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -152,7 +152,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		wallet:       wallet,
 		logger:       logger,
 		db:           db,
-		chainDataDir: snowCtx.ChainDataDir,
+		chainDataDir: chainDataDir,
 		closeOnce:    closeOnce,
 	}
 }
@@ -1119,10 +1119,10 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			t.Run("recover", func(t *testing.T) {
 				// Restart the chain to remove the TrieDB cache.
 				src := blocks.Source(chain.GetBlock)
-				snowCtx := snowtest.Context(t, ids.GenerateTestID())
-				snowCtx.ChainDataDir = sut.chainDataDir
-				snowCtx.Log = loggingtest.New(t, logging.Debug)
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), snowCtx, prometheus.NewRegistry())
+				log := loggingtest.New(t, logging.Debug)
+				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
+				require.NoError(t, err, "saedb.NewTracker()")
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)

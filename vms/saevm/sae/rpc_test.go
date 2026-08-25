@@ -56,12 +56,24 @@ var zeroAddr common.Address
 
 type rpcTest struct {
 	method       string
+	name         string
 	args         []any
 	want         any // untyped nil means no return value.
 	wantErr      testerr.Want
 	parallel     bool
 	eventually   bool
 	extraCmpOpts []cmp.Option
+}
+
+// withCmpOpts appends opts to the [rpcTest.extraCmpOpts] of every test, for
+// tables whose rows compare their results the same way. A row MAY carry its own
+// options too.
+func withCmpOpts(tests []rpcTest, opts ...cmp.Option) []rpcTest {
+	for i := range tests {
+		test := &tests[i]
+		test.extraCmpOpts = append(test.extraCmpOpts, opts...)
+	}
+	return tests
 }
 
 func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
@@ -96,7 +108,11 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			}
 		}
 
-		t.Run(tc.method, func(t *testing.T) {
+		name := tc.name
+		if name == "" {
+			name = tc.method
+		}
+		t.Run(name, func(t *testing.T) {
 			if tc.parallel {
 				t.Parallel()
 			}
@@ -861,13 +877,8 @@ func TestEthPendingTransactions(t *testing.T) {
 }
 
 func TestGetReceipts(t *testing.T) {
-	// Blocking precompile creates accepted-but-not-executed blocks
-	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withAllAPIs())
-	t.Cleanup(unblock)
+	ctx, sut := newSUT(t, 2, timeOpt, withAllAPIs())
 
 	var (
 		txs  []*types.Transaction
@@ -929,13 +940,6 @@ func TestGetReceipts(t *testing.T) {
 	settled, wantSettled := slice(t, 2, 4)
 	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
-
-	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &blockingPrecompile,
-		Gas:      params.TxGas,
-		GasPrice: big.NewInt(1),
-	}))
 
 	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
 		raw := make([]hexutil.Bytes, len(rs))
@@ -1001,9 +1005,6 @@ func TestGetReceipts(t *testing.T) {
 		})
 	}
 
-	// Acceptance writes blocks to the DB but not receipts, so pending
-	// block receipts error, while pending tx receipts block until they're ready
-	// as long as they have been included in a block.
 	tests = append(tests, []rpcTest{
 		{
 			method: "eth_getTransactionReceipt",
@@ -1028,26 +1029,6 @@ func TestGetReceipts(t *testing.T) {
 		{
 			method: "debug_getRawReceipts",
 			args:   []any{genesis.Hash()},
-			want:   []hexutil.Bytes{},
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{pending.Hash()},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{pending.Hash()},
-			want:   []hexutil.Bytes{},
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
 			want:   []hexutil.Bytes{},
 		},
 	}...)
@@ -1371,15 +1352,18 @@ func TestDebugRPCs(t *testing.T) {
 	})
 }
 
+// encodeRLP returns the value's RLP encoding.
+func encodeRLP(tb testing.TB, v any) hexutil.Bytes {
+	tb.Helper()
+	b, err := rlp.EncodeToBytes(v)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%T)", v)
+	return b
+}
+
 func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block) {
 	t.Helper()
 
 	testRPCGetter(ctx, t, "eth_getBlockByHash", s.BlockByHash, want.Hash(), want)
-
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
 
 	s.testRPC(ctx, t, []rpcTest{
 		{
@@ -1405,12 +1389,12 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		{
 			method: "debug_getRawBlock",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
@@ -1527,11 +1511,6 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	t.Helper()
 	testRPCGetter(ctx, t, "eth_getBlockByNumber", s.BlockByNumber, big.NewInt(n.Int64()), want)
 
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
-
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getBlockByNumber",
@@ -1556,12 +1535,12 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		{
 			method: "debug_getRawBlock",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
@@ -1842,7 +1821,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chain := sut.rawVM.chain()
 			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
-			t.Logf("blocks.ResolveBlockNumberOrhash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
+			t.Logf("blocks.ResolveRPCNumberOrHash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantNum, gotNum)
 			assert.Equal(t, tt.wantHash, gotHash)

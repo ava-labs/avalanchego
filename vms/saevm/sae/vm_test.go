@@ -227,7 +227,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
 		close:  closeOnce,
@@ -539,43 +539,42 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from
-// s.wallet[0], in its own consensus block, returning the block, the deployed
-// contract address, and the deploy tx.
-func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
+// s.wallet[0], in its own consensus block.
+func (s *SUT) deployEscrow(tb testing.TB) common.Address {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
 // balances[recipient] on the escrow contract at escrowAddr, in its own
-// consensus block, returning the block and the deposit tx.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
+// consensus block.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recipient),
-		Value:    depositVal,
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, tx
+	return block
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
@@ -885,151 +884,6 @@ func TestEmptyChainConfig(t *testing.T) {
 	}
 }
 
-func TestSyntacticBlockChecks(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
-
-	bodyWithTx := types.Body{
-		Transactions: []*types.Transaction{
-			types.NewTx(&types.DynamicFeeTx{
-				To:        &zeroAddr,
-				Gas:       params.TxGas,
-				GasFeeCap: big.NewInt(1),
-				Value:     big.NewInt(1),
-			}),
-		},
-	}
-
-	tests := []struct {
-		name string
-		// mutate will receive a valid header for an empty body and should return a mutated version of it.
-		mutate      func(*types.Header) *types.Header
-		body        types.Body
-		withdrawals []*types.Withdrawal
-		wantErr     error
-	}{
-		{
-			name:   "valid_header", // base case for test setup
-			mutate: func(h *types.Header) *types.Header { return h },
-		},
-		{
-			name: "block_height_overflow_protection",
-			mutate: func(h *types.Header) *types.Header {
-				h.Number = new(big.Int).Lsh(big.NewInt(1), 64)
-				return h
-			},
-			wantErr: errBlockHeightNotUint64,
-		},
-		{
-			name: "block_time_at_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds
-				return h
-			},
-		},
-		{
-			name: "block_time_after_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds + 1
-				return h
-			},
-			wantErr: errBlockTooFarInFuture,
-		},
-		{
-			name: "invalid_tx_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = common.Hash{}
-				return h
-			},
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name:    "invalid_tx_hash_nonempty",
-			mutate:  func(h *types.Header) *types.Header { return h }, // uses [types.EmptyTxsHash]
-			body:    bodyWithTx,                                       // contains a tx
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name: "valid_tx_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = types.DeriveSha(types.Transactions(bodyWithTx.Transactions), saetest.TrieHasher())
-				return h
-			},
-			body: bodyWithTx,
-		},
-		{
-			name: "invalid_uncle_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = common.Hash{}
-				return h
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name:   "invalid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header { return h }, // uses [types.EmptyUncleHash]
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name: "valid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = types.CalcUncleHash([]*types.Header{{}})
-				return h
-			},
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "nil_withdrawals_nonnil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			wantErr: errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = nil
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-			wantErr:     errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nonempty_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hdr := tt.mutate(&types.Header{
-				Number:    big.NewInt(1),
-				UncleHash: types.EmptyUncleHash,
-				TxHash:    types.EmptyTxsHash,
-			})
-			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
-			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
-		})
-	}
-}
-
 func TestSemanticBlockChecks(t *testing.T) {
 	const now = 1e6
 	opt, _ := withVMTime(t, time.Unix(now, 0))
@@ -1208,6 +1062,9 @@ func TestBlockSources(t *testing.T) {
 		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound), false},
 	}
 
+	ethBlockSrc := ethBlockSource(sut.rawVM.consensusCritical, sut.db)
+	headerSrc := headerSource(sut.rawVM.consensusCritical, sut.db)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run("GetBlock", func(t *testing.T) {
@@ -1229,7 +1086,7 @@ func TestBlockSources(t *testing.T) {
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := ethBlockSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
@@ -1239,7 +1096,7 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := headerSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return

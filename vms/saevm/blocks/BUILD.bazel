@@ -11,6 +11,7 @@ go_library(
         "execution.go",
         "export.go",
         "invariants.go",
+        "parse.go",
         "settlement.go",
         "snow.go",
     ],
@@ -50,6 +51,7 @@ go_test(
     srcs = [
         "block_test.go",
         "execution_test.go",
+        "parse_test.go",
         "settlement_test.go",
     ],
     data = glob(["testdata/**"]),
@@ -60,7 +62,6 @@ go_test(
         "//vms/components/gas",
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
-        "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",

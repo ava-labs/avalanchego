@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/eth/filters"
-	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
@@ -257,10 +256,10 @@ var apiServices = []apiService{
 		// - debug_traceBlockByNumber
 		// - debug_traceBlockFromFile
 		// - debug_traceCall
-		// - debug_traceChain
+		// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
 		// - debug_traceTransaction
 		name: APITrace, namespace: "debug", defaultOn: true,
-		receiver: func(b *backend, _ *filters.FilterAPI) any { return tracers.NewAPI(b) },
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return newTracerAPI(b) },
 	},
 }
 
