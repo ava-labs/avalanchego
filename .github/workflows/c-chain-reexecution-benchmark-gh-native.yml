@@ -89,7 +89,8 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes }}
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
+    # This job needs repository secrets, which external users do not have.
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)) }}
     permissions:
       id-token: write
       contents: write
