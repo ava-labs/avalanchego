@@ -25,9 +25,6 @@ const (
 	debugNamespace = "debug"
 )
 
-// Taken as the default from geth / libevm's `node.DefaultConfig`.
-const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
-
 // An API is a named group of JSON-RPC methods that a node MAY serve, see
 // [Config.APIs]. Groups can't align with the JSON-RPC namespaces for security
 // and compatibility reasons with existing APIs :(.
@@ -275,6 +272,9 @@ func (p *Provider) Server() *rpc.Server {
 }
 
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
+	// Taken as the default from geth / libevm's `node.DefaultConfig`.
+	const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
+
 	s := rpc.NewServer()
 	s.SetBatchLimits(int(b.config.BatchRequestLimit), batchResponseMaxSize) // #nosec G115 -- [Config.Verify], bounds-checks against math.MaxInt
 	for _, svc := range apiServices {
