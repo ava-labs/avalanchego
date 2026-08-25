@@ -26,7 +26,7 @@ import (
 )
 
 // RegisterHandler serves leaf-range requests at handlerID on net. The ID names
-// which trie is served.
+// which trie is served. Every key in the trie is trieKeyLength bytes.
 func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
 	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
 	return net.AddHandler(handlerID, h)
@@ -86,8 +86,8 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, reqPB *syncpb.
 	return resp, nil
 }
 
-// MaxLeavesLimit caps leaves per response.
-const MaxLeavesLimit = 1024
+// maxLimit caps leaves per response.
+const maxLimit = 1024
 
 var (
 	errWrongStartKeyLength = &avacommon.AppError{
@@ -108,7 +108,7 @@ var (
 	}
 	errWrongAccountHashLength = &avacommon.AppError{
 		Code:    3004,
-		Message: "account length mismatch",
+		Message: "account hash length mismatch",
 	}
 	errWrongRootLength = &avacommon.AppError{
 		Code:    3005,
@@ -134,10 +134,11 @@ type request struct {
 	start []byte
 	end   []byte
 	limit int
+	// startsAtMin reports whether start is the lowest representable key.
+	startsAtMin bool
 
 	snapshot trieSnapshot
 	trie     *trie.Trie
-	minKey   []byte
 }
 
 // newRequest opens the requested trie and returns the parsed request, or the
@@ -166,9 +167,26 @@ func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacomm
 		return nil, errZeroKeyLimit
 	}
 
+	rootBytes := reqPB.GetRootHash()
+	if len(rootBytes) != common.HashLength {
+		return nil, errWrongRootLength
+	}
+	root := common.BytesToHash(rootBytes)
+	switch root {
+	case common.Hash{}:
+		return nil, errMissingRoot
+	case types.EmptyRootHash:
+		return nil, errEmptyRoot
+	}
+
 	account := reqPB.GetAccountHash()
 	if len(account) != 0 && len(account) != common.HashLength {
 		return nil, errWrongAccountHashLength
+	}
+
+	t, err := trie.New(trie.TrieID(root), r.trieDB)
+	if err != nil {
+		return nil, errRootNotFound
 	}
 
 	var snap trieSnapshot
@@ -184,31 +202,14 @@ func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacomm
 			}
 		}
 	}
-
-	rootBytes := reqPB.GetRootHash()
-	if len(rootBytes) != common.HashLength {
-		return nil, errWrongRootLength
-	}
-	root := common.BytesToHash(rootBytes)
-	switch root {
-	case common.Hash{}:
-		return nil, errMissingRoot
-	case types.EmptyRootHash:
-		return nil, errEmptyRoot
-	}
-
-	t, err := trie.New(trie.TrieID(root), r.trieDB)
-	if err != nil {
-		return nil, errRootNotFound
-	}
 	return &request{
-		start: start,
-		end:   end,
-		limit: int(min(limit, MaxLeavesLimit)),
+		start:       start,
+		end:         end,
+		limit:       int(min(limit, maxLimit)),
+		startsAtMin: bytes.Equal(start, r.minKey),
 
 		snapshot: snap,
 		trie:     t,
-		minKey:   r.minKey,
 	}, nil
 }
 
@@ -232,7 +233,7 @@ func getLeaves(req *request) (*syncpb.GetLeafResponse, error) {
 	}
 	// [trie.VerifyRangeProof] allows an empty proof when proving a full trie.
 	// This uses less bandwidth and is faster to verify.
-	if bytes.Equal(req.start, req.minKey) && !more {
+	if req.startsAtMin && !more {
 		return resp, nil
 	}
 
@@ -344,6 +345,8 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (b
 	return fillFromSegments(t, r, keys, vals)
 }
 
+// segmentLen balances proof overhead against waste. Larger segments amortize
+// per-segment proofs, smaller segments discard fewer leaves when one diverges.
 const segmentLen = 64
 
 // fillFromSegments appends segments of keys and vals that prove against the

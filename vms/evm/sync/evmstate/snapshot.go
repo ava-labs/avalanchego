@@ -14,6 +14,9 @@ import (
 // Snapshot opens flat iterators over the snapshot leaves. The implementation
 // does not need to guarantee anything about the state it serves. A state that
 // happens to match a request speeds up the response but never changes it.
+//
+// Account and Slot bytes returned by the iterators MUST NOT be invalidated by
+// later calls to Next or Release.
 type Snapshot interface {
 	AccountIterator(start common.Hash) (snapshot.AccountIterator, error)
 	StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error)
@@ -46,10 +49,11 @@ var (
 	_ iterator = (*storageIterator)(nil)
 )
 
-// iterator walks snapshot leaves. Value returns the trie-encoded value at the
-// cursor.
+// iterator walks snapshot leaves.
 type iterator interface {
 	snapshot.Iterator
+	// Value returns the trie-encoded value at the cursor. The value MUST NOT
+	// be invalidated by later calls to Next or Release.
 	Value() ([]byte, error)
 }
 
@@ -82,7 +86,7 @@ func (it storageIterator) Value() ([]byte, error) {
 	return it.Slot(), nil
 }
 
-// readSnapshot returns leaves in [start, end] up to [limit]. There is no
+// readSnapshot returns up to limit leaves in [start, end]. There is no
 // guarantee what state root the snapshot is based on.
 func readSnapshot(
 	s trieSnapshot,
@@ -98,9 +102,9 @@ func readSnapshot(
 
 	keys := make([][]byte, 0, limit)
 	vals := make([][]byte, 0, limit)
-	for it.Next() {
+	for len(keys) < limit && it.Next() {
 		k := it.Hash()
-		if bytes.Compare(k[:], end[:]) > 0 || len(keys) >= limit {
+		if bytes.Compare(k[:], end[:]) > 0 {
 			break
 		}
 		v, err := it.Value()

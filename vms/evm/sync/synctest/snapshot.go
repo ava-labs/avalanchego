@@ -59,7 +59,7 @@ type StaticPair struct {
 	K, V []byte
 }
 
-// StaticSnapshot is an in-memory [evmstate.SnapshotReader] for tests. Accounts
+// StaticSnapshot is an in-memory [evmstate.Snapshot] for tests. Accounts
 // and each Storage entry are sorted by K, accounts holding slim values. The root
 // is ignored, as a real disk layer serves whatever it last flushed.
 type StaticSnapshot struct {
