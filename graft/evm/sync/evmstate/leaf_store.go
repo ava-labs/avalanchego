@@ -25,12 +25,6 @@ type codeEnqueuer interface {
 	AddCode(hashes []common.Hash) error
 }
 
-// storageRegistry records storage tries that must be synced for an account.
-// Satisfied by [trieQueue].
-type storageRegistry interface {
-	RegisterStorageTrie(root, account common.Hash) error
-}
-
 // leafStore is the seam leaves are written through and read back in key order. What a
 // leaf means differs for accounts and storage. Batch capping is the segment's job.
 type leafStore interface {
@@ -42,10 +36,10 @@ type leafStore interface {
 type accountLeafStore struct {
 	db         ethdb.KeyValueStore
 	codeSyncer codeEnqueuer
-	trieQueue  storageRegistry
+	trieQueue  *trieQueue
 }
 
-func newAccountLeafStore(db ethdb.KeyValueStore, codeSyncer codeEnqueuer, trieQueue storageRegistry) *accountLeafStore {
+func newAccountLeafStore(db ethdb.KeyValueStore, codeSyncer codeEnqueuer, trieQueue *trieQueue) *accountLeafStore {
 	return &accountLeafStore{
 		db:         db,
 		codeSyncer: codeSyncer,

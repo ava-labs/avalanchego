@@ -28,17 +28,14 @@ func (f *fakeCodeQueue) AddCode(hashes []common.Hash) error {
 	return nil
 }
 
-type registered struct {
-	root, account common.Hash
-}
-
-type fakeRegistry struct {
-	tries []registered
-}
-
-func (f *fakeRegistry) RegisterStorageTrie(root, account common.Hash) error {
-	f.tries = append(f.tries, registered{root, account})
-	return nil
+func collectStorageTries(t *testing.T, q *trieQueue) []storageTrieRef {
+	t.Helper()
+	var refs []storageTrieRef
+	for ref, err := range q.storageTries() {
+		require.NoError(t, err)
+		refs = append(refs, ref)
+	}
+	return refs
 }
 
 func accountLeaf(t *testing.T, storageRoot, codeHash common.Hash) []byte {
@@ -60,7 +57,7 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
-	reg := &fakeRegistry{}
+	reg := newTrieQueue(db)
 	leaves := newAccountLeafStore(db, queue, reg)
 
 	storageRoot := common.HexToHash("0xaa")
@@ -77,9 +74,10 @@ func TestAccountLeaves_DecodesAndDiscovers(t *testing.T) {
 	require.NoError(t, leaves.writeLeaves(t.Context(), batch, evmstate.Leaves{Keys: keys, Vals: vals}))
 
 	// Only the non-empty storage root is registered, keyed to its account.
-	require.Len(t, reg.tries, 1)
-	require.Equal(t, storageRoot, reg.tries[0].root)
-	require.Equal(t, common.BytesToHash(keys[1]), reg.tries[0].account)
+	require.Equal(t, []storageTrieRef{{
+		root:     storageRoot,
+		accounts: []common.Hash{common.BytesToHash(keys[1])},
+	}}, collectStorageTries(t, reg))
 	// Only the non-empty code hash is enqueued.
 	require.Equal(t, []common.Hash{codeHash}, queue.hashes)
 
@@ -96,7 +94,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 	t.Parallel()
 	db := rawdb.NewMemoryDatabase()
 	queue := &fakeCodeQueue{}
-	reg := &fakeRegistry{}
+	reg := newTrieQueue(db)
 	leaves := newAccountLeafStore(db, queue, reg)
 
 	err := leaves.writeLeaves(t.Context(), db.NewBatch(), evmstate.Leaves{
@@ -104,7 +102,7 @@ func TestAccountLeaves_RejectsMalformedAccount(t *testing.T) {
 		Vals: [][]byte{[]byte("not-a-valid-rlp-account")},
 	})
 	require.ErrorIs(t, err, errDecodeAccount)
-	require.Empty(t, reg.tries, "a malformed account must register no storage trie")
+	require.Empty(t, collectStorageTries(t, reg), "a malformed account must register no storage trie")
 	require.Empty(t, queue.hashes, "a malformed account must enqueue no code")
 }
 
