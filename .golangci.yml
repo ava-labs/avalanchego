@@ -121,8 +121,6 @@ linters:
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
     goconst:
-      # Test files repeat short fixture strings. If the count includes them,
-      # goconst reports strings that appear only once in production code.
       ignore-tests: true
     gosec:
       excludes:
