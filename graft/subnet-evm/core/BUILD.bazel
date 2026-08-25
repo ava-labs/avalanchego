@@ -148,7 +148,6 @@ graft_go_test(
         "//snow/engine/snowman/block",
         "//upgrade",
         "//upgrade/upgradetest",
-        "//utils",
         "//utils/set",
         "//vms/evm/acp226",
         "//vms/evm/predicate",

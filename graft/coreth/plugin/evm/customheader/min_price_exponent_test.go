@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -19,7 +18,7 @@ func TestVerifyMinPriceExponent(t *testing.T) {
 
 	withExponent := customtypes.WithHeaderExtra(
 		&types.Header{Time: 1001},
-		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(dynamic.PriceExponent(1000))},
+		&customtypes.HeaderExtra{MinPriceExponent: new(dynamic.PriceExponent(1000))},
 	)
 	require.ErrorIs(t, VerifyMinPriceExponent(withExponent), errRemoteMinPriceExponentSet)
 }

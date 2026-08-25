@@ -258,13 +258,13 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	indexedImportTx, status, height, err := s.getAtomicTx(importTx.ID())
 	require.NoError(err)
 	require.Equal(atomic.Accepted, status)
-	require.Equal(common.PointerTo[json.Uint64](1), height, "expected height of indexed import tx to be 1")
+	require.Equal(new(json.Uint64(1)), height, "expected height of indexed import tx to be 1")
 	require.Equal(indexedImportTx.ID(), importTx.ID(), "expected ID of indexed import tx to match original txID")
 
 	indexedExportTx, status, height, err := s.getAtomicTx(exportTx.ID())
 	require.NoError(err)
 	require.Equal(atomic.Accepted, status)
-	require.Equal(common.PointerTo[json.Uint64](2), height, "expected height of indexed export tx to be 2")
+	require.Equal(new(json.Uint64(2)), height, "expected height of indexed export tx to be 2")
 	require.Equal(indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
 

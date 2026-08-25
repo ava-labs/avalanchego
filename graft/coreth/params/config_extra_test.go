@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestMain(m *testing.M) {
@@ -22,7 +21,7 @@ func TestMain(m *testing.M) {
 
 func TestSetEthUpgrades(t *testing.T) {
 	genesisBlock := big.NewInt(0)
-	genesisTimestamp := utils.PointerTo(initiallyActive)
+	genesisTimestamp := new(initiallyActive)
 	tests := []struct {
 		fork     upgradetest.Fork
 		expected *ChainConfig

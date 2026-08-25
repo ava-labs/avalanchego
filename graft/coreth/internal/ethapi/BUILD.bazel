@@ -75,7 +75,6 @@ graft_go_test(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/plugin/evm/upgrade/ap3",
         "//graft/evm/rpc",
-        "//utils",
         "//vms/evm/acp176",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//accounts/keystore",

@@ -12,8 +12,6 @@ import (
 	"github.com/ava-labs/libevm/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils"
-
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -84,7 +82,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_COUNTER.Enum(),
 			Metric: []*dto.Metric{{
 				Counter: &dto.Counter{
-					Value: utils.PointerTo(float64(m.Snapshot().Count())),
+					Value: new(float64(m.Snapshot().Count())),
 				},
 			}},
 		}, nil
@@ -95,7 +93,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_COUNTER.Enum(),
 			Metric: []*dto.Metric{{
 				Counter: &dto.Counter{
-					Value: utils.PointerTo(m.Snapshot().Count()),
+					Value: new(m.Snapshot().Count()),
 				},
 			}},
 		}, nil
@@ -106,7 +104,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
-					Value: utils.PointerTo(float64(m.Snapshot().Value())),
+					Value: new(float64(m.Snapshot().Value())),
 				},
 			}},
 		}, nil
@@ -117,7 +115,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
-					Value: utils.PointerTo(m.Snapshot().Value()),
+					Value: new(m.Snapshot().Value()),
 				},
 			}},
 		}, nil
@@ -129,8 +127,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		dtoQuantiles := make([]*dto.Quantile, len(quantiles))
 		for i := range thresholds {
 			dtoQuantiles[i] = &dto.Quantile{
-				Quantile: utils.PointerTo(quantiles[i]),
-				Value:    utils.PointerTo(thresholds[i]),
+				Quantile: new(quantiles[i]),
+				Value:    new(thresholds[i]),
 			}
 		}
 		return &dto.MetricFamily{
@@ -139,8 +137,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: utils.PointerTo(uint64(snapshot.Count())),
-					SampleSum:   utils.PointerTo(float64(snapshot.Sum())),
+					SampleCount: new(uint64(snapshot.Count())),
+					SampleSum:   new(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
 			}},
@@ -152,7 +150,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
-					Value: utils.PointerTo(float64(m.Snapshot().Count())),
+					Value: new(float64(m.Snapshot().Count())),
 				},
 			}},
 		}, nil
@@ -162,8 +160,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		dtoQuantiles := make([]*dto.Quantile, len(quantiles))
 		for i := range thresholds {
 			dtoQuantiles[i] = &dto.Quantile{
-				Quantile: utils.PointerTo(quantiles[i]),
-				Value:    utils.PointerTo(thresholds[i]),
+				Quantile: new(quantiles[i]),
+				Value:    new(thresholds[i]),
 			}
 		}
 		return &dto.MetricFamily{
@@ -172,8 +170,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: utils.PointerTo(uint64(snapshot.Count())),
-					SampleSum:   utils.PointerTo(float64(snapshot.Sum())),
+					SampleCount: new(uint64(snapshot.Count())),
+					SampleSum:   new(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
 			}},
@@ -184,8 +182,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		dtoQuantiles := make([]*dto.Quantile, len(pvShortPercent))
 		for i := range pvShortPercent {
 			dtoQuantiles[i] = &dto.Quantile{
-				Quantile: utils.PointerTo(pvShortPercent[i]),
-				Value:    utils.PointerTo(thresholds[i]),
+				Quantile: new(pvShortPercent[i]),
+				Value:    new(thresholds[i]),
 			}
 		}
 		count := snapshot.Count()
@@ -195,8 +193,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: utils.PointerTo(uint64(count)),
-					SampleSum:   utils.PointerTo(float64(count) * snapshot.Mean()),
+					SampleCount: new(uint64(count)),
+					SampleSum:   new(float64(count) * snapshot.Mean()),
 					Quantile:    dtoQuantiles,
 				},
 			}},

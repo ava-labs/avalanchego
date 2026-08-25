@@ -29,7 +29,6 @@ graft_go_test(
     data = glob(["testdata/**"]),
     embed = [":commontype"],
     deps = [
-        "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],

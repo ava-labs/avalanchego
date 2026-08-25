@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
@@ -143,7 +142,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 	fork := upgradetest.Granite
 	chainConfig := paramstest.ForkToChainConfig[fork]
 	extraConfig := params.GetExtra(chainConfig)
-	extraConfig.NetworkUpgrades.GraniteTimestamp = avalancheutils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
+	extraConfig.NetworkUpgrades.GraniteTimestamp = new(uint64(upgrade.InitiallyActiveTime.Unix()))
 	genesis := &core.Genesis{}
 	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(chainConfig)), genesis))
 	// Set the genesis timestamp to before the Granite activation time
@@ -352,7 +351,7 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 			upgradeJSON: func() string {
 				upgrade := &extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						EtnaTimestamp: avalancheutils.PointerTo(defaultEtnaTime + 2),
+						EtnaTimestamp: new(defaultEtnaTime + 2),
 					},
 				}
 				b, err := json.Marshal(upgrade)
