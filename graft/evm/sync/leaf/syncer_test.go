@@ -47,12 +47,15 @@ func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, evmstate.LeafRange
 }
 
 // runLeafTask drives one Task through a single worker.
-func runLeafTask(t *testing.T, ctx context.Context, fetcher types.LeafFetcher, tk Task) error {
+func runLeafTask(t *testing.T, ctx context.Context, fetcher types.LeafFetcher, tk Task, opts ...Option) error {
 	t.Helper()
 	tasks := make(chan Task, 1)
 	tasks <- tk
 	close(tasks)
-	return NewSyncer(fetcher, tasks, WithNumWorkers(1)).Sync(ctx)
+
+	// A fresh slice, because the caller's may be shared across parallel subtests.
+	opts = append([]Option{WithNumWorkers(1)}, opts...)
+	return NewSyncer(fetcher, tasks, opts...).Sync(ctx)
 }
 
 func TestLeafFetch_Batching(t *testing.T) {
@@ -133,13 +136,7 @@ func TestLeafFetch_RequestSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			fetcher := &limitFetcher{}
-			tasks := make(chan Task, 1)
-			tasks <- &recordingTask{}
-			close(tasks)
-
-			opts := append([]Option{WithNumWorkers(1)}, tt.opts...)
-			require.NoError(t, NewSyncer(fetcher, tasks, opts...).Sync(t.Context()))
-
+			require.NoError(t, runLeafTask(t, t.Context(), fetcher, &recordingTask{}, tt.opts...))
 			require.Equal(t, []uint16{tt.want}, fetcher.limits)
 		})
 	}

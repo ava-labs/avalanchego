@@ -117,36 +117,6 @@ func fill(t *testing.T, trieDB *triedb.Database, n int, keyOf, valueOf func(i in
 	return root, keys, vals
 }
 
-// FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
-// and commits it to [trieDB]. For each 3 accounts created:
-// - One does not have a storage trie,
-// - One has a storage trie shared with other accounts (total number of shared storage tries [numOverlappingStorageRoots]),
-// - One has a uniquely generated storage trie,
-// returns the new trie root and a map of funded keys to StateAccount structs.
-// This is only safe for HashDB, as path-based DBs do not share storage tries.
-func FillAccountsWithOverlappingStorage(
-	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
-) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
-	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
-	for i := 0; i < numOverlappingStorageRoots; i++ {
-		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
-		storageRoots = append(storageRoots, storageRoot)
-	}
-	storageRootIndex := 0
-	return FillAccounts(t, r, s, root, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
-		switch i % 3 {
-		case 0: // unmodified account
-		case 1: // account with overlapping storage root
-			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
-			storageRootIndex++
-		case 2: // account with unique storage root
-			FillStorageForAccount(t, r, 16, addr, storageTr)
-		}
-
-		return account
-	})
-}
-
 // GenerateIndependentTrie creates a trie with [numKeys] random key-value pairs inside of [trieDB].
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
