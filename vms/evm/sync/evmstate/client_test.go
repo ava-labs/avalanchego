@@ -76,7 +76,8 @@ func TestClient_FetchLeaves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
 
-			got, more, err := serve(t, ctx, trieDB).FetchLeaves(ctx, LeafRange{Root: root, Limit: tt.limit})
+			client := serve(t, ctx, trieDB)
+			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: tt.limit})
 			require.NoError(t, err)
 
 			require.Equal(t, keys[:tt.wantLen], got.Keys)
