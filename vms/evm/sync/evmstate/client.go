@@ -57,7 +57,6 @@ type LeafRange struct {
 	Root    common.Hash
 	Account *common.Hash // nil for the account trie
 	Start   []byte       // nil for the trie's first key
-	End     []byte       // inclusive, nil for the trie's last key
 	Limit   uint16
 }
 
@@ -73,7 +72,6 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 	reqPB := &syncpb.GetLeafRequest{
 		RootHash: req.Root.Bytes(),
 		StartKey: req.Start,
-		EndKey:   req.End,
 		KeyLimit: uint32(req.Limit),
 	}
 	if req.Account != nil {

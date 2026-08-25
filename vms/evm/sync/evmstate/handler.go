@@ -39,7 +39,6 @@ type responder struct {
 	trieDB   *triedb.Database
 	snapshot Snapshot // optional
 	minKey   []byte   // read-only stand-in for an absent start key
-	maxKey   []byte   // read-only stand-in for an absent end key
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
@@ -48,7 +47,6 @@ func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int
 		trieDB:   trieDB,
 		snapshot: options.As(opts...).snapshot,
 		minKey:   make([]byte, trieKeyLength),
-		maxKey:   bytes.Repeat([]byte{0xff}, trieKeyLength),
 	}
 }
 
@@ -94,36 +92,28 @@ var (
 		Code:    3000,
 		Message: "start key length mismatch",
 	}
-	errWrongEndKeyLength = &avacommon.AppError{
-		Code:    3001,
-		Message: "end key length mismatch",
-	}
-	errStartAfterEnd = &avacommon.AppError{
-		Code:    3002,
-		Message: "start key after end key",
-	}
 	errZeroKeyLimit = &avacommon.AppError{
-		Code:    3003,
+		Code:    3001,
 		Message: "zero key limit",
 	}
 	errWrongAccountHashLength = &avacommon.AppError{
-		Code:    3004,
+		Code:    3002,
 		Message: "account hash length mismatch",
 	}
 	errWrongRootLength = &avacommon.AppError{
-		Code:    3005,
+		Code:    3003,
 		Message: "root length mismatch",
 	}
 	errMissingRoot = &avacommon.AppError{
-		Code:    3006,
+		Code:    3004,
 		Message: "missing trie root",
 	}
 	errEmptyRoot = &avacommon.AppError{
-		Code:    3007,
+		Code:    3005,
 		Message: "empty trie root",
 	}
 	errRootNotFound = &avacommon.AppError{
-		Code:    3008,
+		Code:    3006,
 		Message: "requested trie root not found",
 	}
 )
@@ -132,7 +122,6 @@ var (
 // the state opened to serve them.
 type request struct {
 	start []byte
-	end   []byte
 	limit int
 	// startsAtMin reports whether start is the lowest representable key.
 	startsAtMin bool
@@ -145,21 +134,11 @@ type request struct {
 // rejection for a malformed or unservable reqPB.
 func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacommon.AppError) {
 	start := reqPB.GetStartKey()
-	if len(start) == 0 {
-		start = r.minKey
-	}
-	end := reqPB.GetEndKey()
-	if len(end) == 0 {
-		end = r.maxKey
-	}
-	trieKeyLength := len(r.minKey)
 	switch {
-	case len(start) != trieKeyLength:
+	case len(start) == 0:
+		start = r.minKey
+	case len(start) != len(r.minKey):
 		return nil, errWrongStartKeyLength
-	case len(end) != trieKeyLength:
-		return nil, errWrongEndKeyLength
-	case bytes.Compare(start, end) > 0:
-		return nil, errStartAfterEnd
 	}
 
 	limit := reqPB.GetKeyLimit()
@@ -204,7 +183,6 @@ func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacomm
 	}
 	return &request{
 		start:       start,
-		end:         end,
 		limit:       int(min(limit, maxLimit)),
 		startsAtMin: bytes.Equal(start, r.minKey),
 
@@ -216,12 +194,12 @@ func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacomm
 // getLeaves returns the response holding the leaf range and its proof.
 func getLeaves(req *request) (*syncpb.GetLeafResponse, error) {
 	r := newLeafRange(req.start, req.limit)
-	more, err := fillFromSnapshot(req.snapshot, req.trie, r, req.end)
+	more, err := fillFromSnapshot(req.snapshot, req.trie, r)
 	if err != nil {
 		return nil, err
 	}
 	if more && !r.full() {
-		more, err = fillFromTrie(req.trie, r, req.end)
+		more, err = fillFromTrie(req.trie, r)
 		if err != nil {
 			return nil, err
 		}
@@ -300,11 +278,11 @@ func (l *leafRange) next() []byte {
 	return next
 }
 
-// fillFromSnapshot appends leaves from [leafRange.next] through end to r, up
-// to the capacity, serving from the snapshot where it agrees with the trie.
-// A nil snapshot appends nothing. It returns whether the trie may hold leaves
-// past the response.
-func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (bool, error) {
+// fillFromSnapshot appends leaves from [leafRange.next] to r, up to the
+// capacity, serving from the snapshot where it agrees with the trie. A nil
+// snapshot appends nothing. It returns whether the trie may hold leaves past
+// the response.
+func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) {
 	if s == nil {
 		return true, nil
 	}
@@ -313,7 +291,6 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (b
 	keys, vals, err := readSnapshot(
 		s,
 		common.BytesToHash(next),
-		common.BytesToHash(end),
 		r.space(),
 	)
 	if err != nil || len(keys) == 0 {
@@ -389,7 +366,7 @@ func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, er
 		}
 		if hasGap {
 			// The trie supplies the gap, the segment supplies the rest.
-			if _, err := fillFromTrie(t, r, segment.keys[0], withExclusiveEnd()); err != nil {
+			if _, err := fillFromTrie(t, r, withBefore(segment.keys[0])); err != nil {
 				return false, err
 			}
 			hasGap = false
@@ -404,25 +381,25 @@ func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, er
 }
 
 type fillConfig struct {
-	// maxEndCmp is the largest [bytes.Compare] result allowed between an
-	// appended key and the fill's end. 0 includes end, -1 excludes it.
-	maxEndCmp int
+	hasEnd bool
+	end    []byte
 }
 
 // fillOption configures [fillFromTrie].
 type fillOption = options.Option[fillConfig]
 
-// withExclusiveEnd stops the fill before end rather than on it.
-func withExclusiveEnd() fillOption {
+// withBefore stops the fill before end.
+func withBefore(end []byte) fillOption {
 	return options.Func[fillConfig](func(c *fillConfig) {
-		c.maxEndCmp = -1
+		c.hasEnd = true
+		c.end = end
 	})
 }
 
-// fillFromTrie appends trie leaves from [leafRange.next] through end to r, up
-// to the capacity. [withExclusiveEnd] stops the fill before end instead. It
-// returns whether the trie holds leaves past the response.
-func fillFromTrie(t *trie.Trie, r *leafRange, end []byte, opts ...fillOption) (bool, error) {
+// fillFromTrie appends trie leaves from [leafRange.next] to r, up to the
+// capacity. [withBefore] stops the fill before end. It returns whether the trie
+// holds leaves past the response.
+func fillFromTrie(t *trie.Trie, r *leafRange, opts ...fillOption) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.
 	nodeIt, err := t.NodeIterator(r.next())
@@ -431,9 +408,9 @@ func fillFromTrie(t *trie.Trie, r *leafRange, end []byte, opts ...fillOption) (b
 	}
 	it := trie.NewIterator(nodeIt)
 
-	maxEndCmp := options.As(opts...).maxEndCmp
+	c := options.As(opts...)
 	for it.Next() {
-		if bytes.Compare(it.Key, end) > maxEndCmp || r.full() {
+		if hitEnd := c.hasEnd && bytes.Compare(it.Key, c.end) >= 0; hitEnd || r.full() {
 			return true, it.Err
 		}
 		r.add(it.Key, it.Value)

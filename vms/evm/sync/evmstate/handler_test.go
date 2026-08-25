@@ -44,8 +44,6 @@ const (
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
 		"errWrongStartKeyLength":    errWrongStartKeyLength,
-		"errWrongEndKeyLength":      errWrongEndKeyLength,
-		"errStartAfterEnd":          errStartAfterEnd,
 		"errZeroKeyLimit":           errZeroKeyLimit,
 		"errWrongAccountHashLength": errWrongAccountHashLength,
 		"errWrongRootLength":        errWrongRootLength,
@@ -114,25 +112,6 @@ func TestResponder_ValidationRejects(t *testing.T) {
 				KeyLimit: 10,
 			},
 			wantErr: errWrongStartKeyLength,
-		},
-		{
-			name: "end_key_wrong_length",
-			req: &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				EndKey:   []byte{0x01, 0x02},
-				KeyLimit: 10,
-			},
-			wantErr: errWrongEndKeyLength,
-		},
-		{
-			name: "start_key_after_end_key",
-			req: &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				StartKey: bytes.Repeat([]byte{0xff}, common.HashLength),
-				EndKey:   bytes.Repeat([]byte{0x00}, common.HashLength),
-				KeyLimit: 10,
-			},
-			wantErr: errStartAfterEnd,
 		},
 	}
 
@@ -474,14 +453,13 @@ func TestResponder_BoundedRange(t *testing.T) {
 			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: c.root.Bytes(),
 				StartKey: c.keys[10],
-				EndKey:   c.keys[30],
 				KeyLimit: uint32(len(c.keys)),
 			})
 			require.Nil(t, appErr)
 			require.NotNil(t, resp)
 			// EndKey is inclusive.
-			require.Equal(t, c.keys[10:31], resp.Keys)
-			require.Equal(t, c.vals[10:31], resp.Values)
+			require.Equal(t, c.keys[10:], resp.Keys)
+			require.Equal(t, c.vals[10:], resp.Values)
 			require.NotEmpty(t, resp.ProofVals)
 		})
 	}
@@ -693,13 +671,12 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 // newSnapshotRequest opens a request over c's snapshot. The trie fallback
 // hides the snapshot from a response assertion, so these tests read it
 // directly.
-func newSnapshotRequest(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int, endKey []byte) *request {
+func newSnapshotRequest(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int) *request {
 	t.Helper()
 	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 	req, appErr := r.newRequest(&syncpb.GetLeafRequest{
 		RootHash:    c.root.Bytes(),
 		AccountHash: c.accountHash,
-		EndKey:      endKey,
 		KeyLimit:    uint32(keyLimit),
 	})
 	require.Nil(t, appErr)
@@ -715,7 +692,6 @@ func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
 		name string
 		// keyLimit and endAt bound the read, endAt indexing the last leaf wanted.
 		keyLimit int
-		endAt    int
 		iterErr  error
 		wantLen  int
 	}{
@@ -728,12 +704,6 @@ func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
 			name:     "key_limit_truncates",
 			keyLimit: 5,
 			wantLen:  5,
-		},
-		{
-			name:     "end_key_truncates",
-			keyLimit: numLeaves,
-			endAt:    8,
-			wantLen:  8,
 		},
 		{
 			name:     "iteration_failure_reads_nothing",
@@ -750,16 +720,10 @@ func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
 				c := kind.build(t, trieDB, numLeaves)
 				c.snap.IterErr = tt.iterErr
 
-				var endKey []byte
-				if tt.endAt > 0 {
-					endKey = c.keys[tt.endAt-1]
-				}
-
-				req := newSnapshotRequest(t, trieDB, c, tt.keyLimit, endKey)
+				req := newSnapshotRequest(t, trieDB, c, tt.keyLimit)
 				keys, vals, err := readSnapshot(
 					req.snapshot,
 					common.BytesToHash(req.start),
-					common.BytesToHash(req.end),
 					req.limit,
 				)
 				require.ErrorIs(t, err, tt.iterErr)
@@ -803,9 +767,9 @@ func TestRequest_SnapshotFillsResponse(t *testing.T) {
 				c := kind.build(t, trieDB, numLeaves)
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 
-				req := newSnapshotRequest(t, trieDB, c, numLeaves, nil)
+				req := newSnapshotRequest(t, trieDB, c, numLeaves)
 				leaves := newLeafRange(req.start, req.limit)
-				more, err := fillFromSnapshot(req.snapshot, req.trie, leaves, req.end)
+				more, err := fillFromSnapshot(req.snapshot, req.trie, leaves)
 				require.NoError(t, err)
 
 				require.False(t, more, "the snapshot must satisfy a whole-trie request")
