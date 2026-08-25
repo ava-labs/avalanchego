@@ -93,7 +93,7 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 
 // AddCode persists code hashes as durable disk markers and enqueues them
 // for the forwarder goroutine. Never blocks the caller.
-// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
+// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.DoneAdding].
 func (q *Queue) AddCode(codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
@@ -149,13 +149,6 @@ func (q *Queue) markClosed() {
 	q.closeMu.Lock()
 	defer q.closeMu.Unlock()
 	q.closed = true
-}
-
-// closeInput signals the forwarder that no more work is coming, at most once.
-func (q *Queue) closeInput() {
-	q.closeInOnce.Do(func() {
-		close(q.in)
-	})
 }
 
 // stop waits for in-flight AddCode calls (via write lock), optionally cancels
