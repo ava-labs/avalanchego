@@ -24,6 +24,7 @@ func TestFxVerifyWarpCredential(t *testing.T) {
 
 	tx := &TestTx{UnsignedBytes: []byte{0, 1, 2, 3}}
 	sender := ids.ShortID{1}
+	helper := WarpHelperAddresses.List()[0]
 	other := ids.ShortID{0}
 	good := append(sender[:], tx.UnsignedBytes...)
 
@@ -46,11 +47,11 @@ func TestFxVerifyWarpCredential(t *testing.T) {
 	require.NoError(fx.VerifyTransfer(tx, tin, newCred(sender[:], good), utxo))
 	require.NoError(fx.VerifyPermission(tx, in, newCred(sender[:], good), owners))
 	// The trusted helper sends it on the owner's behalf.
-	require.NoError(fx.VerifyTransfer(tx, tin, newCred(WarpHelperAddress[:], good), utxo))
+	require.NoError(fx.VerifyTransfer(tx, tin, newCred(helper[:], good), utxo))
 
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(other[:], good), utxo), ErrWrongWarpSourceAddr)
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], append(other[:], tx.UnsignedBytes...)), utxo), ErrWrongWarpSourceAddr)
-	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(WarpHelperAddress[:], append(other[:], tx.UnsignedBytes...)), utxo), ErrWrongWarpSourceAddr)
+	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(helper[:], append(other[:], tx.UnsignedBytes...)), utxo), ErrWrongWarpSourceAddr)
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], append(sender[:], 9)), utxo), ErrWrongWarpPayload)
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], []byte("short")), utxo), ErrWrongWarpPayload)
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:3], good), utxo), ErrWrongWarpSourceAddrL)

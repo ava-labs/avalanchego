@@ -95,7 +95,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			ChecksumsEnabled:              true,
 			MempoolPruneFrequency:         time.Minute,
 			MempoolGasCapacity:            14,
-			WarpHelperAddress:             ids.ShortID{15},
+			WarpHelperAddresses:           []ids.ShortID{{15}},
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)

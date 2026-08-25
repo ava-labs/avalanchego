@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -111,8 +112,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
-	if execConfig.WarpHelperAddress != ids.ShortEmpty {
-		secp256k1fx.WarpHelperAddress = execConfig.WarpHelperAddress
+	if len(execConfig.WarpHelperAddresses) > 0 {
+		secp256k1fx.WarpHelperAddresses = set.Of(execConfig.WarpHelperAddresses...)
 	}
 
 	registerer, err := metrics.MakeAndRegister(chainCtx.Metrics, "")

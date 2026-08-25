@@ -3,23 +3,39 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "warpauth",
-    srcs = ["generate.go"],
+    srcs = [
+        "generate.go",
+        "wrap.go",
+    ],
     embedsrcs = [
         "PChain.abi",
         "PChain.bin",
     ],
     importpath = "github.com/ava-labs/avalanchego/tests/warpauth",
     visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/components/verify",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "//vms/secp256k1fx",
+    ],
 )
 
 go_test(
     name = "warpauth_test",
     srcs = ["pchain_test.go"],
     embed = [":warpauth"],
+    embedsrcs = ["MockWarp.bin-runtime"],
     deps = [
+        "//graft/coreth/precompile/contracts/warp",
         "//ids",
+        "//utils/crypto/bls",
         "//vms/components/avax",
+        "//vms/platformvm/signer",
         "//vms/platformvm/txs",
+        "//vms/platformvm/warp/message",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",

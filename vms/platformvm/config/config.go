@@ -34,9 +34,9 @@ var Default = Config{
 // Config contains all of the user-configurable parameters of the PlatformVM.
 type Config struct {
 	Network Network `json:"network"`
-	// WarpHelperAddress is the C-chain contract trusted to send warp
+	// WarpHelperAddresses are the C-chain contracts trusted to send warp
 	// credentials on behalf of the owner named in the payload.
-	WarpHelperAddress             ids.ShortID   `json:"warp-helper-address"`
+	WarpHelperAddresses           []ids.ShortID `json:"warp-helper-addresses"`
 	BlockCacheSize                int           `json:"block-cache-size"`
 	TxCacheSize                   int           `json:"tx-cache-size"`
 	TransformedSubnetTxCacheSize  int           `json:"transformed-subnet-tx-cache-size"`

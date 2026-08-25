@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -22,12 +23,12 @@ var (
 	ErrWrongWarpSourceAddr  = errors.New("warp source address is not an owner")
 	ErrWrongWarpSourceAddrL = errors.New("warp source address has wrong length")
 
-	// WarpHelperAddress is the C-chain contract trusted to name the real
-	// owner in the payload (it calls sendWarpMessage on the owner's behalf,
-	// so the warp source address is the helper, not the owner).
-	// ponytail: package var placeholder, becomes the Nick-deployed address
-	// once the helper contract is deployed.
-	WarpHelperAddress = ids.ShortID{0x50, 0x43, 0x48, 0x41, 0x49, 0x4e} // "PCHAIN"
+	// WarpHelperAddresses are the C-chain contracts trusted to name the real
+	// owner in the payload (they call sendWarpMessage on the owner's behalf,
+	// so the warp source address is the helper, not the owner). A list so
+	// that a new helper version can be added without dropping the old one.
+	// ponytail: package var set from the P-chain config at VM init.
+	WarpHelperAddresses = set.Of(ids.ShortID{0x50, 0x43, 0x48, 0x41, 0x49, 0x4e}) // "PCHAIN"
 )
 
 // WarpCredential authorizes an input on behalf of a 20-byte owner address.
@@ -75,8 +76,8 @@ func (fx *Fx) VerifyWarpCredential(utx UnsignedTx, in *Input, cred *WarpCredenti
 	}
 	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
 	sender := ids.ShortID(call.SourceAddress)
-	if sender != owner && sender != WarpHelperAddress {
-		return fmt.Errorf("%w: %s is neither %s nor the helper", ErrWrongWarpSourceAddr, sender, owner)
+	if sender != owner && !WarpHelperAddresses.Contains(sender) {
+		return fmt.Errorf("%w: %s is neither %s nor a helper", ErrWrongWarpSourceAddr, sender, owner)
 	}
 
 	for _, index := range in.SigIndices {

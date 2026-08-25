@@ -46,6 +46,7 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 
 	// Fund an EVM-style owner (any 20 bytes).
 	owner := ids.ShortID{0xde, 0xad, 0xbe, 0xef}
+	helper := secp256k1fx.WarpHelperAddresses.List()[0]
 	wallet := newWallet(t, vm, walletConfig{})
 	fundTx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -99,7 +100,7 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 	// A stranger claiming to be the owner, and the helper naming a stranger.
 	require.ErrorIs(vm.issueTxFromRPC(newTx(ids.GenerateTestShortID(), owner)), secp256k1fx.ErrWrongWarpSourceAddr)
-	require.ErrorIs(vm.issueTxFromRPC(newTx(secp256k1fx.WarpHelperAddress, ids.GenerateTestShortID())), secp256k1fx.ErrWrongWarpSourceAddr)
+	require.ErrorIs(vm.issueTxFromRPC(newTx(helper, ids.GenerateTestShortID())), secp256k1fx.ErrWrongWarpSourceAddr)
 
 	spendTx := newTx(owner, owner)
 	require.NoError(vm.issueTxFromRPC(spendTx))

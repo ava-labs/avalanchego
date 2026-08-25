@@ -25,12 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	pwarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -58,7 +56,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 		owner := ids.ShortID(ethAddress)
 		helper := crypto.CreateAddress(ethAddress, 0)
 		privateNetwork.PrimaryChainConfigs = map[string]tmpnet.ConfigMap{
-			"P": {"warp-helper-address": ids.ShortID(helper).String()},
+			"P": {"warp-helper-addresses": []string{ids.ShortID(helper).String()}},
 		}
 		env.StartPrivateNetwork(privateNetwork)
 		e2e.EmitMetricsLink = false
@@ -110,7 +108,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 				Nonce:     nonce,
 				GasTipCap: big.NewInt(0),
 				GasFeeCap: gasPrice,
-				Gas:       2_000_000,
+				Gas:       8_000_000,
 				To:        to,
 				Data:      data,
 			}), signer, key.ToECDSA())
@@ -132,61 +130,33 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			require.Equal(helper, send(nil, append(initcode, ctorArgs...)).ContractAddress)
 		})
 
-		var unsignedMsg *pwarp.UnsignedMessage
-		tc.By("calling createSubnet from the EVM address", func() {
-			type utxo struct {
-				TxID        [32]byte
-				OutputIndex uint32
-				Amount      uint64
-			}
-			type owners struct {
-				Locktime  uint64
-				Threshold uint32
-				Addrs     []common.Address
-			}
-			data, err := parsedABI.Pack("createSubnet",
-				[]utxo{{TxID: utxoID.TxID, OutputIndex: utxoID.OutputIndex, Amount: fundAmount}},
-				uint64(fundAmount-10*units.MilliAvax),
-				owners{Threshold: 1, Addrs: []common.Address{ethAddress}},
-			)
+		warpClient, err := warpclient.NewClient(nodeURI.URI, "C")
+		require.NoError(err)
+
+		// command sends one helper call from the EVM address, aggregates the
+		// validator signatures and relays the wrapped tx to the P-chain.
+		command := func(method string, args ...any) *txs.Tx {
+			data, err := parsedABI.Pack(method, args...)
 			require.NoError(err)
 			receipt := send(&helper, data)
+
+			var unsignedMsg *pwarp.UnsignedMessage
 			for _, log := range receipt.Logs {
-				if log.Address != warp.ContractAddress {
-					continue
+				if log.Address == warp.ContractAddress {
+					unsignedMsg, err = warp.UnpackSendWarpEventDataToMessage(log.Data)
+					require.NoError(err)
 				}
-				unsignedMsg, err = warp.UnpackSendWarpEventDataToMessage(log.Data)
-				require.NoError(err)
 			}
 			require.NotNil(unsignedMsg)
-		})
 
-		var signedMsg []byte
-		tc.By("aggregating validator signatures", func() {
-			client, err := warpclient.NewClient(nodeURI.URI, "C")
-			require.NoError(err)
+			var signedMsg []byte
 			tc.Eventually(func() bool {
-				signedMsg, err = client.GetMessageAggregateSignature(tc.DefaultContext(), unsignedMsg.ID(), 67, "")
+				signedMsg, err = warpClient.GetMessageAggregateSignature(tc.DefaultContext(), unsignedMsg.ID(), 67, "")
 				return err == nil
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to aggregate signatures")
-		})
 
-		var pTx *txs.Tx
-		tc.By("relaying the message to the P-chain", func() {
-			call, err := payload.ParseAddressedCall(unsignedMsg.Payload)
+			pTx, err := warpauth.Wrap(signedMsg)
 			require.NoError(err)
-			require.Equal(helper.Bytes(), call.SourceAddress)
-			require.Equal(owner[:], call.Payload[:ids.ShortIDLen])
-
-			var unsigned txs.UnsignedTx
-			_, err = txs.Codec.Unmarshal(call.Payload[ids.ShortIDLen:], &unsigned)
-			require.NoError(err)
-			pTx = &txs.Tx{
-				Unsigned: unsigned,
-				Creds:    []verify.Verifiable{&secp256k1fx.WarpCredential{Message: signedMsg}},
-			}
-			require.NoError(pTx.Initialize(txs.Codec))
-
 			txID, err := pClient.IssueTx(tc.DefaultContext(), pTx.Bytes())
 			require.NoError(err)
 			require.Equal(pTx.ID(), txID)
@@ -195,13 +165,48 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 				require.NoError(err)
 				return res.Status == status.Committed
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "tx not committed")
-		})
+			return pTx
+		}
 
-		tc.By("checking the subnet is owned by the EVM address", func() {
-			subnet, err := pClient.GetSubnet(tc.DefaultContext(), pTx.ID())
+		type utxo struct {
+			TxID        [32]byte
+			OutputIndex uint32
+			Amount      uint64
+		}
+		type owners struct {
+			Locktime  uint64
+			Threshold uint32
+			Addrs     []common.Address
+		}
+		const fee = 10 * units.MilliAvax
+
+		var subnetID ids.ID
+		tc.By("creating a subnet owned by the EVM address", func() {
+			createTx := command("createSubnet",
+				[]utxo{{TxID: utxoID.TxID, OutputIndex: utxoID.OutputIndex, Amount: fundAmount}},
+				uint64(fundAmount-fee),
+				owners{Threshold: 1, Addrs: []common.Address{ethAddress}},
+			)
+			subnetID = createTx.ID()
+			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal([]ids.ShortID{owner}, subnet.ControlKeys)
-			require.Equal(uint32(1), subnet.Threshold)
+			// The change output is the only output.
+			utxoID = avax.UTXOID{TxID: subnetID, OutputIndex: 0}
+		})
+
+		tc.By("transferring the subnet with the EVM address as subnet authority", func() {
+			newOwner := ids.GenerateTestShortID()
+			command("transferSubnetOwnership",
+				[]utxo{{TxID: utxoID.TxID, OutputIndex: utxoID.OutputIndex, Amount: fundAmount - fee}},
+				uint64(fundAmount-2*fee),
+				subnetID,
+				[]uint32{0},
+				owners{Threshold: 1, Addrs: []common.Address{common.Address(newOwner)}},
+			)
+			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+			require.Equal([]ids.ShortID{newOwner}, subnet.ControlKeys)
 		})
 	})
 })

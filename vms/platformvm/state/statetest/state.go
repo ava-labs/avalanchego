@@ -4,6 +4,8 @@
 package statetest
 
 import (
+	"reflect"
+
 	"testing"
 	"time"
 
@@ -66,7 +68,7 @@ func New(t testing.TB, c Config) *state.State {
 	if c.Upgrades == (upgrade.Config{}) {
 		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
 	}
-	if c.Config == (config.Config{}) {
+	if reflect.ValueOf(c.Config).IsZero() {
 		c.Config = config.Default
 	}
 	if c.Metrics == nil {
