@@ -29,7 +29,8 @@ func (s *stubLeafClient) GetLeafs(_ context.Context, req message.LeafsRequest) (
 	return s.resp, s.err
 }
 
-// The stub returns nothing, so only the request the range becomes is checked.
+// The stub answers with nothing, so only the request the range becomes is checked.
+// The node type and the concrete request type both come from construction.
 func TestLeafFetcher_TranslatesRange(t *testing.T) {
 	t.Parallel()
 	root := common.HexToHash("0xbb")
@@ -40,18 +41,26 @@ func TestLeafFetcher_TranslatesRange(t *testing.T) {
 		reqType  message.LeafsRequestType
 		nodeType message.NodeType
 		req      evmstate.LeafRange
+		want     message.LeafsRequest
 	}{
 		{
 			name:     "account_trie_subnet_evm",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req:      evmstate.LeafRange{Root: root, Limit: 1024},
+			want: message.SubnetEVMLeafsRequest{
+				Root: root, Limit: 1024, NodeType: message.StateTrieNode,
+			},
 		},
 		{
 			name:     "storage_trie_coreth",
 			reqType:  message.CorethLeafsRequestType,
 			nodeType: message.NodeType(2),
 			req:      evmstate.LeafRange{Root: root, Account: account, Start: []byte{0x01}, End: []byte{0x02}, Limit: 16},
+			want: message.CorethLeafsRequest{
+				Root: root, Account: account, Start: []byte{0x01}, End: []byte{0x02},
+				Limit: 16, NodeType: message.NodeType(2),
+			},
 		},
 	}
 
@@ -61,14 +70,7 @@ func TestLeafFetcher_TranslatesRange(t *testing.T) {
 			stub := &stubLeafClient{}
 			_, _, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).FetchLeaves(t.Context(), tt.req)
 			require.NoError(t, err)
-
-			require.Equal(t, tt.req.Root, stub.got.RootHash())
-			require.Equal(t, tt.req.Account, stub.got.AccountHash())
-			require.Equal(t, tt.req.Start, stub.got.StartKey())
-			require.Equal(t, tt.req.End, stub.got.EndKey())
-			require.Equal(t, tt.req.Limit, stub.got.KeyLimit())
-			// The node type comes from construction, not from the range.
-			require.Equal(t, tt.nodeType, stub.got.LeafType())
+			require.Equal(t, tt.want, stub.got)
 		})
 	}
 }
@@ -83,7 +85,6 @@ func TestLeafFetcher_UnpacksResponse(t *testing.T) {
 		err      error
 		want     evmstate.Leaves
 		wantMore bool
-		wantErr  error
 	}{
 		{
 			// The proof is verified by the client, so it never reaches the caller.
@@ -98,9 +99,8 @@ func TestLeafFetcher_UnpacksResponse(t *testing.T) {
 			wantMore: true,
 		},
 		{
-			name:    "client_error_propagates",
-			err:     errStub,
-			wantErr: errStub,
+			name: "client_error_propagates",
+			err:  errStub,
 		},
 	}
 
@@ -111,7 +111,7 @@ func TestLeafFetcher_UnpacksResponse(t *testing.T) {
 			got, more, err := NewLeafFetcher(stub, message.SubnetEVMLeafsRequestType, message.StateTrieNode).
 				FetchLeaves(t.Context(), evmstate.LeafRange{Root: root, Limit: 8})
 
-			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorIs(t, err, tt.err)
 			require.Equal(t, tt.want, got)
 			require.Equal(t, tt.wantMore, more)
 		})
