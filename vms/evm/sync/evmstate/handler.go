@@ -431,29 +431,19 @@ func (l *leafRange) next() []byte {
 	return next
 }
 
-// isRangeValid range-proves keys/vals against the trie from start. valid
-// reports whether the proof succeeded, and more reports whether the trie holds
-// leaves past keys.
-func isRangeValid(
-	t *trie.Trie,
-	start []byte,
-	keys [][]byte,
-	vals [][]byte,
-) (valid, more bool, _ error) {
-	proofDB, err := newRangeProof(t, start, keys)
+// isRangeValid range-proves r against the trie. valid reports whether the proof
+// succeeded, and more reports whether the trie holds leaves past r.
+func isRangeValid(t *trie.Trie, r *leafRange) (valid, more bool, _ error) {
+	proofDB, err := newRangeProof(t, r.start, r.keys)
 	if err != nil {
 		return false, false, err
 	}
-	more, proofErr := trie.VerifyRangeProof(t.Hash(), start, keys, vals, proofDB)
+	more, proofErr := trie.VerifyRangeProof(t.Hash(), r.start, r.keys, r.vals, proofDB)
 	return proofErr == nil, more, nil
 }
 
 // newRangeProof returns a range proof for [start, last(keys)].
-func newRangeProof(
-	t *trie.Trie,
-	start []byte,
-	keys [][]byte,
-) (*memorydb.Database, error) {
+func newRangeProof(t *trie.Trie, start []byte, keys [][]byte) (*memorydb.Database, error) {
 	// [trie.VerifyRangeProof] requires the proof to resolve a full path for
 	// each edge key, even when the leaves would otherwise prove the range.
 	proofDB := memorydb.New()
