@@ -9,7 +9,6 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -33,23 +32,14 @@ func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, tri
 	return net.AddHandler(handlerID, h)
 }
 
-// SnapshotReader opens flat iterators over the snapshot leaves. The
-// implementation does not need to guarantee anything about the state it
-// serves. A state that happens to match a request speeds up the response but
-// never changes it.
-type SnapshotReader interface {
-	AccountIterator(start common.Hash) (snapshot.AccountIterator, error)
-	StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error)
-}
-
 var _ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
 
 type responder struct {
 	log      logging.Logger
 	trieDB   *triedb.Database
-	snapshot SnapshotReader // optional
-	minKey   []byte         // read-only stand-in for an absent start key
-	maxKey   []byte         // read-only stand-in for an absent end key
+	snapshot Snapshot // optional
+	minKey   []byte   // read-only stand-in for an absent start key
+	maxKey   []byte   // read-only stand-in for an absent end key
 }
 
 func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
@@ -63,25 +53,16 @@ func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int
 }
 
 type handlerConfig struct {
-	snapshot SnapshotReader
+	snapshot Snapshot
 }
 
 // HandlerOption configures [RegisterHandler].
 type HandlerOption = options.Option[handlerConfig]
 
-// SnapshotReaderPointer is a type constraint for a pointer that implements
-// [SnapshotReader].
-//
-// It can be used to avoid typed-nil interface panics.
-type SnapshotReaderPointer[V any] interface {
-	SnapshotReader
-	*V
-}
-
 // WithSnapshot serves leaves from the snapshot where it agrees with the trie,
 // falling back to trie iteration everywhere else. A nil snapshot is equivalent
 // to not providing this option.
-func WithSnapshot[V any, P SnapshotReaderPointer[V]](s P) HandlerOption {
+func WithSnapshot[V any, P SnapshotPointer[V]](s P) HandlerOption {
 	return options.Func[handlerConfig](func(c *handlerConfig) {
 		if s != nil {
 			c.snapshot = s
@@ -180,15 +161,13 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.A
 
 // query holds the read-only inputs of a request.
 type query struct {
-	log       logging.Logger
-	startKey  []byte
-	endKey    []byte
-	account   common.Hash // populated when isStorage
-	isStorage bool
-	limit     int
+	log      logging.Logger
+	startKey []byte
+	endKey   []byte
+	limit    int
 
 	trie     *trie.Trie
-	snapshot SnapshotReader
+	snapshot trieSnapshot
 	minKey   []byte
 }
 
@@ -217,17 +196,27 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 	if len(end) == 0 {
 		end = r.maxKey
 	}
-	account := req.GetAccountHash()
+	var snap trieSnapshot
+	if r.snapshot != nil {
+		if account := req.GetAccountHash(); len(account) != 0 {
+			snap = storageSnapshot{
+				s:       r.snapshot,
+				account: common.BytesToHash(account),
+			}
+		} else {
+			snap = accountSnapshot{
+				s: r.snapshot,
+			}
+		}
+	}
 	return &query{
-		log:       r.log,
-		startKey:  start,
-		endKey:    end,
-		account:   common.BytesToHash(account),
-		isStorage: len(account) != 0,
-		limit:     int(min(req.GetKeyLimit(), MaxLeavesLimit)),
+		log:      r.log,
+		startKey: start,
+		endKey:   end,
+		limit:    int(min(req.GetKeyLimit(), MaxLeavesLimit)),
 
 		trie:     t,
-		snapshot: r.snapshot,
+		snapshot: snap,
 		minKey:   r.minKey,
 	}, nil
 }
@@ -359,19 +348,9 @@ func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte)
 // readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
 // are unvalidated, the caller range-proves them against the requested root.
 func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
-	log := q.log.With(
-		zap.Bool("isStorage", q.isStorage),
-		zap.Stringer("account", q.account),
-	)
-
-	it, err := newSnapshotIterator(
-		q.snapshot,
-		q.isStorage,
-		q.account,
-		common.BytesToHash(q.startKey),
-	)
+	it, err := q.snapshot.newIterator(common.BytesToHash(q.startKey))
 	if err != nil {
-		log.Debug("snapshot read abandoned",
+		q.log.Debug("snapshot read abandoned",
 			zap.String("reason", "iterator unavailable"),
 			zap.Error(err),
 		)
@@ -388,7 +367,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		}
 		v, err := it.Value()
 		if err != nil {
-			log.Debug("snapshot read abandoned",
+			q.log.Debug("snapshot read abandoned",
 				zap.String("reason", "leaf encoding failed"),
 				zap.Error(err),
 			)
@@ -398,7 +377,7 @@ func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
 		vals = append(vals, v)
 	}
 	if err := it.Error(); err != nil {
-		log.Debug("snapshot read abandoned",
+		q.log.Debug("snapshot read abandoned",
 			zap.String("reason", "iteration failed"),
 			zap.Error(err),
 		)
@@ -476,39 +455,6 @@ func (l *leafRange) next() []byte {
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
-}
-
-// iterator walks snapshot leaves. Value returns the trie-encoded value at the
-// cursor.
-type iterator interface {
-	snapshot.Iterator
-	Value() ([]byte, error)
-}
-
-type (
-	accountIterator struct{ snapshot.AccountIterator }
-	storageIterator struct{ snapshot.StorageIterator }
-)
-
-func (it accountIterator) Value() ([]byte, error) { return types.FullAccountRLP(it.Account()) }
-func (it storageIterator) Value() ([]byte, error) { return it.Slot(), nil }
-
-// newSnapshotIterator returns an iterator starting at start over the account
-// trie or over the account's storage when isStorage is true.
-//
-// If a nil error is returned, the iterator MUST be released.
-func newSnapshotIterator(
-	s SnapshotReader,
-	isStorage bool,
-	account common.Hash,
-	start common.Hash,
-) (iterator, error) {
-	if isStorage {
-		it, err := s.StorageIterator(account, start)
-		return storageIterator{it}, err
-	}
-	it, err := s.AccountIterator(start)
-	return accountIterator{it}, err
 }
 
 // isRangeValid range-proves keys/vals against the trie from start. valid
