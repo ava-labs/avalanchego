@@ -176,7 +176,7 @@ type (
 	}
 )
 
-// Option configures [Execute].
+// An Option configures [Execute].
 type Option = options.Option[executionConfig]
 
 // WithMaxNumTxs limits execution to maxNumTxs transactions from the start of
