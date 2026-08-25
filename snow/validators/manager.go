@@ -314,13 +314,13 @@ func (m *manager) String() string {
 
 	sb := strings.Builder{}
 
-	fmt.Fprintf(&sb, "Validator Manager: (Size = %d)",
-		len(subnets))
+	fmt.Fprintf(&sb, "Validator Manager: (Size = %d)", len(subnets))
 	for _, subnetID := range subnets {
 		vdrs := m.subnetToVdrs[subnetID]
 		fmt.Fprintf(&sb, "\n    Subnet[%s]: %s",
 			subnetID,
-			vdrs.PrefixedString("    "))
+			vdrs.PrefixedString("    "),
+		)
 	}
 
 	return sb.String()

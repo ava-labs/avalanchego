@@ -9,9 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// processIDLabel partitions resource metrics by process.
-const processIDLabel = "processID"
-
 type metrics struct {
 	numCPUCycles       *prometheus.GaugeVec
 	numDiskReads       *prometheus.GaugeVec
@@ -21,6 +18,9 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
+	// processIDLabel partitions resource metrics by process.
+	const processIDLabel = "processID"
+
 	m := &metrics{
 		numCPUCycles: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
