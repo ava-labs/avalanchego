@@ -312,6 +312,10 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 
 	const numAccounts = 300
 
+	// One limit past a segment boundary, so every divergence is reachable and
+	// the response is trimmed. TestResponder_HonorsKeyLimit sweeps the limits.
+	const limit = uint32(oneSegment + 1)
+
 	divergences := map[string][2]int{
 		"mirrors_the_trie": {0, 0},
 		"head_segment":     {0, oneSegment},
@@ -320,42 +324,33 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 		"tail_segment":     {numAccounts - oneSegment, numAccounts},
 		"every_segment":    {0, numAccounts},
 	}
-	limits := map[string]uint32{
-		"whole_trie":      numAccounts,
-		"under_a_segment": 1,
-		"one_segment":     64,
-		"past_a_segment":  65,
-		"over_the_cap":    maxLimit + 10,
-	}
 
-	for dname, diverge := range divergences {
-		for lname, limit := range limits {
-			t.Run(fmt.Sprintf("%s/%s", dname, lname), func(t *testing.T) {
-				t.Parallel()
+	for name, diverge := range divergences {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-				trieDB := synctest.NewTrieDB()
-				c := newAccountCase(t, trieDB, numAccounts)
-				c.corrupt(diverge[0], diverge[1])
-				withSnap := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
+			trieDB := synctest.NewTrieDB()
+			c := newAccountCase(t, trieDB, numAccounts)
+			c.corrupt(diverge[0], diverge[1])
+			withSnap := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
 
-				bareDB := synctest.NewTrieDB()
-				bare := newAccountCase(t, bareDB, numAccounts)
-				require.Equal(t, c.root, bare.root)
-				noSnap := newResponder(loggingtest.New(t, logging.Debug), bareDB, common.HashLength)
+			bareDB := synctest.NewTrieDB()
+			bare := newAccountCase(t, bareDB, numAccounts)
+			require.Equal(t, c.root, bare.root)
+			noSnap := newResponder(loggingtest.New(t, logging.Debug), bareDB, common.HashLength)
 
-				req := func() *syncpb.GetLeafRequest {
-					return &syncpb.GetLeafRequest{RootHash: c.root.Bytes(), KeyLimit: limit}
-				}
-				got, gotErr := withSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
-				want, wantErr := noSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
+			req := func() *syncpb.GetLeafRequest {
+				return &syncpb.GetLeafRequest{RootHash: c.root.Bytes(), KeyLimit: limit}
+			}
+			got, gotErr := withSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
+			want, wantErr := noSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
 
-				require.Equal(t, wantErr, gotErr)
-				require.Equal(t, want.GetKeys(), got.GetKeys())
-				require.Equal(t, want.GetValues(), got.GetValues())
-				require.Equal(t, len(want.GetProofVals()) == 0, len(got.GetProofVals()) == 0,
-					"proof presence must not depend on the snapshot")
-			})
-		}
+			require.Equal(t, wantErr, gotErr)
+			require.Equal(t, want.GetKeys(), got.GetKeys())
+			require.Equal(t, want.GetValues(), got.GetValues())
+			require.Equal(t, len(want.GetProofVals()) == 0, len(got.GetProofVals()) == 0,
+				"proof presence must not depend on the snapshot")
+		})
 	}
 }
 
@@ -389,57 +384,26 @@ func TestResponder_PartialResponseCarriesProof(t *testing.T) {
 	}
 }
 
-func TestResponder_SnapshotProofVerifies(t *testing.T) {
+// A nil snapshot reaches the handler as a non-nil interface holding a nil
+// pointer, which would pass the nil check and panic on the first request.
+func TestResponder_NilSnapshotServesFromTrie(t *testing.T) {
 	t.Parallel()
 
-	const (
-		numLeaves = segmentedLeaves
-		keyLimit  = 100 // key limit leaves the range partial so a proof is required
-	)
+	trieDB := synctest.NewTrieDB()
+	root, keys, vals := synctest.FillTrie(t, trieDB, 20)
 
-	tests := []struct {
-		name        string
-		corruptFrom int
-		corruptTo   int
-	}{
-		{
-			name: "snapshot_agrees_with_the_trie",
-		},
-		{
-			// The head segment fails, so the bridge finishes below the key limit
-			// and the append past the bridged key still runs.
-			name:        "bridges_a_diverged_segment",
-			corruptFrom: 0,
-			corruptTo:   segmentLen,
-		},
-	}
+	var absent *synctest.StaticSnapshot
+	r := newLeafResponder(t, trieDB, WithSnapshot(absent))
+	require.Nil(t, r.snapshot, "a nil snapshot must not be stored")
 
-	for _, kind := range snapshotKinds {
-		for _, tt := range tests {
-			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := kind.build(t, trieDB, numLeaves)
-				c.corrupt(tt.corruptFrom, tt.corruptTo)
-
-				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-					RootHash:    c.root.Bytes(),
-					AccountHash: c.accountHash,
-					KeyLimit:    keyLimit,
-				})
-				require.Nil(t, appErr)
-				require.NotNil(t, resp)
-				require.Equal(t, c.keys[:keyLimit], resp.GetKeys())
-				require.NotEmpty(t, resp.GetProofVals(), "a partial response must carry a proof")
-
-				more, err := trie.VerifyRangeProof(c.root, bytes.Repeat([]byte{0x00}, common.HashLength),
-					resp.GetKeys(), resp.GetValues(), proofFrom(t, resp.GetProofVals()))
-				require.NoError(t, err)
-				require.True(t, more, "leaves remain past a partial range")
-			})
-		}
-	}
+	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+		RootHash: root.Bytes(),
+		KeyLimit: uint32(len(keys)),
+	})
+	require.Nil(t, appErr)
+	require.NotNil(t, resp)
+	require.Equal(t, keys, resp.GetKeys())
+	require.Equal(t, vals, resp.GetValues())
 }
 
 func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
@@ -919,17 +883,13 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 				firstKey = startKey
 			}
 
-			net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-			require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
-
-			resp := &syncpb.GetLeafResponse{}
-			outcome, err := NewClient(net, p2p.EVMLeafRequestHandlerID, tracker).Send(ctx, &syncpb.GetLeafRequest{
+			// The wire response carries the proof, which the verified client
+			// consumes rather than returns, so this asserts at the transport.
+			resp := rawResponse(t, ctx, serve(t, ctx, trieDB, opts...), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: startKey,
 				KeyLimit: tt.keyLimit,
-			}, resp)
-			require.NoError(t, err)
-			outcome.Success()
+			})
 
 			to := tt.startAt + tt.wantLen
 			require.Equal(t, keys[tt.startAt:to], resp.GetKeys())
