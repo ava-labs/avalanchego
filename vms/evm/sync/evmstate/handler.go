@@ -302,76 +302,7 @@ func (q *query) fillFromSnapshot(leaves *leafRange) (bool, error) {
 		return more, nil
 	}
 
-	return q.fillFromSegments(leaves, snapKeys, snapVals)
-}
-
-const snapshotSegmentLen = 64
-
-// fillFromSegments appends the segments of snapKeys and snapVals that prove
-// against the trie to leaves, bridging failed segments with leaves from the
-// trie. It returns whether the trie may hold leaves past the response.
-//
-// snapKeys=[A B C D E], snapshotSegmentLen=2, [C D] diverged:
-//
-//	[A B] proves    append        -> leaves=[A B]
-//	[C D] fails     mark the gap  -> leaves=[A B]
-//	[E]   proves    bridge to E   -> leaves=[A B C D]
-//	                append past E -> leaves=[A B C D E]
-func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte) (bool, error) {
-	hasGap := false
-	// Only a proved segment answers this, so it starts pessimistic. A stale
-	// answer is safe, collect re-derives it below the limit.
-	trieHasMore := true
-
-	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
-		// Without a gap the proof starts at leaves.next, so the span back to
-		// the response is covered too.
-		var startKey []byte
-		if hasGap {
-			startKey = snapKeys[i]
-		} else {
-			startKey = leaves.next()
-		}
-		end := min(i+snapshotSegmentLen, len(snapKeys))
-		valid, more, err := isRangeValid(
-			q.trie,
-			&leafRange{
-				start: startKey,
-				keys:  snapKeys[i:end],
-				vals:  snapVals[i:end],
-			},
-		)
-		if err != nil {
-			return false, err
-		}
-		if !valid {
-			hasGap = true
-			continue
-		}
-
-		start := i
-		if hasGap {
-			// The bridge stops on snapKeys[i] inclusive, so skip it here.
-			if _, err := fillFromTrie(q.trie, leaves, snapKeys[i]); err != nil {
-				return false, err
-			}
-			if leaves.full() {
-				break
-			}
-			start = i + 1
-		}
-		hasGap = false
-
-		// The response now ends where this segment was proved, so the segment's
-		// verdict carries. A trimmed segment leaves the rest of the trie to come.
-		kept := leaves.append(snapKeys[start:end], snapVals[start:end])
-		trieHasMore = more || kept < end-start
-
-		if leaves.full() {
-			break
-		}
-	}
-	return trieHasMore, nil
+	return fillFromSegments(q.trie, leaves, snapKeys, snapVals)
 }
 
 // leafRange accumulates the leaves of one response.
@@ -422,6 +353,75 @@ func (l *leafRange) next() []byte {
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
+}
+
+const segmentLen = 64
+
+// fillFromSegments appends segments of keys and vals that prove against the
+// trie to r, bridging failed segments with leaves from the trie. It returns
+// whether the trie may hold leaves past the range.
+//
+// keys=[A B C D E], segmentLen=2, [C D] diverged:
+//
+//	[A B] proves    append        -> r=[A B]
+//	[C D] fails     mark the gap  -> r=[A B]
+//	[E]   proves    bridge to E   -> r=[A B C D]
+//	                append past E -> r=[A B C D E]
+func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, error) {
+	hasGap := false
+	// Only a proved segment answers this, so it starts pessimistic. A stale
+	// answer is safe, collect re-derives it below the limit.
+	trieHasMore := true
+
+	for i := 0; i < len(keys); i += segmentLen {
+		// Without a gap the proof starts at leaves.next, so the span back to
+		// the response is covered too.
+		var startKey []byte
+		if hasGap {
+			startKey = keys[i]
+		} else {
+			startKey = r.next()
+		}
+		end := min(i+segmentLen, len(keys))
+		valid, more, err := isRangeValid(
+			t,
+			&leafRange{
+				start: startKey,
+				keys:  keys[i:end],
+				vals:  vals[i:end],
+			},
+		)
+		if err != nil {
+			return false, err
+		}
+		if !valid {
+			hasGap = true
+			continue
+		}
+
+		start := i
+		if hasGap {
+			// The bridge stops on keys[i] inclusive, so skip it here.
+			if _, err := fillFromTrie(t, r, keys[i]); err != nil {
+				return false, err
+			}
+			if r.full() {
+				break
+			}
+			start = i + 1
+		}
+		hasGap = false
+
+		// The response now ends where this segment was proved, so the segment's
+		// verdict carries. A trimmed segment leaves the rest of the trie to come.
+		kept := r.append(keys[start:end], vals[start:end])
+		trieHasMore = more || kept < end-start
+
+		if r.full() {
+			break
+		}
+	}
+	return trieHasMore, nil
 }
 
 // fillFromTrie appends trie leaves from [leafRange.next] through end to leaves,

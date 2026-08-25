@@ -34,8 +34,8 @@ import (
 // Snapshot fixture shapes, derived from snapshotSegmentLen so they survive a
 // change to it.
 const (
-	oneSegment  = snapshotSegmentLen
-	twoSegments = 2 * snapshotSegmentLen
+	oneSegment  = segmentLen
+	twoSegments = 2 * segmentLen
 	// segmentedLeaves fills two segments and leaves a short third, so a tail
 	// case spans fewer leaves than a whole segment.
 	segmentedLeaves = twoSegments + 2
@@ -410,7 +410,7 @@ func TestResponder_SnapshotProofVerifies(t *testing.T) {
 			// and the append past the bridged key still runs.
 			name:        "bridges_a_diverged_segment",
 			corruptFrom: 0,
-			corruptTo:   snapshotSegmentLen,
+			corruptTo:   segmentLen,
 		},
 	}
 
