@@ -341,6 +341,9 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (b
 		return false, err
 	}
 	if valid {
+		// TODO(StephenButtolph): In the case where the snapshot proved
+		// correctly and it isn't the full trie, we could avoid re-proving the
+		// range and just return the proof here.
 		r.append(keys, vals)
 		return more, nil
 	}
