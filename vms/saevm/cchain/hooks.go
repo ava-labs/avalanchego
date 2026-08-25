@@ -199,6 +199,10 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 }
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
+	return SettledBy(h)
+}
+
+func SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
 	if he.SettledHeight == nil ||
 		he.SettledGasUnix == nil ||

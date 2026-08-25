@@ -229,10 +229,14 @@ type Settled struct {
 	Excess       gas.Gas
 }
 
+func (s Settled) IsSynchronous() bool {
+	return s == Settled{}
+}
+
 // Synchronous reports whether the header is that of a synchronously executed
 // (pre-SAE) block.
 func Synchronous(h Points, hdr *types.Header) bool {
-	return h.SettledBy(hdr) == (Settled{})
+	return h.SettledBy(hdr).IsSynchronous()
 }
 
 // SettledGasTime is a helper that given a header and its settler, returns the
