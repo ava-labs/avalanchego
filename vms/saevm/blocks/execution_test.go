@@ -202,14 +202,7 @@ func errIsNot(target error) testerr.Want {
 
 func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
-	header := func() *types.Header {
-		return &types.Header{
-			Number:  big.NewInt(height),
-			BaseFee: big.NewInt(1),
-			Time:    42,
-		}
-	}
-	asynchronous := &hook.Settled{Height: height - 1}
+	asynchronous := hook.Settled{Height: height - 1}
 
 	markExecuted := func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
 		t.Helper()
@@ -227,7 +220,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		settled  *hook.Settled
+		settled  hook.Settled
 		txs      []*types.Transaction
 		hookOpts []hookstest.HookOption
 		setupDBs func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
@@ -279,15 +272,15 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hdr := header()
-			var ethB *types.Block
-			if tt.settled != nil {
-				var err error
-				ethB, err = hookstest.BuildBlock(hdr, nil, tt.txs, nil, nil, *tt.settled)
-				require.NoError(t, err, "hookstest.BuildBlock()")
-			} else {
-				ethB = types.NewBlock(hdr, tt.txs, nil, nil, saetest.TrieHasher())
-			}
+			ethB, err := hookstest.BuildBlock(
+				&types.Header{
+					Number:  big.NewInt(height),
+					BaseFee: big.NewInt(1),
+					Time:    42,
+				},
+				nil, tt.txs, nil, nil, tt.settled,
+			)
+			require.NoError(t, err, "hookstest.BuildBlock()")
 
 			hooks := hookstest.NewStub(1e6, tt.hookOpts...)
 			db := rawdb.NewMemoryDatabase()
@@ -306,10 +299,11 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 				return
 			}
 
+			synchronous := hook.Synchronous(hooks, ethB.Header())
 			require.NoErrorf(t, b.CheckInvariants(Executed), "%T.CheckInvariants(Executed)", b)
-			require.Equalf(t, tt.settled == nil, b.Synchronous(), "%T.Synchronous()", b)
+			require.Equalf(t, synchronous, b.Synchronous(), "%T.Synchronous()", b)
 			require.Falsef(t, b.Settled(), "%T.Settled()", b)
-			require.Equalf(t, tt.settled == nil, b == b.LastSettled(), "%T is its own LastSettled()", b)
+			require.Equalf(t, synchronous, b == b.LastSettled(), "%T is its own LastSettled()", b)
 		})
 	}
 }
