@@ -43,15 +43,15 @@ const (
 
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errZeroKeyLimit":           errZeroKeyLimit,
-		"errMissingRoot":            errMissingRoot,
-		"errEmptyRoot":              errEmptyRoot,
-		"errWrongAccountHashLength": errWrongAccountHashLength,
 		"errWrongStartKeyLength":    errWrongStartKeyLength,
 		"errWrongEndKeyLength":      errWrongEndKeyLength,
 		"errStartAfterEnd":          errStartAfterEnd,
+		"errZeroKeyLimit":           errZeroKeyLimit,
+		"errWrongAccountHashLength": errWrongAccountHashLength,
+		"errWrongRootLength":        errWrongRootLength,
+		"errMissingRoot":            errMissingRoot,
+		"errEmptyRoot":              errEmptyRoot,
 		"errRootNotFound":           errRootNotFound,
-		"errWrongRootHashLength":    errWrongRootLength,
 	})
 }
 
@@ -731,7 +731,7 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 func newSnapshotQuery(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int, endKey []byte) *query {
 	t.Helper()
 	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-	q, appErr := newQuery(r, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+	q, appErr := newQuery(r, &syncpb.GetLeafRequest{
 		RootHash:    c.root.Bytes(),
 		AccountHash: c.accountHash,
 		EndKey:      endKey,

@@ -70,55 +70,13 @@ func WithSnapshot[V any, P SnapshotPointer[V]](s P) HandlerOption {
 	})
 }
 
-var (
-	errZeroKeyLimit = &avacommon.AppError{
-		Code:    3000,
-		Message: "zero key limit",
-	}
-	errWrongRootLength = &avacommon.AppError{
-		Code:    3001,
-		Message: "root length mismatch",
-	}
-	errMissingRoot = &avacommon.AppError{
-		Code:    3002,
-		Message: "missing trie root",
-	}
-	errEmptyRoot = &avacommon.AppError{
-		Code:    3003,
-		Message: "empty trie root",
-	}
-	errWrongAccountHashLength = &avacommon.AppError{
-		Code:    3004,
-		Message: "account length mismatch",
-	}
-	errWrongStartKeyLength = &avacommon.AppError{
-		Code:    3005,
-		Message: "start key length mismatch",
-	}
-	errWrongEndKeyLength = &avacommon.AppError{
-		Code:    3006,
-		Message: "end key length mismatch",
-	}
-	errStartAfterEnd = &avacommon.AppError{
-		Code:    3007,
-		Message: "start key after end key",
-	}
-	errRootNotFound = &avacommon.AppError{
-		Code:    3008,
-		Message: "requested trie root not found",
-	}
-)
-
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	if appErr := validateRequest(req, len(r.minKey)); appErr != nil {
+	q, appErr := newQuery(r, req)
+	if appErr != nil {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(appErr),
 		)
-		return nil, appErr
-	}
-	q, appErr := newQuery(r, nodeID, req)
-	if appErr != nil {
 		return nil, appErr
 	}
 	resp, err := q.collect()
@@ -128,65 +86,62 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	return resp, nil
 }
 
-// validateRequest returns the rejection for a malformed req, nil when it is
-// valid.
-func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) *avacommon.AppError {
-	if req.GetKeyLimit() == 0 {
-		return errZeroKeyLimit
-	}
-
-	root := req.GetRootHash()
-	if len(root) != common.HashLength {
-		return errWrongRootLength
-	}
-	switch common.BytesToHash(root) {
-	case common.Hash{}:
-		return errMissingRoot
-	case types.EmptyRootHash:
-		return errEmptyRoot
-	}
-
-	switch account, start, end := req.GetAccountHash(), req.GetStartKey(), req.GetEndKey(); {
-	case len(account) != 0 && len(account) != common.HashLength:
-		return errWrongAccountHashLength
-	case len(start) != 0 && len(start) != trieKeyLength:
-		return errWrongStartKeyLength
-	case len(end) != 0 && len(end) != trieKeyLength:
-		return errWrongEndKeyLength
-	case len(end) != 0 && bytes.Compare(start, end) > 0:
-		return errStartAfterEnd
-	}
-	return nil
-}
-
 // query holds the read-only inputs of a request.
 type query struct {
 	startKey []byte
 	endKey   []byte
 	limit    int
 
-	trie     *trie.Trie
 	snapshot trieSnapshot
+	trie     *trie.Trie
 	minKey   []byte
 }
 
 // MaxLeavesLimit caps leaves per response.
 const MaxLeavesLimit = 1024
 
-// newQuery opens the trie and returns a per-request query.
-func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*query, *avacommon.AppError) {
-	root := common.BytesToHash(req.GetRootHash())
-	t, err := trie.New(trie.TrieID(root), r.trieDB)
-	if err != nil {
-		r.log.Debug("rejecting request",
-			zap.Stringer("nodeID", nodeID),
-			zap.String("reason", "trie root not found"),
-			zap.Stringer("root", root),
-			zap.Error(err),
-		)
-		return nil, errRootNotFound
+var (
+	errWrongStartKeyLength = &avacommon.AppError{
+		Code:    3000,
+		Message: "start key length mismatch",
 	}
+	errWrongEndKeyLength = &avacommon.AppError{
+		Code:    3001,
+		Message: "end key length mismatch",
+	}
+	errStartAfterEnd = &avacommon.AppError{
+		Code:    3002,
+		Message: "start key after end key",
+	}
+	errZeroKeyLimit = &avacommon.AppError{
+		Code:    3003,
+		Message: "zero key limit",
+	}
+	errWrongAccountHashLength = &avacommon.AppError{
+		Code:    3004,
+		Message: "account length mismatch",
+	}
+	errWrongRootLength = &avacommon.AppError{
+		Code:    3005,
+		Message: "root length mismatch",
+	}
+	errMissingRoot = &avacommon.AppError{
+		Code:    3006,
+		Message: "missing trie root",
+	}
+	errEmptyRoot = &avacommon.AppError{
+		Code:    3007,
+		Message: "empty trie root",
+	}
+	errRootNotFound = &avacommon.AppError{
+		Code:    3008,
+		Message: "requested trie root not found",
+	}
+)
 
+// newQuery opens the requested trie and returns the per-request query, or the
+// rejection for a malformed or unservable req.
+func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppError) {
 	start := req.GetStartKey()
 	if len(start) == 0 {
 		start = r.minKey
@@ -195,9 +150,29 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 	if len(end) == 0 {
 		end = r.maxKey
 	}
+	trieKeyLength := len(r.minKey)
+	switch {
+	case len(start) != trieKeyLength:
+		return nil, errWrongStartKeyLength
+	case len(end) != trieKeyLength:
+		return nil, errWrongEndKeyLength
+	case bytes.Compare(start, end) > 0:
+		return nil, errStartAfterEnd
+	}
+
+	limit := req.GetKeyLimit()
+	if limit == 0 {
+		return nil, errZeroKeyLimit
+	}
+
+	account := req.GetAccountHash()
+	if len(account) != 0 && len(account) != common.HashLength {
+		return nil, errWrongAccountHashLength
+	}
+
 	var snap trieSnapshot
 	if r.snapshot != nil {
-		if account := req.GetAccountHash(); len(account) != 0 {
+		if len(account) != 0 {
 			snap = storageSnapshot{
 				s:       r.snapshot,
 				account: common.BytesToHash(account),
@@ -208,13 +183,30 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 			}
 		}
 	}
+
+	rootBytes := req.GetRootHash()
+	if len(rootBytes) != common.HashLength {
+		return nil, errWrongRootLength
+	}
+	root := common.BytesToHash(rootBytes)
+	switch root {
+	case common.Hash{}:
+		return nil, errMissingRoot
+	case types.EmptyRootHash:
+		return nil, errEmptyRoot
+	}
+
+	t, err := trie.New(trie.TrieID(root), r.trieDB)
+	if err != nil {
+		return nil, errRootNotFound
+	}
 	return &query{
 		startKey: start,
 		endKey:   end,
-		limit:    int(min(req.GetKeyLimit(), MaxLeavesLimit)),
+		limit:    int(min(limit, MaxLeavesLimit)),
 
-		trie:     t,
 		snapshot: snap,
+		trie:     t,
 		minKey:   r.minKey,
 	}, nil
 }
