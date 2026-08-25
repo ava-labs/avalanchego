@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -16,6 +17,7 @@ import (
 func VerifyWarpMessages(
 	ctx context.Context,
 	networkID uint32,
+	cChainID ids.ID,
 	validatorState validators.State,
 	pChainHeight uint64,
 	b block.Block,
@@ -24,9 +26,10 @@ func VerifyWarpMessages(
 		err := executor.VerifyWarpMessages(
 			ctx,
 			networkID,
+			cChainID,
 			validatorState,
 			pChainHeight,
-			tx.Unsigned,
+			tx,
 		)
 		if err != nil {
 			return err

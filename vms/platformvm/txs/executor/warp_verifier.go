@@ -5,10 +5,13 @@ package executor
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
@@ -18,21 +21,42 @@ const (
 
 var _ txs.Visitor = (*warpVerifier)(nil)
 
-// VerifyWarpMessages verifies all warp messages in the tx. If any of the warp
-// messages are invalid, an error is returned.
+// VerifyWarpMessages verifies all warp messages in the tx, including warp
+// credentials. If any of the warp messages are invalid, an error is returned.
 func VerifyWarpMessages(
 	ctx context.Context,
 	networkID uint32,
+	cChainID ids.ID,
 	validatorState validators.State,
 	pChainHeight uint64,
-	tx txs.UnsignedTx,
+	tx *txs.Tx,
 ) error {
-	return tx.Visit(&warpVerifier{
+	w := &warpVerifier{
 		context:        ctx,
 		networkID:      networkID,
 		validatorState: validatorState,
 		pChainHeight:   pChainHeight,
-	})
+	}
+	if err := tx.Unsigned.Visit(w); err != nil {
+		return err
+	}
+	for _, cred := range tx.Creds {
+		warpCred, ok := cred.(*secp256k1fx.WarpCredential)
+		if !ok {
+			continue
+		}
+		msg, err := warp.ParseMessage(warpCred.Message)
+		if err != nil {
+			return err
+		}
+		if msg.SourceChainID != cChainID {
+			return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, cChainID, msg.SourceChainID)
+		}
+		if err := w.verify(warpCred.Message); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type warpVerifier struct {

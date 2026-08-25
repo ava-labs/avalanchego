@@ -545,9 +545,10 @@ func executeTx(
 	err := txexecutor.VerifyWarpMessages(
 		ctx,
 		backend.Ctx.NetworkID,
+		backend.Ctx.CChainID,
 		backend.Ctx.ValidatorState,
 		pChainHeight,
-		tx.Unsigned,
+		tx,
 	)
 	if err != nil {
 		backend.Ctx.Log.Debug("transaction failed warp verification",

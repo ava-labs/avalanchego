@@ -40,6 +40,7 @@ func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Con
 		err := VerifyWarpMessages(
 			ctx,
 			b.manager.ctx.NetworkID,
+			b.manager.ctx.CChainID,
 			b.manager.ctx.ValidatorState,
 			blockContext.PChainHeight,
 			b,

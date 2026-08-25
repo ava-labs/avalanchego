@@ -87,13 +87,19 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 	if !ok {
 		return ErrWrongInputType
 	}
-	cred, ok := credIntf.(*Credential)
-	if !ok {
-		return ErrWrongCredentialType
-	}
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return ErrWrongOwnerType
+	}
+	if cred, ok := credIntf.(*WarpCredential); ok {
+		if err := verify.All(in, cred, owner); err != nil {
+			return err
+		}
+		return fx.VerifyWarpCredential(tx, in, cred, owner)
+	}
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return ErrWrongCredentialType
 	}
 	if err := verify.All(in, cred, owner); err != nil {
 		return err
@@ -143,13 +149,21 @@ func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) err
 	if !ok {
 		return ErrWrongInputType
 	}
-	cred, ok := credIntf.(*Credential)
-	if !ok {
-		return ErrWrongCredentialType
-	}
 	out, ok := utxoIntf.(*TransferOutput)
 	if !ok {
 		return ErrWrongUTXOType
+	}
+	if cred, ok := credIntf.(*WarpCredential); ok {
+		if err := verify.All(out, in, cred); err != nil {
+			return err
+		} else if out.Amt != in.Amt {
+			return fmt.Errorf("%w: %d != %d", ErrMismatchedAmounts, out.Amt, in.Amt)
+		}
+		return fx.VerifyWarpCredential(tx, &in.Input, cred, &out.OutputOwners)
+	}
+	cred, ok := credIntf.(*Credential)
+	if !ok {
+		return ErrWrongCredentialType
 	}
 	return fx.VerifySpend(tx, in, cred, out)
 }

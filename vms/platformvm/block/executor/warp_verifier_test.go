@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -144,6 +145,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 			err := VerifyWarpMessages(
 				t.Context(),
 				constants.UnitTestID,
+				ids.Empty,
 				nil,
 				0,
 				test.block,

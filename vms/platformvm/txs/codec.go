@@ -138,5 +138,7 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&AddAutoRenewedValidatorTx{}),
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
+
+		targetCodec.RegisterType(&secp256k1fx.WarpCredential{}),
 	)
 }

@@ -151,9 +151,10 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	err = executor.VerifyWarpMessages(
 		context.TODO(),
 		m.ctx.NetworkID,
+		m.ctx.CChainID,
 		m.ctx.ValidatorState,
 		recommendedPChainHeight,
-		tx.Unsigned,
+		tx,
 	)
 	if err != nil {
 		return fmt.Errorf("failed verifying warp messages: %w", err)

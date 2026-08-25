@@ -17,8 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestVerifyWarpMessages(t *testing.T) {
@@ -87,9 +89,20 @@ func TestVerifyWarpMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	otherChainWarpMessage, err := warp.NewMessage(
+		must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+			constants.UnitTestID,
+			ids.GenerateTestID(),
+			nil,
+		)),
+		warpSignature,
+	)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name        string
 		tx          txs.UnsignedTx
+		creds       []verify.Verifiable
 		expectedErr error
 	}{
 		{
@@ -200,17 +213,46 @@ func TestVerifyWarpMessages(t *testing.T) {
 			name: "DisableL1ValidatorTx",
 			tx:   &txs.DisableL1ValidatorTx{},
 		},
+		{
+			name:  "BaseTx with secp credential",
+			tx:    &txs.BaseTx{},
+			creds: []verify.Verifiable{&secp256k1fx.Credential{}},
+		},
+		{
+			name:  "BaseTx with valid warp credential",
+			tx:    &txs.BaseTx{},
+			creds: []verify.Verifiable{&secp256k1fx.WarpCredential{Message: validWarpMessage.Bytes()}},
+		},
+		{
+			name:        "BaseTx with unparsable warp credential",
+			tx:          &txs.BaseTx{},
+			creds:       []verify.Verifiable{&secp256k1fx.WarpCredential{}},
+			expectedErr: codec.ErrCantUnpackVersion,
+		},
+		{
+			name:        "BaseTx with warp credential from wrong network",
+			tx:          &txs.BaseTx{},
+			creds:       []verify.Verifiable{&secp256k1fx.WarpCredential{Message: invalidWarpMessage.Bytes()}},
+			expectedErr: warp.ErrWrongNetworkID,
+		},
+		{
+			name:        "BaseTx with warp credential from wrong chain",
+			tx:          &txs.BaseTx{},
+			creds:       []verify.Verifiable{&secp256k1fx.WarpCredential{Message: otherChainWarpMessage.Bytes()}},
+			expectedErr: errWrongWarpMessageSourceChainID,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := VerifyWarpMessages(
 				t.Context(),
 				constants.UnitTestID,
+				chainID,
 				state,
 				0,
-				test.tx,
+				&txs.Tx{Unsigned: test.tx, Creds: test.creds},
 			)
-			require.Equal(t, test.expectedErr, err)
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }
