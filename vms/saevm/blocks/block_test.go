@@ -63,13 +63,18 @@ func newBlock(tb testing.TB, eth *types.Block, parent *Block) *Block {
 	return b
 }
 
+// newChain returns a slice of contiguous-height blocks. Only the last-settled
+// height for the first in the chain is required, and any missing value will
+// default to the same as its parent. Blocks that settle their own height are
+// considered synchronous.
 func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
 	var (
-		ethParent *types.Block
-		parent    *Block
-		blocks    []*Block
+		ethParent         *types.Block
+		parent            *Block
+		synchronousParent = true
+		blocks            []*Block
 	)
 	byNum := make(map[uint64]*Block)
 
@@ -80,14 +85,21 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 			settle      *Block
 			synchronous bool
 		)
-		if s, ok := lastSettledAtHeight[n]; ok {
-			if s == n {
-				synchronous = true
-			} else {
-				require.Less(tb, s, n, "Last-settled height MUST be <= current height")
-				settle = byNum[s]
+		switch s, ok := lastSettledAtHeight[n]; {
+		case ok && s == n:
+			if !synchronousParent {
+				tb.Fatal("Bad test setup: synchronous block after asynchronous")
 			}
-		} else if n > 0 {
+			synchronous = true
+
+		case ok && s != n:
+			require.Less(tb, s, n, "Last-settled height MUST be <= current height")
+			settle = byNum[s]
+
+		case i == 0:
+			tb.Fatal("Bad test setup: first block in chain MUST have last-settled height specified")
+
+		default:
 			settle = parent.LastSettled()
 		}
 
@@ -109,6 +121,7 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 
 		parent = byNum[n]
 		ethParent = parent.EthBlock()
+		synchronousParent = synchronous
 	}
 
 	return blocks
