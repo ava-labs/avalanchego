@@ -27,7 +27,6 @@ go_library(
         "//graft/evm/precompileconfig",
         "//snow",
         "//upgrade",
-        "//utils",
         "//utils/set",
         "//vms/evm/predicate",
         "//vms/saevm/hook",
@@ -51,7 +50,6 @@ graft_go_test(
     deps = [
         "//graft/coreth/params/extras",
         "//upgrade/upgradetest",
-        "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//assert",

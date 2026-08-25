@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 // mkConfigWithAllowList creates a new config with the correct type for [module]
@@ -105,7 +104,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: nil,
 			}, precompileconfig.Upgrade{
-				BlockTimestamp: utils.PointerTo[uint64](1),
+				BlockTimestamp: new(uint64(1)),
 			}),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))

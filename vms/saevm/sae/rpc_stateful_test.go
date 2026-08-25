@@ -37,7 +37,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -305,7 +304,7 @@ func TestDebugTrace(t *testing.T) {
 	}
 	wantTracedResults := wantPrecompileResults(ethBlock)
 	callPrecompileArgs := ethapi.TransactionArgs{
-		From: utils.PointerTo(sender),
+		From: new(sender),
 		To:   &precompile,
 	}
 
@@ -398,7 +397,7 @@ func TestDebugTrace(t *testing.T) {
 			Pc:    logBaseFeePC,
 			Op:    vm.LOG1.String(),
 			Depth: 1,
-			Stack: utils.PointerTo([]string{
+			Stack: new([]string{
 				baseFee.Hex(),
 				"0x0", "0x0", // LOG1's size and offset
 			}),
@@ -458,8 +457,8 @@ func TestDebugTrace(t *testing.T) {
 					method: "debug_traceCall",
 					args: []any{
 						ethapi.TransactionArgs{
-							From: utils.PointerTo(sender),
-							Data: utils.PointerTo(hexutil.Bytes(logBaseFeeCode)),
+							From: new(sender),
+							Data: new(hexutil.Bytes(logBaseFeeCode)),
 							// Traced calls set [vm.Config.NoBaseFee], which
 							// zeroes the base fee unless we pay a gas price.
 							GasPrice: (*hexutil.Big)(gasPrice),
@@ -500,7 +499,7 @@ func TestDebugTrace(t *testing.T) {
 		return results
 	}
 	flatCallTracer := tracers.TraceConfig{
-		Tracer: utils.PointerTo("flatCallTracer"),
+		Tracer: new("flatCallTracer"),
 	}
 
 	t.Run("reported_block_hash", func(t *testing.T) {
@@ -554,7 +553,7 @@ func TestDebugTrace(t *testing.T) {
 				name:   "call_tracer",
 				method: "debug_traceTransaction",
 				args: []any{precompileTx.Hash(), tracers.TraceConfig{
-					Tracer: utils.PointerTo("callTracer"),
+					Tracer: new("callTracer"),
 				}},
 				want: native.CallFrame{
 					From:    sender,
@@ -573,7 +572,7 @@ func TestDebugTrace(t *testing.T) {
 				name:   "javascript",
 				method: "debug_traceTransaction",
 				args: []any{precompileTx.Hash(), tracers.TraceConfig{
-					Tracer: utils.PointerTo(`{
+					Tracer: new(`{
 						fault: function() {},
 						result: function() { return "ok" }
 					}`),
@@ -643,7 +642,7 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 		Pc:    logPC,
 		Op:    vm.LOG1.String(),
 		Depth: 1,
-		Stack: utils.PointerTo([]string{
+		Stack: new([]string{
 			uint256.NewInt(b.NumberU64()).Hex(),
 			"0x0", "0x0", // LOG1's size and offset
 		}),
