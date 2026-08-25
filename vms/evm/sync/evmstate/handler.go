@@ -237,7 +237,7 @@ func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 		}
 	}
 	if more && !leaves.full() {
-		more, err = q.fillFromTrie(leaves, q.endKey)
+		more, err = fillFromTrie(q.trie, leaves, q.endKey)
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +352,7 @@ func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte)
 		start := i
 		if hasGap {
 			// The bridge stops on snapKeys[i] inclusive, so skip it here.
-			if _, err := q.fillFromTrie(leaves, snapKeys[i]); err != nil {
+			if _, err := fillFromTrie(q.trie, leaves, snapKeys[i]); err != nil {
 				return false, err
 			}
 			if leaves.full() {
@@ -372,27 +372,6 @@ func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte)
 		}
 	}
 	return trieHasMore, nil
-}
-
-// fillFromTrie appends trie leaves from [leafRange.next] through end to
-// leaves, up to the limit. It returns whether the trie holds leaves past the
-// response.
-func (q *query) fillFromTrie(leaves *leafRange, end []byte) (bool, error) {
-	// While [trie.Trie.NodeIterator] documents that it starts iterating after
-	// the given key, it actually starts at the key if it exists.
-	nodeIt, err := q.trie.NodeIterator(leaves.next())
-	if err != nil {
-		return false, err
-	}
-	it := trie.NewIterator(nodeIt)
-
-	for it.Next() {
-		if bytes.Compare(it.Key, end) > 0 || leaves.full() {
-			return true, it.Err
-		}
-		leaves.add(it.Key, it.Value)
-	}
-	return false, it.Err
 }
 
 // leafRange accumulates the leaves of one response.
@@ -443,6 +422,26 @@ func (l *leafRange) next() []byte {
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
+}
+
+// fillFromTrie appends trie leaves from [leafRange.next] through end to leaves,
+// up to the limit. It returns whether the trie holds leaves past the response.
+func fillFromTrie(t *trie.Trie, r *leafRange, end []byte) (bool, error) {
+	// While [trie.Trie.NodeIterator] documents that it starts iterating after
+	// the given key, it actually starts at the key if it exists.
+	nodeIt, err := t.NodeIterator(r.next())
+	if err != nil {
+		return false, err
+	}
+	it := trie.NewIterator(nodeIt)
+
+	for it.Next() {
+		if bytes.Compare(it.Key, end) > 0 || r.full() {
+			return true, it.Err
+		}
+		r.add(it.Key, it.Value)
+	}
+	return false, it.Err
 }
 
 // isRangeValid range-proves r against the trie. valid reports whether the proof
