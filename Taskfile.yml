@@ -444,12 +444,7 @@ tasks:
 
   sync-go-work:
     desc: Syncs workspace dependencies and go.work.sum
-    cmds:
-      # go work sync can leave go.work.sum without module content hashes. See
-      # https://github.com/golang/go/issues/63901.
-      - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
-      - cmd: '{{.NIX_RUN}} env GOWORK="" go mod download'
-      - cmd: '{{.NIX_RUN}} env GOWORK="" go list -m all'
+    cmd: '{{.NIX_RUN}} ./scripts/sync_go_work.sh'
 
   tags-create:
     desc: Creates tags for avalanchego and submodules
