@@ -31,7 +31,7 @@ import (
 var (
 	errExecutorClosed                = errors.New("saexec.Executor closed")
 	errTransactionCountOutOfRange    = errors.New("transaction count out of range")
-	errPartialEndOfBlockExecution    = errors.New("end-of-block operations require all transactions")
+	errPartialEndOfBlockExecution    = errors.New("end-of-block operations require all transactions to have been executed")
 	errCanonicalWithoutEndOfBlockOps = errors.New("canonical execution requires end-of-block operations")
 	errNilReceiptStore               = errors.New("receipt store is nil")
 )
