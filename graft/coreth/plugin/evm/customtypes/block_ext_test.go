@@ -17,7 +17,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
@@ -330,8 +329,8 @@ func TestBlockGetters(t *testing.T) {
 			headerExtra: &HeaderExtra{
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
-				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+				TimeMilliseconds: new(uint64(3)),
+				MinDelayExcess:   new(acp226.DelayExcess(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
@@ -341,8 +340,8 @@ func TestBlockGetters(t *testing.T) {
 			wantBlockGasCost:     big.NewInt(2),
 			wantVersion:          3,
 			wantExtData:          []byte{4},
-			wantTimeMilliseconds: utils.PointerTo[uint64](3),
-			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+			wantTimeMilliseconds: new(uint64(3)),
+			wantMinDelayExcess:   new(acp226.DelayExcess(4)),
 		},
 	}
 
