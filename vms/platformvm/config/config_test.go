@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Requires all values in a struct to be initialized
@@ -93,6 +95,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			ChecksumsEnabled:              true,
 			MempoolPruneFrequency:         time.Minute,
 			MempoolGasCapacity:            14,
+			WarpHelperAddress:             ids.ShortID{15},
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)

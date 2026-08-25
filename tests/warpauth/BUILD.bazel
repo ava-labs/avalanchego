@@ -4,6 +4,10 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "warpauth",
     srcs = ["generate.go"],
+    embedsrcs = [
+        "PChain.abi",
+        "PChain.bin",
+    ],
     importpath = "github.com/ava-labs/avalanchego/tests/warpauth",
     visibility = ["//visibility:public"],
 )
@@ -12,10 +16,6 @@ go_test(
     name = "warpauth_test",
     srcs = ["pchain_test.go"],
     embed = [":warpauth"],
-    embedsrcs = [
-        "PChain.abi",
-        "PChain.bin",
-    ],
     deps = [
         "//ids",
         "//vms/components/avax",

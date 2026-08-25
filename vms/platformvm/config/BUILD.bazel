@@ -30,5 +30,8 @@ go_test(
     name = "config_test",
     srcs = ["config_test.go"],
     embed = [":config"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
 )

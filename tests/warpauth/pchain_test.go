@@ -4,7 +4,6 @@
 package warpauth
 
 import (
-	_ "embed"
 	"encoding/hex"
 	"strings"
 	"testing"
@@ -23,13 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	//go:embed PChain.abi
-	pchainABI string
-	//go:embed PChain.bin
-	pchainBin string
-)
-
 type utxo struct {
 	TxID        [32]byte
 	OutputIndex uint32
@@ -46,9 +38,9 @@ type owners struct {
 func TestEncodeCreateSubnet(t *testing.T) {
 	require := require.New(t)
 
-	parsed, err := abi.JSON(strings.NewReader(pchainABI))
+	parsed, err := abi.JSON(strings.NewReader(PChainABI))
 	require.NoError(err)
-	initcode, err := hex.DecodeString(pchainBin)
+	initcode, err := hex.DecodeString(PChainBin)
 	require.NoError(err)
 
 	var (

@@ -111,6 +111,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
+	if execConfig.WarpHelperAddress != ids.ShortEmpty {
+		secp256k1fx.WarpHelperAddress = execConfig.WarpHelperAddress
+	}
 
 	registerer, err := metrics.MakeAndRegister(chainCtx.Metrics, "")
 	if err != nil {
