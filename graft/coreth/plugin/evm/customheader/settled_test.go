@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func settledHeader(extra *customtypes.HeaderExtra) *types.Header {
@@ -28,31 +27,31 @@ func TestVerifySettled(t *testing.T) {
 	}{
 		{
 			name:    "settled_height_should_fail",
-			header:  settledHeader(&customtypes.HeaderExtra{SettledHeight: utils.PointerTo[uint64](1)}),
+			header:  settledHeader(&customtypes.HeaderExtra{SettledHeight: new(uint64(1))}),
 			wantErr: errSettledMarkerSet,
 		},
 		{
 			name:    "settled_gas_unix_should_fail",
-			header:  settledHeader(&customtypes.HeaderExtra{SettledGasUnix: utils.PointerTo[uint64](1)}),
+			header:  settledHeader(&customtypes.HeaderExtra{SettledGasUnix: new(uint64(1))}),
 			wantErr: errSettledMarkerSet,
 		},
 		{
 			name:    "settled_gas_numerator_should_fail",
-			header:  settledHeader(&customtypes.HeaderExtra{SettledGasNumerator: utils.PointerTo[uint64](1)}),
+			header:  settledHeader(&customtypes.HeaderExtra{SettledGasNumerator: new(uint64(1))}),
 			wantErr: errSettledMarkerSet,
 		},
 		{
 			name:    "settled_excess_should_fail",
-			header:  settledHeader(&customtypes.HeaderExtra{SettledExcess: utils.PointerTo[uint64](1)}),
+			header:  settledHeader(&customtypes.HeaderExtra{SettledExcess: new(uint64(1))}),
 			wantErr: errSettledMarkerSet,
 		},
 		{
 			name: "all_settled_fields_should_fail",
 			header: settledHeader(&customtypes.HeaderExtra{
-				SettledHeight:       utils.PointerTo[uint64](1),
-				SettledGasUnix:      utils.PointerTo[uint64](2),
-				SettledGasNumerator: utils.PointerTo[uint64](3),
-				SettledExcess:       utils.PointerTo[uint64](4),
+				SettledHeight:       new(uint64(1)),
+				SettledGasUnix:      new(uint64(2)),
+				SettledGasNumerator: new(uint64(3)),
+				SettledExcess:       new(uint64(4)),
 			}),
 			wantErr: errSettledMarkerSet,
 		},

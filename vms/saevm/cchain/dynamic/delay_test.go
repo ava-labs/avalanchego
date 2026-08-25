@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 // delayReaderCases pin DelayExponent to its Delay() value, including the
@@ -35,13 +33,13 @@ var delayReaderCases = []readerCase[DelayExponent, uint64]{
 
 var delayTowardCases = []towardCase[DelayExponent]{
 	{name: "nil_unchanged", current: 1234, want: 1234},
-	{name: "no_change", current: 0, desired: utils.PointerTo[DelayExponent](0), want: 0},
-	{name: "increase_within_cap", current: 50, desired: utils.PointerTo[DelayExponent](100), want: 100},
-	{name: "decrease_within_cap", current: 100, desired: utils.PointerTo[DelayExponent](50), want: 50},
-	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[DelayExponent](200), want: 200},
-	{name: "decrease_at_cap", current: 200, desired: utils.PointerTo[DelayExponent](0), want: 0},
-	{name: "increase_capped", current: 0, desired: utils.PointerTo[DelayExponent](1000), want: 200},
-	{name: "decrease_capped", current: 1000, desired: utils.PointerTo[DelayExponent](0), want: 800},
+	{name: "no_change", current: 0, desired: new(DelayExponent), want: 0},
+	{name: "increase_within_cap", current: 50, desired: new(DelayExponent(100)), want: 100},
+	{name: "decrease_within_cap", current: 100, desired: new(DelayExponent(50)), want: 50},
+	{name: "increase_at_cap", current: 0, desired: new(DelayExponent(200)), want: 200},
+	{name: "decrease_at_cap", current: 200, desired: new(DelayExponent), want: 0},
+	{name: "increase_capped", current: 0, desired: new(DelayExponent(1000)), want: 200},
+	{name: "decrease_capped", current: 1000, desired: new(DelayExponent), want: 800},
 }
 
 func TestDelay(t *testing.T) {
