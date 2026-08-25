@@ -228,20 +228,20 @@ func (c *executionConfig) verify(numTxs uint) error {
 	return nil
 }
 
-// stateBeforeTransactions applies the state changes required before executing
-// b's transactions, specifically the start-executing-block hook and the
-// EIP-4788 beacon root, mirroring [core.StateProcessor.Process].
+// stateBeforeTransactions applies the EIP-4788 beacon root and finalizes the
+// state before calling the start-executing-block hook, mirroring
+// [core.StateProcessor.Process].
 func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *state.StateDB, parent *types.Header, b *types.Block) error {
+	core.SetBeaconBlockRoot(stateDB, b.Header())
+
+	// SetBeaconBlockRoot only finalizes when it applies the root. Finalize
+	// unconditionally before exposing the state to the hook. This mirrors the
+	// finalization performed by [core.ApplyTransaction].
+	stateDB.Finalise(rules.IsEIP158)
+
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
 		return fmt.Errorf("start-executing-block hook: %v", err)
 	}
-
-	core.SetBeaconBlockRoot(stateDB, b.Header())
-
-	// SetBeaconRoot only finalizes when it applies the root, so we want to
-	// finalize last. This mirrors the finalization performed by
-	// [core.ApplyTransaction].
-	stateDB.Finalise(rules.IsEIP158)
 	return nil
 }
 
@@ -364,6 +364,9 @@ func Execute(
 	}
 
 	if config.skipEndOfBlockOps {
+		// TODO(JonathanOppenheimer): skipping the FinishExecutingBlock hook
+		// leaks goroutines from an in-flight parallel.Processor, which requires
+		// a FinishBlock call.
 		return res, nil
 	}
 
