@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -171,11 +172,16 @@ func TestClient_RejectsTamperedRange(t *testing.T) {
 	const attempts = 3
 	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), attempts, tamperLeaf)
 	recording := synctest.NewRecordingResponder(tampering)
-	net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID,
-		synctest.NewCancelAfter(recording, attempts, cancel))
+	net, tracker := synctest.ServeResponder(
+		t,
+		ctx,
+		log,
+		p2p.EVMLeafRequestHandlerID,
+		synctest.NewCancelAfter(recording, attempts, cancel),
+	)
 
-	got, _, err := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker).
-		FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
+	client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+	got, _, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 	require.ErrorIs(t, err, context.Canceled, "a tampered range must never be returned")
 	require.Empty(t, got.Keys)
 	require.Len(t, recording.Requests(), attempts, "each tampered range must be re-requested")
@@ -186,20 +192,14 @@ func TestClient_FetchesStorageRange(t *testing.T) {
 	ctx := t.Context()
 
 	trieDB := synctest.NewTrieDB()
-	c := newStorageCase(t, trieDB, 20)
-
-	var account *common.Hash
-	if len(c.accountHash) != 0 {
-		a := common.BytesToHash(c.accountHash)
-		account = &a
-	}
-	got, more, err := serve(t, ctx, trieDB).FetchLeaves(ctx, LeafRange{
+	c := newStorageCase(t, trieDB, maxLimit)
+	client := serve(t, ctx, trieDB)
+	got, more, err := client.FetchLeaves(ctx, LeafRange{
 		Root:    c.root,
-		Account: account,
+		Account: utils.PointerTo(common.BytesToHash(c.accountHash)),
 		Limit:   maxLimit,
 	})
 	require.NoError(t, err)
+	require.Equal(t, Leaves{Keys: c.keys, Vals: c.vals}, got)
 	require.False(t, more)
-	require.Equal(t, c.keys, got.Keys)
-	require.Equal(t, c.vals, got.Vals)
 }

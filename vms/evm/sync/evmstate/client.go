@@ -66,7 +66,8 @@ type Leaves struct {
 	Vals [][]byte
 }
 
-// FetchLeaves re-requests from another peer until the range proves out or ctx
+// FetchLeaves returns a proven run of leaves and whether the trie holds leaves
+// past it. It re-requests from another peer until the range proves out or ctx
 // ends, so an unproven range never surfaces.
 func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, error) {
 	reqPB := &syncpb.GetLeafRequest{
@@ -78,9 +79,8 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		reqPB.AccountHash = req.Account.Bytes()
 	}
 
-	// If we are asking for the first key, [trie.VerifyRangeProof] expects a
-	// zero-padded key. We only swap this out AFTER making the proto request to
-	// avoid sending unecessary bytes over the wire.
+	// The request keeps the empty start key to save wire bytes.
+	// [trie.VerifyRangeProof] needs the zero-padded form.
 	startKey := req.Start
 	if len(startKey) == 0 {
 		startKey = c.minKey
@@ -123,7 +123,8 @@ var (
 	errInvalidRangeProof = errors.New("invalid range proof")
 )
 
-// verifyRange reports whether more leaves remain to the right of resp.
+// verifyRange proves that resp holds exactly the trie's leaves from start, and
+// reports whether the trie holds leaves past resp.
 func verifyRange(
 	root common.Hash,
 	start []byte,
@@ -131,7 +132,7 @@ func verifyRange(
 	resp *syncpb.GetLeafResponse,
 ) (bool, error) {
 	keys := resp.GetKeys()
-	if uint(len(keys)) > uint(limit) {
+	if len(keys) > int(limit) {
 		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), limit)
 	}
 

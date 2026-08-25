@@ -25,8 +25,9 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// RegisterHandler serves leaf-range requests at handlerID on net. The ID names
-// which trie is served. Every key in the trie is trieKeyLength bytes.
+// RegisterHandler serves leaf-range requests at handlerID on net. Requests
+// name the trie to read by root, opened from trieDB. Every key in a served
+// trie is trieKeyLength bytes.
 func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
 	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
 	return net.AddHandler(handlerID, h)
@@ -60,6 +61,9 @@ type HandlerOption = options.Option[handlerConfig]
 // WithSnapshot serves leaves from the snapshot where it agrees with the trie,
 // falling back to trie iteration everywhere else. A nil snapshot is equivalent
 // to not providing this option.
+//
+// The snapshot's keys are hashes, so providing a snapshop SHOULD only be done
+// when the trie's keys are [common.HashLength] bytes.
 func WithSnapshot[V any, P SnapshotPointer[V]](s P) HandlerOption {
 	return options.Func[handlerConfig](func(c *handlerConfig) {
 		if s != nil {
@@ -413,6 +417,9 @@ func fillFromTrie(t *trie.Trie, r *leafRange, opts ...fillOption) (bool, error) 
 		if hitEnd := c.hasEnd && bytes.Compare(it.Key, c.end) >= 0; hitEnd || r.full() {
 			return true, it.Err
 		}
+		// While [trie.NodeIterator] forbids retaining [trie.NodeIterator.LeafKey]
+		// and [trie.NodeIterator.LeafBlob] past Next, the implementation never
+		// reuses their memory, so it.Key and it.Value are safe to retain.
 		r.add(it.Key, it.Value)
 	}
 	return false, it.Err
