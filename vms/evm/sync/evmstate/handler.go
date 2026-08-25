@@ -358,39 +358,36 @@ func (l *leafRange) next() []byte {
 const segmentLen = 64
 
 // fillFromSegments appends segments of keys and vals that prove against the
-// trie to r, bridging failed segments with leaves from the trie. It returns
-// whether the trie may hold leaves past the range.
+// trie to r, filling the gaps left by failed segments with leaves from the
+// trie. It returns whether the trie may hold leaves past the range.
 //
 // keys=[A B C D E], segmentLen=2, [C D] diverged:
 //
-//	[A B] proves    append        -> r=[A B]
-//	[C D] fails     mark the gap  -> r=[A B]
-//	[E]   proves    bridge to E   -> r=[A B C D]
-//	                append past E -> r=[A B C D E]
+//	[A B] proves    append           -> r=[A B]
+//	[C D] fails     mark the gap     -> r=[A B]
+//	[E]   proves    fill gap below E -> r=[A B C D]
+//	                append [E]       -> r=[A B C D E]
 func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, error) {
+	// Only a proved segment establishes what lies past the response, so more
+	// starts pessimistic.
+	more := true
 	hasGap := false
-	// Only a proved segment answers this, so it starts pessimistic. A stale
-	// answer is safe, collect re-derives it below the limit.
-	trieHasMore := true
-
-	for i := 0; i < len(keys); i += segmentLen {
-		// Without a gap the proof starts at leaves.next, so the span back to
-		// the response is covered too.
-		var startKey []byte
+	for i := 0; i < len(keys) && !r.full(); i += segmentLen {
+		// Starting at r.next proves the trie holds nothing between the
+		// response and the segment. After a gap the trie itself supplies
+		// that span, so the proof starts at the segment.
+		start := r.next()
 		if hasGap {
-			startKey = keys[i]
-		} else {
-			startKey = r.next()
+			start = keys[i]
 		}
 		end := min(i+segmentLen, len(keys))
-		valid, more, err := isRangeValid(
-			t,
-			&leafRange{
-				start: startKey,
-				keys:  keys[i:end],
-				vals:  vals[i:end],
-			},
-		)
+		segment := &leafRange{
+			start: start,
+			keys:  keys[i:end],
+			vals:  vals[i:end],
+		}
+
+		valid, moreAfterSeg, err := isRangeValid(t, segment)
 		if err != nil {
 			return false, err
 		}
@@ -398,35 +395,42 @@ func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, er
 			hasGap = true
 			continue
 		}
-
-		start := i
 		if hasGap {
-			// The bridge stops on keys[i] inclusive, so skip it here.
-			if _, err := fillFromTrie(t, r, keys[i]); err != nil {
+			// The trie supplies the gap, the segment supplies the rest.
+			if _, err := fillFromTrie(t, r, segment.keys[0], withExclusiveEnd()); err != nil {
 				return false, err
 			}
-			if r.full() {
-				break
-			}
-			start = i + 1
+			hasGap = false
 		}
-		hasGap = false
 
-		// The response now ends where this segment was proved, so the segment's
-		// verdict carries. A trimmed segment leaves the rest of the trie to come.
-		kept := r.append(keys[start:end], vals[start:end])
-		trieHasMore = more || kept < end-start
-
-		if r.full() {
-			break
-		}
+		// moreAfterSeg speaks for the segment's end, which the response only
+		// reaches when nothing is trimmed.
+		kept := r.append(segment.keys, segment.vals)
+		more = moreAfterSeg || kept < len(segment.keys)
 	}
-	return trieHasMore, nil
+	return more, nil
 }
 
-// fillFromTrie appends trie leaves from [leafRange.next] through end to leaves,
-// up to the limit. It returns whether the trie holds leaves past the response.
-func fillFromTrie(t *trie.Trie, r *leafRange, end []byte) (bool, error) {
+type fillConfig struct {
+	// maxEndCmp is the largest [bytes.Compare] result allowed between an
+	// appended key and the fill's end. 0 includes end, -1 excludes it.
+	maxEndCmp int
+}
+
+// fillOption configures [fillFromTrie].
+type fillOption = options.Option[fillConfig]
+
+// withExclusiveEnd stops the fill before end rather than on it.
+func withExclusiveEnd() fillOption {
+	return options.Func[fillConfig](func(c *fillConfig) {
+		c.maxEndCmp = -1
+	})
+}
+
+// fillFromTrie appends trie leaves from [leafRange.next] through end to r, up
+// to the limit. [withExclusiveEnd] stops the fill before end instead. It
+// returns whether the trie holds leaves past the response.
+func fillFromTrie(t *trie.Trie, r *leafRange, end []byte, opts ...fillOption) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after
 	// the given key, it actually starts at the key if it exists.
 	nodeIt, err := t.NodeIterator(r.next())
@@ -435,8 +439,9 @@ func fillFromTrie(t *trie.Trie, r *leafRange, end []byte) (bool, error) {
 	}
 	it := trie.NewIterator(nodeIt)
 
+	maxEndCmp := options.As(opts...).maxEndCmp
 	for it.Next() {
-		if bytes.Compare(it.Key, end) > 0 || r.full() {
+		if bytes.Compare(it.Key, end) > maxEndCmp || r.full() {
 			return true, it.Err
 		}
 		r.add(it.Key, it.Value)
