@@ -55,9 +55,9 @@ func NewClient(log logging.Logger, n *p2p.Network, handlerID uint64, peers *p2p.
 // LeafRange is a run of leaves to fetch from one trie.
 type LeafRange struct {
 	Root    common.Hash
-	Account common.Hash // zero for the account trie
-	Start   []byte      // nil for the trie's first key
-	End     []byte      // inclusive, nil for the trie's last key
+	Account *common.Hash // nil for the account trie
+	Start   []byte       // nil for the trie's first key
+	End     []byte       // inclusive, nil for the trie's last key
 	Limit   uint16
 }
 
@@ -70,12 +70,14 @@ type Leaves struct {
 // FetchLeaves re-requests from another peer until the range proves out or ctx
 // ends, so an unproven range never surfaces.
 func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, error) {
-	pbReq := &syncpb.GetLeafRequest{
-		RootHash:    req.Root.Bytes(),
-		AccountHash: accountBytes(req.Account),
-		StartKey:    req.Start,
-		EndKey:      req.End,
-		KeyLimit:    uint32(req.Limit),
+	reqPB := &syncpb.GetLeafRequest{
+		RootHash: req.Root.Bytes(),
+		StartKey: req.Start,
+		EndKey:   req.End,
+		KeyLimit: uint32(req.Limit),
+	}
+	if req.Account != nil {
+		reqPB.AccountHash = req.Account.Bytes()
 	}
 
 	for {
@@ -83,22 +85,30 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 			return Leaves{}, false, err
 		}
 
-		pbResp := &syncpb.GetLeafResponse{}
-		outcome, err := c.sender.Send(ctx, pbReq, pbResp)
+		var resp syncpb.GetLeafResponse
+		outcome, err := c.sender.Send(ctx, reqPB, &resp)
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
+			c.log.Debug("leaf request failed, re-requesting",
+				zap.Error(err),
+			)
 			continue
 		}
 
-		more, err := verifyRange(req, pbResp)
+		more, err := verifyRange(req, &resp)
 		if err != nil {
 			outcome.Failure()
-			c.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+			c.log.Debug("invalid leaf response, re-requesting",
+				zap.Error(err),
+			)
 			continue
 		}
 
 		outcome.Success()
-		return Leaves{Keys: pbResp.GetKeys(), Vals: pbResp.GetValues()}, more, nil
+		return Leaves{
+			Keys: resp.GetKeys(),
+			Vals: resp.GetValues(),
+		}, more, nil
 	}
 }
 
@@ -136,12 +146,4 @@ func verifyRange(req LeafRange, resp *syncpb.GetLeafResponse) (bool, error) {
 		return false, fmt.Errorf("%w: %w", errInvalidRangeProof, err)
 	}
 	return more, nil
-}
-
-// accountBytes is nil for the account trie, which a request leaves unset.
-func accountBytes(account common.Hash) []byte {
-	if account == (common.Hash{}) {
-		return nil
-	}
-	return account.Bytes()
 }

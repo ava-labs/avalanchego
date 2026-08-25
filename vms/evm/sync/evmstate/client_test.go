@@ -188,9 +188,14 @@ func TestClient_FetchesStorageRange(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	c := newStorageCase(t, trieDB, 20)
 
+	var account *common.Hash
+	if len(c.accountHash) != 0 {
+		a := common.BytesToHash(c.accountHash)
+		account = &a
+	}
 	got, more, err := serve(t, ctx, trieDB).FetchLeaves(ctx, LeafRange{
 		Root:    c.root,
-		Account: common.BytesToHash(c.accountHash),
+		Account: account,
 		Limit:   maxLimit,
 	})
 	require.NoError(t, err)

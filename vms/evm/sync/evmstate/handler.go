@@ -482,8 +482,7 @@ func dbValues(db *memorydb.Database) [][]byte {
 	return out
 }
 
-// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to
-// all-zeros.
+// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to all-zeros.
 func incrementBytes(b []byte) {
 	for i := len(b) - 1; i >= 0; i-- {
 		if b[i] < 0xff {
