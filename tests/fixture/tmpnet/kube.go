@@ -446,7 +446,7 @@ func applyManifest(
 		// Use server-side apply to create or update the resource
 		_, err = resourceInterface.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
 			FieldManager: "tmpnet-apply",
-			Force:        ptr.To(true),
+			Force:        new(true),
 		})
 		if err != nil {
 			return stacktrace.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)

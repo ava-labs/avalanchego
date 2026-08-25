@@ -41,7 +41,6 @@ go_test(
         "//cache/lru",
         "//database",
         "//database/heightindexdb/dbtest",
-        "//utils",
         "//utils/compression",
         "//utils/logging",
         "//utils/math",
