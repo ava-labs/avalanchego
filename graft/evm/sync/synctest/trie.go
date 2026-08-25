@@ -4,8 +4,10 @@
 package synctest
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -25,34 +27,90 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
-// and commits it to [trieDB]. For each 3 accounts created:
-// - One does not have a storage trie,
-// - One has a storage trie shared with other accounts (total number of shared storage tries [numOverlappingStorageRoots]),
-// - One has a uniquely generated storage trie,
-// returns the new trie root and a map of funded keys to StateAccount structs.
-// This is only safe for HashDB, as path-based DBs do not share storage tries.
-func FillAccountsWithOverlappingStorage(
-	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
-) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
-	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
-	for i := 0; i < numOverlappingStorageRoots; i++ {
-		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
-		storageRoots = append(storageRoots, storageRoot)
-	}
-	storageRootIndex := 0
-	return FillAccounts(t, r, s, root, numAccounts, func(t *testing.T, i int, addr common.Address, account types.StateAccount, storageTr state.Trie) types.StateAccount {
-		switch i % 3 {
-		case 0: // unmodified account
-		case 1: // account with overlapping storage root
-			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
-			storageRootIndex++
-		case 2: // account with unique storage root
-			FillStorageForAccount(t, r, 16, addr, storageTr)
-		}
+func NewTrieDB() *triedb.Database {
+	return triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
+}
 
-		return account
+func NewTrieDBWithDisk() (*triedb.Database, ethdb.Database) {
+	db := rawdb.NewMemoryDatabase()
+	return triedb.NewDatabase(db, nil), db
+}
+
+// FillTrie writes numKeys deterministic 32-byte pairs, returning the root and the
+// pairs sorted ascending. Keys are unhashed, so they cluster low in the key space.
+func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
+	t.Helper()
+	return fill(t, trieDB, numKeys, sequentialKey, func(i int) []byte {
+		val := make([]byte, common.HashLength)
+		binary.BigEndian.PutUint64(val, uint64(i+1)*1000)
+		return val
 	})
+}
+
+// FillTrieDistributed is [FillTrie] with hashed keys and 8-byte values, so every
+// 2-byte prefix segment has data.
+func FillTrieDistributed(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
+	t.Helper()
+	return fill(t, trieDB, numKeys, hashedKey, func(i int) []byte {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i+1)*7)
+		return val
+	})
+}
+
+// FillAccountTrieDistributed is [FillTrieDistributed] with full-RLP account values,
+// for reconstructing an account trie.
+func FillAccountTrieDistributed(t *testing.T, trieDB *triedb.Database, numAccounts int) (common.Hash, [][]byte, [][]byte) {
+	t.Helper()
+	return fill(t, trieDB, numAccounts, hashedKey, func(i int) []byte {
+		full, err := types.FullAccountRLP(types.SlimAccountRLP(types.StateAccount{
+			Nonce:    uint64(i + 1),
+			Balance:  uint256.NewInt(uint64(i+1) * 1000),
+			Root:     types.EmptyRootHash,
+			CodeHash: types.EmptyCodeHash.Bytes(),
+		}))
+		require.NoError(t, err)
+		return full
+	})
+}
+
+func sequentialKey(i int) []byte {
+	key := make([]byte, common.HashLength)
+	binary.BigEndian.PutUint64(key, uint64(i+1))
+	return key
+}
+
+func hashedKey(i int) []byte {
+	return HashedKey(uint64(i + 1))
+}
+
+// fill writes n pairs from keyOf and valueOf, returning the root and the pairs
+// sorted ascending to match the responder's iteration order.
+func fill(t *testing.T, trieDB *triedb.Database, n int, keyOf, valueOf func(i int) []byte) (common.Hash, [][]byte, [][]byte) {
+	t.Helper()
+	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
+	require.NoError(t, err)
+
+	type row struct{ key, val []byte }
+	rows := make([]row, n)
+	for i := range n {
+		key, val := keyOf(i), valueOf(i)
+		tr.MustUpdate(key, val)
+		rows[i] = row{key, val}
+	}
+
+	root, nodes, err := tr.Commit(false)
+	require.NoError(t, err)
+	require.NoError(t, trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil))
+	require.NoError(t, trieDB.Commit(root, false))
+
+	slices.SortFunc(rows, func(a, b row) int { return bytes.Compare(a.key, b.key) })
+	keys := make([][]byte, n)
+	vals := make([][]byte, n)
+	for i, r := range rows {
+		keys[i], vals[i] = r.key, r.val
+	}
+	return root, keys, vals
 }
 
 // GenerateIndependentTrie creates a trie with [numKeys] random key-value pairs inside of [trieDB].

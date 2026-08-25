@@ -4,17 +4,24 @@
 package leaf
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm/options"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+)
+
+const (
+	defaultWorkers = 8
+
+	// defaultRequestSize caps a single range, matching the handler's own cap.
+	defaultRequestSize = 1024
 )
 
 var (
@@ -22,58 +29,77 @@ var (
 	ErrMoreWithoutKeys    = errors.New("more leaves reported but none returned")
 )
 
-// Fetcher reads a range of leaves from the network. An implementation may
-// re-request internally, so a returned error is terminal and ctx bounds the retries.
-type Fetcher interface {
-	// FetchLeaves reports whether the trie holds more keys past the returned range.
-	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error)
+// Task is one unit of leaf work the syncer drives: a contiguous key range of a
+// trie, with callbacks per batch and on completion.
+type Task interface {
+	Root() common.Hash
+	Account() common.Hash
+	Start() []byte
+	// End is the inclusive last key of the range, or nil for the whole trie.
+	End() []byte
+	OnLeaves(ctx context.Context, leaves evmstate.Leaves) error
+	OnFinish(ctx context.Context) error
 }
 
-// SyncTask represents a complete task to be completed by the leaf syncer.
-// Note: each SyncTask is processed on its own goroutine and there will
-// not be concurrent calls to the callback methods. Implementations should return
-// the same value for Root, Account, and Start throughout the sync.
-// The value returned by End can change between calls to OnLeafs.
-type SyncTask interface {
-	Root() common.Hash                                      // Root of the trie to sync
-	Account() common.Hash                                   // Account hash of the trie to sync (only applicable to storage tries)
-	Start() []byte                                          // Starting key to request new leaves
-	End() []byte                                            // End key to request new leaves
-	OnStart() (bool, error)                                 // Callback when tasks begins, returns true if work can be skipped
-	OnLeafs(ctx context.Context, keys, vals [][]byte) error // Callback when new leaves are received from the network
-	OnFinish(ctx context.Context) error                     // Callback when there are no more leaves in the trie to sync or when we reach End()
+type config struct {
+	numWorkers  int
+	requestSize uint16
 }
 
-type SyncerConfig struct {
-	RequestSize uint16 // Number of leafs to request from a peer at a time
-	NumWorkers  int    // Number of workers to process leaf sync tasks
+type Option = options.Option[config]
+
+// WithNumWorkers overrides the number of concurrent workers.
+func WithNumWorkers(n int) Option {
+	return options.Func[config](func(c *config) {
+		if n > 0 {
+			c.numWorkers = n
+		}
+	})
 }
 
-type CallbackSyncer struct {
-	config  *SyncerConfig
-	fetcher Fetcher
-	tasks   <-chan SyncTask
+// WithRequestSize overrides how many leaves a single range asks for.
+func WithRequestSize(n uint16) Option {
+	return options.Func[config](func(c *config) {
+		if n > 0 {
+			c.requestSize = n
+		}
+	})
 }
 
-// NewCallbackSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackSyncer(fetcher Fetcher, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
-	return &CallbackSyncer{
-		config:  config,
-		fetcher: fetcher,
-		tasks:   tasks,
+// Syncer fetches each task's leaves with a pool of workers and hands every batch to
+// the task, which is what reconstructs. Batches arrive verified.
+type Syncer struct {
+	fetcher types.LeafFetcher
+	tasks   <-chan Task
+	config  config
+}
+
+func NewSyncer(fetcher types.LeafFetcher, tasks <-chan Task, opts ...Option) *Syncer {
+	cfg := options.ApplyTo(&config{
+		numWorkers:  defaultWorkers,
+		requestSize: defaultRequestSize,
+	}, opts...)
+	return &Syncer{fetcher: fetcher, tasks: tasks, config: *cfg}
+}
+
+// Sync runs the workers until tasks is drained and closed, or ctx ends.
+func (s *Syncer) Sync(ctx context.Context) error {
+	eg, egCtx := errgroup.WithContext(ctx)
+	for range s.config.numWorkers {
+		eg.Go(func() error { return s.workerLoop(egCtx) })
 	}
+	return eg.Wait()
 }
 
-// workerLoop reads from [c.tasks] and calls [c.syncTask] until [ctx] is finished
-// or [c.tasks] is closed.
-func (c *CallbackSyncer) workerLoop(ctx context.Context) error {
+// workerLoop processes tasks until the channel closes or ctx ends.
+func (s *Syncer) workerLoop(ctx context.Context) error {
 	for {
 		select {
-		case task, more := <-c.tasks:
-			if !more {
+		case t, ok := <-s.tasks:
+			if !ok {
 				return nil
 			}
-			if err := c.syncTask(ctx, task); err != nil {
+			if err := s.syncTask(ctx, t); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -82,87 +108,59 @@ func (c *CallbackSyncer) workerLoop(ctx context.Context) error {
 	}
 }
 
-// syncTask performs [task], requesting the leaves of the trie corresponding to [task.Root]
-// starting at [task.Start] and invoking the callbacks as necessary.
-func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
-	var (
-		root    = task.Root()
-		account = task.Account()
-		start   = task.Start()
-	)
-
-	if skip, err := task.OnStart(); err != nil {
-		return err
-	} else if skip {
-		return nil
-	}
-
+// syncTask walks the task's range left to right until it is exhausted or End is reached.
+func (s *Syncer) syncTask(ctx context.Context, t Task) error {
+	start := t.Start()
 	for {
-		// If [ctx] has finished, return early.
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		// End is left unset, because [VerifyRangeProof] does not handle empty
-		// responses with a non-empty end key. The response is truncated below.
-		leaves, more, err := c.fetcher.FetchLeaves(ctx, evmstate.LeafRange{
-			Root:    root,
-			Account: account,
+		leaves, more, err := s.fetcher.FetchLeaves(ctx, evmstate.LeafRange{
+			Root:    t.Root(),
+			Account: t.Account(),
 			Start:   start,
-			Limit:   c.config.RequestSize,
+			Limit:   s.config.requestSize,
 		})
 		if err != nil {
-			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
+			return fmt.Errorf("%w from %x: %w", ErrFailedToFetchLeafs, start, err)
 		}
 
-		// Keys ascend, so the first one past [End()] bounds the run. Cutting any
-		// of them means the task's range is exhausted.
-		done := false
-		if end := task.End(); end != nil {
-			n := sort.Search(len(leaves.Keys), func(i int) bool {
-				return bytes.Compare(leaves.Keys[i], end) > 0
-			})
-			if n < len(leaves.Keys) {
-				leaves.Keys, leaves.Vals = leaves.Keys[:n], leaves.Vals[:n]
-				done = true
-			}
-		}
+		// End is bounded here, not on the wire, because VerifyRangeProof mishandles
+		// an empty response with a non-empty end.
+		exhausted := truncate(&leaves, t.End())
 
-		// The last key is copied before [OnLeafs], which may retain and mutate it.
-		var lastKey []byte
-		if n := len(leaves.Keys); n > 0 {
-			lastKey = common.CopyBytes(leaves.Keys[n-1])
-		}
-
-		if err := task.OnLeafs(ctx, leaves.Keys, leaves.Vals); err != nil {
+		if err := t.OnLeaves(ctx, leaves); err != nil {
 			return err
 		}
 
-		// If we have completed syncing this task, invoke [OnFinish] and mark the task
-		// as complete.
-		if done || !more {
-			return task.OnFinish(ctx)
+		if exhausted || !more {
+			return t.OnFinish(ctx)
 		}
-
 		if len(leaves.Keys) == 0 {
+			// more with no keys would loop forever.
 			return ErrMoreWithoutKeys
 		}
-		// Update start to be one bit past the last returned key for the next request.
-		// Note: since more was true, this cannot cause an overflow.
-		start = lastKey
-		utils.IncrOne(start)
+		start = NextRangeKey(lastKey(leaves))
 	}
 }
 
-// Sync launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
-func (c *CallbackSyncer) Sync(ctx context.Context) error {
-	// Start the worker threads with the desired context.
-	eg, egCtx := errgroup.WithContext(ctx)
-	for i := 0; i < c.config.NumWorkers; i++ {
-		eg.Go(func() error {
-			return c.workerLoop(egCtx)
-		})
-	}
+// lastKey returns the highest key, the next request's start. Not valid when empty.
+func lastKey(leaves evmstate.Leaves) []byte {
+	return leaves.Keys[len(leaves.Keys)-1]
+}
 
-	return eg.Wait()
+// truncate drops leaves past end and reports whether it cut any, meaning the
+// range is exhausted. An empty end is a no-op.
+func truncate(leaves *evmstate.Leaves, end []byte) bool {
+	if len(end) == 0 {
+		return false
+	}
+	// Keys ascend, so the first one past end bounds the run.
+	n := sort.Search(len(leaves.Keys), func(i int) bool { return !WithinRange(leaves.Keys[i], end) })
+	if n == len(leaves.Keys) {
+		return false
+	}
+	leaves.Keys, leaves.Vals = leaves.Keys[:n], leaves.Vals[:n]
+	return true
 }

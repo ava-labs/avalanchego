@@ -4,23 +4,26 @@
 package evmstate
 
 import (
+	"math"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/metrics"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// A huge backlog divided by a near-zero rate must not wrap the duration.
 func TestETAShouldNotOverflow(t *testing.T) {
-	require := require.New(t)
+	t.Parallel()
 	now := time.Now()
-	start := now.Add(-6 * time.Hour)
 
-	stats := &trieSyncStats{
-		triesStartTime: start,
-		triesSynced:    100_000,
-		triesRemaining: 450_000,
-		leafsRateGauge: metrics.NilGauge{},
-	}
-	require.Positive(stats.updateETA(time.Minute, now))
+	stats := newTrieSyncStats(loggingtest.New(t, logging.Debug))
+	stats.leavesRate = safemath.NewAverager(math.SmallestNonzeroFloat64, leafRateHalfLife, now)
+	stats.remainingLeaves = map[*stateSegment]uint64{{}: math.MaxUint64}
+
+	require.GreaterOrEqual(t, stats.estimateSegmentsInProgressTime(), time.Duration(0))
 }

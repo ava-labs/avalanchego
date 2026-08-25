@@ -2,15 +2,25 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "synctest",
+    testonly = True,
     srcs = [
         "blocks.go",
+        "fetchers.go",
+        "state.go",
         "trie.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/synctest",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/sync/types",
         "//graft/evm/utils/utilstest",
+        "//ids",
+        "//network/p2p",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/wrappers",
+        "//vms/evm/sync/evmstate",
+        "//vms/evm/sync/synctest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

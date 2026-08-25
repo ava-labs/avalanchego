@@ -3,13 +3,17 @@ load("//.bazel:defs.bzl", "graft_go_test")
 
 go_library(
     name = "leaf",
-    srcs = ["syncer.go"],
+    srcs = [
+        "keys.go",
+        "syncer.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/leaf",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/evm/utils",
+        "//graft/evm/sync/types",
         "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@org_golang_x_sync//errgroup",
     ],
 )
@@ -19,7 +23,8 @@ graft_go_test(
     srcs = ["syncer_test.go"],
     embed = [":leaf"],
     deps = [
-        "//graft/evm/utils",
+        "//graft/evm/sync/synctest",
+        "//graft/evm/sync/types",
         "//vms/evm/sync/evmstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",

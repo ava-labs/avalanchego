@@ -5,228 +5,139 @@ package leaf
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
-var (
-	errFetch = errors.New("peer unreachable")
-	errStart = errors.New("task refused to start")
-)
-
-// syncTask reads neither the task channel nor the worker count.
-func newTestSyncer(f Fetcher) *CallbackSyncer {
-	return NewCallbackSyncer(f, nil, &SyncerConfig{RequestSize: 16})
-}
-
-// batchFetcher serves the same batch twice, more set on the first.
-type batchFetcher struct {
-	keys, vals [][]byte
-	err        error
-	starts     [][]byte
-}
-
-func (f *batchFetcher) FetchLeaves(_ context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
-	f.starts = append(f.starts, common.CopyBytes(req.Start))
-	if f.err != nil {
-		return evmstate.Leaves{}, false, f.err
-	}
-	return evmstate.Leaves{
-		Keys: f.keys,
-		Vals: f.vals,
-	}, len(f.starts) == 1, nil
-}
-
+// recordingTask records the leaves handed to it.
 type recordingTask struct {
-	end      []byte
-	skip     bool
-	startErr error
-
-	gotKeys  [][]byte
-	gotVals  [][]byte
-	finished bool
+	root     common.Hash
+	keys     [][]byte
+	finished int
 }
 
-func (*recordingTask) Root() common.Hash        { return common.Hash{0x01} }
-func (*recordingTask) Account() common.Hash     { return common.Hash{} }
-func (*recordingTask) Start() []byte            { return []byte{0x00} }
-func (t *recordingTask) End() []byte            { return t.end }
-func (t *recordingTask) OnStart() (bool, error) { return t.skip, t.startErr }
+func (r *recordingTask) Root() common.Hash  { return r.root }
+func (*recordingTask) Account() common.Hash { return common.Hash{} }
+func (*recordingTask) Start() []byte        { return nil }
+func (*recordingTask) End() []byte          { return nil }
 
-func (t *recordingTask) OnFinish(context.Context) error {
-	t.finished = true
+func (r *recordingTask) OnLeaves(_ context.Context, leaves evmstate.Leaves) error {
+	r.keys = append(r.keys, leaves.Keys...)
 	return nil
 }
 
-func (t *recordingTask) OnLeafs(_ context.Context, keys, vals [][]byte) error {
-	t.gotKeys = append(t.gotKeys, keys...)
-	t.gotVals = append(t.gotVals, vals...)
+func (r *recordingTask) OnFinish(context.Context) error {
+	r.finished++
 	return nil
 }
 
-// mutatingTask retains and increments the last key, as [evmstate.trieSegment] does.
-type mutatingTask struct {
-	recordingTask
-	pos []byte
+// moreWithoutKeysFetcher reports leaves remaining but returns none, which would
+// advance the range nowhere and loop forever.
+type moreWithoutKeysFetcher struct{ calls int }
+
+func (f *moreWithoutKeysFetcher) FetchLeaves(context.Context, evmstate.LeafRange) (evmstate.Leaves, bool, error) {
+	f.calls++
+	return evmstate.Leaves{}, true, nil
 }
 
-func (t *mutatingTask) OnLeafs(_ context.Context, keys, _ [][]byte) error {
-	if len(keys) > 0 {
-		t.pos = keys[len(keys)-1]
-		utils.IncrOne(t.pos)
-	}
-	return nil
+// runLeafTask drives one Task through a single worker.
+func runLeafTask(t *testing.T, ctx context.Context, fetcher types.LeafFetcher, tk Task, opts ...Option) error {
+	t.Helper()
+	tasks := make(chan Task, 1)
+	tasks <- tk
+	close(tasks)
+
+	// A fresh slice, because the caller's may be shared across parallel subtests.
+	opts = append([]Option{WithNumWorkers(1)}, opts...)
+	return NewSyncer(fetcher, tasks, opts...).Sync(ctx)
 }
 
-func TestSyncTaskAdvancesOnePastLastKey(t *testing.T) {
+func TestLeafFetch_Batching(t *testing.T) {
 	t.Parallel()
-
-	fetcher := &batchFetcher{
-		keys: [][]byte{{0x01}, {0x02}},
-		vals: [][]byte{{0x0a}, {0x0b}},
-	}
-
-	require.NoError(t, newTestSyncer(fetcher).syncTask(t.Context(), &mutatingTask{}))
-	require.Equal(t, [][]byte{{0x00}, {0x03}}, fetcher.starts)
-}
-
-// Only a segmented trie has a non-nil End, so nothing else reaches this path.
-func TestSyncTaskTruncatesAtEnd(t *testing.T) {
-	t.Parallel()
-
-	var (
-		keys = [][]byte{{0x01}, {0x02}, {0x03}, {0x04}}
-		vals = [][]byte{{0x0a}, {0x0b}, {0x0c}, {0x0d}}
-	)
-
 	tests := []struct {
-		name      string
-		end       []byte
-		wantKeys  [][]byte
-		wantVals  [][]byte
-		wantCalls int
+		name         string
+		numKeys      int
+		wantRequests int
 	}{
-		{
-			name:      "cuts_mid_batch",
-			end:       []byte{0x02},
-			wantKeys:  [][]byte{{0x01}, {0x02}},
-			wantVals:  [][]byte{{0x0a}, {0x0b}},
-			wantCalls: 1,
-		},
-		{
-			name:      "cuts_every_key",
-			end:       []byte{0x00},
-			wantCalls: 1,
-		},
-		{
-			name:      "keeps_the_key_equal_to_end",
-			end:       []byte{0x04},
-			wantKeys:  slices.Concat(keys, keys),
-			wantVals:  slices.Concat(vals, vals),
-			wantCalls: 2,
-		},
-		{
-			name:      "cuts_nothing_and_keeps_going",
-			end:       []byte{0xff},
-			wantKeys:  slices.Concat(keys, keys),
-			wantVals:  slices.Concat(vals, vals),
-			wantCalls: 2,
-		},
+		{name: "single_batch", numKeys: 50, wantRequests: 1},
+		{name: "exact_limit", numKeys: defaultRequestSize, wantRequests: 1},
+		{name: "multiple_batches", numKeys: defaultRequestSize + 50, wantRequests: 2},
+		{name: "many_batches", numKeys: 5000, wantRequests: 5},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			ctx := t.Context()
 
-			fetcher := &batchFetcher{
-				keys: keys,
-				vals: vals,
-			}
-			task := &recordingTask{end: tt.end}
+			trieDB := synctest.NewTrieDB()
+			root, keys, _ := synctest.FillTrie(t, trieDB, tt.numKeys)
+			recorder := synctest.RecordLeaves(t, ctx, trieDB)
 
-			require.NoError(t, newTestSyncer(fetcher).syncTask(t.Context(), task))
-			require.Equal(t, tt.wantKeys, task.gotKeys)
-			require.Equal(t, tt.wantVals, task.gotVals)
-			require.Len(t, fetcher.starts, tt.wantCalls)
-			require.True(t, task.finished)
+			tk := &recordingTask{root: root}
+			require.NoError(t, runLeafTask(t, ctx, recorder, tk))
+
+			require.Len(t, recorder.Requests(), tt.wantRequests)
+			require.Equal(t, keys, tk.keys, "every leaf must be fetched in key order")
+			require.Equal(t, 1, tk.finished, "the Task must finish exactly once")
 		})
 	}
 }
 
-func TestSyncTaskRejectsMoreWithoutKeys(t *testing.T) {
+func TestLeafFetch_MoreWithoutKeys(t *testing.T) {
 	t.Parallel()
+	fetcher := &moreWithoutKeysFetcher{}
 
-	err := newTestSyncer(&batchFetcher{}).syncTask(t.Context(), &recordingTask{})
+	err := runLeafTask(t, t.Context(), fetcher, &recordingTask{})
+
 	require.ErrorIs(t, err, ErrMoreWithoutKeys)
+	require.Equal(t, 1, fetcher.calls, "must stop at the first offending response")
 }
 
-// The atomic syncer matches this sentinel to detect an interrupted sync.
-func TestSyncTaskWrapsFetchError(t *testing.T) {
+func TestLeafFetch_ContextCancelled(t *testing.T) {
 	t.Parallel()
-
-	err := newTestSyncer(&batchFetcher{err: errFetch}).syncTask(t.Context(), &recordingTask{})
-	require.ErrorIs(t, err, ErrFailedToFetchLeafs)
-	require.ErrorIs(t, err, errFetch)
-}
-
-func TestSyncTaskOnStart(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		skip     bool
-		startErr error
-		wantErr  error
-	}{
-		{
-			name: "skip_completes_the_task",
-			skip: true,
-		},
-		{
-			name:     "error_stops_the_task",
-			startErr: errStart,
-			wantErr:  errStart,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			fetcher := &batchFetcher{
-				keys: [][]byte{{0x01}},
-				vals: [][]byte{{0x0a}},
-			}
-			task := &recordingTask{
-				skip:     tt.skip,
-				startErr: tt.startErr,
-			}
-
-			require.ErrorIs(t, newTestSyncer(fetcher).syncTask(t.Context(), task), tt.wantErr)
-			require.Empty(t, fetcher.starts)
-			require.Empty(t, task.gotKeys)
-			require.False(t, task.finished)
-		})
-	}
-}
-
-func TestSyncTaskStopsOnCanceledContext(t *testing.T) {
-	t.Parallel()
+	trieDB := synctest.NewTrieDB()
+	root, _, _ := synctest.FillTrie(t, trieDB, 10)
 
 	ctx, cancel := context.WithCancel(t.Context())
+	fetcher := synctest.ServeLeaves(t, ctx, trieDB)
 	cancel()
 
-	fetcher := &batchFetcher{
-		keys: [][]byte{{0x01}},
-		vals: [][]byte{{0x0a}},
+	require.ErrorIs(t, runLeafTask(t, ctx, fetcher, &recordingTask{root: root}), context.Canceled)
+}
+
+// limitFetcher records the Limit of every range it is asked for.
+type limitFetcher struct{ limits []uint16 }
+
+func (f *limitFetcher) FetchLeaves(_ context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
+	f.limits = append(f.limits, req.Limit)
+	return evmstate.Leaves{Keys: [][]byte{{1}}, Vals: [][]byte{{1}}}, false, nil
+}
+
+func TestLeafFetch_RequestSize(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		opts []Option
+		want uint16
+	}{
+		{name: "defaults", want: defaultRequestSize},
+		{name: "overridden", opts: []Option{WithRequestSize(7)}, want: 7},
+		{name: "zero_keeps_default", opts: []Option{WithRequestSize(0)}, want: defaultRequestSize},
 	}
-	require.ErrorIs(t, newTestSyncer(fetcher).syncTask(ctx, &recordingTask{}), context.Canceled)
-	require.Empty(t, fetcher.starts)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fetcher := &limitFetcher{}
+			require.NoError(t, runLeafTask(t, t.Context(), fetcher, &recordingTask{}, tt.opts...))
+			require.Equal(t, []uint16{tt.want}, fetcher.limits)
+		})
+	}
 }

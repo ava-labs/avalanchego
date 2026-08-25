@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -122,9 +121,9 @@ type ClientConfig struct {
 	Enabled            bool
 	SkipResume         bool
 
-	// LeafFetcher is the transport the state syncer reads leaves over. Required,
-	// so the caller names its wire protocol rather than inheriting a default.
-	LeafFetcher leaf.Fetcher
+	// LeafFetcher is the leaf transport and must be set. [client.NewLeafFetcher]
+	// speaks the message protocol, the vms/evm/sync/evmstate client speaks proto.
+	LeafFetcher types.LeafFetcher
 }
 
 type client struct {
@@ -267,8 +266,15 @@ func (c *client) startAsync(executor Executor, summary message.Syncable) block.S
 
 	c.wg.Add(1)
 	go func() {
-		defer c.wg.Done()
-		defer cancel()
+		// The queue outlives the syncers that feed it, so release it here on
+		// every path rather than only at node shutdown.
+		defer func() {
+			if c.codeQueue != nil {
+				c.codeQueue.Shutdown()
+			}
+			cancel()
+			c.wg.Done()
+		}()
 
 		if err := executor.Execute(ctx, summary); err != nil {
 			c.err = err
@@ -427,14 +433,10 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			return nil, fmt.Errorf("failed to create firewood syncer: %w", err)
 		}
 	} else {
-		stateSyncer, err = evmstate.NewSyncer(
-			c.config.LeafFetcher, c.config.ChainDB,
-			summary.GetBlockRoot(),
-			codeQueue, c.config.RequestSize,
+		stateSyncer = evmstate.NewHashDBSyncer(
+			c.config.SnowCtx.Log, c.config.LeafFetcher, c.config.ChainDB,
+			summary.GetBlockRoot(), codeQueue,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
-		}
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}
