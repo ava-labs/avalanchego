@@ -17,9 +17,6 @@ import (
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
 
-// Taken as the default from geth / libevm's `node.DefaultConfig`.
-const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
-
 // Server returns the Provider's [rpc.Server], with all configured JSON-RPC
 // namespace handlers registered.
 func (p *Provider) Server() *rpc.Server {
@@ -30,6 +27,9 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	const (
 		ethNamespace   = "eth"
 		debugNamespace = "debug"
+
+		// Taken as the default from geth / libevm's `node.DefaultConfig`.
+		batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 	)
 
 	type api struct {
