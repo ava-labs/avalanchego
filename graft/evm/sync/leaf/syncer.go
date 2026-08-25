@@ -8,51 +8,59 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/ava-labs/libevm/common"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 )
 
-var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
+var (
+	ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
+	ErrMoreWithoutKeys    = errors.New("more leaves reported but none returned")
+)
+
+// Fetcher reads a range of leaves from the network. An implementation may
+// re-request internally, so a returned error is terminal and ctx bounds the retries.
+type Fetcher interface {
+	// FetchLeaves reports whether the trie holds more keys past the returned range.
+	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error)
+}
 
 // SyncTask represents a complete task to be completed by the leaf syncer.
 // Note: each SyncTask is processed on its own goroutine and there will
 // not be concurrent calls to the callback methods. Implementations should return
-// the same value for Root, Account, Start, and NodeType throughout the sync.
+// the same value for Root, Account, and Start throughout the sync.
 // The value returned by End can change between calls to OnLeafs.
 type SyncTask interface {
 	Root() common.Hash                                      // Root of the trie to sync
 	Account() common.Hash                                   // Account hash of the trie to sync (only applicable to storage tries)
 	Start() []byte                                          // Starting key to request new leaves
 	End() []byte                                            // End key to request new leaves
-	NodeType() message.NodeType                             // Specifies the message type (atomic/state trie) for the leaf syncer to send
 	OnStart() (bool, error)                                 // Callback when tasks begins, returns true if work can be skipped
 	OnLeafs(ctx context.Context, keys, vals [][]byte) error // Callback when new leaves are received from the network
 	OnFinish(ctx context.Context) error                     // Callback when there are no more leaves in the trie to sync or when we reach End()
 }
 
 type SyncerConfig struct {
-	RequestSize      uint16                   // Number of leafs to request from a peer at a time
-	NumWorkers       int                      // Number of workers to process leaf sync tasks
-	LeafsRequestType message.LeafsRequestType // Type of leafs request to use
+	RequestSize uint16 // Number of leafs to request from a peer at a time
+	NumWorkers  int    // Number of workers to process leaf sync tasks
 }
 
 type CallbackSyncer struct {
-	config *SyncerConfig
-	client types.LeafClient
-	tasks  <-chan SyncTask
+	config  *SyncerConfig
+	fetcher Fetcher
+	tasks   <-chan SyncTask
 }
 
 // NewCallbackSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackSyncer(client types.LeafClient, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
+func NewCallbackSyncer(fetcher Fetcher, tasks <-chan SyncTask, config *SyncerConfig) *CallbackSyncer {
 	return &CallbackSyncer{
-		config: config,
-		client: client,
-		tasks:  tasks,
+		config:  config,
+		fetcher: fetcher,
+		tasks:   tasks,
 	}
 }
 
@@ -78,8 +86,9 @@ func (c *CallbackSyncer) workerLoop(ctx context.Context) error {
 // starting at [task.Start] and invoking the callbacks as necessary.
 func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	var (
-		root  = task.Root()
-		start = task.Start()
+		root    = task.Root()
+		account = task.Account()
+		start   = task.Start()
 	)
 
 	if skip, err := task.OnStart(); err != nil {
@@ -94,58 +103,53 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return err
 		}
 
-		leafsRequest, err := message.NewLeafsRequest(
-			c.config.LeafsRequestType,
-			root,
-			task.Account(),
-			start,
-			nil, // End is intentionally nil, because VerifyRangeProof does not handle empty responses with non-empty end key.
-			c.config.RequestSize,
-			task.NodeType(),
-		)
-		if err != nil {
-			return err
-		}
-
-		leafsResponse, err := c.client.GetLeafs(ctx, leafsRequest)
+		// End is left unset, because [VerifyRangeProof] does not handle empty
+		// responses with a non-empty end key. The response is truncated below.
+		leaves, more, err := c.fetcher.FetchLeaves(ctx, evmstate.LeafRange{
+			Root:    root,
+			Account: account,
+			Start:   start,
+			Limit:   c.config.RequestSize,
+		})
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}
 
-		// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case
-		// the response includes any keys past [End()].
-		// Note: We truncate the response here as opposed to sending End
-		// in the request, as [VerifyRangeProof] does not handle empty
-		// responses correctly with a non-empty end key for the range.
+		// Keys ascend, so the first one past [End()] bounds the run. Cutting any
+		// of them means the task's range is exhausted.
 		done := false
-		if task.End() != nil && len(leafsResponse.Keys) > 0 {
-			i := len(leafsResponse.Keys) - 1
-			for ; i >= 0; i-- {
-				if bytes.Compare(leafsResponse.Keys[i], task.End()) <= 0 {
-					break
-				}
+		if end := task.End(); end != nil {
+			n := sort.Search(len(leaves.Keys), func(i int) bool {
+				return bytes.Compare(leaves.Keys[i], end) > 0
+			})
+			if n < len(leaves.Keys) {
+				leaves.Keys, leaves.Vals = leaves.Keys[:n], leaves.Vals[:n]
 				done = true
 			}
-			leafsResponse.Keys = leafsResponse.Keys[:i+1]
-			leafsResponse.Vals = leafsResponse.Vals[:i+1]
 		}
 
-		if err := task.OnLeafs(ctx, leafsResponse.Keys, leafsResponse.Vals); err != nil {
+		// The last key is copied before [OnLeafs], which may retain and mutate it.
+		var lastKey []byte
+		if n := len(leaves.Keys); n > 0 {
+			lastKey = common.CopyBytes(leaves.Keys[n-1])
+		}
+
+		if err := task.OnLeafs(ctx, leaves.Keys, leaves.Vals); err != nil {
 			return err
 		}
 
 		// If we have completed syncing this task, invoke [OnFinish] and mark the task
 		// as complete.
-		if done || !leafsResponse.More {
+		if done || !more {
 			return task.OnFinish(ctx)
 		}
 
-		if len(leafsResponse.Keys) == 0 {
-			return errors.New("found no keys in a response with more set to true")
+		if len(leaves.Keys) == 0 {
+			return ErrMoreWithoutKeys
 		}
 		// Update start to be one bit past the last returned key for the next request.
 		// Note: since more was true, this cannot cause an overflow.
-		start = leafsResponse.Keys[len(leafsResponse.Keys)-1]
+		start = lastKey
 		utils.IncrOne(start)
 	}
 }
