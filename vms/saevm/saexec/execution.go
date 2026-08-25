@@ -156,7 +156,7 @@ type (
 	}
 
 	executionConfig struct {
-		maxNumTxs         int
+		maxNumTxs         uint
 		skipEndOfBlockOps bool
 		canonical         bool
 		receiptStore      ReceiptStore
@@ -181,7 +181,7 @@ type Option = options.Option[executionConfig]
 
 // WithMaxNumTxs limits execution to maxNumTxs transactions from the start of
 // the block. A value of 0 executes no transactions.
-func WithMaxNumTxs(maxNumTxs int) Option {
+func WithMaxNumTxs(maxNumTxs uint) Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.maxNumTxs = maxNumTxs
 	})
@@ -212,8 +212,8 @@ func WithReceiptStore(receiptStore ReceiptStore) Option {
 	})
 }
 
-func (c *executionConfig) verify(numTxs int) error {
-	if c.maxNumTxs < 0 || c.maxNumTxs > numTxs {
+func (c *executionConfig) verify(numTxs uint) error {
+	if c.maxNumTxs > numTxs {
 		return fmt.Errorf("%w: %d not in [0, %d]", errTransactionCountOutOfRange, c.maxNumTxs, numTxs)
 	}
 	if !c.skipEndOfBlockOps && c.maxNumTxs != numTxs {
@@ -257,22 +257,24 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
 //
 // Execute does not call [blocks.Block.MarkExecuted]. Only canonical execution
-// records block progress. Receipt publication is configured independently.
+// records block progress. Receipts are always returned in [ExecutionResults]
+// but are only published to a [ReceiptStore] when configured with
+// [WithReceiptStore].
 func Execute(
 	b *blocks.Block,
 	stateDB *state.StateDB,
 	hooks hook.Points,
-	config *params.ChainConfig,
+	chainConfig *params.ChainConfig,
 	chainCtx core.ChainContext,
 	log logging.Logger,
 	opts ...Option,
 ) (*ExecutionResults, error) {
 	txs := b.Transactions()
-	execConfig := options.ApplyTo(&executionConfig{
-		maxNumTxs:    len(txs),
+	config := options.ApplyTo(&executionConfig{
+		maxNumTxs:    uint(len(txs)),
 		receiptStore: &NullReceiptStore{},
 	}, opts...)
-	if err := execConfig.verify(len(txs)); err != nil {
+	if err := config.verify(uint(len(txs))); err != nil {
 		return nil, err
 	}
 
@@ -285,7 +287,7 @@ func Execute(
 	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
-	rules := config.Rules(header.Number, true /*isMerge*/, header.Time)
+	rules := chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	if err := stateBeforeTransactions(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, err
 	}
@@ -298,12 +300,16 @@ func Execute(
 	}
 	header.BaseFee = baseFee.ToBig()
 
-	signer := b.Signer(config)
+	signer := b.Signer(chainConfig)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
-	var blockGasConsumed gas.Gas
 
-	txs = txs[:execConfig.maxNumTxs]
-	receipts := make(types.Receipts, len(txs))
+	txs = txs[:config.maxNumTxs]
+	res := &ExecutionResults{
+		BaseFee:  baseFee,
+		Signer:   signer,
+		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts: make(types.Receipts, len(txs)),
+	}
 
 	for ti, tx := range txs {
 		stateDB.SetTxContext(tx.Hash(), ti)
@@ -311,14 +317,14 @@ func Execute(
 
 		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(
-			config,
+			chainConfig,
 			chainCtx,
 			&header.Coinbase,
 			&gasPool,
 			stateDB,
 			header,
 			tx,
-			(*uint64)(&blockGasConsumed),
+			(*uint64)(&res.GasConsumed),
 			vm.Config{},
 		)
 		if err != nil {
@@ -330,7 +336,7 @@ func Execute(
 		// execution can run only part of the same in-memory block and overwrite
 		// that progress with an earlier time. This violates monotonicity and can
 		// change the settlement decision made by LastToSettleAt.
-		if execConfig.canonical {
+		if config.canonical {
 			b.SetInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
@@ -351,21 +357,14 @@ func Execute(
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
-		if r, ok := execConfig.receiptStore.Load(tx.Hash()); ok {
+		if r, ok := config.receiptStore.Load(tx.Hash()); ok {
 			r.Put(&Receipt{receipt, signer, tx})
 		}
-		receipts[ti] = receipt
+		res.Receipts[ti] = receipt
 	}
 
-	r := &ExecutionResults{
-		BaseFee:     baseFee,
-		Signer:      signer,
-		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts:    receipts,
-		GasConsumed: blockGasConsumed,
-	}
-	if execConfig.skipEndOfBlockOps {
-		return r, nil
+	if config.skipEndOfBlockOps {
+		return res, nil
 	}
 
 	numTxs := len(b.Transactions())
@@ -375,9 +374,9 @@ func Execute(
 	}
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
-		r.GasConsumed += o.Gas
+		res.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
-		if execConfig.canonical {
+		if config.canonical {
 			b.SetInterimExecutionTime(perTxClock)
 		}
 
@@ -386,26 +385,26 @@ func Execute(
 		}
 	}
 
-	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), receipts); err != nil {
+	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), res.Receipts); err != nil {
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
 	endTime := time.Now()
 	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(r.GasConsumed, target, gasCfg); err != nil {
+	if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 
 	log.Trace(
 		"Block execution complete",
-		zap.Uint64("gas_consumed", uint64(r.GasConsumed)),
+		zap.Uint64("gas_consumed", uint64(res.GasConsumed)),
 		zap.Time("gas_time", gasClock.AsTime()),
 		zap.Time("wall_time", endTime),
 	)
 
-	r.FinishBy.Gas = gasClock
-	r.FinishBy.Wall = endTime
-	return r, nil
+	res.FinishBy.Gas = gasClock
+	res.FinishBy.Wall = endTime
+	return res, nil
 }
 
 func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *ExecutionResults) error {

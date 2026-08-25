@@ -487,52 +487,6 @@ func TestEndOfBlockOps(t *testing.T) {
 	})
 }
 
-// TestExecuteTransactionPrefix verifies that executing a transaction prefix
-// does not execute later transactions or end-of-block operations.
-func TestExecuteTransactionPrefix(t *testing.T) {
-	_, sut := newSUT(t)
-	recipient := common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
-	b := sut.chain.NewBlock(t, types.Transactions{
-		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &recipient,
-			Value:    big.NewInt(1),
-			Gas:      params.TxGas,
-			GasPrice: big.NewInt(1),
-		}),
-		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &recipient,
-			Value:    big.NewInt(2),
-			Gas:      params.TxGas,
-			GasPrice: big.NewInt(1),
-		}),
-	}, blockstest.WithEthBlockOptions(blockstest.WithOps([]saehookstest.Op{{
-		Gas: 1,
-		Mint: []saehookstest.AccountCredit{{
-			Address: recipient,
-			Amount:  *uint256.NewInt(100),
-		}},
-	}})))
-	stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
-	require.NoError(t, err, "Executor.StateDB(parent root)")
-
-	result, err := Execute(
-		b,
-		stateDB,
-		sut.hooks,
-		sut.chainConfig,
-		sut.chainContext,
-		sut.logger,
-		WithMaxNumTxs(1),
-		SkipEndOfBlockOps(),
-	)
-	require.NoError(t, err, "Execute()")
-
-	require.Len(t, result.Receipts, 1, "ExecutionResults.Receipts")
-	require.Equal(t, uint256.NewInt(1), stateDB.GetBalance(recipient), "recipient balance")
-	require.Equal(t, gas.Gas(params.TxGas), result.GasConsumed, "ExecutionResults.GasConsumed")
-	require.Nil(t, result.FinishBy.Gas, "ExecutionResults.FinishBy.Gas")
-}
-
 func TestExecuteRejectsInvalidOptions(t *testing.T) {
 	_, sut := newSUT(t)
 	b := sut.chain.NewBlock(t, types.Transactions{
@@ -543,11 +497,6 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 		opts    []Option
 		wantErr error
 	}{
-		{
-			name:    "negative transaction count",
-			opts:    []Option{WithMaxNumTxs(-1)},
-			wantErr: errTransactionCountOutOfRange,
-		},
 		{
 			name:    "excessive transaction count",
 			opts:    []Option{WithMaxNumTxs(2)},

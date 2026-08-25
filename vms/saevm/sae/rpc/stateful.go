@@ -169,7 +169,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		b.ChainConfig(),
 		b.ChainContext(),
 		b.Logger(),
-		saexec.WithMaxNumTxs(txIndex),
+		saexec.WithMaxNumTxs(uint(txIndex)),
 		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
