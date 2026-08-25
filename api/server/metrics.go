@@ -11,9 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// baseLabel partitions API metrics by the call's base URL.
-const baseLabel = "base"
-
 type metrics struct {
 	numProcessing *prometheus.GaugeVec
 	numCalls      *prometheus.CounterVec
@@ -21,6 +18,9 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
+	// baseLabel partitions API metrics by the call's base URL.
+	const baseLabel = "base"
+
 	m := &metrics{
 		numProcessing: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{

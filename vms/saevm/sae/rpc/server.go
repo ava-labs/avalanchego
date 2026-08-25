@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// More than one handler below registers each of these JSON-RPC namespaces.
+// JSON-RPC namespaces shared by more than one [apiService].
 const (
 	ethNamespace   = "eth"
 	debugNamespace = "debug"
