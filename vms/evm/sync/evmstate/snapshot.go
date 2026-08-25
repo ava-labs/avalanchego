@@ -4,6 +4,8 @@
 package evmstate
 
 import (
+	"bytes"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
@@ -78,4 +80,38 @@ type storageIterator struct{ snapshot.StorageIterator }
 
 func (it storageIterator) Value() ([]byte, error) {
 	return it.Slot(), nil
+}
+
+// readSnapshot returns leaves in [start, end] up to [limit]. There is no
+// guarantee what state root the snapshot is based on.
+func readSnapshot(
+	s trieSnapshot,
+	start common.Hash,
+	end common.Hash,
+	limit int,
+) ([][]byte, [][]byte, error) {
+	it, err := s.newIterator(start)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer it.Release()
+
+	keys := make([][]byte, 0, limit)
+	vals := make([][]byte, 0, limit)
+	for it.Next() {
+		k := it.Hash()
+		if bytes.Compare(k[:], end[:]) > 0 || len(keys) >= limit {
+			break
+		}
+		v, err := it.Value()
+		if err != nil {
+			return nil, nil, err
+		}
+		keys = append(keys, k.Bytes())
+		vals = append(vals, v)
+	}
+	if err := it.Error(); err != nil {
+		return nil, nil, err
+	}
+	return keys, vals, nil
 }

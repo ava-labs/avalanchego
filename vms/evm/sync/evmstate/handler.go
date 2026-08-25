@@ -265,9 +265,24 @@ func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 // as correct to leaves. It returns whether the trie may hold leaves past the
 // last key appended.
 func (q *query) fillFromSnapshot(leaves *leafRange) (bool, error) {
-	snapKeys, snapVals := q.readFromSnapshot()
+	snapKeys, snapVals, err := readSnapshot(
+		q.snapshot,
+		common.BytesToHash(q.startKey),
+		common.BytesToHash(q.endKey),
+		q.limit,
+	)
+	if err != nil {
+		q.log.Debug("snapshot read abandoned",
+			zap.String("reason", "iteration failed"),
+			zap.Error(err),
+		)
+		return true, nil
+	}
 	if len(snapKeys) == 0 {
-		return true, nil // Unavailable or empty here, use the trie.
+		q.log.Debug("snapshot read abandoned",
+			zap.String("reason", "no keys"),
+		)
+		return true, nil
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
@@ -343,47 +358,6 @@ func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte)
 		}
 	}
 	return trieHasMore, nil
-}
-
-// readFromSnapshot pulls leaves in [startKey, endKey] up to [query.limit]. They
-// are unvalidated, the caller range-proves them against the requested root.
-func (q *query) readFromSnapshot() ([][]byte, [][]byte) {
-	it, err := q.snapshot.newIterator(common.BytesToHash(q.startKey))
-	if err != nil {
-		q.log.Debug("snapshot read abandoned",
-			zap.String("reason", "iterator unavailable"),
-			zap.Error(err),
-		)
-		return nil, nil
-	}
-	defer it.Release()
-
-	keys := make([][]byte, 0, q.limit)
-	vals := make([][]byte, 0, q.limit)
-	for it.Next() {
-		k := it.Hash().Bytes()
-		if bytes.Compare(k, q.endKey) > 0 || len(keys) >= q.limit {
-			break
-		}
-		v, err := it.Value()
-		if err != nil {
-			q.log.Debug("snapshot read abandoned",
-				zap.String("reason", "leaf encoding failed"),
-				zap.Error(err),
-			)
-			return nil, nil
-		}
-		keys = append(keys, k)
-		vals = append(vals, v)
-	}
-	if err := it.Error(); err != nil {
-		q.log.Debug("snapshot read abandoned",
-			zap.String("reason", "iteration failed"),
-			zap.Error(err),
-		)
-		return nil, nil
-	}
-	return keys, vals
 }
 
 // fillFromTrie appends trie leaves from [leafRange.next] through end to

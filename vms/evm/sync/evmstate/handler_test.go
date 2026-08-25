@@ -791,13 +791,19 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 				}
 
 				q := newSnapshotQuery(t, trieDB, c, tt.keyLimit, endKey)
-				keys, vals := q.readFromSnapshot()
+				keys, vals, err := readSnapshot(
+					q.snapshot,
+					common.BytesToHash(q.startKey),
+					common.BytesToHash(q.endKey),
+					q.limit,
+				)
+				require.ErrorIs(t, err, tt.iterErr)
 
 				if diff := cmp.Diff(c.keys[:tt.wantLen], keys, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("readFromSnapshot() keys diff (-want +got):\n%s", diff)
+					t.Errorf("readSnapshot() keys diff (-want +got):\n%s", diff)
 				}
 				if diff := cmp.Diff(c.vals[:tt.wantLen], vals, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("readFromSnapshot() values diff (-want +got):\n%s", diff)
+					t.Errorf("readSnapshot() values diff (-want +got):\n%s", diff)
 				}
 			})
 		}

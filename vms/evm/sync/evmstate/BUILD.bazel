@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "client.go",
         "handler.go",
+        "snapshot.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
     visibility = ["//visibility:public"],
