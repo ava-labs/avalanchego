@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -200,6 +202,84 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			tc.Eventually(func() bool {
 				return subnetOwnedBy(subnetID, newOwner)
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "subnet not transferred")
+		})
+
+		// balance sums the owner's spendable AVAX on the P-chain.
+		balance := func() uint64 {
+			utxosBytes, _, _, err := pClient.GetUTXOs(tc.DefaultContext(), []ids.ShortID{owner}, 1024, ids.ShortEmpty, ids.Empty)
+			require.NoError(err)
+			var total uint64
+			for _, utxoBytes := range utxosBytes {
+				utxo := &avax.UTXO{}
+				_, err := txs.Codec.Unmarshal(utxoBytes, utxo)
+				require.NoError(err)
+				total += utxo.Out.(avax.Amounter).Amount()
+			}
+			return total
+		}
+
+		const stakeAmount = 25 * units.Avax
+		var stakeUTXO avax.UTXOID
+		tc.By("funding the EVM address for staking", func() {
+			fundTx, err := pWallet.IssueBaseTx(
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: pContext.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          stakeAmount + fee,
+						OutputOwners: secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{owner}},
+					},
+				}},
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+			for i, out := range fundTx.Unsigned.Outputs() {
+				if out.Out.(*secp256k1fx.TransferOutput).Addrs[0] == owner {
+					stakeUTXO = avax.UTXOID{TxID: fundTx.ID(), OutputIndex: uint32(i)}
+				}
+			}
+		})
+
+		type validator struct {
+			NodeID [20]byte
+			Start  uint64
+			End    uint64
+			Weight uint64
+		}
+		type out struct {
+			Amount uint64
+			Owners owners
+		}
+		validatorNodeID := node.NodeID
+		endTime := uint64(time.Now().Add(20 * time.Second).Unix())
+		before := balance()
+		tc.By("delegating to a primary network validator from the EVM address", func() {
+			command("addPermissionlessDelegator",
+				[]utxo{{TxID: stakeUTXO.TxID, OutputIndex: stakeUTXO.OutputIndex, Amount: stakeAmount + fee}},
+				uint64(0),
+				validator{NodeID: validatorNodeID, End: endTime, Weight: stakeAmount},
+				constants.PrimaryNetworkID,
+				[]out{{Amount: stakeAmount, Owners: owners{Threshold: 1, Addrs: []common.Address{ethAddress}}}},
+				owners{Threshold: 1, Addrs: []common.Address{ethAddress}},
+			)
+			tc.Eventually(func() bool {
+				vdrs, err := pClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{validatorNodeID})
+				require.NoError(err)
+				for _, vdr := range vdrs {
+					for _, d := range vdr.Delegators {
+						if d.RewardOwner != nil && len(d.RewardOwner.Addresses) == 1 && d.RewardOwner.Addresses[0] == owner {
+							return true
+						}
+					}
+				}
+				return false
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "delegation not active")
+			require.Equal(before-stakeAmount-fee, balance())
+		})
+
+		tc.By("receiving the stake and the reward back on the EVM address", func() {
+			tc.Eventually(func() bool {
+				return balance() > before-fee
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "stake and reward not returned")
 		})
 	})
 })

@@ -39,7 +39,9 @@ func Wrap(signedMessage []byte) (*txs.Tx, ids.ShortID, error) {
 	}
 
 	numCreds := len(unsigned.InputIDs())
-	switch unsigned.(type) {
+	switch tx := unsigned.(type) {
+	case *txs.ImportTx:
+		numCreds += len(tx.ImportedInputs)
 	case *txs.CreateChainTx, *txs.AddSubnetValidatorTx, *txs.RemoveSubnetValidatorTx,
 		*txs.TransferSubnetOwnershipTx, *txs.ConvertSubnetToL1Tx,
 		*txs.DisableL1ValidatorTx, *txs.SetAutoRenewedValidatorConfigTx:
