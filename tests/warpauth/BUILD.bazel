@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "warpauth",
+    srcs = ["generate.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/warpauth",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "warpauth_test",
+    srcs = ["pchain_test.go"],
+    embed = [":warpauth"],
+    embedsrcs = [
+        "PChain.abi",
+        "PChain.bin",
+    ],
+    deps = [
+        "//ids",
+        "//vms/components/avax",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/vm/runtime",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)
