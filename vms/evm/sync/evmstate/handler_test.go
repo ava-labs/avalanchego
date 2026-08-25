@@ -5,6 +5,7 @@ package evmstate
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -778,6 +779,17 @@ func TestRequest_SnapshotFillsResponse(t *testing.T) {
 			})
 		}
 	}
+}
+
+// rawResponse fetches a range at the wire level, so a test can assert on the
+// raw response rather than the verified leaves.
+func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLeafRequest) *syncpb.GetLeafResponse {
+	t.Helper()
+	resp := &syncpb.GetLeafResponse{}
+	outcome, err := c.sender.Send(ctx, req, resp)
+	require.NoError(t, err)
+	outcome.Success()
+	return resp
 }
 
 func TestRegisterHandler_ServesOverNetwork(t *testing.T) {

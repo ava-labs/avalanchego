@@ -4,8 +4,8 @@
 package evmstate
 
 import (
-	"bytes"
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -32,23 +32,15 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...H
 	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
 }
 
-// rawResponse fetches a range at the wire level, so a test can build cases from
-// proofs the handler really produced.
-func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLeafRequest) *syncpb.GetLeafResponse {
-	t.Helper()
-	resp := &syncpb.GetLeafResponse{}
-	outcome, err := c.sender.Send(ctx, req, resp)
-	require.NoError(t, err)
-	outcome.Success()
-	return resp
-}
-
 func TestClient_FetchLeaves(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		numKeys  int
+		name    string
+		numKeys int
+		// startAt indexes the first leaf wanted, 0 leaves the start key unset.
+		startAt  int
+		account  *common.Hash
 		limit    uint16
 		wantLen  int
 		wantMore bool
@@ -66,6 +58,20 @@ func TestClient_FetchLeaves(t *testing.T) {
 			wantLen:  20,
 			wantMore: true,
 		},
+		{
+			name:    "from_start_key",
+			numKeys: 50,
+			startAt: 10,
+			limit:   maxLimit,
+			wantLen: 40,
+		},
+		{
+			name:    "storage_trie",
+			numKeys: 50,
+			account: utils.PointerTo(common.HexToHash("0xa11ce")),
+			limit:   maxLimit,
+			wantLen: 50,
+		},
 	}
 
 	for _, tt := range tests {
@@ -76,89 +82,107 @@ func TestClient_FetchLeaves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
 
+			var start []byte
+			if tt.startAt > 0 {
+				start = keys[tt.startAt]
+			}
+
 			client := serve(t, ctx, trieDB)
-			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: tt.limit})
+			got, more, err := client.FetchLeaves(ctx, LeafRange{
+				Root:    root,
+				Account: tt.account,
+				Start:   start,
+				Limit:   tt.limit,
+			})
 			require.NoError(t, err)
 
-			require.Equal(t, keys[:tt.wantLen], got.Keys)
-			require.Equal(t, vals[:tt.wantLen], got.Vals)
+			to := tt.startAt + tt.wantLen
+			require.Equal(t, keys[tt.startAt:to], got.Keys)
+			require.Equal(t, vals[tt.startAt:to], got.Vals)
 			require.Equal(t, tt.wantMore, more)
 		})
 	}
 }
 
-func TestVerifyRange(t *testing.T) {
+// Without verification the client would hand a corrupted range to its caller.
+func TestClient_RetriesInvalidResponses(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
 
 	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, 50)
-	client := serve(t, ctx, trieDB)
-
-	req := func(limit uint32) *syncpb.GetLeafRequest {
-		return &syncpb.GetLeafRequest{RootHash: root.Bytes(), KeyLimit: limit}
-	}
-	partial := rawResponse(t, ctx, client, req(20))
-	whole := rawResponse(t, ctx, client, req(maxLimit))
-
-	tampered := &syncpb.GetLeafResponse{
-		Keys:      partial.GetKeys(),
-		Values:    append([][]byte{bytes.Repeat([]byte{0xff}, common.HashLength)}, partial.GetValues()[1:]...),
-		ProofVals: partial.GetProofVals(),
-	}
+	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
 	tests := []struct {
-		name     string
-		resp     *syncpb.GetLeafResponse
-		wantMore bool
-		wantErr  error
+		name   string
+		tamper func(*syncpb.GetLeafResponse)
 	}{
 		{
-			name:     "partial_has_more",
-			resp:     partial,
-			wantMore: true,
+			name: "incorrect_key",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys[0][0]++
+			},
 		},
 		{
-			name: "whole_trie_has_no_more",
-			resp: whole,
+			name: "incorrect_value",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Values[0][0]++
+			},
 		},
 		{
-			name:    "tampered_value_fails_proof",
-			resp:    tampered,
-			wantErr: errInvalidRangeProof,
+			name: "missing_slot",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys = resp.Keys[1:]
+				resp.Values = resp.Values[1:]
+			},
 		},
 		{
-			name:    "empty_without_proof",
-			resp:    &syncpb.GetLeafResponse{},
-			wantErr: errInvalidRangeProof,
+			name: "trailing_incorrect_slot",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys = append(resp.Keys, slices.Repeat([]byte{0xff}, common.HashLength))
+				resp.Values = append(resp.Values, resp.Values[0])
+			},
 		},
 		{
-			name:    "more_leaves_than_requested",
-			resp:    &syncpb.GetLeafResponse{Keys: make([][]byte, maxLimit+1)},
-			wantErr: errTooManyLeaves,
+			name: "missing_proof",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.ProofVals = nil
+			},
+		},
+		{
+			name: "empty_response",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				*resp = syncpb.GetLeafResponse{}
+			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			more, err := verifyRange(root, make([]byte, common.HashLength), maxLimit, tt.resp)
-			require.ErrorIs(t, err, tt.wantErr)
-			require.Equal(t, tt.wantMore, more)
+			ctx := t.Context()
+
+			const limit = 20
+
+			log := loggingtest.New(t, logging.Debug)
+
+			tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), 1, tt.tamper)
+			recording := synctest.NewRecordingResponder(tampering)
+			net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID, recording)
+			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+
+			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: limit})
+			require.NoError(t, err)
+
+			require.Equal(t, keys[:limit], got.Keys)
+			require.Equal(t, vals[:limit], got.Vals)
+			require.True(t, more)
+			require.Len(t, recording.Requests(), 2, "the invalid response must be re-requested")
 		})
 	}
 }
 
-// tamperLeaf corrupts a served value so its range proof fails, leaving the
-// client's own verification as the thing under test.
-func tamperLeaf(resp *syncpb.GetLeafResponse) {
-	if len(resp.GetValues()) > 0 {
-		resp.Values[0] = bytes.Repeat([]byte{0xff}, common.HashLength)
-	}
-}
-
-// Without verification the client would hand a tampered range to its caller.
-func TestClient_RejectsTamperedRange(t *testing.T) {
+// Incorrect responses should be retried until either a correct response is
+// received or the context is cancelled. This test verifies that the context
+// cancellation gracefully exists.
+func TestClient_CancelEndsRetries(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -168,39 +192,21 @@ func TestClient_RejectsTamperedRange(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 	log := loggingtest.New(t, logging.Debug)
 
-	// Corrupting as many responses as the guard allows tampers every one the
-	// client sees, and cancelling ends a fetch that never converges.
 	const attempts = 3
-	tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), attempts, tamperLeaf)
-	recording := synctest.NewRecordingResponder(tampering)
+	responder := newLeafResponder(t, trieDB)
+	tampering := synctest.NewMutatingResponder(responder, attempts, func(resp *syncpb.GetLeafResponse) {
+		*resp = syncpb.GetLeafResponse{} // Empty responses are invalid.
+	})
 	net, tracker := synctest.ServeResponder(
 		t,
 		ctx,
 		log,
 		p2p.EVMLeafRequestHandlerID,
-		synctest.NewCancelAfter(recording, attempts, cancel),
+		synctest.NewCancelAfter(tampering, attempts, cancel),
 	)
-
 	client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+
 	got, _, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 	require.ErrorIs(t, err, context.Canceled, "a tampered range must never be returned")
-	require.Empty(t, got.Keys)
-	require.Len(t, recording.Requests(), attempts, "each tampered range must be re-requested")
-}
-
-func TestClient_FetchesStorageRange(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-
-	trieDB := synctest.NewTrieDB()
-	c := newStorageCase(t, trieDB, maxLimit)
-	client := serve(t, ctx, trieDB)
-	got, more, err := client.FetchLeaves(ctx, LeafRange{
-		Root:    c.root,
-		Account: utils.PointerTo(common.BytesToHash(c.accountHash)),
-		Limit:   maxLimit,
-	})
-	require.NoError(t, err)
-	require.Equal(t, Leaves{Keys: c.keys, Vals: c.vals}, got)
-	require.False(t, more)
+	require.Zero(t, got)
 }
