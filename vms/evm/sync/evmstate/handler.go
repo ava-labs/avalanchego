@@ -223,18 +223,10 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 
 // collect returns the response holding the leaf range and its proof.
 func (q *query) collect() (*syncpb.GetLeafResponse, error) {
-	var (
-		r = newLeafRange(q.startKey, q.limit)
-		// Only a proof establishes what lies past the response, so more starts
-		// pessimistic.
-		more = true
-		err  error
-	)
-	if q.snapshot != nil {
-		more, err = fillFromSnapshot(q.snapshot, q.trie, r, q.endKey)
-		if err != nil {
-			return nil, err
-		}
+	r := newLeafRange(q.startKey, q.limit)
+	more, err := fillFromSnapshot(q.snapshot, q.trie, r, q.endKey)
+	if err != nil {
+		return nil, err
 	}
 	if more && !r.full() {
 		more, err = fillFromTrie(q.trie, r, q.endKey)
@@ -318,8 +310,13 @@ func (l *leafRange) next() []byte {
 
 // fillFromSnapshot appends leaves from [leafRange.next] through end to r, up
 // to the capacity, serving from the snapshot where it agrees with the trie.
-// It returns whether the trie may hold leaves past the response.
+// A nil snapshot appends nothing. It returns whether the trie may hold leaves
+// past the response.
 func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (bool, error) {
+	if s == nil {
+		return true, nil
+	}
+
 	next := r.next()
 	keys, vals, err := readSnapshot(
 		s,
