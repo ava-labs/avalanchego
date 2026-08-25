@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Long-form chain aliases. These are not the VM names in [constants]: the
-// P-Chain alias is "platform", but its VM name is "platformvm".
 const (
 	pChainAlias = "platform"
 	xChainAlias = "avm"

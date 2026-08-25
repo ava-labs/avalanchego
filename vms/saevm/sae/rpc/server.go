@@ -17,12 +17,6 @@ import (
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
 )
 
-// More than one handler below registers each of these JSON-RPC namespaces.
-const (
-	ethNamespace   = "eth"
-	debugNamespace = "debug"
-)
-
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
@@ -33,6 +27,11 @@ func (p *Provider) Server() *rpc.Server {
 }
 
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
+	const (
+		ethNamespace   = "eth"
+		debugNamespace = "debug"
+	)
+
 	type api struct {
 		namespace string
 		api       any

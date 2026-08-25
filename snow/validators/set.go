@@ -297,13 +297,15 @@ func (s *vdrSet) prefixedString(prefix string) string {
 
 	fmt.Fprintf(&sb, "Validator Set: (Size = %d, Weight = %d)",
 		len(s.vdrSlice),
-		s.totalWeight)
+		s.totalWeight,
+	)
 	format := fmt.Sprintf("\n%s    Validator[%s]: %%33s, %%d", prefix, formatting.IntFormat(len(s.vdrSlice)-1))
 	for i, vdr := range s.vdrSlice {
 		fmt.Fprintf(&sb, format,
 			i,
 			vdr.NodeID,
-			vdr.Weight)
+			vdr.Weight,
+		)
 	}
 
 	return sb.String()
