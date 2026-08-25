@@ -50,6 +50,7 @@ var (
 	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
+	errGraniteUpgradeNotActive          = errors.New("attempting to use a Granite-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
@@ -81,6 +82,15 @@ func StandardTx(
 	tx *txs.Tx,
 	state *state.Diff,
 ) (set.Set[ids.ID], map[ids.ID]*atomic.Requests, func(), error) {
+	// ponytail: gated on Granite so the e2e keeps coreth's warp RPC (SAE, the
+	// Helicon C-chain VM, has none yet); the ACP picks its own activation.
+	if !backend.Config.UpgradeConfig.IsGraniteActivated(state.GetTimestamp()) {
+		for _, cred := range tx.Creds {
+			if _, ok := cred.(*secp256k1fx.WarpCredential); ok {
+				return nil, nil, nil, errGraniteUpgradeNotActive
+			}
+		}
+	}
 	standardExecutor := standardTxExecutor{
 		backend:       backend,
 		feeCalculator: feeCalculator,

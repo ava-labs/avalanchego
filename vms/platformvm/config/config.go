@@ -4,13 +4,32 @@
 package config
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"github.com/ava-labs/avalanchego/ids"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
+
+// DefaultWarpHelperAddresses are the Nick-deployed PChain.sol addresses per
+// network, used when the chain config does not list any. Regenerate with
+// `go run ./tests/warpauth/nick -network <name>` whenever PChain.sol changes;
+// tests/warpauth pins these to the contract bytes.
+var DefaultWarpHelperAddresses = map[uint32][]ids.ShortID{
+	constants.MainnetID: {mustShortID("0x01B8Ee353564FB752b7E9E768E0fb6F069796E99")},
+	constants.FujiID:    {mustShortID("0x23c6437426e186BbfFC4B54143c2B14aB3569e80")},
+}
+
+func mustShortID(hexAddr string) ids.ShortID {
+	b, err := hex.DecodeString(hexAddr[2:])
+	if err != nil {
+		panic(err)
+	}
+	return ids.ShortID(b)
+}
 
 var Default = Config{
 	Network:                       DefaultNetwork,

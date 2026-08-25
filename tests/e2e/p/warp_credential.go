@@ -4,6 +4,7 @@
 package p
 
 import (
+	"context"
 	"encoding/hex"
 	"math/big"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	warpclient "github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -26,9 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	pwarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -130,42 +127,31 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			require.Equal(helper, send(nil, append(initcode, ctorArgs...)).ContractAddress)
 		})
 
-		warpClient, err := warpclient.NewClient(nodeURI.URI, "C")
-		require.NoError(err)
+		tc.By("starting a keyless relayer", func() {
+			warpClient, err := warpclient.NewClient(nodeURI.URI, "C")
+			require.NoError(err)
+			relayer := &warpauth.Relayer{
+				Log:    tc.Log(),
+				Eth:    ethClient,
+				Warp:   warpClient,
+				PChain: pClient,
+				Helper: helper,
+			}
+			ctx, cancel := context.WithCancel(tc.DefaultContext())
+			tc.DeferCleanup(cancel)
+			go func() { _ = relayer.Run(ctx, 0) }()
+		})
 
-		// command sends one helper call from the EVM address, aggregates the
-		// validator signatures and relays the wrapped tx to the P-chain.
-		command := func(method string, args ...any) *txs.Tx {
+		// command sends one helper call from the EVM address; the relayer
+		// does the rest.
+		command := func(method string, args ...any) {
 			data, err := parsedABI.Pack(method, args...)
 			require.NoError(err)
-			receipt := send(&helper, data)
-
-			var unsignedMsg *pwarp.UnsignedMessage
-			for _, log := range receipt.Logs {
-				if log.Address == warp.ContractAddress {
-					unsignedMsg, err = warp.UnpackSendWarpEventDataToMessage(log.Data)
-					require.NoError(err)
-				}
-			}
-			require.NotNil(unsignedMsg)
-
-			var signedMsg []byte
-			tc.Eventually(func() bool {
-				signedMsg, err = warpClient.GetMessageAggregateSignature(tc.DefaultContext(), unsignedMsg.ID(), 67, "")
-				return err == nil
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to aggregate signatures")
-
-			pTx, err := warpauth.Wrap(signedMsg)
-			require.NoError(err)
-			txID, err := pClient.IssueTx(tc.DefaultContext(), pTx.Bytes())
-			require.NoError(err)
-			require.Equal(pTx.ID(), txID)
-			tc.Eventually(func() bool {
-				res, err := pClient.GetTxStatus(tc.DefaultContext(), txID)
-				require.NoError(err)
-				return res.Status == status.Committed
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "tx not committed")
-			return pTx
+			send(&helper, data)
+		}
+		subnetOwnedBy := func(subnetID ids.ID, addr ids.ShortID) bool {
+			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+			return err == nil && len(subnet.ControlKeys) == 1 && subnet.ControlKeys[0] == addr
 		}
 
 		type utxo struct {
@@ -182,15 +168,22 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 
 		var subnetID ids.ID
 		tc.By("creating a subnet owned by the EVM address", func() {
-			createTx := command("createSubnet",
+			command("createSubnet",
 				[]utxo{{TxID: utxoID.TxID, OutputIndex: utxoID.OutputIndex, Amount: fundAmount}},
 				uint64(fundAmount-fee),
 				owners{Threshold: 1, Addrs: []common.Address{ethAddress}},
 			)
-			subnetID = createTx.ID()
-			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
-			require.Equal([]ids.ShortID{owner}, subnet.ControlKeys)
+			tc.Eventually(func() bool {
+				subnets, err := pClient.GetSubnets(tc.DefaultContext(), nil)
+				require.NoError(err)
+				for _, subnet := range subnets {
+					if len(subnet.ControlKeys) == 1 && subnet.ControlKeys[0] == owner {
+						subnetID = subnet.ID
+						return true
+					}
+				}
+				return false
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "subnet not created")
 			// The change output is the only output.
 			utxoID = avax.UTXOID{TxID: subnetID, OutputIndex: 0}
 		})
@@ -204,9 +197,9 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 				[]uint32{0},
 				owners{Threshold: 1, Addrs: []common.Address{common.Address(newOwner)}},
 			)
-			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
-			require.Equal([]ids.ShortID{newOwner}, subnet.ControlKeys)
+			tc.Eventually(func() bool {
+				return subnetOwnedBy(subnetID, newOwner)
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "subnet not transferred")
 		})
 	})
 })

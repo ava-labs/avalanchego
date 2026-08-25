@@ -6,6 +6,7 @@ package warpauth
 import (
 	_ "embed"
 	"encoding/hex"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -14,13 +15,17 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm/runtime"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -323,4 +328,19 @@ func TestEncodeRejects(t *testing.T) {
 	reverts("transfer", ins, []out{outs[1], outs[0]})
 	reverts("registerL1Validator", ins, uint64(4), uint64(5), []byte{1}, []byte{})
 	reverts("addPermissionlessDelegator", ins, uint64(4), vdr, subnetID, []out{outs[1], outs[0]}, twoOwners)
+}
+
+// The hardcoded helper addresses must match the current contract bytes.
+func TestDefaultHelperAddressesMatchContract(t *testing.T) {
+	for networkID, evmChainID := range map[uint32]int64{constants.MainnetID: 43114, constants.FujiID: 43113} {
+		_, avaxAssetID, err := genesis.FromConfig(genesis.GetConfig(networkID))
+		require.NoError(t, err)
+		_, deployer, err := NickDeployTx(big.NewInt(evmChainID), networkID, avaxAssetID)
+		require.NoError(t, err)
+		require.Equal(t,
+			[]ids.ShortID{ids.ShortID(crypto.CreateAddress(deployer, 0))},
+			config.DefaultWarpHelperAddresses[networkID],
+			"run: go run ./tests/warpauth/nick -network %s", constants.NetworkName(networkID),
+		)
+	}
 }
