@@ -117,10 +117,10 @@ func (b *Block) parentBlock(ifSettledErrMsg string) *Block {
 // without logging.
 //
 // It is only valid to call LastSettled for the first time on b if it is
-// currently the last-accepted block. This is because the value is computed by
-// traversing the ancestral lineage, which might not be available for older
-// blocks. The value is, however, cached until b itself is settled, so repeated
-// calls are allowed.
+// currently the last-accepted block or one of its descendants. This is because
+// the value is computed by traversing the ancestral lineage, which might not be
+// available for older blocks. The value is, however, cached until b itself is
+// settled, so repeated calls are allowed.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
