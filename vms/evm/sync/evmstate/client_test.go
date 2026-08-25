@@ -128,7 +128,7 @@ func TestVerifyRange(t *testing.T) {
 		{
 			name:    "empty_without_proof",
 			resp:    &syncpb.GetLeafResponse{},
-			wantErr: errEmptyLeafResponse,
+			wantErr: errInvalidRangeProof,
 		},
 		{
 			name:    "more_leaves_than_requested",
