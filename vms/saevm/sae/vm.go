@@ -44,6 +44,9 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
+// directory that stores execution results database under the chain data directory
+const executionResultsDir = "sae_execution_results"
+
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
 // ensure that the last-synchronous block (which MAY be the genesis) is
@@ -134,11 +137,11 @@ func NewVM[T hook.Transaction](
 	}
 
 	// ==========  Execution Results DB  ==========
-	xdb, err := hooks.ExecutionResultsDB(
-		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
-	)
+	xdbDir := filepath.Join(snowCtx.ChainDataDir, executionResultsDir)
+
+	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
-		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
+		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
 	}
 	closers.Push(&xdb)
 

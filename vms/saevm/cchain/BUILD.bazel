@@ -185,6 +185,7 @@ go_test(
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/secp256k1fx",
         "@com_github_arr4n_shed//testerr",
+        "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core",
