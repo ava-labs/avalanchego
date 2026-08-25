@@ -128,3 +128,22 @@ func HashedKey(i uint64) []byte {
 	binary.BigEndian.PutUint64(idx[:], i)
 	return crypto.Keccak256(idx[:])
 }
+
+// VariedAccounts describes n accounts cycling through plain, code only, storage,
+// and storage with code. Sizes repeat, so every storage root ends up shared.
+func VariedAccounts(n int) []AccountDesc {
+	descs := make([]AccountDesc, n)
+	for i := range descs {
+		switch i % 5 {
+		case 1:
+			descs[i] = AccountDesc{WithCode: true}
+		case 2:
+			descs[i] = AccountDesc{StorageSize: 16}
+		case 3:
+			descs[i] = AccountDesc{StorageSize: 16, WithCode: true}
+		case 4:
+			descs[i] = AccountDesc{StorageSize: 8 + i%3}
+		}
+	}
+	return descs
+}

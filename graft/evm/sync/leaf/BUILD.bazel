@@ -20,10 +20,7 @@ go_library(
 
 graft_go_test(
     name = "leaf_test",
-    srcs = [
-        "keys_test.go",
-        "syncer_test.go",
-    ],
+    srcs = ["syncer_test.go"],
     embed = [":leaf"],
     deps = [
         "//graft/evm/sync/synctest",

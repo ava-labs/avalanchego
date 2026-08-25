@@ -6,6 +6,7 @@ package evmstate
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -41,6 +42,9 @@ type (
 		target      ethdb.Database
 		threshold   uint64
 		leafFetcher types.LeafFetcher
+
+		leafsIntercept func(message.LeafsRequest, message.LeafsResponse) (message.LeafsResponse, error)
+		codeIntercept  func([]common.Hash, [][]byte) ([][]byte, error)
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -63,6 +67,24 @@ func withTarget(db ethdb.Database) sutOption {
 func withThreshold(n uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.threshold = n
+	})
+}
+
+// withLeafError fails every leaf request, standing in for an unusable peer.
+func withLeafError(err error) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.leafsIntercept = func(message.LeafsRequest, message.LeafsResponse) (message.LeafsResponse, error) {
+			return message.LeafsResponse{}, err
+		}
+	})
+}
+
+// withCodeError fails every code request, which only the code syncer sees.
+func withCodeError(err error) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.codeIntercept = func([]common.Hash, [][]byte) ([][]byte, error) {
+			return nil, err
+		}
 	})
 }
 
@@ -99,6 +121,8 @@ func newSUT(t *testing.T, trieDB *triedb.Database, root common.Hash, opts ...sut
 		handlers.NewCodeRequestHandler(cfg.codeDB, c, handlerstats.NewNoopHandlerStats()),
 		nil,
 	)
+	server.GetLeafsIntercept = cfg.leafsIntercept
+	server.GetCodeIntercept = cfg.codeIntercept
 
 	fetcher := cfg.leafFetcher
 	if fetcher == nil {
@@ -152,15 +176,24 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 		name             string
 		accounts         []synctest.AccountDesc
 		wantStorageTries int
+		wantCodes        int
 	}{
 		{
-			name:     "accounts_with_code",
-			accounts: []synctest.AccountDesc{{WithCode: true}, {}, {WithCode: true}, {WithCode: true}, {}},
+			name:      "accounts_with_code",
+			accounts:  []synctest.AccountDesc{{WithCode: true}, {}, {WithCode: true}, {WithCode: true}, {}},
+			wantCodes: 3,
 		},
 		{
 			name:             "shared_storage_roots",
 			accounts:         []synctest.AccountDesc{{StorageSize: 5}, {StorageSize: 6, WithCode: true}, {StorageSize: 5}, {WithCode: true}, {}},
 			wantStorageTries: 2,
+			wantCodes:        2,
+		},
+		{
+			name:             "varied_state_at_scale",
+			accounts:         synctest.VariedAccounts(250),
+			wantStorageTries: 4,
+			wantCodes:        100,
 		},
 	}
 
@@ -172,6 +205,7 @@ func TestHashDBSyncer_Reconstruction(t *testing.T) {
 
 				f := synctest.NewStateFixture(t, tt.accounts)
 				require.Len(t, f.Storage, tt.wantStorageTries)
+				require.Len(t, f.Codes, tt.wantCodes)
 
 				opts := []sutOption{withCodeDB(f.CodeDB)}
 				if tr.proto {
@@ -458,4 +492,71 @@ func runResumableSync(t *testing.T, trieDB *triedb.Database, root common.Hash, t
 
 	syncErr := sut.sync(t, ctx)
 	return len(recorder.Requests()), syncErr
+}
+
+// A peer that cannot serve must surface its error rather than stall or complete.
+func TestHashDBSyncer_PropagatesFetchErrors(t *testing.T) {
+	t.Parallel()
+	wantErr := errors.New("peer refused")
+
+	tests := []struct {
+		name     string
+		leafFail bool
+	}{
+		{name: "leaf_request_fails", leafFail: true},
+		{name: "code_request_fails"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			f := synctest.NewStateFixture(t, synctest.VariedAccounts(10))
+			opts := []sutOption{withCodeDB(f.CodeDB)}
+			if tt.leafFail {
+				opts = append(opts, withLeafError(wantErr))
+			} else {
+				opts = append(opts, withCodeError(wantErr))
+			}
+
+			sut := newSUT(t, f.TrieDB, f.Root, opts...)
+			require.ErrorIs(t, sut.sync(t, ctx), wantErr)
+		})
+	}
+}
+
+// cancelOnIterateDB cancels when the storage-trie scan opens its iterator, which
+// lands after the producer starts and before it checks the next trie.
+type cancelOnIterateDB struct {
+	ethdb.Database
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (d *cancelOnIterateDB) NewIterator(prefix, start []byte) ethdb.Iterator {
+	it := d.Database.NewIterator(prefix, start)
+	d.once.Do(d.cancel)
+	return it
+}
+
+// Cancelling mid-sync must stop before queueing the next storage trie, rather than
+// admit work the sync is about to abandon.
+func TestHashDBSyncer_StopsBetweenStorageTries(t *testing.T) {
+	t.Parallel()
+
+	disk := rawdb.NewMemoryDatabase()
+	queue := newTrieQueue(disk)
+	require.NoError(t, queue.RegisterStorageTrie(common.Hash{0xaa}, common.Hash{0x01}))
+	require.NoError(t, queue.RegisterStorageTrie(common.Hash{0xbb}, common.Hash{0x02}))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	db := &cancelOnIterateDB{Database: disk, cancel: cancel}
+
+	s := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.Hash{0xff}, nil)
+	s.scheduler = newTrieScheduler(1, 1)
+	s.mainTrieDone = make(chan struct{})
+	close(s.mainTrieDone)
+
+	require.ErrorIs(t, s.storageTrieProducer(ctx), context.Canceled)
 }

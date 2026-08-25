@@ -36,7 +36,7 @@ func ServeLeaves(t *testing.T, ctx context.Context, trieDB *triedb.Database) typ
 // RecordLeaves is [ServeLeaves] with every range recorded.
 func RecordLeaves(t *testing.T, ctx context.Context, trieDB *triedb.Database) *RecordingFetcher {
 	t.Helper()
-	return NewRecordingFetcher(ServeLeaves(t, ctx, trieDB))
+	return newRecordingFetcher(ServeLeaves(t, ctx, trieDB))
 }
 
 // RecordingFetcher records every range reaching inner.
@@ -47,7 +47,7 @@ type RecordingFetcher struct {
 	requests []evmstate.LeafRange
 }
 
-func NewRecordingFetcher(inner types.LeafFetcher) *RecordingFetcher {
+func newRecordingFetcher(inner types.LeafFetcher) *RecordingFetcher {
 	return &RecordingFetcher{inner: inner}
 }
 
