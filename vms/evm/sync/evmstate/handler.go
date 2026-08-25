@@ -286,7 +286,14 @@ func (q *query) fillFromSnapshot(leaves *leafRange) (bool, error) {
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
-	valid, more, err := isRangeValid(q.trie, q.startKey, snapKeys, snapVals)
+	valid, more, err := isRangeValid(
+		q.trie,
+		&leafRange{
+			start: q.startKey,
+			keys:  snapKeys,
+			vals:  snapVals,
+		},
+	)
 	if err != nil {
 		return false, err
 	}
@@ -326,7 +333,14 @@ func (q *query) fillFromSegments(leaves *leafRange, snapKeys, snapVals [][]byte)
 			startKey = leaves.next()
 		}
 		end := min(i+snapshotSegmentLen, len(snapKeys))
-		valid, more, err := isRangeValid(q.trie, startKey, snapKeys[i:end], snapVals[i:end])
+		valid, more, err := isRangeValid(
+			q.trie,
+			&leafRange{
+				start: startKey,
+				keys:  snapKeys[i:end],
+				vals:  snapVals[i:end],
+			},
+		)
 		if err != nil {
 			return false, err
 		}
