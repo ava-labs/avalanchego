@@ -121,9 +121,9 @@ linters:
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
     goconst:
-      # goconst counts occurrences in _test.go files, but can report the issue
-      # on a non-test file. A path exclusion matches the reported path, so it
-      # cannot remove such an issue. This option omits the test files instead.
+      # goconst counts occurrences in _test.go files, but combines with the default
+      # 3 occurrences in production files, causing a lint error even though goconst
+      # is ignored for all test files in the regex in the exclusion rules.
       ignore-tests: true
     gosec:
       excludes:
