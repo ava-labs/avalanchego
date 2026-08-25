@@ -52,6 +52,21 @@ func NewClient(log logging.Logger, n *p2p.Network, handlerID uint64, peers *p2p.
 	return &Client{log: log, sender: newSender(n, handlerID, peers)}
 }
 
+// LeafRange is a run of leaves to fetch from one trie.
+type LeafRange struct {
+	Root    common.Hash
+	Account common.Hash // zero for the account trie
+	Start   []byte      // nil for the trie's first key
+	End     []byte      // inclusive, nil for the trie's last key
+	Limit   uint16
+}
+
+// Leaves is a verified run of trie leaves in key order.
+type Leaves struct {
+	Keys [][]byte
+	Vals [][]byte
+}
+
 // FetchLeaves re-requests from another peer until the range proves out or ctx
 // ends, so an unproven range never surfaces.
 func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, error) {
