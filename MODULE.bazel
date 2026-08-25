@@ -130,6 +130,7 @@ use_repo(
     "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracehttp",
     "io_opentelemetry_go_otel_sdk",
     "io_opentelemetry_go_otel_trace",
+    "net_pgregory_rapid",
     "org_golang_google_genproto",
     "org_golang_google_genproto_googleapis_rpc",
     "org_golang_google_grpc",

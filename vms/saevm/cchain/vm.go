@@ -52,9 +52,20 @@ type VM struct {
 	*network.Network          // created by [VM.Initialize]
 	*statesync.SummaryHandler // created by [VM.Initialize]
 
-	// gossip frequencies are configurable to speed up testing.
-	pullGossipPeriod time.Duration
-	pushGossipPeriod time.Duration
+	// Gossip frequencies are configurable to speed up testing. These two
+	// control cchain's own cross-chain (atomic-tx) gossip system, registered
+	// under [p2p.AtomicTxGossipHandlerID] below; eth-tx gossip is controlled
+	// separately, by [sae.Config.PushGossipPeriod] / [sae.Config.PullGossipPeriod]
+	// (see ethTxPushGossipPeriod / ethTxPullGossipPeriod).
+	atomicTxPullGossipPeriod time.Duration
+	atomicTxPushGossipPeriod time.Duration
+
+	// ethTxPushGossipPeriod and ethTxPullGossipPeriod, if non-zero, override
+	// the embedded [sae.VM]'s eth-tx gossip periods (see
+	// [sae.Config.PushGossipPeriod] / [sae.Config.PullGossipPeriod]). Zero
+	// leaves the [sae.VM] defaults in place.
+	ethTxPushGossipPeriod time.Duration
+	ethTxPullGossipPeriod time.Duration
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
 	now              func() time.Time
@@ -191,6 +202,10 @@ func (vm *VM) Initialize(
 		}
 
 		saeConfig := userConfig.saeConfig(vm.now)
+		// Unconditional override: safe only because config.saeConfig() never sets
+		// PushGossipPeriod / PullGossipPeriod itself.
+		saeConfig.PushGossipPeriod = vm.ethTxPushGossipPeriod
+		saeConfig.PullGossipPeriod = vm.ethTxPullGossipPeriod
 		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 			return fmt.Errorf("setting up genesis trie: %w", err)
@@ -242,7 +257,7 @@ func (vm *VM) Initialize(
 				Registry:      reg,
 				Namespace:     "gossip",
 				HandlerID:     p2p.AtomicTxGossipHandlerID,
-				RequestPeriod: vm.pullGossipPeriod,
+				RequestPeriod: vm.atomicTxPullGossipPeriod,
 			},
 		)
 		if err != nil {
@@ -276,10 +291,10 @@ func (vm *VM) Initialize(
 			gossipCtx, cancelGossip := context.WithCancel(context.Background())
 			var gossipWG sync.WaitGroup
 			gossipWG.Go(func() {
-				gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, vm.pullGossipPeriod)
+				gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, vm.atomicTxPullGossipPeriod)
 			})
 			gossipWG.Go(func() {
-				gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, vm.pushGossipPeriod)
+				gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, vm.atomicTxPushGossipPeriod)
 			})
 			vm.onClose = append(vm.onClose, func(context.Context) error {
 				cancelGossip()

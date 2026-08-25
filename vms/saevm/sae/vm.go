@@ -86,6 +86,13 @@ type VM struct {
 	closers unwind.Closers
 }
 
+// Default periods for eth-tx push/pull gossip; used when the corresponding
+// Config fields are zero.
+const (
+	DefaultPushGossipPeriod = 100 * time.Millisecond
+	DefaultPullGossipPeriod = time.Second
+)
+
 // A Config configures construction of a new [VM].
 //
 // TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
@@ -98,6 +105,15 @@ type Config struct {
 
 	// Now defaults to [time.Now] if nil
 	Now func() time.Time `json:"-"`
+
+	// PushGossipPeriod and PullGossipPeriod control how often eth-tx gossip
+	// is pushed to, and pulled from, peers; zero defaults to
+	// [DefaultPushGossipPeriod] and [DefaultPullGossipPeriod] respectively.
+	// They exist primarily so heavy multi-node test suites can compress the
+	// real (wall-clock) time spent waiting for gossip to converge; production
+	// callers should leave them unset.
+	PushGossipPeriod time.Duration
+	PullGossipPeriod time.Duration
 }
 
 const ExecutionResultsDir = "sae_execution_results"
@@ -154,7 +170,7 @@ func NewVM[T hook.Transaction](
 	closers.Push(exec)
 
 	// ==========  Mempool & P2P Gossip  ==========
-	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
+	pool, mempoolClosers, err := newGossipMempool(cfg, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +234,7 @@ func NewVM[T hook.Transaction](
 // resources and goroutines created by this function; the last closer stops
 // the gossip loops, blocking until they have returned.
 func newGossipMempool(
-	config legacypool.Config,
+	config Config,
 	snowCtx *snow.Context,
 	network *network.Network,
 	exec *saexec.Executor,
@@ -230,7 +246,7 @@ func newGossipMempool(
 
 	bc := txgossip.NewBlockChain(exec, blockSource)
 	pools := []txpool.SubPool{
-		legacypool.New(config, bc),
+		legacypool.New(config.MempoolConfig, bc),
 	}
 	txPool, err := txpool.New(0, bc, pools)
 	if err != nil {
@@ -248,7 +264,10 @@ func newGossipMempool(
 		return nil, nil, err
 	}
 
-	const pullGossipPeriod = time.Second
+	pullGossipPeriod := config.PullGossipPeriod
+	if pullGossipPeriod == 0 {
+		pullGossipPeriod = DefaultPullGossipPeriod
+	}
 	handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
 		network.Network,
@@ -277,7 +296,10 @@ func newGossipMempool(
 		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
 	})
 	wg.Go(func() {
-		const pushGossipPeriod = 100 * time.Millisecond
+		pushGossipPeriod := config.PushGossipPeriod
+		if pushGossipPeriod == 0 {
+			pushGossipPeriod = DefaultPushGossipPeriod
+		}
 		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 	})
 

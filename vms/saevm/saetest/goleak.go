@@ -23,5 +23,10 @@ func GoleakOptions() []goleak.Option {
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
+		// DB.Close() signals mpoolDrain via a channel close but doesn't wait
+		// for it to observe the signal and return, so the goroutine can
+		// outlive Close() by up to a second. Also ignored in
+		// graft/coreth/core and graft/subnet-evm/core.
+		goleak.IgnoreTopFunction("github.com/syndtr/goleveldb/leveldb.(*DB).mpoolDrain"),
 	}
 }
