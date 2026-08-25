@@ -253,7 +253,7 @@ tasks:
     desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
       - task: go-mod-tidy
-      - task: check-clean-branch
+      - cmd: '{{.NIX_RUN}} .github/workflows/check-clean-branch.sh "task go-mod-tidy"'
 
   check-go-version:
     desc: Checks that go version directives are consistent across all modules
@@ -443,11 +443,13 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/setup_cchain_data.sh'
 
   sync-go-work:
-    desc: Downloads module dependencies and syncs go.work.sum
+    desc: Syncs workspace dependencies and go.work.sum
     cmds:
-      - cmd: '{{.NIX_RUN}} go mod download'
-      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
+      # go work sync can leave go.work.sum without module content hashes. See
+      # https://github.com/golang/go/issues/63901.
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+      - cmd: '{{.NIX_RUN}} env GOWORK="" go mod download'
+      - cmd: '{{.NIX_RUN}} env GOWORK="" go list -m all'
 
   tags-create:
     desc: Creates tags for avalanchego and submodules
@@ -641,6 +643,18 @@ tasks:
       NO_SHUFFLE: TRUE
       NO_RACE: TRUE
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+
+  test-unit-all:
+    desc: Runs all workspace unit tests without race detection or shuffled order
+    # Invoking with bash ensures compatibility with CI execution on Windows
+    env:
+      NO_SHUFFLE: TRUE
+      NO_RACE: TRUE
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-all-race-shuffle:
+    desc: Runs all workspace unit tests with race detection and shuffled order
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
 
   test-unit-race-shuffle:
     desc: Runs unit tests with race detection and shuffled order

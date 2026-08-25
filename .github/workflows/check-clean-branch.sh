@@ -9,4 +9,12 @@ git update-index --really-refresh >> /dev/null
 git status --short
 
 # Exits if any uncommitted changes are found.
-git diff-index --quiet HEAD
+if git diff-index --quiet HEAD; then
+  exit 0
+fi
+
+if [[ $# -gt 0 ]]; then
+  echo "Generated files are out of date." >&2
+  echo "To fix, run: $*" >&2
+fi
+exit 1

@@ -4,17 +4,15 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly repo_root
-readonly module_directories=(
-  .
-  graft/coreth
-  graft/evm
-  graft/subnet-evm
-  tools/external
+# Download the workspace build list. This includes dependencies needed by every
+# module in go.work, including dependencies used only by tests.
+(
+  cd "${repo_root}"
+  GOWORK="" go mod download all
 )
 
-for module_directory in "${module_directories[@]}"; do
-  (
-    cd "${repo_root}/${module_directory}"
-    GOWORK=off go mod download all
-  )
-done
+# tools/external is intentionally outside the workspace.
+(
+  cd "${repo_root}/tools/external"
+  GOWORK=off go mod download all
+)

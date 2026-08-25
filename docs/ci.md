@@ -245,32 +245,38 @@ reusable smoke workflow for macOS 26 ARM64. The full workflow also contains the
 four suites' pre-merge lint, generation, image, E2E, load, and upgrade jobs.
 
 [`.github/workflows/go-ci.yml`](../.github/workflows/go-ci.yml) accepts a runner
-and platform name. Each invocation prepares dependencies once and then fans out
-the four full unit suites. Its `run_race_shuffle_unit_tests` input selects either
-`test-unit` or `test-unit-race-shuffle`. Its `run_premerge_jobs` input prevents
-pre-merge-only jobs from running on every scheduled platform.
+and platform name. Each invocation prepares dependencies once and then runs the
+four module-specific unit suites and one combined workspace suite. The combined
+suite runs beside the module suites so CI can compare their cold and warm costs
+before replacing the four-job fan-out. Its `run_race_shuffle_unit_tests` input
+selects the cacheable or race/shuffle task variant. Its `run_premerge_jobs`
+input prevents pre-merge-only jobs from running on every scheduled platform.
 [`.github/workflows/go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml)
 uses the same runner and platform inputs and fans out the four
 `test-unit-smoke` tasks.
 
-Pre-merge CI uses fewer unit-test jobs to reduce failures from hosted runners.
-It runs the four full cacheable unit suites on Ubuntu 24.04 AMD64. It runs one
-small smoke test from each suite on macOS 26 ARM64. The smoke tests prove that
-Go can build and run tests on macOS. They do not provide full macOS coverage.
+Pre-merge CI uses fewer test platforms to reduce failures from hosted runners.
+It runs the four full cacheable module suites and the combined workspace suite
+on Ubuntu 24.04 AMD64. It runs one small smoke test from each module on macOS 26
+ARM64. The smoke tests prove that Go can build and run tests on macOS. They do
+not provide full macOS coverage.
 
 [`.github/workflows/ci-scheduled.yml`](../.github/workflows/ci-scheduled.yml)
 is the single daily non-Bazel Go entrypoint. It calls the reusable full workflow
 for Ubuntu 22.04 and 24.04 on AMD64 and ARM64, and for macOS 26 ARM64. Every
-scheduled invocation runs all four full suites with race detection and shuffled
-order. Scheduled workflows stay separate from pull-request and merge-group
+scheduled invocation runs the four module suites and the combined workspace
+suite with race detection and shuffled order. Scheduled workflows stay separate
+from pull-request and merge-group
 workflows so scheduled-only jobs do not appear as skipped checks.
 
 Each reusable workflow invocation runs one setup job before its Go jobs fan out.
-The setup job uses `scripts/download_go_dependencies.sh` to download the root,
-Coreth, EVM, Subnet-EVM, and repository Go-tool module graphs with `GOWORK=off`.
-It saves one platform-specific workspace `GOMODCACHE`. Consumer jobs restore
-that cache read-only. The cache key covers the Go version source, workspace
-files, every listed module file, and the dependency-download implementation.
+The setup job uses `scripts/download_go_dependencies.sh` to download the
+workspace build list, including dependencies used only by tests. It separately
+downloads the repository Go-tool module graph because `tools/external` is not in
+the workspace. It saves one platform-specific workspace `GOMODCACHE`. Consumer
+jobs restore that cache read-only. The cache key covers the Go version source,
+workspace files, every listed module file, and the dependency-download
+implementation.
 
 Dependency and test-result caching are separate. Each cacheable pre-merge full
 or smoke job manages its own suite- and platform-specific `GOCACHE`. The primary
@@ -315,13 +321,20 @@ privileged `pull_request_target` event, and protected secrets are not available
 to untrusted pull request jobs. A pull request can affect cache contents within
 its own scope, but those entries do not become trusted-branch caches.
 
+`task check-go-mod-tidy` also validates workspace checksums, and its fix is
+`task go-mod-tidy`. After `go work sync`, the fix runs `go list -m all` to load
+the complete workspace module graph and update `go.work.sum`. This works around
+[Go issue #63901](https://github.com/golang/go/issues/63901), where `go work
+sync` can leave `go.work.sum` incomplete. After adopting a Go release with that
+fix, test whether the extra module-list command can be removed.
+
 When reviewing or changing this implementation:
 
 - keep dependency keys tied to the Go version source, every workspace and tool
   module file, and the dependency-download script and action
-- update `scripts/test_download_go_dependencies.sh` when adding or removing a Go
-  module; the test must continue to compare the checked-in list with every
-  `go.mod` in the repository
+- keep `scripts/download_go_dependencies.sh` in workspace mode when it downloads
+  workspace dependencies; use `GOWORK=off` only for `tools/external`, which is
+  outside the workspace
 - keep dependency setup as the only `GOMODCACHE` writer and keep consumers on
   restore-only behavior
 - keep `GOCACHE` keys revision-, suite-, and platform-specific, with a
@@ -352,8 +365,9 @@ The migration retains these job destinations:
 - Subnet-EVM full workflow: `lint-subnet-evm`, `e2e-warp-subnet-evm`,
   `e2e-load-subnet-evm`, `test-build-image-subnet-evm`, and
   `test-build-antithesis-images-subnet-evm`
-- reusable full workflow: `unit-avalanchego`, `unit-coreth`, `unit-evm`, and
-  `unit-subnet-evm`, including all four former scheduled matrices
+- reusable full workflow: `unit-all`, `unit-avalanchego`, `unit-coreth`,
+  `unit-evm`, and `unit-subnet-evm`, including all four former scheduled
+  matrices
 - reusable smoke workflow: `smoke-avalanchego`, `smoke-coreth`, `smoke-evm`,
   and `smoke-subnet-evm`
 
