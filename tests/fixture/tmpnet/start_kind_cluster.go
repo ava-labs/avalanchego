@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/utils/ptr"
 
 	_ "embed"
 
@@ -299,7 +298,7 @@ func createServiceAccountKubeconfig(
 	tokenRequest := &authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
 			// Token will be valid for 1 year
-			ExpirationSeconds: ptr.To[int64](365 * 24 * 60 * 60),
+			ExpirationSeconds: new(int64(365 * 24 * 60 * 60)),
 		},
 	}
 	token, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, "tmpnet", tokenRequest, metav1.CreateOptions{})
