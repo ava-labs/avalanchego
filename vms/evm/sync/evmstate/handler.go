@@ -224,28 +224,28 @@ func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*que
 // collect returns the response holding the leaf range and its proof.
 func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 	var (
-		leaves = newLeafRange(q.startKey, q.limit)
+		r = newLeafRange(q.startKey, q.limit)
 		// Only a proof establishes what lies past the response, so more starts
 		// pessimistic.
 		more = true
 		err  error
 	)
 	if q.snapshot != nil {
-		more, err = q.fillFromSnapshot(leaves)
+		more, err = fillFromSnapshot(q.snapshot, q.trie, r, q.endKey)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if more && !leaves.full() {
-		more, err = fillFromTrie(q.trie, leaves, q.endKey)
+	if more && !r.full() {
+		more, err = fillFromTrie(q.trie, r, q.endKey)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	resp := &syncpb.GetLeafResponse{
-		Keys:   leaves.keys,
-		Values: leaves.vals,
+		Keys:   r.keys,
+		Values: r.vals,
 	}
 	// [trie.VerifyRangeProof] allows an empty proof when proving a full trie.
 	// This uses less bandwidth and is faster to verify.
@@ -253,7 +253,7 @@ func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 		return resp, nil
 	}
 
-	proofDB, err := newRangeProof(q.trie, q.startKey, leaves.keys)
+	proofDB, err := newRangeProof(q.trie, q.startKey, r.keys)
 	if err != nil {
 		return nil, err
 	}
@@ -261,83 +261,44 @@ func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 	return resp, nil
 }
 
-// fillFromSnapshot appends the snapshot leaves that were able to be proven
-// as correct to leaves. It returns whether the trie may hold leaves past the
-// last key appended.
-func (q *query) fillFromSnapshot(leaves *leafRange) (bool, error) {
-	snapKeys, snapVals, err := readSnapshot(
-		q.snapshot,
-		common.BytesToHash(q.startKey),
-		common.BytesToHash(q.endKey),
-		q.limit,
-	)
-	if err != nil {
-		q.log.Debug("snapshot read abandoned",
-			zap.String("reason", "iteration failed"),
-			zap.Error(err),
-		)
-		return true, nil
-	}
-	if len(snapKeys) == 0 {
-		q.log.Debug("snapshot read abandoned",
-			zap.String("reason", "no keys"),
-		)
-		return true, nil
-	}
-
-	// Fast path: validate the entire range against the trie in one shot.
-	valid, more, err := isRangeValid(
-		q.trie,
-		&leafRange{
-			start: q.startKey,
-			keys:  snapKeys,
-			vals:  snapVals,
-		},
-	)
-	if err != nil {
-		return false, err
-	}
-	if valid {
-		leaves.append(snapKeys, snapVals)
-		return more, nil
-	}
-
-	return fillFromSegments(q.trie, leaves, snapKeys, snapVals)
-}
-
 // leafRange accumulates the leaves of one response.
 type leafRange struct {
 	start []byte // start of the requested range
-	limit int    // maximum number of leaves
 	keys  [][]byte
 	vals  [][]byte
 }
 
-// newLeafRange returns an empty range starting at start, capped at limit.
-func newLeafRange(start []byte, limit int) *leafRange {
+// newLeafRange returns an empty range starting at start, holding at most
+// capacity leaves.
+func newLeafRange(start []byte, capacity int) *leafRange {
 	return &leafRange{
 		start: start,
-		limit: limit,
-		keys:  make([][]byte, 0, limit),
-		vals:  make([][]byte, 0, limit),
+		keys:  make([][]byte, 0, capacity),
+		vals:  make([][]byte, 0, capacity),
 	}
 }
 
-// full reports whether the limit has been reached.
-func (l *leafRange) full() bool {
-	return len(l.keys) >= l.limit
+// space returns the remaining capacity for the range.
+func (l *leafRange) space() int {
+	return cap(l.keys) - len(l.keys)
 }
 
-// append appends what the limit allows. kept below len(keys) means the leaves
-// were trimmed.
+// full reports whether the range's capacity has been reached.
+func (l *leafRange) full() bool {
+	return l.space() == 0
+}
+
+// append appends what the capacity allows. kept below len(keys) means the
+// leaves were trimmed.
 func (l *leafRange) append(keys, vals [][]byte) (kept int) {
-	kept = min(len(keys), l.limit-len(l.keys))
+	space := l.space()
+	kept = min(len(keys), space)
 	l.keys = append(l.keys, keys[:kept]...)
 	l.vals = append(l.vals, vals[:kept]...)
 	return kept
 }
 
-// add appends one leaf, ignoring the limit.
+// add appends a leaf, ignoring the capacity.
 func (l *leafRange) add(key, val []byte) {
 	l.keys = append(l.keys, key)
 	l.vals = append(l.vals, val)
@@ -353,6 +314,43 @@ func (l *leafRange) next() []byte {
 	next := slices.Clone(last)
 	incrementBytes(next)
 	return next
+}
+
+// fillFromSnapshot appends leaves from [leafRange.next] through end to r, up
+// to the capacity, serving from the snapshot where it agrees with the trie.
+// It returns whether the trie may hold leaves past the response.
+func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange, end []byte) (bool, error) {
+	next := r.next()
+	keys, vals, err := readSnapshot(
+		s,
+		common.BytesToHash(next),
+		common.BytesToHash(end),
+		r.space(),
+	)
+	if err != nil || len(keys) == 0 {
+		// Since the snapshot is volatile, an error or an empty read falls
+		// back to the trie.
+		return true, nil
+	}
+
+	// The whole read often proves in one shot, avoiding per-segment proofs.
+	valid, more, err := isRangeValid(
+		t,
+		&leafRange{
+			start: next,
+			keys:  keys,
+			vals:  vals,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	if valid {
+		r.append(keys, vals)
+		return more, nil
+	}
+
+	return fillFromSegments(t, r, keys, vals)
 }
 
 const segmentLen = 64
@@ -428,7 +426,7 @@ func withExclusiveEnd() fillOption {
 }
 
 // fillFromTrie appends trie leaves from [leafRange.next] through end to r, up
-// to the limit. [withExclusiveEnd] stops the fill before end instead. It
+// to the capacity. [withExclusiveEnd] stops the fill before end instead. It
 // returns whether the trie holds leaves past the response.
 func fillFromTrie(t *trie.Trie, r *leafRange, end []byte, opts ...fillOption) (bool, error) {
 	// While [trie.Trie.NodeIterator] documents that it starts iterating after

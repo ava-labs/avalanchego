@@ -840,7 +840,7 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 
 				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
 				leaves := newLeafRange(q.startKey, q.limit)
-				more, err := q.fillFromSnapshot(leaves)
+				more, err := fillFromSnapshot(q.snapshot, q.trie, leaves, q.endKey)
 				require.NoError(t, err)
 
 				require.False(t, more, "the snapshot must satisfy a whole-trie request")
