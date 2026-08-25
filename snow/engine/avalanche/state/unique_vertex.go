@@ -296,7 +296,8 @@ func (vtx *uniqueVertex) String() string {
 		vtx.ID(),
 		vtx.Status(),
 		len(parents),
-		len(txs))
+		len(txs),
+	)
 
 	parentFormat := fmt.Sprintf("\n    Parent[%s]: ID = %%s, Status = %%s", //nolint:perfsprint
 		formatting.IntFormat(len(parents)-1))
