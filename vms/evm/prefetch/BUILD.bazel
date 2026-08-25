@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "prefetch",
-    srcs = [
-        "bounded_workers.go",
-        "prefetch.go",
-    ],
+    srcs = ["prefetch.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/prefetch",
     visibility = ["//visibility:public"],
     deps = ["@com_github_ava_labs_libevm//core/state"],
