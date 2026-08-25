@@ -9,6 +9,13 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 )
 
+// WithConcurrentWorkers sets the maximum number of goroutines that trie
+// prefetching uses to load nodes.
+func WithConcurrentWorkers(prefetchers int) state.PrefetcherOption {
+	pool := newBoundedWorkers(prefetchers)
+	return state.WithWorkerPools(func() state.WorkerPool { return pool })
+}
+
 type boundedWorkers struct {
 	workerSpawner      chan struct{}
 	outstandingWorkers sync.WaitGroup
@@ -75,11 +82,4 @@ func (b *boundedWorkers) Done() {
 		close(b.work)
 	})
 	b.outstandingWorkers.Wait()
-}
-
-// WithConcurrentWorkers sets the maximum number of goroutines that trie
-// prefetching uses to load nodes.
-func WithConcurrentWorkers(prefetchers int) state.PrefetcherOption {
-	pool := newBoundedWorkers(prefetchers)
-	return state.WithWorkerPools(func() state.WorkerPool { return pool })
 }
