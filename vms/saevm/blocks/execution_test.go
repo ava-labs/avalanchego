@@ -190,13 +190,14 @@ func errAll(wants ...testerr.Want) testerr.Want {
 	})
 }
 
-// errIsNot requires the error to be non-nil and to NOT wrap `target`.
+// errIsNot requires that the error does NOT wrap `target`; a nil error
+// trivially satisfies this.
 func errIsNot(target error) testerr.Want {
 	return testerr.Func(func(got error) string {
-		if got != nil && !errors.Is(got, target) {
-			return ""
+		if errors.Is(got, target) {
+			return testerr.DiffMessage(got, "error that is not %v", target)
 		}
-		return testerr.DiffMessage(got, "non-nil error that is not %v", target)
+		return ""
 	})
 }
 
