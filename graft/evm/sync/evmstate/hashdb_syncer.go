@@ -39,17 +39,15 @@ type HashDBSyncer struct {
 	fetcher   types.LeafFetcher
 	db        ethdb.Database
 	root      common.Hash
-	codeQueue CodeProducer
-	trieQueue *trieQueue
-	stats     *trieSyncStats
-	threshold uint64 // leaf count above which a trie splits into segments
+	codeQueue CodeProducer // the engine owns its teardown, this syncer only feeds it
+	trieQueue *trieQueue   // durable storage-trie markers, so a restart resumes
+	threshold uint64       // leaf count above which a trie splits into segments
 
-	// scheduler owns the task channel and tracks what needs flushing on failure.
-	scheduler *trieScheduler
-
-	mainTrieDone chan struct{}
-	mainTrie     *stateTrie
-	completed    atomic.Bool
+	scheduler    *trieScheduler // tracks what needs flushing on failure
+	stats        *trieSyncStats
+	mainTrieDone chan struct{} // closed once the account trie is verified
+	mainTrie     *stateTrie    // nodes commit only after every storage trie is done
+	completed    atomic.Bool   // makes Finalize a no-op after a clean run
 }
 
 // NewHashDBSyncer syncs the account trie at root. codeQueue must drain concurrently
