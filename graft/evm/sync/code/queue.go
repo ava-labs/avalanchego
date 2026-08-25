@@ -14,15 +14,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 const defaultQueueCapacity = 5000
 
 var (
-	_ types.Finalizer = (*Queue)(nil)
-
 	ErrQueueClosed = errors.New("code queue is closed")
 )
 
@@ -97,13 +94,9 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 // AddCode persists code hashes as durable disk markers and enqueues them
 // for the forwarder goroutine. Never blocks the caller.
 // Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
-func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
+func (q *Queue) AddCode(codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
 	}
 
 	q.closeMu.RLock()
@@ -139,16 +132,15 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	return nil
 }
 
-// Finalize waits for all pending hashes to be sent, then closes out.
-// Blocks if no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
-func (q *Queue) Finalize() error {
+// DoneAdding waits for all pending hashes to be sent, then closes out. Blocks if
+// no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
+func (q *Queue) DoneAdding() {
 	q.stop(false)
-	return nil
 }
 
-// Shutdown cancels the forwarder, waits for exit, then closes out.
-// Unsent hashes are safe as disk markers and will be recovered on restart.
-// Idempotent with [Queue.Finalize].
+// Shutdown cancels the forwarder, waits for exit, then closes out.  Unsent
+// hashes are safe as disk markers and will be recovered on restart.  Idempotent
+// with [Queue.DoneAdding].
 func (q *Queue) Shutdown() {
 	q.stop(true)
 }
@@ -157,6 +149,13 @@ func (q *Queue) markClosed() {
 	q.closeMu.Lock()
 	defer q.closeMu.Unlock()
 	q.closed = true
+}
+
+// closeInput signals the forwarder that no more work is coming, at most once.
+func (q *Queue) closeInput() {
+	q.closeInOnce.Do(func() {
+		close(q.in)
+	})
 }
 
 // stop waits for in-flight AddCode calls (via write lock), optionally cancels
@@ -227,9 +226,7 @@ func (q *Queue) init() error {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
 
-	// context.Background: init runs during construction before sync starts,
-	// the queue is not closed yet so AddCode will always succeed.
-	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
+	if err := q.AddCode(dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
 
