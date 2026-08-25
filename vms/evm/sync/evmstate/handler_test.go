@@ -726,22 +726,23 @@ func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
 	require.Equal(t, c.vals, resp.Values)
 }
 
-// newSnapshotQuery opens a query over c's snapshot. The trie fallback hides the
-// snapshot from a response assertion, so these tests read it directly.
-func newSnapshotQuery(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int, endKey []byte) *query {
+// newSnapshotRequest opens a request over c's snapshot. The trie fallback
+// hides the snapshot from a response assertion, so these tests read it
+// directly.
+func newSnapshotRequest(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int, endKey []byte) *request {
 	t.Helper()
 	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-	q, appErr := newQuery(r, &syncpb.GetLeafRequest{
+	req, appErr := r.newRequest(&syncpb.GetLeafRequest{
 		RootHash:    c.root.Bytes(),
 		AccountHash: c.accountHash,
 		EndKey:      endKey,
 		KeyLimit:    uint32(keyLimit),
 	})
 	require.Nil(t, appErr)
-	return q
+	return req
 }
 
-func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
+func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
 	t.Parallel()
 
 	const numLeaves = 20
@@ -790,12 +791,12 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 					endKey = c.keys[tt.endAt-1]
 				}
 
-				q := newSnapshotQuery(t, trieDB, c, tt.keyLimit, endKey)
+				req := newSnapshotRequest(t, trieDB, c, tt.keyLimit, endKey)
 				keys, vals, err := readSnapshot(
-					q.snapshot,
-					common.BytesToHash(q.startKey),
-					common.BytesToHash(q.endKey),
-					q.limit,
+					req.snapshot,
+					common.BytesToHash(req.start),
+					common.BytesToHash(req.end),
+					req.limit,
 				)
 				require.ErrorIs(t, err, tt.iterErr)
 
@@ -810,7 +811,7 @@ func TestQuery_ReadsSnapshotLeaves(t *testing.T) {
 	}
 }
 
-func TestQuery_SnapshotFillsResponse(t *testing.T) {
+func TestRequest_SnapshotFillsResponse(t *testing.T) {
 	t.Parallel()
 
 	const numLeaves = segmentedLeaves
@@ -838,9 +839,9 @@ func TestQuery_SnapshotFillsResponse(t *testing.T) {
 				c := kind.build(t, trieDB, numLeaves)
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
 
-				q := newSnapshotQuery(t, trieDB, c, numLeaves, nil)
-				leaves := newLeafRange(q.startKey, q.limit)
-				more, err := fillFromSnapshot(q.snapshot, q.trie, leaves, q.endKey)
+				req := newSnapshotRequest(t, trieDB, c, numLeaves, nil)
+				leaves := newLeafRange(req.start, req.limit)
+				more, err := fillFromSnapshot(req.snapshot, req.trie, leaves, req.end)
 				require.NoError(t, err)
 
 				require.False(t, more, "the snapshot must satisfy a whole-trie request")

@@ -70,8 +70,8 @@ func WithSnapshot[V any, P SnapshotPointer[V]](s P) HandlerOption {
 	})
 }
 
-func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
-	q, appErr := newQuery(r, req)
+func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, reqPB *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+	req, appErr := r.newRequest(reqPB)
 	if appErr != nil {
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
@@ -79,22 +79,11 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 		)
 		return nil, appErr
 	}
-	resp, err := q.collect()
+	resp, err := getLeaves(req)
 	if err != nil {
 		return nil, handlers.Fault(r.log, nodeID, err)
 	}
 	return resp, nil
-}
-
-// query holds the read-only inputs of a request.
-type query struct {
-	startKey []byte
-	endKey   []byte
-	limit    int
-
-	snapshot trieSnapshot
-	trie     *trie.Trie
-	minKey   []byte
 }
 
 // MaxLeavesLimit caps leaves per response.
@@ -139,14 +128,26 @@ var (
 	}
 )
 
-// newQuery opens the requested trie and returns the per-request query, or the
-// rejection for a malformed or unservable req.
-func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppError) {
-	start := req.GetStartKey()
+// request holds the parsed read-only inputs of a [syncpb.GetLeafRequest] and
+// the state opened to serve them.
+type request struct {
+	start []byte
+	end   []byte
+	limit int
+
+	snapshot trieSnapshot
+	trie     *trie.Trie
+	minKey   []byte
+}
+
+// newRequest opens the requested trie and returns the parsed request, or the
+// rejection for a malformed or unservable reqPB.
+func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacommon.AppError) {
+	start := reqPB.GetStartKey()
 	if len(start) == 0 {
 		start = r.minKey
 	}
-	end := req.GetEndKey()
+	end := reqPB.GetEndKey()
 	if len(end) == 0 {
 		end = r.maxKey
 	}
@@ -160,12 +161,12 @@ func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppE
 		return nil, errStartAfterEnd
 	}
 
-	limit := req.GetKeyLimit()
+	limit := reqPB.GetKeyLimit()
 	if limit == 0 {
 		return nil, errZeroKeyLimit
 	}
 
-	account := req.GetAccountHash()
+	account := reqPB.GetAccountHash()
 	if len(account) != 0 && len(account) != common.HashLength {
 		return nil, errWrongAccountHashLength
 	}
@@ -184,7 +185,7 @@ func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppE
 		}
 	}
 
-	rootBytes := req.GetRootHash()
+	rootBytes := reqPB.GetRootHash()
 	if len(rootBytes) != common.HashLength {
 		return nil, errWrongRootLength
 	}
@@ -200,10 +201,10 @@ func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppE
 	if err != nil {
 		return nil, errRootNotFound
 	}
-	return &query{
-		startKey: start,
-		endKey:   end,
-		limit:    int(min(limit, MaxLeavesLimit)),
+	return &request{
+		start: start,
+		end:   end,
+		limit: int(min(limit, MaxLeavesLimit)),
 
 		snapshot: snap,
 		trie:     t,
@@ -211,15 +212,15 @@ func newQuery(r *responder, req *syncpb.GetLeafRequest) (*query, *avacommon.AppE
 	}, nil
 }
 
-// collect returns the response holding the leaf range and its proof.
-func (q *query) collect() (*syncpb.GetLeafResponse, error) {
-	r := newLeafRange(q.startKey, q.limit)
-	more, err := fillFromSnapshot(q.snapshot, q.trie, r, q.endKey)
+// getLeaves returns the response holding the leaf range and its proof.
+func getLeaves(req *request) (*syncpb.GetLeafResponse, error) {
+	r := newLeafRange(req.start, req.limit)
+	more, err := fillFromSnapshot(req.snapshot, req.trie, r, req.end)
 	if err != nil {
 		return nil, err
 	}
 	if more && !r.full() {
-		more, err = fillFromTrie(q.trie, r, q.endKey)
+		more, err = fillFromTrie(req.trie, r, req.end)
 		if err != nil {
 			return nil, err
 		}
@@ -231,11 +232,11 @@ func (q *query) collect() (*syncpb.GetLeafResponse, error) {
 	}
 	// [trie.VerifyRangeProof] allows an empty proof when proving a full trie.
 	// This uses less bandwidth and is faster to verify.
-	if bytes.Equal(q.startKey, q.minKey) && !more {
+	if bytes.Equal(req.start, req.minKey) && !more {
 		return resp, nil
 	}
 
-	proofDB, err := newRangeProof(q.trie, q.startKey, r.keys)
+	proofDB, err := newRangeProof(req.trie, req.start, r.keys)
 	if err != nil {
 		return nil, err
 	}
