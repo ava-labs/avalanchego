@@ -25,7 +25,8 @@ var (
 // Fetcher reads a range of leaves from the network. An implementation may
 // re-request internally, so a returned error is terminal and ctx bounds the retries.
 type Fetcher interface {
-	// FetchLeaves reports whether the trie holds more keys past the returned range.
+	// FetchLeaves returns leaves already proven against the range's root, in
+	// ascending key order, and reports whether the trie holds more past them.
 	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error)
 }
 
@@ -115,8 +116,8 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}
 
-		// Keys ascend, so the first one past [End()] bounds the run. Cutting any
-		// of them means the task's range is exhausted.
+		// The request carries no end key, so bound the response here. [Fetcher]
+		// returns ascending keys, so the first past [SyncTask.End] ends the run.
 		done := false
 		if end := task.End(); end != nil {
 			n := sort.Search(len(leaves.Keys), func(i int) bool {

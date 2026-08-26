@@ -26,7 +26,8 @@ func newTestSyncer(f Fetcher) *CallbackSyncer {
 	return NewCallbackSyncer(f, nil, &SyncerConfig{RequestSize: 16})
 }
 
-// batchFetcher serves the same batch twice, more set on the first.
+// batchFetcher serves the same keys and values on every call, reporting more
+// leaves only on the first, so a task takes exactly two batches.
 type batchFetcher struct {
 	keys, vals [][]byte
 	err        error
@@ -71,7 +72,7 @@ func (t *recordingTask) OnLeafs(_ context.Context, keys, vals [][]byte) error {
 	return nil
 }
 
-// mutatingTask retains and increments the last key, as [evmstate.trieSegment] does.
+// mutatingTask retains and increments the last key.
 type mutatingTask struct {
 	recordingTask
 	pos []byte
@@ -85,6 +86,8 @@ func (t *mutatingTask) OnLeafs(_ context.Context, keys, _ [][]byte) error {
 	return nil
 }
 
+// Regression for a skipped key: the task increments the last key in place, so
+// the driver must not increment that same slice a second time.
 func TestSyncTaskAdvancesOnePastLastKey(t *testing.T) {
 	t.Parallel()
 
@@ -183,7 +186,6 @@ func TestSyncTaskOnStart(t *testing.T) {
 		name     string
 		skip     bool
 		startErr error
-		wantErr  error
 	}{
 		{
 			name: "skip_completes_the_task",
@@ -192,7 +194,6 @@ func TestSyncTaskOnStart(t *testing.T) {
 		{
 			name:     "error_stops_the_task",
 			startErr: errStart,
-			wantErr:  errStart,
 		},
 	}
 
@@ -209,7 +210,7 @@ func TestSyncTaskOnStart(t *testing.T) {
 				startErr: tt.startErr,
 			}
 
-			require.ErrorIs(t, newTestSyncer(fetcher).syncTask(t.Context(), task), tt.wantErr)
+			require.ErrorIs(t, newTestSyncer(fetcher).syncTask(t.Context(), task), tt.startErr)
 			require.Empty(t, fetcher.starts)
 			require.Empty(t, task.gotKeys)
 			require.False(t, task.finished)
