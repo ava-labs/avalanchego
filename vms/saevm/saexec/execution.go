@@ -143,11 +143,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	// StartPrefetcher does nothing without a snapshot. Firewood runs without
-	// one, because prefetching wouldn't help it anyway.
-	//
-	// The commit in [Executor.afterExecution] also stops the prefetcher, but
-	// only on the happy path; this covers every path that returns first.
+
 	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
 	defer stateDB.StopPrefetcher()
 
