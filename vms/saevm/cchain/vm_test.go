@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"math"
 	"math/big"
@@ -121,6 +122,7 @@ type (
 		chainDataDir string
 		state        snow.State
 		upgrades     upgrade.Config
+		log          logging.Logger
 
 		skipRPCTransport bool
 	}
@@ -267,6 +269,23 @@ func withCommitInterval(n uint64) sutOption {
 	})
 }
 
+// withLogger overrides the [logging.Logger] installed in the SUT's
+// [snow.Context]. The default [loggingtest.Logger] doesn't implement
+// [logging.Logger.SetLevel], so tests exercising [config.LogLevel] must
+// provide a logger that does.
+func withLogger(log logging.Logger) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.log = log
+	})
+}
+
+// withLogLevel sets [config.LogLevel] on the SUT.
+func withLogLevel(lvl logging.Level) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.LogLevel = &lvl
+	})
+}
+
 // withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
 // true.
 func withStateSyncDisabled() sutOption {
@@ -307,7 +326,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	sut, err := tryNewSUT(tb, opts...)
 	require.NoError(tb, err, "tryNewSUT()")
-	return sut.logger.CancelOnError(tb.Context()), sut
+	ctx := tb.Context()
+	if sut.logger != nil { // nil when overridden via [withLogger]
+		ctx = sut.logger.CancelOnError(ctx)
+	}
+	return ctx, sut
 }
 
 // tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
@@ -357,7 +380,14 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
-	log := loggingtest.New(tb, logging.Debug)
+	ctx := tb.Context()
+	var testLog *loggingtest.Logger
+	log := cfg.log
+	if log == nil {
+		testLog = loggingtest.New(tb, logging.Debug)
+		ctx = testLog.CancelOnError(ctx)
+		log = testLog
+	}
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
@@ -372,7 +402,6 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	validatorIDs := cfg.validators.NodeIDs()
 	appSender := saetest.NewSender(tb, validatorIDs)
 
-	ctx := log.CancelOnError(tb.Context())
 	if err := vm.Initialize(
 		ctx,
 		snowCtx,
@@ -410,7 +439,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		sender:         appSender,
 		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
 		clock:          cfg.clock,
-		logger:         log,
+		logger:         testLog,
 	}
 
 	// Called from [SUT.SetState].
@@ -972,6 +1001,24 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 	_, overflow := op(&balance, &delta)
 	require.Falsef(tb, overflow, "addNAVAX(%s, %d) overflows uint256", balance, nAVAXDelta)
 	return balance
+}
+
+// nopWriteCloser adds a no-op Close to an [io.Writer] so it can back a
+// [logging.WrappedCore].
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }
+
+func TestInitializeLogLevel(t *testing.T) {
+	log := logging.NewLogger("", logging.NewWrappedCore(
+		logging.Info,
+		nopWriteCloser{io.Discard},
+		logging.Plain.ConsoleEncoder(),
+	))
+	require.Falsef(t, log.Enabled(logging.Debug), "%T.Enabled(%s) before Initialize with default level %s", log, logging.Debug, logging.Info)
+
+	newSUT(t, withLogger(log), withLogLevel(logging.Debug))
+	require.Truef(t, log.Enabled(logging.Debug), "%T.Enabled(%s) after Initialize with log-level=%s", log, logging.Debug, logging.Debug)
 }
 
 // TestExport exercises the cchain VM end-to-end with an Export tx.
