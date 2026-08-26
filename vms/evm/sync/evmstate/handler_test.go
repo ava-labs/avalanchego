@@ -37,6 +37,11 @@ func TestErrorSentinels(t *testing.T) {
 	})
 }
 
+func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
+	tb.Helper()
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
+}
+
 func TestResponder_AppErrors(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
@@ -515,9 +520,4 @@ func TestFillFromSnapshot_ServesHistoricalRootFromDiskLayer(t *testing.T) {
 	require.Equal(t, keys, r.keys)
 	require.Equal(t, vals, r.vals)
 	require.False(t, more)
-}
-
-func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
-	tb.Helper()
-	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
 }
