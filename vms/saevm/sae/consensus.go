@@ -65,7 +65,12 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		return errUnverifiedBlock
 	}
 
-	settles := b.Settles()
+	settles, err := b.Settles()
+	if err != nil {
+		// Settlement is consensus-critical so a block of unknown settlement
+		// MUST NOT be accepted as if it settles nothing.
+		return fmt.Errorf("determining blocks settled by %#x: %w", b.Hash(), err)
+	}
 	{
 		batch := vm.db.NewBatch()
 

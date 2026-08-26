@@ -77,9 +77,30 @@ func (b *Block) ParentBlock() *Block {
 	return p
 }
 
+// settledHeight returns the height of the block that b settles, as recorded in
+// its header. A synchronous block settles itself, mirroring [Block.LastSettled]
+// returning b, because the settlement marker of such a block is the zero value
+// and hence conveys no height.
+func (b *Block) settledHeight() uint64 {
+	if b.Synchronous() {
+		return b.Height()
+	}
+	return b.hooks.SettledBy(b.Header()).Height
+}
+
 // LastSettled returns the last-settled block at the time of b's acceptance.
-// If [Block.MarkSettled] has been called on any block in the chain between b
-// and the last-settled block, LastSettled returns nil and logs an error.
+//
+// Settlement never regresses, so if an ancestor of b has already been settled at
+// a height above the one recorded in b's header, that ancestor is returned
+// instead; the ancestry of a settled block is severed so it is, by definition,
+// the furthest that the lookback can reach. This is the case for every block
+// building on the last pre-SAE block, which is restored in a settled state at a
+// mid-chain transition to SAE.
+//
+// If [Block.MarkSettled] has been called on b itself, LastSettled returns nil
+// and logs an error. It also returns nil, without logging, if the ancestry
+// between b and the last-settled block is incomplete, which is only possible for
+// a [Block] that hasn't had its parent set (see [Block.CopyParentFrom]).
 //
 // Note that this value might not be distinct between contiguous blocks. If the
 // block is synchronous, LastSettled always returns b itself, without logging.
@@ -95,9 +116,22 @@ func (b *Block) LastSettled() *Block {
 		}
 		return nil
 	}
+	return b.lastSettledFrom(parent)
+}
 
-	settledHeight := b.hooks.SettledBy(b.Header()).Height
+// lastSettledFrom is the implementation of [Block.LastSettled] for a non-
+// synchronous block with the specified (non-nil) parent.
+func (b *Block) lastSettledFrom(parent *Block) *Block {
+	settledHeight := b.settledHeight()
 	for parent.Height() > settledHeight {
+		// Settlement never regresses so an already-settled ancestor is the
+		// last-settled block, irrespective of b claiming to settle a lower one.
+		// This clamps the lookback at the last pre-SAE block, which is restored
+		// in a settled state at a mid-chain transition and hence has a severed
+		// ancestry.
+		if parent.Settled() {
+			return parent
+		}
 		parent = parent.ParentBlock() // a settled intermediate logs for itself
 		if parent == nil {
 			return nil
@@ -107,22 +141,51 @@ func (b *Block) LastSettled() *Block {
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by
-// consensus. If `x` is the block height of the `b.ParentBlock().LastSettled()`
-// and `y` is the height of the `b.LastSettled()`, then Settles returns the
-// contiguous, half-open range (x,y] or an empty slice i.f.f. x==y. Every block
-// therefore returns a disjoint (and possibly empty) set of historical blocks.
+// consensus. If `x` is the settled height recorded in the header of
+// `b.ParentBlock()` and `y` is the height of the `b.LastSettled()`, then Settles
+// returns the contiguous, half-open range (x,y] or an empty slice i.f.f. x==y.
+// Every block therefore returns a disjoint (and possibly empty) set of
+// historical blocks.
 //
-// It is not valid to call Settles after a call to [Block.MarkSettled] on either
-// b or its parent. If the block is synchronous, Settles always returns a
-// single-element slice of `b` itself.
-func (b *Block) Settles() []*Block {
+// The recorded height `x` is equivalent to `b.ParentBlock().LastSettled()`
+// without the ancestry walk, and remains valid even once the parent's own
+// ancestry has been severed (e.g. it was restored by [RestoreSettledBlock]).
+// Unlike [Block.LastSettled] it is not clamped at an already-settled ancestor
+// because block verification guarantees that the recorded height is that of the
+// first settled block found when walking up from the parent, hence never below
+// it; see the use of [LastToSettleAt] by, and the settled-height check in, the
+// VM's block verification.
+//
+// An error is returned i.f.f. the last-settled block can't be determined, which
+// is a broken invariant of the caller: it is not valid to call Settles after a
+// call to [Block.MarkSettled] on either b or its parent, nor on a [Block] that
+// hasn't had its parent set. As settlement is consensus-critical, the error MUST
+// be treated as fatal rather than as "nothing to settle".
+//
+// If the block is synchronous, Settles always returns a single-element slice of
+// `b` itself, and every block that would settle such a block therefore settles
+// nothing.
+func (b *Block) Settles() ([]*Block, error) {
 	if b.Synchronous() {
-		return []*Block{b}
+		return []*Block{b}, nil
 	}
-	return Range(
-		b.hooks.SettledBy(b.ParentBlock().Header()).Height,
-		b.LastSettled(),
-	)
+
+	parent := b.ParentBlock() // logs if b was settled
+	if parent == nil {
+		return nil, fmt.Errorf("%w: parent of block %d", errIncompleteBlockHistory, b.Height())
+	}
+
+	end := b.lastSettledFrom(parent)
+	switch {
+	case end == nil:
+		return nil, fmt.Errorf("%w: ancestry of block %d", errIncompleteBlockHistory, b.Height())
+	case end.Settled():
+		// A settled block can't be settled again, i.e. x==y. This is the case
+		// for all blocks settling the last pre-SAE block, which settles itself
+		// at a mid-chain transition.
+		return nil, nil
+	}
+	return Range(parent.settledHeight(), end), nil
 }
 
 // Range returns the blocks in the continuous, half-open interval (start, end]

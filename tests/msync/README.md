@@ -293,6 +293,41 @@ Maintenance note:
 - if tmpnet, the health details, or C-Chain sync metrics change, the evidence checks in this harness
   may need to be updated even when the underlying bootstrap behavior is still correct
 
+### Mid-chain transition mode
+
+A positive `--activate-latest-after` starts the chain on coreth and schedules
+Helicon after network start, so the run exercises the coreth-to-SAE
+transition itself. The harness then validates **two** bootstrap scenarios
+against the transitioned network:
+
+1. a fresh node, which must transition eagerly during `Initialize` (its
+   genesis predates the transition time) and state sync via the SAE C-Chain;
+2. a node seeded with pre-transition shared state and no transition marker —
+   captured from the generation node during the coreth era — started with
+   `state-sync-enabled: true`, which must also transition eagerly and sync a
+   summary above its pre-transition head instead of resuming execution.
+
+Phase order: start the generation node with Helicon at now+Δ → issue
+transfers so pre-transition blocks exist → stop the node, copy `db/` +
+`chainData/` aside as the partial seed, restart it → force blocks until the
+C-Chain reports the SAE VM's health details (coreth reports none), issuing
+the forcing transfers over HTTP and not waiting on their receipts, since
+transitionvm's API drain cannot protect a long-lived WebSocket connection
+across the transition → run the normal workload, serving restart, and
+summary refresh → validate both bootstrap scenarios.
+
+Δ must cover node startup plus the coreth-era transfers and seed capture;
+the harness fails with "increase --activate-latest-after" if the node
+transitions before the seed is captured. `--activate-latest-after=90s` is a
+comfortable local value:
+
+```bash
+task tests:merkle-sync:e2e -- --activate-latest-after=90s
+```
+
+With `--state-scheme=firewood` the SAE C-Chain cannot sync, so the
+partial-bootstrap scenario is skipped along with the usual sync assertions.
+
 ## Current limitations
 
 This harness currently generates state from scratch during the run.

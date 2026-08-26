@@ -96,8 +96,9 @@ func (bb *blockBuilder) newFromHooks(tb testing.TB, num, sec uint64, parent *Blo
 // newChain returns a chain of blocks with heights in [startHeight,
 // startHeight+total) and build times equal to their heights. The
 // lastSettledAtHeight map determines each block's last-settled block; a
-// self-settling entry (only valid for the genesis) results in a synchronous
-// block that is marked as settled.
+// self-settling entry (only valid for the first block of the chain, i.e. the
+// genesis or the last pre-SAE block at a transition boundary) results in a
+// synchronous block that is marked as settled.
 func (bb *blockBuilder) newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
@@ -117,7 +118,7 @@ func (bb *blockBuilder) newChain(tb testing.TB, startHeight, total uint64, lastS
 		)
 		if s, ok := lastSettledAtHeight[n]; ok {
 			if s == n {
-				require.Zero(tb, s, "Only genesis block is self-settling")
+				require.Equal(tb, startHeight, s, "Only the first block of the chain is self-settling")
 				synchronous = true
 			} else {
 				require.Less(tb, s, n, "Last-settled height MUST be <= current height")

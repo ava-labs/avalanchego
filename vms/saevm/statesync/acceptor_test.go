@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -91,6 +93,35 @@ func TestAcceptSummarySkips(t *testing.T) {
 			mode, err := sh.AcceptSummary(t.Context(), s)
 			require.NoErrorf(t, err, "%T.AcceptSummary()", sh)
 			require.Equalf(t, block.StateSyncSkipped, mode, "%T.AcceptSummary()", sh)
+		})
+	}
+}
+
+// TestShouldAcceptSummaryHeights verifies the accept decision is a strict
+// height comparison against local accepted state: only a summary ahead of the
+// local head is worth syncing to. There is deliberately no minimum-distance
+// threshold; see the comment in shouldAcceptSummary.
+func TestShouldAcceptSummaryHeights(t *testing.T) {
+	vm := newVM(t)
+	vm.acceptBlocks(t, defaultCommitInterval)
+	local := vm.lastAcceptedBlock(t).Height()
+	require.Equalf(t, uint64(defaultCommitInterval), local, "%T.lastAcceptedBlock().Height()", vm)
+
+	tests := []struct {
+		name   string
+		height uint64
+		want   bool
+	}{
+		{name: "genesis_summary", height: 0, want: false},
+		{name: "below_local_height", height: local - 1, want: false},
+		{name: "at_local_height", height: local, want: false},
+		{name: "above_local_height", height: local + defaultCommitInterval, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := vm.summaryHandler.ShouldAcceptSummary(NewSummary(ethcommon.Hash{0x01}, tt.height))
+			require.NoErrorf(t, err, "ShouldAcceptSummary(height=%d)", tt.height)
+			require.Equalf(t, tt.want, got, "ShouldAcceptSummary(height=%d)", tt.height)
 		})
 	}
 }
@@ -266,4 +297,84 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
 		})
 	})
+}
+
+// TestStateSyncWipesStaleSnapshot plants snapshot content in the client's
+// database — as a pre-transition chain interrupted mid-generation would leave
+// behind after an eager transition — and verifies the sync removes it so
+// post-sync snapshot reads cannot be served from stale layers.
+func TestStateSyncWipesStaleSnapshot(t *testing.T) {
+	t.Parallel()
+
+	const numBlocks = defaultCommitInterval + 2
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, numBlocks)
+
+	xdb := saetest.NewExecutionResultsDB()
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db), withXDB(xdb))
+
+	staleRoot := ethcommon.Hash{0xde, 0xad}
+	staleAccount := ethcommon.Hash{0xaa}
+	staleSlot := ethcommon.Hash{0xbb}
+	rawdb.WriteSnapshotRoot(client.sutEnv.db, staleRoot)
+	rawdb.WriteAccountSnapshot(client.sutEnv.db, staleAccount, []byte{0x01})
+	rawdb.WriteStorageSnapshot(client.sutEnv.db, staleAccount, staleSlot, []byte{0x02})
+
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(t.Context())
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+	require.Emptyf(t, rawdb.ReadAccountSnapshot(client.sutEnv.db, staleAccount), "stale account snapshot after sync")
+	require.Emptyf(t, rawdb.ReadStorageSnapshot(client.sutEnv.db, staleAccount, staleSlot), "stale storage snapshot after sync")
+	require.NotEqualf(t, staleRoot, rawdb.ReadSnapshotRoot(client.sutEnv.db), "stale snapshot root after sync")
+}
+
+// TestShouldWipeSnapshot verifies the resume guard in isolation: a snapshot
+// wipe is skipped only when a sync already in progress for exactly the
+// target root has left resumable leaves behind, per the contract documented
+// on [evmstate.NewHashDBSyncer].
+func TestShouldWipeSnapshot(t *testing.T) {
+	t.Parallel()
+
+	targetRoot := ethcommon.Hash{0x01}
+	otherRoot := ethcommon.Hash{0x02}
+
+	tests := []struct {
+		name          string
+		persistedRoot *ethcommon.Hash // nil means no persisted sync root
+		want          bool
+	}{
+		{
+			name:          "no_persisted_root",
+			persistedRoot: nil,
+			want:          true,
+		},
+		{
+			name:          "different_persisted_root",
+			persistedRoot: &otherRoot,
+			want:          true,
+		},
+		{
+			name:          "equal_persisted_root",
+			persistedRoot: &targetRoot,
+			want:          false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			db := rawdb.NewMemoryDatabase()
+			if tt.persistedRoot != nil {
+				require.NoErrorf(t, customrawdb.WriteSyncRoot(db, *tt.persistedRoot), "customrawdb.WriteSyncRoot()")
+			}
+
+			got, err := shouldWipeSnapshot(db, targetRoot)
+			require.NoErrorf(t, err, "shouldWipeSnapshot(%v)", targetRoot)
+			require.Equalf(t, tt.want, got, "shouldWipeSnapshot(%v)", targetRoot)
+		})
+	}
 }

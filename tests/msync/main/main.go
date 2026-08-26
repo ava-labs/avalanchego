@@ -116,6 +116,11 @@ var (
 	// --activate-latest-after in main before the network is configured.
 	saeCChain bool
 
+	// midChainTransition reports whether the network starts on coreth and
+	// transitions to the SAE VM mid-run. Derived from --activate-latest-after
+	// in main before the network is configured.
+	midChainTransition bool
+
 	// stateSyncSupported reports whether the C-Chain serving this run can state
 	// sync the requested state scheme. It drives both whether the bootstrap node
 	// is configured to sync and whether the sync is asserted: a run whose scheme
@@ -398,12 +403,19 @@ func main() {
 	stateSyncSupported = !saeCChain || stateScheme == rawdb.HashScheme
 	assertSyncMetrics = !saeCChain
 
+	// A positive --activate-latest-after schedules Helicon after network
+	// start, so the chain begins on coreth and transitions mid-run. This mode
+	// additionally validates that nodes joining after the transition state
+	// sync via the SAE C-Chain instead of full-bootstrapping.
+	midChainTransition = flagVars.ActivateLatestAfter() > 0
+
 	var schemeErr error
 	schemeConfig, schemeErr = newStateSchemeConfig(stateScheme)
 	require.NoError(schemeErr, "newStateSchemeConfig()")
 	log.Info("configuring merkle sync harness",
 		zap.String("stateScheme", stateScheme),
 		zap.Bool("saeCChain", saeCChain),
+		zap.Bool("midChainTransition", midChainTransition),
 		zap.Bool("stateSyncSupported", stateSyncSupported),
 		zap.Bool("assertSyncMetrics", assertSyncMetrics),
 		zap.Duration("activateLatestAfter", flagVars.ActivateLatestAfter()),
@@ -434,6 +446,14 @@ func main() {
 	servingNode := network.Nodes[1]
 	require.NoError(startGenerationNode(tc, network, generationNode))
 
+	var (
+		partialSeedDir    string
+		preTransitionHead uint64
+	)
+	if midChainTransition {
+		partialSeedDir, preTransitionHead = runCorethEraPhase(tc, network, generationNode)
+	}
+
 	pathsToMeasure := statePaths(generationNode)
 	initialSize, err := totalSize(pathsToMeasure...)
 	require.NoError(err)
@@ -450,7 +470,17 @@ func main() {
 
 	contracts := deployContracts(tc, client, chainID, fundingKey)
 	requireGasLimitsFitBlock(tc, client)
+	fundingAddr := crypto.PubkeyToAddress(fundingKey.ToECDSA().PublicKey)
+	nonceBeforeExport, err := client.PendingNonceAt(tc.DefaultContext(), fundingAddr)
+	require.NoError(err)
 	issueAtomicExportTx(tc, network, fundingKey)
+	// The export consumes an EVM nonce, but the executed state exposing that
+	// nonce can lag the tx's acceptance. Wait for it so the first workload tx
+	// doesn't reuse the export's nonce and get dropped from the pool.
+	require.Eventually(func() bool {
+		nonce, err := client.PendingNonceAt(tc.DefaultContext(), fundingAddr)
+		return err == nil && nonce > nonceBeforeExport
+	}, 30*time.Second, 100*time.Millisecond, "export tx nonce not reflected in pending state")
 	snapshot := generateWorkload(tc, client, chainID, fundingKey, transferRecipient, contracts, pathsToMeasure, initialSize, initialRecipientBalance)
 
 	require.NoError(stopNode(generationNode))
@@ -472,6 +502,19 @@ func main() {
 		// bootstrap helper's cleanup runs. Clearing the URI avoids a best-effort
 		// metrics snapshot against an already-stopped node during cleanup.
 		bootstrapNode.URI = ""
+
+		switch {
+		case midChainTransition && stateSyncSupported:
+			partialNode := checkPartialBootstrap(tc, network, partialSeedDir, preTransitionHead, expectedSummaryHeight)
+			partialClient := newWSClient(tc, []*tmpnet.Node{partialNode})
+			validatePostBootstrapState(tc, partialClient, snapshot, contracts)
+			// See the equivalent comment on bootstrapNode above.
+			partialNode.URI = ""
+		case midChainTransition:
+			tc.Log().Warn("skipping the partial-bootstrap scenario; the C-Chain cannot state sync the requested state scheme",
+				zap.String("stateScheme", stateScheme),
+			)
+		}
 	}
 }
 
@@ -618,6 +661,87 @@ func copyDir(sourceRoot string, targetRoot string) error {
 	})
 }
 
+// runCorethEraPhase drives the pre-transition (coreth) era of a mid-chain
+// transition run: it issues transfers so the chain has pre-transition blocks,
+// captures a copy of the generation node's shared state as the seed for the
+// partial-bootstrap scenario, restarts the node, and forces blocks until the
+// C-Chain transitions to the SAE VM. Blocks are only built when transactions
+// are issued, so the chain cannot cross the transition time on its own.
+//
+// It returns the seed directory and the head height recorded in the seed.
+func runCorethEraPhase(tc tests.TestContext, network *tmpnet.Network, generationNode *tmpnet.Node) (string, uint64) {
+	require := require.New(tc)
+	tc.By("driving the coreth era and capturing a partial-bootstrap seed")
+
+	client := newWSClient(tc, []*tmpnet.Node{generationNode})
+	chainID, err := client.ChainID(tc.DefaultContext())
+	require.NoError(err)
+	fundingKey := network.PreFundedKeys[0]
+	transferRecipient := crypto.PubkeyToAddress(network.PreFundedKeys[1].ToECDSA().PublicKey)
+
+	// A couple of accepted blocks make the seed a genuinely partial bootstrap
+	// rather than a fresh database.
+	var preTransitionHead uint64
+	for range 2 {
+		preTransitionHead = issueTransfer(tc, client, chainID, fundingKey, transferRecipient, big.NewInt(0))
+	}
+	require.Positive(preTransitionHead, "expected pre-transition blocks")
+
+	// The seed must not contain the transition. The generation node is the
+	// only validator, so no blocks are built while it is stopped and the
+	// capture cannot race the transition time.
+	require.NoError(stopNode(generationNode))
+	seedDir := filepath.Join(network.Dir, "partial-seed")
+	for _, relativePath := range []string{"db", "chainData"} {
+		require.NoError(copyDir(
+			filepath.Join(generationNode.DataDir, relativePath),
+			filepath.Join(seedDir, relativePath),
+		))
+	}
+	require.NoError(startNodes(tc, network, generationNode))
+
+	// Both the seed and the restarted node must still be on coreth, or
+	// --activate-latest-after was too short for this environment.
+	reply, err := tmpnet.CheckNodeHealth(tc.DefaultContext(), generationNode.URI)
+	require.NoError(err)
+	require.False(cChainTransitioned(reply), "the generation node transitioned before the seed was captured; increase --activate-latest-after")
+
+	// An HTTP client, not a WS one, drives the forcing transfers below.
+	// transitionvm's httpHandlers.Block()/Drain() gate ordinary per-request
+	// HTTP calls across the transition, but, per the "blocking API requests"
+	// comment in vms/transitionvm/vm.go, cannot do the same for a long-lived
+	// connection: "Websockets are long-lived connections which are not able
+	// to be gracefully terminated during the transition. This means that
+	// websocket connections can (and will) cause this to timeout during the
+	// transition." A transfer submitted over a WS connection during the
+	// drain window is accepted by the pre-transition VM's mempool but then
+	// silently lost when that VM shuts down, hanging any caller waiting on
+	// its receipt.
+	transitionClient := newHTTPClient(tc, generationNode)
+	deadline := time.Now().Add(flagVars.ActivateLatestAfter() + e2e.DefaultTimeout)
+	for {
+		reply, err := tmpnet.CheckNodeHealth(tc.DefaultContext(), generationNode.URI)
+		require.NoError(err)
+		if cChainTransitioned(reply) {
+			break
+		}
+		require.False(time.Now().After(deadline), "C-Chain did not transition to the SAE VM in time")
+		// Fire-and-forget: waiting for the receipt here would reintroduce the
+		// WS hang above (an HTTP send right before "blocking API requests"
+		// can still be lost the same way). A transfer lost to that narrow
+		// pre-Block() race is superseded by the next iteration's, which
+		// re-reads the nonce via PendingNonceAt against whichever VM answers
+		// it next.
+		sendTransfer(tc, transitionClient, chainID, fundingKey, transferRecipient, big.NewInt(0))
+		time.Sleep(time.Second)
+	}
+	tc.Log().Info("C-Chain transitioned to the SAE VM",
+		zap.Uint64("preTransitionHead", preTransitionHead),
+		zap.String("seedDir", seedDir),
+	)
+	return seedDir, preTransitionHead
+}
+
 // refreshStateSummaries advances the restarted serving topology past a fresh
 // state sync summary boundary and returns that boundary, which the bootstrap
 // node is expected to sync at or above.
@@ -721,6 +845,18 @@ func newWSClient(tc tests.TestContext, nodes []*tmpnet.Node) *ethclient.Client {
 	}
 
 	client, err := ethclient.Dial(wsURIs[0])
+	require.NoError(err)
+	return client
+}
+
+// newHTTPClient returns an ethclient.Client connected to the given node's
+// C-Chain RPC endpoint over HTTP. Unlike newWSClient's long-lived connection,
+// each call is a discrete HTTP request, which lets transitionvm's
+// httpHandlers.Block()/Drain() gate it during a VM transition; see the
+// transitionClient comment in runCorethEraPhase.
+func newHTTPClient(tc tests.TestContext, node *tmpnet.Node) *ethclient.Client {
+	require := require.New(tc)
+	client, err := ethclient.Dial(node.URI + "/ext/bc/" + blockchainID + "/rpc")
 	require.NoError(err)
 	return client
 }
@@ -933,6 +1069,26 @@ func issueTransfer(
 	amount *big.Int,
 ) uint64 {
 	require := require.New(tc)
+	signedTx := sendTransfer(tc, client, chainID, fundingKey, to, amount)
+
+	receipt, err := bind.WaitMined(tc.DefaultContext(), client, signedTx)
+	require.NoError(err)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+	return receipt.BlockNumber.Uint64()
+}
+
+// sendTransfer builds, signs, and submits a transfer transaction, without
+// waiting for it to be mined. See issueTransfer for a variant that also waits
+// for the transaction's receipt.
+func sendTransfer(
+	tc tests.TestContext,
+	client *ethclient.Client,
+	chainID *big.Int,
+	fundingKey *secp256k1.PrivateKey,
+	to common.Address,
+	amount *big.Int,
+) *types.Transaction {
+	require := require.New(tc)
 	from := crypto.PubkeyToAddress(fundingKey.ToECDSA().PublicKey)
 	nonce, err := client.PendingNonceAt(tc.DefaultContext(), from)
 	require.NoError(err)
@@ -949,11 +1105,7 @@ func issueTransfer(
 	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), fundingKey.ToECDSA())
 	require.NoError(err)
 	require.NoError(client.SendTransaction(tc.DefaultContext(), signedTx))
-
-	receipt, err := bind.WaitMined(tc.DefaultContext(), client, signedTx)
-	require.NoError(err)
-	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
-	return receipt.BlockNumber.Uint64()
+	return signedTx
 }
 
 func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*tmpnet.Node, syncObservation) {
@@ -999,6 +1151,63 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*t
 	}
 
 	return node, observation
+}
+
+// checkPartialBootstrap starts a node seeded with pre-transition shared state
+// and no transition marker — a node that bootstrapped partway on coreth and
+// went offline across the transition — and validates that it eagerly
+// transitions and state syncs instead of resuming execution.
+func checkPartialBootstrap(
+	tc tests.TestContext,
+	network *tmpnet.Network,
+	seedDir string,
+	preTransitionHead uint64,
+	expectedSummaryHeight uint64,
+) *tmpnet.Node {
+	require := require.New(tc)
+	tc.By("checking that a partially-bootstrapped pre-transition node state syncs after the transition")
+
+	subnetIDs := make([]string, len(network.Subnets))
+	for i, subnet := range network.Subnets {
+		subnetIDs[i] = subnet.SubnetID.String()
+	}
+	flags := tmpnet.FlagsMap{
+		config.TrackSubnetsKey:    strings.Join(subnetIDs, ","),
+		config.HealthCheckFreqKey: defaultBootstrapHealthCheckFreq.String(),
+	}
+	chainConfigContent, err := newBootstrapChainConfigContent(network)
+	require.NoError(err)
+	flags[config.ChainConfigContentKey] = chainConfigContent
+
+	node := tmpnet.NewEphemeralNode(flags)
+	// EnsureNodeConfig assigns the data dir so the seed can be planted before
+	// the node starts.
+	require.NoError(network.EnsureNodeConfig(node))
+	for _, relativePath := range []string{"db", "chainData"} {
+		require.NoError(copyDir(
+			filepath.Join(seedDir, relativePath),
+			filepath.Join(node.DataDir, relativePath),
+		))
+	}
+
+	nodeStartedAt := time.Now()
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
+	tc.DeferCleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
+	})
+
+	observation, err := awaitBootstrapNode(tc, node, nodeStartedAt)
+	require.NoError(err, "awaitBootstrapNode()")
+
+	syncHealth := validateMerkleSyncEvidence(tc, network, node, expectedSummaryHeight)
+	// Syncing above the seed's head proves the node synced rather than
+	// resumed executing from its pre-transition state.
+	require.Greater(syncHealth.StateSync.SummaryHeight, preTransitionHead,
+		"expected the partial node to sync a summary above its pre-transition head")
+	reportStateSyncDuration(tc, observation, syncHealth)
+	return node
 }
 
 // awaitBootstrapNode blocks until the bootstrap node reports healthy, sampling
@@ -1298,6 +1507,14 @@ func bootstrapVMHealth(tc tests.TestContext, bootstrapNode *tmpnet.Node) (vmHeal
 	}
 	health, _, err := chainVMHealth(reply)
 	return health, err
+}
+
+// cChainTransitioned reports whether the C-Chain health reply carries the SAE
+// VM's health details. Coreth reports no VM details, so their presence marks
+// the coreth-to-SAE transition.
+func cChainTransitioned(reply *health.APIReply) bool {
+	_, _, err := chainVMHealth(reply)
+	return err == nil
 }
 
 // chainVMHealth decodes the C-Chain VM's health details from a node health
