@@ -36,9 +36,10 @@ Granite (`txs/executor/standard_tx_executor.go`).
    `sendWarpMessage`. `msg.sender` at the precompile is the contract, so the
    P-chain trusts the contract's address to name the owner (the ACP-77
    validator-manager pattern). All 17 user tx types are covered.
-3. Anyone runs a relayer (`go run ./tests/warpauth/relayer`): it watches the
-   contract's `SendWarpMessage` logs, aggregates signatures with
-   `warp_getMessageAggregateSignature`, rebuilds the tx from the payload
+3. Anyone runs a relayer (the icm-services `pchain-relayer` command, built on
+   its signature aggregator; the e2e uses coreth's aggregation RPC): it
+   watches the contract's `SendWarpMessage` logs, aggregates signatures
+   (67% of the primary network), rebuilds the tx from the payload
    (`Wrap`), attaches the message as every credential and calls
    `platform.issueTx`. The relayer holds no keys and no funds; the fee is
    burned from the tx's own inputs. Racing relayers are harmless: the node

@@ -6,7 +6,6 @@ go_library(
     srcs = [
         "generate.go",
         "nick.go",
-        "relayer.go",
         "wrap.go",
     ],
     embedsrcs = [
@@ -18,7 +17,6 @@ go_library(
     deps = [
         "//graft/coreth/ethclient",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/warp",
         "//ids",
         "//utils/constants",
         "//utils/logging",

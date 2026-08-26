@@ -15,17 +15,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	warpclient "github.com/ava-labs/avalanchego/graft/coreth/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 const (
-	relayQuorum  = 67
 	relayPoll    = time.Second
 	relayMaxSpan = 1000 // blocks per log query
 	maxUTXOs     = 1024 // platform.getUTXOs page cap
@@ -40,9 +39,11 @@ const (
 // relayer, or by the owner) is dropped, so rescanning old blocks is harmless
 // and racing relayers cannot stall each other.
 type Relayer struct {
-	Log    logging.Logger
-	Eth    *ethclient.Client
-	Warp   warpclient.Client
+	Log logging.Logger
+	Eth *ethclient.Client
+	// Sign returns the message with an aggregated BLS signature of at least
+	// relayQuorum percent of the primary network stake.
+	Sign   func(context.Context, *avalanchewarp.UnsignedMessage) ([]byte, error)
 	PChain *platformvm.Client
 	Helper common.Address
 }
@@ -95,7 +96,7 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 		r.Log.Warn("dropping unparsable log", zap.Error(err))
 		return nil
 	}
-	signed, err := r.Warp.GetMessageAggregateSignature(ctx, unsigned.ID(), relayQuorum, "")
+	signed, err := r.Sign(ctx, unsigned)
 	if err != nil {
 		return fmt.Errorf("aggregating signatures for %s: %w", unsigned.ID(), err)
 	}

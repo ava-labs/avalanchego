@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -133,9 +134,11 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			warpClient, err := warpclient.NewClient(nodeURI.URI, "C")
 			require.NoError(err)
 			relayer := &warpauth.Relayer{
-				Log:    tc.Log(),
-				Eth:    ethClient,
-				Warp:   warpClient,
+				Log: tc.Log(),
+				Eth: ethClient,
+				Sign: func(ctx context.Context, msg *avalanchewarp.UnsignedMessage) ([]byte, error) {
+					return warpClient.GetMessageAggregateSignature(ctx, msg.ID(), 67, "")
+				},
 				PChain: pClient,
 				Helper: helper,
 			}
