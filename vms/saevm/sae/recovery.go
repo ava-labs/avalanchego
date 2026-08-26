@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,14 +21,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/unwind"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -45,7 +43,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
+	return blocks.New(ethB, parent, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
@@ -266,36 +264,28 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := settler.PreciseTime().Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
+		settledHeight := rec.hooks.SettledBy(settler.Header()).Height
 
 		for {
 			switch b := lastOf(chain); {
 			case b.Synchronous():
 				return nil
 
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
-				if b.Settled() {
-					return nil
-				}
-				return b.MarkSettled(blackhole)
+			case b.Height() == settledHeight:
+				// Although this block is settled by definition, we don't want
+				// to break the ancestral chain just yet, so defer _marking_ it
+				// as settled until later.
+				return nil
 
 			default:
 				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := b.SetParent(parent); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
-
-				if !b.Settled() && !parent.Synchronous() {
-					continue
-				}
-				if err := parent.MarkSettled(blackhole); err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -303,20 +293,41 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	if err := extend(exec.LastExecuted()); err != nil {
 		return err
 	}
-	lastSettled := lastOf(chain)
-	for _, b := range chain {
-		bMap.Store(b.Hash(), b)
+	for _, b := range chain[1:] { // [0] is [saexec.Executor.LastExecuted]
+		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+			return err
+		}
 	}
 
-	for i, b := range chain[:len(chain)-1] {
-		if err := extend(b); err != nil {
-			return err
+	unsettled := chain[:len(chain)-1]
+	lastSettled := lastOf(chain)
+	critical := slices.Clone(chain)
+
+	// Last-settled blocks are loaded (and cached) by traversing the parental
+	// lineage, so we need to ensure that the chain is (a) long enough to find
+	// them all; and (b) not broken by marking an intermediate block as settled,
+	// thus removing its ancestry.
+	//
+	// For (a) the monotonicity of last-settled blocks means that extending to
+	// the last-settled of the last-settled is sufficiently far back.
+	if err := extend(lastSettled); err != nil {
+		return err
+	}
+	// For (b) [slices.Backward] ensures that we cut ancestry further back than
+	// the next iteration needs.
+	for _, b := range slices.Backward(unsettled) {
+		s := b.LastSettled()
+		if s.Settled() {
+			continue
 		}
-		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
+		if err := s.MarkSettled(blackhole); err != nil {
 			return err
 		}
 	}
-	for _, b := range bMap.m {
+
+	for _, b := range critical {
+		bMap.Store(b.Hash(), b)
+
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {
 			stage = blocks.Settled

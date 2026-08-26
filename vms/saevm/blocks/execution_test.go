@@ -54,26 +54,30 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
+	db := rawdb.NewMemoryDatabase()
+	xdb := saetest.NewExecutionResultsDB()
+	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
+
+	settles := newBlock(t, newSynchronousEthBlock(t, 1, 0, nil), nil)
+	settles.markExecutedForTests(t, db, xdb, tm)
+
+	parent := newBlock(t, newEthBlock(t, 2, 10, settles.EthBlock(), settles), settles)
+
 	ethB, err := hookstest.BuildBlock(
 		&types.Header{
-			Number: big.NewInt(1),
-			Time:   42,
+			Number:     big.NewInt(3),
+			Time:       42,
+			ParentHash: parent.Hash(),
 		},
 		nil, // blockContext
 		txs,
 		nil, // receipts
 		nil, // ops
-		hook.Settled{Height: 1, GasUnix: 1},
+		hook.Settled{Height: settles.Height()},
 	)
-	require.NoError(t, err, "hookstest.BuildBlock()")
-	db := rawdb.NewMemoryDatabase()
+	require.NoError(t, err, "hookstest.BuildBlock(...)")
 	rawdb.WriteBlock(db, ethB)
-	xdb := saetest.NewExecutionResultsDB()
-
-	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
-	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
-	settles.markExecutedForTests(t, db, xdb, tm)
-	b := newBlock(t, ethB, nil, settles)
+	b := newBlock(t, ethB, parent)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
@@ -109,7 +113,7 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
+	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock())
 	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
@@ -211,7 +215,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 		hdr := ethB.Header()
 		target, cfg := hooks.GasConfigAfter(hdr)
 		tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
-		newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
+		newBlock(t, ethB, nil).markExecutedForTests(t, db, xdb, tm)
 	}
 
 	putCorruptResults := func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, ethB *types.Block) {
@@ -290,7 +294,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 				tt.setupDBs(t, db, xdb, hooks, ethB)
 			}
 
-			b, err := New(ethB, nil, nil, hooks, loggingtest.New(t, logging.Warn))
+			b, err := New(ethB, nil, hooks, loggingtest.New(t, logging.Warn))
 			require.NoError(t, err, "New()")
 			err = b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig())
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {

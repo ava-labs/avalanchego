@@ -47,7 +47,12 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
-		settled: hook.Settled{Height: 1},
+		settled: hook.Settled{
+			// A zero [hook.Settled] indicates that the block is synchronous.
+			// All fields other than the excess could introduce hard-to-find
+			// discrepancies (e.g. self-settling asynchronous block).
+			Excess: 1,
+		},
 	}
 	props = options.ApplyTo(props, opts...)
 	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
@@ -99,7 +104,7 @@ func WithOps(ops []hookstest.Op) EthBlockOption {
 type BlockOption = options.Option[blockProperties]
 
 // NewBlock constructs an SAE block, wrapping the raw Ethereum block.
-func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block, opts ...BlockOption) *blocks.Block {
+func NewBlock(tb testing.TB, eth *types.Block, parent *blocks.Block, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 
 	props := options.ApplyTo(&blockProperties{
@@ -107,7 +112,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block
 		hooks:  hookstest.NewStub(0),
 	}, opts...)
 
-	b, err := blocks.New(eth, parent, lastSettled, props.hooks, props.logger)
+	b, err := blocks.New(eth, parent, props.hooks, props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }

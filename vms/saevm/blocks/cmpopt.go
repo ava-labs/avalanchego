@@ -6,6 +6,8 @@
 package blocks
 
 import (
+	"sync/atomic"
+
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -18,7 +20,7 @@ import (
 // tests.
 func CmpOpt() cmp.Option {
 	return cmp.Options{
-		cmp.AllowUnexported(Block{}, ancestry{}),
+		cmp.AllowUnexported(Block{}, ancestry{}, cachedBlock{}),
 		cmpopts.IgnoreFields(
 			Block{},
 			"bounds",
@@ -36,6 +38,7 @@ func CmpOpt() cmp.Option {
 		cmputils.Blocks(),
 		cmputils.Headers(),
 		cmputils.LoadAtomicPointers[ancestry](),
+		cmputils.LoadAtomicPointers[Block](),
 		cmputils.LoadAtomicPointers[executionResults](),
 		cmp.Comparer((*executionResults).equalForTests),
 	}
@@ -50,4 +53,19 @@ func (e *executionResults) equalForTests(f *executionResults) bool {
 			e.stateRootPost == f.stateRootPost
 	})
 	return fn(e, f)
+}
+
+// IgnoreLastSettledExecutionArtefacts returns an option for [cmp.Diff] that
+// ignores execution artefacts of the last-settled ancestor of a [Block]. This
+// SHOULD only be used for testing database recovery, during which blocks older
+// than the chain's last settled do not have [Block.RestoreExecutionArtefacts]
+// called (to simplify state sync).
+func IgnoreLastSettledExecutionArtefacts() cmp.Option {
+	return cmputils.IfIn[ancestry](
+		cmputils.IfIn[cachedBlock](
+			cmpopts.IgnoreTypes(
+				atomic.Pointer[executionResults]{},
+			),
+		),
+	)
 }

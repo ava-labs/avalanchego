@@ -75,17 +75,21 @@ func InMemoryBlockCount() int64 {
 
 // New constructs a new Block.
 //
-// While both the `parent` and `lastSettled` arguments MAY be nil, this will
-// result in an invalid Block as it breaks important invariants. In such
-// situations, [Block.CopyAncestorsFrom] MUST then be called before further use
-// of the Block. In practice, this SHOULD only be done when parsing an encoded
-// Block. The provided `hooks` MUST NOT be nil.
-func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
+// The [types.Block] MUST carry all information pertaining to the last-settled
+// block of the one being constructed, such that it can be extracted with the
+// [hook.Points].
+//
+// While the `parent` argument MAY be nil, this will result in an invalid Block
+// as it breaks important invariants. In such situations, [Block.SetParent]
+// or [Block.CopyParentFrom] MUST then be called before further use of the
+// Block. In practice, this SHOULD only be done when parsing an encoded Block.
+func New(eth *types.Block, parent *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
-		b:        eth,
-		executed: make(chan struct{}),
-		settled:  make(chan struct{}),
-		hooks:    hooks,
+		b:           eth,
+		synchronous: hook.Synchronous(hooks, eth.Header()),
+		executed:    make(chan struct{}),
+		settled:     make(chan struct{}),
+		hooks:       hooks,
 		log: log.With(
 			zap.Uint64("block_height", eth.NumberU64()),
 			zap.Stringer("block_hash", eth.Hash()),
@@ -97,7 +101,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 		inMemoryBlockCount.Add(-1)
 	}, struct{}{})
 
-	if err := b.SetAncestors(parent, lastSettled); err != nil {
+	if err := b.SetParent(parent); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -107,7 +111,7 @@ func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log lo
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
 func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
-	b, err := New(eth, nil, nil, hooks, log)
+	b, err := New(eth, nil, hooks, log)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +133,8 @@ var (
 	errHashMismatch               = errors.New("block hash mismatch")
 )
 
-// SetAncestors sets the block's ancestry while enforcing invariants.
-func (b *Block) SetAncestors(parent, lastSettled *Block) error {
+// SetParent sets the block's parent while enforcing invariants.
+func (b *Block) SetParent(parent *Block) error {
 	if parent != nil {
 		if got, want := parent.Hash(), b.ParentHash(); got != want {
 			return fmt.Errorf("%w: constructing Block with parent hash %v; expecting %v", errParentHashMismatch, got, want)
@@ -140,25 +144,23 @@ func (b *Block) SetAncestors(parent, lastSettled *Block) error {
 		}
 	}
 	b.ancestry.Store(&ancestry{
-		parent:      parent,
-		lastSettled: lastSettled,
+		parent: parent,
 	})
 	return nil
 }
 
-// CopyAncestorsFrom populates the [Block.ParentBlock] and [Block.LastSettled]
-// values, typically only required during database recovery or block
-// verification. The source block MUST have the same hash as b.
+// CopyParentFrom populates the [Block.ParentBlock] value, typically only
+// required during database recovery or block verification. The source block
+// MUST have the same hash as b.
 //
-// Although the individual ancestral blocks are shallow copied, calling
-// [Block.MarkSettled] on either the source or destination will NOT clear the
-// pointers of the other.
-func (b *Block) CopyAncestorsFrom(c *Block) error {
+// Although the parent is shallow copied, calling [Block.MarkSettled] on either
+// the source or destination will NOT clear the pointers of the other.
+func (b *Block) CopyParentFrom(c *Block) error {
 	if from, to := c.Hash(), b.Hash(); from != to {
 		return fmt.Errorf("%w: copying internals from block %#x to %#x", errHashMismatch, from, to)
 	}
 	a := c.ancestry.Load()
-	return b.SetAncestors(a.parent, a.lastSettled)
+	return b.SetParent(a.parent)
 }
 
 // Signer returns the transaction signer for the block.

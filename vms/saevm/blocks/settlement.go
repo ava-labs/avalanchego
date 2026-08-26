@@ -18,7 +18,24 @@ import (
 )
 
 type ancestry struct {
-	parent, lastSettled *Block
+	parent      *Block
+	lastSettled cachedBlock
+}
+
+type cachedBlock struct {
+	b atomic.Pointer[Block]
+}
+
+// cachedOrFrom returns the block stored in c, if non-nil, otherwise it returns
+// the value returned by `fn`. Concurrent calls when no block is cached MAY
+// result in multiple calls to `fn`, but only the first's value will be
+// returned.
+func (c *cachedBlock) cachedOrFrom(fn func() *Block) *Block {
+	if b := c.b.Load(); b != nil {
+		return b
+	}
+	c.b.CompareAndSwap(nil, fn())
+	return c.b.Load()
 }
 
 var (
@@ -76,8 +93,8 @@ func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether the block was marked as synchronous during
-// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
+// Synchronous reports whether the block is a pre-SAE, synchronously executed
+// block, as defined by [hook.Synchronous].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }
@@ -94,12 +111,17 @@ func (b *Block) ancestor(ifSettledErrMsg string, get func(*ancestry) *Block) *Bl
 const (
 	getParentOfSettledErrMsg  = "Get parent of settled block"
 	getSettledOfSettledErrMsg = "Get last-settled of settled block"
+	getSettledOfTooOldErrMsg  = "Get last-settled of block older than last-accepted"
 )
 
 // ParentBlock returns the block's parent unless [Block.MarkSettled] has been
 // called, in which case it returns nil and logs an error.
 func (b *Block) ParentBlock() *Block {
-	return b.ancestor(getParentOfSettledErrMsg, func(a *ancestry) *Block {
+	return b.parentBlock(getParentOfSettledErrMsg)
+}
+
+func (b *Block) parentBlock(ifSettledErrMsg string) *Block {
+	return b.ancestor(ifSettledErrMsg, func(a *ancestry) *Block {
 		return a.parent
 	})
 }
@@ -109,22 +131,42 @@ func (b *Block) ParentBlock() *Block {
 // logs an error. Note that this value might not be distinct between contiguous
 // blocks. If the block is synchronous, LastSettled always returns b itself,
 // without logging.
+//
+// It is only valid to call LastSettled for the first time on b if it is
+// currently the last-accepted block or one of its descendants. This is because
+// the value is computed by traversing the ancestral lineage, which might not be
+// available for older blocks. The value is, however, cached until b itself is
+// settled, so repeated calls are allowed.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
 	}
-	return b.ancestor(getSettledOfSettledErrMsg, func(a *ancestry) *Block {
-		return a.lastSettled
+
+	a := b.ancestry.Load()
+	if a == nil {
+		b.log.Error(getSettledOfSettledErrMsg)
+		return nil
+	}
+
+	return a.lastSettled.cachedOrFrom(func() *Block {
+		n := b.hooks.SettledBy(b.Header()).Height
+		for p := a.parent; p != nil; p = p.parentBlock(getSettledOfTooOldErrMsg) {
+			if p.Height() > n {
+				continue
+			}
+			return p
+		}
+		return nil
 	})
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by
-// consensus. If `x` is the block height of the `b.ParentBlock().LastSettled()`
-// and `y` is the height of the `b.LastSettled()`, then Settles returns the
-// contiguous, half-open range (x,y] or an empty slice i.f.f. x==y. Every block
-// therefore returns a disjoint (and possibly empty) set of historical blocks.
+// consensus. If `x` is the block height of `b.ParentBlock().LastSettled()` and
+// `y` is the height of `b.LastSettled()`, then Settles returns the contiguous,
+// half-open range (x,y] or an empty slice i.f.f. x==y. Every block therefore
+// returns a disjoint (and possibly empty) set of historical blocks.
 //
-// It is not valid to call Settles after a call to [Block.MarkSettled] on either
+// It is not valid to call Settles if [Block.LastSettled] returns nil for either
 // b or its parent. If the block is synchronous, Settles always returns a
 // single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {

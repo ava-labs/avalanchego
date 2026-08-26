@@ -24,7 +24,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -268,9 +267,8 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 		e   *executionResults
 		err error
 	)
-	if hook.Synchronous(b.hooks, b.Header()) {
+	if b.Synchronous() {
 		e, err = b.synchronousExecutionResults()
-		b.synchronous = true
 	} else {
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
