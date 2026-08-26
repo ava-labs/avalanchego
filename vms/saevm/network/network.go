@@ -24,7 +24,7 @@ var (
 	_ common.AppHandler    = (*Network)(nil)
 )
 
-// Config sets optional parameters for the P2P network.
+// config sets optional parameters for the P2P network.
 type config struct {
 	// stateSyncIDs provides an exclusive list of nodes that will be connected
 	// through the [p2p.PeerTracker] on the [Network].
@@ -55,7 +55,7 @@ func New(
 	sender common.AppSender,
 	opts ...Option,
 ) (*Network, error) {
-	config := options.As(opts...)
+	cfg := options.As(opts...)
 
 	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "p2p")
 	if err != nil {
@@ -79,13 +79,13 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("creating peer tracker: %w", err)
 	}
-	for id := range config.stateSyncIDs {
+	for id := range cfg.stateSyncIDs {
 		peerTracker.Connected(id, nil)
 	}
 
 	peers := &p2p.Peers{}
 	connectionHandlers := []p2p.ConnectionHandler{peers, validatorPeers}
-	if len(config.stateSyncIDs) == 0 {
+	if len(cfg.stateSyncIDs) == 0 {
 		connectionHandlers = append(
 			connectionHandlers,
 			peerTracker,
