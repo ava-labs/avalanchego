@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -23,28 +25,38 @@ var (
 )
 
 // Config sets optional parameters for the P2P network.
-type Config struct {
-	// TrackedIDs provides an exclusive list of nodes that will be connected
-	// through all [p2p.PeerTracker] on the [Network].
-	TrackedIDs set.Set[ids.NodeID]
+type config struct {
+	// stateSyncIDs provides an exclusive list of nodes that will be connected
+	// through the [p2p.PeerTracker] on the [Network].
+	stateSyncIDs set.Set[ids.NodeID]
+}
+
+// An Option provides overrides to default network behavior
+type Option = options.Option[config]
+
+func WithStateSyncIDs(ids set.Set[ids.NodeID]) Option {
+	return options.Func[config](func(c *config) {
+		c.stateSyncIDs = ids
+	})
 }
 
 // Network contains the [p2p.Network] and all coupled state for use by the SAE
 // VM. It should only be constructed with [New].
 type Network struct {
 	*p2p.Network
-	ValidatorPeers       *p2p.Validators
-	Peers                *p2p.Peers
-	TrieDependentTracker *p2p.PeerTracker
-	PeerTracker          *p2p.PeerTracker
+	ValidatorPeers *p2p.Validators
+	Peers          *p2p.Peers
+	PeerTracker    *p2p.PeerTracker
 }
 
 // New creates the P2P network with a registered validator set.
 func New(
-	config Config,
 	snowCtx *snow.Context,
 	sender common.AppSender,
+	opts ...Option,
 ) (*Network, error) {
+	config := options.As(opts...)
+
 	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "p2p")
 	if err != nil {
 		return nil, fmt.Errorf("registering metrics: %w", err)
@@ -57,16 +69,6 @@ func New(
 		maxValidatorSetStaleness,
 	)
 
-	triePeerTracker, err := p2p.NewPeerTracker(
-		snowCtx.Log,
-		"trie_peer_tracker",
-		reg,
-		set.Of(snowCtx.NodeID),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating trie peer tracker: %w", err)
-	}
 	peerTracker, err := p2p.NewPeerTracker(
 		snowCtx.Log,
 		"peer_tracker",
@@ -77,19 +79,16 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("creating peer tracker: %w", err)
 	}
-	for id := range config.TrackedIDs {
-		for _, pt := range []*p2p.PeerTracker{peerTracker, triePeerTracker} {
-			pt.Connected(id, nil)
-		}
+	for id := range config.stateSyncIDs {
+		peerTracker.Connected(id, nil)
 	}
 
 	peers := &p2p.Peers{}
 	connectionHandlers := []p2p.ConnectionHandler{peers, validatorPeers}
-	if len(config.TrackedIDs) == 0 {
+	if len(config.stateSyncIDs) == 0 {
 		connectionHandlers = append(
 			connectionHandlers,
-			&connectablePeerTracker{peerTracker},
-			&connectablePeerTracker{triePeerTracker},
+			peerTracker,
 		)
 	}
 
@@ -104,20 +103,9 @@ func New(
 		return nil, err
 	}
 	return &Network{
-		Network:              network,
-		Peers:                peers,
-		ValidatorPeers:       validatorPeers,
-		TrieDependentTracker: triePeerTracker,
-		PeerTracker:          peerTracker,
+		Network:        network,
+		Peers:          peers,
+		ValidatorPeers: validatorPeers,
+		PeerTracker:    peerTracker,
 	}, nil
-}
-
-var _ p2p.ConnectionHandler = (*connectablePeerTracker)(nil)
-
-type connectablePeerTracker struct {
-	*p2p.PeerTracker
-}
-
-func (c *connectablePeerTracker) Connected(nodeID ids.NodeID) {
-	c.PeerTracker.Connected(nodeID, nil)
 }

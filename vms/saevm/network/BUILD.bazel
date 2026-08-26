@@ -14,6 +14,7 @@ go_library(
         "//snow/engine/common",
         "//snow/validators",
         "//utils/set",
+        "@com_github_ava_labs_libevm//libevm/options",
     ],
 )
 
@@ -23,7 +24,6 @@ go_test(
     embed = [":network"],
     deps = [
         "//ids",
-        "//network/p2p",
         "//snow/engine/enginetest",
         "//snow/snowtest",
         "//utils/set",

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -36,19 +35,14 @@ func TestNewTrackedIDs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			snowCtx := snowtest.Context(t, snowtest.CChainID)
 			net, err := New(
-				Config{TrackedIDs: tt.trackedIDs},
 				snowCtx,
 				&enginetest.Sender{},
+				WithStateSyncIDs(tt.trackedIDs),
 			)
 			require.NoError(t, err, "New()")
 
-			trackers := map[string]*p2p.PeerTracker{
-				"PeerTracker":          net.PeerTracker,
-				"TrieDependentTracker": net.TrieDependentTracker,
-			}
-			for name, tracker := range trackers {
-				require.Equalf(t, tt.trackedIDs.Len(), tracker.Size(), "%s.Size()", name)
-			}
+			tracker := net.PeerTracker
+			require.Equalf(t, tt.trackedIDs.Len(), tracker.Size(), "PeerTracker.Size()")
 
 			// A regular P2P connection MUST be reflected by [Network.Peers]
 			// regardless of config, but MUST only be selectable by the
@@ -62,9 +56,7 @@ func TestNewTrackedIDs(t *testing.T) {
 				selectable = set.Of(peer)
 			}
 
-			for name, tracker := range trackers {
-				require.Equalf(t, selectable.Len(), tracker.Size(), "%s.Size()", name)
-			}
+			require.Equalf(t, selectable.Len(), tracker.Size(), "PeerTracker.Size()")
 		})
 	}
 }
