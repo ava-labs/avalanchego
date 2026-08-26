@@ -94,6 +94,11 @@ func (l LoadGenerator) Run(
 
 // execTestWithRecovery ensures assertion-related panics encountered during test execution are recovered
 // and that deferred cleanups are always executed before returning.
+//
+// TODO(JonathanOppenheimer): Do not report a failure when the load timeout
+// stops a transaction that is in progress. The timeout cancels ctx, and each
+// worker then logs an assertion failure that looks like a defect. Check
+// ctx.Err() and return.
 func execTestWithRecovery(ctx context.Context, log logging.Logger, test Test, wallet *Wallet, testTimeout time.Duration) {
 	tc := tests.NewTestContext(log)
 	defer tc.Recover()
