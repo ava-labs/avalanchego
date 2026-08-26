@@ -30,16 +30,6 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// Snapshot fixture shapes, derived from snapshotSegmentLen so they survive a
-// change to it.
-const (
-	oneSegment  = segmentLen
-	twoSegments = 2 * segmentLen
-	// segmentedLeaves fills two segments and leaves a short third, so a tail
-	// case spans fewer leaves than a whole segment.
-	segmentedLeaves = twoSegments + 2
-)
-
 func TestErrorSentinels(t *testing.T) {
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
 		"errWrongStartKeyLength":    errWrongStartKeyLength,
@@ -250,8 +240,8 @@ func TestResponder_HonorsKeyLimit(t *testing.T) {
 		},
 		{
 			name:        "corrupt_middle_segment",
-			corruptFrom: oneSegment,
-			corruptTo:   twoSegments,
+			corruptFrom: segmentLen,
+			corruptTo:   2 * segmentLen,
 		},
 		// The only shape where the segment trim bites.
 		{
@@ -292,14 +282,14 @@ func TestResponder_SnapshotChangesNothing(t *testing.T) {
 
 	// One limit past a segment boundary, so every divergence is reachable and
 	// the response is trimmed. TestResponder_HonorsKeyLimit sweeps the limits.
-	const limit = uint32(oneSegment + 1)
+	const limit = uint32(segmentLen + 1)
 
 	divergences := map[string][2]int{
 		"mirrors_the_trie": {0, 0},
-		"head_segment":     {0, oneSegment},
-		"middle_segment":   {oneSegment, twoSegments},
-		"segment_boundary": {oneSegment - 1, oneSegment + 1},
-		"tail_segment":     {numAccounts - oneSegment, numAccounts},
+		"head_segment":     {0, segmentLen},
+		"middle_segment":   {segmentLen, 2 * segmentLen},
+		"segment_boundary": {segmentLen - 1, segmentLen + 1},
+		"tail_segment":     {numAccounts - segmentLen, numAccounts},
 		"every_segment":    {0, numAccounts},
 	}
 
@@ -587,7 +577,9 @@ func newStorageCaseFor(t *testing.T, trieDB *triedb.Database, n int, account com
 func TestResponder_Snapshot(t *testing.T) {
 	t.Parallel()
 
-	const numLeaves = segmentedLeaves
+	// Two segments and a short third, so a tail case spans fewer leaves than a
+	// whole segment.
+	const numLeaves = 2*segmentLen + 2
 
 	tests := []struct {
 		name string
@@ -601,23 +593,23 @@ func TestResponder_Snapshot(t *testing.T) {
 		},
 		{
 			name:        "slow_path_bridges_an_invalid_middle_segment",
-			corruptFrom: oneSegment,
-			corruptTo:   twoSegments,
+			corruptFrom: segmentLen,
+			corruptTo:   2 * segmentLen,
 		},
 		{
 			name:        "invalid_head_segment",
 			corruptFrom: 0,
-			corruptTo:   oneSegment,
+			corruptTo:   segmentLen,
 		},
 		{
 			name:        "invalid_tail_segment",
-			corruptFrom: twoSegments,
+			corruptFrom: 2 * segmentLen,
 			corruptTo:   numLeaves,
 		},
 		{
 			name:        "invalid_segment_boundary",
-			corruptFrom: oneSegment - 1,
-			corruptTo:   oneSegment + 1,
+			corruptFrom: segmentLen - 1,
+			corruptTo:   segmentLen + 1,
 		},
 		{
 			name:        "all_invalid_falls_back_to_trie",
@@ -741,7 +733,8 @@ func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
 func TestRequest_SnapshotFillsResponse(t *testing.T) {
 	t.Parallel()
 
-	const numLeaves = segmentedLeaves
+	// Two segments and a short third, so bridging can end mid-segment.
+	const numLeaves = 2*segmentLen + 2
 
 	tests := []struct {
 		name        string
@@ -753,8 +746,8 @@ func TestRequest_SnapshotFillsResponse(t *testing.T) {
 		},
 		{
 			name:        "bridged_middle_segment",
-			corruptFrom: oneSegment,
-			corruptTo:   twoSegments,
+			corruptFrom: segmentLen,
+			corruptTo:   2 * segmentLen,
 		},
 	}
 
