@@ -42,7 +42,7 @@ func TestErrorSentinels(t *testing.T) {
 	})
 }
 
-func TestResponder_ValidationRejects(t *testing.T) {
+func TestResponder_AppErrors(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
@@ -53,12 +53,30 @@ func TestResponder_ValidationRejects(t *testing.T) {
 		wantErr *avacommon.AppError
 	}{
 		{
+			name: "start_key_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				StartKey: []byte{0x01, 0x02},
+				KeyLimit: 10,
+			},
+			wantErr: errWrongStartKeyLength,
+		},
+		{
 			name: "zero_key_limit",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: 0,
 			},
 			wantErr: errZeroKeyLimit,
+		},
+		{
+			name: "account_hash_wrong_length",
+			req: &syncpb.GetLeafRequest{
+				RootHash:    root.Bytes(),
+				AccountHash: []byte{0x01, 0x02},
+				KeyLimit:    10,
+			},
+			wantErr: errWrongAccountHashLength,
 		},
 		{
 			name: "root_hash_wrong_length",
@@ -85,22 +103,12 @@ func TestResponder_ValidationRejects(t *testing.T) {
 			wantErr: errEmptyRoot,
 		},
 		{
-			name: "account_hash_wrong_length",
+			name: "root_not_found",
 			req: &syncpb.GetLeafRequest{
-				RootHash:    root.Bytes(),
-				AccountHash: []byte{0x01, 0x02},
-				KeyLimit:    10,
-			},
-			wantErr: errWrongAccountHashLength,
-		},
-		{
-			name: "start_key_wrong_length",
-			req: &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				StartKey: []byte{0x01, 0x02},
+				RootHash: common.Hash{0x01}.Bytes(),
 				KeyLimit: 10,
 			},
-			wantErr: errWrongStartKeyLength,
+			wantErr: errRootNotFound,
 		},
 	}
 
