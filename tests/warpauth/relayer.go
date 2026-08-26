@@ -9,29 +9,36 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/libevm"
+	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	warpclient "github.com/ava-labs/avalanchego/graft/coreth/warp"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
 	relayQuorum  = 67
 	relayPoll    = time.Second
 	relayMaxSpan = 1000 // blocks per log query
+	maxUTXOs     = 1024 // platform.getUTXOs page cap
+	// ponytail: bounded so a tx the P-chain will never take (bad fee, bad
+	// auth) cannot stall the relayer; raise if slow blocks cause drops.
+	relayMaxAttempts = 10
 )
 
 // Relayer carries helper-contract warp messages to the P-chain. It holds no
 // keys and no funds: the fee is paid by the tx's own inputs. A message whose
 // inputs are already spent (by this relayer before a restart, by another
-// relayer, or by the owner) is rejected by the node and dropped, so
-// rescanning old blocks is harmless and racing relayers cannot stall each
-// other.
+// relayer, or by the owner) is dropped, so rescanning old blocks is harmless
+// and racing relayers cannot stall each other.
 type Relayer struct {
 	Log    logging.Logger
 	Eth    *ethclient.Client
@@ -92,24 +99,76 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 	if err != nil {
 		return fmt.Errorf("aggregating signatures for %s: %w", unsigned.ID(), err)
 	}
-	tx, err := Wrap(signed)
+	tx, owner, err := Wrap(signed)
 	if err != nil {
 		r.Log.Warn("dropping message with unparsable tx", zap.Stringer("messageID", unsigned.ID()), zap.Error(err))
 		return nil
 	}
 
-	txID, err := r.PChain.IssueTx(ctx, tx.Bytes())
-	if err != nil {
-		r.Log.Warn("P-chain rejected tx; dropping message",
-			zap.Stringer("messageID", unsigned.ID()),
+	// Issue until it lands or an input disappears: a missing input means the
+	// tx was accepted (ours or another relayer's) or was wrong to begin with.
+	for attempt := 1; ; attempt++ {
+		spendable, err := r.spendableUTXOs(ctx, owner, tx.Unsigned)
+		if err != nil {
+			return fmt.Errorf("fetching UTXOs of %s: %w", owner, err)
+		}
+		missing := tx.Unsigned.InputIDs()
+		missing.Difference(spendable)
+		if missing.Len() > 0 {
+			r.Log.Info("dropping message whose inputs are spent",
+				zap.Stringer("messageID", unsigned.ID()),
+				zap.Stringer("txID", tx.ID()),
+			)
+			return nil
+		}
+		txID, err := r.PChain.IssueTx(ctx, tx.Bytes())
+		if err == nil {
+			r.Log.Info("relayed warp message to the P-chain",
+				zap.Stringer("messageID", unsigned.ID()),
+				zap.Stringer("txID", txID),
+			)
+			return nil
+		}
+		if attempt == relayMaxAttempts {
+			r.Log.Warn("P-chain kept rejecting tx; dropping message",
+				zap.Stringer("messageID", unsigned.ID()),
+				zap.Stringer("txID", tx.ID()),
+				zap.Error(err),
+			)
+			return nil
+		}
+		r.Log.Info("P-chain rejected tx; rechecking inputs",
 			zap.Stringer("txID", tx.ID()),
 			zap.Error(err),
 		)
-		return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(relayPoll):
+		}
 	}
-	r.Log.Info("relayed warp message to the P-chain",
-		zap.Stringer("messageID", unsigned.ID()),
-		zap.Stringer("txID", txID),
-	)
-	return nil
+}
+
+// spendableUTXOs returns the IDs of the UTXOs [owner] can spend in [unsigned]:
+// its P-chain UTXOs, plus the shared-memory UTXOs an ImportTx pulls in.
+func (r *Relayer) spendableUTXOs(ctx context.Context, owner ids.ShortID, unsigned txs.UnsignedTx) (set.Set[ids.ID], error) {
+	sourceChains := []string{""}
+	if importTx, ok := unsigned.(*txs.ImportTx); ok {
+		sourceChains = append(sourceChains, importTx.SourceChain.String())
+	}
+	utxoIDs := set.Set[ids.ID]{}
+	for _, sourceChain := range sourceChains {
+		utxosBytes, _, _, err := r.PChain.GetAtomicUTXOs(ctx, []ids.ShortID{owner}, sourceChain, maxUTXOs, ids.ShortEmpty, ids.Empty)
+		if err != nil {
+			return nil, err
+		}
+		for _, utxoBytes := range utxosBytes {
+			utxo := &avax.UTXO{}
+			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+				return nil, err
+			}
+			utxoIDs.Add(utxo.InputID())
+		}
+	}
+	return utxoIDs, nil
 }
