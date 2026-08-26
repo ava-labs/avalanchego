@@ -54,7 +54,7 @@ type Block struct {
 	// Allows this block to be ruled out as able to be settled at a particular
 	// time (i.e. if this field is >= said time). The pointer MAY be nil if
 	// execution is yet to commence. For more details, see
-	// [Block.SetInterimExecutionTime for setting and [LastToSettleAt] for
+	// [Block.SwapInterimExecutionTime] for setting and [LastToSettleAt] for
 	// usage.
 	interimExecutionTime atomic.Pointer[proxytime.Time[gas.Gas]]
 
