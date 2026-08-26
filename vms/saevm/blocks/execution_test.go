@@ -69,10 +69,10 @@ func TestMarkExecuted(t *testing.T) {
 			Time:       42,
 			ParentHash: parent.Hash(),
 		},
-		nil,
+		nil, // blockContext
 		txs,
 		nil, // receipts
-		nil, // opts
+		nil, // ops
 		hook.Settled{Height: settles.Height()},
 	)
 	require.NoError(t, err, "hookstest.BuildBlock(...)")
