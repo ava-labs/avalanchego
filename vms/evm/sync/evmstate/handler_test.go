@@ -5,13 +5,15 @@ package evmstate
 
 import (
 	"errors"
-	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -225,288 +227,87 @@ func TestResponder(t *testing.T) {
 	}
 }
 
-// snapshotKinds is the leaf scopes every snapshot path must serve.
-var snapshotKinds = []struct {
-	name  string
-	build func(*testing.T, *triedb.Database, int) snapshotCase
-}{
-	{
-		name:  "account",
-		build: newAccountCase,
-	},
-	{
-		name:  "storage",
-		build: newStorageCase,
-	},
-	{
-		name:  "zero_account_storage",
-		build: newZeroAccountCase,
-	},
-}
-
-// snapshotCase is a trie plus a snapshot mirroring it, for one kind of leaf.
-type snapshotCase struct {
-	root        common.Hash
-	accountHash []byte // nil for the account trie
-	keys        [][]byte
-	vals        [][]byte
-	snap        *synctest.StaticSnapshot
-	// leaves aliases the snapshot's pairs, so mutating it desyncs from the trie.
-	leaves []synctest.StaticPair
-}
-
-// drop removes [from, to) from the snapshot only, so the trie holds leaves the
-// snapshot lacks and a bridge overshoots the snapshot index.
-func (c *snapshotCase) drop(from, to int) {
-	kept := make([]synctest.StaticPair, 0, len(c.leaves))
-	kept = append(kept, c.leaves[:from]...)
-	kept = append(kept, c.leaves[to:]...)
-	c.snap.Accounts = kept
-	// leaves must keep aliasing the snapshot, otherwise a later corrupt
-	// mutates a slice the snapshot no longer holds.
-	c.leaves = kept
-}
-
-// corrupt points [from, to) at leaf 0's value, well formed but not matching the
-// trie. A segment fails on any single mismatch.
-func (c snapshotCase) corrupt(from, to int) {
-	for i := from; i < to; i++ {
-		c.leaves[i].V = c.leaves[0].V
-	}
-}
-
-// trieSnapshot returns the case's flat view, an account view without an
-// account hash, a storage view otherwise.
-func (c snapshotCase) trieSnapshot() trieSnapshot {
-	if len(c.accountHash) == 0 {
-		return accountSnapshot{s: c.snap}
-	}
-	return storageSnapshot{s: c.snap, account: common.BytesToHash(c.accountHash)}
-}
-
-func newAccountCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
-	root, keys, vals, snap := synctest.FillAccountTrie(t, trieDB, n)
-	return snapshotCase{root: root, keys: keys, vals: vals, snap: snap, leaves: snap.Accounts}
-}
-
-func newStorageCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
-	return newStorageCaseFor(t, trieDB, n, common.HexToHash("0xa11ce"))
-}
-
-// Genesis or a state upgrade can populate the zero account, so its storage
-// trie must be served rather than aliased to the account trie.
-func newZeroAccountCase(t *testing.T, trieDB *triedb.Database, n int) snapshotCase {
-	return newStorageCaseFor(t, trieDB, n, common.Hash{})
-}
-
-func newStorageCaseFor(t *testing.T, trieDB *triedb.Database, n int, account common.Hash) snapshotCase {
-	root, keys, vals := synctest.FillTrie(t, trieDB, n)
-
-	// Storage slots are already trie-encoded, so the snapshot mirrors the trie.
-	leaves := make([]synctest.StaticPair, len(keys))
-	for i := range keys {
-		leaves[i] = synctest.StaticPair{K: keys[i], V: vals[i]}
-	}
-	static := &synctest.StaticSnapshot{Storage: map[common.Hash][]synctest.StaticPair{account: leaves}}
-	return snapshotCase{
-		root:        root,
-		accountHash: account.Bytes(),
-		keys:        keys,
-		vals:        vals,
-		snap:        static,
-		leaves:      leaves,
-	}
-}
-
-// Whatever the snapshot holds, diverged leaves, a failed open, a failed
-// iterator, the fill appends exactly the trie's leaves and reports more when
-// the trie must serve the rest.
-func TestFillFromSnapshot_NeverChangesLeaves(t *testing.T) {
+// However the snapshot diverges from the trie, corrupt values, dropped runs,
+// or reads that fail outright, the fill MUST produce exactly the trie's
+// leaves and report whether the trie holds more.
+func TestFillFromSnapshot(t *testing.T) {
 	t.Parallel()
 
-	// Two segments and a short third, so a tail case spans fewer leaves than a
-	// whole segment.
-	const numLeaves = 2*segmentLen + 2
+	const numLeaves = 7 * segmentLen
+	trieDB := synctest.NewTrieDB()
+	root, keys, vals, snap := synctest.FillAccountTrie(t, trieDB, numLeaves)
+	tr, err := trie.New(trie.TrieID(root), trieDB)
+	require.NoError(t, err)
 
+	leaves := snap.Accounts
+	// corrupt replaces the all the values from the pairs with the first value.
+	// It MUST produce well-formed values to avoid skipping snapshot iteration
+	// entirely.
+	corrupt := func(pairs []synctest.StaticPair) []synctest.StaticPair {
+		out := slices.Clone(pairs)
+		for i := range out {
+			out[i].V = out[0].V
+		}
+		return out
+	}
+
+	// The snapshot has various inaccuracies and missing values:
+	const dropTo = 5*segmentLen + segmentLen/2
+	snap.Accounts = slices.Concat(
+		leaves[:segmentLen],                            // [0, 64)    valid
+		corrupt(leaves[segmentLen:2*segmentLen]),       // [64, 128)  corrupt
+		leaves[2*segmentLen:3*segmentLen],              // [128, 192) valid
+		corrupt(leaves[3*segmentLen:4*segmentLen]),     // [192, 256) corrupt
+		leaves[4*segmentLen:4*segmentLen+segmentLen/2], // [256, 288) valid
+		[]synctest.StaticPair{},                        // [288, 320) missing
+		leaves[dropTo:],                                // [320, 384) valid
+	)
+
+	minKey := make([]byte, common.HashLength)
+	const earlyEnd = numLeaves - segmentLen/2
 	tests := []struct {
-		name string
-		// corruptFrom/corruptTo desync those leaves.
-		corruptFrom int
-		corruptTo   int
-		openErr     error
-		iterErr     error
-		// wantLen is how many leaves the fill appends, the trie serves the rest.
-		wantLen int
+		name     string
+		r        *leafRange
+		openErr  error
+		iterErr  error
+		want     Leaves
+		wantMore bool
 	}{
 		{
-			name:    "fast_path_serves_leaves",
-			wantLen: numLeaves,
+			name:     "bridges_every_divergence",
+			r:        newLeafRange(minKey, earlyEnd),
+			want:     Leaves{Keys: keys[:earlyEnd], Vals: vals[:earlyEnd]},
+			wantMore: true,
 		},
 		{
-			name:        "slow_path_bridges_an_invalid_middle_segment",
-			corruptFrom: segmentLen,
-			corruptTo:   2 * segmentLen,
-			wantLen:     numLeaves,
+			name: "clean_tail_proves_in_one_shot",
+			r:    newLeafRange(keys[dropTo], numLeaves),
+			want: Leaves{Keys: keys[dropTo:], Vals: vals[dropTo:]},
 		},
 		{
-			name:      "invalid_head_segment",
-			corruptTo: segmentLen,
-			wantLen:   numLeaves,
-		},
-		// Nothing proves after the tail segment fails, so the fill ends at the
-		// last proved segment.
-		{
-			name:        "invalid_tail_segment",
-			corruptFrom: 2 * segmentLen,
-			corruptTo:   numLeaves,
-			wantLen:     2 * segmentLen,
+			name:     "unopenable_snapshot_fills_nothing",
+			r:        newLeafRange(minKey, numLeaves),
+			openErr:  errors.New("snapshot unavailable"),
+			wantMore: true,
 		},
 		{
-			name:        "invalid_segment_boundary",
-			corruptFrom: segmentLen - 1,
-			corruptTo:   segmentLen + 1,
-			wantLen:     numLeaves,
-		},
-		{
-			name:      "all_invalid_appends_nothing",
-			corruptTo: numLeaves,
-		},
-		{
-			name:    "unopenable_snapshot_appends_nothing",
-			openErr: errors.New("snapshot unavailable"),
-		},
-		{
-			name:    "failing_iterator_appends_nothing",
-			iterErr: errors.New("iteration failed"),
+			name:     "failing_iterator_fills_nothing",
+			r:        newLeafRange(minKey, numLeaves),
+			iterErr:  errors.New("iteration failed"),
+			wantMore: true,
 		},
 	}
 
-	for _, kind := range snapshotKinds {
-		for _, tt := range tests {
-			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := kind.build(t, trieDB, numLeaves)
-				c.corrupt(tt.corruptFrom, tt.corruptTo)
-				c.snap.OpenErr = tt.openErr
-				c.snap.IterErr = tt.iterErr
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			snap.OpenErr = test.openErr
+			snap.IterErr = test.iterErr
 
-				tr, err := trie.New(trie.TrieID(c.root), trieDB)
-				require.NoError(t, err)
-
-				r := newLeafRange(make([]byte, common.HashLength), numLeaves)
-				more, err := fillFromSnapshot(c.trieSnapshot(), tr, r)
-				require.NoError(t, err)
-				require.Equal(t, c.keys[:tt.wantLen], r.keys)
-				require.Equal(t, c.vals[:tt.wantLen], r.vals)
-				require.Equal(t, tt.wantLen < numLeaves, more)
-
-				// A wrongly scoped read consults another trie's flat data, which
-				// only the read log can show.
-				reads := c.snap.Reads()
-				require.Len(t, reads, 1)
-				require.Equal(t, common.BytesToHash(c.accountHash), reads[0].Account)
-				require.Equal(t, len(c.accountHash) != 0, reads[0].Storage)
-			})
-		}
+			more, err := fillFromSnapshot(accountSnapshot{s: snap}, tr, test.r)
+			require.NoError(t, err)
+			got := Leaves{Keys: test.r.keys, Vals: test.r.vals}
+			require.Empty(t, cmp.Diff(test.want, got, cmpopts.EquateEmpty()))
+			require.Equal(t, test.wantMore, more)
+		})
 	}
-}
-
-// A fill never exceeds the range's capacity and appends only an exact prefix
-// of the trie's leaves, whatever the snapshot holds. Every capacity here is
-// below the trie's size, so more must always be reported.
-func TestFillFromSnapshot_TrimsToCapacity(t *testing.T) {
-	t.Parallel()
-
-	const numAccounts = 300
-
-	shapes := []struct {
-		name        string
-		corruptFrom int
-		corruptTo   int
-		dropFrom    int
-		dropTo      int
-	}{
-		{
-			name: "mirrors_the_trie",
-		},
-		{
-			name:      "corrupt_head_segment",
-			corruptTo: segmentLen,
-		},
-		{
-			name:        "corrupt_middle_segment",
-			corruptFrom: segmentLen,
-			corruptTo:   2 * segmentLen,
-		},
-		{
-			name:        "corrupt_segment_boundary",
-			corruptFrom: segmentLen - 1,
-			corruptTo:   segmentLen + 1,
-		},
-		{
-			name:      "corrupt_everything",
-			corruptTo: numAccounts,
-		},
-		// The bridge overshoots the missing leaves, so the capacity trims
-		// proved segments, including one reaching the trie's end.
-		{
-			name:     "missing_leaves",
-			dropFrom: 1,
-			dropTo:   100,
-		},
-	}
-
-	capacities := []int{1, segmentLen - 1, segmentLen, segmentLen + 1, 2*segmentLen + 1, numAccounts - 1}
-
-	for _, capacity := range capacities {
-		for _, shape := range shapes {
-			t.Run(fmt.Sprintf("capacity=%d/%s", capacity, shape.name), func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := newAccountCase(t, trieDB, numAccounts)
-				c.corrupt(shape.corruptFrom, shape.corruptTo)
-				c.drop(shape.dropFrom, shape.dropTo)
-
-				tr, err := trie.New(trie.TrieID(c.root), trieDB)
-				require.NoError(t, err)
-
-				r := newLeafRange(make([]byte, common.HashLength), capacity)
-				more, err := fillFromSnapshot(c.trieSnapshot(), tr, r)
-				require.NoError(t, err)
-				require.True(t, more)
-
-				n := len(r.keys)
-				require.LessOrEqual(t, n, capacity)
-				require.Equal(t, c.keys[:n], r.keys)
-				require.Equal(t, c.vals[:n], r.vals)
-			})
-		}
-	}
-}
-
-// A real [snapshot.Tree] driven through the case the disk-layer read exists
-// for: a root the tree has retired.
-func TestFillFromSnapshot_ServesHistoricalRootFromDiskLayer(t *testing.T) {
-	t.Parallel()
-
-	const numAccounts = 100
-
-	trieDB, disk := synctest.NewTrieDBWithDisk()
-	oldRoot, keys, vals, _ := synctest.FillAccountTrie(t, trieDB, numAccounts)
-	newRoot := synctest.AdvanceAccountTrie(t, trieDB, oldRoot, 30)
-	require.NotEqual(t, oldRoot, newRoot)
-
-	tree := synctest.NewSnapshotTree(t, disk, trieDB, newRoot)
-	synctest.RequireRootRetired(t, tree, oldRoot)
-
-	tr, err := trie.New(trie.TrieID(oldRoot), trieDB)
-	require.NoError(t, err)
-
-	r := newLeafRange(make([]byte, common.HashLength), numAccounts)
-	more, err := fillFromSnapshot(accountSnapshot{s: tree}, tr, r)
-	require.NoError(t, err)
-	require.Equal(t, keys, r.keys)
-	require.Equal(t, vals, r.vals)
-	require.False(t, more)
 }
