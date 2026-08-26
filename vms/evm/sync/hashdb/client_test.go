@@ -108,6 +108,10 @@ func TestVerifyRange(t *testing.T) {
 			wantMore: true,
 		},
 		{
+			name:  "full_trie_valid_response",
+			limit: numSlots,
+		},
+		{
 			name:     "valid_from_start_key",
 			start:    keys[10],
 			wantMore: true,
