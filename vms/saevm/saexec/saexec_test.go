@@ -380,7 +380,7 @@ func TestExecution(t *testing.T) {
 
 	var logIndex uint
 	for i, r := range want {
-		ui := uint(i) //#nosec G115 -- Known to not overflow
+		ui := uint(i)
 
 		r.Status = 1
 		r.TransactionIndex = ui
@@ -629,7 +629,7 @@ func TestGasAccounting(t *testing.T) {
 
 		t.Run("CumulativeGasUsed", func(t *testing.T) {
 			for i, r := range b.Receipts() {
-				ui := uint64(i + 1) //#nosec G115 -- Known to not overflow
+				ui := uint64(i + 1)
 				assert.Equalf(t, ui*params.TxGas, r.CumulativeGasUsed, "%T.Receipts()[%d]", b, i)
 			}
 		})

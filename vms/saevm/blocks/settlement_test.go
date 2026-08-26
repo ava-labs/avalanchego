@@ -220,7 +220,7 @@ func TestLastToSettleAt(t *testing.T) {
 	blocks := newChain(t, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
-			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
+			require.Equal(t, uint64(i), b.Height())
 			require.Equal(t, b.BuildTime(), b.Height())
 		}
 	})

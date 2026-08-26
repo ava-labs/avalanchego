@@ -111,7 +111,7 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 		return &triedb.Config{
 			DBOverride: firewood.Config{
 				Path:                   filepath.Join(dataDir, graftfw.Directory),
-				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes,
 				RevisionsInMemory:      uint(2 * c.CommitInterval),
 				DeferredCommitInterval: c.CommitInterval,
 				Archive:                c.Archival,

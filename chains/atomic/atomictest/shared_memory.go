@@ -53,7 +53,7 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 	pairSize := 2 * elementSize  // 8 KiB
 
 	b := make([]byte, totalSize)
-	_, err := rand.Read(b) // #nosec G404
+	_, err := rand.Read(b)
 	require.NoError(err)
 
 	elems := []*atomic.Element{}
@@ -314,7 +314,7 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ ato
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)
-	_, err := rand.Read(bytes) // #nosec G404
+	_, err := rand.Read(bytes)
 	require.NoError(err)
 
 	batch := db.NewBatch()

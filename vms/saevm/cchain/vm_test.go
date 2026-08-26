@@ -1740,7 +1740,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1 //#nosec G115 -- Known non-negative
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
 	err := sut.verifyTampered(ctx, t, child, func(hdr *types.Header) {
 		hdr.Time = earlyMS / 1000
 		tamperExtra(func(e *customtypes.HeaderExtra) {
@@ -1926,7 +1926,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
 		hdr := valid.Header()
-		preHeliconMS := uint64(preHeliconTime.UnixMilli()) //#nosec G115 -- Known non-negative
+		preHeliconMS := uint64(preHeliconTime.UnixMilli())
 		hdr.Time = preHeliconMS / 1000
 		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
 
