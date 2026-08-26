@@ -20,7 +20,6 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Test platforms and test configuration](#test-platforms-and-test-configuration)
-  - [Workspace checksums in `go.work.sum`](#workspace-checksums-in-goworksum)
 - [Validation](#validation)
 
 ## Principles
@@ -361,6 +360,18 @@ privileged `pull_request_target` event, and protected secrets are not available
 to untrusted pull request jobs. A pull request can affect cache contents within
 its own scope, but those entries do not become trusted-branch caches.
 
+`task check-go-mod-tidy` also validates workspace checksums, and its fix is
+`task go-mod-tidy`. After `go work sync`, the fix runs `go mod download` and
+`go list -m all` to record the checksums that `go work sync` leaves out. This
+works around [Go issue #63901](https://github.com/golang/go/issues/63901),
+where `go work sync` can leave `go.work.sum` incomplete. After adopting a Go
+release with that fix, test whether the extra commands can be removed.
+
+Every command that writes `go.work.sum` or a member `go.sum` belongs in that
+task. Warm-up steps elsewhere must leave the checked-in checksums untouched: a
+dirty tree breaks any later step that switches branches, which is how the
+C-Chain benchmark jobs publish their results.
+
 When reviewing or changing this implementation:
 
 - keep dependency keys tied to the Go version source, every workspace and tool
@@ -434,67 +445,6 @@ a launcher that execs task through a `GOWORK=off` assignment.
 
 When you change a test platform or test configuration, update this policy and
 the related workflow and task entrypoints together.
-
-### Workspace checksums in `go.work.sum`
-
-`task check-go-mod-tidy` validates workspace checksums. Its fix is
-`task go-mod-tidy`, which calls `scripts/sync_go_work.sh`.
-
-The `unit-all` job runs one `go test` invocation over the packages of every
-workspace module. That invocation resolves checksums through `go.work.sum`. It
-does not read the member `go.sum` files. `go.work.sum` must therefore hold a
-checksum for every module that provides a package or a test dependency in the
-workspace.
-
-`go work sync` does not produce that file. It records only the checksums that
-resolve the workspace module graph. The go command does not add the remaining
-checksums later, because it finds them in the member `go.sum` files and writes
-to `go.work.sum` only for checksums it cannot find there. See [Go issue
-#63901](https://github.com/golang/go/issues/63901).
-
-The two files are disjoint as a result. Before this workaround, `go.work.sum`
-held 1186 entries and the member `go.sum` files held 2264 entries, with no
-entry in common. The 10 checksums that `unit-all` reported as missing were
-present in `graft/subnet-evm/go.sum`.
-
-`scripts/sync_go_work.sh` moves the member `go.sum` files aside, loads every
-package and test dependency in the workspace, and then restores the files. The
-go command has no member `go.sum` to read during that load, so it writes each
-checksum it needs into `go.work.sum`. A shell trap restores the files if the
-script exits early.
-
-The script loads the workspace once per supported platform. Build constraints
-select different files per platform, and those files pull in different modules.
-A single load on the host platform misses checksums that another platform
-needs. Do not reduce the list to one platform. Do not add `darwin/amd64` or
-`windows/amd64`; this repository does not support those platforms and CI does
-not build for them.
-
-Two alternatives were rejected:
-
-- **Merge the member `go.sum` entries into `go.work.sum` with a text tool.**
-  The go command sorts `go.work.sum` by module path and semantic version. A
-  byte sort produces a different order. Any later go command that adds one
-  entry rewrites the whole file in the go command's order, which turns a
-  one-line change into a whole-file diff. Letting the go command write the file
-  keeps its own order.
-- **Keep `go list -m all` as the only extra step.** That command loads the
-  module graph. It does not load packages, so it never requests the
-  package-level checksums that `unit-all` needs. The script still runs it,
-  inside the same window, to record the module-graph checksums that the member
-  `go.sum` files would otherwise supply.
-
-Validate a change to this script as follows:
-
-1. Run `task go-mod-tidy` twice. The second run must leave `go.work.sum`
-   unchanged.
-2. Move every member `go.sum` aside. Run `go list -deps -test` over all
-   workspace packages for each supported platform. Each load must succeed and
-   must leave `go.work.sum` unchanged. Restore the files.
-
-Remove this workaround after this repository adopts a Go release that fixes
-issue #63901. To test whether the fix landed, run step 2 above against a
-`go.work.sum` produced by `go work sync` alone.
 
 ## Validation
 

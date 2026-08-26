@@ -9,6 +9,33 @@ source "${REPO_ROOT}/scripts/lib_go_modules.sh"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lib_go_tools.sh"
 
+# `go mod download` rewrites go.work.sum and the member go.sum files. This
+# script only warms the module cache, so snapshot the checked-in checksums and
+# put them back when it finishes. Copies are used rather than `git checkout` so
+# a contributor running this locally keeps any unrelated edits. A dirty tree
+# breaks any later step that switches branches, which is how the C-Chain
+# benchmark jobs publish their results.
+checksum_files=("go.work.sum" "tools/external/go.sum")
+for prefix in "${TAG_PREFIXES[@]}"; do
+  checksum_files+=("${prefix}go.sum")
+done
+
+snapshot_dir="$(mktemp -d)"
+restore_checksums() {
+  local i
+  for i in "${!checksum_files[@]}"; do
+    if [[ -f "${snapshot_dir}/${i}" ]]; then
+      cp "${snapshot_dir}/${i}" "${REPO_ROOT}/${checksum_files[${i}]}"
+    fi
+  done
+  rm -rf "${snapshot_dir}"
+}
+trap restore_checksums EXIT INT TERM
+
+for i in "${!checksum_files[@]}"; do
+  cp "${REPO_ROOT}/${checksum_files[${i}]}" "${snapshot_dir}/${i}"
+done
+
 # Download the workspace build list. This includes dependencies needed by every
 # module in go.work, including dependencies used only by tests.
 (
