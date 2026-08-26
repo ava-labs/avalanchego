@@ -196,10 +196,10 @@ func SkipEndOfBlockOps() Option {
 	})
 }
 
-// withCanonical marks execution as canonical. It is unexported because
+// asCanonical marks execution as canonical. It is unexported because
 // canonical execution mutates the block's shared progress and is exclusive to
 // Executor.
-func withCanonical() Option {
+func asCanonical() Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.canonical = true
 	})
