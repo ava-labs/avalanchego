@@ -4,6 +4,7 @@
 package hashdb
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -120,6 +121,7 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 
 var (
 	errTooManyLeaves     = errors.New("more leaves returned than requested")
+	errKeyBeforeStart    = errors.New("key returned before the requested start")
 	errInvalidRangeProof = errors.New("invalid range proof")
 )
 
@@ -134,6 +136,9 @@ func verifyRange(
 	keys := resp.GetKeys()
 	if len(keys) > int(limit) {
 		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), limit)
+	}
+	if len(keys) > 0 && bytes.Compare(keys[0], start) < 0 {
+		return false, errKeyBeforeStart
 	}
 
 	// A whole-trie response carries no proof, so VerifyRangeProof asserts the

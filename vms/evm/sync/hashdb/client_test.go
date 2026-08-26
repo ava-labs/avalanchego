@@ -93,11 +93,12 @@ func TestVerifyRange(t *testing.T) {
 	root, keys, vals := synctest.FillTrie(t, trieDB, numSlots)
 	responder := newLeafResponder(t, trieDB)
 
-	const limit = 20
+	const defaultLimit uint16 = 20
 	maxKey := slices.Repeat([]byte{0xff}, common.HashLength)
 	tests := []struct {
 		name     string
 		start    []byte
+		limit    uint16
 		tamper   func(*syncpb.GetLeafResponse)
 		wantMore bool
 		wantErr  error
@@ -113,7 +114,7 @@ func TestVerifyRange(t *testing.T) {
 		},
 		{
 			name:  "valid_to_trie_end",
-			start: keys[numSlots-limit],
+			start: keys[numSlots-defaultLimit],
 		},
 		{
 			name:  "valid_exclusion_only",
@@ -160,13 +161,14 @@ func TestVerifyRange(t *testing.T) {
 			wantErr: errInvalidRangeProof,
 		},
 		{
-			name:  "leaf_before_start_key",
+			name:  "key_before_start",
 			start: keys[10],
+			limit: numSlots,
 			tamper: func(resp *syncpb.GetLeafResponse) {
-				resp.Keys[0] = keys[9]
-				resp.Values[0] = vals[9]
+				resp.Keys, resp.Values = keys, vals
+				resp.ProofVals = nil
 			},
-			wantErr: errInvalidRangeProof,
+			wantErr: errKeyBeforeStart,
 		},
 		{
 			name:  "exceeds_limit",
@@ -197,10 +199,14 @@ func TestVerifyRange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			limit := defaultLimit
+			if tt.limit > 0 {
+				limit = tt.limit
+			}
 			resp, appErr := responder.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				StartKey: tt.start,
-				KeyLimit: limit,
+				KeyLimit: uint32(limit),
 			})
 			require.Nil(t, appErr)
 			if tt.tamper != nil {
