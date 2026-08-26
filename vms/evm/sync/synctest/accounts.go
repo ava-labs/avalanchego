@@ -20,8 +20,8 @@ import (
 
 // FillAccountTrie writes numAccounts deterministic accounts into trieDB. It
 // returns the root, sorted keys and full-RLP leaves, and a matching
-// [StaticSnapshot] of slim accounts.
-func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (common.Hash, [][]byte, [][]byte, *StaticSnapshot) {
+// [Snapshot] of slim accounts.
+func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (common.Hash, [][]byte, [][]byte, *Snapshot) {
 	t.Helper()
 	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
 	require.NoError(t, err)
@@ -40,12 +40,12 @@ func FillAccountTrie(t *testing.T, trieDB *triedb.Database, numAccounts int) (co
 	slices.SortFunc(rows, func(a, b accountRow) int { return bytes.Compare(a.key, b.key) })
 	keys := make([][]byte, numAccounts)
 	vals := make([][]byte, numAccounts)
-	pairs := make([]StaticPair, numAccounts)
+	pairs := make([]Pair, numAccounts)
 	for i, r := range rows {
 		keys[i], vals[i] = r.key, r.full
-		pairs[i] = StaticPair{K: r.key, V: r.slim}
+		pairs[i] = Pair{K: r.key, V: r.slim}
 	}
-	return root, keys, vals, &StaticSnapshot{Accounts: pairs}
+	return root, keys, vals, &Snapshot{Accounts: pairs}
 }
 
 // accountRow is one deterministic account in both encodings.

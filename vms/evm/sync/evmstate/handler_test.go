@@ -138,7 +138,7 @@ func TestResponder(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		snapshot *synctest.StaticSnapshot
+		snapshot *synctest.Snapshot
 		req      LeafRange
 		want     Leaves
 		wantMore bool
@@ -243,7 +243,7 @@ func TestFillFromSnapshot(t *testing.T) {
 	// corrupt replaces the all the values from the pairs with the first value.
 	// It MUST produce well-formed values to avoid skipping snapshot iteration
 	// entirely.
-	corrupt := func(pairs []synctest.StaticPair) []synctest.StaticPair {
+	corrupt := func(pairs []synctest.Pair) []synctest.Pair {
 		out := slices.Clone(pairs)
 		for i := range out {
 			out[i].V = out[0].V
@@ -259,7 +259,7 @@ func TestFillFromSnapshot(t *testing.T) {
 		leaves[2*segmentLen:3*segmentLen],              // [128, 192) valid
 		corrupt(leaves[3*segmentLen:4*segmentLen]),     // [192, 256) corrupt
 		leaves[4*segmentLen:4*segmentLen+segmentLen/2], // [256, 288) valid
-		[]synctest.StaticPair{},                        // [288, 320) missing
+		[]synctest.Pair{},                              // [288, 320) missing
 		leaves[dropTo:],                                // [320, 384) valid
 	)
 

@@ -5,89 +5,40 @@ package synctest
 
 import (
 	"bytes"
-	"slices"
-	"sync"
-	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
-	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/require"
 )
 
-// SnapshotTree is a real [snapshot.Tree] that logs the iterators it serves.
-type SnapshotTree struct {
-	snapshotReads
-
-	tree *snapshot.Tree
-}
-
-// NewSnapshotTree builds a real [snapshot.Tree] with its disk layer generated
-// from the state at root, for driving a handler through the production type.
-func NewSnapshotTree(t *testing.T, disk ethdb.Database, trieDB *triedb.Database, root common.Hash) *SnapshotTree {
-	t.Helper()
-	tree, err := snapshot.New(snapshot.Config{CacheSize: 1}, disk, trieDB, root)
-	require.NoError(t, err)
-	require.Equal(t, root, tree.DiskRoot())
-	return &SnapshotTree{tree: tree}
-}
-
-func (s *SnapshotTree) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
-	s.record(SnapshotRead{})
-	return s.tree.AccountIterator(s.tree.DiskRoot(), start)
-}
-
-func (s *SnapshotTree) StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Account: account, Storage: true})
-	return s.tree.StorageIterator(s.tree.DiskRoot(), account, start)
-}
-
-// RequireRootRetired asserts tree cannot serve root. libevm reports the miss
-// with no sentinel, so this asserts iteration is impossible, not which error.
-func RequireRootRetired(t *testing.T, tree *SnapshotTree, root common.Hash) {
-	t.Helper()
-	// The inner tree, so probing during setup stays out of the read log.
-	it, err := tree.tree.AccountIterator(root, common.Hash{})
-	if err == nil {
-		it.Release()
-		t.Fatalf("snapshot tree still serves root %s", root)
-	}
-}
-
-type StaticPair struct {
+type Pair struct {
 	K, V []byte
 }
 
-// StaticSnapshot is an in-memory [evmstate.Snapshot] for tests. Accounts
+// Snapshot is an in-memory [evmstate.Snapshot] for tests. Accounts
 // and each Storage entry are sorted by K, accounts holding slim values. The root
 // is ignored, as a real disk layer serves whatever it last flushed.
-type StaticSnapshot struct {
-	snapshotReads
-
-	Accounts []StaticPair
-	Storage  map[common.Hash][]StaticPair
+type Snapshot struct {
+	Accounts []Pair
+	Storage  map[common.Hash][]Pair
 	OpenErr  error
 	IterErr  error
 }
 
-func (s *StaticSnapshot) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
-	s.record(SnapshotRead{})
+func (s *Snapshot) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
 	if s.OpenErr != nil {
 		return nil, s.OpenErr
 	}
 	return &staticAccountIter{pairs: seekPairs(s.Accounts, start), idx: -1, err: s.IterErr}, nil
 }
 
-func (s *StaticSnapshot) StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error) {
-	s.record(SnapshotRead{Account: account, Storage: true})
+func (s *Snapshot) StorageIterator(account, start common.Hash) (snapshot.StorageIterator, error) {
 	if s.OpenErr != nil {
 		return nil, s.OpenErr
 	}
 	return &staticStorageIter{pairs: seekPairs(s.Storage[account], start), idx: -1, err: s.IterErr}, nil
 }
 
-func seekPairs(pairs []StaticPair, seek common.Hash) []StaticPair {
+func seekPairs(pairs []Pair, seek common.Hash) []Pair {
 	i := 0
 	for i < len(pairs) && bytes.Compare(pairs[i].K, seek.Bytes()) < 0 {
 		i++
@@ -96,7 +47,7 @@ func seekPairs(pairs []StaticPair, seek common.Hash) []StaticPair {
 }
 
 type staticAccountIter struct {
-	pairs []StaticPair
+	pairs []Pair
 	idx   int
 	err   error
 }
@@ -118,7 +69,7 @@ func (it *staticAccountIter) Error() error    { return it.err }
 func (*staticAccountIter) Release()           {}
 
 type staticStorageIter struct {
-	pairs []StaticPair
+	pairs []Pair
 	idx   int
 	err   error
 }
@@ -138,31 +89,3 @@ func (it *staticStorageIter) Hash() common.Hash {
 func (it *staticStorageIter) Slot() []byte { return it.pairs[it.idx].V }
 func (it *staticStorageIter) Error() error { return it.err }
 func (*staticStorageIter) Release()        {}
-
-// SnapshotRead is one iterator a handler opened.
-type SnapshotRead struct {
-	Account common.Hash // Set when Storage
-	Storage bool
-}
-
-// snapshotReads is the read log every snapshot source here keeps, so a test can
-// tell a snapshot read from a trie fallback serving the same leaves.
-type snapshotReads struct {
-	mu    sync.Mutex
-	reads []SnapshotRead
-}
-
-func (s *snapshotReads) Reads() []SnapshotRead {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return slices.Clone(s.reads)
-}
-
-// One responder serves peers concurrently, so the log is guarded.
-func (s *snapshotReads) record(read SnapshotRead) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.reads = append(s.reads, read)
-}
