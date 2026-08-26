@@ -78,8 +78,12 @@ runs:
       uses: actions/cache@v5
       with:
         path: ${{ steps.task-bin.outputs.dir }}
-        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/run_tool.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', '.github/actions/setup-go-for-ci/action.yml') }}
 
+    # The key covers what determines the binary: the tool module files and the
+    # Go version source. Keep it a subset of the dependency-cache inputs, which
+    # are known to hash the same in the setup job and its consumers.
+    #
     # No restore-keys: a binary built from a different tools/external or Go
     # version must not be reused. A miss simply falls back to building task.
     - name: Restore the task binary
@@ -87,7 +91,7 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.task-bin.outputs.dir }}
-        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/run_tool.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', '.github/actions/setup-go-for-ci/action.yml') }}
 
     - name: Build the task binary
       if: ${{ inputs.initial_setup == 'true' }}

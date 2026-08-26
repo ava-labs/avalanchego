@@ -33,6 +33,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - setup
+      - setup-blacksmith
       - unit-all
       - unit-avalanchego
       - unit-coreth
@@ -98,6 +99,23 @@ jobs:
 
   setup:
     runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          initial_setup: true
+
+  # Blacksmith runners redirect the Actions cache API to their own colocated
+  # cache instead of GitHub's backend, so they cannot see anything the `setup`
+  # job saved on a GitHub-hosted runner. Populate the Blacksmith-side cache
+  # separately, on the smallest instance available, since this job only
+  # downloads dependencies. Gated with the jobs that need it: every Blacksmith
+  # job here is pre-merge only.
+  # See https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions
+  setup-blacksmith:
+    if: ${{ inputs.run_premerge_jobs }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-ci
@@ -199,7 +217,7 @@ jobs:
         run: ./scripts/run_task.sh test-fuzz
   e2e:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-blacksmith
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -229,7 +247,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_schedule_latest:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-blacksmith
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -255,7 +273,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_latest:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-blacksmith
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -755,7 +773,7 @@ jobs:
           working_directory: ./graft/subnet-evm
   test-build-antithesis-images-subnet-evm:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-blacksmith
     name: Build Antithesis images
     # Use a faster runner pending migration to bazel. The default free runners result
     # in 20+ minute runtime, slowing down every PR and merge queue CI run.

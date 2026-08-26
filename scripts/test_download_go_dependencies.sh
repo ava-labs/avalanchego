@@ -22,7 +22,12 @@ PATH="${temp_dir}/bin:${PATH}" \
 
 cat > "${temp_dir}/expected" <<EOF
 ${repo_root}		mod download all
+${repo_root}	off	mod download all
+${repo_root}/graft/coreth	off	mod download all
+${repo_root}/graft/evm	off	mod download all
+${repo_root}/graft/subnet-evm	off	mod download all
 ${repo_root}/tools/external	off	mod download all
+${repo_root}	off	install github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release
 EOF
 
 diff -u "${temp_dir}/expected" "${temp_dir}/invocations"

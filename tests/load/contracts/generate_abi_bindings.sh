@@ -10,6 +10,9 @@ if ! command -v solc &> /dev/null; then
 fi
 
 CONTRACTS_DIR="$(dirname "$0")"
+REPO_ROOT="$(cd "${CONTRACTS_DIR}/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lib_go_tools.sh"
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
@@ -42,7 +45,9 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
+  # ABIGEN_PKG is pinned in scripts/lib_go_tools.sh, which the CI dependency
+  # download also reads so this `go run` resolves from the module cache.
+  go run "${ABIGEN_PKG}" \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \

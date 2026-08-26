@@ -270,11 +270,15 @@ suite with race detection and shuffled order. Scheduled workflows stay separate
 from pull-request and merge-group
 workflows so scheduled-only jobs do not appear as skipped checks.
 
-Each reusable workflow invocation runs one setup job before its Go jobs fan out.
+Each reusable workflow invocation runs its setup jobs before its Go jobs fan out.
 The setup job uses `scripts/download_go_dependencies.sh` to download the
-workspace build list, including dependencies used only by tests. It separately
-downloads the repository Go-tool module graph because `tools/external` is not in
-the workspace. It saves one platform-specific workspace `GOMODCACHE`. Consumer
+workspace build list, including dependencies used only by tests. It then
+downloads each module's own build list with `GOWORK=off`, because lint tooling,
+the per-module suites, and `go mod tidy` all resolve per module and can select
+versions the workspace resolution does not. It separately downloads the
+repository Go-tool module graph because `tools/external` is not in the
+workspace, and installs the tools pinned in `scripts/lib_go_tools.sh`, which are
+invoked as `go run pkg@version` and resolve a module graph of their own. It saves one platform-specific workspace `GOMODCACHE`. Consumer
 jobs restore that cache read-only. The cache key covers the Go version source,
 workspace files, every listed module file, and the dependency-download
 implementation.
@@ -289,6 +293,23 @@ second cache restoring into the `GOCACHE` path this action already manages. The
 key has no restore prefix, because a binary built from a different
 `tools/external` or Go version must not be reused. A miss is not a failure;
 `scripts/run_task.sh` still builds `task` itself.
+
+The full workflow runs a second setup job, `setup-blacksmith`. Blacksmith
+runners redirect the Actions cache API to their own colocated cache instead of
+GitHub's backend, so a cache saved on a GitHub-hosted runner is invisible to
+them and vice versa. Without a Blacksmith-side setup job, every Blacksmith job
+misses the dependency cache and downloads its whole module graph. That job uses
+the smallest Blacksmith instance because it only downloads, and it is gated on
+`run_premerge_jobs` because every Blacksmith job in this workflow is pre-merge
+only. When you move a job onto or off a Blacksmith runner, move its `needs`
+between the two setup jobs at the same time.
+
+The C-Chain re-execution benchmark workflows also run on Blacksmith runners,
+but they do not use `setup-go-for-ci`, so they take part in neither the
+dependency cache nor the `GOPROXY=off` check. Leaving them as they are is
+deliberate: the intended direction is to move their pre-merge coverage into
+`go-ci.yml` rather than give them a third setup job. The Bazel workflows are
+unaffected; they do not use Blacksmith runners.
 
 Consumer jobs run with `GOPROXY=off`, so every module they need must already
 be in the restored dependency cache. A miss fails the job and names the missing
@@ -344,9 +365,14 @@ When reviewing or changing this implementation:
 
 - keep dependency keys tied to the Go version source, every workspace and tool
   module file, and the dependency-download script and action
-- keep `scripts/download_go_dependencies.sh` in workspace mode when it downloads
-  workspace dependencies; use `GOWORK=off` only for `tools/external`, which is
-  outside the workspace
+- keep every Blacksmith job on `needs: setup-blacksmith` and every
+  GitHub-hosted job on `needs: setup`; the two caches do not reach each other
+- keep `scripts/download_go_dependencies.sh` covering every resolution CI uses:
+  the workspace build list in workspace mode, each module's build list with
+  `GOWORK=off`, `tools/external`, and the versioned tools in
+  `scripts/lib_go_tools.sh`
+- add a tool to `tools/external` where Bazel allows it; pin it in
+  `scripts/lib_go_tools.sh` only when it cannot go there, and say why
 - keep dependency setup as the only `GOMODCACHE` writer and keep consumers on
   restore-only behavior
 - keep `GOCACHE` keys revision-, suite-, and platform-specific, with a

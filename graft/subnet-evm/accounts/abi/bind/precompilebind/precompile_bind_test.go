@@ -701,6 +701,16 @@ func TestPrecompileBind(t *testing.T) {
 	out, err = replacer.CombinedOutput()
 	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
 
+	// The generated module sits outside the workspace, so it inherits neither
+	// go.work's genproto replace nor the identical one in each module go.mod.
+	// Without it, tidy resolves the old monolithic genproto that
+	// cockroachdb/errors requires, which conflicts with the split modules and
+	// is a version CI does not cache. Keep in sync with ../../../../go.mod.
+	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-replace", "google.golang.org/genproto=google.golang.org/genproto@v0.0.0-20240903143218-8af14fe29dc1")
+	replacer.Dir = pkg
+	out, err = replacer.CombinedOutput()
+	require.NoError(t, err, "failed to pin genproto for binding test: %v\n%s", err, out)
+
 	tidier := exec.Command(gocmd, "mod", "tidy", "-compat=1.24")
 	tidier.Dir = pkg
 	out, err = tidier.CombinedOutput()

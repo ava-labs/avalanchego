@@ -46,9 +46,10 @@ done
 
 # Validate that the derived list matches actual go.mod files in the repo.
 # Excludes utility modules (tools/) that are not part of the release.
-mapfile -t actual < <(git ls-files 'go.mod' '*/go.mod' | grep -v '^tools/' | sort)
+# Avoid bash 4 builtins such as mapfile. This file is sourced by scripts that
+# run on macOS CI runners, where bash is 3.2.
 expected="$(printf '%s\n' "${GO_MODS[@]}" | sort)"
-actual_str="$(printf '%s\n' "${actual[@]}")"
+actual_str="$(git ls-files 'go.mod' '*/go.mod' | grep -v '^tools/' | sort)"
 
 if [[ "$expected" != "$actual_str" ]]; then
     echo "Error: TAG_PREFIXES in scripts/lib_go_modules.sh is out of date." >&2

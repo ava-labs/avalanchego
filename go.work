@@ -7,10 +7,14 @@ use (
 	./graft/subnet-evm
 )
 
-// Force genproto >= v0.0.0-20230526161137-0005af68ea54 to avoid ambiguous import
-// errors from the 2023 submodule split. See: https://github.com/googleapis/go-genproto/issues/1015
+// Avoid ambiguous import errors from the 2023 genproto submodule split. See:
+// https://github.com/googleapis/go-genproto/issues/1015
 //
-// This is needed because cockroachdb/errors (even v1.12.0) transitively depends on
-// an older genproto version that conflicts with the new split modules (googleapis/rpc,
-// googleapis/api). The replace forces a version that knows to defer to the submodules.
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
+// This is needed because cockroachdb/errors transitively depends on an older
+// genproto version that conflicts with the new split modules (googleapis/rpc,
+// googleapis/api). The replace forces a version that defers to the submodules.
+//
+// This overrides the identical replace in each member go.mod. Keep the version
+// the same in all of them, or workspace mode and module mode resolve
+// differently.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
