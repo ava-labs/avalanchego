@@ -71,8 +71,9 @@ type config struct {
 
 	// State & trie
 	Pruning bool `json:"pruning-enabled"`
-	// CommitInterval is the HashDB persistence interval or Firewood's maximum
-	// number of committed revisions awaiting persistence.
+	// CommitInterval is the HashDB state trie persistence interval in blocks.
+	// For pruning Firewood, it is the maximum number of unpersisted revisions
+	// that can exist at a time. Archival Firewood overrides the value to 1.
 	CommitInterval    uint64 `json:"commit-interval"`
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
