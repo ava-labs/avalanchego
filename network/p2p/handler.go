@@ -27,6 +27,11 @@ const (
 	// SignatureRequestHandlerID is specified in ACP-118: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 	SignatureRequestHandlerID
 	FirewoodProofHandlerID
+	EVMLeafRequestHandlerID
+	EVMCodeRequestHandlerID
+	EVMBlockRequestHandlerID
+	// EVMAtomicLeafRequestHandlerID is reserved for the coreth atomic-trie syncer.
+	EVMAtomicLeafRequestHandlerID
 )
 
 var (

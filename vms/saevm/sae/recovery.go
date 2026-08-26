@@ -15,23 +15,27 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
-	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type recovery struct {
 	db          ethdb.Database
-	xdb         types.ExecutionResults
+	xdb         saetypes.ExecutionResults
 	chainConfig *params.ChainConfig
-	log         logging.Logger
+	snowCtx     *snow.Context
 	hooks       hook.Points
 	config      Config
 }
@@ -41,15 +45,18 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.log)
+	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
-	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig)
+	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
 	defer func() {
+		// Unlike elsewhere in this package, the trie database MUST be closed on
+		// both the success and error paths; it is only used to probe for
+		// available state and ownership is never transferred to the caller.
 		retErr = errors.Join(retErr, cache.TrieDB().Close())
 	}()
 
@@ -61,6 +68,12 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	if lastSettledHeight == nil {
 		return nil, fmt.Errorf("no height for finalized block %s", lastSettledHash)
 	}
+
+	rec.snowCtx.Log.Info(
+		"searching for state from last settled block",
+		zap.Stringer("hash", lastSettledHash),
+		zap.Uint64("height", *lastSettledHeight),
+	)
 
 	// Search for highest settled post-execution state
 	// Invariant: The state is written to disk AFTER the block is written to
@@ -79,12 +92,17 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.log, rec.db, rec.xdb, rec.chainConfig)
+		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.snowCtx.Log, rec.db, rec.xdb, rec.chainConfig)
 		if err != nil {
 			return nil, err
 		}
 
 		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
+			rec.snowCtx.Log.Info(
+				"found most recently executed settled block with available post-execution state",
+				zap.Stringer("hash", b.Hash()),
+				zap.Uint64("height", height),
+			)
 			return b, nil
 		}
 
@@ -94,9 +112,95 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	}
 }
 
+// recoverExecutor returns an [sae.Executor] that is ready to execute any child
+// of the last-known accepted block, and a map of all consensus-critical blocks.
+func recoverExecutor(
+	ctx context.Context,
+	db ethdb.Database,
+	xdb saetypes.ExecutionResults,
+	chainConfig *params.ChainConfig,
+	snowCtx *snow.Context,
+	hooks hook.Points,
+	cfg Config,
+	reg prometheus.Registerer,
+) (
+	_ *saexec.Executor,
+	_ *syncMap[common.Hash, *blocks.Block],
+	retErr error,
+) {
+	var closers unwind.Closers
+	defer closers.CloseIfPointsToNonNil(&retErr)
+
+	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
+
+	lastCommitted, err := rec.lastCommittedBlock()
+	if err != nil {
+		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
+	}
+	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
+
+	tracker, err := saedb.NewTracker(
+		rec.db,
+		rec.config.DBConfig,
+		lastCommittedRoot,
+		rec.snowCtx.ChainDataDir,
+		rec.snowCtx.Log,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+	}
+	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
+
+	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
+		func(b *blocks.Block) {
+			tracker.Track(b.SettledStateRoot())
+			// The post-execution root is tracked by the [saexec.Executor]
+			// as soon as it's known. In the case of database recovery,
+			// this occurred in [recovery.executeAllAccepted].
+		},
+		func(b *blocks.Block) {
+			tracker.Untrack(b.SettledStateRoot())
+			if b.Executed() { // i.e. deleted due to settlement not rejection
+				tracker.Untrack(b.PostExecutionStateRoot())
+			}
+		},
+	)
+
+	exec, err := saexec.New(
+		lastCommitted,
+		headerSource(consensusCritical, rec.db),
+		rec.chainConfig,
+		rec.db,
+		rec.xdb,
+		tracker,
+		rec.hooks,
+		rec.snowCtx.Log,
+		reg,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+	}
+	closers.Push(exec)
+
+	if err := rec.executeAllAccepted(ctx, exec); err != nil {
+		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+	}
+	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
+		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
+	}
+	return exec, consensusCritical, nil
+}
+
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
 		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		rec.snowCtx.Log.Info(
+			"finding canonical blocks",
+			zap.Stringer("parent_hash", parent.Hash()),
+			zap.Uint64("parent_height", parent.Height()),
+			zap.Stringer("last_accepted_hash", lastAcceptedHash),
+		)
+
 		if lastAcceptedHash == (common.Hash{}) {
 			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
 			// asynchronous blocks MUST be empty.
@@ -129,6 +233,12 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		return err
 	}
 
+	rec.snowCtx.Log.Info(
+		"executed all accepted blocks",
+		zap.Uint64("previously_executed_height", after.Height()),
+		zap.Uint64("last_accepted_height", last.Height()),
+	)
+
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
 	keepFrom := rec.hooks.SettledBy(last.Header()).Height
@@ -145,17 +255,18 @@ func lastOf[E any](s []E) E {
 	return s[len(s)-1]
 }
 
-// consensusCriticalBlocks returns a block-hash-keyed map of all blocks from the
-// last executed back to, and including, the block that it settled. Said settled
-// block is returned separately, for convenience.
-func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[common.Hash, *blocks.Block], lastSettled *blocks.Block, _ error) {
+// populateConsensusCriticalBlocks populates bMap with all blocks from the last
+// executed back to, and including, the block that it settled. bMap MUST be
+// empty and MUST already have its callbacks bound to the executor's state
+// tracker.
+func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
+		settleAt := settler.PreciseTime().Add(-saeparams.Tau)
 		tm := proxytime.Of[gas.Gas](settleAt)
 
 		for {
@@ -174,7 +285,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
@@ -190,34 +301,19 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
-		return nil, nil, err
+		return err
 	}
-	lastSettled = lastOf(chain)
-	tr := exec.Tracker
-	bMap := newSyncMap[common.Hash, *blocks.Block](
-		func(b *blocks.Block) {
-			tr.Track(b.SettledStateRoot())
-			// The post-execution root is tracked by the [saexec.Executor] as
-			// soon as it's known. In the case of database recovery, this
-			// occurred in [recovery.executeAllAccepted].
-		},
-		func(b *blocks.Block) {
-			tr.Untrack(b.SettledStateRoot())
-			if b.Executed() { // i.e. deleted due to settlement not rejection
-				tr.Untrack(b.PostExecutionStateRoot())
-			}
-		},
-	)
+	lastSettled := lastOf(chain)
 	for _, b := range chain {
 		bMap.Store(b.Hash(), b)
 	}
 
 	for i, b := range chain[:len(chain)-1] {
 		if err := extend(b); err != nil {
-			return nil, nil, err
+			return err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return nil, nil, err
+			return err
 		}
 	}
 	for _, b := range bMap.m {
@@ -226,8 +322,8 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 			stage = blocks.Settled
 		}
 		if err := b.CheckInvariants(stage); err != nil {
-			return nil, nil, err
+			return err
 		}
 	}
-	return bMap, lastSettled, nil
+	return nil
 }

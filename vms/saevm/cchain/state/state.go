@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -31,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // These prefixes and keys are byte-compatible with the indices written by
@@ -68,10 +67,6 @@ type State struct {
 }
 
 // New initializes the state with db.
-//
-// TODO(#5375): Coreth's commitInterval must be reduced to 1 prior to
-// transitioning to SAE. Otherwise, the atomic trie may not contain operations
-// for recent blocks.
 func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, height, err := readLast(db)
 	if err != nil {
@@ -86,7 +81,7 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
 		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
-			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
+			saetypes.NewEthDB(prefixdb.NewNested(triePrefix, db)),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
@@ -157,8 +152,24 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
 
-	batch := s.db.NewBatch()
+	var (
+		isBonus = isBonusBlock(s.snowCtx.NetworkID, height)
+		batch   = s.db.NewBatch()
+	)
 	for _, t := range txs {
+		if isBonus {
+			// To provide consistent API behavior with databases made by Coreth,
+			// we report the first height a transaction was accepted at as the
+			// canonical height.
+			txID := t.ID()
+			has, err := s.db.Has(txKey(txID))
+			if err != nil {
+				return fmt.Errorf("checking for existing tx %s: %w", txID, err)
+			}
+			if has {
+				continue
+			}
+		}
 		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
@@ -169,16 +180,21 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err := database.PutID(batch, rootKey(height), ids.ID(newRoot)); err != nil {
 		return fmt.Errorf("writing root: %w", err)
 	}
+
+	// Applying the same operation multiple times to shared memory MAY result in
+	// an error. Since bonus blocks consume the same UTXOs multiple times, we
+	// MUST skip applying their operations to shared memory.
+	if isBonus {
+		ops = nil
+	}
+
 	// Committing the batch atomically with shared memory prevents duplicate
 	// shared memory operations in the event of a crash.
-	//
-	// TODO(StephenButtolph): Skip applying shared memory operations for bonus
-	// blocks.
 	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
 		return fmt.Errorf("applying shared memory: %w", err)
 	}
 
-	s.snowCtx.Log.Debug("updated atomic trie",
+	s.snowCtx.Log.Trace("updated atomic trie",
 		zap.Uint64("height", height),
 		zap.Stringer("root", newRoot),
 	)

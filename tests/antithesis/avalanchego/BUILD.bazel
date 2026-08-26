@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/tests/antithesis/avalanchego",
     visibility = ["//visibility:private"],
     deps = [
+        "//api/info",
         "//database",
         "//genesis",
         "//graft/coreth/accounts/abi/bind",

@@ -6,6 +6,9 @@ package dynamic
 import (
 	"math"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -59,4 +62,24 @@ func FuzzDelayExponentToward(f *testing.F) {
 
 func FuzzDesiredDelayExponent(f *testing.F) {
 	fuzzSearch(f, delayReaderCases, DesiredDelayExponent, DelayExponent.Delay)
+}
+
+func TestInitialDelayExponent(t *testing.T) {
+	require.Equal(t, uint64(2000), InitialDelayExponent.Delay(), "InitialDelayExponent.Delay()")
+}
+
+func TestDelayDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		exponent DelayExponent
+		want     time.Duration
+	}{
+		{name: "minimum_floor", exponent: 0, want: time.Millisecond}, // Delay() == 1ms
+		{name: "initial", exponent: InitialDelayExponent, want: 2 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.exponent.DelayDuration(), "DelayExponent.DelayDuration()")
+		})
+	}
 }

@@ -23,6 +23,7 @@ go_library(
         "//snow",
         "//snow/uptime",
         "//snow/validators",
+        "//upgrade",
         "//utils",
         "//utils/constants",
         "//utils/crypto/bls",

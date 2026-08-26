@@ -686,11 +686,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
-		DB:         vm.db,
-		Validators: vm.Internal.Validators,
-		Upgrades:   vm.Internal.UpgradeConfig,
-		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
+		DB:           vm.db,
+		Validators:   vm.Internal.Validators,
+		Upgrades:     vm.Internal.UpgradeConfig,
+		Context:      vm.ctx,
+		RewardConfig: vm.Internal.RewardConfig,
 	})
 
 	// Verify that new validator is now in the current validator set.
@@ -978,11 +978,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
-		DB:         vm.db,
-		Validators: vm.Internal.Validators,
-		Upgrades:   vm.Internal.UpgradeConfig,
-		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
+		DB:           vm.db,
+		Validators:   vm.Internal.Validators,
+		Upgrades:     vm.Internal.UpgradeConfig,
+		Context:      vm.ctx,
+		RewardConfig: vm.Internal.RewardConfig,
 	})
 
 	// Verify that validators are in the current validator set with the correct

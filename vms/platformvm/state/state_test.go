@@ -54,6 +54,25 @@ import (
 var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
 func newTestState(t testing.TB, db database.Database) *State {
+	return newTestStateWithUpgrade(
+		t,
+		db,
+		upgradetest.GetConfig(upgradetest.Latest),
+		reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		},
+	)
+}
+
+func newTestStateWithUpgrade(
+	t testing.TB,
+	db database.Database,
+	upgradeConfig upgrade.Config,
+	rewardConfig reward.Config,
+) *State {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -61,7 +80,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
-		upgradetest.GetConfig(upgradetest.Latest),
+		upgradeConfig,
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
@@ -69,12 +88,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
+		rewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -110,6 +124,37 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) {
+	// One day into the ramp makes the integer reward differ from pre-Helicon.
+	const heliconRampElapsed = 24 * time.Hour
+
+	startTime := genesistest.DefaultValidatorStartTime
+	duration := genesistest.DefaultValidatorDuration
+	heliconTime := startTime.Add(-heliconRampElapsed)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(
+		upgradetest.Helicon,
+		heliconTime,
+	)
+	rewardConfig := reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig, rewardConfig)
+
+	wantReward := reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig).Calculate(
+		startTime,
+		duration,
+		genesistest.DefaultValidatorWeight,
+		genesistest.InitialSupply,
+	)
+
+	staker, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, staker.PotentialReward)
 }
 
 // Whenever we add or remove a staker, a number of on-disk data structures
@@ -172,6 +217,8 @@ func TestState_writeStakers(t *testing.T) {
 		addPrimaryNetworkValidator.ID(),
 		unsignedAddPrimaryNetworkValidator,
 		primaryValidatorStartTime,
+		unsignedAddPrimaryNetworkValidator.EndTime(),
+		unsignedAddPrimaryNetworkValidator.Weight(),
 		primaryValidatorReward,
 	)
 	require.NoError(t, err)
@@ -190,6 +237,8 @@ func TestState_writeStakers(t *testing.T) {
 		addPrimaryNetworkDelegator.ID(),
 		unsignedAddPrimaryNetworkDelegator,
 		primaryDelegatorStartTime,
+		unsignedAddPrimaryNetworkDelegator.EndTime(),
+		unsignedAddPrimaryNetworkDelegator.Weight(),
 		primaryDelegatorReward,
 	)
 	require.NoError(t, err)
@@ -202,6 +251,8 @@ func TestState_writeStakers(t *testing.T) {
 		addSubnetValidator.ID(),
 		unsignedAddSubnetValidator,
 		subnetValidatorStartTime,
+		unsignedAddSubnetValidator.EndTime(),
+		unsignedAddSubnetValidator.Weight(),
 		subnetValidatorReward,
 	)
 	require.NoError(t, err)
@@ -707,7 +758,7 @@ func createStakerAndTx(
 	tx := &txs.Tx{Unsigned: unsignedTx}
 	require.NoError(t, tx.Initialize(txs.Codec))
 
-	staker, err := NewCurrentStaker(tx.ID(), unsignedTx, startTime, potentialReward)
+	staker, err := NewCurrentStaker(tx.ID(), unsignedTx, startTime, unsignedTx.EndTime(), unsignedTx.Weight(), potentialReward)
 	require.NoError(t, err)
 
 	return staker, tx
@@ -2996,7 +3047,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 	})
 	tx1 := &txs.Tx{Unsigned: unsignedTx1}
 	require.NoError(tx1.Initialize(txs.Codec))
-	staker1, err := NewCurrentStaker(tx1.ID(), unsignedTx1, startTime, 0)
+	staker1, err := NewCurrentStaker(tx1.ID(), unsignedTx1, startTime, unsignedTx1.EndTime(), unsignedTx1.Weight(), 0)
 	require.NoError(err)
 	pk1 := staker1.PublicKey
 	require.NotNil(pk1)
@@ -3008,7 +3059,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 	})
 	tx2 := &txs.Tx{Unsigned: unsignedTx2}
 	require.NoError(tx2.Initialize(txs.Codec))
-	staker2, err := NewCurrentStaker(tx2.ID(), unsignedTx2, startTime, 0)
+	staker2, err := NewCurrentStaker(tx2.ID(), unsignedTx2, startTime, unsignedTx2.EndTime(), unsignedTx2.Weight(), 0)
 	require.NoError(err)
 	pk2 := staker2.PublicKey
 	require.NotNil(pk2)
@@ -3020,7 +3071,7 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 	})
 	tx3 := &txs.Tx{Unsigned: unsignedTx3}
 	require.NoError(tx3.Initialize(txs.Codec))
-	staker3, err := NewCurrentStaker(tx3.ID(), unsignedTx3, startTime, 0)
+	staker3, err := NewCurrentStaker(tx3.ID(), unsignedTx3, startTime, unsignedTx3.EndTime(), unsignedTx3.Weight(), 0)
 	require.NoError(err)
 
 	// Block 0: Add staker1 (weight=10, PK1).
@@ -3102,7 +3153,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	})
 	primaryTx1 := &txs.Tx{Unsigned: primaryUnsigned1}
 	require.NoError(primaryTx1.Initialize(txs.Codec))
-	primaryStaker1, err := NewCurrentStaker(primaryTx1.ID(), primaryUnsigned1, startTime, 0)
+	primaryStaker1, err := NewCurrentStaker(primaryTx1.ID(), primaryUnsigned1, startTime, primaryUnsigned1.EndTime(), primaryUnsigned1.Weight(), 0)
 	require.NoError(err)
 	pk1 := primaryStaker1.PublicKey
 	require.NotNil(pk1)
@@ -3115,7 +3166,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	})
 	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
 	require.NoError(subnetTx1.Initialize(txs.Codec))
-	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, 0)
+	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, subnetUnsigned1.EndTime(), subnetUnsigned1.Weight(), 0)
 	require.NoError(err)
 	require.Nil(subnetStaker1.PublicKey, "subnet validators must not carry their own BLS key")
 
@@ -3127,7 +3178,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	})
 	primaryTx2 := &txs.Tx{Unsigned: primaryUnsigned2}
 	require.NoError(primaryTx2.Initialize(txs.Codec))
-	primaryStaker2, err := NewCurrentStaker(primaryTx2.ID(), primaryUnsigned2, startTime, 0)
+	primaryStaker2, err := NewCurrentStaker(primaryTx2.ID(), primaryUnsigned2, startTime, primaryUnsigned2.EndTime(), primaryUnsigned2.Weight(), 0)
 	require.NoError(err)
 	pk2 := primaryStaker2.PublicKey
 	require.NotNil(pk2)
@@ -3144,7 +3195,7 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	})
 	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
 	require.NoError(subnetTx2.Initialize(txs.Codec))
-	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, 0)
+	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, subnetUnsigned2.EndTime(), subnetUnsigned2.Weight(), 0)
 	require.NoError(err)
 
 	// Block 0: Add primary validator 1 + subnet validator 1.
@@ -3223,7 +3274,7 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	})
 	primaryTx := &txs.Tx{Unsigned: primaryUnsigned}
 	require.NoError(primaryTx.Initialize(txs.Codec))
-	primaryStaker, err := NewCurrentStaker(primaryTx.ID(), primaryUnsigned, startTime, 0)
+	primaryStaker, err := NewCurrentStaker(primaryTx.ID(), primaryUnsigned, startTime, primaryUnsigned.EndTime(), primaryUnsigned.Weight(), 0)
 	require.NoError(err)
 	pk1 := primaryStaker.PublicKey
 	require.NotNil(pk1)
@@ -3236,7 +3287,7 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	})
 	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
 	require.NoError(subnetTx1.Initialize(txs.Codec))
-	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, 0)
+	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, subnetUnsigned1.EndTime(), subnetUnsigned1.Weight(), 0)
 	require.NoError(err)
 
 	// Create subnet validator 2 (replacement).
@@ -3247,7 +3298,7 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	})
 	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
 	require.NoError(subnetTx2.Initialize(txs.Codec))
-	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, 0)
+	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, subnetUnsigned2.EndTime(), subnetUnsigned2.Weight(), 0)
 	require.NoError(err)
 
 	// Block 0: Add primary validator + subnet validator 1.
@@ -4380,7 +4431,7 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
 	require.NoError(autoRenewedTx.Initialize(txs.Codec))
 
-	autoRenewedStaker, err := NewStaker(
+	autoRenewedStaker, err := NewCurrentStaker(
 		autoRenewedTx.ID(),
 		autoRenewedUnsigned,
 		startTime,
@@ -4407,7 +4458,7 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	require.NoError(err)
 	require.NoError(d.DeleteCurrentValidator(autoRenewedStaker))
 
-	renewedStaker, err := NewStaker(
+	renewedStaker, err := NewCurrentStaker(
 		autoRenewedTx.ID(),
 		autoRenewedUnsigned,
 		wantStartTime,

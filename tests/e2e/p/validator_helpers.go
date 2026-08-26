@@ -107,7 +107,12 @@ func (f *autoRenewedValidatorFixture) addValidatorAndCheckSupplyMint(
 	period time.Duration,
 ) (txID ids.ID, potentialReward uint64, supply uint64) {
 	pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
-	calculator := reward.NewCalculator(GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)))
+	upgrades, err := info.NewClient(f.randomWalletNodeURI.URI).Upgrades(f.tc.DefaultContext())
+	require.NoError(f.tc, err)
+	calculator := reward.NewPrimaryNetworkCalculator(
+		GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)),
+		*upgrades,
+	)
 
 	supplyBefore := currentSupply(f.tc, pvmClient)
 
@@ -145,7 +150,9 @@ func (f *autoRenewedValidatorFixture) addValidatorAndCheckSupplyMint(
 	)
 	require.NoError(f.tc, err)
 
-	potentialReward = calculator.Calculate(period, weight, supplyBefore)
+	validator := currentValidator(f.tc, pvmClient, f.validatorNode.NodeID)
+	stakeStartTime := time.Unix(int64(validator.StartTime), 0)
+	potentialReward = calculator.Calculate(stakeStartTime, period, weight, supplyBefore)
 	require.Equal(f.tc, supplyBefore+potentialReward, currentSupply(f.tc, pvmClient))
 
 	return tx.ID(), potentialReward, supplyBefore
@@ -244,13 +251,18 @@ func currentValidator(
 	return validators[0]
 }
 
+type delegatorStakingPeriod struct {
+	startTime time.Time
+	duration  time.Duration
+}
+
 // waitForOneActiveDelegator waits until the validator with nodeID has exactly one
-// active delegator and returns the delegator's actual staking period.
+// active delegator and returns its staking period.
 func waitForOneActiveDelegator(
 	tc *e2e.GinkgoTestContext,
 	pvmClient *platformvm.Client,
 	nodeID ids.NodeID,
-) time.Duration {
+) delegatorStakingPeriod {
 	tc.Eventually(func() bool {
 		validators, err := pvmClient.GetCurrentValidators(
 			tc.DefaultContext(),
@@ -264,7 +276,10 @@ func waitForOneActiveDelegator(
 	validator := currentValidator(tc, pvmClient, nodeID)
 	require.Len(tc, validator.Delegators, 1)
 	delegator := validator.Delegators[0]
-	return time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
+	return delegatorStakingPeriod{
+		startTime: time.Unix(int64(delegator.StartTime), 0),
+		duration:  time.Duration(delegator.EndTime-delegator.StartTime) * time.Second,
+	}
 }
 
 // requireValidatorRemoved waits until the validator with nodeID is no longer

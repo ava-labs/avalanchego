@@ -13,7 +13,7 @@ runs:
   using: composite
   steps:
     - name: Collect diagnostics
-      shell: bash
+      shell: nix develop --command bash -x {0}
       run: ./scripts/collect_kind_diagnostics.sh "${{ inputs.diagnostics_dir }}"
     - name: Upload diagnostics
       uses: actions/upload-artifact@v6

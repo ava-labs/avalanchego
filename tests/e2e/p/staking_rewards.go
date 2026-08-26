@@ -270,14 +270,30 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		tc.By("checking expected rewards against actual rewards", func() {
+			upgrades, err := alphaInfoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
 			var (
 				adminClient  = admin.NewClient(nodeURI.URI)
 				rewardConfig = GetRewardConfig(tc, adminClient)
-				calculator   = reward.NewCalculator(rewardConfig)
+				calculator   = reward.NewPrimaryNetworkCalculator(rewardConfig, *upgrades)
+			)
 
-				expectedValidationReward = calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+			// ACP-285 selects the primary-network rate from each staker's start time.
+			var (
+				expectedValidationReward = calculator.Calculate(
+					time.Unix(int64(alphaValidator.StartTime), 0),
+					actualAlphaValidationPeriod,
+					weight,
+					supplyAtAlphaNodeStart,
+				)
 
-				potentialDelegationReward                      = calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				potentialDelegationReward = calculator.Calculate(
+					time.Unix(int64(gammaDelegator.StartTime), 0),
+					actualGammaDelegationPeriod,
+					weight,
+					supplyAtGammaDelegatorStart,
+				)
 				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
 			)
 
