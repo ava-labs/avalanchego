@@ -309,7 +309,7 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// thus removing its ancestry.
 	//
 	// For (a) the monotonicity of last-settled blocks means that extending to
-	// the last-settled of the last-settled sufficiently far back.
+	// the last-settled of the last-settled is sufficiently far back.
 	if err := extend(lastSettled); err != nil {
 		return err
 	}
