@@ -59,11 +59,10 @@ runs:
         restore-keys: |
           go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
 
-    - name: Download workspace Go dependencies
-      if: ${{ inputs.initial_setup == 'true' }}
-      shell: bash
-      run: ./scripts/download_go_dependencies.sh
-
+    # Every cache key here is hashed before the download step below runs.
+    # `go mod download` rewrites go.sum and tools/external/go.sum, so a key
+    # evaluated after it hashes different bytes in the setup job than in its
+    # consumers, and the two never match. Keep cache steps ahead of it.
     # Every job that does not find task on PATH builds it from tools/external,
     # which costs about 15 seconds. Build it once in setup and share the binary.
     # Caching the binary instead of the GOCACHE that produced it moves ~13MB
@@ -117,6 +116,11 @@ runs:
         else
           echo "No cached task binary; run_task.sh will build one."
         fi
+
+    - name: Download workspace Go dependencies
+      if: ${{ inputs.initial_setup == 'true' }}
+      shell: bash
+      run: ./scripts/download_go_dependencies.sh
 
     # The setup job is meant to leave every module a consumer needs in
     # GOMODCACHE. GOPROXY=off turns a miss into an immediate failure naming the
