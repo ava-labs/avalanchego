@@ -51,7 +51,6 @@ type Chain interface {
 	// Execution results and replay
 	saedb.StateDBOpener
 	CanReconstruct() bool
-	CommitInterval() uint64
 	Reconstructing(common.Hash) (*state.StateDB, func(), error)
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)

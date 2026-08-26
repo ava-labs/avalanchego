@@ -124,14 +124,11 @@ type TrieDB struct {
 	log logging.Logger
 }
 
-// ErrReconstructionNotCommitted means the root is an uncommitted proposal.
-var ErrReconstructionNotCommitted = errors.New("state root is not committed")
-
 // NewReconstructed returns an isolated mutable view at root. It does not
 // persist changes.
 //
 // root MUST identify a committed revision. Callers MAY try an older root only
-// after [ErrReconstructionNotCommitted] or [ffi.ErrRevisionNotFound].
+// after [ffi.ErrRevisionNotFound].
 //
 // The caller owns the view and MUST call [ffi.Reconstructed.Drop].
 func (t *TrieDB) NewReconstructed(root common.Hash) (*ffi.Reconstructed, error) {
@@ -145,7 +142,7 @@ func (t *TrieDB) NewReconstructed(root common.Hash) (*ffi.Reconstructed, error) 
 	}
 	t.proposalsLock.Unlock()
 	if uncommitted {
-		return nil, fmt.Errorf("%w: %#x", ErrReconstructionNotCommitted, root)
+		return nil, fmt.Errorf("opening revision %#x: %w", root, ffi.ErrRevisionNotFound)
 	}
 
 	rev, err := t.Firewood.Revision(ffi.Hash(root))

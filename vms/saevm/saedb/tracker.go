@@ -171,10 +171,6 @@ type Tracker struct {
 	snaps *snapshot.Tree
 	cache state.Database
 
-	// firewood is the cache's backend when it is Firewood, and nil otherwise.
-	// Only Firewood can reconstruct historical state.
-	firewood *firewood.TrieDB
-
 	config Config
 	log    logging.Logger
 }
@@ -199,13 +195,11 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 			return nil, err
 		}
 	}
-	fw, _ := cache.TrieDB().Backend().(*firewood.TrieDB)
 	return &Tracker{
-		snaps:    snaps,
-		cache:    cache,
-		firewood: fw,
-		config:   c,
-		log:      log,
+		snaps:  snaps,
+		cache:  cache,
+		config: c,
+		log:    log,
 	}, nil
 }
 
@@ -324,10 +318,9 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 
 // CanReconstruct reports whether the tracker uses Firewood.
 func (t *Tracker) CanReconstruct() bool {
-	return t.firewood != nil
+	_, ok := t.cache.TrieDB().Backend().(*firewood.TrieDB)
+	return ok
 }
-
-var errReconstructionRequiresFirewood = errors.New("state reconstruction requires firewood")
 
 // Reconstructing returns an isolated [state.StateDB] at root and a release
 // function. root MUST identify an available committed Firewood revision.
@@ -336,13 +329,13 @@ var errReconstructionRequiresFirewood = errors.New("state reconstruction require
 // use. Each state MUST be used by one goroutine and MUST NOT be committed.
 // Supported replay and RPC operations do not persist changes.
 func (t *Tracker) Reconstructing(root common.Hash) (*state.StateDB, func(), error) {
-	fw := t.firewood
-	if fw == nil {
-		return nil, nil, fmt.Errorf("%w, got %T", errReconstructionRequiresFirewood, t.cache.TrieDB().Backend())
+	fw, ok := t.cache.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return nil, nil, fmt.Errorf("state reconstruction requires firewood, got %T", t.cache.TrieDB().Backend())
 	}
 
 	recon, err := fw.NewReconstructed(root)
-	if errors.Is(err, ffi.ErrRevisionNotFound) || errors.Is(err, firewood.ErrReconstructionNotCommitted) {
+	if errors.Is(err, ffi.ErrRevisionNotFound) {
 		return nil, nil, fmt.Errorf("%w: reconstructing state at %#x: %w", ErrStateUnavailable, root, err)
 	}
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -517,7 +518,7 @@ func TestMultipleProposals(t *testing.T) {
 	tdb, ok := db.TrieDB().Backend().(*TrieDB)
 	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
 	_, err := tdb.NewReconstructed(lastRoot)
-	require.ErrorIsf(t, err, ErrReconstructionNotCommitted, "%T.NewReconstructed(%s)", tdb, lastRoot)
+	require.ErrorIsf(t, err, ffi.ErrRevisionNotFound, "%T.NewReconstructed(%s)", tdb, lastRoot)
 
 	require.NoErrorf(t, db.TrieDB().Commit(lastRoot, false), "triedb.Commit(%s)", lastRoot)
 
