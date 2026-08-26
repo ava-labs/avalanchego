@@ -22,11 +22,11 @@ var (
 	ErrMoreWithoutKeys    = errors.New("more leaves reported but none returned")
 )
 
-// Fetcher reads a range of leaves from the network. An implementation may
-// re-request internally, so a returned error is terminal and ctx bounds the retries.
+// Fetcher reads a range of leaves from the network, already proven against the
+// requested root. An error is terminal, and ctx bounds how long it re-requests.
 type Fetcher interface {
-	// FetchLeaves returns leaves already proven against the range's root, in
-	// ascending key order, and reports whether the trie holds more past them.
+	// FetchLeaves returns the leaves in ascending key order and reports whether
+	// the trie holds more past them.
 	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error)
 }
 
