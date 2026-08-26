@@ -7,14 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -120,314 +117,89 @@ func TestResponder_AppErrors(t *testing.T) {
 	}
 }
 
-func TestResponder_Serves(t *testing.T) {
+// A typed-nil snapshot passed to [WithSnapshot] must be treated as if no
+// snapshot was provided, rather than wrapped into a non-nil interface that
+// could later panic.
+func TestWithSnapshot_IgnoresNilPointer(t *testing.T) {
 	t.Parallel()
-
-	const numKeys = 50
-
-	tests := []struct {
-		name  string
-		limit uint32
-	}{
-		{
-			name:  "whole_trie_has_no_proof",
-			limit: numKeys,
-		},
-		{
-			name:  "partial_range_includes_proof",
-			limit: numKeys / 2,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			trieDB := synctest.NewTrieDB()
-			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
-
-			r := newLeafResponder(t, trieDB)
-			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				KeyLimit: tt.limit,
-			})
-			require.Nil(t, appErr)
-			require.NotNil(t, resp)
-
-			n := int(tt.limit)
-			require.Equal(t, keys[:n], resp.Keys)
-			require.Equal(t, vals[:n], resp.Values)
-			if n < numKeys {
-				require.NotEmpty(t, resp.ProofVals)
-			} else {
-				require.Empty(t, resp.ProofVals)
-			}
-		})
-	}
-}
-
-func TestResponder_HonorsKeyLimit(t *testing.T) {
-	t.Parallel()
-
-	const numAccounts = 300
-
-	shapes := []struct {
-		name        string
-		corruptFrom int
-		corruptTo   int
-		dropFrom    int
-		dropTo      int
-	}{
-		{
-			name: "mirrors_the_trie",
-		},
-		{
-			name:        "corrupt_middle_segment",
-			corruptFrom: segmentLen,
-			corruptTo:   2 * segmentLen,
-		},
-		// The only shape where the segment trim bites.
-		{
-			name:     "missing_leaves",
-			dropFrom: 1,
-			dropTo:   100,
-		},
-	}
-
-	for _, limit := range []uint32{1, 63, 64, 65, 129, 200} {
-		for _, shape := range shapes {
-			t.Run(fmt.Sprintf("limit=%d/%s", limit, shape.name), func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := newAccountCase(t, trieDB, numAccounts)
-				c.corrupt(shape.corruptFrom, shape.corruptTo)
-				c.drop(shape.dropFrom, shape.dropTo)
-
-				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-				resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-					RootHash: c.root.Bytes(),
-					KeyLimit: limit,
-				})
-				require.Nil(t, appErr)
-				require.NotNil(t, resp)
-				require.LessOrEqual(t, len(resp.Keys), int(limit))
-				require.Len(t, resp.Values, len(resp.Keys))
-			})
-		}
-	}
-}
-
-// The snapshot is a latency optimisation, never visible to the peer.
-func TestResponder_SnapshotChangesNothing(t *testing.T) {
-	t.Parallel()
-
-	const numAccounts = 300
-
-	// One limit past a segment boundary, so every divergence is reachable and
-	// the response is trimmed. TestResponder_HonorsKeyLimit sweeps the limits.
-	const limit = uint32(segmentLen + 1)
-
-	divergences := map[string][2]int{
-		"mirrors_the_trie": {0, 0},
-		"head_segment":     {0, segmentLen},
-		"middle_segment":   {segmentLen, 2 * segmentLen},
-		"segment_boundary": {segmentLen - 1, segmentLen + 1},
-		"tail_segment":     {numAccounts - segmentLen, numAccounts},
-		"every_segment":    {0, numAccounts},
-	}
-
-	for name, diverge := range divergences {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			trieDB := synctest.NewTrieDB()
-			c := newAccountCase(t, trieDB, numAccounts)
-			c.corrupt(diverge[0], diverge[1])
-			withSnap := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-
-			bareDB := synctest.NewTrieDB()
-			bare := newAccountCase(t, bareDB, numAccounts)
-			require.Equal(t, c.root, bare.root)
-			noSnap := newResponder(loggingtest.New(t, logging.Debug), bareDB, common.HashLength)
-
-			req := func() *syncpb.GetLeafRequest {
-				return &syncpb.GetLeafRequest{RootHash: c.root.Bytes(), KeyLimit: limit}
-			}
-			got, gotErr := withSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
-			want, wantErr := noSnap.Respond(t.Context(), ids.GenerateTestNodeID(), req())
-
-			require.Equal(t, wantErr, gotErr)
-			require.Equal(t, want.GetKeys(), got.GetKeys())
-			require.Equal(t, want.GetValues(), got.GetValues())
-			require.Equal(t, len(want.GetProofVals()) == 0, len(got.GetProofVals()) == 0,
-				"proof presence must not depend on the snapshot")
-		})
-	}
-}
-
-// The whole-trie shortcut's complement: without a proof a client reads a short
-// range as the trie's end.
-func TestResponder_PartialResponseCarriesProof(t *testing.T) {
-	t.Parallel()
-
-	const numAccounts = 300
-
-	for _, limit := range []uint32{251, 260, 299} {
-		t.Run(fmt.Sprintf("limit=%d", limit), func(t *testing.T) {
-			t.Parallel()
-			trieDB := synctest.NewTrieDB()
-			c := newAccountCase(t, trieDB, numAccounts)
-
-			// The bridge then overshoots and the limit trims the segment that
-			// reaches the trie's end.
-			c.drop(1, 50)
-
-			r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-				RootHash: c.root.Bytes(),
-				KeyLimit: limit,
-			})
-			require.Nil(t, appErr)
-			require.NotNil(t, resp)
-			require.Less(t, len(resp.Keys), numAccounts, "the limit must leave leaves unserved")
-			require.NotEmpty(t, resp.ProofVals, "a partial response must carry a proof")
-		})
-	}
-}
-
-// A nil snapshot reaches the handler as a non-nil interface holding a nil
-// pointer, which would pass the nil check and panic on the first request.
-func TestResponder_NilSnapshotServesFromTrie(t *testing.T) {
-	t.Parallel()
-
-	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 20)
 
 	var absent *synctest.StaticSnapshot
-	r := newLeafResponder(t, trieDB, WithSnapshot(absent))
-	require.Nil(t, r.snapshot, "a nil snapshot must not be stored")
-
-	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: uint32(len(keys)),
-	})
-	require.Nil(t, appErr)
-	require.NotNil(t, resp)
-	require.Equal(t, keys, resp.GetKeys())
-	require.Equal(t, vals, resp.GetValues())
+	r := newLeafResponder(t, synctest.NewTrieDB(), WithSnapshot(absent))
+	require.Nil(t, r.snapshot)
 }
 
-func TestResponder_ReadsSnapshotAtDiskRoot(t *testing.T) {
-	t.Parallel()
-
-	for _, kind := range snapshotKinds {
-		t.Run(kind.name, func(t *testing.T) {
-			t.Parallel()
-			trieDB := synctest.NewTrieDB()
-			c := kind.build(t, trieDB, 20)
-
-			r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-			requireServesWholeTrie(t, r, c)
-
-			reads := c.snap.Reads()
-			require.Len(t, reads, 1)
-			require.Equal(t, common.BytesToHash(c.accountHash), reads[0].Account, "must read the requested scope")
-			require.Equal(t, len(c.accountHash) != 0, reads[0].Storage, "must read the requested trie kind")
-		})
-	}
+// serve registers the leaf handler for trieDB on a loopback network and returns
+// a client bound to it, so a test drives both halves of the protocol.
+func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...HandlerOption) *Client {
+	t.Helper()
+	log := loggingtest.New(t, logging.Debug)
+	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	require.NoError(t, RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
+	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
 }
 
-// A real [snapshot.Tree] driven through the case the disk-layer read exists
-// for: a root the tree has retired.
-func TestResponder_ServesHistoricalRootFromDiskLayer(t *testing.T) {
+func TestGetLeaves(t *testing.T) {
 	t.Parallel()
 
-	const numAccounts = 100
+	const numLeaves = 50
 
-	trieDB, disk := synctest.NewTrieDBWithDisk()
-	oldRoot, keys, vals, _ := synctest.FillAccountTrie(t, trieDB, numAccounts)
-	newRoot := synctest.AdvanceAccountTrie(t, trieDB, oldRoot, 30)
-	require.NotEqual(t, oldRoot, newRoot)
-
-	tree := synctest.NewSnapshotTree(t, disk, trieDB, newRoot)
-	synctest.RequireRootRetired(t, tree, oldRoot)
-
-	r := newLeafResponder(t, trieDB, WithSnapshot(tree))
-	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: oldRoot.Bytes(),
-		KeyLimit: uint32(len(keys)),
-	})
-	require.Nil(t, appErr)
-	require.NotNil(t, resp)
-
-	require.Equal(t, keys, resp.Keys)
-	require.Equal(t, vals, resp.Values)
-
-	// Without this the assertions above pass on a pure trie fallback.
-	require.Len(t, tree.Reads(), 1)
-}
-
-func TestResponder_BoundedRange(t *testing.T) {
-	t.Parallel()
-
-	// The snapshot applies its own endKey cut, so both paths are checked.
-	for _, withSnapshot := range []bool{false, true} {
-		t.Run(fmt.Sprintf("snapshot=%t", withSnapshot), func(t *testing.T) {
-			t.Parallel()
-			trieDB := synctest.NewTrieDB()
-			c := newAccountCase(t, trieDB, 50)
-
-			var opts []HandlerOption
-			if withSnapshot {
-				opts = append(opts, WithSnapshot(c.snap))
-			}
-			r := newLeafResponder(t, trieDB, opts...)
-			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-				RootHash: c.root.Bytes(),
-				StartKey: c.keys[10],
-				KeyLimit: uint32(len(c.keys)),
-			})
-			require.Nil(t, appErr)
-			require.NotNil(t, resp)
-			// EndKey is inclusive.
-			require.Equal(t, c.keys[10:], resp.Keys)
-			require.Equal(t, c.vals[10:], resp.Values)
-			require.NotEmpty(t, resp.ProofVals)
-		})
-	}
-}
-
-func TestResponder_CapsAtMaxLeavesLimit(t *testing.T) {
-	t.Parallel()
+	// Requests are root-addressed, so every trie shares one database.
+	trieDB := synctest.NewTrieDB()
+	accountRoot, accountKeys, accountVals, _ := synctest.FillAccountTrie(t, trieDB, numLeaves)
+	storageRoot, storageKeys, storageVals := synctest.FillTrie(t, trieDB, numLeaves)
+	// More leaves than one response may carry.
+	overfullRoot, overfullKeys, overfullVals := synctest.FillTrie(t, trieDB, maxLimit+200)
 
 	tests := []struct {
 		name     string
-		keyLimit uint32
+		req      LeafRange
+		want     Leaves
+		wantMore bool
 	}{
 		{
-			name:     "over_the_limit",
-			keyLimit: maxLimit + 200,
+			name: "whole_trie",
+			req:  LeafRange{Root: accountRoot, Limit: numLeaves},
+			want: Leaves{Keys: accountKeys, Vals: accountVals},
 		},
-		// Capping in uint16 would truncate this to 4 rather than clamp it.
 		{
-			name:     "overflows_uint16",
-			keyLimit: math.MaxUint16 + 5,
+			name:     "partial_range",
+			req:      LeafRange{Root: accountRoot, Limit: 20},
+			want:     Leaves{Keys: accountKeys[:20], Vals: accountVals[:20]},
+			wantMore: true,
+		},
+		{
+			name: "range_to_the_end",
+			req:  LeafRange{Root: accountRoot, Start: accountKeys[10], Limit: numLeaves},
+			want: Leaves{Keys: accountKeys[10:], Vals: accountVals[10:]},
+		},
+		{
+			name: "storage_trie_without_account",
+			req:  LeafRange{Root: storageRoot, Limit: numLeaves},
+			want: Leaves{Keys: storageKeys, Vals: storageVals},
+		},
+		{
+			name: "storage_trie_with_wrong_account",
+			req:  LeafRange{Root: storageRoot, Account: utils.PointerTo(common.HexToHash("0xa11ce")), Limit: numLeaves},
+			want: Leaves{Keys: storageKeys, Vals: storageVals},
+		},
+		{
+			name:     "capped_at_max_limit",
+			req:      LeafRange{Root: overfullRoot, Limit: maxLimit + 200},
+			want:     Leaves{Keys: overfullKeys[:maxLimit], Vals: overfullVals[:maxLimit]},
+			wantMore: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			trieDB := synctest.NewTrieDB()
-			root, _, _ := synctest.FillTrie(t, trieDB, maxLimit+200)
+			ctx := t.Context()
+			client := serve(t, ctx, trieDB)
 
-			r := newLeafResponder(t, trieDB)
-			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				KeyLimit: tt.keyLimit,
-			})
-			require.Nil(t, appErr)
-			require.NotNil(t, resp)
-			require.Len(t, resp.Keys, maxLimit)
+			got, more, err := client.FetchLeaves(ctx, tt.req)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.wantMore, more)
 		})
 	}
 }
@@ -460,6 +232,14 @@ type snapshotCase struct {
 	snap        *synctest.StaticSnapshot
 	// leaves aliases the snapshot's pairs, so mutating it desyncs from the trie.
 	leaves []synctest.StaticPair
+}
+
+// account returns the scope for a client request, nil for the account trie.
+func (c snapshotCase) account() *common.Hash {
+	if len(c.accountHash) == 0 {
+		return nil
+	}
+	return utils.PointerTo(common.BytesToHash(c.accountHash))
 }
 
 // drop removes [from, to) from the snapshot only, so the trie holds leaves the
@@ -516,7 +296,9 @@ func newStorageCaseFor(t *testing.T, trieDB *triedb.Database, n int, account com
 	}
 }
 
-func TestResponder_Snapshot(t *testing.T) {
+// The snapshot is a latency optimisation. Whatever it holds, diverged leaves,
+// a failed open, a failed iterator, the peer sees exactly the trie.
+func TestRegisterHandler_SnapshotNeverChangesLeaves(t *testing.T) {
 	t.Parallel()
 
 	// Two segments and a short third, so a tail case spans fewer leaves than a
@@ -525,10 +307,11 @@ func TestResponder_Snapshot(t *testing.T) {
 
 	tests := []struct {
 		name string
-		// corruptFrom/corruptTo desync those leaves, err fails the snapshot.
+		// corruptFrom/corruptTo desync those leaves.
 		corruptFrom int
 		corruptTo   int
-		err         bool
+		openErr     error
+		iterErr     error
 	}{
 		{
 			name: "fast_path_serves_leaves",
@@ -539,9 +322,8 @@ func TestResponder_Snapshot(t *testing.T) {
 			corruptTo:   2 * segmentLen,
 		},
 		{
-			name:        "invalid_head_segment",
-			corruptFrom: 0,
-			corruptTo:   segmentLen,
+			name:      "invalid_head_segment",
+			corruptTo: segmentLen,
 		},
 		{
 			name:        "invalid_tail_segment",
@@ -554,13 +336,16 @@ func TestResponder_Snapshot(t *testing.T) {
 			corruptTo:   segmentLen + 1,
 		},
 		{
-			name:        "all_invalid_falls_back_to_trie",
-			corruptFrom: 0,
-			corruptTo:   numLeaves,
+			name:      "all_invalid_falls_back_to_trie",
+			corruptTo: numLeaves,
 		},
 		{
-			name: "unavailable_snapshot_falls_back_to_trie",
-			err:  true,
+			name:    "unopenable_snapshot_falls_back_to_trie",
+			openErr: errors.New("snapshot unavailable"),
+		},
+		{
+			name:    "failing_iterator_falls_back_to_trie",
+			iterErr: errors.New("iteration failed"),
 		},
 	}
 
@@ -568,287 +353,130 @@ func TestResponder_Snapshot(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
 				t.Parallel()
+				ctx := t.Context()
 				trieDB := synctest.NewTrieDB()
 				c := kind.build(t, trieDB, numLeaves)
-
 				c.corrupt(tt.corruptFrom, tt.corruptTo)
-				if tt.err {
-					c.snap.OpenErr = errors.New("snapshot unavailable")
-				}
-
-				r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-				requireServesWholeTrie(t, r, c)
-
-				// The trie fallback serves the same leaves, so only this proves
-				// the snapshot ran.
-				require.NotEmpty(t, c.snap.Reads(), "snapshot must be consulted")
-			})
-		}
-	}
-}
-
-// requireServesWholeTrie asserts a whole-trie request for c returns its leaves.
-func requireServesWholeTrie(t *testing.T, r *responder, c snapshotCase) {
-	t.Helper()
-	resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash:    c.root.Bytes(),
-		AccountHash: c.accountHash,
-		KeyLimit:    uint32(len(c.keys)),
-	})
-	require.Nil(t, appErr)
-	require.NotNil(t, resp)
-	require.Equal(t, c.keys, resp.Keys)
-	require.Equal(t, c.vals, resp.Values)
-}
-
-// newSnapshotRequest opens a request over c's snapshot. The trie fallback
-// hides the snapshot from a response assertion, so these tests read it
-// directly.
-func newSnapshotRequest(t *testing.T, trieDB *triedb.Database, c snapshotCase, keyLimit int) *request {
-	t.Helper()
-	r := newLeafResponder(t, trieDB, WithSnapshot(c.snap))
-	req, appErr := r.newRequest(&syncpb.GetLeafRequest{
-		RootHash:    c.root.Bytes(),
-		AccountHash: c.accountHash,
-		KeyLimit:    uint32(keyLimit),
-	})
-	require.Nil(t, appErr)
-	return req
-}
-
-func TestRequest_ReadsSnapshotLeaves(t *testing.T) {
-	t.Parallel()
-
-	const numLeaves = 20
-
-	tests := []struct {
-		name string
-		// keyLimit and endAt bound the read, endAt indexing the last leaf wanted.
-		keyLimit int
-		iterErr  error
-		wantLen  int
-	}{
-		{
-			name:     "every_leaf",
-			keyLimit: numLeaves,
-			wantLen:  numLeaves,
-		},
-		{
-			name:     "key_limit_truncates",
-			keyLimit: 5,
-			wantLen:  5,
-		},
-		{
-			name:     "iteration_failure_reads_nothing",
-			keyLimit: numLeaves,
-			iterErr:  errors.New("iteration failed"),
-		},
-	}
-
-	for _, kind := range snapshotKinds {
-		for _, tt := range tests {
-			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := kind.build(t, trieDB, numLeaves)
+				c.snap.OpenErr = tt.openErr
 				c.snap.IterErr = tt.iterErr
 
-				req := newSnapshotRequest(t, trieDB, c, tt.keyLimit)
-				keys, vals, err := readSnapshot(
-					req.snapshot,
-					common.BytesToHash(req.start),
-					req.limit,
-				)
-				require.ErrorIs(t, err, tt.iterErr)
+				client := serve(t, ctx, trieDB, WithSnapshot(c.snap))
+				got, more, err := client.FetchLeaves(ctx, LeafRange{
+					Root:    c.root,
+					Account: c.account(),
+					Limit:   numLeaves,
+				})
+				require.NoError(t, err)
+				require.Equal(t, c.keys, got.Keys)
+				require.Equal(t, c.vals, got.Vals)
+				require.False(t, more)
 
-				if diff := cmp.Diff(c.keys[:tt.wantLen], keys, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("readSnapshot() keys diff (-want +got):\n%s", diff)
-				}
-				if diff := cmp.Diff(c.vals[:tt.wantLen], vals, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("readSnapshot() values diff (-want +got):\n%s", diff)
-				}
+				// The trie fallback serves the same leaves, so only the read log
+				// proves the snapshot ran, and only its scope shows the right
+				// trie was consulted.
+				reads := c.snap.Reads()
+				require.Len(t, reads, 1)
+				require.Equal(t, common.BytesToHash(c.accountHash), reads[0].Account)
+				require.Equal(t, len(c.accountHash) != 0, reads[0].Storage)
 			})
 		}
 	}
 }
 
-func TestRequest_SnapshotFillsResponse(t *testing.T) {
+// Every response is trimmed to the KeyLimit whatever the snapshot holds, and a
+// trimmed response keeps its proof, otherwise the fetch never verifies.
+func TestRegisterHandler_SnapshotTrimsToKeyLimit(t *testing.T) {
 	t.Parallel()
 
-	// Two segments and a short third, so bridging can end mid-segment.
-	const numLeaves = 2*segmentLen + 2
+	const numAccounts = 300
 
-	tests := []struct {
+	shapes := []struct {
 		name        string
 		corruptFrom int
 		corruptTo   int
+		dropFrom    int
+		dropTo      int
 	}{
 		{
-			name: "whole_range_at_once",
+			name: "mirrors_the_trie",
 		},
 		{
-			name:        "bridged_middle_segment",
+			name:      "corrupt_head_segment",
+			corruptTo: segmentLen,
+		},
+		{
+			name:        "corrupt_middle_segment",
 			corruptFrom: segmentLen,
 			corruptTo:   2 * segmentLen,
 		},
+		{
+			name:        "corrupt_segment_boundary",
+			corruptFrom: segmentLen - 1,
+			corruptTo:   segmentLen + 1,
+		},
+		{
+			name:      "corrupt_everything",
+			corruptTo: numAccounts,
+		},
+		// The bridge overshoots the missing leaves, so the limit trims proved
+		// segments, including one reaching the trie's end.
+		{
+			name:     "missing_leaves",
+			dropFrom: 1,
+			dropTo:   100,
+		},
 	}
 
-	for _, kind := range snapshotKinds {
-		for _, tt := range tests {
-			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
-				t.Parallel()
-				trieDB := synctest.NewTrieDB()
-				c := kind.build(t, trieDB, numLeaves)
-				c.corrupt(tt.corruptFrom, tt.corruptTo)
+	limits := []uint16{1, segmentLen - 1, segmentLen, segmentLen + 1, 2*segmentLen + 1, numAccounts - 1}
 
-				req := newSnapshotRequest(t, trieDB, c, numLeaves)
-				leaves := newLeafRange(req.start, req.limit)
-				more, err := fillFromSnapshot(req.snapshot, req.trie, leaves)
+	for _, limit := range limits {
+		for _, shape := range shapes {
+			t.Run(fmt.Sprintf("limit=%d/%s", limit, shape.name), func(t *testing.T) {
+				t.Parallel()
+				ctx := t.Context()
+				trieDB := synctest.NewTrieDB()
+				c := newAccountCase(t, trieDB, numAccounts)
+				c.corrupt(shape.corruptFrom, shape.corruptTo)
+				c.drop(shape.dropFrom, shape.dropTo)
+
+				client := serve(t, ctx, trieDB, WithSnapshot(c.snap))
+				got, more, err := client.FetchLeaves(ctx, LeafRange{Root: c.root, Limit: limit})
 				require.NoError(t, err)
 
-				require.False(t, more, "the snapshot must satisfy a whole-trie request")
-				require.Equal(t, c.keys, leaves.keys)
-				require.Equal(t, c.vals, leaves.vals)
+				n := int(limit)
+				require.Equal(t, c.keys[:n], got.Keys)
+				require.Equal(t, c.vals[:n], got.Vals)
+				require.True(t, more)
 			})
 		}
 	}
 }
 
-// rawResponse fetches a range at the wire level, so a test can assert on the
-// raw response rather than the verified leaves.
-func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLeafRequest) *syncpb.GetLeafResponse {
-	t.Helper()
-	resp := &syncpb.GetLeafResponse{}
-	outcome, err := c.sender.Send(ctx, req, resp)
-	require.NoError(t, err)
-	outcome.Success()
-	return resp
-}
-
-// serve registers the leaf handler for trieDB on a loopback network and returns
-// a client bound to it, so a test drives both halves of the protocol.
-func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...HandlerOption) *Client {
-	t.Helper()
-	log := loggingtest.New(t, logging.Debug)
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
-	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
-}
-
-func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
+// A real [snapshot.Tree] driven through the case the disk-layer read exists
+// for: a root the tree has retired.
+func TestRegisterHandler_ServesHistoricalRootFromDiskLayer(t *testing.T) {
 	t.Parallel()
+	ctx := t.Context()
 
-	const numLeaves = 50
+	const numAccounts = 100
 
-	tests := []struct {
-		name  string
-		build func(*testing.T, *triedb.Database, int) snapshotCase
-		// startAt indexes the first leaf wanted, 0 leaves the start key unset.
-		startAt   int
-		keyLimit  uint16
-		wantLen   int
-		wantProof bool
-		wantMore  bool
-		snapshot  bool
-	}{
-		{
-			name:     "whole_trie_carries_no_proof",
-			build:    newAccountCase,
-			keyLimit: numLeaves,
-			wantLen:  numLeaves,
-		},
-		{
-			name:      "partial_range_carries_a_proof",
-			build:     newAccountCase,
-			keyLimit:  20,
-			wantLen:   20,
-			wantProof: true,
-			wantMore:  true,
-		},
-		// Only a range that starts at the trie's head may omit the proof, so
-		// reaching the end from a start key does not make the root sufficient.
-		{
-			name:      "range_to_the_end_still_carries_a_proof",
-			build:     newAccountCase,
-			startAt:   10,
-			keyLimit:  numLeaves,
-			wantLen:   numLeaves - 10,
-			wantProof: true,
-		},
-		{
-			name:      "partial_range_from_a_snapshot_carries_a_proof",
-			build:     newAccountCase,
-			keyLimit:  20,
-			wantLen:   20,
-			wantProof: true,
-			wantMore:  true,
-			snapshot:  true,
-		},
-		{
-			name:     "storage_trie",
-			build:    newStorageCase,
-			keyLimit: numLeaves,
-			wantLen:  numLeaves,
-		},
-	}
+	trieDB, disk := synctest.NewTrieDBWithDisk()
+	oldRoot, keys, vals, _ := synctest.FillAccountTrie(t, trieDB, numAccounts)
+	newRoot := synctest.AdvanceAccountTrie(t, trieDB, oldRoot, 30)
+	require.NotEqual(t, oldRoot, newRoot)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := t.Context()
-			trieDB := synctest.NewTrieDB()
+	tree := synctest.NewSnapshotTree(t, disk, trieDB, newRoot)
+	synctest.RequireRootRetired(t, tree, oldRoot)
 
-			c := tt.build(t, trieDB, numLeaves)
+	client := serve(t, ctx, trieDB, WithSnapshot(tree))
+	got, more, err := client.FetchLeaves(ctx, LeafRange{Root: oldRoot, Limit: numAccounts})
+	require.NoError(t, err)
+	require.Equal(t, keys, got.Keys)
+	require.Equal(t, vals, got.Vals)
+	require.False(t, more)
 
-			var opts []HandlerOption
-			if tt.snapshot {
-				opts = append(opts, WithSnapshot(c.snap))
-			}
-
-			var account *common.Hash
-			if len(c.accountHash) > 0 {
-				account = utils.PointerTo(common.BytesToHash(c.accountHash))
-			}
-			var startKey []byte
-			if tt.startAt > 0 {
-				startKey = c.keys[tt.startAt]
-			}
-
-			client := serve(t, ctx, trieDB, opts...)
-
-			// The wire response carries the proof, which the verified client
-			// consumes rather than returns, so proof presence asserts at the
-			// transport.
-			resp := rawResponse(t, ctx, client, &syncpb.GetLeafRequest{
-				RootHash:    c.root.Bytes(),
-				AccountHash: c.accountHash,
-				StartKey:    startKey,
-				KeyLimit:    uint32(tt.keyLimit),
-			})
-			require.Equal(t, tt.wantProof, len(resp.GetProofVals()) > 0, "proof presence")
-
-			// The client verifies the range with libevm before returning it, so
-			// a successful fetch is also the handler's proof passing the oracle.
-			got, more, err := client.FetchLeaves(ctx, LeafRange{
-				Root:    c.root,
-				Account: account,
-				Start:   startKey,
-				Limit:   tt.keyLimit,
-			})
-			require.NoError(t, err)
-
-			to := tt.startAt + tt.wantLen
-			require.Equal(t, c.keys[tt.startAt:to], got.Keys)
-			require.Equal(t, c.vals[tt.startAt:to], got.Vals)
-			require.Equal(t, tt.wantMore, more)
-
-			if tt.snapshot {
-				// A read is recorded when the iterator is opened, so this shows
-				// the snapshot was consulted, not that it served the leaves.
-				require.NotEmpty(t, c.snap.Reads(), "the snapshot must be consulted")
-			}
-		})
-	}
+	// Without this the assertions above pass on a pure trie fallback.
+	require.Len(t, tree.Reads(), 1)
 }
 
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
