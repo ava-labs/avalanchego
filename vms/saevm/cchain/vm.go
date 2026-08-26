@@ -110,6 +110,9 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
+	if lvl := userConfig.LogLevel; lvl != nil {
+		snowCtx.Log.SetLevel(*lvl)
+	}
 	snowCtx.Log.Info("initializing C-Chain",
 		zap.Reflect("config", userConfig),
 	)

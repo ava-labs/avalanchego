@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -106,6 +107,13 @@ type config struct {
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
+
+	// Logging
+	// LogLevel overrides the level of this chain's logger — both its log file
+	// and its stdout display — leaving other chains and node-level logs
+	// untouched. nil keeps the levels from the node's --log-level and
+	// --log-display-level flags.
+	LogLevel *logging.Level `json:"log-level,omitempty"`
 
 	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.

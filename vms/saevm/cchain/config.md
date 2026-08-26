@@ -106,3 +106,9 @@ options, `apis` wins and `eth-apis` is ignored.
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `warp-off-chain-messages` | array of strings | Hex-encoded off-chain Warp messages the node should be willing to sign. These messages do not need to correspond to any on-chain event. | empty array |
+
+## Logging
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `log-level` | string | Log level for this chain's logger: one of `verbo`, `debug`, `trace`, `info`, `warn`, `error`, `fatal`, or `off` (case-insensitive). Overrides both the file level (`--log-level`) and the stdout display level (`--log-display-level`) of the node, for this chain only. | The node's `--log-level` and `--log-display-level` |
