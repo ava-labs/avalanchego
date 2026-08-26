@@ -28,7 +28,14 @@ import (
 // RegisterHandler serves leaf-range requests at handlerID on net. Requests
 // name the trie to read by root, opened from trieDB. Every key in a served
 // trie is trieKeyLength bytes.
-func RegisterHandler(log logging.Logger, net *p2p.Network, handlerID uint64, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) error {
+func RegisterHandler(
+	log logging.Logger,
+	net *p2p.Network,
+	handlerID uint64,
+	trieDB *triedb.Database,
+	trieKeyLength int,
+	opts ...HandlerOption,
+) error {
 	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
 	return net.AddHandler(handlerID, h)
 }
