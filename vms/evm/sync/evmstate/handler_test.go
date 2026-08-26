@@ -138,7 +138,7 @@ func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...H
 	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
 }
 
-func TestGetLeaves(t *testing.T) {
+func TestResponder(t *testing.T) {
 	t.Parallel()
 
 	const numLeaves = 50
@@ -298,7 +298,7 @@ func newStorageCaseFor(t *testing.T, trieDB *triedb.Database, n int, account com
 
 // The snapshot is a latency optimisation. Whatever it holds, diverged leaves,
 // a failed open, a failed iterator, the peer sees exactly the trie.
-func TestRegisterHandler_SnapshotNeverChangesLeaves(t *testing.T) {
+func TestResponder_SnapshotNeverChangesLeaves(t *testing.T) {
 	t.Parallel()
 
 	// Two segments and a short third, so a tail case spans fewer leaves than a
@@ -385,7 +385,7 @@ func TestRegisterHandler_SnapshotNeverChangesLeaves(t *testing.T) {
 
 // Every response is trimmed to the KeyLimit whatever the snapshot holds, and a
 // trimmed response keeps its proof, otherwise the fetch never verifies.
-func TestRegisterHandler_SnapshotTrimsToKeyLimit(t *testing.T) {
+func TestResponder_SnapshotTrimsToKeyLimit(t *testing.T) {
 	t.Parallel()
 
 	const numAccounts = 300
@@ -454,7 +454,7 @@ func TestRegisterHandler_SnapshotTrimsToKeyLimit(t *testing.T) {
 
 // A real [snapshot.Tree] driven through the case the disk-layer read exists
 // for: a root the tree has retired.
-func TestRegisterHandler_ServesHistoricalRootFromDiskLayer(t *testing.T) {
+func TestResponder_ServesHistoricalRootFromDiskLayer(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
