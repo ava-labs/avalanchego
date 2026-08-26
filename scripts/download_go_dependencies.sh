@@ -9,7 +9,8 @@ source "${REPO_ROOT}/scripts/lib_go_modules.sh"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lib_go_tools.sh"
 
-# `go mod download` rewrites go.work.sum and the member go.sum files. This
+# `go mod download all` pulls a wider set than `go mod tidy` records, so it
+# rewrites tools/external/go.sum. This
 # script only warms the module cache, so snapshot the checked-in checksums and
 # put them back when it finishes. Copies are used rather than `git checkout` so
 # a contributor running this locally keeps any unrelated edits. A dirty tree

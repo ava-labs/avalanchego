@@ -303,12 +303,23 @@ the smallest Blacksmith instance because it only downloads, and it is gated on
 only. When you move a job onto or off a Blacksmith runner, move its `needs`
 between the two setup jobs at the same time.
 
-The C-Chain re-execution benchmark workflows also run on Blacksmith runners,
-but they do not use `setup-go-for-ci`, so they take part in neither the
-dependency cache nor the `GOPROXY=off` check. Leaving them as they are is
-deliberate: the intended direction is to move their pre-merge coverage into
-`go-ci.yml` rather than give them a third setup job. The Bazel workflows are
-unaffected; they do not use Blacksmith runners.
+The `c-chain-reexecution` job runs the C-Chain re-execution benchmark for pull
+requests. It shares this workflow's setup job, so the repository keeps one Go
+dependency cache instead of two. It sets the benchmark action's
+`manage-go-caches` input to `false`, because two caches that save the same
+directory compete.
+
+The `c-chain-reexecution-benchmark-*` workflows run the other benchmark
+configurations, on dispatch and on a schedule. Those runs keep
+`manage-go-caches` set to `true`. They also use Blacksmith runners and other
+self-hosted runners. The setup jobs here cannot reach those caches. The Bazel
+workflows do not use Blacksmith runners.
+
+`go-required` does not include `c-chain-reexecution`. GitHub skips that job for
+pull requests from forks and Dependabot, because the benchmark action assumes
+an AWS role and those events do not receive that role. `go-required` treats a skipped pre-merge job as a
+failure. Branch protection must name `c-chain-reexecution` directly to gate
+merges on it.
 
 Consumer jobs run with `GOPROXY=off`, so every module they need must already
 be in the restored dependency cache. A miss fails the job and names the missing
@@ -369,8 +380,9 @@ release with that fix, test whether the extra commands can be removed.
 
 Every command that writes `go.work.sum` or a member `go.sum` belongs in that
 task. Warm-up steps elsewhere must leave the checked-in checksums untouched: a
-dirty tree breaks any later step that switches branches, which is how the
-C-Chain benchmark jobs publish their results.
+dirty tree breaks any later step that switches branches. The C-Chain benchmark
+comparison step switches to the gh-pages branch to read stored results, whether
+or not the job publishes.
 
 When reviewing or changing this implementation:
 
@@ -412,7 +424,7 @@ The migration retains these job destinations:
   `tausecondslint`, `links-lint`, `check_generated_protobuf`, `check_mockgen`,
   `check_canotogen`, `check_contract_bindings`, `check_go_mod_tidy`,
   `test_build_image`, `test_build_antithesis_avalanchego_images`,
-  `e2e_bootstrap_monitor`, `load`, and `robustness`
+  `e2e_bootstrap_monitor`, `load`, `robustness`, and `c-chain-reexecution`
 - Coreth full workflow: `lint-coreth` and `e2e-warp-coreth`
 - EVM full workflow: `lint-evm`
 - Subnet-EVM full workflow: `lint-subnet-evm`, `e2e-warp-subnet-evm`,

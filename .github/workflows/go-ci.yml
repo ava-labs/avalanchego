@@ -99,8 +99,13 @@ jobs:
 
   setup:
     runs-on: ${{ inputs.runner }}
+    outputs:
+      has-aws-role: ${{ steps.check-aws-role.outputs.available }}
     steps:
       - uses: actions/checkout@v5
+      - name: Check AWS Role Availability
+        id: check-aws-role
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
@@ -534,6 +539,53 @@ jobs:
         uses: ./.github/actions/collect-kind-diagnostics
         with:
           artifact_name: bootstrap-monitor-kind-diagnostics
+  # This job runs the C-Chain re-execution benchmark for pull requests. It uses
+  # the hashdb-101-250k configuration. The c-chain-reexecution-benchmark-*
+  # workflows run the other configurations, on dispatch and on a schedule.
+  #
+  # Keep push-github-action-benchmark set to false. Only the scheduled runs
+  # publish results. The comparison step still reads the gh-pages branch, so
+  # this job needs a clean working tree.
+  #
+  # The benchmark action assumes an AWS role. Fork PRs and Dependabot PRs use
+  # secret stores without this role, so skip the job rather than fail before it starts.
+  c-chain-reexecution:
+    if: ${{ inputs.run_premerge_jobs && needs.setup.outputs.has-aws-role == 'true' }}
+    needs: setup
+    name: C-Chain re-execution benchmark
+    # One entry, so runs-on and the runner_type input below share a single
+    # source. runner_type becomes the runner label on the exported metrics and
+    # part of the benchmark name, which is the key the comparison step matches
+    # against stored history. A mismatch mislabels results without failing.
+    strategy:
+      matrix:
+        runner: [ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Run C-Chain re-execution benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          test: hashdb-101-250k
+          runner_type: ${{ matrix.runner }}
+          # setup-go-for-ci already manages GOMODCACHE for this job.
+          manage-go-caches: 'false'
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: 'false'
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
   load:
     if: ${{ inputs.run_premerge_jobs }}
     needs: setup

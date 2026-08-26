@@ -48,20 +48,12 @@ runs:
         path: ~/.cache/go-build
         key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
         restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss.
-    #
-    # `go mod download` rewrites go.work.sum and the member go.sum files. These
-    # steps only warm the module cache, so restore the checked-in checksums
-    # afterwards. A dirty tree breaks any later step that switches branches,
-    # which is how the C-Chain benchmark jobs publish to gh-pages. `git -C` is
-    # used because a job may set a working-directory inside a submodule.
-    - run: |
-        nix develop --command go mod download
-        git -C "${GITHUB_WORKSPACE}" checkout -- '*.sum'
+    # Download modules only on cache miss. Neither command rewrites a
+    # checked-in checksum file: `task go-mod-tidy` runs `go mod download`, so
+    # the committed go.work.sum already covers what these want.
+    - run: nix develop --command go mod download
       if: ${{ inputs.cache_go == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
       shell: bash
-    - run: |
-        GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
-        git -C "${GITHUB_WORKSPACE}" checkout -- '*.sum'
+    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
       if: ${{ inputs.cache_go == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
       shell: bash
