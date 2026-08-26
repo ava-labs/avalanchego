@@ -39,7 +39,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. When enabled, trie roots are only persisted every `commit-interval` blocks. | `true` |
-| `commit-interval` | uint64 | Interval at which to persist the state trie (blocks). A value of `0` uses the default. | `4096` |
+| `commit-interval` | uint64 | For HashDB, the interval at which to persist state trie blocks. For pruning Firewood, the maximum number of committed revisions awaiting persistence. Archival Firewood persists every revision. | `4096` |
 | `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
