@@ -18,41 +18,44 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
+	// processIDLabel partitions resource metrics by process.
+	const processIDLabel = "processID"
+
 	m := &metrics{
 		numCPUCycles: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_cpu_cycles",
 				Help: "Total number of CPU cycles",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskReads: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_reads",
 				Help: "Total number of disk reads",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskReadBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_read_bytes",
 				Help: "Total number of disk read bytes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskWrites: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_writes",
 				Help: "Total number of disk writes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 		numDiskWritesBytes: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "num_disk_write_bytes",
 				Help: "Total number of disk write bytes",
 			},
-			[]string{"processID"},
+			[]string{processIDLabel},
 		),
 	}
 	err := errors.Join(

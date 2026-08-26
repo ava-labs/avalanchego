@@ -242,7 +242,7 @@ func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
 	s.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority, time.Now()))
 
 	s.syncing = true
-	ctx, s.cancelCtx = context.WithCancel(ctx)
+	ctx, s.cancelCtx = context.WithCancel(ctx) //#nosec G118 -- workLoop defers close(), and close() calls s.cancelCtx.
 	return ctx, nil
 }
 

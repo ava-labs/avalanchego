@@ -19,6 +19,6 @@ func ChmodR(dir string, dirOnly bool, perm os.FileMode) error {
 		if err != nil || (dirOnly && !info.IsDir()) {
 			return err
 		}
-		return os.Chmod(name, perm)
+		return os.Chmod(name, perm) //#nosec G122 -- the node operator supplies dir.
 	})
 }

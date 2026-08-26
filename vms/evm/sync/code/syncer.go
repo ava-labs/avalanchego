@@ -321,7 +321,7 @@ func verifyCode(hashes []common.Hash, codes [][]byte) error {
 		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(codes), len(hashes))
 	}
 	for i, code := range codes {
-		if got := crypto.Keccak256Hash(code); got != hashes[i] {
+		if got := crypto.Keccak256Hash(code); got != hashes[i] { //#nosec G602 -- the length check above keeps i in range for hashes.
 			return fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
 		}
 	}

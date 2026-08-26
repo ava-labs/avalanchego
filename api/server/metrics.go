@@ -18,27 +18,30 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
+	// baseLabel partitions API metrics by the call's base URL.
+	const baseLabel = "base"
+
 	m := &metrics{
 		numProcessing: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "calls_processing",
 				Help: "The number of calls this API is currently processing",
 			},
-			[]string{"base"},
+			[]string{baseLabel},
 		),
 		numCalls: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "calls",
 				Help: "The number of calls this API has processed",
 			},
-			[]string{"base"},
+			[]string{baseLabel},
 		),
 		totalDuration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "calls_duration",
 				Help: "The total amount of time, in nanoseconds, spent handling API calls",
 			},
-			[]string{"base"},
+			[]string{baseLabel},
 		),
 	}
 
