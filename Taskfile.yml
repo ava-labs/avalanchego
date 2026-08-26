@@ -106,6 +106,8 @@ tasks:
 
   bazel-test-e2e-smoke:
     desc: Run an E2E smoke test with Bazel-built binaries
+    env:
+      E2E_SERIAL: 1
     cmds:
       - task: bazel-build-e2e
       - cmd: |
