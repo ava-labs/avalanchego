@@ -117,12 +117,16 @@ Outside unified Go CI, `setup-go-for-project`, `setup-bazel`, and `install-nix`
 are alternative Go provisioning mechanisms. A job that uses `setup-bazel` can
 also use `install-nix` for dependencies that Bazel does not provide.
 
-Unified Go CI is an intentional exception. Its Go-consuming Nix jobs restore the
-prepared workspace module cache before installing Nix. They disable
-`install-nix`'s standalone Go caches so two cache actions do not restore or save
-the same `GOMODCACHE` or `GOCACHE` paths. Docker-only image builds remain
-independent because their module downloads occur inside Docker build layers,
-not in the runner's prepared `GOMODCACHE`.
+`install-nix` keeps its standalone Go caches off by default, so two cache
+actions do not restore or save the same `GOMODCACHE` or `GOCACHE` paths. A job
+that has no other source of Go dependencies turns them on with `cache_go`. Two
+jobs do that today: the Bazel e2e smoke tests, which build xsvm and ginkgo with
+plain `go` rather than Bazel. When both become Bazel targets, remove those
+opt-ins, and then `cache_go` has no callers left and can be deleted with the
+steps it gates.
+
+Docker-only image builds remain independent because their module downloads occur
+inside Docker build layers, not in the runner's prepared `GOMODCACHE`.
 
 ## Using Nix in GitHub Actions
 
@@ -324,9 +328,13 @@ workflows do not use Blacksmith runners.
 
 `go-required` does not include `c-chain-reexecution`. GitHub skips that job for
 pull requests from forks and Dependabot, because the benchmark action assumes
-an AWS role and those events do not receive that role. `go-required` treats a skipped pre-merge job as a
-failure. Branch protection must name `c-chain-reexecution` directly to gate
-merges on it.
+access to an AWS role identifier secret and GitHub OIDC permission to assume
+that role. Those events do not receive the secret. `go-required` treats a
+skipped pre-merge job as a failure.
+
+Do not use `c-chain-reexecution` as a required branch-protection check. It is
+skipped when the AWS role is unavailable, so it cannot enforce the benchmark for
+every pull request.
 
 Every job that uses `setup-go-for-ci` then runs with `GOPROXY=off`, so every
 module it needs must already be in the cache. A miss fails the job and names the

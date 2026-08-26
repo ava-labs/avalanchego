@@ -6,6 +6,9 @@ inputs:
     description: "github token to authenticate with to avoid being rate-limited"
     default: ${{ github.token }}
     required: false
+  # Only the Bazel e2e smoke jobs set this, because they build xsvm and ginkgo
+  # with plain go. Delete this input and the four steps it gates once both are
+  # Bazel targets.
   cache_go:
     description: 'Restore and save the standalone Nix job Go caches. Set true only for a job that has no other source of Go dependencies.'
     default: 'false'
