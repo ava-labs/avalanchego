@@ -161,7 +161,7 @@ func newHandlerMetrics(namespace string, reg prometheus.Registerer) (*handlerMet
 		proofShrinkNewKeyLimit: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "proof_shrink_new_key_limit",
-			Help:      "key limit after halving because a generated proof exceeded the byte limit; the count is the total number of shrink events",
+			Help:      "key limit after halving because a generated proof exceeded the byte limit",
 			Buckets:   keyLimitBuckets,
 		}, []string{proofTypeLabel}),
 	}
