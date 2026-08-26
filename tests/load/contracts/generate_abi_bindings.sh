@@ -34,6 +34,17 @@ should_skip() {
   return 1
 }
 
+# `go run pkg@version` always queries the module proxy for the module's
+# deprecation notice, which is a @latest query rather than a pinned lookup. No
+# amount of module-cache warming satisfies it, so it cannot run under the
+# GOPROXY=off that CI test jobs use. CI therefore builds the pinned binary in
+# its setup job and points ABIGEN_BIN at it. Locally, `go run` is fine.
+if [[ -n "${ABIGEN_BIN:-}" && -x "${ABIGEN_BIN}" ]]; then
+  ABIGEN=("${ABIGEN_BIN}")
+else
+  ABIGEN=(go run "${ABIGEN_PKG}")
+fi
+
 for FILE in "${CONTRACTS_DIR}"/*.sol; do
   FILE_NAME=$(basename "$FILE")
   if should_skip "$FILE_NAME"; then
@@ -45,9 +56,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  # ABIGEN_PKG is pinned in scripts/lib_go_tools.sh, which the CI dependency
-  # download also reads so this `go run` resolves from the module cache.
-  go run "${ABIGEN_PKG}" \
+  "${ABIGEN[@]}" \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \

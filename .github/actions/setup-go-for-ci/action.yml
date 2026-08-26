@@ -63,58 +63,82 @@ runs:
     # `go mod download` rewrites go.sum and tools/external/go.sum, so a key
     # evaluated after it hashes different bytes in the setup job than in its
     # consumers, and the two never match. Keep cache steps ahead of it.
-    # Every job that does not find task on PATH builds it from tools/external,
-    # which costs about 15 seconds. Build it once in setup and share the binary.
-    # Caching the binary instead of the GOCACHE that produced it moves ~13MB
-    # rather than ~150MB, and avoids restoring a second cache into the GOCACHE
-    # path this action already manages for cacheable test jobs.
-    - id: task-bin
+    # Two tools are shared as prebuilt binaries rather than resolved per job.
+    #
+    # task: every job that does not find it on PATH builds it from
+    # tools/external, which costs about 15 seconds. Caching the binary instead
+    # of the GOCACHE that produced it moves ~13MB rather than ~150MB, and avoids
+    # restoring a second cache into the GOCACHE path this action already manages
+    # for cacheable test jobs.
+    #
+    # abigen: `go run pkg@version` always queries the proxy for the module's
+    # deprecation notice, which is a @latest query rather than a pinned version.
+    # No amount of module-cache warming satisfies it, so under GOPROXY=off the
+    # only way to run a versioned tool is to have the binary already built.
+    - id: tool-bin
       shell: bash
-      run: echo "dir=${HOME}/.cache/avalanchego/task-bin" >> "$GITHUB_OUTPUT"
+      run: echo "dir=${HOME}/.cache/avalanchego/tool-bin" >> "$GITHUB_OUTPUT"
 
-    - name: Restore and save the task binary
+    - name: Restore and save the tool binaries
       if: ${{ inputs.initial_setup == 'true' }}
       uses: actions/cache@v5
       with:
-        path: ${{ steps.task-bin.outputs.dir }}
-        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', '.github/actions/setup-go-for-ci/action.yml') }}
+        path: ${{ steps.tool-bin.outputs.dir }}
+        key: go-tools-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/lib_go_tools.sh', '.github/actions/setup-go-for-ci/action.yml') }}
 
-    # The key covers what determines the binary: the tool module files and the
-    # Go version source. Keep it a subset of the dependency-cache inputs, which
-    # are known to hash the same in the setup job and its consumers.
+    # The key covers what determines the binaries: the tool module files, the
+    # versioned tool pins, and the Go version source. Keep it a subset of the
+    # dependency-cache inputs, which are known to hash the same in the setup job
+    # and its consumers.
     #
-    # No restore-keys: a binary built from a different tools/external or Go
-    # version must not be reused. A miss simply falls back to building task.
-    - name: Restore the task binary
+    # No restore-keys: a binary built from different pins or a different Go
+    # version must not be reused.
+    - name: Restore the tool binaries
       if: ${{ inputs.initial_setup != 'true' }}
       uses: actions/cache/restore@v5
       with:
-        path: ${{ steps.task-bin.outputs.dir }}
-        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', '.github/actions/setup-go-for-ci/action.yml') }}
+        path: ${{ steps.tool-bin.outputs.dir }}
+        key: go-tools-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/lib_go_tools.sh', '.github/actions/setup-go-for-ci/action.yml') }}
 
-    - name: Build the task binary
+    - name: Build the tool binaries
       if: ${{ inputs.initial_setup == 'true' }}
       shell: bash
       run: |
-        task_bin="${{ steps.task-bin.outputs.dir }}/task"
-        if [[ -x "${task_bin}" ]]; then
+        source ./scripts/lib_go_tools.sh
+        dir="${{ steps.tool-bin.outputs.dir }}"
+        mkdir -p "${dir}"
+
+        if [[ -x "${dir}/task" ]]; then
           echo "Reusing the cached task binary."
-          exit 0
+        else
+          cp "$(./scripts/run_tool.sh -n task)" "${dir}/task"
+          chmod +x "${dir}/task"
         fi
-        mkdir -p "${{ steps.task-bin.outputs.dir }}"
-        cp "$(./scripts/run_tool.sh -n task)" "${task_bin}"
-        chmod +x "${task_bin}"
+
+        if [[ -x "${dir}/abigen" ]]; then
+          echo "Reusing the cached abigen binary."
+        else
+          GOWORK=off GOBIN="${dir}" go install "${ABIGEN_PKG}"
+        fi
 
     # Putting task on PATH also keeps run_task.sh off its go fallback, which
-    # has to build task with GOWORK=off. A miss is not fatal; the fallback
-    # still works.
-    - name: Use the cached task binary
+    # has to build task with GOWORK=off. A task miss is not fatal, since that
+    # fallback still works; an abigen miss fails under GOPROXY=off.
+    - name: Use the cached tool binaries
       shell: bash
       run: |
-        if [[ -x "${{ steps.task-bin.outputs.dir }}/task" ]]; then
-          echo "${{ steps.task-bin.outputs.dir }}" >> "$GITHUB_PATH"
+        dir="${{ steps.tool-bin.outputs.dir }}"
+        if [[ -x "${dir}/task" ]]; then
+          echo "${dir}" >> "$GITHUB_PATH"
         else
           echo "No cached task binary; run_task.sh will build one."
+        fi
+        # Named explicitly rather than found on PATH, so an unrelated abigen on
+        # a developer's PATH cannot silently generate bindings.
+        if [[ -x "${dir}/abigen" ]]; then
+          echo "ABIGEN_BIN=${dir}/abigen" >> "$GITHUB_ENV"
+        else
+          echo "No cached abigen binary; generation will use go run."
         fi
 
     - name: Download workspace Go dependencies
