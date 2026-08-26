@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// An 0x address owns a P-chain UTXO and spends it with a warp message sent
-// from that address on the C-chain instead of a secp256k1 signature.
+// An 0x address owns a P-chain UTXO and spends it with a warp message the
+// trusted helper sends on its behalf instead of a secp256k1 signature.
 func TestWarpCredentialSpendsUTXO(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t, upgradetest.Latest)
@@ -46,7 +46,8 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 
 	// Fund an EVM-style owner (any 20 bytes).
 	owner := ids.ShortID{0xde, 0xad, 0xbe, 0xef}
-	helper := secp256k1fx.WarpHelperAddresses.List()[0]
+	helper := ids.ShortID{0xca, 0xfe}
+	vm.fx.(*secp256k1fx.Fx).WarpHelpers = set.Of(helper)
 	wallet := newWallet(t, vm, walletConfig{})
 	fundTx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
@@ -98,11 +99,11 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 	}
 
 	vm.ctx.Lock.Unlock()
-	// A stranger claiming to be the owner, and the helper naming a stranger.
-	require.ErrorIs(vm.issueTxFromRPC(newTx(ids.GenerateTestShortID(), owner)), secp256k1fx.ErrWrongWarpSourceAddr)
+	// The owner sending directly, and the helper naming a stranger.
+	require.ErrorIs(vm.issueTxFromRPC(newTx(owner, owner)), secp256k1fx.ErrWrongWarpSourceAddr)
 	require.ErrorIs(vm.issueTxFromRPC(newTx(helper, ids.GenerateTestShortID())), secp256k1fx.ErrWrongWarpSourceAddr)
 
-	spendTx := newTx(owner, owner)
+	spendTx := newTx(helper, owner)
 	require.NoError(vm.issueTxFromRPC(spendTx))
 	vm.ctx.Lock.Lock()
 	require.NoError(buildAndAcceptStandardBlock(vm))

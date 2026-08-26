@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
@@ -19,12 +20,12 @@ func TestFxVerifyWarpCredential(t *testing.T) {
 	require := require.New(t)
 
 	vm := TestVM{Codec: linearcodec.NewDefault(), Log: logging.NoLog{}}
-	fx := Fx{}
+	helper := ids.ShortID{2}
+	fx := Fx{WarpHelpers: set.Of(helper)}
 	require.NoError(fx.Initialize(&vm))
 
 	tx := &TestTx{UnsignedBytes: []byte{0, 1, 2, 3}}
 	sender := ids.ShortID{1}
-	helper := WarpHelperAddresses.List()[0]
 	other := ids.ShortID{0}
 	good := append(sender[:], tx.UnsignedBytes...)
 
@@ -43,18 +44,18 @@ func TestFxVerifyWarpCredential(t *testing.T) {
 	utxo := &TransferOutput{Amt: 1, OutputOwners: *owners}
 	tin := &TransferInput{Amt: 1, Input: *in}
 
-	// Owner sends the message itself.
-	require.NoError(fx.VerifyTransfer(tx, tin, newCred(sender[:], good), utxo))
-	require.NoError(fx.VerifyPermission(tx, in, newCred(sender[:], good), owners))
-	// The trusted helper sends it on the owner's behalf.
+	// The trusted helper sends the message on the owner's behalf.
 	require.NoError(fx.VerifyTransfer(tx, tin, newCred(helper[:], good), utxo))
+	require.NoError(fx.VerifyPermission(tx, in, newCred(helper[:], good), owners))
 
+	// The owner itself, a stranger, and a short address are not helpers.
+	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], good), utxo), ErrWrongWarpSourceAddr)
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(other[:], good), utxo), ErrWrongWarpSourceAddr)
-	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], append(other[:], tx.UnsignedBytes...)), utxo), ErrWrongWarpSourceAddr)
+	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(helper[:3], good), utxo), ErrWrongWarpSourceAddr)
+	// The helper names someone other than the UTXO owner.
 	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(helper[:], append(other[:], tx.UnsignedBytes...)), utxo), ErrWrongWarpSourceAddr)
-	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], append(sender[:], 9)), utxo), ErrWrongWarpPayload)
-	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:], []byte("short")), utxo), ErrWrongWarpPayload)
-	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(sender[:3], good), utxo), ErrWrongWarpSourceAddrL)
-	require.ErrorIs(fx.VerifyTransfer(tx, &TransferInput{Amt: 2, Input: *in}, newCred(sender[:], good), utxo), ErrMismatchedAmounts)
-	require.ErrorIs(fx.VerifyTransfer(tx, &TransferInput{Amt: 1}, newCred(sender[:], good), utxo), ErrTooFewSigners)
+	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(helper[:], append(sender[:], 9)), utxo), ErrWrongWarpPayload)
+	require.ErrorIs(fx.VerifyTransfer(tx, tin, newCred(helper[:], []byte("short")), utxo), ErrWrongWarpPayload)
+	require.ErrorIs(fx.VerifyTransfer(tx, &TransferInput{Amt: 2, Input: *in}, newCred(helper[:], good), utxo), ErrMismatchedAmounts)
+	require.ErrorIs(fx.VerifyTransfer(tx, &TransferInput{Amt: 1}, newCred(helper[:], good), utxo), ErrTooFewSigners)
 }

@@ -16,26 +16,22 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	warpclient "github.com/ava-labs/avalanchego/graft/coreth/warp"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
 	relayQuorum  = 67
 	relayPoll    = time.Second
 	relayMaxSpan = 1000 // blocks per log query
-	maxUTXOs     = 1024 // platform.getUTXOs page cap
 )
 
 // Relayer carries helper-contract warp messages to the P-chain. It holds no
 // keys and no funds: the fee is paid by the tx's own inputs. A message whose
 // inputs are already spent (by this relayer before a restart, by another
-// relayer, or by the owner) is finished and skipped, so rescanning old
-// blocks is harmless and racing relayers cannot stall each other.
+// relayer, or by the owner) is rejected by the node and dropped, so
+// rescanning old blocks is harmless and racing relayers cannot stall each
+// other.
 type Relayer struct {
 	Log    logging.Logger
 	Eth    *ethclient.Client
@@ -96,23 +92,9 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 	if err != nil {
 		return fmt.Errorf("aggregating signatures for %s: %w", unsigned.ID(), err)
 	}
-	tx, owner, err := Wrap(signed)
+	tx, err := Wrap(signed)
 	if err != nil {
 		r.Log.Warn("dropping message with unparsable tx", zap.Stringer("messageID", unsigned.ID()), zap.Error(err))
-		return nil
-	}
-
-	spendable, err := r.spendableUTXOs(ctx, owner, tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("fetching UTXOs of %s: %w", owner, err)
-	}
-	unspent := tx.Unsigned.InputIDs()
-	unspent.Difference(spendable) // removes the inputs that still exist
-	if unspent.Len() > 0 {
-		r.Log.Info("skipping message whose inputs are already spent",
-			zap.Stringer("messageID", unsigned.ID()),
-			zap.Stringer("txID", tx.ID()),
-		)
 		return nil
 	}
 
@@ -130,28 +112,4 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 		zap.Stringer("txID", txID),
 	)
 	return nil
-}
-
-// spendableUTXOs returns the IDs of the UTXOs [owner] can spend in [unsigned]:
-// its P-chain UTXOs, plus the shared-memory UTXOs an ImportTx pulls in.
-func (r *Relayer) spendableUTXOs(ctx context.Context, owner ids.ShortID, unsigned txs.UnsignedTx) (set.Set[ids.ID], error) {
-	sourceChains := []string{""}
-	if importTx, ok := unsigned.(*txs.ImportTx); ok {
-		sourceChains = append(sourceChains, importTx.SourceChain.String())
-	}
-	utxoIDs := set.Set[ids.ID]{}
-	for _, sourceChain := range sourceChains {
-		utxosBytes, _, _, err := r.PChain.GetAtomicUTXOs(ctx, []ids.ShortID{owner}, sourceChain, maxUTXOs, ids.ShortEmpty, ids.Empty)
-		if err != nil {
-			return nil, err
-		}
-		for _, utxoBytes := range utxosBytes {
-			utxo := &avax.UTXO{}
-			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-				return nil, err
-			}
-			utxoIDs.Add(utxo.InputID())
-		}
-	}
-	return utxoIDs, nil
 }

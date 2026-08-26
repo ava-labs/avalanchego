@@ -116,9 +116,6 @@ func (vm *VM) Initialize(
 	if len(helpers) == 0 {
 		helpers = config.DefaultWarpHelperAddresses[chainCtx.NetworkID]
 	}
-	if len(helpers) > 0 {
-		secp256k1fx.WarpHelperAddresses = set.Of(helpers...)
-	}
 
 	registerer, err := metrics.MakeAndRegister(chainCtx.Metrics, "")
 	if err != nil {
@@ -136,7 +133,7 @@ func (vm *VM) Initialize(
 
 	// Note: this codec is never used to serialize anything
 	vm.codecRegistry = linearcodec.NewDefault()
-	vm.fx = &secp256k1fx.Fx{}
+	vm.fx = &secp256k1fx.Fx{WarpHelpers: set.Of(helpers...)}
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}

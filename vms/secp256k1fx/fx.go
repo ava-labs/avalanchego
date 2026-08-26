@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -35,7 +37,11 @@ var (
 
 // Fx describes the secp256k1 feature extension
 type Fx struct {
-	VM           VM
+	VM VM
+	// WarpHelpers are the C-chain contracts trusted to send a WarpCredential
+	// naming the real owner. A list so that a new helper version can be added
+	// without dropping the old one.
+	WarpHelpers  set.Set[ids.ShortID]
 	bootstrapped bool
 	recoverCache *secp256k1.RecoverCache
 }

@@ -16,9 +16,9 @@ when:
 
 - BLS quorum of the primary network signed it and its source chain is the
   C-chain (`txs/executor/warp_verifier.go`, same check as ACP-77 txs),
-- the source address is the owner itself, or one of the trusted helper
-  contracts (`config.DefaultWarpHelperAddresses`, override with the P-chain
-  chain config key `warp-helper-addresses`),
+- the source address is one of the trusted helper contracts
+  (`config.DefaultWarpHelperAddresses`, override with the P-chain chain
+  config key `warp-helper-addresses`),
 - the tx bytes equal the tx being verified, and every owner slot the input
   names is `owner` (`vms/secp256k1fx/warp_credential.go`).
 

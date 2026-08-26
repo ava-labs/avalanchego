@@ -18,24 +18,22 @@ import (
 var errShortPayload = errors.New("warp payload shorter than an owner address")
 
 // Wrap rebuilds the P-chain tx carried by a signed warp message and attaches
-// the message as the credential for every input and authorization. It also
-// returns the owner named in the payload.
-func Wrap(signedMessage []byte) (*txs.Tx, ids.ShortID, error) {
+// the message as the credential for every input and authorization.
+func Wrap(signedMessage []byte) (*txs.Tx, error) {
 	msg, err := warp.ParseMessage(signedMessage)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 	call, err := payload.ParseAddressedCall(msg.Payload)
 	if err != nil {
-		return nil, ids.ShortEmpty, err
+		return nil, err
 	}
 	if len(call.Payload) < ids.ShortIDLen {
-		return nil, ids.ShortEmpty, errShortPayload
+		return nil, errShortPayload
 	}
-	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
 	var unsigned txs.UnsignedTx
 	if _, err := txs.Codec.Unmarshal(call.Payload[ids.ShortIDLen:], &unsigned); err != nil {
-		return nil, ids.ShortEmpty, fmt.Errorf("parsing tx from warp payload: %w", err)
+		return nil, fmt.Errorf("parsing tx from warp payload: %w", err)
 	}
 
 	numCreds := len(unsigned.InputIDs())
@@ -52,5 +50,5 @@ func Wrap(signedMessage []byte) (*txs.Tx, ids.ShortID, error) {
 		creds[i] = &secp256k1fx.WarpCredential{Message: signedMessage}
 	}
 	tx := &txs.Tx{Unsigned: unsigned, Creds: creds}
-	return tx, owner, tx.Initialize(txs.Codec)
+	return tx, tx.Initialize(txs.Codec)
 }

@@ -51,9 +51,8 @@ func TestWrapCredentialCount(t *testing.T) {
 		msg, err := warp.NewMessage(unsignedMsg, &warp.BitSetSignature{})
 		require.NoError(t, err)
 
-		tx, gotOwner, err := Wrap(msg.Bytes())
+		tx, err := Wrap(msg.Bytes())
 		require.NoError(t, err, "%T", test.tx)
-		require.Equal(t, owner, gotOwner)
 		require.Len(t, tx.Creds, test.numCreds, "%T", test.tx)
 		for _, cred := range tx.Creds {
 			require.Equal(t, &secp256k1fx.WarpCredential{Message: msg.Bytes()}, cred)
