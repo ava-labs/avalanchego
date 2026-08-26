@@ -80,7 +80,7 @@ func TestFirewoodSync(t *testing.T) {
 			assertFirewoodConsistency(t, root, clientState, accounts)
 
 			// Code queue should be closed.
-			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
+			err := codeQueue.AddCode([]common.Hash{{1}})
 			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
@@ -134,7 +134,7 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			require.NoError(t, firewoodSyncer.Finalize())
 
 			// After finalize, the queue should reject new code additions.
-			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
+			err := codeQueue.AddCode([]common.Hash{{1}})
 			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
