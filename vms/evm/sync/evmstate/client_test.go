@@ -9,12 +9,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -22,191 +20,201 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// serve registers the leaf handler for trieDB on a loopback network and returns
-// a client bound to it, so a test drives both halves of the protocol.
-func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...HandlerOption) *Client {
-	t.Helper()
-	log := loggingtest.New(t, logging.Debug)
-	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
-	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
-}
-
-func TestClient_FetchLeaves(t *testing.T) {
+// This test verifies that the client drops invalid responses and retries the
+// request until a response verifies or cancellation ends the fetch.
+func TestClient_Retries(t *testing.T) {
 	t.Parallel()
 
+	trieDB := synctest.NewTrieDB()
+	root, keys, vals := synctest.FillTrie(t, trieDB, maxLimit)
+
+	const cancelAfter = 3
 	tests := []struct {
-		name    string
-		numKeys int
-		// startAt indexes the first leaf wanted, 0 leaves the start key unset.
-		startAt  int
-		account  *common.Hash
-		limit    uint16
-		wantLen  int
-		wantMore bool
+		name   string
+		numBad int
+
+		want    Leaves
+		wantErr error
 	}{
 		{
-			name:    "whole_trie",
-			numKeys: 50,
-			limit:   maxLimit,
-			wantLen: 50,
+			name:   "recovers_from_invalid_response",
+			numBad: 1,
+			want: Leaves{
+				Keys: keys,
+				Vals: vals,
+			},
 		},
 		{
-			name:     "bounded_by_limit",
-			numKeys:  200,
-			limit:    20,
-			wantLen:  20,
-			wantMore: true,
-		},
-		{
-			name:    "from_start_key",
-			numKeys: 50,
-			startAt: 10,
-			limit:   maxLimit,
-			wantLen: 40,
-		},
-		{
-			name:    "storage_trie",
-			numKeys: 50,
-			account: utils.PointerTo(common.HexToHash("0xa11ce")),
-			limit:   maxLimit,
-			wantLen: 50,
+			name:    "cancellation_ends_retries",
+			numBad:  cancelAfter,
+			want:    Leaves{},
+			wantErr: context.Canceled,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
 
-			trieDB := synctest.NewTrieDB()
-			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 
-			var start []byte
-			if tt.startAt > 0 {
-				start = keys[tt.startAt]
-			}
-
-			client := serve(t, ctx, trieDB)
-			got, more, err := client.FetchLeaves(ctx, LeafRange{
-				Root:    root,
-				Account: tt.account,
-				Start:   start,
-				Limit:   tt.limit,
+			log := loggingtest.New(t, logging.Debug)
+			responder := newLeafResponder(t, trieDB)
+			tampering := synctest.NewMutatingResponder(responder, tt.numBad, func(resp *syncpb.GetLeafResponse) {
+				*resp = syncpb.GetLeafResponse{} // Empty responses are invalid.
 			})
-			require.NoError(t, err)
+			recording := synctest.NewRecordingResponder(tampering)
+			net, tracker := synctest.ServeResponder(
+				t,
+				ctx,
+				log,
+				p2p.EVMLeafRequestHandlerID,
+				synctest.NewCancelAfter(recording, cancelAfter, cancel),
+			)
+			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
 
-			to := tt.startAt + tt.wantLen
-			require.Equal(t, keys[tt.startAt:to], got.Keys)
-			require.Equal(t, vals[tt.startAt:to], got.Vals)
-			require.Equal(t, tt.wantMore, more)
+			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.want, got, "a tampered range must never be returned")
+			require.False(t, more)
+
+			wantRequests := min(tt.numBad+1, cancelAfter)
+			require.Len(t, recording.Requests(), wantRequests)
 		})
 	}
 }
 
-// Without verification the client would hand a corrupted range to its caller.
-func TestClient_RetriesInvalidResponses(t *testing.T) {
+// This test verifies the error each corruption of a served response produces.
+func TestVerifyRange(t *testing.T) {
 	t.Parallel()
 
+	const numSlots = 50
 	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
+	root, keys, vals := synctest.FillTrie(t, trieDB, numSlots)
+	responder := newLeafResponder(t, trieDB)
 
+	const limit = 20
+	maxKey := slices.Repeat([]byte{0xff}, common.HashLength)
 	tests := []struct {
-		name   string
-		tamper func(*syncpb.GetLeafResponse)
+		name     string
+		start    []byte
+		tamper   func(*syncpb.GetLeafResponse)
+		wantMore bool
+		wantErr  error
 	}{
+		{
+			name:     "valid_response",
+			wantMore: true,
+		},
+		{
+			name:     "valid_from_start_key",
+			start:    keys[10],
+			wantMore: true,
+		},
+		{
+			name:  "valid_to_trie_end",
+			start: keys[numSlots-limit],
+		},
+		{
+			name:  "valid_exclusion_only",
+			start: maxKey,
+		},
 		{
 			name: "incorrect_key",
 			tamper: func(resp *syncpb.GetLeafResponse) {
 				resp.Keys[0][0]++
 			},
+			wantErr: errInvalidRangeProof,
 		},
 		{
-			name: "incorrect_value",
+			name:  "incorrect_value",
+			start: keys[10],
 			tamper: func(resp *syncpb.GetLeafResponse) {
 				resp.Values[0][0]++
 			},
+			wantErr: errInvalidRangeProof,
 		},
 		{
-			name: "missing_slot",
+			name:  "missing_first_slot",
+			start: keys[10],
 			tamper: func(resp *syncpb.GetLeafResponse) {
 				resp.Keys = resp.Keys[1:]
 				resp.Values = resp.Values[1:]
 			},
+			wantErr: errInvalidRangeProof,
 		},
 		{
-			name: "trailing_incorrect_slot",
+			name: "truncated_response",
 			tamper: func(resp *syncpb.GetLeafResponse) {
-				resp.Keys = append(resp.Keys, slices.Repeat([]byte{0xff}, common.HashLength))
+				resp.Keys = resp.Keys[:1]
+				resp.Values = resp.Values[:1]
+			},
+			wantErr: errInvalidRangeProof,
+		},
+		{
+			name:  "mutated_last_key",
+			start: keys[25],
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys[len(resp.Keys)-1] = maxKey
+			},
+			wantErr: errInvalidRangeProof,
+		},
+		{
+			name:  "leaf_before_start_key",
+			start: keys[10],
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys[0] = keys[9]
+				resp.Values[0] = vals[9]
+			},
+			wantErr: errInvalidRangeProof,
+		},
+		{
+			name:  "exceeds_limit",
+			start: keys[5],
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys = append(resp.Keys, resp.Keys[0])
 				resp.Values = append(resp.Values, resp.Values[0])
 			},
+			wantErr: errTooManyLeaves,
 		},
 		{
-			name: "missing_proof",
+			name:  "missing_proof",
+			start: keys[35],
 			tamper: func(resp *syncpb.GetLeafResponse) {
 				resp.ProofVals = nil
 			},
+			wantErr: errInvalidRangeProof,
 		},
 		{
 			name: "empty_response",
 			tamper: func(resp *syncpb.GetLeafResponse) {
 				*resp = syncpb.GetLeafResponse{}
 			},
+			wantErr: errInvalidRangeProof,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
 
-			const limit = 20
+			resp, appErr := responder.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+				RootHash: root.Bytes(),
+				StartKey: tt.start,
+				KeyLimit: limit,
+			})
+			require.Nil(t, appErr)
+			if tt.tamper != nil {
+				tt.tamper(resp)
+			}
 
-			log := loggingtest.New(t, logging.Debug)
+			start := tt.start
+			if len(start) == 0 {
+				start = make([]byte, common.HashLength)
+			}
 
-			tampering := synctest.NewMutatingResponder(newLeafResponder(t, trieDB), 1, tt.tamper)
-			recording := synctest.NewRecordingResponder(tampering)
-			net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMLeafRequestHandlerID, recording)
-			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
-
-			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: limit})
-			require.NoError(t, err)
-
-			require.Equal(t, keys[:limit], got.Keys)
-			require.Equal(t, vals[:limit], got.Vals)
-			require.True(t, more)
-			require.Len(t, recording.Requests(), 2, "the invalid response must be re-requested")
+			more, err := verifyRange(root, start, limit, resp)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.wantMore, more)
 		})
 	}
-}
-
-// Incorrect responses should be retried until either a correct response is
-// received or the context is cancelled. This test verifies that the context
-// cancellation gracefully exists.
-func TestClient_CancelEndsRetries(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, 50)
-	log := loggingtest.New(t, logging.Debug)
-
-	const attempts = 3
-	responder := newLeafResponder(t, trieDB)
-	tampering := synctest.NewMutatingResponder(responder, attempts, func(resp *syncpb.GetLeafResponse) {
-		*resp = syncpb.GetLeafResponse{} // Empty responses are invalid.
-	})
-	net, tracker := synctest.ServeResponder(
-		t,
-		ctx,
-		log,
-		p2p.EVMLeafRequestHandlerID,
-		synctest.NewCancelAfter(tampering, attempts, cancel),
-	)
-	client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
-
-	got, _, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
-	require.ErrorIs(t, err, context.Canceled, "a tampered range must never be returned")
-	require.Zero(t, got)
 }

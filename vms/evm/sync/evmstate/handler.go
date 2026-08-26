@@ -300,7 +300,7 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) 
 	if err != nil || len(keys) == 0 {
 		// Since the snapshot is volatile, an error or an empty read falls
 		// back to the trie.
-		return true, nil
+		return true, nil //nolint:nilerr // The snapshot is only optimistic, an error is not fatal.
 	}
 
 	// The whole read often proves in one shot, avoiding per-segment proofs.

@@ -12,10 +12,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
@@ -24,6 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -792,16 +790,27 @@ func rawResponse(t *testing.T, ctx context.Context, c *Client, req *syncpb.GetLe
 	return resp
 }
 
+// serve registers the leaf handler for trieDB on a loopback network and returns
+// a client bound to it, so a test drives both halves of the protocol.
+func serve(t *testing.T, ctx context.Context, trieDB *triedb.Database, opts ...HandlerOption) *Client {
+	t.Helper()
+	log := loggingtest.New(t, logging.Debug)
+	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	require.NoError(t, RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, trieDB, common.HashLength, opts...))
+	return NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+}
+
 func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 	t.Parallel()
 
 	const numLeaves = 50
 
 	tests := []struct {
-		name string
+		name  string
+		build func(*testing.T, *triedb.Database, int) snapshotCase
 		// startAt indexes the first leaf wanted, 0 leaves the start key unset.
 		startAt   int
-		keyLimit  uint32
+		keyLimit  uint16
 		wantLen   int
 		wantProof bool
 		wantMore  bool
@@ -809,11 +818,13 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 	}{
 		{
 			name:     "whole_trie_carries_no_proof",
+			build:    newAccountCase,
 			keyLimit: numLeaves,
 			wantLen:  numLeaves,
 		},
 		{
 			name:      "partial_range_carries_a_proof",
+			build:     newAccountCase,
 			keyLimit:  20,
 			wantLen:   20,
 			wantProof: true,
@@ -823,6 +834,7 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 		// reaching the end from a start key does not make the root sufficient.
 		{
 			name:      "range_to_the_end_still_carries_a_proof",
+			build:     newAccountCase,
 			startAt:   10,
 			keyLimit:  numLeaves,
 			wantLen:   numLeaves - 10,
@@ -830,11 +842,18 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 		},
 		{
 			name:      "partial_range_from_a_snapshot_carries_a_proof",
+			build:     newAccountCase,
 			keyLimit:  20,
 			wantLen:   20,
 			wantProof: true,
 			wantMore:  true,
 			snapshot:  true,
+		},
+		{
+			name:     "storage_trie",
+			build:    newStorageCase,
+			keyLimit: numLeaves,
+			wantLen:  numLeaves,
 		},
 	}
 
@@ -844,38 +863,48 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			ctx := t.Context()
 			trieDB := synctest.NewTrieDB()
 
-			c := newAccountCase(t, trieDB, numLeaves)
-			root, keys, vals := c.root, c.keys, c.vals
+			c := tt.build(t, trieDB, numLeaves)
 
 			var opts []HandlerOption
 			if tt.snapshot {
 				opts = append(opts, WithSnapshot(c.snap))
 			}
 
-			firstKey := bytes.Repeat([]byte{0x00}, common.HashLength)
+			var account *common.Hash
+			if len(c.accountHash) > 0 {
+				account = utils.PointerTo(common.BytesToHash(c.accountHash))
+			}
 			var startKey []byte
 			if tt.startAt > 0 {
-				startKey = keys[tt.startAt]
-				firstKey = startKey
+				startKey = c.keys[tt.startAt]
 			}
 
-			// The wire response carries the proof, which the verified client
-			// consumes rather than returns, so this asserts at the transport.
-			resp := rawResponse(t, ctx, serve(t, ctx, trieDB, opts...), &syncpb.GetLeafRequest{
-				RootHash: root.Bytes(),
-				StartKey: startKey,
-				KeyLimit: tt.keyLimit,
-			})
+			client := serve(t, ctx, trieDB, opts...)
 
-			to := tt.startAt + tt.wantLen
-			require.Equal(t, keys[tt.startAt:to], resp.GetKeys())
-			require.Equal(t, vals[tt.startAt:to], resp.GetValues())
+			// The wire response carries the proof, which the verified client
+			// consumes rather than returns, so proof presence asserts at the
+			// transport.
+			resp := rawResponse(t, ctx, client, &syncpb.GetLeafRequest{
+				RootHash:    c.root.Bytes(),
+				AccountHash: c.accountHash,
+				StartKey:    startKey,
+				KeyLimit:    uint32(tt.keyLimit),
+			})
 			require.Equal(t, tt.wantProof, len(resp.GetProofVals()) > 0, "proof presence")
 
-			// libevm is the oracle for the proof the handler emits.
-			more, err := trie.VerifyRangeProof(root, firstKey,
-				resp.GetKeys(), resp.GetValues(), proofFrom(t, resp.GetProofVals()))
+			// The client verifies the range with libevm before returning it, so
+			// a successful fetch is also the handler's proof passing the oracle.
+			got, more, err := client.FetchLeaves(ctx, LeafRange{
+				Root:    c.root,
+				Account: account,
+				Start:   startKey,
+				Limit:   tt.keyLimit,
+			})
 			require.NoError(t, err)
+
+			to := tt.startAt + tt.wantLen
+			require.Equal(t, c.keys[tt.startAt:to], got.Keys)
+			require.Equal(t, c.vals[tt.startAt:to], got.Vals)
 			require.Equal(t, tt.wantMore, more)
 
 			if tt.snapshot {
@@ -885,21 +914,6 @@ func TestRegisterHandler_ServesOverNetwork(t *testing.T) {
 			}
 		})
 	}
-}
-
-// proofFrom rebuilds proof nodes keyed by hash. Nil for a whole-trie response,
-// which VerifyRangeProof then checks against the root alone.
-func proofFrom(t *testing.T, vals [][]byte) ethdb.Database {
-	t.Helper()
-	if len(vals) == 0 {
-		return nil
-	}
-	db := rawdb.NewMemoryDatabase()
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	for _, v := range vals {
-		require.NoError(t, db.Put(crypto.Keccak256(v), v))
-	}
-	return db
 }
 
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
