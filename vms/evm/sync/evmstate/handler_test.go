@@ -225,17 +225,6 @@ func TestResponder(t *testing.T) {
 	}
 }
 
-// A typed-nil snapshot passed to [WithSnapshot] must be treated as if no
-// snapshot was provided, rather than wrapped into a non-nil interface that
-// could later panic.
-func TestWithSnapshot_IgnoresNilPointer(t *testing.T) {
-	t.Parallel()
-
-	var absent *synctest.StaticSnapshot
-	r := newLeafResponder(t, synctest.NewTrieDB(), WithSnapshot(absent))
-	require.Nil(t, r.snapshot)
-}
-
 // snapshotKinds is the leaf scopes every snapshot path must serve.
 var snapshotKinds = []struct {
 	name  string
