@@ -72,13 +72,11 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest, c codec.Manager) {
 	require.NoError(t, err)
 	go func() {
 		for _, codeHashes := range test.codeRequestHashes {
-			if err := codeQueue.AddCode(t.Context(), codeHashes); err != nil {
+			if err := codeQueue.AddCode(codeHashes); err != nil {
 				require.ErrorIs(t, err, test.err)
 			}
 		}
-		if err := codeQueue.Finalize(); err != nil {
-			require.ErrorIs(t, err, test.err)
-		}
+		codeQueue.DoneAdding()
 	}()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -320,7 +318,7 @@ func TestCodeSyncerDuplicateAddCodeNoMarkerLeak(t *testing.T) {
 				for range numProducers {
 					producers.Go(func() error {
 						for range iterations {
-							if err := codeQueue.AddCode(t.Context(), []common.Hash{codeHash}); err != nil {
+							if err := codeQueue.AddCode([]common.Hash{codeHash}); err != nil {
 								return err
 							}
 						}
@@ -328,7 +326,7 @@ func TestCodeSyncerDuplicateAddCodeNoMarkerLeak(t *testing.T) {
 					})
 				}
 				require.NoError(t, producers.Wait())
-				require.NoError(t, codeQueue.Finalize())
+				codeQueue.DoneAdding()
 				require.NoError(t, <-syncErrCh)
 
 				require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
