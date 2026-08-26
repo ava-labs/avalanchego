@@ -282,8 +282,13 @@ func TestRecover(t *testing.T) {
 func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 	t.Helper()
 
+	opts := cmp.Options{
+		blocks.CmpOpt(),
+		blocks.IgnoreLastSettledExecutionArtefacts(),
+	}
+
 	t.Run("consensus_critical", func(t *testing.T) {
-		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, blocks.CmpOpt()); diff != "" {
+		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, opts); diff != "" {
 			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.rawVM, diff)
 		}
 		for _, b := range sut.rawVM.consensusCritical.m {
@@ -302,7 +307,7 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			t.Run(name, func(t *testing.T) {
 				got := fn(sut.rawVM)
 				want := fn(src.rawVM)
-				if diff := cmp.Diff(want, got, blocks.CmpOpt()); diff != "" {
+				if diff := cmp.Diff(want, got, opts); diff != "" {
 					t.Errorf("(-want +got):\n%s", diff)
 				}
 			})

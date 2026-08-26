@@ -18,8 +18,24 @@ import (
 )
 
 type ancestry struct {
-	parent            *Block
-	cachedLastSettled atomic.Pointer[Block]
+	parent      *Block
+	lastSettled cachedBlock
+}
+
+type cachedBlock struct {
+	b atomic.Pointer[Block]
+}
+
+// cachedOrFrom returns the block stored in c, if non-nil, otherwise it returns
+// the value returned by `fn`. Concurrent calls when no block is cached MAY
+// result in multiple calls to `fn`, but only the first's value will be
+// returned.
+func (c *cachedBlock) cachedOrFrom(fn func() *Block) *Block {
+	if b := c.b.Load(); b != nil {
+		return b
+	}
+	c.b.Store(fn())
+	return c.b.Load()
 }
 
 var (
@@ -131,20 +147,17 @@ func (b *Block) LastSettled() *Block {
 		b.log.Error(getSettledOfSettledErrMsg)
 		return nil
 	}
-	cache := &a.cachedLastSettled
-	if s := cache.Load(); s != nil {
-		return s
-	}
 
-	n := b.hooks.SettledBy(b.Header()).Height
-	for p := a.parent; p != nil; p = p.parentBlock(getSettledOfTooOldErrMsg) {
-		if p.Height() > n {
-			continue
+	return a.lastSettled.cachedOrFrom(func() *Block {
+		n := b.hooks.SettledBy(b.Header()).Height
+		for p := a.parent; p != nil; p = p.parentBlock(getSettledOfTooOldErrMsg) {
+			if p.Height() > n {
+				continue
+			}
+			return p
 		}
-		cache.Store(p)
-		return p
-	}
-	return nil
+		return nil
+	})
 }
 
 // Settles returns the executed blocks that b settles if it is accepted by

@@ -21,14 +21,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/unwind"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -267,15 +264,14 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := settler.PreciseTime().Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
+		settledHeight := rec.hooks.SettledBy(settler.Header()).Height
 
 		for {
 			switch b := lastOf(chain); {
 			case b.Synchronous():
 				return nil
 
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
+			case b.Height() == settledHeight:
 				// Although this block is settled by definition, we don't want
 				// to break the ancestral chain just yet, so defer _marking_ it
 				// as settled until later.
@@ -284,9 +280,6 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			default:
 				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 				if err != nil {
-					return err
-				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				if err := b.SetParent(parent); err != nil {
@@ -300,6 +293,12 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	if err := extend(exec.LastExecuted()); err != nil {
 		return err
 	}
+	for _, b := range chain[1:] { // [0] is [saexec.Executor.LastExecuted]
+		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+			return err
+		}
+	}
+
 	unsettled := chain[:len(chain)-1]
 	lastSettled := lastOf(chain)
 	critical := slices.Clone(chain)
