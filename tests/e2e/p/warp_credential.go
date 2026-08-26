@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/hex"
 	"math/big"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -131,6 +133,22 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 		})
 
 		tc.By("starting a keyless relayer", func() {
+			// WARPAUTH_RELAYER_CMD runs an external relayer (the icm-services
+			// pchain-relayer) instead of the in-process one; the shell gets
+			// NODE_URI and HELPER. Pair with --activate-latest-after 0 to
+			// run it against SAE, which has no aggregation RPC.
+			if cmd := os.Getenv("WARPAUTH_RELAYER_CMD"); cmd != "" {
+				relayer := exec.Command("sh", "-c", "exec "+cmd)
+				relayer.Env = append(os.Environ(), "NODE_URI="+nodeURI.URI, "HELPER="+helper.Hex())
+				relayer.Stdout = os.Stdout
+				relayer.Stderr = os.Stderr
+				require.NoError(relayer.Start())
+				tc.DeferCleanup(func() {
+					_ = relayer.Process.Kill()
+					_ = relayer.Wait()
+				})
+				return
+			}
 			warpClient, err := warpclient.NewClient(nodeURI.URI, "C")
 			require.NoError(err)
 			relayer := &warpauth.Relayer{
