@@ -584,9 +584,12 @@ func (p *PushGossiper[T]) Add(gossipables ...T) {
 			addedTime: nowUnixNano,
 		}
 		if _, ok := p.discarded.Get(gossipID); ok {
-			// Pretend that recently discarded transactions were just gossiped.
-			tracking.lastGossiped = now
-			p.toRegossip.PushRight(gossipable)
+			// Recently discarded transactions are sent with the regossip
+			// fanout rather than the push fanout, to avoid overgossiping
+			// transactions that are frequently dropped. The zero lastGossiped
+			// makes this the oldest entry, so it goes to the front of the
+			// queue and out on the next regossip cycle.
+			p.toRegossip.PushLeft(gossipable)
 		} else {
 			p.toGossip.PushRight(gossipable)
 		}

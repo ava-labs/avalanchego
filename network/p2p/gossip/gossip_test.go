@@ -478,11 +478,13 @@ func (h hasFunc) Has(id ids.ID) bool {
 func TestPushGossiper(t *testing.T) {
 	type cycle struct {
 		toAdd    []tx
+		evict    []tx
 		expected [][]tx
 	}
 	tests := []struct {
 		name           string
 		cycles         []cycle
+		discardedSize  int
 		shouldRegossip bool
 	}{
 		{
@@ -532,6 +534,35 @@ func TestPushGossiper(t *testing.T) {
 				},
 			},
 			shouldRegossip: true,
+		},
+		{
+			name: "resubmitted discarded transaction is regossiped promptly",
+			cycles: []cycle{
+				{
+					toAdd: []tx{
+						{0},
+					},
+					expected: [][]tx{
+						{{0}},
+					},
+				},
+				{
+					evict: []tx{
+						{0},
+					},
+					expected: [][]tx{},
+				},
+				{
+					toAdd: []tx{
+						{0},
+					},
+					expected: [][]tx{
+						{{0}},
+					},
+				},
+			},
+			discardedSize:  1,
+			shouldRegossip: false,
 		},
 		{
 			name: "verify that we don't gossip empty messages",
@@ -592,10 +623,11 @@ func TestPushGossiper(t *testing.T) {
 				regossipTime = time.Nanosecond
 			}
 
+			evicted := set.Set[ids.ID]{}
 			gossiper, err := NewPushGossiper[tx](
 				marshaller,
-				hasFunc(func(ids.ID) bool {
-					return true // Never remove the items from the set
+				hasFunc(func(id ids.ID) bool {
+					return !evicted.Contains(id)
 				}),
 				validators,
 				client,
@@ -606,13 +638,19 @@ func TestPushGossiper(t *testing.T) {
 				BranchingFactor{
 					Validators: 1,
 				},
-				0, // the discarded cache size doesn't matter for this test
+				tt.discardedSize,
 				units.MiB,
 				regossipTime,
 			)
 			require.NoError(err)
 
 			for _, cycle := range tt.cycles {
+				for _, gossipable := range cycle.evict {
+					evicted.Add(gossipable.GossipID())
+				}
+				for _, gossipable := range cycle.toAdd {
+					evicted.Remove(gossipable.GossipID())
+				}
 				gossiper.Add(cycle.toAdd...)
 				require.NoError(gossiper.Gossip(ctx))
 
