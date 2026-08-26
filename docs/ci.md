@@ -279,6 +279,24 @@ jobs restore that cache read-only. The cache key covers the Go version source,
 workspace files, every listed module file, and the dependency-download
 implementation.
 
+The setup job also builds the `task` binary from `tools/external` and shares it
+through a small platform-specific cache. Consumer jobs restore it and put it on
+`PATH`. Without it every job that does not already have `task` on `PATH` rebuilds
+it, which measured about 15 seconds per job, and only the cacheable test jobs
+have a `GOCACHE` that could absorb that cost. The cache holds the binary rather
+than the `GOCACHE` that produced it: about 13MB instead of about 150MB, and no
+second cache restoring into the `GOCACHE` path this action already manages. The
+key has no restore prefix, because a binary built from a different
+`tools/external` or Go version must not be reused. A miss is not a failure;
+`scripts/run_task.sh` still builds `task` itself.
+
+Consumer jobs run with `GOPROXY=off`, so every module they need must already
+be in the restored dependency cache. A miss fails the job and names the missing
+module instead of downloading it silently, which would hide an incomplete setup
+job and pay the download cost in every consumer. Jobs that resolve module
+versions the setup job has no reason to have cached, such as the `go mod tidy`
+checks, set `allow_dependency_download` on `setup-go-for-ci`.
+
 Dependency and test-result caching are separate. Each cacheable pre-merge full
 or smoke job manages its own suite- and platform-specific `GOCACHE`. The primary
 key includes `github.sha`, and a platform/suite prefix supplies a warm start from
@@ -336,6 +354,10 @@ When reviewing or changing this implementation:
 - do not enable `GOCACHE` restore or save for scheduled race/shuffle tests
 - do not allow `install-nix` or a nested action to restore a second cache into a
   path already managed by `setup-go-for-ci`
+- keep consumer jobs on `GOPROXY=off`; set `allow_dependency_download` only for
+  a job that must resolve module versions the setup job cannot predict
+- keep the `task` binary cache keyed exactly, with no restore prefix, and keep a
+  cache miss non-fatal
 - verify cold, warm, same-revision, post-merge `master`, and scheduled behavior
   in CI logs after changing cache keys or scope
 
@@ -367,6 +389,22 @@ The migration retains these job destinations:
 
 `load_kube_kind` remains commented out. Do not enable it while changing this
 workflow structure.
+
+The combined workspace suite must run with the Go workspace enabled. It loads
+packages from every workspace module in one `go test` invocation, so it depends
+on `go.work`. With the workspace off, the graft modules resolve through the root
+`go.sum`, which does not carry their transitive checksums, and the suite fails
+with `missing go.sum entry`. The module-specific suites are unaffected because
+each runs from inside its own module directory.
+
+Keeping the workspace enabled is not automatic. `scripts/run_tool.sh` needs
+`GOWORK=off` for `go tool -modfile`, and `go tool` passes that assignment to the
+tool it launches. When `task` is not on `PATH`, which is the case for every CI
+job, `scripts/run_task.sh` reaches task through that path. It therefore resolves
+the task binary with `go tool -n` and executes it as a separate step, so
+`GOWORK=off` stays with the build and task runs its commands in the caller's
+environment. `scripts/test_run_task_launcher.sh` covers this. Do not reintroduce
+a launcher that execs task through a `GOWORK=off` assignment.
 
 When you change a test platform or test configuration, update this policy and
 the related workflow and task entrypoints together.

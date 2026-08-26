@@ -17,6 +17,10 @@ inputs:
     description: 'Suite-specific GOCACHE namespace'
     required: false
     default: ''
+  allow_dependency_download:
+    description: 'Let a consumer job download modules instead of failing on a cache miss'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -59,6 +63,67 @@ runs:
       if: ${{ inputs.initial_setup == 'true' }}
       shell: bash
       run: ./scripts/download_go_dependencies.sh
+
+    # Every job that does not find task on PATH builds it from tools/external,
+    # which costs about 15 seconds. Build it once in setup and share the binary.
+    # Caching the binary instead of the GOCACHE that produced it moves ~13MB
+    # rather than ~150MB, and avoids restoring a second cache into the GOCACHE
+    # path this action already manages for cacheable test jobs.
+    - id: task-bin
+      shell: bash
+      run: echo "dir=${HOME}/.cache/avalanchego/task-bin" >> "$GITHUB_OUTPUT"
+
+    - name: Restore and save the task binary
+      if: ${{ inputs.initial_setup == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.task-bin.outputs.dir }}
+        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/run_tool.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+
+    # No restore-keys: a binary built from a different tools/external or Go
+    # version must not be reused. A miss simply falls back to building task.
+    - name: Restore the task binary
+      if: ${{ inputs.initial_setup != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.task-bin.outputs.dir }}
+        key: go-task-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/run_tool.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+
+    - name: Build the task binary
+      if: ${{ inputs.initial_setup == 'true' }}
+      shell: bash
+      run: |
+        task_bin="${{ steps.task-bin.outputs.dir }}/task"
+        if [[ -x "${task_bin}" ]]; then
+          echo "Reusing the cached task binary."
+          exit 0
+        fi
+        mkdir -p "${{ steps.task-bin.outputs.dir }}"
+        cp "$(./scripts/run_tool.sh -n task)" "${task_bin}"
+        chmod +x "${task_bin}"
+
+    # Putting task on PATH also keeps run_task.sh off its go fallback, which
+    # has to build task with GOWORK=off. A miss is not fatal; the fallback
+    # still works.
+    - name: Use the cached task binary
+      shell: bash
+      run: |
+        if [[ -x "${{ steps.task-bin.outputs.dir }}/task" ]]; then
+          echo "${{ steps.task-bin.outputs.dir }}" >> "$GITHUB_PATH"
+        else
+          echo "No cached task binary; run_task.sh will build one."
+        fi
+
+    # The setup job is meant to leave every module a consumer needs in
+    # GOMODCACHE. GOPROXY=off turns a miss into an immediate failure naming the
+    # module, instead of a silent download that hides an incomplete setup job
+    # and pays the download cost in every consumer. Jobs that legitimately
+    # resolve new module versions (for example `go mod tidy`) set
+    # allow_dependency_download.
+    - name: Require cached dependencies
+      if: ${{ inputs.initial_setup != 'true' && inputs.allow_dependency_download != 'true' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
 
     - name: Validate build-cache inputs
       if: ${{ inputs.cache_build_results == 'true' && inputs.build_cache_scope == '' }}

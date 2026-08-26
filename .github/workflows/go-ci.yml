@@ -456,6 +456,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
   test_build_image:
@@ -600,6 +603,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
       - uses: ./.github/actions/install-nix
         with:
           cache_go: false
@@ -648,6 +654,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -666,6 +675,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
       - uses: ./.github/actions/install-nix
         with:
           cache_go: false
