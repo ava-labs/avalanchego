@@ -59,7 +59,8 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 		}
 	}
 
-	if err := v.e.VM.SetPreference(ctx, v.e.Consensus.Preference()); err != nil {
+	pref, _ := v.e.Consensus.Preference()
+	if err := v.e.VM.SetPreference(ctx, pref); err != nil {
 		return err
 	}
 

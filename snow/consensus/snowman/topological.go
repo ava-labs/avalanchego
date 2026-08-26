@@ -33,6 +33,15 @@ type TopologicalFactory struct {
 	factory snowball.Factory
 }
 
+// preferredBlock is used to track the preferred block for snowman.
+// It couples the blockID and height so that they will always be updated together.
+type preferredBlock struct {
+	// blockID is the ID of the preferred block at this height
+	blockID ids.ID
+	// height is the height of the preferred block
+	height uint64
+}
+
 func (tf TopologicalFactory) New() Consensus {
 	return &Topological{Factory: tf.factory}
 }
@@ -68,8 +77,9 @@ type Topological struct {
 	// that height.
 	preferredHeights map[uint64]ids.ID // height -> blockID
 
-	// preference is the preferred block with highest height
-	preference ids.ID
+	// preference is the preferred block with highest height,
+	// we hold them both so that they will always be updated together.
+	preference preferredBlock
 
 	// Used in [calculateInDegree] and.
 	// Should only be accessed in that method.
@@ -133,7 +143,11 @@ func (ts *Topological) Initialize(
 		lastAcceptedID: {t: ts},
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
-	ts.preference = lastAcceptedID
+	ts.preference = preferredBlock{
+		blockID: lastAcceptedID,
+		height:  lastAcceptedHeight,
+	}
+
 	return nil
 }
 
@@ -173,8 +187,11 @@ func (ts *Topological) Add(blk Block) error {
 	}
 
 	// If we are extending the preference, this is the new preference
-	if ts.preference == parentID {
-		ts.preference = blkID
+	if ts.preference.blockID == parentID {
+		ts.preference = preferredBlock{
+			blockID: blkID,
+			height:  height,
+		}
 		ts.preferredIDs.Add(blkID)
 		ts.preferredHeights[height] = blkID
 	}
@@ -207,8 +224,8 @@ func (ts *Topological) LastAccepted() (ids.ID, uint64) {
 	return ts.lastAcceptedID, ts.lastAcceptedHeight
 }
 
-func (ts *Topological) Preference() ids.ID {
-	return ts.preference
+func (ts *Topological) Preference() (ids.ID, uint64) {
+	return ts.preference.blockID, ts.preference.height
 }
 
 func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
@@ -279,8 +296,23 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	ts.preferredIDs.Clear()
 	clear(ts.preferredHeights)
 
-	ts.preference = preferred
-	startBlock := ts.blocks[ts.preference]
+	// The only entry in the blocks map with a nil blk is the last accepted block,
+	// set at initialization. All other blocks are stored in Add() with a non-nil blk.
+	// Therefore, if the preferred is not the last accepted block,
+	// it was added by Add() with a non-nil block.
+	startBlock := ts.blocks[preferred]
+
+	if preferred == ts.lastAcceptedID {
+		ts.preference = preferredBlock{
+			blockID: preferred,
+			height:  ts.lastAcceptedHeight,
+		}
+	} else {
+		ts.preference = preferredBlock{
+			blockID: preferred,
+			height:  startBlock.blk.Height(),
+		}
+	}
 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
@@ -298,13 +330,17 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	// Traverse from the preferred ID to the preferred child until there are no
 	// children.
 	for block := startBlock; block.sb != nil; {
-		ts.preference = block.sb.Preference()
-		ts.preferredIDs.Add(ts.preference)
-		block = ts.blocks[ts.preference]
+		preferred = block.sb.Preference()
+		ts.preferredIDs.Add(preferred)
+		block = ts.blocks[preferred]
 		// Invariant: Because the prior block had an initialized snowball
 		// instance, it must have a processing child. This guarantees that
 		// block.blk is non-nil here.
-		ts.preferredHeights[block.blk.Height()] = ts.preference
+		ts.preference = preferredBlock{
+			blockID: preferred,
+			height:  block.blk.Height(),
+		}
+		ts.preferredHeights[block.blk.Height()] = preferred
 	}
 	return nil
 }
@@ -464,7 +500,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 			)
 			ts.metrics.FailedPoll()
 		}
-		return ts.preference, nil
+		return ts.preference.blockID, nil
 	}
 
 	// keep track of the new preferred block
