@@ -146,14 +146,17 @@ runs:
       shell: bash
       run: ./scripts/download_go_dependencies.sh
 
-    # The setup job is meant to leave every module a consumer needs in
-    # GOMODCACHE. GOPROXY=off turns a miss into an immediate failure naming the
-    # module, instead of a silent download that hides an incomplete setup job
-    # and pays the download cost in every consumer. Jobs that legitimately
-    # resolve new module versions (for example `go mod tidy`) set
+    # The steps above must leave every module the rest of the job needs in
+    # GOMODCACHE. GOPROXY=off turns a miss into an immediate failure that names
+    # the module. A silent download would instead hide an incomplete download
+    # script and pay the download cost in every job.
+    #
+    # This step runs after the download step, so a job that populates its own
+    # cache is checked too. Jobs that resolve module versions the download
+    # script cannot predict, such as `go mod tidy`, set
     # allow_dependency_download.
     - name: Require cached dependencies
-      if: ${{ inputs.initial_setup != 'true' && inputs.allow_dependency_download != 'true' }}
+      if: ${{ inputs.allow_dependency_download != 'true' }}
       shell: bash
       run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
 

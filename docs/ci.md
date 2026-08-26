@@ -277,10 +277,17 @@ the per-module suites, and `go mod tidy` all resolve per module and can select
 versions the workspace resolution does not. It separately downloads the
 repository Go-tool module graph because `tools/external` is not in the
 workspace, and installs the tools pinned in `scripts/lib_go_tools.sh`, which are
-invoked as `go run pkg@version` and resolve a module graph of their own. It saves one platform-specific workspace `GOMODCACHE`. Consumer
-jobs restore that cache read-only. The cache key covers the Go version source,
-workspace files, every listed module file, and the dependency-download
-implementation.
+invoked as `go run pkg@version` and resolve a module graph of their own. It saves
+one platform-specific workspace `GOMODCACHE`. Consumer jobs restore that cache
+read-only. The cache key covers the Go version source, workspace files, every
+listed module file, and the dependency-download implementation.
+
+A workflow with no setup job sets `initial_setup` on the job that needs the
+dependencies. That job populates and saves its own cache.
+`firewood-chaos-test`, `firewood-load-test`, and `self-hosted-load-tests` work
+this way. The last two share a cache key, because they name the same runner, and
+the key is immutable: the job that finishes first populates it, and the other
+skips its save.
 
 The setup job also builds the `task` binary from `tools/external` and shares it
 through a small platform-specific cache. Consumer jobs restore it and put it on
@@ -321,12 +328,14 @@ an AWS role and those events do not receive that role. `go-required` treats a sk
 failure. Branch protection must name `c-chain-reexecution` directly to gate
 merges on it.
 
-Consumer jobs run with `GOPROXY=off`, so every module they need must already
-be in the restored dependency cache. A miss fails the job and names the missing
-module instead of downloading it silently, which would hide an incomplete setup
-job and pay the download cost in every consumer. Jobs that resolve module
-versions the setup job has no reason to have cached, such as the `go mod tidy`
-checks, set `allow_dependency_download` on `setup-go-for-ci`.
+Every job that uses `setup-go-for-ci` then runs with `GOPROXY=off`, so every
+module it needs must already be in the cache. A miss fails the job and names the
+missing module. A silent download would instead hide an incomplete
+dependency-download script and pay the download cost in every job. A job that
+populates its own cache is checked the same way, because the check is applied
+after its download. Jobs that resolve module versions the download script cannot
+predict, such as the `go mod tidy` checks, set `allow_dependency_download` on
+`setup-go-for-ci`.
 
 Dependency and test-result caching are separate. Each cacheable pre-merge full
 or smoke job manages its own suite- and platform-specific `GOCACHE`. The primary
