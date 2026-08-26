@@ -524,7 +524,7 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 			require.NoError(t, err, "Executor.StateDB(parent root)")
 
 			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
-			require.ErrorIs(t, err, tt.wantErr, "Execute() with %s options", tt.name)
+			require.ErrorIsf(t, err, tt.wantErr, "Execute() with %s options", tt.name)
 		})
 	}
 }
