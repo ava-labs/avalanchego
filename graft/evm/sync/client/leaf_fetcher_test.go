@@ -26,8 +26,8 @@ func (s *stubLeafClient) GetLeafs(_ context.Context, req message.LeafsRequest) (
 	return s.resp, s.err
 }
 
-// Each case sets both directions: the request a range becomes, and the leaves a
-// response becomes. Request type and node type come from construction.
+// The leaf syncer cannot see the wire format, so it depends on this translation
+// keeping every field of a range and surfacing every error.
 func TestLeafFetcher_FetchLeaves(t *testing.T) {
 	t.Parallel()
 	root := common.HexToHash("0xbb")

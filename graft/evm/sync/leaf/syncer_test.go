@@ -163,6 +163,7 @@ func TestSyncTaskTruncatesAtEnd(t *testing.T) {
 	}
 }
 
+// A peer claiming more leaves without sending any would spin the range forever.
 func TestSyncTaskRejectsMoreWithoutKeys(t *testing.T) {
 	t.Parallel()
 
@@ -179,6 +180,7 @@ func TestSyncTaskWrapsFetchError(t *testing.T) {
 	require.ErrorIs(t, err, errFetch)
 }
 
+// A storage trie already on disk is skipped, so a resume must reach no peer.
 func TestSyncTaskOnStart(t *testing.T) {
 	t.Parallel()
 
@@ -218,6 +220,7 @@ func TestSyncTaskOnStart(t *testing.T) {
 	}
 }
 
+// A cancelled sync must not put another request on the network.
 func TestSyncTaskStopsOnCanceledContext(t *testing.T) {
 	t.Parallel()
 
