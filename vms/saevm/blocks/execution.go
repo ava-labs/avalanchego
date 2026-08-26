@@ -245,9 +245,16 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }
 
+var ErrMissingExecutionResults = errors.New("missing execution results for asynchronous block")
+
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.
+// said function was originally called. Synchronous blocks do not persist
+// execution results, so theirs are inferred from the block itself without
+// consulting the execution-results DB;
+// for asynchronous blocks the results are loaded from the DB. Any failure to
+// obtain the results is reported wrapped in [ErrMissingExecutionResults],
+// alongside the underlying cause.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
@@ -266,7 +273,7 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), err)
 	}
 
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
