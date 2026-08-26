@@ -91,6 +91,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
+      # This workflow has no setup job, so this job populates its own Go
+      # dependency cache.
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.runner || 'ubuntu-24.04' }}
+          initial_setup: true
       - uses: ./.github/actions/install-nix
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6

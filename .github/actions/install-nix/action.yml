@@ -7,8 +7,8 @@ inputs:
     default: ${{ github.token }}
     required: false
   cache_go:
-    description: 'Restore and save the standalone Nix job Go caches'
-    default: 'true'
+    description: 'Restore and save the standalone Nix job Go caches. Set true only for a job that has no other source of Go dependencies.'
+    default: 'false'
     required: false
 
 runs:

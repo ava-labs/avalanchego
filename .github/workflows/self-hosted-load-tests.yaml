@@ -36,6 +36,12 @@ jobs:
             sudo apt-get install -y xz-utils
           fi
       - uses: actions/checkout@v5
+      # This workflow has no setup job, so this job populates its own Go
+      # dependency cache.
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: avalanche-avalanchego-runner
+          initial_setup: true
       - name: Run load test
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

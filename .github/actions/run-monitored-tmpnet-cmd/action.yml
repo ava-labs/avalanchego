@@ -15,8 +15,8 @@ inputs:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
   cache_go_with_nix:
-    description: 'Whether install-nix manages standalone Go caches'
-    default: 'true'
+    description: 'Whether install-nix manages standalone Go caches. Set true only for a job that has no other source of Go dependencies.'
+    default: 'false'
   filter_by_owner:
     default: ''
   artifact_prefix:

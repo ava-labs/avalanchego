@@ -238,7 +238,6 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-e2e-ci
           artifact_prefix: e2e-${{ matrix.os }}
           filter_by_owner: avalanchego-e2e
@@ -264,7 +263,6 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-e2e-ci-schedule-latest
           artifact_prefix: e2e-schedule-latest
           filter_by_owner: avalanchego-e2e
@@ -290,7 +288,6 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-e2e-ci-post-latest
           artifact_prefix: e2e-post-latest
           filter_by_owner: avalanchego-e2e
@@ -313,7 +310,6 @@ jobs:
           platform_name: ${{ inputs.platform_name }}
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-e2e-kube-ci
           runtime: kube
           artifact_prefix: e2e-kube
@@ -338,7 +334,6 @@ jobs:
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -361,7 +356,6 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-upgrade
           artifact_prefix: upgrade
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -385,8 +379,6 @@ jobs:
         with:
           platform_name: ${{ inputs.platform_name }}
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - name: Runs all lint checks
         run: ./scripts/run_task.sh lint-all-ci
   tausecondslint:
@@ -425,8 +417,6 @@ jobs:
           platform_name: ${{ inputs.platform_name }}
       # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
     if: ${{ inputs.run_premerge_jobs }}
@@ -466,8 +456,6 @@ jobs:
         with:
           platform_name: ${{ inputs.platform_name }}
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - run: task check-generate-load-contract-bindings
   check_go_mod_tidy:
     if: ${{ inputs.run_premerge_jobs }}
@@ -526,8 +514,6 @@ jobs:
         with:
           diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - name: Run e2e tests
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
       - name: Log Docker disk diagnostics
@@ -598,7 +584,6 @@ jobs:
           platform_name: ${{ inputs.platform_name }}
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ./scripts/run_task.sh test-load-ci
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -644,8 +629,6 @@ jobs:
         with:
           diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
         run: ./scripts/run_task.sh test-robustness
@@ -677,8 +660,6 @@ jobs:
           # to have cached.
           allow_dependency_download: 'true'
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -699,7 +680,6 @@ jobs:
       - name: Run Warp E2E Tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ../../scripts/run_task.sh test-e2e-warp-ci
           working_directory: ./graft/coreth
           artifact_prefix: warp
@@ -749,8 +729,6 @@ jobs:
           # to have cached.
           allow_dependency_download: 'true'
       - uses: ./.github/actions/install-nix
-        with:
-          cache_go: false
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -771,7 +749,6 @@ jobs:
       - name: Run Warp E2E Tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ../../scripts/run_task.sh test-e2e-warp-ci
           working_directory: ./graft/subnet-evm
           artifact_prefix: warp
@@ -799,7 +776,6 @@ jobs:
       - name: Run E2E Load Tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          cache_go_with_nix: false
           run: ../../scripts/run_task.sh test-e2e-load-ci
           working_directory: ./graft/subnet-evm
           artifact_prefix: load

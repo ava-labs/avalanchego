@@ -118,6 +118,9 @@ jobs:
       - name: Run E2E smoke test with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
+          # This job builds xsvm and ginkgo with plain go, so it has no other
+          # source of Go dependencies. Remove once both are bazel targets.
+          cache_go_with_nix: true
           run: ./scripts/run_task.sh bazel-test-e2e-smoke
           setup_bazel: 'true'
           artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
