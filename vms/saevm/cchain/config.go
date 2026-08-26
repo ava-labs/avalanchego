@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -78,7 +79,46 @@ type config struct {
 // Don't set these unless you know what you're doing.
 type internalConfig struct {
 	// State sync
-	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
+	StateSyncIDs nodeIDs `json:"state-sync-ids"`
+}
+
+// nodeIDs is a slice of [ids.NodeID] that accepts either a JSON array or,
+// for compatibility with coreth's encoding of the same chain config across the
+// SAE transition, a comma-separated string of node IDs.
+type nodeIDs []ids.NodeID
+
+var errInvalidNodeIDs = errors.New("expected array or comma-separated string of node IDs")
+
+func (n *nodeIDs) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || string(b) == "null" {
+		return nil
+	}
+	switch b[0] {
+	case '[':
+		return json.Unmarshal(b, (*[]ids.NodeID)(n))
+	case '"':
+		var csv string
+		if err := json.Unmarshal(b, &csv); err != nil {
+			return err
+		}
+		if csv == "" {
+			*n = nil
+			return nil
+		}
+		split := strings.Split(csv, ",")
+		parsed := make([]ids.NodeID, len(split))
+		for i, s := range split {
+			id, err := ids.NodeIDFromString(s)
+			if err != nil {
+				return fmt.Errorf("%w: %w", errInvalidNodeIDs, err)
+			}
+			parsed[i] = id
+		}
+		*n = parsed
+		return nil
+	default:
+		return errInvalidNodeIDs
+	}
 }
 
 // defaultConfig returns the config used when an operator leaves a field unset.

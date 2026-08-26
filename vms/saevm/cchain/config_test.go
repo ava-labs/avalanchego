@@ -40,6 +40,11 @@ func TestParseConfig(t *testing.T) {
 	nodeID, err := ids.NodeIDFromString(nodeIDStr)
 	require.NoErrorf(t, err, "ids.NodeIDFromString(%q)", nodeIDStr)
 
+	otherShortID := ids.GenerateTestShortID()
+	otherNodeIDStr := fmt.Sprintf("NodeID-%s", otherShortID)
+	otherNodeID, err := ids.NodeIDFromString(otherNodeIDStr)
+	require.NoErrorf(t, err, "ids.NodeIDFromString(%q)", otherNodeIDStr)
+
 	tests := []struct {
 		name      string
 		json      string
@@ -196,6 +201,40 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) {
 				c.StateSyncIDs = []ids.NodeID{nodeID}
 			}),
+		},
+		{
+			// coreth encodes state-sync-ids as a comma-separated string; the
+			// same chain config must remain parseable across the transition.
+			name: "internal/state_sync_ids_coreth_string",
+			json: fmt.Sprintf(`{"state-sync-ids":"%s,%s"}`, nodeIDStr, otherNodeIDStr),
+			want: with(func(c *config) {
+				c.StateSyncIDs = []ids.NodeID{nodeID, otherNodeID}
+			}),
+		},
+		{
+			name: "internal/state_sync_ids_empty_string",
+			json: `{"state-sync-ids":""}`,
+			want: defaultConfig(),
+		},
+		{
+			name: "internal/state_sync_ids_null",
+			json: `{"state-sync-ids":null}`,
+			want: defaultConfig(),
+		},
+		{
+			name:    "internal/state_sync_ids_invalid_string",
+			json:    `{"state-sync-ids":"not-a-node-id"}`,
+			wantErr: testerr.Is(errInvalidNodeIDs),
+		},
+		{
+			name:    "internal/state_sync_ids_wrong_type",
+			json:    `{"state-sync-ids":5}`,
+			wantErr: testerr.Is(errInvalidNodeIDs),
+		},
+		{
+			name:    "internal/state_sync_ids_invalid_array_entry",
+			json:    `{"state-sync-ids":["not-a-node-id"]}`,
+			wantErr: testerr.Contains("NodeID"),
 		},
 
 		// All active fields
