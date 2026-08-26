@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -178,6 +179,24 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.ResolvePendingToLastExecuted = false }),
 		},
 
+		// Logging
+		{
+			name: "logging/log_level",
+			json: `{"log-level":"debug"}`,
+			want: with(func(c *config) { c.LogLevel = utils.PointerTo(logging.Debug) }),
+		},
+		{
+			// Matches the case-insensitivity of the node's --log-level flag.
+			name: "logging/log_level_case_insensitive",
+			json: `{"log-level":"DEBUG"}`,
+			want: with(func(c *config) { c.LogLevel = utils.PointerTo(logging.Debug) }),
+		},
+		{
+			name:    "logging/log_level_invalid",
+			json:    `{"log-level":"dbug"}`,
+			wantErr: testerr.Is(logging.ErrUnknownLevel),
+		},
+
 		// Warp
 		{
 			name: "warp/off_chain_messages",
@@ -256,6 +275,7 @@ func TestParseConfig(t *testing.T) {
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
 				"state-sync-enabled":false,
+				"log-level":"trace",
 				"warp-off-chain-messages":["0x1234"],
 				"api-resolve-pending-to-last-executed":true
 			}`,
@@ -274,6 +294,7 @@ func TestParseConfig(t *testing.T) {
 				TxPoolGlobalSlots:            2048,
 				AllowUnprotectedTxs:          true,
 				BatchRequestLimit:            50,
+				LogLevel:                     utils.PointerTo(logging.Trace),
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
 				StateSyncEnabled:             false,
