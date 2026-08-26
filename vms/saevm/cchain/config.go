@@ -78,7 +78,7 @@ type config struct {
 	Pruning bool `json:"pruning-enabled"`
 	// CommitInterval is the HashDB state trie persistence interval in blocks.
 	// For pruning Firewood, it is the maximum number of unpersisted revisions
-	// that can exist at a time. 
+	// that can exist at a time.
 	CommitInterval    uint64 `json:"commit-interval"`
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
@@ -189,10 +189,11 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := saeCfg.DBConfig.Verify(); err != nil {
 		return config{}, err
 	}
-	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) {
-		if ci := saeCfg.DBConfig.CommitInterval; c.StateScheme != customrawdb.FirewoodScheme && ci != saedb.DefaultCommitInterval {
-			return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
-		}
+	ci := saeCfg.DBConfig.CommitInterval
+	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
+		c.StateScheme != customrawdb.FirewoodScheme &&
+		ci != saedb.DefaultCommitInterval {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
 }

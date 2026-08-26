@@ -41,7 +41,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. | `true` |
-| `commit-interval` | uint64 | For HashDB, the number of blocks between state trie persistence operations. For pruning Firewood, the maximum number of unpersisted revisions that can exist at a time. Firewood persists every revision in archival mode. | `4096` |
+| `commit-interval` | uint64 | For HashDB, the number of blocks between state trie persistence operations. For pruning Firewood, the maximum number of unpersisted revisions that can exist at a time. | `4096` |
 | `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
