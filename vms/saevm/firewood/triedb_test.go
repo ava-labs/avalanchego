@@ -507,7 +507,7 @@ func TestMultipleProposals(t *testing.T) {
 		sdb.CreateAccount(addr)
 		sdb.SetNonce(addr, 1)
 		sdb.SetBalance(addr, uint256.NewInt(0))
-		root, err := sdb.Commit(uint64(i), true) //#nosec G115 // guaranteed to be positive
+		root, err := sdb.Commit(uint64(i), true)
 		require.NoError(t, err, "sdb.Commit()")
 		lastRoot = root
 	}
