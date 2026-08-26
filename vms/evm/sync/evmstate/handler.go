@@ -436,7 +436,8 @@ func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte) {
 	return keys, vals
 }
 
-// fillFromTrie iterates the trie from [query.nextKey] up to end (exclusive).
+// fillFromTrie iterates the trie from [query.nextKey] up to end, which is
+// inclusive so the segment bridge can stop on a key it means to serve.
 // more reports keys past the response, the inverse of fillFromSnapshot's done.
 func (q *query) fillFromTrie(ctx context.Context, end []byte) (more bool, _ error) {
 	nodeIt, err := q.trie.NodeIterator(q.nextKey())
