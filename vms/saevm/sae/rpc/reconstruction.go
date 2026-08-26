@@ -26,7 +26,7 @@ func noRelease() {}
 // reconstructState returns target's post-execution state. It keeps the normal
 // state-opening path unchanged and reconstructs only unavailable Firewood
 // state.
-func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, reexec uint64) (*state.StateDB, func(), error) {
+func (b *backend) reconstructState(ctx context.Context, target *blocks.Block) (*state.StateDB, func(), error) {
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
@@ -55,10 +55,7 @@ func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, re
 		return nil, nil, ctx.Err()
 	}
 
-	// Firewood guarantees a persisted reconstruction seed only within one commit
-	// interval, which can exceed the tracing API's requested replay allowance.
-	horizon := max(reexec, b.CommitInterval())
-	stateDB, release, seed, err := b.reconstructionSeed(ctx, target, horizon)
+	stateDB, release, seed, err := b.reconstructionSeed(ctx, target)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -111,13 +108,14 @@ func (b *backend) reconstructState(ctx context.Context, target *blocks.Block, re
 	return stateDB, release, nil
 }
 
-func (b *backend) reconstructionSeed(ctx context.Context, target *blocks.Block, horizon uint64) (*state.StateDB, func(), *blocks.Block, error) {
-	searchLimit := min(horizon, target.Height())
-	for distance := uint64(1); distance <= searchLimit; distance++ {
+func (b *backend) reconstructionSeed(ctx context.Context, target *blocks.Block) (*state.StateDB, func(), *blocks.Block, error) {
+	// Settlement may lag execution, so persisted revisions are not bounded by
+	// their block distance from the target.
+	for height := target.Height(); height > 0; {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, nil, err
 		}
-		height := target.Height() - distance
+		height--
 		block, err := b.restoreExecutedBlockAtHeight(ctx, height)
 		if err != nil {
 			return nil, nil, nil, err
@@ -130,7 +128,7 @@ func (b *backend) reconstructionSeed(ctx context.Context, target *blocks.Block, 
 			return nil, nil, nil, err
 		}
 	}
-	return nil, nil, nil, fmt.Errorf("%w: searched %d blocks below block %d", ErrNoReconstructionSeed, searchLimit, target.Height())
+	return nil, nil, nil, fmt.Errorf("%w: searched %d blocks below block %d", ErrNoReconstructionSeed, target.Height(), target.Height())
 }
 
 func (b *backend) restoreExecutedBlockAtHeight(ctx context.Context, height uint64) (*blocks.Block, error) {

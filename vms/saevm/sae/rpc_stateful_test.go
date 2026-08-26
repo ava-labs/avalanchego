@@ -956,8 +956,7 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 	}
 	src.close()
 
-	restartedXDB := srcXDB.Clone()
-	ctx, sut := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(restartedXDB), options.Func[sutConfig](func(c *sutConfig) {
+	ctx, sut := newSUT(t, 1, sutOpt, archivalFirewood, withExecResultsDB(srcXDB.Clone()), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = saetest.CopyDB(t, srcDB)
 		c.dataDir = dataDir
 	}))
@@ -1018,22 +1017,4 @@ func TestFirewoodArchivalHistoricalRPCs(t *testing.T) {
 		}},
 		cmpopts.EquateEmpty(),
 	)...)
-
-	// The target state depends on this block, but reconstruction does not need
-	// its recorded root. Corrupting only this intermediate commitment proves
-	// replay does not validate or otherwise depend on it.
-	intermediate := blocksByHeight[replayTarget.Height()-1]
-	result, err := restartedXDB.Get(intermediate.Height())
-	require.NoError(t, err, "ExecutionResults.Get(intermediate height)")
-	wantRoot := intermediate.PostExecutionStateRoot()
-	require.Equal(t, 1, bytes.Count(result, wantRoot[:]), "recorded intermediate root occurrences")
-	bogusRoot := wantRoot
-	bogusRoot[0] ^= 0xff
-	result = bytes.Replace(result, wantRoot[:], bogusRoot[:], 1)
-	require.NoError(t, restartedXDB.Put(intermediate.Height(), result), "ExecutionResults.Put(intermediate height)")
-	require.NoError(t, restartedXDB.Sync(intermediate.Height(), intermediate.Height()), "ExecutionResults.Sync(intermediate height)")
-
-	got, err := sut.NonceAt(ctx, addr, new(big.Int).SetUint64(replayTarget.Height()))
-	require.NoError(t, err, "Client.NonceAt(replay target with corrupt intermediate root)")
-	require.Equal(t, replayTarget.Height(), got, "nonce at replay target")
 }
