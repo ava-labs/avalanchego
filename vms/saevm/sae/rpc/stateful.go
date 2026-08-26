@@ -115,8 +115,6 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, _ uint64
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing. Replay does not apply end-of-block
 // operations, record block progress, or publish receipts.
-//
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, _ uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
 	if ethB.NumberU64() == 0 {
