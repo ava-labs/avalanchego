@@ -45,6 +45,7 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
+        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/gas",
