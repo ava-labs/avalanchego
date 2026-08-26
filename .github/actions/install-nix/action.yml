@@ -6,13 +6,6 @@ inputs:
     description: "github token to authenticate with to avoid being rate-limited"
     default: ${{ github.token }}
     required: false
-  # Only the Bazel e2e smoke jobs set this, because they build xsvm and ginkgo
-  # with plain go. Delete this input and the four steps it gates once both are
-  # Bazel targets.
-  cache_go:
-    description: 'Restore and save the standalone Nix job Go caches. Set true only for a job that has no other source of Go dependencies.'
-    default: 'false'
-    required: false
 
 runs:
   using: composite
@@ -35,28 +28,4 @@ runs:
         gc-max-store-size-macos: 5G
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
-      shell: bash
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
-      if: ${{ inputs.cache_go == 'true' }}
-      id: go-mod-cache
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
-      if: ${{ inputs.cache_go == 'true' }}
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss. Neither command rewrites a
-    # checked-in checksum file: `task go-mod-tidy` runs `go mod download`, so
-    # the committed go.work.sum already covers what these want.
-    - run: nix develop --command go mod download
-      if: ${{ inputs.cache_go == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
-      shell: bash
-    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
-      if: ${{ inputs.cache_go == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
       shell: bash

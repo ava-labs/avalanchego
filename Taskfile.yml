@@ -80,31 +80,36 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
+  bazel-build-e2e:
+    desc: Build E2E binaries with Bazel
+    cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego //vms/example/xsvm/cmd/xsvm:xsvm @com_github_onsi_ginkgo_v2//ginkgo:ginkgo //tests/e2e:e2e_test'
+
+  bazel-build-e2e-race:
+    desc: Build E2E binaries with Bazel and race detection
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego //vms/example/xsvm/cmd/xsvm:xsvm @com_github_onsi_ginkgo_v2//ginkgo:ginkgo //tests/e2e:e2e_test'
+
   bazel-test-e2e:
-    desc: Run E2E tests with bazel-built binary
+    desc: Run E2E tests with Bazel-built binaries
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
+      - task: bazel-build-e2e
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-ci:
-    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
+    desc: Run the E2E network-reuse smoke test with Bazel-built binaries [serially with race detection]
     env:
       E2E_SERIAL: 1
     cmds:
-      - task: bazel-build-race
-      - task: build-xsvm
+      - task: bazel-build-e2e-race
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-smoke:
-    desc: Run an E2E smoke test with bazel-built binary
+    desc: Run an E2E smoke test with Bazel-built binaries
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
+      - task: bazel-build-e2e
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
   bazel-test-unit-all:
     desc: Run cacheable Go unit tests with Bazel
