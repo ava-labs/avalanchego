@@ -509,7 +509,7 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 		},
 		{
 			name:    "canonical without end-of-block operations",
-			opts:    []Option{withCanonical(), SkipEndOfBlockOps()},
+			opts:    []Option{asCanonical(), SkipEndOfBlockOps()},
 			wantErr: errCanonicalWithoutEndOfBlockOps,
 		},
 		{
@@ -530,8 +530,7 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 }
 
 // TestExecuteRecordsOnlyCanonicalProgress verifies that non-canonical execution
-// does not overwrite an in-memory block's canonical progress and change the
-// settlement decision made by  [blocks.LastToSettleAt].
+// does not overwrite an in-memory block's canonical progress.
 func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -548,13 +547,13 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 		{
 			name:   "canonical transaction",
 			withTx: true,
-			opts:   []Option{withCanonical()},
+			opts:   []Option{asCanonical()},
 			want:   true,
 		},
 		{
 			name: "canonical end-of-block operation",
 			ops:  []saehookstest.Op{{Gas: 1}},
-			opts: []Option{withCanonical()},
+			opts: []Option{asCanonical()},
 			want: true,
 		},
 	}
@@ -580,11 +579,9 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
 			require.NoError(t, err, "Execute()")
 
-			gasClock := b.ParentBlock().ExecutedByGasTime()
-			gasClock.BeforeBlock(sut.hooks.BlockTime(b.Header()))
-			_, got, err := blocks.LastToSettleAt(gasClock.AsTime(), b)
-			require.NoError(t, err, "blocks.LastToSettleAt()")
-			require.Equal(t, tt.want, got, "Execute() reports canonical progress")
+			interimExecutionTime := proxytime.New[gas.Gas](math.MaxUint64, 0, 1)
+			got := b.SwapInterimExecutionTime(interimExecutionTime) != nil
+			require.Equal(t, tt.want, got, "Block.SwapInterimExecutionTime()")
 		})
 	}
 }

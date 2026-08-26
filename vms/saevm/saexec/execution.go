@@ -140,7 +140,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		e.chainConfig,
 		e.chainContext,
 		log,
-		withCanonical(),
+		asCanonical(),
 		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
@@ -337,7 +337,7 @@ func Execute(
 		// that progress with an earlier time. This violates monotonicity and can
 		// change the settlement decision made by LastToSettleAt.
 		if config.canonical {
-			b.SetInterimExecutionTime(perTxClock)
+			b.SwapInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
 			// returns false, meaning that execution is blocking consensus.
@@ -380,7 +380,7 @@ func Execute(
 		res.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
 		if config.canonical {
-			b.SetInterimExecutionTime(perTxClock)
+			b.SwapInterimExecutionTime(perTxClock)
 		}
 
 		if err := o.ApplyTo(stateDB); err != nil {
