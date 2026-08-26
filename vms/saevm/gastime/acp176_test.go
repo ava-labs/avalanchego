@@ -120,28 +120,28 @@ func FuzzWorstCasePrice(f *testing.F) {
 		}{
 			{
 				time:   time0,
-				nanos:  time.Duration(nanos0 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos0 % 1e9),
 				used:   gas.Gas(used0),
 				limit:  gas.Gas(limit0),
 				target: gas.Gas(target0),
 			},
 			{
 				time:   time1,
-				nanos:  time.Duration(nanos1 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos1 % 1e9),
 				used:   gas.Gas(used1),
 				limit:  gas.Gas(limit1),
 				target: gas.Gas(target1),
 			},
 			{
 				time:   time2,
-				nanos:  time.Duration(nanos2 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos2 % 1e9),
 				used:   gas.Gas(used2),
 				limit:  gas.Gas(limit2),
 				target: gas.Gas(target2),
 			},
 			{
 				time:   time3,
-				nanos:  time.Duration(nanos3 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos3 % 1e9),
 				used:   gas.Gas(used3),
 				limit:  gas.Gas(limit3),
 				target: gas.Gas(target3),

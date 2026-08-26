@@ -182,7 +182,7 @@ func (c *customAPI) NewAcceptedTransactions(ctx context.Context, fullTx *bool) (
 				for i, tx := range block.Transactions() {
 					var data any
 					if fullTx != nil && *fullTx {
-						data = ethapi.NewRPCTransaction(tx, hash, num, buildTime, uint64(i), baseFee, chainConfig) //#nosec G115 -- i is non-negative
+						data = ethapi.NewRPCTransaction(tx, hash, num, buildTime, uint64(i), baseFee, chainConfig)
 					} else {
 						data = tx.Hash()
 					}

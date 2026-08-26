@@ -47,7 +47,7 @@ func TestMarkExecuted(t *testing.T) {
 	txs := make(types.Transactions, 10)
 	for i := range txs {
 		txs[i] = types.NewTx(&types.LegacyTx{
-			Nonce:    uint64(i), //#nosec G115 -- Won't overflow
+			Nonce:    uint64(i),
 			GasPrice: big.NewInt(gasPrice),
 			Gas:      params.TxGas,
 			To:       &common.Address{},
@@ -103,7 +103,7 @@ func TestMarkExecuted(t *testing.T) {
 			EffectiveGasPrice: big.NewInt(gasPrice),
 			BlockHash:         ethB.Hash(),
 			BlockNumber:       new(big.Int).Set(ethB.Number()),
-			TransactionIndex:  uint(i), //#nosec G115 -- Won't overflow
+			TransactionIndex:  uint(i),
 		})
 	}
 	lastExecuted := new(atomic.Pointer[Block])

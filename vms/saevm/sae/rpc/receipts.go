@@ -100,6 +100,6 @@ func (ir immediateReceipts) GetTransactionReceipt(ctx context.Context, h common.
 		r.BlockNumber.Uint64(),
 		r.Signer,
 		r.Tx,
-		int(r.TransactionIndex), //#nosec G115 -- Known to not overflow
+		int(r.TransactionIndex),
 	), nil
 }

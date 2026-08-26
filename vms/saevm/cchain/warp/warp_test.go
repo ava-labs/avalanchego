@@ -357,7 +357,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 					// A unique nonce gives every transaction a distinct hash,
 					// matching the per-tx work of a real block.
 					txs[i] = types.NewTx(&types.DynamicFeeTx{
-						Nonce:      uint64(i), //#nosec G115 -- Known non-negative
+						Nonce:      uint64(i),
 						AccessList: accessList,
 					})
 				}
