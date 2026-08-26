@@ -34,7 +34,7 @@ func (c *cachedBlock) cachedOrFrom(fn func() *Block) *Block {
 	if b := c.b.Load(); b != nil {
 		return b
 	}
-	c.b.Store(fn())
+	c.b.CompareAndSwap(nil, fn())
 	return c.b.Load()
 }
 
