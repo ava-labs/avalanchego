@@ -193,6 +193,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 
 func (c config) stateSyncConfig(networkID uint32) statesync.Config {
 	saeCfg := c.saeConfig(nil)
+	// All nodes in production networks MUST agree which state summaries to serve.
 	if constants.ProductionNetworkIDs.Contains(networkID) {
 		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
 	}
