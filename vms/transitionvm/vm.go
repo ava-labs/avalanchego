@@ -142,7 +142,27 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
 	if lastAccepted.Timestamp().Before(vm.transitionTime) {
-		return nil
+		if time.Now().Before(vm.transitionTime) {
+			return nil
+		}
+		// The network is past the transition time, so peers serve the
+		// post-transition chain's state summaries, which the pre-transition
+		// chain cannot parse. If this node is going to state sync it must do
+		// so as the post-transition chain, so transition before the engine
+		// starts the sync.
+		//
+		// This commits to state syncing before any summary has been seen; see
+		// the README's "Eager transition for state sync" section for the
+		// failure modes this accepts.
+		enabled, err := vm.StateSyncEnabled(ctx)
+		if err != nil {
+			return fmt.Errorf("checking whether the node will state sync: %w", err)
+		}
+		if !enabled {
+			log.Info("past transition time but not state syncing; waiting for the transition block")
+			return nil
+		}
+		log.Info("transitioning eagerly to state sync as the post-transition chain")
 	}
 	return vm.transition(ctx, lastAccepted)
 }

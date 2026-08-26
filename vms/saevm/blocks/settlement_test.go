@@ -225,6 +225,117 @@ func TestSettles(t *testing.T) {
 	}
 }
 
+// TestSettlesAtTransitionBoundary covers a mid-chain transition to SAE, at
+// which the last pre-SAE block is restored as a settled, synchronous block by
+// [RestoreSettledBlock]. Its ancestry is severed, so the SAE blocks built on
+// top of it MUST treat it as the furthest reachable last-settled block.
+func TestSettlesAtTransitionBoundary(t *testing.T) {
+	// Height of the last pre-SAE block. Deliberately non-zero, unlike the
+	// genesis of an SAE-from-inception chain.
+	const boundary = 39
+
+	lastSettledAtHeight := map[uint64]uint64{
+		boundary:     boundary, // synchronous blocks settle themselves
+		boundary + 1: boundary,
+		boundary + 2: boundary,
+		boundary + 3: boundary,
+		boundary + 4: boundary + 1,
+		boundary + 5: boundary + 3,
+		boundary + 6: boundary + 3,
+	}
+	wantSettles := map[uint64][]uint64{
+		boundary:     {boundary},
+		boundary + 1: nil,                          // (39,39]
+		boundary + 2: nil,                          // (39,39]
+		boundary + 3: nil,                          // (39,39]
+		boundary + 4: {boundary + 1},               // (39,40]
+		boundary + 5: {boundary + 2, boundary + 3}, // (40,42]
+		boundary + 6: nil,                          // (42,42]
+	}
+	chain := newChain(t, boundary, uint64(len(lastSettledAtHeight)), lastSettledAtHeight)
+
+	blockAt := func(tb testing.TB, height uint64) *Block {
+		tb.Helper()
+		require.GreaterOrEqual(tb, height, uint64(boundary), "test block height")
+		return chain[height-boundary]
+	}
+	blocksAt := func(tb testing.TB, heights ...uint64) []*Block {
+		tb.Helper()
+		bs := make([]*Block, len(heights))
+		for i, h := range heights {
+			bs[i] = blockAt(tb, h)
+		}
+		return bs
+	}
+
+	t.Run("boundary_block", func(t *testing.T) {
+		b := blockAt(t, boundary)
+		require.True(t, b.Synchronous(), "Synchronous() of last pre-SAE block")
+		require.True(t, b.Settled(), "Settled() of last pre-SAE block")
+	})
+
+	opts := cmp.Options{
+		CmpOpt(),
+		cmputils.NilSlicesAreEmpty[[]*Block](),
+	}
+	for height, want := range wantSettles {
+		t.Run(fmt.Sprintf("Block(%d).Settles()", height), func(t *testing.T) {
+			got := blockAt(t, height).Settles()
+			if diff := cmp.Diff(blocksAt(t, want...), got, opts); diff != "" {
+				t.Errorf("Settles() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("last_settled", func(t *testing.T) {
+		for height, want := range lastSettledAtHeight {
+			got := blockAt(t, height).LastSettled()
+			require.NotNilf(t, got, "Block(%d).LastSettled()", height)
+			require.Equalf(t, want, got.Height(), "Block(%d).LastSettled().Height()", height)
+		}
+	})
+
+	t.Run("disjoint_and_contiguous", func(t *testing.T) {
+		// Every SAE block settles a disjoint range, which together are
+		// contiguous from the block after the boundary. The boundary block
+		// itself is excluded as it settles itself.
+		var settled []uint64
+		for _, b := range chain[1:] {
+			for _, s := range b.Settles() {
+				settled = append(settled, s.Height())
+			}
+		}
+		want := []uint64{boundary + 1, boundary + 2, boundary + 3}
+		require.Equal(t, want, settled, "heights settled by each block of the chain, in order")
+	})
+}
+
+// TestSettlesWithUnsettledSynchronousParent covers a block building on a
+// synchronous block that is yet to be marked as settled, e.g. the last pre-SAE
+// block during recovery, before [Block.MarkSettled] is called on it. A
+// synchronous block settles itself, so its child settles nothing.
+func TestSettlesWithUnsettledSynchronousParent(t *testing.T) {
+	// Deliberately non-zero: the height of the genesis is indistinguishable
+	// from the zero-valued settlement marker of a synchronous block.
+	const boundary = 39
+
+	parent := newBlock(t, newSynchronousEthBlock(t, boundary, boundary, nil), nil, nil)
+	parent.synchronous = true // avoid requiring hooks and DB to mark as synchronous
+	require.True(t, parent.Synchronous(), "Synchronous() of last pre-SAE block")
+	require.False(t, parent.Settled(), "Settled() of block yet to be settled")
+	require.Nil(t, parent.ParentBlock(), "ParentBlock() of block without a parent")
+
+	b := newBlock(t, newEthBlock(t, boundary+1, boundary+1, parent.EthBlock(), parent), parent, parent)
+
+	require.Equal(t, parent, b.LastSettled(), "LastSettled() is the synchronous parent")
+	// The parent settles itself, i.e. x==y==boundary, so b settles nothing.
+	require.Empty(t, b.Settles(), "Settles() of block building on an unsettled synchronous block")
+
+	t.Run("parent_settles_itself", func(t *testing.T) {
+		require.Equal(t, []*Block{parent}, parent.Settles(), "Settles() of synchronous block")
+	})
+}
+
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()

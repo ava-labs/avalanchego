@@ -66,7 +66,8 @@ func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Bloc
 // newChain returns a slice of contiguous-height blocks. Only the last-settled
 // height for the first in the chain is required, and any missing value will
 // default to the same as its parent. Blocks that settle their own height are
-// considered synchronous.
+// considered synchronous (e.g. the genesis or the last pre-SAE block at a
+// transition boundary) and are marked as settled.
 func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 

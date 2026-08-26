@@ -84,6 +84,37 @@ flowchart TD
     class E errCls;
 ```
 
+### Eager transition for state sync
+
+The engine runs state sync once, at startup, against the active VM — but a
+node starting after the transition faces peers that serve only the
+post-transition VM's summaries. So `Initialize` transitions *eagerly*, before
+any block requires it, when both hold:
+
+- the wall clock is at or past `transitionTime` (the network has almost
+  certainly built the transition block), and
+- the pre-transition VM reports `StateSyncEnabled` (this node will sync
+  rather than execute).
+
+This commits the node to state syncing before it has seen a summary, and the
+commitment is durable (the marker is written before the sync runs). The
+accepted failure modes, all of which leave the node on the post-transition VM
+retrying state sync on every restart:
+
+- **A skipped or failed sync.** The node cannot fall back to executing
+  pre-transition blocks; it retries until peers serve an acceptable summary.
+- **A wall-clock false positive.** A skewed clock, or a chain that has not
+  yet built the transition block, strands the node until the network
+  actually transitions.
+- **Schemes the post-transition VM cannot sync** (Firewood): every summary is
+  declined. Disable state sync on such nodes so they bootstrap instead.
+- **Summaries at pre-transition heights.** A fresh node syncs to state at a
+  commit boundary below the transition block, state whose suffix it cannot
+  execute. A partial node whose head is above such a boundary declines the
+  summary and lands on the broken bootstrap path, stranded until restarted
+  after the network crosses its next commit boundary. Serving-side clamping is
+  the intended future guard.
+
 ### Swapping the VM underneath the node
 
 The consensus engine, network, and API server treat a chain's VM as one

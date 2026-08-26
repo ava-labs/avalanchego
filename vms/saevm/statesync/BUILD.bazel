@@ -16,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//database",
+        "//graft/evm/core/state/snapshot",
         "//graft/evm/sync/evmstate",
         "//graft/evm/sync/types",
         "//ids",
@@ -71,6 +72,7 @@ go_test(
         "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",
+        "//vms/evm/sync/customrawdb",
         "//vms/saevm/blocks",
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/network",
