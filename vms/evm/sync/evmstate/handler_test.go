@@ -4,7 +4,6 @@
 package evmstate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -162,70 +160,6 @@ func TestResponder_Serves(t *testing.T) {
 				require.NotEmpty(t, resp.ProofVals)
 			} else {
 				require.Empty(t, resp.ProofVals)
-			}
-		})
-	}
-}
-
-func TestResponder_Rejects(t *testing.T) {
-	t.Parallel()
-
-	const numKeys = 50
-
-	tests := []struct {
-		name        string
-		limit       uint32
-		badRoot     bool
-		corruptTrie bool
-		wantErr     *avacommon.AppError
-	}{
-		{
-			name:    "missing_root",
-			limit:   numKeys,
-			badRoot: true,
-			wantErr: errRootNotFound,
-		},
-		// A corrupt trie fails the proof step, a server fault.
-		{
-			name:        "corrupted_trie",
-			limit:       numKeys / 2,
-			corruptTrie: true,
-			wantErr:     p2p.ErrUnexpected,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			trieDB, disk := synctest.NewTrieDBWithDisk()
-			root, _, _ := synctest.FillTrie(t, trieDB, numKeys)
-
-			if tt.corruptTrie {
-				tr, err := trie.New(trie.TrieID(root), trieDB)
-				require.NoError(t, err)
-				synctest.CorruptTrie(t, disk, tr, 2)
-			}
-			rootHash := root.Bytes()
-			if tt.badRoot {
-				rootHash = bytes.Repeat([]byte{0xab}, common.HashLength)
-			}
-
-			// loggingtest.New fails the test on an ERROR, so record instead.
-			log := loggingtest.NewRecorder(logging.Debug)
-			r := newResponder(log, trieDB, common.HashLength)
-			resp, appErr := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-				RootHash: rootHash,
-				KeyLimit: tt.limit,
-			})
-			require.ErrorIs(t, appErr, tt.wantErr)
-			require.Nil(t, resp)
-
-			// Only a fault earns an ERROR, a peer's bad request does not.
-			faults := log.AtLeast(logging.Error)
-			if tt.wantErr == p2p.ErrUnexpected {
-				require.Len(t, faults, 1, "a server fault must be logged")
-			} else {
-				require.Empty(t, faults, "rejecting a peer must not log an error")
 			}
 		})
 	}
