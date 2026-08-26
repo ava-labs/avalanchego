@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVerify(t *testing.T) {
@@ -22,7 +21,7 @@ func TestVerify(t *testing.T) {
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	tests := map[string]precompiletest.ConfigVerifyTest{
 		"both reward mechanisms should not be activated at the same time in reward manager": {
-			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, &rewardmanager.InitialRewardConfig{
+			Config: rewardmanager.NewConfig(new(uint64(3)), admins, enableds, managers, &rewardmanager.InitialRewardConfig{
 				AllowFeeRecipients: true,
 				RewardAddress:      common.HexToAddress("0x01"),
 			}),
@@ -38,42 +37,42 @@ func TestEqual(t *testing.T) {
 	managers := []common.Address{allowlisttest.TestManagerAddr}
 	tests := map[string]precompiletest.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, nil),
+			Config:   rewardmanager.NewConfig(new(uint64(3)), admins, enableds, managers, nil),
 			Other:    nil,
 			Expected: false,
 		},
 		"different type": {
-			Config:   rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, managers, nil),
+			Config:   rewardmanager.NewConfig(new(uint64(3)), admins, enableds, managers, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
-			Other:    rewardmanager.NewConfig(utils.PointerTo[uint64](4), admins, nil, nil, nil),
+			Config:   rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, nil),
+			Other:    rewardmanager.NewConfig(new(uint64(4)), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
+			Config: rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				AllowFeeRecipients: true,
 			}),
-			Other:    rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Other:    rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
+			Config: rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
-			Other: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil,
+			Other: rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil,
 				&rewardmanager.InitialRewardConfig{
 					RewardAddress: common.HexToAddress("0x02"),
 				}),
 			Expected: false,
 		},
 		"same config": {
-			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
+			Config: rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
-			Other: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
+			Other: rewardmanager.NewConfig(new(uint64(3)), admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
 			Expected: true,

@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -53,8 +52,6 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func u64(val uint64) *uint64 { return &val }
-
 // TestStateProcessorErrors tests the output from the 'core' errors
 // as defined in core/error.go. These errors are generated when the
 // blockchain imports bad blocks, meaning blocks which have valid headers but
@@ -62,8 +59,8 @@ func u64(val uint64) *uint64 { return &val }
 func TestStateProcessorErrors(t *testing.T) {
 	cpcfg := params.Copy(params.TestChainConfig)
 	config := &cpcfg
-	config.ShanghaiTime = u64(0)
-	config.CancunTime = u64(0)
+	config.ShanghaiTime = new(uint64)
+	config.CancunTime = new(uint64)
 	params.GetExtra(config).FeeConfig.MinBaseFee = big.NewInt(legacy.BaseFee)
 
 	var (
@@ -385,7 +382,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
+		headerExtra.TimeMilliseconds = new(timeMS)
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {

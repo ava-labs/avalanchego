@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
@@ -67,7 +66,7 @@ func TestUnmarshalConfig(t *testing.T) {
 		{
 			"state sync enabled",
 			[]byte(`{"state-sync-enabled":true}`),
-			Config{StateSyncEnabled: utils.PointerTo(true)},
+			Config{StateSyncEnabled: new(true)},
 			false,
 		},
 		{

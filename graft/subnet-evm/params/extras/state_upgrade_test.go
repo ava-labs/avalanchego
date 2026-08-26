@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVerifyStateUpgrades(t *testing.T) {
@@ -30,31 +29,31 @@ func TestVerifyStateUpgrades(t *testing.T) {
 		{
 			name: "valid upgrade",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: utils.PointerTo[uint64](1), StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: utils.PointerTo[uint64](2), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(1)), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(2)), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: nil,
 		},
 		{
 			name: "upgrade block timestamp is not strictly increasing",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: utils.PointerTo[uint64](1), StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: utils.PointerTo[uint64](1), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(1)), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(1)), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: errStateUpgradeTimestampNotMonotonic,
 		},
 		{
 			name: "upgrade block timestamp decreases",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: utils.PointerTo[uint64](2), StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: utils.PointerTo[uint64](1), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(2)), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64(1)), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: errStateUpgradeTimestampNotMonotonic,
 		},
 		{
 			name: "upgrade block timestamp is zero",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: utils.PointerTo[uint64](0), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: new(uint64), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: errStateUpgradeTimestampZero,
 		},
@@ -88,12 +87,12 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
@@ -104,14 +103,14 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: utils.PointerTo[uint64](7), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(7)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: utils.PointerTo[uint64](7), StateUpgradeAccounts: differentStateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(7)), StateUpgradeAccounts: differentStateUpgrade},
 					},
 				},
 			},
@@ -121,13 +120,13 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: utils.PointerTo[uint64](7), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(7)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(6)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
@@ -138,7 +137,7 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: utils.PointerTo[uint64](5), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: new(uint64(5)), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
@@ -171,7 +170,7 @@ func TestUnmarshalStateUpgradeJSON(t *testing.T) {
 	upgradeConfig := UpgradeConfig{
 		StateUpgrades: []StateUpgrade{
 			{
-				BlockTimestamp: utils.PointerTo[uint64](1677608400),
+				BlockTimestamp: new(uint64(1677608400)),
 				StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 					common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"): {
 						BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),

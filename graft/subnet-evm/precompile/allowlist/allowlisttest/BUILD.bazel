@@ -25,7 +25,6 @@ go_library(
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
-        "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",

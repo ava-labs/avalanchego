@@ -30,7 +30,6 @@ graft_go_test(
     srcs = ["config_test.go"],
     embed = [":config"],
     deps = [
-        "//utils",
         "//utils/constants",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",

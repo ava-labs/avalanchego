@@ -123,7 +123,6 @@ use_repo(
     "io_k8s_api",
     "io_k8s_apimachinery",
     "io_k8s_client_go",
-    "io_k8s_utils",
     "io_opentelemetry_go_otel",
     "io_opentelemetry_go_otel_exporters_otlp_otlptrace",
     "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracegrpc",

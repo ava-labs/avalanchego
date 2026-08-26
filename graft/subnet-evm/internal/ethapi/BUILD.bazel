@@ -77,7 +77,6 @@ graft_go_test(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/upgrade/legacy",
         "//upgrade",
-        "//utils",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//accounts/keystore",
         "@com_github_ava_labs_libevm//common",

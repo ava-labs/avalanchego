@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -40,10 +39,10 @@ $`,
 		"set": {
 			config: &ChainConfig{
 				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-					DurangoTimestamp:   utils.PointerTo[uint64](2),
-					EtnaTimestamp:      utils.PointerTo[uint64](3),
-					FortunaTimestamp:   utils.PointerTo[uint64](4),
+					SubnetEVMTimestamp: new(uint64(1)),
+					DurangoTimestamp:   new(uint64(2)),
+					EtnaTimestamp:      new(uint64(3)),
+					FortunaTimestamp:   new(uint64(4)),
 				},
 				FeeConfig: commontype.FeeConfig{
 					GasLimit:                 big.NewInt(5),
@@ -58,11 +57,11 @@ $`,
 				AllowFeeRecipients: true,
 				UpgradeConfig: UpgradeConfig{
 					NetworkUpgradeOverrides: &NetworkUpgrades{
-						SubnetEVMTimestamp: utils.PointerTo[uint64](13),
+						SubnetEVMTimestamp: new(uint64(13)),
 					},
 					StateUpgrades: []StateUpgrade{
 						{
-							BlockTimestamp: utils.PointerTo[uint64](14),
+							BlockTimestamp: new(uint64(14)),
 							StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 								{15}: {
 									Code: []byte{16},
@@ -108,10 +107,10 @@ func TestChainConfigVerify(t *testing.T) {
 		return ChainConfig{
 			FeeConfig: validFeeConfig,
 			NetworkUpgrades: NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
-				EtnaTimestamp:      utils.PointerTo[uint64](3),
-				FortunaTimestamp:   utils.PointerTo[uint64](4),
+				SubnetEVMTimestamp: new(uint64(1)),
+				DurangoTimestamp:   new(uint64(2)),
+				EtnaTimestamp:      new(uint64(3)),
+				FortunaTimestamp:   new(uint64(4)),
 			},
 			AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
 				NetworkUpgrades: upgrade.Config{
@@ -143,8 +142,8 @@ func TestChainConfigVerify(t *testing.T) {
 				UpgradeConfig: UpgradeConfig{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						// same precompile cannot be configured twice for the same timestamp
-						{Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](1))},
-						{Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](1))},
+						{Config: txallowlist.NewDisableConfig(new(uint64(1)))},
+						{Config: txallowlist.NewDisableConfig(new(uint64(1)))},
 					},
 				},
 			},
