@@ -531,7 +531,7 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 
 // TestExecuteRecordsOnlyCanonicalProgress verifies that non-canonical execution
 // does not overwrite an in-memory block's canonical progress and change the
-// settlement decision made by LastToSettleAt.
+// settlement decision made by  [blocks.LastToSettleAt].
 func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 	tests := []struct {
 		name   string
