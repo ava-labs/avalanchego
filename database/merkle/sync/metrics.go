@@ -149,7 +149,7 @@ func newHandlerMetrics(namespace string, reg prometheus.Registerer) (*handlerMet
 		proofGenerationTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "proof_generation_seconds",
-			Help:      "time, in seconds, spent generating each proof, labeled by result; the count is the total number of generation attempts",
+			Help:      "time, in seconds, spent generating each proof",
 			Buckets:   durationBuckets,
 		}, []string{proofTypeLabel, resultLabel}),
 		generatedProofSizeBytes: prometheus.NewHistogramVec(prometheus.HistogramOpts{
