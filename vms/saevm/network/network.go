@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -79,25 +80,16 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("creating peer tracker: %w", err)
 	}
-	for id := range cfg.stateSyncIDs {
-		peerTracker.Connected(id, nil)
-	}
 
 	peers := &p2p.Peers{}
-	connectionHandlers := []p2p.ConnectionHandler{peers, validatorPeers}
-	if len(cfg.stateSyncIDs) == 0 {
-		connectionHandlers = append(
-			connectionHandlers,
-			peerTracker,
-		)
-	}
-
 	network, err := p2p.NewNetwork(
 		snowCtx.Log,
 		sender,
 		reg,
 		"p2p",
-		connectionHandlers...,
+		peers,
+		validatorPeers,
+		withFilter(peerTracker, cfg.stateSyncIDs),
 	)
 	if err != nil {
 		return nil, err
@@ -108,4 +100,27 @@ func New(
 		ValidatorPeers: validatorPeers,
 		PeerTracker:    peerTracker,
 	}, nil
+}
+
+// withFilter wraps a [p2p.ConnectionHandler] to only connect to nodes in the
+// provided set, if the set is non-empty.
+func withFilter(handler p2p.ConnectionHandler, onlyInclude set.Set[ids.NodeID]) p2p.ConnectionHandler {
+	if len(onlyInclude) == 0 {
+		return handler
+	}
+	return &filteredConnections{
+		ConnectionHandler: handler,
+		onlyInclude:       onlyInclude,
+	}
+}
+
+type filteredConnections struct {
+	p2p.ConnectionHandler
+	onlyInclude set.Set[ids.NodeID]
+}
+
+func (f *filteredConnections) Connected(id ids.NodeID, ver *version.Application) {
+	if f.onlyInclude.Contains(id) {
+		f.ConnectionHandler.Connected(id, ver)
+	}
 }

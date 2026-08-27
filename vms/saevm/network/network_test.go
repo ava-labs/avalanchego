@@ -15,19 +15,32 @@ import (
 )
 
 func TestNewTrackedIDs(t *testing.T) {
+	peer := ids.GenerateTestNodeID()
+
 	tests := []struct {
-		name       string
-		trackedIDs set.Set[ids.NodeID]
+		name         string
+		trackedIDs   set.Set[ids.NodeID]
+		expectedSize int
 	}{
 		{
-			name: "empty",
+			name:         "empty",
+			expectedSize: 1,
 		},
 		{
-			name: "non_empty",
+			name: "non_empty_filtered",
 			trackedIDs: set.Of(
 				ids.GenerateTestNodeID(),
 				ids.GenerateTestNodeID(),
 			),
+			expectedSize: 0,
+		},
+		{
+			name: "includeFilter",
+			trackedIDs: set.Of(
+				peer,
+				ids.GenerateTestNodeID(),
+			),
+			expectedSize: 1,
 		},
 	}
 
@@ -41,22 +54,10 @@ func TestNewTrackedIDs(t *testing.T) {
 			)
 			require.NoError(t, err, "New()")
 
-			tracker := net.PeerTracker
-			require.Equalf(t, tt.trackedIDs.Len(), tracker.Size(), "PeerTracker.Size()")
-
-			// A regular P2P connection MUST be reflected by [Network.Peers]
-			// regardless of config, but MUST only be selectable by the
-			// trackers if no exclusive list was configured.
-			peer := ids.GenerateTestNodeID()
 			require.NoError(t, net.Connected(t.Context(), peer, nil), "Connected()")
 			require.True(t, net.Peers.Has(peer), "Peers.Has() connected peer")
 
-			selectable := tt.trackedIDs
-			if selectable.Len() == 0 {
-				selectable = set.Of(peer)
-			}
-
-			require.Equalf(t, selectable.Len(), tracker.Size(), "PeerTracker.Size()")
+			require.Equalf(t, tt.expectedSize, net.PeerTracker.Size(), "PeerTracker.Size()")
 		})
 	}
 }
