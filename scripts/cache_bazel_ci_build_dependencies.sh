@@ -23,4 +23,17 @@ done < <(bazel_ci_dependency_targets)
 # bazel-check-metadata also runs `bazel mod deps`. It has no target patterns,
 # but it must load every repository in the module graph with repository and
 # Go module downloads disabled.
+# The image targets use Linux-only package configurations and must not be
+# fetched by the Darwin Bazel setup job.
+if [[ "$(uname -s)" == "Linux" ]]; then
+  while IFS= read -r target_set; do
+    [[ -n "${target_set}" ]] || continue
+    read -r -a target_args <<<"${target_set}"
+    bazelisk fetch "${target_args[@]}"
+  done < <(bazel_ci_linux_target_patterns)
+fi
+
+# bazel-check-metadata also runs `bazel mod deps`. It has no target patterns,
+# but it must load every repository in the module graph with repository and
+# Go module downloads disabled.
 bazelisk mod deps --lockfile_mode=error >/dev/null

@@ -52,7 +52,7 @@ tasks:
 
   bazel-fmt:
     desc: Format BUILD.bazel files with buildifier
-    cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
+    cmd: 'find . -path ./.cache -prune -o -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE -o -name WORKSPACE.bazel -o -name "*.bzl" -o -name "*.bazel" \) -print0 | xargs -0 {{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier --'
 
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
@@ -79,6 +79,14 @@ tasks:
     cmds:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
+
+  bazel-build-image:
+    desc: Build the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh --build-only'
+
+  bazel-test-build-image:
+    desc: Test the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh'
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
