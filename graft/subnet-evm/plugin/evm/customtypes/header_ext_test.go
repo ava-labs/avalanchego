@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 func TestMain(m *testing.M) {
@@ -122,7 +122,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		BlockGasCost:                   big.NewInt(23),
 		TimeMilliseconds:               utils.PointerTo[uint64](24),
 		MinDelayExcess:                 utils.PointerTo(acp226.DelayExcess(25)),
-		TargetExcess:                   utils.PointerTo(acp176.TargetExcess(26)),
+		TargetExcess:                   utils.PointerTo(gas.Gas(26)),
 		SettledHeight:                  utils.PointerTo[uint64](27),
 		SettledGasUnix:                 utils.PointerTo[uint64](28),
 		SettledGasNumerator:            utils.PointerTo[uint64](29),
@@ -183,7 +183,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
-			case *acp176.TargetExcess:
+			case *gas.Gas:
 				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
@@ -196,7 +196,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *acp176.TargetExcess
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *gas.Gas
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)

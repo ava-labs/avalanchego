@@ -1,11 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package hook
+package subnetevm
 
 import (
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -22,17 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
-
-// TestMain registers libevm extras required by [subnetevmparams.GetExtra]
-// and [customtypes.GetHeaderExtra] used in this package's tests.
-func TestMain(m *testing.M) {
-	core.RegisterExtras()
-	subnetevmparams.RegisterExtras()
-	customtypes.Register()
-	os.Exit(m.Run())
-}
 
 // TestBlockRebuilderFromOverridesValidatorCoinbase: in operator-chosen
 // Coinbase branches the rebuilt block MUST carry the BUILDER's Coinbase
@@ -60,20 +49,20 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
 	// Any non-zero marker works; it only needs to match on both sides for the
 	// hash-equality assertion.
-	settledMarker := saehook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
+	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
 	// Builder side: stamp `builderCoinbase` into a real block. The settled
 	// state reader is nil because neither rewardmanager nor gaspricemanager
 	// is enabled, so FinalizeHeader never reads it.
-	builderPts := NewPoints(
+	builderPts := newHooks(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
-		nil, nil, nil, builderCoinbase,
+		desiredParams{}, nil, builderCoinbase,
 	)
-	builderHdr, err := builderPts.blockBuilder.BuildHeader(parent)
+	builderHdr, err := builderPts.builder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, builderPts.blockBuilder.FinalizeHeader(builderHdr, settled, nil))
-	builderBlock, err := builderPts.blockBuilder.BuildBlock(
+	require.NoError(t, builderPts.builder.FinalizeHeader(builderHdr, settled, nil))
+	builderBlock, err := builderPts.builder.BuildBlock(
 		builderHdr, nil, []*types.Transaction{tx}, nil, nil, settledMarker,
 	)
 	require.NoError(t, err)
@@ -82,7 +71,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	// Rebuilder side: a DIFFERENT node (rebuilderCoinbase != builderCoinbase)
 	// rebuilds builderBlock. Its rebuilt block must carry builderCoinbase.
-	rebuilderPts := NewPoints(nil, &chainCfg, nil, nil, nil, nil, rebuilderCoinbase)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, rebuilderCoinbase)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(builderBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
@@ -135,7 +124,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
-	settledMarker := saehook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
+	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
 	// "Builder" forges by skipping resolveCoinbase entirely and stamping
 	// `forgedCoinbase` directly into the header that will be served as the
@@ -153,7 +142,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
-	rebuilderPts := NewPoints(nil, &chainCfg, nil, nil, nil, nil, forgedCoinbase /* same as builder; doesn't matter */)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, forgedCoinbase /* same as builder; doesn't matter */)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(forgedBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)

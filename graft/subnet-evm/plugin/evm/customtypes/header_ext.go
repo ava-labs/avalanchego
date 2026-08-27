@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -51,7 +51,7 @@ type HeaderExtra struct {
 	// gas-time coordinates of that block's post-execution state. All four
 	// MUST be set together; a header with any of them missing is treated as
 	// synchronously executed (pre-SAE).
-	TargetExcess        *acp176.TargetExcess
+	TargetExcess        *gas.Gas
 	SettledHeight       *uint64
 	SettledGasUnix      *uint64
 	SettledGasNumerator *uint64
@@ -243,7 +243,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
-	extras.TargetExcess = (*acp176.TargetExcess)(h.TargetExcess)
+	extras.TargetExcess = (*gas.Gas)(h.TargetExcess)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = h.SettledGasNumerator

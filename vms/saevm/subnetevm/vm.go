@@ -36,11 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/validators"
 
@@ -190,24 +189,22 @@ func (v *VM) Initialize(
 		return err
 	}
 
-	var desiredDelayExcess *acp226.DelayExcess
+	var desired desiredParams
 	if userConfig.MinDelayTarget != nil {
-		desiredDelayExcess = new(acp226.DelayExcess)
-		*desiredDelayExcess = acp226.DesiredDelayExcess(*userConfig.MinDelayTarget)
+		e := acp226.DesiredDelayExcess(*userConfig.MinDelayTarget)
+		desired.delayExcess = &e
 	}
-	var desiredTargetExcess *acp176.TargetExcess
 	if userConfig.GasTarget != nil {
-		desiredTargetExcess = new(acp176.TargetExcess)
-		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
+		e := acp176.DesiredTargetExcess(*userConfig.GasTarget)
+		desired.targetExcess = &e
 	}
 
 	warpStorage := sharedwarp.NewStorage(avaDB, warpMessages...)
-	hooks := hook.NewPoints(
+	hooks := newHooks(
 		snowCtx,
 		config,
 		saeConfig.Now,
-		desiredDelayExcess,
-		desiredTargetExcess,
+		desired,
 		warpStorage,
 		nodeFeeRecipient(userConfig, config, snowCtx.Log),
 	)

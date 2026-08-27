@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package hook
+package subnetevm
 
 import (
 	"math"
@@ -10,14 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 )
 
 // A headerGasConfig is the effective ACP-224 gas configuration carried by a
 // subnet-evm SAE header (the customtypes `GasConfig*` field group). It is the
 // projection of gaspricemanager precompile storage in the settled state,
-// stamped by [blockBuilder.FinalizeHeader] and read back by
-// [Points.GasConfigAfter], making recovery and rebuilds self-contained at the
+// stamped by [builder.FinalizeHeader] and read back by
+// [hooks.GasConfigAfter], making recovery and rebuilds self-contained at the
 // header level.
 type headerGasConfig struct {
 	// ValidatorTargetGas selects the gas-target authority: when true, the
@@ -29,7 +28,7 @@ type headerGasConfig struct {
 }
 
 // effective returns the gas target and price config represented by the group.
-// Validity is the producer's responsibility: [blockBuilder.FinalizeHeader]
+// Validity is the producer's responsibility: [builder.FinalizeHeader]
 // only stamps configs whose source passed [commontype.GasPriceConfig.Verify],
 // so consumer-side re-validation here would be redundant.
 func (c *headerGasConfig) effective(headerTarget gas.Gas) (gas.Gas, gastime.GasPriceConfig) {
@@ -99,14 +98,14 @@ func boolToUint64Ptr(b bool) *uint64 {
 // scalingFromTimeToDouble converts ACP-224's `TimeToDouble` (seconds) into the
 // K/T ratio used by ACP-176 / gastime: K = T * TimeToDouble / ln(2), so
 // TargetToExcessScaling = round(TimeToDouble / ln(2)). The default 60s
-// round-trips to the ACP-176 default of 87.
+// round-trips to [gastime.DefaultTargetToExcessScaling].
 //
 // For `StaticPricing` configs `TimeToDouble` is 0 and unused (gastime zeroes
 // excess in that branch instead of scaling), but the gastime invariant
-// requires `TargetToExcessScaling != 0`, so we return the ACP-176 default.
+// requires `TargetToExcessScaling != 0`, so we return the default.
 func scalingFromTimeToDouble(ttd uint64) gas.Gas {
 	if ttd == 0 {
-		return acp176.TargetToExcessScaling
+		return gastime.DefaultTargetToExcessScaling
 	}
 	return gas.Gas(math.Round(float64(ttd) / math.Ln2))
 }

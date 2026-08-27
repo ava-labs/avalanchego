@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -239,7 +239,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 	// (~1.005x `MinTargetPerSecond`). It is well below `overrideTargetGas`
 	// so the override case must visibly ignore the validator's pull.
 	const overrideTargetGas uint64 = 2 * acp176.MinTargetPerSecond
-	desiredGasTarget := acp176.TargetExcess(5 * acp176.MaxTargetExcessDiff).Target()
+	desiredGasTarget := acp176Target(gas.Gas(5 * acp176.MaxTargetExcessDiff))
 
 	buildChain := func(t *testing.T, cfg commontype.GasPriceConfig) []*blocks.Block {
 		t.Helper()
@@ -342,7 +342,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	var (
 		pinnedCfg       = staticPricingConfig(pinnedMinPrice)
 		pinnedBaseFee   = uint256.NewInt(pinnedMinPrice)
-		defaultBaseFeeU = uint256.NewInt(acp176.MinPrice)
+		defaultBaseFeeU = uint256.NewInt(acp176.MinGasPrice)
 	)
 
 	now := postHeliconStartTime(t)
