@@ -20,6 +20,7 @@ that span multiple areas of the tree.
 - [Go toolchains and dependency caches](./go-toolchains-and-caches.md) - compiler
   requirements, dependency preparation, and cache boundaries across repository tasks
 - [Bazel](./bazel.md) - Bazel-related repository guidance
+- [Bazel multi-architecture AvalancheGo image validation](./bazel-multiarch-image-validation.md) - build and validate Debian amd64/arm64 AvalancheGo images with Bazel
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs
 
