@@ -128,8 +128,10 @@ function test_import_testing_only_in_tests {
   # Note that `./...` does not match a directory whose files are ALL excluded
   # by the tags, so the excluded set MUST be derived by inverting the built set
   # rather than read from IgnoredGoFiles.
-  BUILT_WITH_PROD_TAGS=$( go list -e -tags 'prod,nocmpopts' -f '{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}' ./... )
-  IGNORED_BY_PROD_TAGS=$( comm -23 <( echo "${NON_TEST_GO_FILES}" | sort -u ) <( echo "${BUILT_WITH_PROD_TAGS}" | sort -u ) )
+  GO_LIST_TEMPLATE='{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}'
+  BUILT_WITHOUT_PROD_TAGS=$( go list -e -f "${GO_LIST_TEMPLATE}" "${ROOT}/..." )
+  BUILT_WITH_PROD_TAGS=$( go list -e -tags 'prod,nocmpopts' -f "${GO_LIST_TEMPLATE}" "${ROOT}/..." )
+  IGNORED_BY_PROD_TAGS=$( comm -23 <( echo "${BUILT_WITHOUT_PROD_TAGS}" | sort -u ) <( echo "${BUILT_WITH_PROD_TAGS}" | sort -u ) )
 
   IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/.+\.go$' ) # ancestral directory (hence package name) ends in "test"
 
