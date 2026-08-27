@@ -29,9 +29,8 @@ import (
 
 // Config provides all user-configurable information for the [SummaryHandler].
 type Config struct {
-	DBConfig               saedb.Config
-	Enabled                bool
-	ExtraBlockVerification any // TODO fix this
+	DBConfig saedb.Config
+	Enabled  bool
 }
 
 var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
