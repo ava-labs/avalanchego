@@ -6,7 +6,6 @@
 package blocks
 
 import (
-	"reflect"
 	"sync/atomic"
 	"testing"
 
@@ -62,30 +61,7 @@ func (e *executionResults) equalForTests(f *executionResults) bool {
 // than the chain's last settled do not have [Block.RestoreExecutionArtefacts]
 // called (to simplify state sync).
 func IgnoreLastSettledExecutionArtefacts(tb testing.TB) cmp.Option {
-	// [cmputils.IfIn] filters by type, but we need to ignore based on a field
-	// name. To avoid hard-to-debug failures due to a name mismatch, we fail
-	// early if the field no longer exists. Although a bit clunky, it's cleaner
-	// than introducing a marker type in [ancestry] purely to detect
-	// last-settled blocks.
-	const field = "lastSettled"
-	if _, ok := reflect.TypeFor[ancestry]().FieldByName(field); !ok {
-		tb.Fatalf("Type %T does not contain field named %q to ignore last-settled execution artefacts", ancestry{}, field)
-	}
-
-	return cmputils.IfIn[ancestry](
-		cmp.FilterPath(
-			func(p cmp.Path) bool {
-				for _, s := range p {
-					const pathStep = "." + field
-					if s.String() == pathStep {
-						return true
-					}
-				}
-				return false
-			},
-			cmpopts.IgnoreTypes(
-				atomic.Pointer[executionResults]{},
-			),
-		),
-	)
+	tb.Helper()
+	opt := cmpopts.IgnoreTypes(atomic.Pointer[executionResults]{})
+	return cmputils.IfInField[ancestry, *Block](tb, "lastSettled", opt)
 }
