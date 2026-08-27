@@ -253,15 +253,14 @@ var ErrMissingExecutionResults = errors.New("missing execution results for async
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called. Synchronous blocks do not persist
 // execution results, so theirs are inferred from the block itself without
-// consulting the execution-results DB;
-// for asynchronous blocks the results are loaded from the DB. Any failure to
-// obtain the results is reported wrapped in [ErrMissingExecutionResults],
-// alongside the underlying cause.
+// consulting the execution-results DB; for asynchronous blocks the results are
+// loaded from the DB. Any failure to obtain the results is reported wrapped in
+// [ErrMissingExecutionResults], alongside the underlying cause.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
-// appropriate. Because this function breaks this invariant, any consumer
-// SHOULD consider using [RestoreSettledBlock] instead, if possible.
+// appropriate. Because this function breaks this invariant, any consumer SHOULD
+// consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
 func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
