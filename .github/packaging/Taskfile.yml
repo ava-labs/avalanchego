@@ -8,14 +8,14 @@
 version: '3'
 
 vars:
-  # Repo root, computed from this Taskfile's location so that the
-  # packaging Taskfile works both as an include and standalone.
+  # Repo root, resolved independently of whether this Taskfile is included
+  # from the root Taskfile or invoked directly.
   REPO_ROOT:
-    sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
+    sh: git rev-parse --show-toplevel
   # Go version from the project's go.mod. Avoid invoking Go so run-only CI
   # tasks can use a prebuilt task binary without a Go toolchain.
   PACKAGING_GO_VERSION:
-    sh: awk '/^go / { print $2; exit }' "{{.TASKFILE_DIR}}/../../go.mod"
+    sh: awk '/^go / { print $2; exit }' "$(git rev-parse --show-toplevel)/go.mod"
   # Map uname -m to RPM arch names (arm64 -> aarch64).
   PACKAGING_RPM_HOST_ARCH:
     sh: |
