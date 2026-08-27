@@ -31,6 +31,7 @@ func newTestSyncer(f Fetcher) *CallbackSyncer {
 type batchFetcher struct {
 	keys, vals [][]byte
 	err        error
+	more       bool
 	starts     [][]byte
 }
 
@@ -42,7 +43,7 @@ func (f *batchFetcher) FetchLeaves(_ context.Context, req hashdb.LeafRange) (has
 	return hashdb.Leaves{
 		Keys: f.keys,
 		Vals: f.vals,
-	}, len(f.starts) == 1, nil
+	}, f.more && len(f.starts) == 1, nil
 }
 
 type recordingTask struct {
@@ -94,6 +95,7 @@ func TestSyncTaskAdvancesOnePastLastKey(t *testing.T) {
 	fetcher := &batchFetcher{
 		keys: [][]byte{{0x01}, {0x02}},
 		vals: [][]byte{{0x0a}, {0x0b}},
+		more: true,
 	}
 
 	require.NoError(t, newTestSyncer(fetcher).syncTask(t.Context(), &mutatingTask{}))
@@ -151,6 +153,7 @@ func TestSyncTaskTruncatesAtEnd(t *testing.T) {
 			fetcher := &batchFetcher{
 				keys: keys,
 				vals: vals,
+				more: true,
 			}
 			task := &recordingTask{end: tt.end}
 
@@ -167,8 +170,19 @@ func TestSyncTaskTruncatesAtEnd(t *testing.T) {
 func TestSyncTaskRejectsMoreWithoutKeys(t *testing.T) {
 	t.Parallel()
 
-	err := newTestSyncer(&batchFetcher{}).syncTask(t.Context(), &recordingTask{})
+	err := newTestSyncer(&batchFetcher{more: true}).syncTask(t.Context(), &recordingTask{})
 	require.ErrorIs(t, err, ErrMoreWithoutKeys)
+}
+
+// An End check must not index an empty batch, which the fast path in the
+// truncation guards against separately from the search itself.
+func TestSyncTaskFinishesOnEmptyBatchWithEnd(t *testing.T) {
+	t.Parallel()
+
+	task := &recordingTask{end: []byte{0x04}}
+	require.NoError(t, newTestSyncer(&batchFetcher{}).syncTask(t.Context(), task))
+	require.Empty(t, task.gotKeys)
+	require.True(t, task.finished)
 }
 
 // The atomic syncer matches this sentinel to detect an interrupted sync.

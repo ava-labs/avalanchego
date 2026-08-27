@@ -119,14 +119,14 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}
 
-		// The request carries no end key, so bound the response here. [Fetcher]
-		// returns ascending keys, so the first past [SyncTask.End] ends the run.
+		// The request carries no end key, so bound the response here. The common
+		// case is nothing to cut, checked in O(1) before paying for the search.
 		done := false
-		if end := task.End(); end != nil {
-			n := sort.Search(len(leaves.Keys), func(i int) bool {
-				return bytes.Compare(leaves.Keys[i], end) > 0
-			})
-			if n < len(leaves.Keys) {
+		if end := task.End(); end != nil && len(leaves.Keys) > 0 {
+			if last := leaves.Keys[len(leaves.Keys)-1]; bytes.Compare(last, end) > 0 {
+				n := sort.Search(len(leaves.Keys), func(i int) bool {
+					return bytes.Compare(leaves.Keys[i], end) > 0
+				})
 				leaves.Keys, leaves.Vals = leaves.Keys[:n], leaves.Vals[:n]
 				done = true
 			}
