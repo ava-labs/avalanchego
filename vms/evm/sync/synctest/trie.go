@@ -63,21 +63,3 @@ func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, 
 	}
 	return root, keys, vals
 }
-
-// CorruptTrie deletes every nth node of tr from diskdb to exercise
-// proof-generation error paths.
-func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
-	t.Helper()
-	batch := diskdb.NewBatch()
-	nodeIt, err := tr.NodeIterator(nil)
-	require.NoError(t, err)
-	count := 0
-	for nodeIt.Next(true) {
-		count++
-		if count%n == 0 && nodeIt.Hash() != (common.Hash{}) {
-			require.NoError(t, batch.Delete(nodeIt.Hash().Bytes()))
-		}
-	}
-	require.NoError(t, nodeIt.Error())
-	require.NoError(t, batch.Write())
-}

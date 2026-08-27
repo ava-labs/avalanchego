@@ -2,13 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
 go_library(
-    name = "evmstate",
+    name = "hashdb",
     srcs = [
         "client.go",
         "handler.go",
-        "leaves.go",
+        "snapshot.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb",
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
@@ -33,26 +33,27 @@ go_library(
 )
 
 go_test(
-    name = "evmstate_test",
+    name = "hashdb_test",
     srcs = [
         "client_test.go",
         "handler_test.go",
     ],
-    embed = [":evmstate"],
+    embed = [":hashdb"],
     deps = [
         "//ids",
         "//network/p2p",
         "//proto/pb/sync",
         "//snow/engine/common",
+        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/evm/sync/synctest",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//core/rawdb",
-        "@com_github_ava_labs_libevm//crypto",
-        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_stretchr_testify//require",
     ],
 )
