@@ -24,10 +24,6 @@ func (vm *VM) GetAncestors(
 	maxBlocksSize int,
 	maxBlocksRetrievalTime time.Duration,
 ) ([][]byte, error) {
-	// TODO(StephenButtolph): [VM.GetAncestors] is more performant when serving
-	// post-fork blocks than repeated [VM.GetBlock] calls. Even if the inner vm
-	// doesn't implement [block.BatchedChainVM] we should still use the
-	// optimized path to serve post-fork blocks.
 	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
