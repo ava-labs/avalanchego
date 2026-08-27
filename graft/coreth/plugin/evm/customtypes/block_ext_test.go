@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestCopyHeader(t *testing.T) {
@@ -91,7 +91,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
-			case *acp176.TargetExcess:
+			case *dynamic.TargetExponent:
+				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.PriceExponent:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)

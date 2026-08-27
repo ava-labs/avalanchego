@@ -12,12 +12,6 @@ import (
 var (
 	ErrOverflow  = errors.New("overflow")
 	ErrUnderflow = errors.New("underflow")
-
-	// Deprecated: Add64 is deprecated. Use Add[uint64] instead.
-	Add64 = Add[uint64]
-
-	// Deprecated: Mul64 is deprecated. Use Mul[uint64] instead.
-	Mul64 = Mul[uint64]
 )
 
 // MaxUint returns the maximum value of an unsigned integer of type T.

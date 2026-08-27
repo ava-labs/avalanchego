@@ -59,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -618,6 +617,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = atomicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
+	n.Config.NetworkConfig.UpgradeConfig = n.Config.UpgradeConfig
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
@@ -1215,6 +1215,7 @@ func (n *Node) initVMs() error {
 				MinDelegationFee:          n.Config.MinDelegationFee,
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
+				HeliconMinStakeDuration:   n.Config.HeliconMinStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
 				UpgradeConfig:             n.Config.UpgradeConfig,
 				UseCurrentHeight:          n.Config.UseCurrentHeight,
@@ -1228,10 +1229,24 @@ func (n *Node) initVMs() error {
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
-			PreFactory:     &coreth.Factory{},
-			PostFactory:    &saevm.Factory{},
-			TransitionTime: upgrade.InitiallyActiveTime,
-			// TransitionTime: n.Config.UpgradeConfig.HeliconTime,
+			PreFactory:  &coreth.Factory{},
+			PostFactory: &saevm.Factory{},
+			// Transitioning starts briefly before the scheduled Helicon time.
+			//
+			// This allows all Coreth blocks to be executed using the
+			// Pre-Helicon rules and all SAE blocks to be executed using the
+			// Post-Helicon rules.
+			//
+			// Coreth enforces a minimum block time, so we must provide a
+			// sufficient window to guarantee that Coreth can build a block
+			// after the transition time but before the Helicon time. Otherwise,
+			// Coreth may accept a pre-transition block whose timestamp would
+			// force its child to execute with the Post-Helicon rules, which
+			// would cause the chain to halt. The C-Chain's minimum block time
+			// is around a second, so 10 seconds provides plenty of time to
+			// ensure this doesn't happen.
+			TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+			APIDrainTimeout: 15 * time.Second,
 		}),
 	)
 	if err != nil {

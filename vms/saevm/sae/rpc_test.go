@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -34,6 +35,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	// Added for comment resolution.
+	_ "github.com/ava-labs/libevm/core/txpool"
+	_ "github.com/ava-labs/libevm/eth/filters"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -49,12 +54,24 @@ var zeroAddr common.Address
 
 type rpcTest struct {
 	method       string
+	name         string
 	args         []any
 	want         any // untyped nil means no return value.
 	wantErr      testerr.Want
 	parallel     bool
 	eventually   bool
 	extraCmpOpts []cmp.Option
+}
+
+// withCmpOpts appends opts to the [rpcTest.extraCmpOpts] of every test, for
+// tables whose rows compare their results the same way. A row MAY carry its own
+// options too.
+func withCmpOpts(tests []rpcTest, opts ...cmp.Option) []rpcTest {
+	for i := range tests {
+		test := &tests[i]
+		test.extraCmpOpts = append(test.extraCmpOpts, opts...)
+	}
+	return tests
 }
 
 func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
@@ -89,7 +106,11 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			}
 		}
 
-		t.Run(tc.method, func(t *testing.T) {
+		name := tc.name
+		if name == "" {
+			name = tc.method
+		}
+		t.Run(name, func(t *testing.T) {
 			if tc.parallel {
 				t.Parallel()
 			}
@@ -134,6 +155,16 @@ func testRPCGetter[
 }
 
 func TestSubscriptions(t *testing.T) {
+	// TODO(JonathanOppenheimer): [filters.FilterAPI.NewPendingTransactions]
+	// subscribes to the [txpool.TxPool] asynchronously. If the goroutine is not
+	// scheduled before the first transaction is issued, the subscription will
+	// not receive the tx.
+	//
+	// Fixed by: https://github.com/ethereum/go-ethereum/pull/33990
+	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	}
+
 	ctx, sut := newSUT(t, 1)
 
 	var (
@@ -563,7 +594,7 @@ func TestEthGetters(t *testing.T) {
 	onDisk := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 
 	settled := sut.runConsensusLoop(t, createTx(t, zeroAddr))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	executed := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
@@ -714,7 +745,7 @@ func TestGetLogs(t *testing.T) {
 	}
 
 	settled := sut.runConsensusLoop(t, txWithLog(t))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	noLogs := sut.runConsensusLoop(t, txWithoutLog(t))
 
@@ -844,13 +875,8 @@ func TestEthPendingTransactions(t *testing.T) {
 }
 
 func TestGetReceipts(t *testing.T) {
-	// Blocking precompile creates accepted-but-not-executed blocks
-	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
-	t.Cleanup(unblock)
+	ctx, sut := newSUT(t, 2, timeOpt, withDebugAPI())
 
 	var (
 		txs  []*types.Transaction
@@ -910,15 +936,8 @@ func TestGetReceipts(t *testing.T) {
 
 	onDisk, wantOnDisk := slice(t, 0, 2)
 	settled, wantSettled := slice(t, 2, 4)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
-
-	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &blockingPrecompile,
-		Gas:      params.TxGas,
-		GasPrice: big.NewInt(1),
-	}))
 
 	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
 		raw := make([]hexutil.Bytes, len(rs))
@@ -984,9 +1003,6 @@ func TestGetReceipts(t *testing.T) {
 		})
 	}
 
-	// Acceptance writes blocks to the DB but not receipts, so pending
-	// block receipts error, while pending tx receipts block until they're ready
-	// as long as they have been included in a block.
 	tests = append(tests, []rpcTest{
 		{
 			method: "eth_getTransactionReceipt",
@@ -1011,26 +1027,6 @@ func TestGetReceipts(t *testing.T) {
 		{
 			method: "debug_getRawReceipts",
 			args:   []any{genesis.Hash()},
-			want:   []hexutil.Bytes{},
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{pending.Hash()},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{pending.Hash()},
-			want:   []hexutil.Bytes{},
-		},
-		{
-			method: "eth_getBlockReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
-			want:   ([]*types.Receipt)(nil),
-		},
-		{
-			method: "debug_getRawReceipts",
-			args:   []any{hexutil.Uint64(pending.Height())},
 			want:   []hexutil.Bytes{},
 		},
 	}...)
@@ -1108,11 +1104,11 @@ func TestFillTransaction(t *testing.T) {
 		return ethapi.SignTransactionResult{Raw: raw, Tx: tx}
 	}
 
-	args := map[string]any{
-		"from":  sut.wallet.Addresses()[0],
-		"to":    to,
-		"gas":   hexutil.Uint64(gas),
-		"value": hexBig(value),
+	args := ethapi.TransactionArgs{
+		From:  utils.PointerTo(sut.wallet.Addresses()[0]),
+		To:    &to,
+		Gas:   utils.PointerTo(hexutil.Uint64(gas)),
+		Value: hexBig(value),
 	}
 
 	sut.testRPC(ctx, t, rpcTest{
@@ -1155,13 +1151,13 @@ func TestResend(t *testing.T) {
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_resend",
 		args: []any{
-			map[string]any{
-				"from":                 sut.wallet.Addresses()[0],
-				"nonce":                hexutil.Uint64(tx.Nonce()),
-				"to":                   tx.To(),
-				"gas":                  hexutil.Uint64(tx.Gas()),
-				"maxFeePerGas":         (*hexutil.Big)(tx.GasFeeCap()),
-				"maxPriorityFeePerGas": (*hexutil.Big)(tx.GasTipCap()),
+			ethapi.TransactionArgs{
+				From:                 utils.PointerTo(sut.wallet.Addresses()[0]),
+				Nonce:                utils.PointerTo(hexutil.Uint64(tx.Nonce())),
+				To:                   tx.To(),
+				Gas:                  utils.PointerTo(hexutil.Uint64(tx.Gas())),
+				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
+				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
 			},
 			hexBig(2), // arbitrary
 		},
@@ -1175,13 +1171,13 @@ func TestEthSigningAPIs(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	wantErr := testerr.Contains("unknown account")
-	txFields := map[string]any{
-		"from":     zeroAddr,
-		"to":       zeroAddr,
-		"gas":      hexutil.Uint64(params.TxGas),
-		"gasPrice": hexBig(1),
-		"value":    hexBig(100),
-		"nonce":    hexutil.Uint64(0),
+	txFields := ethapi.TransactionArgs{
+		From:     &zeroAddr,
+		To:       &zeroAddr,
+		Gas:      utils.PointerTo(hexutil.Uint64(params.TxGas)),
+		GasPrice: hexBig(1),
+		Value:    hexBig(100),
+		Nonce:    utils.PointerTo(hexutil.Uint64(0)),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1241,6 +1237,43 @@ func TestRPCTxFeeCap(t *testing.T) {
 				Gas:      params.TxGas,
 				GasPrice: tt.gasPrice,
 			})
+			err := sut.Client.SendTransaction(sut.context(t), tx)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("SendTransaction() %s", diff)
+			}
+		})
+	}
+}
+
+func TestUnprotectedTxs(t *testing.T) {
+	tests := []struct {
+		name                string
+		allowUnprotectedTxs bool
+		wantErr             testerr.Want
+	}{
+		{
+			name:                "rejected_when_disallowed",
+			allowUnprotectedTxs: false,
+			wantErr:             testerr.Contains("only replay-protected (EIP-155) transactions allowed over RPC"),
+		},
+		{
+			name:                "accepted_when_allowed",
+			allowUnprotectedTxs: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnprotectedTxs
+			}))
+			// HomesteadSigner produces a pre-EIP-155 (replay-unprotected) tx
+			tx := sut.wallet.SignTx(t, types.HomesteadSigner{}, 0, &types.LegacyTx{
+				To:       &zeroAddr,
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			})
+			require.False(t, tx.Protected(), "tx.Protected()")
+
 			err := sut.Client.SendTransaction(sut.context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("SendTransaction() %s", diff)
@@ -1317,15 +1350,18 @@ func TestDebugRPCs(t *testing.T) {
 	})
 }
 
+// encodeRLP returns the value's RLP encoding.
+func encodeRLP(tb testing.TB, v any) hexutil.Bytes {
+	tb.Helper()
+	b, err := rlp.EncodeToBytes(v)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%T)", v)
+	return b
+}
+
 func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block) {
 	t.Helper()
 
 	testRPCGetter(ctx, t, "eth_getBlockByHash", s.BlockByHash, want.Hash(), want)
-
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
 
 	s.testRPC(ctx, t, []rpcTest{
 		{
@@ -1351,12 +1387,12 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		{
 			method: "debug_getRawBlock",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{want.Hash()},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
@@ -1473,11 +1509,6 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	t.Helper()
 	testRPCGetter(ctx, t, "eth_getBlockByNumber", s.BlockByNumber, big.NewInt(n.Int64()), want)
 
-	wantBlockRLP, err := rlp.EncodeToBytes(want)
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
-	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
-	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
-
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getBlockByNumber",
@@ -1502,12 +1533,12 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		{
 			method: "debug_getRawBlock",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantBlockRLP),
+			want:   encodeRLP(t, want),
 		},
 		{
 			method: "debug_getRawHeader",
 			args:   []any{n},
-			want:   hexutil.Bytes(wantHeaderRLP),
+			want:   encodeRLP(t, want.Header()),
 		},
 	}...)
 
@@ -1607,11 +1638,11 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 	ctx, sut := newSUT(t, 0, opt)
 
 	settled := sut.runConsensusLoop(t)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	for range 2 {
 		b := sut.runConsensusLoop(t)
-		vmTime.advanceToSettle(ctx, t, b)
+		vmTime.AdvanceToSettle(ctx, t, b)
 	}
 	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")
@@ -1689,7 +1720,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chain := sut.rawVM.chain()
 			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
-			t.Logf("blocks.ResolveBlockNumberOrhash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
+			t.Logf("blocks.ResolveRPCNumberOrHash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantNum, gotNum)
 			assert.Equal(t, tt.wantHash, gotHash)

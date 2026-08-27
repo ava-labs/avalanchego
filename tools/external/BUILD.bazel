@@ -1,0 +1,5 @@
+alias(
+    name = "task",
+    actual = "@com_github_go_task_task_v3//cmd/task",
+    visibility = ["//visibility:public"],
+)

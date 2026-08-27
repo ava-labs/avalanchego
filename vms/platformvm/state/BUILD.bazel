@@ -97,6 +97,7 @@ go_test(
         "//snow",
         "//snow/choices",
         "//snow/validators",
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils",
         "//utils/constants",

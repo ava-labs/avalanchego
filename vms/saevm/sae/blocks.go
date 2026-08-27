@@ -7,13 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/rlp"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -21,40 +19,20 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// maxFutureBlockDuration is the maximum time from the current time allowed for
-// blocks before they're considered future blocks and fail parsing or
-// verification.
-const (
-	maxFutureBlockSeconds  uint64 = 10
-	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
-)
-
-var (
-	errBlockHeightNotUint64 = errors.New("block height not uint64")
-	errBlockTooFarInFuture  = errors.New("block too far in the future")
-)
-
-// ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
-// NOT populate the block ancestry, which is done by [VM.VerifyBlock] i.f.f.
-// verification passes.
+// ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
+// block ancestry, which is done by [VM.VerifyBlock] i.f.f. verification
+// passes.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
-	b := new(types.Block)
-	if err := rlp.DecodeBytes(buf, b); err != nil {
-		return nil, fmt.Errorf("rlp.DecodeBytes(..., %T): %v", b, err)
-	}
-
-	if !b.Number().IsUint64() {
-		return nil, errBlockHeightNotUint64
-	}
-	// The uint64 timestamp can't underflow [time.Time] but it can overflow so
-	// make this some future engineer's problem in a few millennia.
-	if b.Time() > unix(vm.config.Now())+maxFutureBlockSeconds {
-		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
+	b, err := blocks.ParseEth(buf, vm.hooks)
+	if err != nil {
+		return nil, err
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)
@@ -66,14 +44,14 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 	return vm.blockBuilder.build(ctx, bCtx, vm.preference.Load())
 }
 
+// saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
+
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
-	// ErrHashMismatch is returned by [VM.VerifyBlock] when the locally
-	// rebuilt block does not hash-match the received block. Exported so
-	// callers / tests can `errors.Is` against it (e.g. assertions that a
-	// forged header field trips the rebuild-and-compare check).
-	ErrHashMismatch = errors.New("hash mismatch")
+	errHashMismatch      = errors.New("hash mismatch")
+	errBlockTooLarge     = errors.New("block size exceeds maximum")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
@@ -93,6 +71,10 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		return vm.verifyWhenBootstrapping(b, parent)
 	}
 
+	if size := b.EthBlock().Size(); size > saeparams.MaxBlockBytes {
+		return fmt.Errorf("%w: %d > %d bytes", errBlockTooLarge, size, saeparams.MaxBlockBytes)
+	}
+
 	rebuilt, err := vm.blockBuilder.rebuild(ctx, bCtx, parent, b)
 	if err != nil {
 		return err
@@ -105,7 +87,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 			zap.Reflect("block", b.Header()),
 			zap.Reflect("rebuilt", rebuilt.Header()),
 		)
-		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", ErrHashMismatch, reH, verH)
+		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}
 	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
 		return err
@@ -137,7 +119,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
 	}
-	if got, want := lastSettled.NumberU64(), vm.hooks.SettledHeight(header); got != want {
+	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
 	if err := b.SetAncestors(parent, lastSettled); err != nil {
@@ -174,27 +156,18 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	}
 
 	ethB := rawdb.ReadBlock(db, hash, num)
-	if num > vm.last.synchronous {
-		return blocks.RestoreSettledBlock(
-			ethB,
-			vm.log(),
-			vm.db,
-			vm.xdb,
-			vm.exec.ChainConfig(),
-		)
+	if ethB == nil {
+		return nil, database.ErrNotFound
 	}
 
-	b, err := vm.blockBuilder.new(ethB, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	// Excess is only used for executing the next block, which can never
-	// be the case if `b` isn't actually the last synchronous block, so
-	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.config.DBConfig.TrieDBConfig, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
-		return nil, err
-	}
-	return b, nil
+	return blocks.RestoreSettledBlock(
+		ethB,
+		vm.hooks,
+		vm.log(),
+		vm.db,
+		vm.xdb,
+		vm.exec.ChainConfig(),
+	)
 }
 
 // GetBlock returns the block with the given ID, or [database.ErrNotFound].
@@ -219,7 +192,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	if errors.Is(err, blocks.ErrNotFound) {
 		return nil, database.ErrNotFound
 	}
-	return b, nil
+	return b, err
 }
 
 // GetBlockIDAtHeight returns the accepted block at the given height, or
@@ -232,26 +205,25 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	return id, nil
 }
 
-var (
-	_ saetypes.BlockSource  = (*VM)(nil).ethBlockSource
-	_ saetypes.HeaderSource = (*VM)(nil).headerSource
-)
-
-func (vm *VM) ethBlockSource(hash common.Hash, num uint64) (*types.Block, bool) {
-	return source(vm, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+func ethBlockSource(m *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.BlockSource {
+	return func(hash common.Hash, num uint64) (*types.Block, bool) {
+		return source(m, db, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+	}
 }
 
-func (vm *VM) headerSource(hash common.Hash, num uint64) (*types.Header, bool) {
-	return source(vm, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+func headerSource(m *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.HeaderSource {
+	return func(hash common.Hash, num uint64) (*types.Header, bool) {
+		return source(m, db, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+	}
 }
 
-func source[T any](vm *VM, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
-	if b, ok := vm.consensusCritical.Load(hash); ok {
+func source[T any](cc *syncMap[common.Hash, *blocks.Block], db ethdb.Database, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
+	if b, ok := cc.Load(hash); ok {
 		if b.NumberU64() != num {
 			return nil, false
 		}
 		return fromMem(b), true
 	}
-	x := fromDB(vm.db, hash, num)
+	x := fromDB(db, hash, num)
 	return x, x != nil
 }

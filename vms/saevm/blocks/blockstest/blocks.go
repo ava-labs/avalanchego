@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -24,12 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // An EthBlockOption configures the default block properties created by
@@ -48,13 +47,10 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
+		settled: hook.Settled{Height: 1},
 	}
 	props = options.ApplyTo(props, opts...)
-	if props.settled == nil {
-		props.settled = props.header
-	}
-	require.NoError(tb, hookstest.FinalizeHeader(props.header, props.settled), "hookstest.FinalizeHeader()")
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops)
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
@@ -63,7 +59,15 @@ type ethBlockProperties struct {
 	header   *types.Header
 	receipts types.Receipts
 	ops      []hookstest.Op
-	settled  *types.Header
+	settled  hook.Settled
+}
+
+// WithSettled overrides the settlement information committed by [NewEthBlock].
+// The zero value makes the block synchronous (pre-SAE).
+func WithSettled(s hook.Settled) EthBlockOption {
+	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
+		p.settled = s
+	})
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -98,18 +102,26 @@ type BlockOption = options.Option[blockProperties]
 func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 
-	props := options.ApplyTo(&blockProperties{}, opts...)
-	if props.logger == nil {
-		props.logger = saetest.NewTBLogger(tb, logging.Warn)
-	}
+	props := options.ApplyTo(&blockProperties{
+		logger: loggingtest.New(tb, logging.Warn),
+		hooks:  hookstest.NewStub(0),
+	}, opts...)
 
-	b, err := blocks.New(eth, parent, lastSettled, props.logger)
+	b, err := blocks.New(eth, parent, lastSettled, props.hooks, props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }
 
 type blockProperties struct {
+	hooks  hook.Points
 	logger logging.Logger
+}
+
+// WithHooks overrides the hooks passed to [blocks.New] by [NewBlock].
+func WithHooks(h hook.Points) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.hooks = h
+	})
 }
 
 // WithLogger overrides the logger passed to [blocks.New] by [NewBlock].
@@ -123,10 +135,11 @@ func WithLogger(l logging.Logger) BlockOption {
 // returns wraps [core.Genesis.ToBlock] with [NewBlock]. It assumes a nil
 // [triedb.Config] unless overridden by a [WithTrieDBConfig]. The block is
 // marked as both executed and synchronous.
-func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
+func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
 	tb.Helper()
 	conf := &genesisConfig{
 		gasTarget: math.MaxUint64,
+		baseFee:   params.GWei,
 	}
 	options.ApplyTo(conf, opts...)
 
@@ -134,16 +147,22 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 		Config:    config,
 		Timestamp: conf.timestamp,
 		Alloc:     alloc,
+		BaseFee:   new(big.Int).SetUint64(conf.baseFee),
 	}
 
-	tdb := state.NewDatabaseWithConfig(db, conf.tdbConfig).TrieDB()
-	_, hash, err := core.SetupGenesisBlock(db, tdb, gen)
+	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	defer func() {
+		// Close the trie database to prevent memory leak and guarantee all
+		// state changes are flushed to disk.
+		require.NoErrorf(tb, tdb.Close(), "%T.Close()", tdb)
+	}()
+	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
-	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
-	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, conf.tdbConfig, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
+	xdb := saetest.NewExecutionResultsDB()
+	b, err := blocks.RestoreSettledBlock(gen.ToBlock(), h, loggingtest.New(tb, logging.Warn), db, xdb, config)
+	require.NoError(tb, err, "blocks.RestoreSettledBlock([genesis]...)")
 	return b
 }
 
@@ -151,7 +170,7 @@ type genesisConfig struct {
 	tdbConfig *triedb.Config
 	timestamp uint64
 	gasTarget gas.Gas
-	gasExcess gas.Gas
+	baseFee   uint64
 }
 
 // A GenesisOption configures [NewGenesis].
@@ -178,9 +197,9 @@ func WithGasTarget(target gas.Gas) GenesisOption {
 	})
 }
 
-// WithGasExcess overrides the gas excess used by [NewGenesis].
-func WithGasExcess(excess gas.Gas) GenesisOption {
+// WithBaseFee overrides the base fee used by [NewGenesis].
+func WithBaseFee(baseFee uint64) GenesisOption {
 	return options.Func[genesisConfig](func(gc *genesisConfig) {
-		gc.gasExcess = excess
+		gc.baseFee = baseFee
 	})
 }

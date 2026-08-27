@@ -314,7 +314,7 @@ func InboundAppResponse(
 	}
 }
 
-// NewInboundSimplexMessage creates a new InboundMessage for simplex messages.
+// InboundSimplexMessage creates a new InboundMessage for simplex messages.
 func InboundSimplexMessage(
 	nodeID ids.NodeID,
 	msg *p2p.Simplex,

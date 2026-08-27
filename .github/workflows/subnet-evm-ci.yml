@@ -27,16 +27,26 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo "$NEEDS_JSON" | jq -e '
-            to_entries
-            | all(.value.result == "success")
-          ' >/dev/null
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
 
   lint_test:
     name: Lint
     runs-on: ubuntu-24.04
     defaults:
       run:
+        shell: nix develop --command bash -x {0}
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v5
@@ -88,26 +98,24 @@ jobs:
   test_build_image:
     name: Image build
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v5
-      - name: Set up QEMU (required for cross-platform builds)
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Check image build
-        run: ./scripts/run_task.sh test-build-image
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          run: ./scripts/run_task.sh test-build-image
+          working_directory: ./graft/subnet-evm
 
   test_build_antithesis_images:
     name: Build Antithesis images
-    runs-on: ubuntu-24.04
+    # Use a faster runner pending migration to bazel. The default free runners result
+    # in 20+ minute runtime, slowing down every PR and merge queue CI run.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: true
-          docker-images: true
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for subnet-evm test setup
-        shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm

@@ -5,9 +5,9 @@ package state
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
+	"os"
 	"slices"
 	"testing"
 
@@ -22,10 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -35,6 +38,11 @@ import (
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	oldstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 )
+
+func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+	os.Exit(m.Run())
+}
 
 // SUT bundles the system under test: a state implementation plus both sides
 // of the shared-memory pair.
@@ -52,7 +60,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 
 	props := options.ApplyTo(&sutProperties{
 		db:  memdb.New(),
-		new: newState,
+		new: newState(constants.UnitTestID),
 	}, opts...)
 
 	chainDB := prefixdb.New([]byte("chain"), props.db)
@@ -71,24 +79,28 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	}
 }
 
-// stateImpl is the surface common to [State] and [oldState]. It's used by the
-// [SUT] so the same test helpers can drive either backend.
-type stateImpl interface {
-	Apply(height uint64, txs []*tx.Tx) error
-	GetTx(txID ids.ID) (*tx.Tx, uint64, error)
-	GetRoot(height uint64) (common.Hash, error)
-	CurrentHeight() uint64
-	Close() error
-}
+type (
+	// stateImpl is the surface common to [State] and [oldState]. It's used by the
+	// [SUT] so the same test helpers can drive either backend.
+	stateImpl interface {
+		Apply(height uint64, txs []*tx.Tx) error
+		GetTx(txID ids.ID) (*tx.Tx, uint64, error)
+		GetRoot(height uint64) (common.Hash, error)
+		CurrentHeight() uint64
+		Close() error
+	}
 
-// A sutOption configures the default SUT properties used by [newSUT].
-type sutOption = options.Option[sutProperties]
+	// A sutOption configures the default SUT properties used by [newSUT].
+	sutOption = options.Option[sutProperties]
 
-type sutProperties struct {
-	// db is used for both the chain state and shared memory.
-	db  database.Database
-	new func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
-}
+	constructor = func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
+
+	sutProperties struct {
+		// db is used for both the chain state and shared memory.
+		db  database.Database
+		new constructor
+	}
+)
 
 // withDB configures the SUT to use the given database.
 func withDB(db database.Database) sutOption {
@@ -104,14 +116,24 @@ func withLegacyBackend() sutOption {
 	})
 }
 
-func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
-	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = saetest.NewTBLogger(tb, logging.Debug)
-	ctx.SharedMemory = sm
+// withNetworkID configures the SUT's snow context to use the given network ID.
+func withNetworkID(networkID uint32) sutOption {
+	return options.Func[sutProperties](func(p *sutProperties) {
+		p.new = newState(networkID)
+	})
+}
 
-	s, err := New(ctx, db)
-	require.NoErrorf(tb, err, "New(%T, %T)", ctx, db)
-	return s
+func newState(networkID uint32) constructor {
+	return func(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
+		ctx := snowtest.Context(tb, snowtest.CChainID)
+		ctx.NetworkID = networkID
+		ctx.Log = loggingtest.New(tb, logging.Debug)
+		ctx.SharedMemory = sm
+
+		s, err := New(ctx, db)
+		require.NoErrorf(tb, err, "New(%T, %T)", ctx, db)
+		return s
+	}
 }
 
 // oldState drives the legacy [oldstate] package behind a surface that mirrors
@@ -405,6 +427,99 @@ func TestApply(t *testing.T) {
 	}
 }
 
+// TestApply_BonusBlock verifies that a block's atomic operations are skipped for
+// shared memory (but still written to the trie) only when the network is mainnet
+// AND the height is a known bonus block.
+func TestApply_BonusBlock(t *testing.T) {
+	const (
+		bonusHeight    uint64 = 102972
+		nonBonusHeight uint64 = 102971
+	)
+	require.Containsf(t, bonusBlocks, bonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	require.NotContainsf(t, bonusBlocks, nonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+
+	tests := []struct {
+		name               string
+		networkID          uint32
+		height             uint64
+		wantInSharedMemory bool
+	}{
+		{
+			name:               "mainnet_bonus_height",
+			networkID:          constants.MainnetID,
+			height:             bonusHeight,
+			wantInSharedMemory: false,
+		},
+		{
+			name:               "mainnet_non_bonus_height",
+			networkID:          constants.MainnetID,
+			height:             nonBonusHeight,
+			wantInSharedMemory: true,
+		},
+		{
+			name:               "non_mainnet_bonus_height",
+			networkID:          constants.FujiID,
+			height:             bonusHeight,
+			wantInSharedMemory: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var build builder
+			s := newSUT(t, withNetworkID(test.networkID))
+			s.apply(t, block{height: test.height, txs: []*tx.Tx{build.newExport()}})
+
+			// The tx is always written to the trie regardless of bonus status.
+			root, err := s.GetRoot(test.height)
+			require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, test.height)
+			require.NotEqualf(t, types.EmptyRootHash, root, "%T.GetRoot(%d) should be updated", s.stateImpl, test.height)
+
+			// Shared memory is only skipped for mainnet bonus blocks.
+			it := s.sharedMemoryDB.NewIterator()
+			defer it.Release()
+			hasSharedMem := it.Next()
+			require.NoError(t, it.Error())
+			require.Equal(t, test.wantInSharedMemory, hasSharedMem, "shared memory written")
+		})
+	}
+}
+
+func TestApply_BonusBlock_Index(t *testing.T) {
+	const (
+		bonusHeight    uint64 = 102972
+		nonBonusHeight uint64 = 102971
+	)
+	require.Containsf(t, bonusBlocks, bonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	require.NotContainsf(t, bonusBlocks, nonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+
+	s := newSUT(t, withNetworkID(constants.MainnetID))
+
+	var build builder
+	export := build.newExport()
+	id := export.ID()
+
+	s.apply(t, block{height: nonBonusHeight, txs: []*tx.Tx{export}})
+
+	got, height, err := s.GetTx(id)
+	require.NoErrorf(t, err, "%T.GetTx(%s) non-bonus", s.stateImpl, id)
+	require.Equalf(t, nonBonusHeight, height, "%T.GetTx(%s) non-bonus height", s.stateImpl, id)
+	if diff := cmp.Diff(export, got, txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T.GetTx(%d) non-bonus Tx diff (-want +got):\n%s", s.stateImpl, nonBonusHeight, diff)
+	}
+
+	// Apply same tx at bonus height and verify it is retrievable.
+	s.apply(t, block{height: bonusHeight, txs: []*tx.Tx{export}})
+	got, height, err = s.GetTx(id)
+	require.NoErrorf(t, err, "%T.GetTx(%s) bonus", s.stateImpl, id)
+	require.Equalf(t, nonBonusHeight, height, "%T.GetTx(%s) bonus height", s.stateImpl, id) // see NOT bonus
+	if diff := cmp.Diff(export, got, txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T.GetTx(%d) bonus Tx diff (-want +got):\n%s", s.stateImpl, bonusHeight, diff)
+	}
+}
+
 // TestApply_SortInvariant verifies that the order of txs passed to Apply does
 // not affect the resulting state.
 func TestApply_SortInvariant(t *testing.T) {
@@ -453,22 +568,22 @@ func TestCrash(t *testing.T) {
 		{height: 7, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	wantDB := newFlakyDB(memdb.New(), math.MaxInt)
+	wantDB := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
 	want := newSUT(t, withDB(wantDB))
 	want.apply(t, blocks...)
 
 	// Iterating over all of the calls made to the db allows us to crash at
 	// every possible point during Apply.
-	for failAfter := range wantDB.calls {
+	for failAfter := range wantDB.Calls() {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			t.Parallel()
 
 			db := memdb.New()
-			preCrash := newSUT(t, withDB(newFlakyDB(db, failAfter)))
+			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
 			remainingBlocks := blocks
 			for i, b := range blocks {
 				if err := preCrash.Apply(b.height, b.txs); err != nil {
-					require.ErrorIsf(t, err, errInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
+					require.ErrorIsf(t, err, saetest.ErrInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
 					break
 				}
 				remainingBlocks = blocks[i+1:]
@@ -482,63 +597,3 @@ func TestCrash(t *testing.T) {
 		})
 	}
 }
-
-var errInjected = errors.New("injected fault")
-
-// flakyDB wraps a database and fails after a configured number of mutating
-// operations. Each [flakyDB.Put], [flakyDB.Delete], and [flakyBatch.Write]
-// counts as an op; reads and iteration are not counted and never fail.
-type flakyDB struct {
-	database.Database
-	failAfter int
-	calls     int
-}
-
-func newFlakyDB(db database.Database, failAfter int) *flakyDB {
-	return &flakyDB{
-		Database:  db,
-		failAfter: failAfter,
-	}
-}
-
-func (f *flakyDB) shouldFail() error {
-	if f.calls >= f.failAfter {
-		return errInjected
-	}
-	f.calls++
-	return nil
-}
-
-func (f *flakyDB) Put(key, value []byte) error {
-	if err := f.shouldFail(); err != nil {
-		return err
-	}
-	return f.Database.Put(key, value)
-}
-
-func (f *flakyDB) Delete(key []byte) error {
-	if err := f.shouldFail(); err != nil {
-		return err
-	}
-	return f.Database.Delete(key)
-}
-
-func (f *flakyDB) NewBatch() database.Batch {
-	return &flakyBatch{Batch: f.Database.NewBatch(), db: f}
-}
-
-type flakyBatch struct {
-	database.Batch
-	db *flakyDB
-}
-
-func (b *flakyBatch) Write() error {
-	if err := b.db.shouldFail(); err != nil {
-		return err
-	}
-	return b.Batch.Write()
-}
-
-// Inner returns the wrapper so that [chainsatomic.WriteAll] calls
-// [flakyBatch.Write].
-func (b *flakyBatch) Inner() database.Batch { return b }

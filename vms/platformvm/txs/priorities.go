@@ -22,7 +22,9 @@ const (
 	// validator set,
 	// Invariant: All permissioned stakers must be removed first because they
 	//            are removed by the advancement of time. Permissionless stakers
-	//            are removed with a RewardValidatorTx after time has advanced.
+	//            are removed with a RewardValidatorTx (or a
+	//            RewardAutoRenewedValidatorTx for auto-renewed validators) after
+	//            time has advanced.
 	SubnetPermissionedValidatorCurrentPriority
 	// then permissionless subnet delegators,
 	SubnetPermissionlessDelegatorCurrentPriority

@@ -25,9 +25,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -57,60 +58,43 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
-	// ExecutionArtifact returns hook-owned bytes derived from `state` (the
-	// post-execution state of the block identified by `h`). SAE persists the
-	// returned bytes alongside its own execution artifacts; the encoding is
-	// opaque to SAE. Implementations MAY return `nil` to indicate no artifact.
-	ExecutionArtifact(h *types.Header, state libevm.StateReader) ([]byte, error)
-	// GasConfigAt returns the gas target and configuration derived directly
-	// from `h`'s post-execution state.
-	GasConfigAt(h *types.Header, state libevm.StateReader) (target gas.Gas, c gastime.GasPriceConfig, err error)
 	// GasConfigAfter returns the gas target and configuration that should go
-	// into effect immediately after `h`. Implementations resolve any
-	// previously-persisted hook artifact themselves, typically via a lookup
-	// keyed by [Points.SettledHeight] against [Points.ExecutionResultsDB].
-	GasConfigAfter(h *types.Header) (target gas.Gas, c gastime.GasPriceConfig, err error)
+	// into effect immediately after the provided block.
+	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
 	// BlockTime returns the exact block time for the given header, as recorded
 	// in [BlockBuilder.BuildHeader]. The returned time MUST match the header
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
-	// SettledHeight returns the block height which [types.Header.Root] corresponds
-	// with as the post-execution state root. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.
-	SettledHeight(*types.Header) uint64
+	// SettledBy returns the extra information for the settled block of the
+	// provided header. It MUST match the value passed to
+	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
+	// executed (pre-SAE) headers.
+	SettledBy(*types.Header) Settled
+	// VerifyBlockSyntax checks chain-specific syntactic invariants of a parsed
+	// block, beyond the universal invariants enforced by [blocks.Parse]. It
+	// MUST be stateless.
+	VerifyBlockSyntax(*types.Block) error
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can share the same check between the SAE worst-case
-	// admission path and the libevm hook fired during actual EVM execution.
-	//
-	// Unlike the libevm hook (which is keyed by [params.Rules] via its
-	// receiver), [Points] is one long-lived value per VM, so the rules for the
-	// block being checked MUST be passed explicitly. SAE worst-case calls this
-	// with rules computed from the LAST-SETTLED block. Implementations MUST
-	// treat the rules and state as a consistent pair, e.g. when
-	// gating with `rules.IsPrecompileEnabled(...)` against contract storage
-	// reads. The trade-off is strict-as-of-last-settled enforcement (a few seconds of leakage after a role
-	// removal) instead of strict-as-of-parent.
-	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
-	// RequiresTransactionAdmissionCheck reports whether
-	// [CanExecuteTransaction] could reject any tx under `rules`. MUST be a
-	// cheap, rules-only check used to skip sender recovery and state opening
-	// when no relevant precompile is active. Over-reporting (returning true)
-	// is safe; under-reporting is not.
-	RequiresTransactionAdmissionCheck(rules params.Rules) bool
-	// BeforeExecutingBlock is called immediately prior to executing the block.
-	// `parent` is the header of the block whose post-execution state `state`
-	// is rooted at; it provides `parent.Time` for upgrade-activation windowing
-	// and is the equivalent of what the legacy plugin's [core.StateProcessor]
-	// reads via `&parent.Time`.
-	BeforeExecutingBlock(rules params.Rules, parent *types.Header, state *state.StateDB, block *types.Block) error
-	// AfterExecutingBlock is called immediately after executing the block.
-	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// so that consumers can use a single concrete type for both SAE and libevm hooks.
+	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// StartExecutingBlock applies state changes before the block's transactions
+	// run. `rules` are those of the block and `parent` is the parent header. It
+	// runs during canonical and historical execution. It MUST NOT change data
+	// outside of the [state.StateDB].
+	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
+	// FinishExecutingBlock applies state changes after the block's transactions
+	// and end-of-block operations. It runs during canonical and historical
+	// execution. It MUST NOT change data outside of the [state.StateDB].
+	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// AfterExecutingBlock runs only during canonical execution, before the VM
+	// commits the post-execution state.
+	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
 // BlockBuilder constructs a block given its components.
@@ -126,10 +110,6 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
-	// FinalizeHeader populates header fields on `hdr` that depend on `settled`
-	// SAE calls this after `lastSettled` has been determined and
-	// BEFORE the worst-case projection consumes the header.
-	FinalizeHeader(hdr *types.Header, settled *types.Header) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//
@@ -145,22 +125,18 @@ type BlockBuilder[T Transaction] interface {
 		lastSettledBlock common.Hash,
 		source saetypes.BlockSource,
 	) iter.Seq[T]
-	// BuildBlock constructs a block with the given components.
+	// BuildBlock constructs a block with the given components. The header
+	// MAY be modified, but all other arguments are read-only.
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
-	//
-	// `worstcaseState` is SAE's worst-case [state.StateDB] (read-only),
-	// rooted at `settled`'s post-execution state. `settled` is the
-	// last-settled block at build time and is deterministic across nodes (see [blocks.LastToSettleAt]).
 	BuildBlock(
 		header *types.Header,
-		worstcaseState libevm.StateReader,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settled *types.Header,
+		settled Settled,
 	) (*types.Block, error)
 }
 
@@ -168,6 +144,8 @@ type BlockBuilder[T Transaction] interface {
 // [Op].
 type Transaction interface {
 	AsOp() Op
+	// Size returns the transaction's serialized size.
+	Size() uint64
 }
 
 // AccountDebit includes an amount that an account should have debited,
@@ -240,4 +218,31 @@ func (o *Op) ApplyTo(stateDB *state.StateDB) error {
 func MinimumGasConsumption(txLimit uint64) uint64 {
 	_ = (params.RulesHooks)(nil) // keep the import to allow [] doc links
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
+}
+
+// Settled includes information about the block that is settled by a header.
+// Fields refer to post-execution state.
+type Settled struct {
+	Height       uint64
+	GasUnix      uint64
+	GasNumerator gas.Gas
+	Excess       gas.Gas
+}
+
+// Synchronous reports whether the header is that of a synchronously executed
+// (pre-SAE) block.
+func Synchronous(h Points, hdr *types.Header) bool {
+	return h.SettledBy(hdr) == (Settled{})
+}
+
+// SettledGasTime is a helper that given a header and its settler, returns the
+// [gastime.Time] associated with the post-execution state of the header.
+//
+// TODO(alarso16): This should be moved to the state sync logic once implemented.
+func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
+	target, cfg := h.GasConfigAfter(settled)
+	s := h.SettledBy(settler)
+
+	pt := proxytime.New(s.GasUnix, s.GasNumerator, gastime.SafeRateOfTarget(target))
+	return gastime.FromProxyTime(pt, s.Excess, cfg)
 }

@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"math/rand/v2"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
@@ -41,19 +44,23 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -65,21 +72,10 @@ import (
 func TestMain(m *testing.M) {
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
-	goleak.VerifyTestMain(
-		m,
-		goleak.IgnoreCurrent(),
-		// ChainIndexer.Close() may check if the event loop is active before it is marked as active.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
-		// diskLayer.Release() doesn't properly stop generation.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
-		// TxPool.Close() doesn't wait for its loop() method to signal termination.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),
-		// Not all filters subscriptions can be closed after the TxPool is closed.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-	)
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
+
+var _ saetest.Peer = (*SUT)(nil)
 
 // SUT is the system under test. Testing SHOULD be performed via the embedded
 // types as these most accurately reflect the public API. Any access to the
@@ -88,18 +84,21 @@ func TestMain(m *testing.M) {
 type SUT struct {
 	block.ChainVM
 	*ethclient.Client
+
+	wallet *saetest.Wallet
+	db     ethdb.Database
+	hooks  *hookstest.Stub
+	logger *loggingtest.Logger
+	sender *saetest.Sender
+
 	rpcClient *rpc.Client
-
-	rawVM   *VM
-	genesis *blocks.Block
-	wallet  *saetest.Wallet
-	db      ethdb.Database
-	hooks   *hookstest.Stub
-	logger  *saetest.TBLogger
-
-	validators *validatorstest.State
-	sender     *enginetest.Sender
+	rawVM     *VM
+	genesis   *blocks.Block
+	close     func()
 }
+
+func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
+func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
@@ -109,15 +108,39 @@ type (
 		genesis     core.Genesis
 		db          database.Database
 		precompiles map[common.Address]libevm.PrecompiledContract
+		nodeID      ids.NodeID
+		validators  set.Set[ids.NodeID]
+		dataDir     string
 	}
 	sutOption = options.Option[sutConfig]
 )
 
+// withNodeID overrides the SUT's randomly generated NodeID.
+func withNodeID(id ids.NodeID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.nodeID = id
+	})
+}
+
+// withValidators adds each NodeID to the validator set with weight 1.
+func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.validators = vdrs
+	})
+}
+
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
-func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+// tryNewSUT constructs a [SUT], returning any initialization error. Tests
+// SHOULD use [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
+
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see txgossip.minGasForSize.
+	const gasTarget = 4_000_000
 
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
@@ -126,41 +149,42 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(gasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{
 			MempoolConfig: mempoolConf,
+			DBConfig: saedb.Config{
+				CommitInterval: saedb.DefaultCommitInterval,
+			},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
 			Config:     saetest.ChainConfig(),
 			Alloc:      saetest.MaxAllocFor(keys.Addresses()...),
 			Timestamp:  saeparams.TauSeconds,
+			BaseFee:    big.NewInt(1),
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
-		db: memdb.New(),
+		db:      memdb.New(),
+		dataDir: tb.TempDir(),
+		nodeID:  ids.GenerateTestNodeID(),
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
-	tb.Cleanup(func() {
-		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
-	})
 
-	logger := saetest.NewTBLogger(tb, conf.logLevel)
+	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
+	snowCtx.ChainDataDir = conf.dataDir
+	snowCtx.NodeID = conf.nodeID
+	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
 
-	sender := &enginetest.Sender{
-		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
-			return nil
-		},
-	}
+	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	if err := snow.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -169,7 +193,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // config bytes (not ChainConfig)
 		nil, // Fxs
 		sender,
-	), "Initialize()")
+	); err != nil {
+		return nil, err
+	}
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -179,32 +205,46 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		// remove the libevm registration.
 		registerPrecompiles(tb, conf.precompiles)
 	}
-	tb.Cleanup(func() {
+	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
+	tb.Cleanup(closeOnce)
+
+	// Avalanchego marks the local node as connected so that p2p protocols
+	// don't need to treat our node as a special case.
+	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	sut := &SUT{
+		ChainVM: snow,
+		Client:  ethClient,
 
-	validators, ok := snowCtx.ValidatorState.(*validatorstest.State)
-	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
-	return ctx, &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
+		sender: sender,
 
-		validators: validators,
-		sender:     sender,
+		rpcClient: rpcClient,
+		rawVM:     vm.VM,
+		genesis:   vm.last.settled.Load(),
+		close:     closeOnce,
 	}
+	sender.Start(tb, sut)
+	return sut, nil
+}
+
+func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+	tb.Helper()
+
+	sut, err := tryNewSUT(tb, numAccounts, opts...)
+	require.NoError(tb, err, "Initialize()")
+	return sut.context(tb), sut
 }
 
 func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {
@@ -236,49 +276,20 @@ func (s *SUT) CallContext(ctx context.Context, result any, method string, args .
 	return s.rpcClient.CallContext(ctx, result, method, args...)
 }
 
-type vmTime struct {
-	time.Time
-}
-
-func (t *vmTime) now() time.Time {
-	return t.Time
-}
-
-func (t *vmTime) set(n time.Time) {
-	t.Time = n
-}
-
-func (t *vmTime) advance(d time.Duration) {
-	t.Time = t.Time.Add(d)
-}
-
-// advanceToSettle advances the time such that the next call to [vmTime.now] is
-// at or after the time required to settle `b`. Note that at least one more
-// accepted [blocks.Block] is still required to actually settle `b`.
-func (t *vmTime) advanceToSettle(ctx context.Context, tb testing.TB, b *blocks.Block) {
-	tb.Helper()
-	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	to := b.ExecutedByGasTime().AsTime().Add(saeparams.Tau)
-	if t.Before(to) {
-		t.set(to)
-	}
-}
-
 // withVMTime returns an option to configure a new SUT's "now" function along
-// with a struct to access and set the time at nanosecond resolution.
-func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *vmTime) {
+// with a [saetest.Clock] to access and advance the time at nanosecond
+// resolution.
+func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) {
 	tb.Helper()
-	t := &vmTime{
-		Time: startTime,
-	}
-	opt := options.Func[sutConfig](func(c *sutConfig) {
+	c := saetest.NewClock(startTime, time.Nanosecond)
+	opt := options.Func[sutConfig](func(cfg *sutConfig) {
 		// TODO(StephenButtolph) unify the time functions provided in the config
 		// and the hooks.
-		c.hooks.Now = t.now
-		c.vmConfig.Now = t.now
+		cfg.hooks.Now = c.Now
+		cfg.vmConfig.Now = c.Now
 	})
 
-	return opt, t
+	return opt, c
 }
 
 // withExecResultsDB returns an option that replaces the default
@@ -293,7 +304,7 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 
 func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.TrieCommitInterval = interval
+		c.vmConfig.DBConfig.CommitInterval = interval
 	})
 }
 
@@ -338,10 +349,6 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 	h.Register(tb)
 }
 
-func (s *SUT) nodeID() ids.NodeID {
-	return s.rawVM.snowCtx.NodeID
-}
-
 // context returns a [context.Context], derived from the [testing.TB], that is
 // cancelled if the SUT's default logger receives a log at [logging.Error] or
 // higher.
@@ -384,7 +391,7 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.mempool.Pool, txs...)
+	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.GethRPCBackends(), txs...)
 }
 
 // buildAndParseBlock adds all `txs` to the mempool and ensures they are pending,
@@ -406,6 +413,102 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	b, err := s.ParseBlock(ctx, proposed.Bytes())
 	require.NoError(tb, err, "ParseBlock(BuildBlock().Bytes())")
 	return b
+}
+
+func TestBuildBlockByteBackstop(t *testing.T) {
+	const (
+		numTxs       = 20
+		calldataSize = 120 * units.KiB
+	)
+	ctx, sut := newSUT(t, numTxs)
+
+	heavyTxs := make([]*types.Transaction, numTxs)
+	for i := range heavyTxs {
+		// Unique address to prevent legacypool race
+		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
+			GasFeeCap: big.NewInt(1),
+			Data:      make([]byte, calldataSize),
+		})
+	}
+
+	txBytes := heavyTxs[0].Size()
+	wantTxs := saeparams.TargetBlockBytes / txBytes
+	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
+
+	// Bypass mempool admission filtering so the builder backstop is exercised.
+	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
+	require.NoError(t, errors.Join(errs...), "TxPool.Add()")
+	txgossiptest.WaitUntilPending(t, ctx, sut.rawVM.GethRPCBackends(), heavyTxs...)
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	builtTxs := built.Transactions()
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
+	for i, tx := range builtTxs {
+		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
+}
+
+func TestBuildBlockOpByteBackstop(t *testing.T) {
+	newOp := func(mints int) hookstest.Op {
+		return hookstest.Op{
+			ID:        ids.GenerateTestID(),
+			Gas:       1_000,
+			GasFeeCap: *uint256.NewInt(params.Wei),
+			Mint: slices.Repeat([]hookstest.AccountCredit{{
+				Address: common.Address{1},
+				Amount:  *uint256.NewInt(1),
+			}}, mints),
+		}
+	}
+	// Three big ops of which only two fit the byte budget, followed by a
+	// small op that fits in the space left after the third is skipped.
+	ops := []hookstest.Op{newOp(19_200), newOp(19_200), newOp(19_200), newOp(1)}
+
+	var (
+		big   = ops[0].Size()
+		small = ops[3].Size()
+	)
+	require.LessOrEqual(t, 2*big+small, uint64(saeparams.TargetBlockBytes), "two big ops plus the small op must fit the byte budget")
+	require.Greater(t, 3*big, uint64(saeparams.TargetBlockBytes), "three big ops must exceed the byte budget")
+
+	ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Ops = ops
+	}))
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	// The third op is too big and gets skipped, but one skip shouldn't stop
+	// inclusion. The smaller op after it still fits, so it's included.
+	want := []hook.Op{ops[0].AsOp(), ops[1].AsOp(), ops[3].AsOp()}
+	got, err := sut.hooks.EndOfBlockOps(built.EthBlock())
+	require.NoErrorf(t, err, "%T.EndOfBlockOps()", sut.hooks)
+	require.Equal(t, want, got, "ops included in block")
+}
+
+func TestVerifyBlockSizeLimit(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	lastAccepted := sut.lastAcceptedBlock(t)
+
+	oversizedTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Data: make([]byte, saeparams.MaxBlockBytes),
+	})
+	ethB := types.NewBlock(
+		&types.Header{
+			ParentHash: common.Hash(lastAccepted.ID()),
+			Number:     new(big.Int).SetUint64(lastAccepted.Height() + 1),
+		},
+		types.Transactions{oversizedTx},
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+	)
+	b := blockstest.NewBlock(t, ethB, nil, nil)
+	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
 }
 
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided
@@ -442,6 +545,45 @@ func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Blo
 func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
+}
+
+// deployEscrow signs and runs a deploy tx for the escrow contract from
+// s.wallet[0], in its own consensus block.
+func (s *SUT) deployEscrow(tb testing.TB) common.Address {
+	tb.Helper()
+	ctx := s.context(tb)
+
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
+	})
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
+
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
+}
+
+// depositToEscrow signs and runs a tx depositing depositVal to
+// balances[recipient] on the escrow contract at escrowAddr, in its own
+// consensus block.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
+	tb.Helper()
+	ctx := s.context(tb)
+
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
+	})
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
+
+	return block
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
@@ -725,7 +867,7 @@ func TestVerifyWhenBootstrapping(t *testing.T) {
 	}{
 		{
 			consensusState: snow.NormalOp,
-			want:           ErrHashMismatch,
+			want:           errHashMismatch,
 		},
 		{
 			consensusState: snow.Bootstrapping,
@@ -748,52 +890,6 @@ func TestEmptyChainConfig(t *testing.T) {
 	}))
 	for range 5 {
 		sut.runConsensusLoop(t)
-	}
-}
-
-func TestSyntacticBlockChecks(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
-
-	tests := []struct {
-		name    string
-		header  *types.Header
-		wantErr error
-	}{
-		{
-			name: "block_height_overflow_protection",
-			header: &types.Header{
-				Number: new(big.Int).Lsh(big.NewInt(1), 64),
-			},
-			wantErr: errBlockHeightNotUint64,
-		},
-		{
-			name: "block_time_at_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds,
-			},
-		},
-		{
-			name: "block_time_after_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds + 1,
-			},
-			wantErr: errBlockTooFarInFuture,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := blockstest.NewBlock(t, types.NewBlockWithHeader(tt.header), nil, nil)
-			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", tt.header.Number, tt.header.Time, uint64(now))
-		})
 	}
 }
 
@@ -843,7 +939,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 			receipts: types.Receipts{
 				&types.Receipt{}, // Unexpected receipt
 			},
-			wantErr: ErrHashMismatch,
+			wantErr: errHashMismatch,
 		},
 	}
 
@@ -882,7 +978,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	for _, sut := range nodes {
 		assert.Eventuallyf(tb, func() bool {
 			return sut.rawVM.mempool.Has(ids.ID(txHash))
-		}, 5*time.Second, 100*time.Millisecond, "tx %x not gossiped to node %s", txHash, sut.nodeID())
+		}, 5*time.Second, 100*time.Millisecond, "tx %x not gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
 		tb.FailNow()
@@ -892,7 +988,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	tb.Helper()
 	for _, sut := range nodes {
-		assert.False(tb, sut.rawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.nodeID())
+		assert.False(tb, sut.rawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
 		tb.FailNow()
@@ -902,8 +998,7 @@ func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 func TestGossip(t *testing.T) {
 	n := newNetworkedSUTs(t, 2, 2)
 
-	nonValidators := n.allNonValidators()
-	api := nonValidators[0]
+	api := n.nonValidators[0]
 	tx := api.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &common.Address{},
 		Gas:       params.TxGas,
@@ -911,37 +1006,73 @@ func TestGossip(t *testing.T) {
 		Value:     big.NewInt(1),
 	})
 	api.mustSendTx(t, tx)
-	requireReceiveTx(t, n.allValidators(), tx.Hash())
-	requireNotReceiveTx(t, nonValidators[1:], tx.Hash())
+	requireReceiveTx(t, n.validators, tx.Hash())
+	requireNotReceiveTx(t, n.nonValidators[1:], tx.Hash())
+}
+
+var errInjectedRead = errors.New("injected read failure")
+
+type corruptableHeightIndex struct {
+	database.HeightIndex
+
+	mu        sync.RWMutex
+	corrupted set.Set[uint64]
+}
+
+// corrupt makes future reads of height fail with [errInjectedRead].
+func (c *corruptableHeightIndex) corrupt(height uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.corrupted.Add(height)
+}
+
+func (c *corruptableHeightIndex) Get(height uint64) ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.corrupted.Contains(height) {
+		return nil, errInjectedRead
+	}
+	return c.HeightIndex.Get(height)
 }
 
 func TestBlockSources(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, opt)
+	xdb := &corruptableHeightIndex{HeightIndex: saetest.NewHeightIndexDB()}
+	ctx, sut := newSUT(t, 1, opt, withExecResultsDB(xdb))
 
 	genesis := sut.lastAcceptedBlock(t)
 	// Once a block is settled, its ancestors are only accessible from the
 	// database.
+	corrupted := sut.runConsensusLoop(t)
 	onDisk := sut.runConsensusLoop(t)
 	settled := sut.runConsensusLoop(t)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled := sut.runConsensusLoop(t)
+	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
 	verified := sut.createAndVerifyBlock(t, unsettled)
 	unverified := sut.buildAndParseBlock(t, unwrap(t, verified))
 
+	xdb.corrupt(corrupted.Height())
 	tests := []struct {
 		name            string
 		block           *blocks.Block
 		wantGetBlockErr testerr.Want
+		wantSourceOK    bool
 	}{
-		{"genesis", genesis, nil},
-		{"on_disk", onDisk, nil},
-		{"settled_in_memory", settled, nil},
-		{"unsettled", unsettled, nil},
-		{"verified", unwrap(t, verified), nil},
-		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound)},
+		{"genesis", genesis, nil, true},
+		{"corrupted", corrupted, testerr.Is(errInjectedRead), true /*sources don't read execution results*/},
+		{"on_disk", onDisk, nil, true},
+		{"settled_in_memory", settled, nil, true},
+		{"unsettled", unsettled, nil, true},
+		{"verified", unwrap(t, verified), nil, true},
+		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound), false},
 	}
+
+	ethBlockSrc := ethBlockSource(sut.rawVM.consensusCritical, sut.db)
+	headerSrc := headerSource(sut.rawVM.consensusCritical, sut.db)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -958,16 +1089,15 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 
-			wantOK := tt.wantGetBlockErr == nil
 			opts := cmp.Options{
 				cmputils.Blocks(),
 				cmputils.Headers(),
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
-				if !wantOK {
+				got, gotOK := ethBlockSrc(tt.block.Hash(), tt.block.NumberU64())
+				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
+				if !tt.wantSourceOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.EthBlock(), got, opts); diff != "" {
@@ -975,15 +1105,113 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.headerSource(...)", sut.rawVM)
-				if !wantOK {
+				got, gotOK := headerSrc(tt.block.Hash(), tt.block.NumberU64())
+				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
+				if !tt.wantSourceOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.Header(), got, opts); diff != "" {
 					t.Errorf("%T.headerSource(...) diff (-want +got)\n%s", sut.rawVM, diff)
 				}
 			})
+		})
+	}
+}
+
+func TestSettledGasTime(t *testing.T) {
+	const target = 1e7
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Target = target
+	}))
+
+	const numBlocks = 100
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	bs := make([]*blocks.Block, 0, numBlocks+1)
+	bs = append(bs, sut.genesis)
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        nil, // contract creation
+			Gas:       params.TxGasContractCreation,
+			GasFeeCap: big.NewInt(1),
+		}))
+		if rng.Int32N(2) == 0 {
+			vmTime.AdvanceToSettle(ctx, t, b)
+		}
+		bs = append(bs, b)
+	}
+
+	for i, b := range bs {
+		if i == 0 {
+			continue // genesis block has no [hook.SettledBy] struct.
+		}
+		settledHeight := sut.hooks.SettledBy(b.Header()).Height
+		settledBlock := bs[settledHeight]
+
+		want := settledBlock.ExecutedByGasTime()
+		got, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
+		require.NoErrorf(t, err, "SettledGasTime() for block %d (settled height %d)", b.Height(), settledHeight)
+		if diff := cmp.Diff(want, got, gastime.CmpOpt()); diff != "" {
+			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
+		}
+	}
+}
+
+// TestDuplicateVerify verifies that having two in-memory instances of the same
+// block doesn't corrupt the VM, regardless of which is accepted.
+func TestDuplicateVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		acceptIndex int
+	}{
+		{
+			name:        "accept_first",
+			acceptIndex: 0,
+		},
+		{
+			name:        "accept_second",
+			acceptIndex: 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0)
+
+			first := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+			second, err := sut.ParseBlock(ctx, first.Bytes())
+			require.NoError(t, err, "%T.ParseBlock(BuildBlock().Bytes())", sut.ChainVM)
+			blks := []snowman.Block{first, second}
+
+			// Consensus may call [block.WithVerifyContext.VerifyWithContext] on
+			// multiple instances of the same block. [VM.consensusCritical]
+			// isn't overridden, so the first instance verified is the one kept
+			// in the map.
+			for _, blk := range blks {
+				b := blk.(block.WithVerifyContext)
+				require.NoErrorf(t,
+					b.VerifyWithContext(ctx, &block.Context{}),
+					"%T.VerifyWithContext()",
+					blk,
+				)
+			}
+
+			parent := blks[test.acceptIndex]
+			require.NoErrorf(t, sut.SetPreference(ctx, parent.ID()), "%T.SetPreference([duplicated block's ID])", sut.ChainVM)
+			child, err := sut.BuildBlock(ctx)
+			require.NoErrorf(t, err, "%T.BuildBlock() with duplicated block as preference", sut.ChainVM)
+			// Loads the parent from [VM.consensusCritical].
+			require.NoErrorf(t, child.Verify(ctx), "%T.Verify() child of duplicated block", child)
+
+			// Accepting parent and child adds them to the execution queue.
+			require.NoError(t, parent.Accept(ctx), "parent.Accept()")
+			require.NoError(t, child.Accept(ctx), "child.Accept()")
+
+			// Inside the executor, execution results are read from
+			// [blocks.Block.ParentBlock]. When the ancestry differs from the
+			// accepted instance, a naive implementation would block child's
+			// execution forever.
+			childRaw := unwrap(t, child)
+			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
 		})
 	}
 }

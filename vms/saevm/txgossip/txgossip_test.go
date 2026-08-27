@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -16,11 +17,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth"
+	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
@@ -35,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -43,6 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 func TestMain(m *testing.M) {
@@ -72,18 +78,43 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
-	logger := saetest.NewTBLogger(t, logging.Warn)
+
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see minGasForSize.
+	const gasTarget = 4_000_000
+
+	logger := loggingtest.New(t, logging.Warn)
 
 	wallet := newWallet(t, numAccounts)
 	config := saetest.ChainConfig()
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, xdb, config, saetest.MaxAllocFor(wallet.Addresses()...))
+	genesis := blockstest.NewGenesis(
+		t,
+		db,
+		config,
+		saetest.MaxAllocFor(wallet.Addresses()...),
+		blockstest.WithGasTarget(gasTarget),
+		blockstest.WithBaseFee(params.Wei),
+	)
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger)
+	tr, err := saedb.NewTracker(db, saedb.Config{CommitInterval: saedb.DefaultCommitInterval}, genesis.EthBlock().Root(), t.TempDir(), logger)
+	require.NoError(t, err, "saedb.NewTracker()")
+	exec, err := saexec.New(
+		genesis,
+		src.AsHeaderSource(),
+		config,
+		db,
+		xdb,
+		tr,
+		hookstest.NewStub(gasTarget),
+		logger,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
@@ -91,7 +122,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(pool, nil /*admitter*/, gossip.BloomSetConfig{})
+	set, err := NewSet(exec, pool, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)
@@ -115,6 +146,122 @@ func newTxPool(t *testing.T, bc BlockChain) *txpool.TxPool {
 	p, err := txpool.New(1, bc, subs)
 	require.NoError(t, err, "txpool.New()")
 	return p
+}
+
+func TestMinGasForSize(t *testing.T) {
+	const m = saeparams.TargetBlockBytes
+
+	tests := []struct {
+		name          string
+		size          uint64
+		blockGasLimit uint64
+		want          uint64
+	}{
+		{
+			name:          "exactDivision",
+			size:          m,
+			blockGasLimit: 42,
+			want:          42,
+		},
+		{
+			name:          "roundsUp",
+			size:          1,
+			blockGasLimit: 1,
+			want:          1,
+		},
+		{
+			name:          "halfBlockBytes",
+			size:          m / 2,
+			blockGasLimit: 100,
+			want:          50,
+		},
+		{
+			name:          "resultOverflowsUint64",
+			size:          m + 1,
+			blockGasLimit: math.MaxUint64,
+			want:          math.MaxUint64,
+		},
+		{
+			name: "zeroBlockGasLimit",
+			size: 1,
+			want: math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := minGasForSize(tt.size, tt.blockGasLimit)
+			require.Equal(t, tt.want, got, "minGasForSize(%d, %d)", tt.size, tt.blockGasLimit)
+		})
+	}
+}
+
+func TestSetRejectsLowGasPerByte(t *testing.T) {
+	s := newSUT(t, 1)
+
+	// The smallest n bytes of zero calldata making a transaction ineligible:
+	// a transaction is strictly larger than its calldata, so it suffices that
+	//
+	//	n·x > (TxGas + TxDataZeroGas·n)·M
+	const m = saeparams.TargetBlockBytes
+	x := s.set.blockGasLimit()
+	zeroCalldataBytes := params.TxGas*m/(x-params.TxDataZeroGas*m) + 1
+
+	transfer := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+		})
+	}
+	calldataHeavy := func() *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*zeroCalldataBytes,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+			Data:      make([]byte, zeroCalldataBytes),
+		})
+	}
+
+	tests := []struct {
+		name    string
+		tx      *types.Transaction
+		submit  func(context.Context, *types.Transaction) error
+		wantErr error
+	}{
+		{
+			name:   "gossip/eligible",
+			tx:     transfer(),
+			submit: func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+		},
+		{
+			name:    "gossip/ineligible",
+			tx:      calldataHeavy(),
+			submit:  func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+			wantErr: errInsufficientGasPerByte,
+		},
+		{
+			name:   "rpc/eligible",
+			tx:     transfer(),
+			submit: s.SendTx,
+		},
+		{
+			name:    "rpc/ineligible",
+			tx:      calldataHeavy(),
+			submit:  s.SendTx,
+			wantErr: errInsufficientGasPerByte,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.submit(t.Context(), tt.tx)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equalf(t, tt.wantErr == nil, s.Has(Transaction{tt.tx}.GossipID()), "Has(GossipID()) after %s", tt.name)
+		})
+	}
 }
 
 func TestExecutorIntegration(t *testing.T) {
@@ -142,7 +289,7 @@ func TestExecutorIntegration(t *testing.T) {
 	for _, tx := range signedTxs {
 		require.NoErrorf(t, s.Add(Transaction{tx}), "%T.Add()", s.set)
 	}
-	txgossiptest.WaitUntilPending(t, ctx, s.Pool, signedTxs...)
+	txgossiptest.WaitUntilPending(t, ctx, poolMempool{s.Pool}, signedTxs...)
 
 	t.Run("Iterate_after_Add", func(t *testing.T) {
 		require.Lenf(t, slices.Collect(s.Iterate), numTxs, "slices.Collect(%T.Iterate)", s.Set)
@@ -267,7 +414,7 @@ func TestP2PIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := saetest.NewTBLogger(t, logging.Debug)
+			logger := loggingtest.New(t, logging.Debug)
 			ctx := logger.CancelOnError(t.Context())
 
 			sendID := ids.GenerateTestNodeID()
@@ -310,7 +457,7 @@ func TestP2PIntegration(t *testing.T) {
 
 			require.NoErrorf(t, send.Add(txViaGossip), "%T.Add()", send.Set)
 			require.NoErrorf(t, send.SendTx(ctx, txViaRPC.Transaction), "%T.SendTx()", send.Set)
-			txgossiptest.WaitUntilPending(t, ctx, send.Pool, txViaRPC.Transaction, txViaGossip.Transaction)
+			txgossiptest.WaitUntilPending(t, ctx, poolMempool{send.Pool}, txViaRPC.Transaction, txViaGossip.Transaction)
 
 			t.Run("confirm_setup", func(t *testing.T) {
 				for _, tx := range bothTxs {
@@ -378,121 +525,6 @@ func TestAPIBackendSendTxSignatureMatch(_ *testing.T) {
 	_ = fn
 }
 
-// stubAdmitter implements [Admitter] by returning the per-call error
-// provided at construction; index `i` returns `errs[i]`. A nil entry admits
-// the tx. Calls past `len(errs)` panic, which protects against silent
-// over-counting.
-type stubAdmitter struct {
-	errs []error
-	n    int
-}
-
-func (s *stubAdmitter) Admit(*types.Transaction) error {
-	defer func() { s.n++ }()
-	return s.errs[s.n]
-}
-
-// signTx signs a trivial value transfer originating from `account`.
-func signTx(t *testing.T, s SUT, account int) *types.Transaction {
-	t.Helper()
-	return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
-		To:        &common.Address{},
-		Gas:       params.TxGas,
-		GasFeeCap: big.NewInt(1),
-	})
-}
-
-// TestAddToPool exercises [txSet.addToPool]. It drives the method directly
-// (instead of going through [Set.Add] / [Set.SendTx], which only carry one
-// tx at a time) so we can observe the index-aligned `[]error` it returns
-// against an input slice that mixes admitter-rejected and pool-accepted /
-// pool-rejected transactions.
-//
-// Each row supplies:
-//   - the [Admitter] to install (nil clears the fixture's admitter);
-//   - a builder for the input txs (handles e.g. duplicates naturally);
-//   - per-position expectations for the result slice and pool membership.
-func TestAddToPool(t *testing.T) {
-	rejectAt0 := errors.New("rejected at index 0")
-	rejectAt2 := errors.New("rejected at index 2")
-
-	tests := []struct {
-		name string
-		// admitter is installed on the fixture's [txSet]. Use `nil` to
-		// exercise the no-admitter pass-through path.
-		admitter Admitter
-		// numTxs requests `numTxs` distinct value-transfer txs, one per
-		// account (so each is independently nonce-0). Ignored when `txs`
-		// is non-nil.
-		numTxs int
-		// txs is an optional override for non-uniform inputs (e.g.
-		// duplicates). When set, `numTxs` is ignored.
-		txs func(t *testing.T, s SUT) []*types.Transaction
-		// wantErrs is index-aligned with the input txs. Entries are
-		// matched via [errors.Is]; nil means "no error".
-		wantErrs []error
-		// wantInPool is index-aligned with the input txs; true means the
-		// pool must contain the tx after [txSet.addToPool] returns.
-		wantInPool []bool
-	}{
-		{
-			name:       "no_admitter_passes_through_to_pool",
-			admitter:   nil,
-			numTxs:     1,
-			wantErrs:   []error{nil},
-			wantInPool: []bool{true},
-		},
-		{
-			name:       "errors_indexed_by_input_position",
-			admitter:   &stubAdmitter{errs: []error{rejectAt0, nil, rejectAt2, nil}},
-			numTxs:     4,
-			wantErrs:   []error{rejectAt0, nil, rejectAt2, nil},
-			wantInPool: []bool{false, true, false, true},
-		},
-		{
-			name:     "pool_error_propagated_at_original_position",
-			admitter: &stubAdmitter{errs: []error{nil, nil}},
-			txs: func(t *testing.T, s SUT) []*types.Transaction {
-				tx := signTx(t, s, 0)
-				return []*types.Transaction{tx, tx} // dup → [txpool.ErrAlreadyKnown] on insert #2
-			},
-			wantErrs:   []error{nil, txpool.ErrAlreadyKnown},
-			wantInPool: []bool{true, true}, // both indices map to the same pooled tx hash
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sut := newSUT(t, 1)
-			set := sut.Set.set
-			set.admitter = tt.admitter
-
-			var txs []*types.Transaction
-			switch {
-			case tt.txs != nil:
-				txs = tt.txs(t, sut)
-			default:
-				txs = make([]*types.Transaction, tt.numTxs)
-				for i := range tt.numTxs {
-					txs[i] = signTx(t, sut, 0)
-				}
-			}
-			errs := set.addToPool(true, txs...)
-
-			require.Len(t, errs, len(tt.wantErrs))
-			for i, want := range tt.wantErrs {
-				require.ErrorIsf(t, errs[i], want, "errs[%d]", i)
-			}
-
-			require.Len(t, tt.wantInPool, len(txs), "test setup: wantInPool must align with txs")
-			for i, want := range tt.wantInPool {
-				assert.Equalf(t, want, set.pool.Has(txs[i].Hash()),
-					"%T.Has(txs[%d]=%#x)", set.pool, i, txs[i].Hash())
-			}
-		})
-	}
-}
-
 func FuzzEffectiveGasTip(f *testing.F) {
 	// The goal of these seeds is to exercise all possible orderings of fee cap,
 	// tip cap and base fee, also including a nil base fee.
@@ -546,4 +578,20 @@ func FuzzEffectiveGasTip(f *testing.F) {
 			t.Errorf("%T.effectiveGasTip(...) got %v; want %v", ltx, got, want)
 		}
 	})
+}
+
+// poolMempool adapts a raw [*txpool.TxPool] to [txgossiptest.Mempool], the
+// only shape these tests have access to without a geth RPC backend.
+type poolMempool struct {
+	pool *txpool.TxPool
+}
+
+func (m poolMempool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
+	return m.pool.SubscribeTransactions(ch, true /*reorgs ignored by legacypool*/)
+}
+
+func (m poolMempool) GetPoolTransactions() (types.Transactions, error) {
+	pendingByAddr, _ := m.pool.Content()
+	txs := slices.Collect(maps.Values(pendingByAddr))
+	return slices.Concat(txs...), nil
 }

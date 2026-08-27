@@ -84,6 +84,7 @@ func newFuzzState(t *testing.T) *fuzzState {
 			DBOverride: fwCfg.BackendConstructor,
 		},
 	)
+	firewoodState = NewStateAccessor(firewoodState)
 	fwTr, err := firewoodState.OpenTrie(ethRoot)
 	r.NoError(err)
 	t.Cleanup(func() {

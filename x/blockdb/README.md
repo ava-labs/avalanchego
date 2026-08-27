@@ -122,6 +122,18 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 3. Calculates the max block height
 4. Updates the index header with the updated max block height and next write offset
 
+### Single-Process Access
+
+BlockDB does not support concurrent access from multiple processes. It acquires an exclusive advisory file lock on a `LOCK` file at open time; a second process attempting to open the same database fails immediately. Within a single process, the database is safe to use from multiple goroutines.
+
+`IndexDir` and `DataDir` must be dedicated to BlockDB. Sharing folders with other databases risks filename conflicts (e.g., the conventional `LOCK` file).
+
+**Locked paths.** A `LOCK` file is created and locked in `IndexDir`, and (when distinct) in `DataDir`.
+
+**Lifecycle.** The lock is acquired before any database files are opened or recovery is attempted, and released after all files are closed. If the process exits unexpectedly (panic, `SIGKILL`, OOM kill), the OS releases the lock automatically.
+
+**Limits.** The lock is advisory and only coordinates between cooperating processes. It does not prevent non-cooperating tools (`rm`, backup utilities, editors) from modifying or deleting the database files. Deleting the `LOCK` file while a database is open breaks the protection.
+
 ## Usage
 
 ### Creating a Database

@@ -7,17 +7,22 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
-func (e *Executor) sendPostExecutionEvents(b *types.Block, receipts types.Receipts) {
+func (e *Executor) sendPostExecutionEvents(block *blocks.Block, results *ExecutionResults) {
+	e.metrics.markExecuted(block, results)
+
+	b := block.EthBlock()
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
 	var n int
-	for _, r := range receipts {
+	for _, r := range results.Receipts {
 		n += len(r.Logs)
 	}
 	logs := make([]*types.Log, 0, n)
-	for _, r := range receipts {
+	for _, r := range results.Receipts {
 		logs = append(logs, r.Logs...)
 	}
 	e.chainEvents.Send(core.ChainEvent{

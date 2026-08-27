@@ -5,6 +5,7 @@ go_library(
     name = "handler",
     srcs = [
         "engine.go",
+        "gossip_ticker.go",
         "handler.go",
         "health.go",
         "message_queue.go",
@@ -44,6 +45,7 @@ go_test(
     name = "handler_test",
     srcs = [
         "engine_test.go",
+        "gossip_ticker_test.go",
         "handler_test.go",
         "health_test.go",
         "message_queue_test.go",

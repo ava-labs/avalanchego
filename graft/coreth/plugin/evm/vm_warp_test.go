@@ -56,8 +56,6 @@ import (
 var (
 	//go:embed ExampleWarp.bin
 	exampleWarpBin string
-	// TODO: consider moving tests working with this ABI to a simulated_test in
-	// coreth/precompile/contracts/warp/simulated_test.go
 	//go:embed ExampleWarp.abi
 	exampleWarpABI string
 )
@@ -931,7 +929,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
 	vm := newDefaultTestVM()
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 

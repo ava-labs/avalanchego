@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -117,6 +116,7 @@ const (
 	ethMetricsPrefix        = "eth"
 	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
+	syncServerMetricsPrefix = "sync_server"
 )
 
 // Define the API endpoints for the VM
@@ -690,11 +690,16 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodRangeProofHandlerID, syncer.NewGetRangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood range proof handler: %w", err)
+		syncServerMetrics := prometheus.NewRegistry()
+		if err := vm.ctx.Metrics.Register(syncServerMetricsPrefix, syncServerMetrics); err != nil {
+			return fmt.Errorf("registering sync server metrics: %w", err)
 		}
-		if err := n.AddHandler(p2p.FirewoodChangeProofHandlerID, syncer.NewGetChangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood change proof handler: %w", err)
+		proofHandler, err := syncer.NewGetProofHandler(tdb.Firewood, syncServerMetrics)
+		if err != nil {
+			return fmt.Errorf("creating firewood proof handler: %w", err)
+		}
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, proofHandler); err != nil {
+			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
 		log.Warn("state sync is not supported for this scheme, no leaf handlers will be registered", "scheme", scheme)
@@ -710,19 +715,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	vm.Network.SetRequestHandler(networkHandler)
 
 	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
-	// parse nodeIDs from state sync IDs in vm config
-	var stateSyncIDs []ids.NodeID
-	if vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
-		nodeIDs := strings.Split(vm.config.StateSyncIDs, ",")
-		stateSyncIDs = make([]ids.NodeID, len(nodeIDs))
-		for i, nodeIDString := range nodeIDs {
-			nodeID, err := ids.NodeIDFromString(nodeIDString)
-			if err != nil {
-				return fmt.Errorf("failed to parse %s as NodeID: %w", nodeIDString, err)
-			}
-			stateSyncIDs[i] = nodeID
-		}
-	}
 
 	vm.Client = engine.NewClient(&engine.ClientConfig{
 		StateSyncDone: vm.stateSyncDone,
@@ -734,7 +726,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				Network:          vm.Network,
 				Codec:            vm.networkCodec,
 				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
-				StateSyncNodeIDs: stateSyncIDs,
+				StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
 				BlockParser:      vm,
 			},
 		),

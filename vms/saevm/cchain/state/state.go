@@ -7,14 +7,12 @@ package state
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -22,21 +20,17 @@ import (
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // These prefixes and keys are byte-compatible with the indices written by
@@ -73,10 +67,6 @@ type State struct {
 }
 
 // New initializes the state with db.
-//
-// TODO(#5375): Coreth's commitInterval must be reduced to 1 prior to
-// transitioning to SAE. Otherwise, the atomic trie may not contain operations
-// for recent blocks.
 func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, height, err := readLast(db)
 	if err != nil {
@@ -91,7 +81,7 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
 		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
-			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
+			saetypes.NewEthDB(prefixdb.NewNested(triePrefix, db)),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
@@ -136,22 +126,6 @@ func rootKey(height uint64) []byte {
 	return prefixdb.PrefixKey(commitPrefix, database.PackUInt64(height))
 }
 
-var (
-	//go:embed bonus_blocks.json
-	bonusBlocksJSON []byte
-	bonusBlocks     set.Set[uint64]
-)
-
-func init() {
-	if err := json.Unmarshal(bonusBlocksJSON, &bonusBlocks); err != nil {
-		panic(err)
-	}
-}
-
-func isBonusBlock(networkID uint32, height uint64) bool {
-	return networkID == constants.MainnetID && bonusBlocks.Contains(height)
-}
-
 // Apply persists the txs accepted at height. It applies their atomic
 // operations to the trie, indexes the txs by ID, and applies the atomic
 // operations to shared memory.
@@ -178,10 +152,15 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
 
-	isBonus := isBonusBlock(s.snowCtx.NetworkID, height)
-	batch := s.db.NewBatch()
+	var (
+		isBonus = isBonusBlock(s.snowCtx.NetworkID, height)
+		batch   = s.db.NewBatch()
+	)
 	for _, t := range txs {
 		if isBonus {
+			// To provide consistent API behavior with databases made by Coreth,
+			// we report the first height a transaction was accepted at as the
+			// canonical height.
 			txID := t.ID()
 			has, err := s.db.Has(txKey(txID))
 			if err != nil {
@@ -202,9 +181,9 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("writing root: %w", err)
 	}
 
-	// There was originally a bug in Coreth that allowed a handful of invalid
-	// blocks to be accepted on mainnet. To canonicalize this behavior, bonus
-	// blocks do not consume their operations from shared memory.
+	// Applying the same operation multiple times to shared memory MAY result in
+	// an error. Since bonus blocks consume the same UTXOs multiple times, we
+	// MUST skip applying their operations to shared memory.
 	if isBonus {
 		ops = nil
 	}
@@ -215,7 +194,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying shared memory: %w", err)
 	}
 
-	s.snowCtx.Log.Debug("updated atomic trie",
+	s.snowCtx.Log.Trace("updated atomic trie",
 		zap.Uint64("height", height),
 		zap.Stringer("root", newRoot),
 	)

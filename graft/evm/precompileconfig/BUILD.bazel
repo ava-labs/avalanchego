@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "precompileconfig",
+    srcs = ["predicate.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/precompileconfig",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow",
+        "//snow/engine/snowman/block",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

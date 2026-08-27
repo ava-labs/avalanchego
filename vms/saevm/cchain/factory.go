@@ -4,28 +4,33 @@
 package cchain
 
 import (
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
+	"time"
 
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 var _ vms.Factory = (*Factory)(nil)
 
+// Factory creates new C-Chain VMs.
 type Factory struct{}
 
-func (*Factory) New(logger logging.Logger) (interface{}, error) {
-	mempoolConfig := legacypool.DefaultConfig
-	mempoolConfig.NoLocals = true
-	logger.Info("Creating new SAE VM")
-	return adaptor.Convert(New(sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieDBConfig: triedb.HashDefaults,
-		},
-	})), nil
+// New creates a new C-Chain VM.
+func (*Factory) New(log logging.Logger) (interface{}, error) {
+	log.Info("Creating new C-Chain SAE VM")
+	vm := &VM{
+		pullGossipPeriod: time.Second,
+		pushGossipPeriod: 100 * time.Millisecond,
+		now:              time.Now,
+	}
+	type fullVM struct {
+		adaptor.ChainVMWithContext
+		block.StateSyncableVM
+	}
+	return fullVM{
+		adaptor.Convert(vm),
+		adaptor.ConvertStateSync(vm),
+	}, nil
 }

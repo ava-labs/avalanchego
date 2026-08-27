@@ -8,68 +8,83 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-func (v *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+// All these functions just route through to the current chain.
 
-	return v.current.chain.AppGossip(ctx, nodeID, msg)
+func (vm *VM) Version(ctx context.Context) (string, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	return vm.current.chain.Version(ctx)
 }
 
-func (v *VM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	return v.current.chain.AppRequest(ctx, nodeID, requestID, deadline, request)
+	return vm.current.chain.AppGossip(ctx, nodeID, msg)
 }
 
-func (v *VM) HealthCheck(ctx context.Context) (interface{}, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	return v.current.chain.HealthCheck(ctx)
+	return vm.current.chain.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
-func (v *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	return v.current.chain.LastAccepted(ctx)
+func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
+	return withLocks(vm, func() (any, error) {
+		return vm.current.chain.HealthCheck(ctx)
+	})
 }
 
-func (v *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	return v.current.chain.GetBlockIDAtHeight(ctx, height)
+func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
+	return withLocks(vm, func() (ids.ID, error) {
+		return vm.current.chain.LastAccepted(ctx)
+	})
 }
 
-func (v *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	return v.current.chain.SetPreference(ctx, blkID)
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	return withLocks(vm, func() (ids.ID, error) {
+		return vm.current.chain.GetBlockIDAtHeight(ctx, height)
+	})
 }
 
-func (v *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *block.Context) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	return v.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
+func (vm *VM) Shutdown(ctx context.Context) error {
+	return vm.withLocks(func() error {
+		return vm.current.chain.Shutdown(ctx)
+	})
 }
 
-func (v *VM) Version(ctx context.Context) (string, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	return v.current.chain.Version(ctx)
+func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
+	return withLocks(vm, func() (bool, error) {
+		return vm.current.chain.StateSyncEnabled(ctx)
+	})
 }
 
-func (v *VM) Shutdown(ctx context.Context) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) GetOngoingSyncStateSummary(ctx context.Context) (smblock.StateSummary, error) {
+	return withLocks(vm, func() (smblock.StateSummary, error) {
+		return vm.current.chain.GetOngoingSyncStateSummary(ctx)
+	})
+}
 
-	return v.current.chain.Shutdown(ctx)
+func (vm *VM) GetLastStateSummary(ctx context.Context) (smblock.StateSummary, error) {
+	return withLocks(vm, func() (smblock.StateSummary, error) {
+		return vm.current.chain.GetLastStateSummary(ctx)
+	})
+}
+
+func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (smblock.StateSummary, error) {
+	return withLocks(vm, func() (smblock.StateSummary, error) {
+		return vm.current.chain.ParseStateSummary(ctx, summaryBytes)
+	})
+}
+
+func (vm *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (smblock.StateSummary, error) {
+	return withLocks(vm, func() (smblock.StateSummary, error) {
+		return vm.current.chain.GetStateSummary(ctx, summaryHeight)
+	})
 }

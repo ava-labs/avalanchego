@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
-	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,14 +27,6 @@ func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 	return vm.rpcProvider.GethBackends()
 }
 
-// RPCServer returns the libevm `*rpc.Server` backing the JSON-RPC handlers
-// served at `/rpc` and `/ws`. Downstream VMs may call `RegisterName` on the
-// returned server to add VM-specific methods to existing namespaces.
-// Must be called after `NewVM`.
-func (vm *VM) RPCServer() *rpc.Server {
-	return vm.rpcProvider.Server()
-}
-
 func (vm *VM) chain() saerpc.Chain {
 	return chain{vm, vm.exec}
 }
@@ -45,17 +36,21 @@ type chain struct {
 	*saexec.Executor
 }
 
-func (c chain) Logger() logging.Logger         { return c.VM.snowCtx.Log }
+func (c chain) Logger() logging.Logger         { return c.snowCtx.Log }
 func (c chain) Hooks() hook.Points             { return c.hooks }
 func (c chain) DB() ethdb.Database             { return c.db }
 func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
 func (c chain) Mempool() *txgossip.Set         { return c.mempool }
-func (c chain) Peers() *p2p.Peers              { return c.VM.Peers }
+func (c chain) Peers() *p2p.Peers              { return c.network.Peers }
 func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
 func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
 
 func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 	return c.consensusCritical.Load(h)
+}
+
+func (c chain) ResolvePendingToLastExecuted() bool {
+	return c.VM.config.RPCConfig.ResolvePendingToLastExecuted
 }
 
 func (c chain) NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {

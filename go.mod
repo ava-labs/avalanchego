@@ -11,7 +11,6 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
-//   - docs/bazel.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
 // - If updating between minor versions (e.g. 1.25.x -> 1.26.x):
@@ -26,9 +25,8 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
-	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
-	github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981
+	github.com/ava-labs/libevm v1.13.15-0.20260824194946-80edd419ae21
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -58,7 +56,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cast v1.9.2
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	github.com/supranational/blst v0.3.14
@@ -73,16 +71,16 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.49.0
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
-	golang.org/x/net v0.52.0
+	golang.org/x/crypto v0.52.0
+	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/term v0.41.0
+	golang.org/x/term v0.43.0
 	golang.org/x/time v0.12.0
-	golang.org/x/tools v0.42.0
+	golang.org/x/tools v0.44.0
 	gonum.org/v1/gonum v0.17.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9
-	google.golang.org/grpc v1.80.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -95,7 +93,8 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.4.0
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
@@ -133,14 +132,14 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
-	github.com/gogo/protobuf v1.3.2
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
@@ -191,11 +190,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
+	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
@@ -211,14 +210,14 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace (
-	github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
-	github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
-	github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
 
-	// Workaround for genproto ambiguous import conflict.
-	// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
-	// Modern packages use split modules (genproto/googleapis/rpc, etc.).
-	// Force use of newer split genproto to resolve ambiguity.
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
-)
+replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+
+replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+
+// Workaround for genproto ambiguous import conflict.
+// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+// Force use of newer split genproto to resolve ambiguity.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1

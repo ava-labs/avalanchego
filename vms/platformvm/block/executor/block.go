@@ -90,6 +90,7 @@ func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 	options := options{
 		log:                     b.manager.ctx.Log,
 		primaryUptimePercentage: b.manager.txExecutorBackend.Config.UptimePercentage,
+		upgradeConfig:           b.manager.txExecutorBackend.Config.UpgradeConfig,
 		uptimes:                 b.manager.txExecutorBackend.Uptimes,
 		state:                   b.manager.backend.state,
 	}

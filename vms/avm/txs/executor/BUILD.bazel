@@ -48,6 +48,7 @@ go_test(
         "//utils/constants",
         "//utils/crypto/secp256k1",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/math",
         "//utils/timer/mockable",
         "//utils/units",

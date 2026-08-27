@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -44,4 +45,42 @@ func (b *backend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.Blo
 
 func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
 	return readByNumberAndHash(b, hash, number, (*blocks.Block).Body, rawdb.ReadBody)
+}
+
+// restoreExecutedParent is [backend.restoreExecutedBlock] for the canonical
+// parent of the given block.
+func (b *backend) restoreExecutedParent(ctx context.Context, child *types.Block) (*blocks.Block, error) {
+	return b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithHash(child.ParentHash(), true /* canonical */))
+}
+
+// restoreExecutedBlock finds any available canonical block by number or hash,
+// restoring it from the database if necessary, and waits for its execution. A
+// missing block is reported as [blocks.ErrNotFound].
+func (b *backend) restoreExecutedBlock(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*blocks.Block, error) {
+	numOrHash.RequireCanonical = true
+	bl, err := blocks.FromNumberOrHash(
+		b,
+		numOrHash,
+		func(b *blocks.Block) *blocks.Block {
+			return b
+		},
+		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
+			if num >= b.LastSettled().Height() {
+				// We can't restore the settlement state, it should have been found in the map.
+				return nil, blocks.ErrNotFound
+			}
+			ethB := rawdb.ReadBlock(db, h, num)
+			if ethB == nil {
+				return nil, blocks.ErrNotFound
+			}
+			return blocks.RestoreSettledBlock(ethB, b.Hooks(), b.Logger(), b.DB(), b.XDB(), b.ChainConfig())
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := bl.WaitUntilExecuted(ctx); err != nil {
+		return nil, err
+	}
+	return bl, nil
 }

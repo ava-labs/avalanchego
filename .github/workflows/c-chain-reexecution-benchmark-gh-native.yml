@@ -48,8 +48,12 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
+      has-aws-role: ${{ steps.check-aws-role.outputs.available }}
     steps:
       - uses: actions/checkout@v5
+      - name: Check AWS Role Availability
+        id: check-aws-role
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -89,23 +93,25 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes }}
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
+    # Fork PRs and Dependabot PRs are served by secret stores without this role, so
+    # authenticating to S3 would fail before the benchmark starts.
+    if: ${{ needs.define-matrix.outputs.has-aws-role == 'true' }}
     permissions:
       id-token: write
       contents: write
     runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
       # Nix is required before calling polyrepo.
       # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
       - name: Install Nix
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        uses: ./.github/actions/install-nix
       - name: Configure dependency versions
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        shell: nix develop --command bash {0}
         run: ./scripts/run_task.sh run-polyrepo
         env:
           LIBEVM_REF: ${{ matrix.libevm-ref }}

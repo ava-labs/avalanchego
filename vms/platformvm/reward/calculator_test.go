@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -28,25 +29,49 @@ var defaultConfig = Config{
 	SupplyCap:          720 * units.MegaAvax,
 }
 
-func TestLongerDurationBonus(t *testing.T) {
-	c := NewCalculator(defaultConfig)
-	shortDuration := 24 * time.Hour
-	totalDuration := 365 * 24 * time.Hour
-	shortBalance := units.KiloAvax
-	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		r := c.Calculate(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
-		shortBalance += r
-	}
-	reward := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
-	shortBalance += reward
+type calculatorImplementation struct {
+	name       string
+	calculator Calculator
+}
 
-	longBalance := units.KiloAvax
-	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
-	require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
+func newCalculatorsBeforeHelicon(config Config) []calculatorImplementation {
+	heliconTime := time.Time{}.Add(time.Second)
+	return []calculatorImplementation{
+		{
+			name:       "calculator",
+			calculator: NewCalculator(config),
+		},
+		{
+			name: "primary_network_before_helicon",
+			calculator: NewPrimaryNetworkCalculator(
+				config,
+				upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+			),
+		},
+	}
+}
+
+func TestLongerDurationBonus(t *testing.T) {
+	for _, impl := range newCalculatorsBeforeHelicon(defaultConfig) {
+		t.Run(impl.name, func(t *testing.T) {
+			shortDuration := 24 * time.Hour
+			totalDuration := 365 * 24 * time.Hour
+			shortBalance := units.KiloAvax
+			for i := 0; i < int(totalDuration/shortDuration); i++ {
+				reward := impl.calculator.Calculate(time.Time{}, shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+				shortBalance += reward
+			}
+			reward := impl.calculator.Calculate(time.Time{}, totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+			shortBalance += reward
+
+			longBalance := units.KiloAvax
+			longBalance += impl.calculator.Calculate(time.Time{}, totalDuration, longBalance, 359*units.MegaAvax+longBalance)
+			require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
+		})
+	}
 }
 
 func TestRewards(t *testing.T) {
-	c := NewCalculator(defaultConfig)
 	tests := []struct {
 		duration       time.Duration
 		stakeAmount    uint64
@@ -115,20 +140,156 @@ func TestRewards(t *testing.T) {
 			expectedReward: 0,
 		},
 	}
-	for _, test := range tests {
-		name := fmt.Sprintf("reward(%s,%d,%d)==%d",
-			test.duration,
-			test.stakeAmount,
-			test.existingAmount,
-			test.expectedReward,
-		)
-		t.Run(name, func(t *testing.T) {
+	for _, impl := range newCalculatorsBeforeHelicon(defaultConfig) {
+		t.Run(impl.name, func(t *testing.T) {
+			for _, test := range tests {
+				name := fmt.Sprintf("reward(%s,%d,%d)==%d",
+					test.duration,
+					test.stakeAmount,
+					test.existingAmount,
+					test.expectedReward,
+				)
+				t.Run(name, func(t *testing.T) {
+					reward := impl.calculator.Calculate(
+						time.Time{},
+						test.duration,
+						test.stakeAmount,
+						test.existingAmount,
+					)
+					require.Equal(t, test.expectedReward, reward)
+				})
+			}
+		})
+	}
+}
+
+func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
+	const (
+		heliconReductionPeriod = 90 * 24 * time.Hour
+		duration               = defaultMinStakingDuration
+		amount                 = units.MegaAvax
+		supply                 = 360 * units.MegaAvax
+	)
+
+	heliconTime := time.Unix(1_000_000, 0)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+	config := defaultConfig
+
+	// expectedReward = (config.SupplyCap-supply) *
+	// (minRate*config.MintingPeriod +
+	// (config.MaxConsumptionRate-minRate)*duration) * amount * duration /
+	// (config.MintingPeriod*PercentDenominator) / supply / config.MintingPeriod.
+	tests := []struct {
+		name               string
+		minConsumptionRate uint64
+		maxConsumptionRate uint64
+		stakeStartTime     time.Time
+		expectedReward     uint64
+	}{
+		{
+			// minRate = 10% at the start of the ramp.
+			name:               "at_helicon",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime,
+			expectedReward:     274122724713,
+		},
+		{
+			// minRate = 10% - (10% - 7.5%) / 3 = 9.1667%.
+			name:               "one_third_ramp",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 3),
+			expectedReward:     251355136048,
+		},
+		{
+			// minRate = 7.5% at the end of the ramp.
+			name:               "at_ramp_end",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     205817226496,
+		},
+		{
+			// minRate = 8% - (8% - 7.5%) / 2 = 7.75%.
+			name:               "custom_min_rate_above_target",
+			minConsumptionRate: 80_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     212647776318,
+		},
+		{
+			// minRate = 1% + (7.5% - 1%) / 2 = 4.25%.
+			name:               "custom_min_rate_below_target",
+			minConsumptionRate: 10_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     117020078814,
+		},
+		{
+			name:               "below_target_at_helicon",
+			minConsumptionRate: 74_999,
+			stakeStartTime:     heliconTime,
+			expectedReward:     205814494276,
+		},
+		{
+			// A half-ramped one-unit increase rounds down to zero.
+			name:               "below_target_mid_ramp",
+			minConsumptionRate: 74_999,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205814494276,
+		},
+		{
+			name:               "below_target_at_ramp_end",
+			minConsumptionRate: 74_999,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "at_target_mid_ramp",
+			minConsumptionRate: 75_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "above_target_at_helicon",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime,
+			expectedReward:     205819958716,
+		},
+		{
+			// A half-ramped one-unit reduction rounds down to zero.
+			name:               "above_target_mid_ramp",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     205819958716,
+		},
+		{
+			name:               "above_target_at_ramp_end",
+			minConsumptionRate: 75_001,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     205817226496,
+		},
+		{
+			// Preserve minRate because the 7.5% target exceeds maxRate.
+			name:               "target_above_max",
+			minConsumptionRate: 10_000,
+			maxConsumptionRate: 20_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     27472321261,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config
+			cfg.MinConsumptionRate = tt.minConsumptionRate
+			if tt.maxConsumptionRate != 0 {
+				cfg.MaxConsumptionRate = tt.maxConsumptionRate
+			}
+			c := NewPrimaryNetworkCalculator(cfg, upgradeConfig)
+
 			reward := c.Calculate(
-				test.duration,
-				test.stakeAmount,
-				test.existingAmount,
+				tt.stakeStartTime,
+				duration,
+				amount,
+				supply,
 			)
-			require.Equal(t, test.expectedReward, reward)
+			require.Equal(t, tt.expectedReward, reward)
 		})
 	}
 }
@@ -138,18 +299,23 @@ func TestRewardsOverflow(t *testing.T) {
 		maxSupply     uint64 = math.MaxUint64
 		initialSupply uint64 = 1
 	)
-	c := NewCalculator(Config{
+	config := Config{
 		MaxConsumptionRate: PercentDenominator,
 		MinConsumptionRate: PercentDenominator,
 		MintingPeriod:      defaultMinStakingDuration,
 		SupplyCap:          maxSupply,
-	})
-	reward := c.Calculate(
-		defaultMinStakingDuration,
-		maxSupply, // The staked amount is larger than the current supply
-		initialSupply,
-	)
-	require.Equal(t, maxSupply-initialSupply, reward)
+	}
+	for _, impl := range newCalculatorsBeforeHelicon(config) {
+		t.Run(impl.name, func(t *testing.T) {
+			reward := impl.calculator.Calculate(
+				time.Time{},
+				defaultMinStakingDuration,
+				maxSupply, // The staked amount is larger than the current supply
+				initialSupply,
+			)
+			require.Equal(t, maxSupply-initialSupply, reward)
+		})
+	}
 }
 
 func TestRewardsMint(t *testing.T) {
@@ -157,18 +323,23 @@ func TestRewardsMint(t *testing.T) {
 		maxSupply     uint64 = 1000
 		initialSupply uint64 = 1
 	)
-	c := NewCalculator(Config{
+	config := Config{
 		MaxConsumptionRate: PercentDenominator,
 		MinConsumptionRate: PercentDenominator,
 		MintingPeriod:      defaultMinStakingDuration,
 		SupplyCap:          maxSupply,
-	})
-	rewards := c.Calculate(
-		defaultMinStakingDuration,
-		maxSupply, // The staked amount is larger than the current supply
-		initialSupply,
-	)
-	require.Equal(t, maxSupply-initialSupply, rewards)
+	}
+	for _, impl := range newCalculatorsBeforeHelicon(config) {
+		t.Run(impl.name, func(t *testing.T) {
+			reward := impl.calculator.Calculate(
+				time.Time{},
+				defaultMinStakingDuration,
+				maxSupply, // The staked amount is larger than the current supply
+				initialSupply,
+			)
+			require.Equal(t, maxSupply-initialSupply, reward)
+		})
+	}
 }
 
 func TestSplit(t *testing.T) {

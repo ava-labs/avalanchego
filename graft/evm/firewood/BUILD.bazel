@@ -6,8 +6,10 @@ go_library(
     srcs = [
         "account_trie.go",
         "base_trie.go",
+        "metrics.go",
         "reconstructed_state.go",
         "reconstructed_trie.go",
+        "reconstructed_triedb.go",
         "state.go",
         "storage_trie.go",
         "triedb.go",

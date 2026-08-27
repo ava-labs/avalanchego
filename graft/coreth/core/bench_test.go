@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	ethcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -90,7 +91,7 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 	return func(i int, gen *BlockGen) {
 		toaddr := common.Address{}
 		data := make([]byte, nbytes)
-		gas, _ := IntrinsicGas(data, nil, false, params.Rules{}) // Disable Istanbul and EIP-2028 for this test
+		gas, _ := ethcore.IntrinsicGas(data, nil, false, params.Rules{}) // Disable Istanbul and EIP-2028 for this test
 		signer := gen.Signer()
 		gasPrice := big.NewInt(0)
 		if gen.header.BaseFee != nil {

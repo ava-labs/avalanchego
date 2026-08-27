@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -73,36 +74,12 @@ func (b *BlockBodyExtra) BodyRLPFieldPointersForDecoding(body *ethtypes.Body) *r
 	}
 }
 
-// BlockRLPFieldPointersForEncoding returns the fields that should be encoded
-// for the [Block] and [BlockBodyExtra].
-// Note the following fields are added (+) and removed (-) compared to geth:
-// - (-) [ethtypes.Block] `Withdrawals` field
-// - (+) [BlockBodyExtra] `Version` field
-// - (+) [BlockBodyExtra] `ExtData` field
-func (b *BlockBodyExtra) BlockRLPFieldsForEncoding(block *ethtypes.BlockRLPProxy) *rlp.Fields {
-	return &rlp.Fields{
-		Required: []any{
-			block.Header,
-			block.Txs,
-			block.Uncles,
-			b.Version,
-			b.ExtData,
-		},
+func (b *BlockBodyExtra) PostRPCMarshal(_ *ethtypes.Block, m map[string]any) {
+	var extData hexutil.Bytes
+	if b.ExtData != nil {
+		extData = *b.ExtData
 	}
-}
-
-// BlockRLPFieldPointersForDecoding returns the fields that should be decoded to
-// for the [Block] and [BlockBodyExtra].
-func (b *BlockBodyExtra) BlockRLPFieldPointersForDecoding(block *ethtypes.BlockRLPProxy) *rlp.Fields {
-	return &rlp.Fields{
-		Required: []any{
-			&block.Header,
-			&block.Txs,
-			&block.Uncles,
-			&b.Version,
-			&b.ExtData,
-		},
-	}
+	m["blockExtraData"] = extData
 }
 
 func BlockExtData(b *ethtypes.Block) []byte {
@@ -164,6 +141,11 @@ func BlockTime(eth *ethtypes.Header) time.Time {
 	return time.Unix(int64(eth.Time), 0)
 }
 
+// TODO(JonathanOppenheimer): take options instead of the positional
+// arguments, most of which are frequently nil/zero at call sites.
+//
+// Note: this code will get deleted but we may bring a simiar helper into
+// SAE.
 func NewBlockWithExtData(
 	header *ethtypes.Header, txs []*ethtypes.Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt,
 	hasher ethtypes.TrieHasher, extdata []byte, recalc bool,

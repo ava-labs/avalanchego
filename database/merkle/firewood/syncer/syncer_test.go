@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -89,8 +90,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestGetProofHandler(t, serverDB)),
 	)
 	require.NoError(t, err)
 
@@ -156,7 +156,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
-	rangeProofHandler := synctest.NewCounterHandler(NewGetRangeProofHandler(serverDB), func() {
+	proofHandler := synctest.NewCounterHandler(newTestGetProofHandler(t, serverDB), func() {
 		err := syncer.UpdateSyncTarget(wantRoot)
 		if err != nil {
 			cancel(err)
@@ -166,8 +166,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		Config{},
 		clientDB,
 		firstRoot,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, proofHandler),
 	)
 	require.NoError(t, err)
 
@@ -348,4 +347,12 @@ func logDiff(t *testing.T, wantDB, gotDB *ffi.Database) {
 	t.Logf("want db had %d keys, got db had %d keys", wantCount, gotCount)
 	assert.NoError(t, wantIter.Err())
 	assert.NoError(t, gotIter.Err())
+}
+
+func newTestGetProofHandler(t *testing.T, db *ffi.Database) *sync.ProofHandler[*RangeProof, struct{}] {
+	t.Helper()
+
+	handler, err := NewGetProofHandler(db, prometheus.NewRegistry())
+	require.NoError(t, err, "NewGetProofHandler()")
+	return handler
 }

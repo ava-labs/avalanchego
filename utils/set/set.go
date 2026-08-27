@@ -31,6 +31,15 @@ func Of[T comparable](elts ...T) Set[T] {
 	return s
 }
 
+// UnionOf returns a new Set that is the union of the provided sets.
+func UnionOf[T comparable](sets ...Set[T]) Set[T] {
+	var s Set[T]
+	for _, set := range sets {
+		s.Union(set)
+	}
+	return s
+}
+
 // Return a new set with initial capacity [size].
 // More or less than [size] elements can be added to this set.
 // Using NewSet() rather than Set[T]{} is just an optimization that can

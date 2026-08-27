@@ -2,15 +2,45 @@
 
 ## Pending (v1.14.3)
 
+### Config
+
+- Added `api-resolve-pending-to-last-executed` for SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
+
 ### Metrics
 
-- Renamed Coreth and Subnet-EVM state-sync p2p metrics (`{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains):
+- Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+- Added SAE execution-pressure metrics:
+  - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
+  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including the state commit and post-execution work.
+  - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet completed execution, being their transaction gas limits plus end-of-block operation gas.
+  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks, transaction gas used plus end-of-block operation gas.
+  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative worst-case gas of executed blocks.
+- Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
+- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative worst-case gas of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+- Added SAE gas-time and pricing metrics:
+  - `avalanche_{vmName}_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
+  - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
+  - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest executed block.
+  - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess simulated for the latest executed block.
+  - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest executed block.
+- Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
+- Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
   - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
+- Added Firewood state-sync proof metrics, labeled by `proof_type="range|change"`; the duration histograms are additionally labeled by `result="success|failure"`:
+  - Server-side histograms: `avalanche_{vmName}_sync_server_sync_proof_generation_seconds`, `avalanche_{vmName}_sync_server_sync_generated_proof_size_bytes`, and `avalanche_{vmName}_sync_server_sync_proof_shrink_new_key_limit`
+  - Client-side histograms: `avalanche_{vmName}_sync_firewood_sync_proof_verification_seconds`, `avalanche_{vmName}_sync_firewood_sync_proof_commit_seconds`, and `avalanche_{vmName}_sync_firewood_sync_received_proof_size_bytes`
+  - Client-side gauge: `avalanche_{vmName}_sync_firewood_sync_request_key_limit`
+
+NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
+- Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 

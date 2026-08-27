@@ -5,11 +5,11 @@ package rpc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
 
@@ -18,7 +18,7 @@ import (
 )
 
 func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	receipts, _, err := b.getReceipts(rpc.BlockNumberOrHashWithHash(hash, false))
+	receipts, _, err := b.getReceipts(ctx, rpc.BlockNumberOrHashWithHash(hash, true /* canonical */))
 	if err != nil {
 		return nil, nil //nolint:nilerr // This follows geth behavior for [ethapi.Backend.GetReceipts]
 	}
@@ -28,34 +28,13 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // getReceipts resolves receipts and the underlying [types.Block] by number or
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
-func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
-	blk, err := readByNumberOrHash(
-		b,
-		numOrHash,
-		func(b *blocks.Block) *blocks.Block {
-			return b
-		},
-		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
-			if num > b.LastExecuted().Height() {
-				return nil, blocks.ErrNotFound
-			}
-			blk, err := blocks.New(rawdb.ReadBlock(db, h, num), nil, nil, b.Logger())
-			if err != nil {
-				return nil, err
-			}
-			if err := blk.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
-				return nil, err
-			}
-			return blk, nil
-		},
-	)
+func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
+	blk, err := b.restoreExecutedBlock(ctx, numOrHash)
 	switch {
-	case err != nil:
-		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
-		// this is a "real" error, not just [blocks.ErrNotFound].
-		return nil, nil, err
-	case blk == nil || !blk.Executed():
+	case errors.Is(err, blocks.ErrNotFound):
 		return nil, nil, nil
+	case err != nil:
+		return nil, nil, err
 	default:
 		return blk.Receipts(), blk.EthBlock(), nil
 	}
@@ -69,7 +48,7 @@ type blockChainAPI struct {
 // GetBlockReceipts overrides [ethapi.BlockChainAPI.GetBlockReceipts] to avoid
 // returning an error when a user queries a known, but not yet executed, block.
 func (b *blockChainAPI) GetBlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]map[string]any, error) {
-	receipts, blk, err := b.b.getReceipts(blockNrOrHash)
+	receipts, blk, err := b.b.getReceipts(ctx, blockNrOrHash)
 	if err != nil || blk == nil {
 		return nil, nil //nolint:nilerr // This follows geth behavior for [ethapi.BlockChainAPI.GetBlockReceipts]
 	}

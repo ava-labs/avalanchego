@@ -49,6 +49,7 @@ var (
 	ErrNoPendingBlocks           = errors.New("no pending blocks")
 	errMissingPreferredState     = errors.New("missing preferred block state")
 	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
+	errUnexpectedStakerTxType    = errors.New("unexpected staker transaction type")
 )
 
 type Builder interface {
@@ -323,7 +324,12 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		stakerTx, _, err := parentState.GetTx(stakerTxID)
+		if err != nil {
+			return nil, fmt.Errorf("getting staker tx: %w", err)
+		}
+
+		rewardValidatorTx, err := newRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
@@ -608,7 +614,7 @@ func executeTx(
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
-// set with a RewardValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
+// set with a [txs.RewardValidatorTx]/[txs.RewardAutoRenewedValidatorTx] rather than an [txs.AdvanceTimeTx]. [chainTimestamp]
 // is the timestamp of the chain at the time this validator would be getting
 // removed and is used to calculate [shouldReward].
 // Returns:
@@ -644,6 +650,37 @@ func getNextStakerToReward(
 
 func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
+}
+
+// newRewardTxForStaker returns the reward tx appropriate for the given staker.
+// Only validators added with an [txs.AddAutoRenewedValidatorTx] can be
+// auto-renewed, and thus are rewarded with a [txs.RewardAutoRenewedValidatorTx];
+// all other stakers are rewarded with a [txs.RewardValidatorTx].
+func newRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
+	switch utx := stakerTx.Unsigned.(type) {
+	case *txs.AddAutoRenewedValidatorTx:
+		return newRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
+	case *txs.AddValidatorTx,
+		*txs.AddDelegatorTx,
+		*txs.AddPermissionlessValidatorTx,
+		*txs.AddPermissionlessDelegatorTx:
+		return NewRewardValidatorTx(ctx, stakerTx.ID())
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, utx)
+	}
+}
+
+// newRewardAutoRenewedValidatorTx returns a signed
+// [txs.RewardAutoRenewedValidatorTx] for the staker with the given txID. The
+// timestamp disambiguates reward txs across cycles, since an auto-renewed
+// validator keeps the same txID.
+func newRewardAutoRenewedValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
+	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err
