@@ -49,11 +49,10 @@ func IfInField[Struct, Field any](tb testing.TB, fieldName string, opt cmp.Optio
 		tb.Fatalf("Type %T does not contain field %q of type %T to filter cmp.Option", s, fieldName, f)
 	}
 
+	step := "." + fieldName
 	return cmp.FilterPath(
 		func(p cmp.Path) bool {
-			step := "." + fieldName
 			inType := false
-
 			for _, s := range p {
 				if inType && s.String() == step {
 					return true
