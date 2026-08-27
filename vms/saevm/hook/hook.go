@@ -258,6 +258,44 @@ type Settled struct {
 	Excess       gas.Gas
 }
 
+// NewSettled returns the settlement marker encoded by the given header-extra
+// pointers, or the zero value (indicating synchronous, pre-SAE execution)
+// when any pointer is nil. It is the inverse of [Settled.AsPointers], letting
+// chains with different header-extra types share one [Points.SettledBy]
+// implementation.
+func NewSettled(height, gasUnix, gasNumerator, excess *uint64) Settled {
+	if height == nil || gasUnix == nil || gasNumerator == nil || excess == nil {
+		return Settled{}
+	}
+	return Settled{
+		Height:       *height,
+		GasUnix:      *gasUnix,
+		GasNumerator: gas.Gas(*gasNumerator),
+		Excess:       gas.Gas(*excess),
+	}
+}
+
+// AsPointers returns pointers to copies of s's fields, for stamping into
+// chain-specific header extras in [BlockBuilder.BuildBlock]. It is the
+// inverse of [NewSettled].
+func (s Settled) AsPointers() (height, gasUnix, gasNumerator, excess *uint64) {
+	return &s.Height, &s.GasUnix, (*uint64)(&s.GasNumerator), (*uint64)(&s.Excess)
+}
+
+// BlockTimeFrom combines a header's whole-second timestamp with its optional
+// millisecond refinement, implementing the [Points.BlockTime] contract: the
+// whole-second value is authoritative and the millisecond field only refines
+// it below the second, so the two can never disagree on which second a block
+// belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
+func BlockTimeFrom(seconds uint64, milliseconds *uint64) time.Time {
+	var subSecondNanos int64
+	if milliseconds != nil {
+		subSecondNanos = int64(*milliseconds%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
+	}
+	return time.Unix(int64(seconds), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
+}
+
 // Synchronous reports whether the header is that of a synchronously executed
 // (pre-SAE) block.
 func Synchronous(h Points, hdr *types.Header) bool {

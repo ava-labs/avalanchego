@@ -5,7 +5,6 @@ package cchain
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -23,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
+
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -164,20 +165,10 @@ func (c config) networkOptions() []network.Option {
 	}
 }
 
-var errParsingWarpMessage = errors.New("parsing warp message")
-
 // WarpMessages parses and returns the messages encoded in
 // [config.WarpOffChainMessages].
 func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
-	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
-	for i, bytes := range c.WarpOffChainMessages {
-		msg, err := warp.ParseUnsignedMessage(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
-		}
-		msgs[i] = msg
-	}
-	return msgs, nil
+	return saewarp.ParseOffChainMessages(c.WarpOffChainMessages)
 }
 
 // desiredParams bundles this node's votes for the dynamic consensus

@@ -14,18 +14,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
 
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -34,17 +30,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/database"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook"
@@ -55,8 +47,10 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	sharedwarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	libevmcommon "github.com/ava-labs/libevm/common"
 )
@@ -79,7 +73,7 @@ type VM struct {
 
 	validators *validators.Manager
 
-	preference       atomic.Pointer[blocks.Block]
+	closed           atomic.Bool
 	lastWaitForEvent utils.Atomic[time.Time]
 }
 
@@ -96,10 +90,6 @@ func New() *VM {
 	return &VM{}
 }
 
-const warpSignatureCacheSize = 512
-
-var ethDBPrefix = []byte("ethdb")
-
 // Initialize initializes the VM.
 func (v *VM) Initialize(
 	ctx context.Context,
@@ -110,7 +100,14 @@ func (v *VM) Initialize(
 	configBytes []byte,
 	_ []*common.Fx,
 	appSender common.AppSender,
-) error {
+) (retErr error) {
+	// Release every resource of a partially-failed initialization.
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, v.Shutdown(ctx))
+		}
+	}()
+
 	snowCtx.Log.Info("parsing user config")
 
 	userConfig, err := ParseConfig(configBytes)
@@ -149,10 +146,7 @@ func (v *VM) Initialize(
 		Now:           v.clock.Time,
 	}
 
-	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
-	// This meant that the database's prefix was not compacted, because the
-	// provided database was wrapped by the rpcchainvm.
-	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
+	db := saetypes.NewChainEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log))
 
 	snowCtx.Log.Info("parsing genesis")
@@ -240,25 +234,11 @@ func (v *VM) Initialize(
 	}
 	v.toClose = append(v.toClose, closerFunc(v.validators.Shutdown))
 
-	snowCtx.Log.Info("registering subnetevm metrics")
-
-	metrics := prometheus.NewRegistry()
-	if err := snowCtx.Metrics.Register("subnetevm", metrics); err != nil {
-		return fmt.Errorf("failed to register metrics: %w", err)
-	}
-
 	snowCtx.Log.Info("warp handlers")
 
-	{ // ==========  Warp Handler  ==========
-		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage, v.validators.Tracker())
-		warpHandler := acp118.NewCachedHandler(
-			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
-			warpVerifier,
-			snowCtx.WarpSigner,
-		)
-		if err := v.Network.AddHandler(acp118.HandlerID, warpHandler); err != nil {
-			return fmt.Errorf("network.AddHandler(warp): %w", err)
-		}
+	warpVerifier := saewarp.NewVerifier(inner, warpStorage, v.validators.Tracker())
+	if err := sharedwarp.RegisterHandler(v.Network, warpVerifier, snowCtx.WarpSigner); err != nil {
+		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
 	snowCtx.Log.Info("initialized saevm")
@@ -392,15 +372,6 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 	return m, nil
 }
 
-func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
-	b, err := v.GetBlock(ctx, id)
-	if err != nil {
-		return err
-	}
-	v.preference.Store(b)
-	return v.VM.SetPreference(ctx, id, bCtx)
-}
-
 // Connected forwards to the embedded [network.Network] AFTER notifying the
 // validators manager.
 func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Application) error {
@@ -436,8 +407,6 @@ func (v *VM) SetState(ctx context.Context, state snow.State) error {
 // Prevent busy looping when the chain is more advanced than the mempool.
 const waitForEventDelay = 100 * time.Millisecond
 
-var errNoPreference = errors.New("no preferred block")
-
 // WaitForEvent waits for the next event from the VM.
 func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	// Avoid busy looping if we seem like we are ready to build a block, but are
@@ -458,12 +427,7 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 
 	// Wait until we are allowed to build a block.
 	{
-		parent := v.preference.Load()
-		if parent == nil {
-			return 0, errNoPreference
-		}
-
-		minTime := minNextBlockTime(parent.Header())
+		minTime := minNextBlockTime(v.VM.GetPreference().Header())
 		select {
 		case <-ctx.Done():
 			return 0, ctx.Err()
@@ -486,42 +450,27 @@ func minNextBlockTime(h *types.Header) time.Time {
 	mde := *e.MinDelayExcess
 	// delay excess is already verified by consensus so this can not overflow.
 	delay := time.Duration(mde.Delay()) * time.Millisecond
-	return customtypes.BlockTime(h).Add(delay)
+	return saehook.BlockTimeFrom(h.Time, e.TimeMilliseconds).Add(delay)
 }
 
+// Shutdown releases every resource allocated by [VM.Initialize] in reverse
+// order. It is idempotent and safe to call after a partially-failed
+// [VM.Initialize].
 func (v *VM) Shutdown(ctx context.Context) error {
+	if v.closed.Swap(true) {
+		return nil
+	}
 	errs := make([]error, 0)
 	for _, c := range slices.Backward(v.toClose) {
 		if err := c.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
+	v.toClose = nil
 	if v.VM != nil {
 		if err := v.VM.Shutdown(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
-}
-
-// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
-type blockClient struct {
-	vm *sae.VM
-}
-
-var _ sharedwarp.Backend = (*blockClient)(nil)
-
-func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
-	b, err := c.vm.GetBlock(ctx, blockID)
-	if err != nil {
-		return err
-	}
-	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
-	if err != nil {
-		return err
-	}
-	if acceptedID != blockID {
-		return avadb.ErrNotFound
-	}
-	return nil
 }

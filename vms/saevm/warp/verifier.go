@@ -41,11 +41,12 @@ func NewVerifier(backend Backend, storage *Storage, addressedCall AddressedCallV
 	}
 }
 
-// Backend that the [Verifier] depends on to look for accepted blocks.
+// Backend that the [Verifier] depends on to look for accepted blocks. It is
+// satisfied by [sae.VM].
 type Backend interface {
-	// IsAccepted returns a non-nil error if the block with the given ID is not
-	// accepted.
-	IsAccepted(ctx context.Context, blockID ids.ID) error
+	// IsAcceptedBlock returns a non-nil error if the block with the given ID
+	// is not accepted.
+	IsAcceptedBlock(ctx context.Context, blockID ids.ID) error
 }
 
 // An AddressedCallVerifier decides whether this node should sign a
@@ -92,7 +93,7 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 
 	switch p := p.(type) {
 	case *payload.Hash:
-		if err := v.backend.IsAccepted(ctx, p.Hash); err != nil {
+		if err := v.backend.IsAcceptedBlock(ctx, p.Hash); err != nil {
 			return &common.AppError{
 				Code:    NotAcceptedErrCode,
 				Message: "block not marked as accepted: " + err.Error(),

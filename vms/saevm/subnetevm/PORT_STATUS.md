@@ -25,7 +25,7 @@ Reference documents (read before changing anything):
 - [x] 3. cchain green: all `vms/saevm/...` (minus subnetevm) +
       `vms/transitionvm` unit tests pass
 - [x] 4. subnetevm green: all `vms/saevm/subnetevm/...` unit tests pass
-- [ ] 5. Duplication audit done + hoists landed (see "Duplication audit"
+- [x] 5. Duplication audit done + hoists landed (see "Duplication audit"
       below); tests still green
 - [ ] 6. Full validation: `task test-unit`, `task test-e2e-warp-sae`, and the
       pre-existing C-Chain e2e suite pass
@@ -236,27 +236,88 @@ Server()` all exist on master. Re-add only what's genuinely missing (e.g.
 `VM.RPCServer()` accessor if absent, `sae.ErrHashMismatch` export used by
 subnetevm's forged-header tests).
 
-## Duplication audit (milestone 5) — targets noted during recon
+## Duplication audit (milestone 5) — findings and outcomes
 
-Recorded now so the audit doesn't rediscover them:
+A systematic file-level comparison of `vms/saevm/cchain/**` vs
+`vms/saevm/subnetevm/**` (line-intersection assisted). Bar for hoisting:
+literal/near-literal copies, or differences reducing cleanly to an extension
+point.
 
-- **Warp**: on the spike, `cchain/warp/{storage,predicates,precompile_accept}.go`
-  and the subnetevm copies differ by <10 lines each. Master restructured
-  cchain/warp (`warp.go`, `verifier.go`, `storage.go`, `warptest/`). Target:
-  ONE shared `vms/saevm/warp` used by both VMs; subnet-evm-specific
-  validator-uptime verification (`subnetevm/warp/verifier.go`,
-  `warp/messages`) stays as an extension point.
-- **acp176 helper**: `subnetevm/hook/acp176` vs master's shared
-  `vms/evm/acp176` — likely delete the local copy.
-- **hooks/builder scaffolding**: after the port, diff subnetevm's
-  `hook/points.go`+`block_builder.go` against cchain's `hooks.go` for
-  hoistable chunks (BlockTime, ExecutionResultsDB/blockdb setup are already
-  near-identical).
-- **state packages / config plumbing / plugin wiring / API glue**: audit for
-  the copy-and-tweak pattern; hoist only literal/near-literal copies or
-  clean extension points. No speculative abstractions.
+### Hoisted
 
-Findings land here when milestone 5 executes.
+- **Warp → one shared `vms/saevm/warp`** (the confirmed case). `Storage`
+  (master cchain's shape + an `AddMessage` method matching subnet-evm's
+  `precompileconfig.WarpMessageWriter`), `Verifier` (with an
+  `AddressedCallVerifier` extension point — subnet-evm's validator-uptime
+  attestation handling plugs in; its `UptimeVerifier` + `warp/messages` stay
+  chain-specific), the concurrent block-predicate engine
+  (`VerifyBlockPredicates`, parameterized by a per-chain closure — subnetevm
+  gained concurrency, resolving a spike TODO), `ParseOffChainMessages`
+  (operator warp-message config parsing, previously copied verbatim with its
+  test), and `RegisterHandler` (ACP-118 wiring, cache size 512, previously
+  copied). Chain packages keep genuine glue only: cchain `FromReceipts` +
+  `VerifyBlock` closure; subnetevm `PredicateBytes` closure +
+  `HandlePrecompileAccept` + uptime verifier.
+- **`sae.VM.IsAcceptedBlock`**: the GetBlock → GetBlockIDAtHeight →
+  compare canonicality check was duplicated as cchain's `warpBackend` and
+  subnetevm's `blockClient`; both adapters deleted, `*sae.VM` satisfies the
+  shared warp `Backend` directly.
+- **`hook.NewSettled` / `Settled.AsPointers`**: the settled-marker
+  read/write over the four `*uint64` header-extra fields was byte-identical
+  in both chains (the two `HeaderExtra` types differ, so the quartet of
+  pointers is the abstraction, not the extra struct).
+- **`hook.BlockTimeFrom`**: both chains hand-rolled the identical
+  seconds-authoritative + millisecond-refinement rule. Hoisting also fixed a
+  live inconsistency: subnetevm's `WaitForEvent` pacing used the
+  ms-authoritative `customtypes.BlockTime` while its hooks used the
+  seconds-authoritative rule.
+- **`hook.NewBlockDBExecutionResults`**: identical blockdb-backed
+  `ExecutionResultsDB` implementations; the `Points` method remains as the
+  injection seam.
+- **`types.NewChainEthDB`**: the verbatim-copied "ethdb"-prefix +
+  rpcchainvm-compaction comment block.
+- **`subnetevm/hook/acp176` now delegates to shared `vms/evm/acp176`**: the
+  local math (Target, UpdateTargetExcess, DesiredTargetExcess, constants)
+  was proven value-identical to the shared state machine; only the
+  header-friendly `TargetExcess` value type remains local.
+
+### Copy-and-tweak residue fixed along the way
+
+- subnetevm `Initialize` now rolls back (Shutdown) on failure and `Shutdown`
+  is idempotent, matching cchain's robustness.
+- subnetevm's redundant `preference` tracking (an override of SetPreference
+  plus an atomic pointer) deleted in favor of `sae.VM.GetPreference`.
+- Dead code deleted: subnetevm's empty prometheus registry, and the
+  never-called `HasLastSync`/`WriteLastSync` (`ReadLastSync` kept with a
+  TODO — transition support will reintroduce a writer).
+
+### Kept separate (and why)
+
+- **Genesis handling**: cchain rebuilds its chain config from scratch
+  (hardcoded C-Chain history) and owns block/state writing; subnetevm honors
+  the operator's genesis JSON and delegates to the graft's
+  `core.SetupGenesisBlock`. Two coherent designs; ~0 shared lines.
+- **Operator config**: field sets barely overlap and parse policy is
+  deliberately opposite (cchain tolerates unknown fields; subnetevm rejects
+  them so legacy-only knobs fail loudly).
+- **VM scaffolding**: cchain's two-phase Initialize/finishInitialize exists
+  for state sync (which subnetevm doesn't have); WaitForEvent's tx-race is
+  C-Chain-specific; Shutdown plumbing differs on context propagation.
+- **state/ packages**: cchain's is the atomic-request trie; subnetevm's is a
+  one-key lastSync accessor. Only the name is shared.
+- **factory vs plugin**: in-process factory vs rpcchainvm plugin runner.
+- **api/metrics/log glue**: zero functional overlap.
+
+### Deferred follow-ups (coupled, cross-graft; not required for this port)
+
+- Unify the exponent types: `cchain/dynamic.DelayExponent` duplicates shared
+  `vms/evm/acp226.DelayExcess` verbatim, `cchain/dynamic.TargetExponent` and
+  `subnetevm/hook/acp176.TargetExcess` are the same value under different
+  names. Both graft `customtypes` packages import the harness-local types
+  for header fields, so the move touches both grafts — sequenced separately.
+- A `hook.Points.MinBlockDelayAfter` extension would let the ACP-226
+  block-separation gate and build pacing share one implementation (3 call
+  sites per chain today, in different units).
 
 ## Current state
 
@@ -287,9 +348,9 @@ Notable adaptations beyond the plan:
 
 ### Next action
 
-Milestone 5: duplication audit + hoists (see the target list below), then
-milestone 6 full validation (`task test-unit`, `task test-e2e-warp-sae`,
-C-Chain e2e).
+Milestone 6 full validation: `task test-unit` (the no-race sweep already
+passed repo-wide), `task test-e2e-warp-sae`, and the pre-existing C-Chain
+e2e suite.
 
 ## Decisions log
 

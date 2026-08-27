@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
-	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -84,14 +83,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (saehook.BlockBuilder[*Tx], 
 }
 
 func (p *Points) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	db, err := blockdb.New(
-		blockdb.DefaultConfig().WithDir(dataDir),
-		p.ctx.Log,
-	)
-	if err != nil {
-		return saetypes.ExecutionResults{}, err
-	}
-	return saetypes.ExecutionResults{HeightIndex: db}, nil
+	return saehook.NewBlockDBExecutionResults(dataDir, p.ctx.Log)
 }
 
 // GasConfigAfter derives the gas target and price config in effect after `h`
@@ -148,28 +140,11 @@ func targetExcess(h *types.Header) acp176.TargetExcess {
 // pre-SAE execution) when any of the quartet is missing.
 func (*Points) SettledBy(h *types.Header) saehook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	if he.SettledHeight == nil ||
-		he.SettledGasUnix == nil ||
-		he.SettledGasNumerator == nil ||
-		he.SettledExcess == nil {
-		return saehook.Settled{}
-	}
-	return saehook.Settled{
-		Height:       *he.SettledHeight,
-		GasUnix:      *he.SettledGasUnix,
-		GasNumerator: gas.Gas(*he.SettledGasNumerator),
-		Excess:       gas.Gas(*he.SettledExcess),
-	}
+	return saehook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
 }
 
 func (*Points) BlockTime(h *types.Header) time.Time {
-	var ns int64
-	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
-		ms := *msp % 1000
-		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
-		ns = frac.Nanoseconds()
-	}
-	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
+	return saehook.BlockTimeFrom(h.Time, customtypes.GetHeaderExtra(h).TimeMilliseconds)
 }
 
 var (

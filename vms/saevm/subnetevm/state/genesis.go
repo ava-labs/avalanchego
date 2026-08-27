@@ -10,14 +10,12 @@ import (
 
 var lastSyncKey = prefixdb.MakePrefix([]byte("lastSync"))
 
+// ReadLastSync returns the RLP encoding of the last synchronously executed
+// block, when one was recorded.
+//
+// TODO: nothing writes this key yet; transition support (materializing a
+// legacy chain's tip as the last synchronous block) will reintroduce a
+// writer.
 func ReadLastSync(db database.KeyValueReader) ([]byte, error) {
 	return db.Get(lastSyncKey)
-}
-
-func HasLastSync(db database.KeyValueReader) (bool, error) {
-	return db.Has(lastSyncKey)
-}
-
-func WriteLastSync(db database.KeyValueWriter, b []byte) error {
-	return db.Put(lastSyncKey, b)
 }

@@ -1,66 +1,56 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// ACP176 implements the fee logic specified here:
+// Package acp176 provides the [TargetExcess] gas-target vote carried in
+// subnet-evm SAE header extras, as specified by
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
+//
+// All math delegates to the shared [acp176] state machine; this package only
+// contributes the header-friendly value type.
+//
+// TODO: unify with cchain's `dynamic.TargetExponent`, which is the same value
+// under a different name, once the two chains' header-extra types can share
+// an exponent package.
 package acp176
 
 import (
-	"sort"
-
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 )
 
+// TargetToExcessScaling is the default ratio between the gas target and the
+// reciprocal of the excess coefficient used in price calculation (K = 87 * T,
+// 87 ~= 60 / ln(2)).
+const TargetToExcessScaling = 87
+
+// Re-exports of the shared ACP-176 parameters this VM's callers consume.
 const (
-	MinTargetPerSecond  = 1_000_000 // P
-	ConversionRate      = 1 << 25   // D
-	MaxTargetExcessDiff = 1 << 15   // Q
-
-	maxTargetExcess = 1_024_950_627 // ConversionRate * ln(MaxUint64 / MinTargetPerSecond) + 1
-
-	TargetToExcessScaling = 87 // 87 ~= 60 / ln(2)
-	MinPrice              = 1  // M
+	MinTargetPerSecond  = acp176.MinTargetPerSecond  // P
+	MaxTargetExcessDiff = acp176.MaxTargetExcessDiff // Q
+	MinPrice            = acp176.MinGasPrice         // M
 )
 
+// A TargetExcess determines the gas target via
+// Target = MinTargetPerSecond * e^(TargetExcess / TargetConversion).
 type TargetExcess uint64
 
 // Target returns the target gas per second.
-//
-// Target = MinTargetPerSecond * e^(TargetExcess / ConversionRate)
 func (t TargetExcess) Target() gas.Gas {
-	return gas.Gas(gas.CalculatePrice(
-		MinTargetPerSecond,
-		gas.Gas(t),
-		ConversionRate,
-	))
+	s := acp176.State{TargetExcess: gas.Gas(t)}
+	return s.Target()
 }
 
-// UpdateTargetExcess updates the TargetExcess to be as close as possible to the
-// desiredTargetExcess without changing by more than [MaxTargetExcessDiff].
+// UpdateTargetExcess updates the TargetExcess to be as close as possible to
+// the desiredTargetExcess without changing by more than
+// [acp176.MaxTargetExcessDiff].
 func (t *TargetExcess) UpdateTargetExcess(desiredTargetExcess TargetExcess) {
-	*t = calculateTargetExcess(*t, desiredTargetExcess)
-}
-
-// calculateTargetExcess calculates the optimal new TargetExcess for a block
-// proposer to include given the current and desired excess values.
-func calculateTargetExcess(excess, desired TargetExcess) TargetExcess {
-	change := safemath.AbsDiff(excess, desired)
-	change = min(change, MaxTargetExcessDiff)
-	if excess < desired {
-		return excess + change
-	}
-	return excess - change
+	s := acp176.State{TargetExcess: gas.Gas(*t)}
+	s.UpdateTargetExcess(gas.Gas(desiredTargetExcess))
+	*t = TargetExcess(s.TargetExcess)
 }
 
 // DesiredTargetExcess calculates the optimal target excess given the desired
 // target in gas.
 func DesiredTargetExcess(desired gas.Gas) TargetExcess {
-	// This could be solved directly by calculating D * ln(desired / P)
-	// using floating point math. However, it introduces inaccuracies. So, we
-	// use a binary search to find the closest integer solution.
-	return TargetExcess(sort.Search(int(maxTargetExcess), func(targetExcessGuess int) bool {
-		return TargetExcess(targetExcessGuess).Target() >= desired
-	}))
+	return TargetExcess(acp176.DesiredTargetExcess(desired))
 }

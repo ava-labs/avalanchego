@@ -41,14 +41,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
-	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
@@ -133,16 +132,11 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	db, err := blockdb.New(
-		blockdb.DefaultConfig().WithDir(dataDir),
-		h.ctx.Log,
-	)
+	xdb, err := hook.NewBlockDBExecutionResults(dataDir, h.ctx.Log)
 	if err != nil {
 		return saetypes.ExecutionResults{}, fmt.Errorf("creating execution results db: %w", err)
 	}
-	return saetypes.ExecutionResults{
-		HeightIndex: db,
-	}, nil
+	return xdb, nil
 }
 
 // priceExponent returns h's ACP-283 price exponent, defaulting to
@@ -201,18 +195,7 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	if he.SettledHeight == nil ||
-		he.SettledGasUnix == nil ||
-		he.SettledGasNumerator == nil ||
-		he.SettledExcess == nil {
-		return hook.Settled{}
-	}
-	return hook.Settled{
-		Height:       *he.SettledHeight,
-		GasUnix:      *he.SettledGasUnix,
-		GasNumerator: gas.Gas(*he.SettledGasNumerator),
-		Excess:       gas.Gas(*he.SettledExcess),
-	}
+	return hook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
 }
 
 // BlockTime returns the canonical wall-clock time of a block.
@@ -226,9 +209,7 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 }
 
 func blockTime(h *types.Header) time.Time {
-	ms := customtypes.HeaderTimeMilliseconds(h)
-	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
-	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
+	return hook.BlockTimeFrom(h.Time, customtypes.GetHeaderExtra(h).TimeMilliseconds)
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -583,10 +564,7 @@ func (b *builder) BuildBlock(
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
-	he.SettledHeight = &settled.Height
-	he.SettledGasUnix = &settled.GasUnix
-	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
-	he.SettledExcess = (*uint64)(&settled.Excess)
+	he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess = settled.AsPointers()
 
 	return customtypes.NewBlockWithExtData(
 		header,

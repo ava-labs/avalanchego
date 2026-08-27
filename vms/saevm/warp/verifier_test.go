@@ -25,7 +25,7 @@ type backend set.Set[ids.ID]
 
 var errBlockNotAccepted = errors.New("block not accepted")
 
-func (b backend) IsAccepted(_ context.Context, id ids.ID) error {
+func (b backend) IsAcceptedBlock(_ context.Context, id ids.ID) error {
 	if s := set.Set[ids.ID](b); !s.Contains(id) {
 		return errBlockNotAccepted
 	}

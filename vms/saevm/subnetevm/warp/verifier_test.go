@@ -33,7 +33,7 @@ func newBlocks(ids ...ids.ID) blocks {
 	}
 }
 
-func (b blocks) IsAccepted(_ context.Context, id ids.ID) error {
+func (b blocks) IsAcceptedBlock(_ context.Context, id ids.ID) error {
 	if !b.accepted.Contains(id) {
 		return database.ErrNotFound
 	}

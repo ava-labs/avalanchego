@@ -34,7 +34,6 @@ import (
 
 	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -75,6 +74,7 @@ import (
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"

@@ -101,9 +101,9 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			ParentHash: parent.Hash(),
 			// `Coinbase` is a placeholder; the final value may depend on
 			// settled-state-as-of-build-time (rewardmanager precompile)
-			// which is not in scope here. [BuildBlock] receives the
-			// worst-case state from SAE and overwrites this field before
-			// the block is sealed (see [blockBuilder.resolveCoinbase]).
+			// which is not in scope here. [blockBuilder.FinalizeHeader]
+			// receives the settled state from SAE and overwrites this field
+			// before the block is sealed (see [blockBuilder.resolveCoinbase]).
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
@@ -192,10 +192,7 @@ func (b *blockBuilder) BuildBlock(
 	// Encode the settled marker into the header so [Points.SettledBy] can
 	// recover it.
 	he := customtypes.GetHeaderExtra(header)
-	he.SettledHeight = &settled.Height
-	he.SettledGasUnix = &settled.GasUnix
-	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
-	he.SettledExcess = (*uint64)(&settled.Excess)
+	he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess = settled.AsPointers()
 
 	return types.NewBlock(
 		header,

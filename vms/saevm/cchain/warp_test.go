@@ -28,14 +28,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
-
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // signAndVerifyWarpMessage requests the SUT to sign msg, verifies the
