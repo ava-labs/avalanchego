@@ -23,6 +23,7 @@ go_library(
         "//graft/evm/sync/client",
         "//graft/evm/sync/code",
         "//graft/evm/sync/evmstate",
+        "//graft/evm/sync/leaf",
         "//graft/evm/sync/types",
         "//ids",
         "//network/p2p",
