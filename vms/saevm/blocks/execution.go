@@ -31,11 +31,13 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// SetInterimExecutionTime is expected to be called during execution of b's
+// SwapInterimExecutionTime is expected to be called during execution of b's
 // transactions, with the highest-known gas time. This MAY be at any resolution
 // but MUST be monotonic.
-func (b *Block) SetInterimExecutionTime(t *proxytime.Time[gas.Gas]) {
-	b.interimExecutionTime.Store(t.Clone())
+//
+// The returned old value is typically only useful for testing.
+func (b *Block) SwapInterimExecutionTime(t *proxytime.Time[gas.Gas]) *proxytime.Time[gas.Gas] {
+	return b.interimExecutionTime.Swap(t.Clone())
 }
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
