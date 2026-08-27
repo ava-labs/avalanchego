@@ -26,8 +26,6 @@ import (
 func runSyncRoundTrip(t *testing.T, blocks []block) {
 	t.Helper()
 
-	// The default SUT is backed by *State, so we can reach the unexported
-	// trieDB/currentRoot the syncer operates on.
 	srcSUT := newSUT(t)
 	srcSUT.apply(t, blocks...)
 	src := srcSUT.stateImpl.(*State)
@@ -35,21 +33,16 @@ func runSyncRoundTrip(t *testing.T, blocks []block) {
 	target := src.currentRoot
 	targetHeight := src.CurrentHeight()
 
-	// Serve the source trie to a single in-memory peer at the leaf-request
-	// handler ID that the syncer's getter dials.
 	server := newSyncServer(t, src)
 
 	dstSUT := newSUT(t)
 	dst := dstSUT.stateImpl.(*State)
 	require.NoError(t, server.syncInto(t.Context(), dst, target, targetHeight), "Sync()")
 
-	// The synced tip matches the source.
 	require.Equal(t, targetHeight, dst.CurrentHeight(), "CurrentHeight()")
 	gotRoot, err := dst.GetRoot(targetHeight)
 	require.NoErrorf(t, err, "GetRoot(%d)", targetHeight)
 	require.Equal(t, target, gotRoot, "GetRoot(%d)", targetHeight)
-
-	// Shared memory was applied identically to the source.
 	require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
 }
 
@@ -73,22 +66,6 @@ func (s *syncServer) syncInto(ctx context.Context, dst *State, target common.Has
 	return syncer.Sync(ctx)
 }
 
-type byteReader struct {
-	data []byte
-	pos  int
-}
-
-func (r *byteReader) next() byte {
-	if r.pos >= len(r.data) {
-		return 0
-	}
-	b := r.data[r.pos]
-	r.pos++
-	return b
-}
-
-// TestSyncer_RoundTrip verifies the synced trie matches its source across a
-// handful of representative block layouts.
 func TestSyncer_RoundTrip(t *testing.T) {
 	var build builder
 	tests := []struct {
@@ -120,9 +97,6 @@ func TestSyncer_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestSyncer_BonusBlock verifies that syncing a trie containing leaves at a
-// bonus block height reproduces the source trie exactly, but only applies the
-// bonus height's operations to shared memory when the network is not mainnet.
 func TestSyncer_BonusBlock(t *testing.T) {
 	const (
 		nonBonusHeight uint64 = 102971
@@ -138,11 +112,9 @@ func TestSyncer_BonusBlock(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		networkID uint32
-		// wantBlocks are the blocks whose operations are expected in shared
-		// memory after syncing.
-		wantBlocks []block
+		name       string
+		networkID  uint32
+		wantBlocks []block // expected in shared memory
 	}{
 		{
 			name:       "mainnet_skips_bonus",
@@ -181,6 +153,20 @@ func TestSyncer_BonusBlock(t *testing.T) {
 			require.Equal(t, dbEntries(t, want.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
 		})
 	}
+}
+
+type byteReader struct {
+	data []byte
+	pos  int
+}
+
+func (r *byteReader) next() byte {
+	if r.pos >= len(r.data) {
+		return 0
+	}
+	b := r.data[r.pos]
+	r.pos++
+	return b
 }
 
 // blocksFromBytes decodes a fuzzer byte stream into blocks. The first byte
@@ -228,10 +214,6 @@ func FuzzSyncer(f *testing.F) {
 	})
 }
 
-// TestSyncer_Crash verifies that a crash at any point during a sync is safe: a
-// clean re-run against the same DB (as the engine does after a restart)
-// completes and yields exactly the source's shared memory, never double-applying
-// the non-idempotent shared memory ops.
 func TestSyncer_Crash(t *testing.T) {
 	var build builder
 	blocks := []block{
@@ -256,7 +238,6 @@ func TestSyncer_Crash(t *testing.T) {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			db := memdb.New()
 
-			// Crash run: either hits the injected fault or (rarely) completes.
 			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
 			err := server.syncInto(t.Context(), preCrash.stateImpl.(*State), target, targetHeight)
 			require.ErrorIs(t, err, saetest.ErrInjected, "Sync()")

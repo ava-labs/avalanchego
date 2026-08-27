@@ -6,7 +6,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/ava-labs/libevm/common"
 
@@ -17,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
-// RegisterSyncHandler returns a [p2p.Handler] that serves atomic trie leaves to
-// a [Syncer].
+// RegisterSyncHandler allows the [State] to serve its data to state-syncing
+// peers.
 func RegisterSyncHandler(n *p2p.Network, state *State) error {
 	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength)
 }
@@ -123,7 +122,7 @@ func (t *task) Start() []byte      { return t.start }
 func (*task) End() []byte          { return nil }
 func (*task) Account() common.Hash { return common.Hash{} }
 
-// OnLeaves is called on each batch from the [leaf.Syncer]. All state is queued
+// OnLeafs is called on each batch from the [leaf.Syncer]. All state is queued
 // to be committed for each individual height. Any error returned will be
 // treated as fatal.
 func (t *task) OnLeafs(_ context.Context, keys, vals [][]byte) error {
@@ -147,8 +146,8 @@ func (t *task) OnLeafs(_ context.Context, keys, vals [][]byte) error {
 		}
 
 		t.pendingHeight = height
-		t.pendingKeys = append(t.pendingKeys, slices.Clone(key))
-		t.pendingVals = append(t.pendingVals, slices.Clone(vals[i]))
+		t.pendingKeys = append(t.pendingKeys, key)
+		t.pendingVals = append(t.pendingVals, vals[i])
 		mergeRequests(t.pendingOps, chainID, req)
 	}
 
@@ -156,7 +155,7 @@ func (t *task) OnLeafs(_ context.Context, keys, vals [][]byte) error {
 }
 
 // OnFinish is called after the entire remote trie has been included in
-// [task.OnLeaves]. Any remaining leaves are pushed to disk, as the last
+// [task.OnLeafs]. Any remaining leaves are pushed to disk, as the last
 // block with an atomic op.
 func (t *task) OnFinish(context.Context) error {
 	return t.flush()
