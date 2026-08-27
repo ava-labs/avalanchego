@@ -80,13 +80,6 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		reqPB.AccountHash = req.Account.Bytes()
 	}
 
-	// The request keeps the empty start key to save wire bytes.
-	// [trie.VerifyRangeProof] needs the zero-padded form.
-	startKey := req.Start
-	if len(startKey) == 0 {
-		startKey = c.minKey
-	}
-
 	for {
 		if err := ctx.Err(); err != nil {
 			return Leaves{}, false, err
@@ -102,7 +95,7 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 			continue
 		}
 
-		more, err := verifyRange(req.Root, startKey, req.Limit, &resp)
+		more, err := verifyRange(c.minKey, req, &resp)
 		if err != nil {
 			outcome.Failure()
 			c.log.Debug("invalid leaf response, re-requesting",
@@ -127,15 +120,17 @@ var (
 
 // verifyRange proves that resp holds exactly the trie's leaves from start, and
 // reports whether the trie holds leaves past resp.
-func verifyRange(
-	root common.Hash,
-	start []byte,
-	limit uint16,
-	resp *syncpb.GetLeafResponse,
-) (bool, error) {
+func verifyRange(zero []byte, req LeafRange, resp *syncpb.GetLeafResponse) (bool, error) {
 	keys := resp.GetKeys()
-	if len(keys) > int(limit) {
-		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), limit)
+	if len(keys) > int(req.Limit) {
+		return false, fmt.Errorf("%w: got %d want at most %d", errTooManyLeaves, len(keys), req.Limit)
+	}
+
+	// The request keeps the empty start key to save wire bytes.
+	// [trie.VerifyRangeProof] needs the zero-padded form.
+	start := req.Start
+	if len(start) == 0 {
+		start = zero
 	}
 	if len(keys) > 0 && bytes.Compare(keys[0], start) < 0 {
 		return false, errKeyBeforeStart
@@ -154,7 +149,7 @@ func verifyRange(
 	}
 
 	more, err := trie.VerifyRangeProof(
-		root,
+		req.Root,
 		start,
 		keys,
 		resp.GetValues(),

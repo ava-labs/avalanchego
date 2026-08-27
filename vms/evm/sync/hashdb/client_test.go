@@ -94,6 +94,7 @@ func TestVerifyRange(t *testing.T) {
 	responder := newLeafResponder(t, trieDB)
 
 	const defaultLimit uint16 = 20
+	minKey := make([]byte, common.HashLength)
 	maxKey := slices.Repeat([]byte{0xff}, common.HashLength)
 	tests := []struct {
 		name     string
@@ -198,6 +199,14 @@ func TestVerifyRange(t *testing.T) {
 			},
 			wantErr: errInvalidRangeProof,
 		},
+		{
+			name: "forged_empty_range",
+			tamper: func(resp *syncpb.GetLeafResponse) {
+				resp.Keys = nil
+				resp.Values = nil
+			},
+			wantErr: errInvalidRangeProof,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -217,12 +226,15 @@ func TestVerifyRange(t *testing.T) {
 				tt.tamper(resp)
 			}
 
-			start := tt.start
-			if len(start) == 0 {
-				start = make([]byte, common.HashLength)
-			}
-
-			more, err := verifyRange(root, start, limit, resp)
+			more, err := verifyRange(
+				minKey,
+				LeafRange{
+					Root:  root,
+					Start: tt.start,
+					Limit: limit,
+				},
+				resp,
+			)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Equal(t, tt.wantMore, more)
 		})
