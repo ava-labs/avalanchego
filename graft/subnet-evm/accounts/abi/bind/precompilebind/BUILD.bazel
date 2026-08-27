@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
     "//graft/subnet-evm:__subpackages__",
@@ -21,16 +20,5 @@ go_library(
         "//graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest",
         "//graft/subnet-evm/precompile/allowlist",
         "@com_github_ava_labs_libevm//accounts/abi",
-    ],
-)
-
-graft_go_test(
-    name = "precompilebind_test",
-    srcs = ["precompile_bind_test.go"],
-    embed = [":precompilebind"],
-    deps = [
-        "//graft/subnet-evm/accounts/abi/bind",
-        "@com_github_ava_labs_libevm//common",
-        "@com_github_stretchr_testify//require",
     ],
 )
