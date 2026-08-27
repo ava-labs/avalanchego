@@ -24,18 +24,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// SetInterimExecutionTime is expected to be called during execution of b's
+// SwapInterimExecutionTime is expected to be called during execution of b's
 // transactions, with the highest-known gas time. This MAY be at any resolution
 // but MUST be monotonic.
-func (b *Block) SetInterimExecutionTime(t *proxytime.Time[gas.Gas]) {
-	b.interimExecutionTime.Store(t.Clone())
+//
+// The returned old value is typically only useful for testing.
+func (b *Block) SwapInterimExecutionTime(t *proxytime.Time[gas.Gas]) *proxytime.Time[gas.Gas] {
+	return b.interimExecutionTime.Swap(t.Clone())
 }
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
@@ -252,15 +253,14 @@ var ErrMissingExecutionResults = errors.New("missing execution results for async
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called. Synchronous blocks do not persist
 // execution results, so theirs are inferred from the block itself without
-// consulting the execution-results DB;
-// for asynchronous blocks the results are loaded from the DB. Any failure to
-// obtain the results is reported wrapped in [ErrMissingExecutionResults],
-// alongside the underlying cause.
+// consulting the execution-results DB; for asynchronous blocks the results are
+// loaded from the DB. Any failure to obtain the results is reported wrapped in
+// [ErrMissingExecutionResults], alongside the underlying cause.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
-// appropriate. Because this function breaks this invariant, any consumer
-// SHOULD consider using [RestoreSettledBlock] instead, if possible.
+// appropriate. Because this function breaks this invariant, any consumer SHOULD
+// consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
 func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
@@ -268,9 +268,8 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 		e   *executionResults
 		err error
 	)
-	if hook.Synchronous(b.hooks, b.Header()) {
+	if b.Synchronous() {
 		e, err = b.synchronousExecutionResults()
-		b.synchronous = true
 	} else {
 		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
