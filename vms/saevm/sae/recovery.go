@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -19,14 +20,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -44,7 +43,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.snowCtx.Log)
+	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
@@ -53,6 +52,9 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
 	defer func() {
+		// Unlike elsewhere in this package, the trie database MUST be closed on
+		// both the success and error paths; it is only used to probe for
+		// available state and ownership is never transferred to the caller.
 		retErr = errors.Join(retErr, cache.TrieDB().Close())
 	}()
 
@@ -108,11 +110,27 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	}
 }
 
-// newExecution returns an executor that is ready to execute any child of
-// [recovery.lastCommitted] and an empty map to track consensus-critical blocks.
-// This map will guarantee that a block's settled and post-execution state is
-// available, if the block is executed, as long as it is in the map.
-func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, *syncMap[common.Hash, *blocks.Block], error) {
+// recoverExecutor returns an [sae.Executor] that is ready to execute any child
+// of the last-known accepted block, and a map of all consensus-critical blocks.
+func recoverExecutor(
+	ctx context.Context,
+	db ethdb.Database,
+	xdb saetypes.ExecutionResults,
+	chainConfig *params.ChainConfig,
+	snowCtx *snow.Context,
+	hooks hook.Points,
+	cfg Config,
+	reg prometheus.Registerer,
+) (
+	_ *saexec.Executor,
+	_ *syncMap[common.Hash, *blocks.Block],
+	retErr error,
+) {
+	var closers unwind.Closers
+	defer closers.CloseIfPointsToNonNil(&retErr)
+
+	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
+
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
@@ -129,6 +147,8 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
+	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
+
 	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {
 			tracker.Track(b.SettledStateRoot())
@@ -143,6 +163,7 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 			}
 		},
 	)
+
 	exec, err := saexec.New(
 		lastCommitted,
 		headerSource(consensusCritical, rec.db),
@@ -155,10 +176,15 @@ func (rec *recovery) newExecution(reg prometheus.Registerer) (*saexec.Executor, 
 		reg,
 	)
 	if err != nil {
-		return nil, nil, errors.Join(
-			fmt.Errorf("saexec.New(...): %v", err),
-			tracker.Close(lastCommittedRoot),
-		)
+		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+	}
+	closers.Push(exec)
+
+	if err := rec.executeAllAccepted(ctx, exec); err != nil {
+		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+	}
+	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
+		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
 	return exec, consensusCritical, nil
 }
@@ -228,74 +254,75 @@ func lastOf[E any](s []E) E {
 }
 
 // populateConsensusCriticalBlocks populates bMap with all blocks from the last
-// executed back to, and including, the block that it settled. Said settled
-// block is returned for convenience. bMap MUST be empty and MUST already have
-// its callbacks bound to the executor's state tracker; see [NewVM].
-func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) (lastSettled *blocks.Block, _ error) {
+// executed back to, and including, the block that it settled. bMap MUST be
+// empty and MUST already have its callbacks bound to the executor's state
+// tracker.
+func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
-	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
-
-		for {
-			switch b := lastOf(chain); {
-			case b.Synchronous():
-				return nil
-
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
-				if b.Settled() {
-					return nil
-				}
-				return b.MarkSettled(blackhole)
-
-			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
-				if err != nil {
-					return err
-				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
-					return err
-				}
-				chain = append(chain, parent)
-
-				if !b.Settled() && !parent.Synchronous() {
-					continue
-				}
-				if err := parent.MarkSettled(blackhole); err != nil {
-					return err
-				}
+		end := rec.hooks.SettledBy(settler.Header()).Height
+		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+			if err != nil {
+				return err
 			}
+			chain = append(chain, parent)
 		}
+		return nil
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
-		return nil, err
+		return err
 	}
-	lastSettled = lastOf(chain)
-	for _, b := range chain {
-		bMap.Store(b.Hash(), b)
+	var (
+		critical    = slices.Clone(chain)
+		lastSettled = lastOf(chain)
+		unsettled   = chain[:len(chain)-1]
+	)
+
+	// [recovery.executeAllAccepted] discarded the blocks we've just rebuilt,
+	// but execution artefacts are required for determining worst-case state.
+	for _, b := range critical[1:] { // [0] is [saexec.Executor.LastExecuted]
+		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+			return err
+		}
 	}
 
-	for i, b := range chain[:len(chain)-1] {
+	for i, b := range unsettled {
 		if err := extend(b); err != nil {
-			return nil, err
+			return err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	for _, b := range bMap.m {
+
+	var (
+		settled   = chain[len(unsettled):]
+		blackhole = new(atomic.Pointer[blocks.Block])
+	)
+	for _, b := range settled {
+		if b.Settled() { // e.g. genesis
+			continue
+		}
+		if err := b.MarkSettled(blackhole); err != nil {
+			return err
+		}
+	}
+
+	for _, b := range critical {
+		bMap.Store(b.Hash(), b)
+
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {
 			stage = blocks.Settled
 		}
 		if err := b.CheckInvariants(stage); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return lastSettled, nil
+	return nil
 }

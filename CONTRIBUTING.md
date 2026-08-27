@@ -315,6 +315,10 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 
 - Ask any question about AvalancheGo under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/q-a).
 
+### Do you want to trace a running node?
+
+- AvalancheGo can export OpenTelemetry traces. See the [trace package README](trace/README.md) for how to collect and visualize them.
+
 ### Do you want to contribute to the Avalanche documentation?
 
 - Please check out the `avalanche-docs` repository [here](https://github.com/ava-labs/avalanche-docs).

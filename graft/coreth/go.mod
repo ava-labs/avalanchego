@@ -11,7 +11,7 @@ require (
 	github.com/ava-labs/avalanchego v1.15.0-fuji-rc.6
 	github.com/ava-labs/avalanchego/graft/evm v1.15.0-fuji-rc.6
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20260803133207-db6d70f2748e
+	github.com/ava-labs/libevm v1.13.15-0.20260824194946-80edd419ae21
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/go-cmp v0.7.0
@@ -94,7 +94,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/rpc v1.2.0 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect

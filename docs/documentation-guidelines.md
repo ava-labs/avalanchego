@@ -10,7 +10,7 @@ These guidelines apply to documentation for any repository content whose correct
 use, review, or evolution requires more context than code comments and tests
 alone can provide.
 
-## Index
+## Table of contents
 
 - [Motivation](#motivation)
 - [Definition](#definition)
@@ -356,10 +356,9 @@ still fairly short, a TOC makes the structure visible up front, helps readers
 jump to the part they need, and makes it easier to notice when the document's
 shape has drifted.
 
-A trailing **References** section pointing to the relevant code, tests, and
-related docs is often useful. It makes the links between the document and the
-code explicit, supports the discoverability conventions above, and helps
-reviewers see what parts of the repository the document covers.
+Use an inline link when its text and the surrounding text explain the linked
+material. If readers need more explanation, link to the relevant item in a
+trailing **References** section.
 
 A README near the code can do more than explain usage. It can also preserve
 non-obvious context a future maintainer would otherwise need to reconstruct

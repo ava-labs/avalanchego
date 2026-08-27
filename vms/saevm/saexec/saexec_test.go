@@ -13,6 +13,7 @@ import (
 	"math/rand/v2"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -36,6 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -131,6 +133,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
+		blockstest.WithHooks(sutCfg.hooks),
 	)
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
@@ -484,6 +487,121 @@ func TestEndOfBlockOps(t *testing.T) {
 			t.Errorf("%T.ExecutedByGasTime() diff (-want +got):\n%s", b, diff)
 		}
 	})
+}
+
+func TestExecuteRejectsInvalidOptions(t *testing.T) {
+	_, sut := newSUT(t)
+	b := sut.chain.NewBlock(t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{}),
+	})
+	tests := []struct {
+		name    string
+		opts    []Option
+		wantErr error
+	}{
+		{
+			name:    "excessive transaction count",
+			opts:    []Option{WithMaxNumTxs(2)},
+			wantErr: errTransactionCountOutOfRange,
+		},
+		{
+			name:    "partial end-of-block execution",
+			opts:    []Option{WithMaxNumTxs(0)},
+			wantErr: errPartialEndOfBlockExecution,
+		},
+		{
+			name:    "canonical without end-of-block operations",
+			opts:    []Option{asCanonical(), SkipEndOfBlockOps()},
+			wantErr: errCanonicalWithoutEndOfBlockOps,
+		},
+		{
+			name:    "nil receipt store",
+			opts:    []Option{WithReceiptStore(nil)},
+			wantErr: errNilReceiptStore,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.ErrorIsf(t, err, tt.wantErr, "Execute() with %s options", tt.name)
+		})
+	}
+}
+
+// TestExecuteRecordsOnlyCanonicalProgress verifies that non-canonical execution
+// does not overwrite an in-memory block's canonical progress.
+func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
+	makeTxs := func(t *testing.T, w *saetest.Wallet) types.Transactions {
+		t.Helper()
+		return types.Transactions{w.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &common.Address{},
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		})}
+	}
+
+	tests := []struct {
+		name            string
+		txs             func(*testing.T, *saetest.Wallet) types.Transactions
+		ops             []saehookstest.Op
+		opts            []Option
+		wantInterimTick *gas.Gas // nil implies nil interim execution time, not no tick
+	}{
+		{
+			name:            "non-canonical with transaction and end-of-block operation",
+			txs:             makeTxs,
+			ops:             []saehookstest.Op{{Gas: 1}},
+			wantInterimTick: nil, // not canonical
+		},
+		{
+			name:            "canonical with transaction only",
+			txs:             makeTxs,
+			ops:             nil,
+			opts:            []Option{asCanonical()},
+			wantInterimTick: utils.PointerTo(gas.Gas(params.TxGas)),
+		},
+		{
+			name:            "canonical with end-of-block operation only",
+			txs:             nil,
+			ops:             []saehookstest.Op{{Gas: 1}},
+			opts:            []Option{asCanonical()},
+			wantInterimTick: utils.PointerTo[gas.Gas](1),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t)
+
+			var txs types.Transactions
+			if tt.txs != nil {
+				txs = tt.txs(t, sut.wallet)
+			}
+			withOps := blockstest.WithEthBlockOptions(blockstest.WithOps(tt.ops))
+			b := sut.chain.NewBlock(t, txs, withOps)
+
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.NoError(t, err, "Execute()")
+
+			got := b.SwapInterimExecutionTime(proxytime.Of[gas.Gas](time.Time{}))
+			if tick := tt.wantInterimTick; tick == nil {
+				require.Nilf(t, got, "%T.SwapInterimExecutionTime(...)", b)
+			} else {
+				want := b.ParentBlock().ExecutedByGasTime()
+				want.BeforeBlock(b.PreciseTime())
+				want.Tick(*tick)
+
+				if diff := cmp.Diff(want.Time, got, proxytime.CmpOpt[gas.Gas]()); diff != "" {
+					t.Errorf("%T.SwapInterimExecutionTime(...); diff (-want +got):\n%s", b, diff)
+				}
+			}
+		})
+	}
 }
 
 func TestGasAccounting(t *testing.T) {
