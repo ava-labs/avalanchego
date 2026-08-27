@@ -62,7 +62,7 @@ func (tx *ImportTx) InputIDs() set.Set[ids.ID] {
 func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case len(tx.ImportedInputs) == 0:

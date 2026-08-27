@@ -82,7 +82,7 @@ func (tx *AddDelegatorTx) RewardsOwner() fx.Owner {
 func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}

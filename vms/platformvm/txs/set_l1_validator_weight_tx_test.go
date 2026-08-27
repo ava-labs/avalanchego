@@ -311,7 +311,7 @@ func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
 		{
 			name:        "nil tx",
 			tx:          nil,
-			expectedErr: ErrNilTx,
+			expectedErr: avax.ErrNilTx,
 		},
 		{
 			name: "already verified",

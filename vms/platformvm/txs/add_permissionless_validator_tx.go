@@ -121,7 +121,7 @@ func (tx *AddPermissionlessValidatorTx) Shares() uint32 {
 func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return ErrNilTx
+		return avax.ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.Validator.NodeID == ids.EmptyNodeID:

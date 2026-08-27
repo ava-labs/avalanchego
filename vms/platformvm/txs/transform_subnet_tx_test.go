@@ -669,7 +669,7 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *TransformSubnetTx {
 				return nil
 			},
-			err: ErrNilTx,
+			err: avax.ErrNilTx,
 		},
 		{
 			name: "already verified",

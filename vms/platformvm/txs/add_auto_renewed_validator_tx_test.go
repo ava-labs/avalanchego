@@ -38,7 +38,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			mutate: func(*AddAutoRenewedValidatorTx) *AddAutoRenewedValidatorTx {
 				return nil
 			},
-			want: ErrNilTx,
+			want: avax.ErrNilTx,
 		},
 		{
 			name: "already_verified",
