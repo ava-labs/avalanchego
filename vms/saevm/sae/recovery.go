@@ -259,38 +259,19 @@ func lastOf[E any](s []E) E {
 // tracker.
 func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
-	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
 		end := rec.hooks.SettledBy(settler.Header()).Height
-
-		for {
-			switch b := lastOf(chain); {
-			case b.Synchronous():
-				return nil
-
-			case b.Height() == end:
-				if b.Settled() {
-					return nil
-				}
-				return b.MarkSettled(blackhole)
-
-			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
-				if err != nil {
-					return err
-				}
-				chain = append(chain, parent)
-
-				if b.Settled() || parent.Synchronous() {
-					if err := parent.MarkSettled(blackhole); err != nil {
-						return err
-					}
-				}
+		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+			if err != nil {
+				return err
 			}
+			chain = append(chain, parent)
 		}
+		return nil
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
@@ -314,6 +295,19 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			return err
 		}
 		if err := b.SetAncestors(chain[i+1], lastOf(chain)); err != nil {
+			return err
+		}
+	}
+
+	var (
+		settled   = chain[len(unsettled):]
+		blackhole = new(atomic.Pointer[blocks.Block])
+	)
+	for _, b := range settled {
+		if b.Settled() { // e.g. genesis
+			continue
+		}
+		if err := b.MarkSettled(blackhole); err != nil {
 			return err
 		}
 	}
