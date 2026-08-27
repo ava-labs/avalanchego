@@ -17,11 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  full:
-    name: ${{ matrix.platform_name }}
+  setup:
     strategy:
       fail-fast: false
-      matrix:
+      matrix: &platforms
         include:
           - platform_name: ubuntu-22.04-amd64
             runner: ubuntu-22.04
@@ -33,11 +32,155 @@ jobs:
             runner: ubuntu-24.04-arm
           - platform_name: macos-26-arm64
             runner: macos-26
-    uses: ./.github/workflows/go-ci.yml
-    with:
-      platform_name: ${{ matrix.platform_name }}
-      runner: ${{ matrix.runner }}
-      run_race_shuffle_unit_tests: true
-      run_premerge_jobs: false
-      run_scheduled_e2e_jobs: true
-    secrets: inherit
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          initial_setup: true
+
+  unit-all:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          cache_build_results: false
+          build_cache_scope: all
+      - name: Run all workspace unit tests
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-all-race-shuffle
+
+  unit-avalanchego:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          cache_build_results: false
+          build_cache_scope: avalanchego
+      - name: Run avalanchego unit tests
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-race-shuffle
+        env:
+          TIMEOUT: ${{ env.TIMEOUT }}
+
+  unit-coreth:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/coreth
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          cache_build_results: false
+          build_cache_scope: coreth
+      - run: ../../scripts/run_task.sh test-unit-race-shuffle
+      - run: ../../scripts/run_task.sh coverage
+
+  unit-evm:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          cache_build_results: false
+          build_cache_scope: evm
+      - run: ../../scripts/run_task.sh test-unit-race-shuffle
+      - run: ../../scripts/run_task.sh coverage
+
+  unit-subnet-evm:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+          cache_build_results: false
+          build_cache_scope: subnet-evm
+      - run: ../../scripts/run_task.sh test-unit-race-shuffle
+      - run: ../../scripts/run_task.sh coverage
+
+  setup-e2e:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ matrix.platform_name }}
+      - name: Build race E2E test binaries
+        run: task build-e2e-test-artifacts-race
+      - name: Archive E2E test binaries
+        shell: bash
+        run: tar -czf "$RUNNER_TEMP/e2e-binaries.tar.gz" build/avalanchego build/xsvm build/ginkgo build/e2e.test build/upgrade.test
+      - uses: actions/upload-artifact@v6
+        with:
+          name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.platform_name }}
+          path: ${{ runner.temp }}/e2e-binaries.tar.gz
+          retention-days: 1
+
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    needs: setup-e2e
+    runs-on: ${{ matrix.runner }}
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.platform_name }}
+      - name: Run race-built E2E tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e
+          artifact_prefix: e2e-${{ matrix.platform_name }}
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

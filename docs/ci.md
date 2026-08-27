@@ -253,9 +253,7 @@ four suites' pre-merge lint, generation, image, E2E, load, and upgrade jobs.
 and platform name. Each invocation prepares dependencies once and then runs the
 four module-specific unit suites and one combined workspace suite. The combined
 suite runs beside the module suites so CI can compare their cold and warm costs
-before replacing the four-job fan-out. Its `run_race_shuffle_unit_tests` input
-selects the cacheable or race/shuffle task variant. Its `run_premerge_jobs`
-input prevents pre-merge-only jobs from running on every scheduled platform.
+before replacing the four-job fan-out.
 [`.github/workflows/go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml)
 uses the same runner and platform inputs and fans out the four
 `test-unit-smoke` tasks.
@@ -267,12 +265,11 @@ ARM64. The smoke tests prove that Go can build and run tests on macOS. They do
 not provide full macOS coverage.
 
 [`.github/workflows/ci-scheduled.yml`](../.github/workflows/ci-scheduled.yml)
-is the single daily non-Bazel Go entrypoint. It calls the reusable full workflow
-for Ubuntu 22.04 and 24.04 on AMD64 and ARM64, and for macOS 26 ARM64. Every
-scheduled invocation runs the four module suites and the combined workspace
-suite with race detection and shuffled order. Scheduled workflows stay separate
-from pull-request and merge-group
-workflows so scheduled-only jobs do not appear as skipped checks.
+is the single daily non-Bazel Go entrypoint. It runs on Ubuntu 22.04 and 24.04
+on AMD64 and ARM64, and on macOS 26 ARM64. Every platform runs the four module
+suites, the combined workspace suite, and the race-built E2E suite. Scheduled
+workflows stay separate from pre-merge workflows so scheduled-only jobs do not
+appear as skipped checks.
 
 Each reusable workflow invocation runs its setup jobs before its Go jobs fan out.
 The setup job uses `scripts/download_go_dependencies.sh` to download the
@@ -338,8 +335,7 @@ the full E2E suite with race-built binaries on these platforms:
 - macOS 26 for ARM64
 
 Each scheduled platform builds and uploads its own artifact. Artifacts must
-include the platform name because the scheduled reusable workflow calls run in
-parallel.
+include the platform name because the scheduled platform jobs run in parallel.
 
 The process E2E and Upgrade jobs download the `task` and binary artifacts. They
 call `run-*` tasks. These tasks run tests but do not build binaries. The consumer
@@ -483,9 +479,10 @@ The migration retains these job destinations:
 - Subnet-EVM full workflow: `lint-subnet-evm`, `e2e-warp-subnet-evm`,
   `e2e-load-subnet-evm`, `test-build-image-subnet-evm`, and
   `test-build-antithesis-images-subnet-evm`
-- reusable full workflow: `unit-all`, `unit-avalanchego`, `unit-coreth`,
-  `unit-evm`, and `unit-subnet-evm`, including all four former scheduled
-  matrices
+- pre-merge reusable workflow: `unit-all`, `unit-avalanchego`, `unit-coreth`,
+  `unit-evm`, and `unit-subnet-evm`
+- scheduled workflow: the same five unit jobs with race detection and shuffled
+  order, plus `e2e`
 - reusable smoke workflow: `smoke-avalanchego`, `smoke-coreth`, `smoke-evm`,
   and `smoke-subnet-evm`
 

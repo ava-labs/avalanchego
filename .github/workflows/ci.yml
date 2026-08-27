@@ -30,7 +30,6 @@ jobs:
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
-      run_race_shuffle_unit_tests: false
       run_premerge_jobs: true
     secrets: inherit
 

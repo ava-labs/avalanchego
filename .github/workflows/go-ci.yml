@@ -11,21 +11,11 @@ on:
       runner:
         required: true
         type: string
-      run_race_shuffle_unit_tests:
-        description: 'Run unit tests with race detection and shuffled test order'
-        required: false
-        type: boolean
-        default: false
       run_premerge_jobs:
         description: 'Run lint, generation, image, E2E, load, and upgrade jobs'
         required: false
         type: boolean
         default: true
-      run_scheduled_e2e_jobs:
-        description: 'Run the full race-built E2E suite on a scheduled platform'
-        required: false
-        type: boolean
-        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -47,7 +37,6 @@ jobs:
       - unit-subnet-evm
       - Fuzz
       - e2e
-      - e2e-scheduled
       - e2e_schedule_latest
       - e2e_post_latest
       - e2e_kube
@@ -81,18 +70,13 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
           RUN_PREMERGE_JOBS: ${{ inputs.run_premerge_jobs }}
-          RUN_SCHEDULED_E2E_JOBS: ${{ inputs.run_scheduled_e2e_jobs }}
         run: |
           unexpected_jobs="$(
             jq -r \
               --arg run_premerge_jobs "$RUN_PREMERGE_JOBS" \
-              --arg run_scheduled_e2e_jobs "$RUN_SCHEDULED_E2E_JOBS" \
-              --argjson always_enabled '["setup", "unit-all", "unit-avalanchego", "unit-coreth", "unit-evm", "unit-subnet-evm"]' \
-              --argjson scheduled_e2e '["setup-e2e", "e2e-scheduled"]' '
+              --argjson always_enabled '["setup", "unit-all", "unit-avalanchego", "unit-coreth", "unit-evm", "unit-subnet-evm"]' '
                 to_entries[] as $entry
                 | if ($always_enabled | index($entry.key)) != null then
-                    $entry | select(.value.result != "success")
-                  elif $run_scheduled_e2e_jobs == "true" and ($scheduled_e2e | index($entry.key)) != null then
                     $entry | select(.value.result != "success")
                   elif $run_premerge_jobs == "true" then
                     $entry | select(.value.result != "success")
@@ -149,11 +133,11 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
-          cache_build_results: ${{ !inputs.run_race_shuffle_unit_tests }}
+          cache_build_results: true
           build_cache_scope: all
       - name: Run all workspace unit tests
         shell: bash
-        run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-all-race-shuffle' || 'test-unit-all' }}
+        run: ./scripts/run_task.sh test-unit-all
 
   unit-avalanchego:
     needs: setup
@@ -163,11 +147,11 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
-          cache_build_results: ${{ !inputs.run_race_shuffle_unit_tests }}
+          cache_build_results: true
           build_cache_scope: avalanchego
       - name: Run avalanchego unit tests
         shell: bash
-        run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+        run: ./scripts/run_task.sh test-unit
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
 
@@ -182,9 +166,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
-          cache_build_results: ${{ !inputs.run_race_shuffle_unit_tests }}
+          cache_build_results: true
           build_cache_scope: coreth
-      - run: ../../scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+      - run: ../../scripts/run_task.sh test-unit
       - run: ../../scripts/run_task.sh coverage
 
   unit-evm:
@@ -198,9 +182,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
-          cache_build_results: ${{ !inputs.run_race_shuffle_unit_tests }}
+          cache_build_results: true
           build_cache_scope: evm
-      - run: ../../scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+      - run: ../../scripts/run_task.sh test-unit
       - run: ../../scripts/run_task.sh coverage
 
   unit-subnet-evm:
@@ -214,9 +198,9 @@ jobs:
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
-          cache_build_results: ${{ !inputs.run_race_shuffle_unit_tests }}
+          cache_build_results: true
           build_cache_scope: subnet-evm
-      - run: ../../scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+      - run: ../../scripts/run_task.sh test-unit
       - run: ../../scripts/run_task.sh coverage
 
   Fuzz:
@@ -232,7 +216,7 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
   setup-e2e:
-    if: ${{ inputs.run_premerge_jobs || inputs.run_scheduled_e2e_jobs }}
+    if: ${{ inputs.run_premerge_jobs }}
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -241,7 +225,7 @@ jobs:
         with:
           platform_name: ${{ inputs.platform_name }}
       - name: Build shared E2E test binaries
-        run: task ${{ inputs.run_scheduled_e2e_jobs && 'build-e2e-test-artifacts-race' || 'build-e2e-test-artifacts' }}
+        run: task build-e2e-test-artifacts
       - name: Archive E2E test binaries
         shell: bash
         run: tar -czf "$RUNNER_TEMP/e2e-binaries.tar.gz" build/avalanchego build/xsvm build/ginkgo build/e2e.test build/upgrade.test
@@ -285,33 +269,6 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
-  e2e-scheduled:
-    if: ${{ inputs.run_scheduled_e2e_jobs }}
-    needs: setup-e2e
-    runs-on: ${{ inputs.runner }}
-    env:
-      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
-      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
-      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/use-e2e-artifacts
-        with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
-      - name: Run race-built E2E tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh run-e2e
-          artifact_prefix: e2e-scheduled-${{ inputs.platform_name }}
-          filter_by_owner: avalanchego-e2e
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_schedule_latest:
     if: ${{ inputs.run_premerge_jobs }}
