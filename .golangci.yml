@@ -20,6 +20,9 @@ run:
     - test
 
 issues:
+  # Show only new issues created after git revision master.
+  new-from-rev: master
+
   # Make issues output unique by line.
   uniq-by-line: false
 
@@ -61,7 +64,7 @@ linters:
     - forbidigo
     - goconst
     - gocheckcompilerdirectives
-    # - godoclint
+    - godoclint
     - gocritic
     - goprintffuncname
     - gosec
@@ -139,6 +142,9 @@ linters:
       rules:
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
         - name: bool-literal-in-expr
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#exported
+        - name: exported
           disabled: false
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
         - name: context-as-argument
@@ -254,7 +260,7 @@ linters:
   exclusions:
     generated: lax
     presets:
-      - comments
+      # - comments
       - common-false-positives
       - legacy
       - std-error-handling
