@@ -216,10 +216,11 @@ func (t *stateSync) onMainTrieFinished() error {
 	}
 	t.stats.setTriesRemaining(numStorageTries)
 
-	// mark the main trie done
-	close(t.mainTrieDone)
-	_, err = t.removeTrieInProgress(t.root)
-	return err
+	if _, err := t.removeTrieInProgress(t.root); err != nil {
+		return err
+	}
+	close(t.mainTrieDone) // awakens storage trie producer
+	return nil
 }
 
 // onSyncComplete is called after the account trie and

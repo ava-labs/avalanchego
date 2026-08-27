@@ -350,7 +350,7 @@ func TestLastToSettleAt(t *testing.T) {
 		blocks[24].markExecutedForTests(t, db, xdb, tm)
 
 		partiallyExecutedAt := proxytime.New[gas.Gas](27, 1, 100)
-		blocks[25].SetInterimExecutionTime(partiallyExecutedAt)
+		blocks[25].SwapInterimExecutionTime(partiallyExecutedAt)
 
 		tests = append(tests, testCase{
 			settleAt: 26,
