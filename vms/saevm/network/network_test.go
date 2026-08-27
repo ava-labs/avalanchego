@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestNewTrackedIDs(t *testing.T) {
+func TestWithAllowedTrackedPeers(t *testing.T) {
 	peer := ids.GenerateTestNodeID()
 
 	tests := []struct {
