@@ -29,9 +29,9 @@ if [[ "${XSVM_IMAGE}" == *"/"* ]]; then
   DOCKER_CMD+=("--push")
 fi
 
-# Use head -1 because go workspaces list multiple modules; CI validates
-# all modules use the same Go version.
-GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
+# CI validates that workspace modules use this root Go version. Read the
+# directive instead of invoking Go so prebuilt E2E test jobs need no Go toolchain.
+GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod)"
 
 "${DOCKER_CMD[@]}" --build-arg GO_VERSION="${GO_VERSION}" --build-arg AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_IMAGE}:${image_tag}" \
   -t "${XSVM_IMAGE}" -f ./vms/example/xsvm/Dockerfile .

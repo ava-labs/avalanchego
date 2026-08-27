@@ -198,6 +198,13 @@ tasks:
     desc: Builds xsvm plugin
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm.sh'
 
+  build-e2e-test-artifacts:
+    desc: Builds the Ginkgo, E2E, and upgrade test binaries for CI
+    cmds:
+      - task: build
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} ./scripts/build_e2e_test_artifacts.sh'
+
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm_image.sh'
@@ -519,41 +526,39 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
 
   test-e2e:
-    desc: Runs e2e tests
+    desc: Builds binaries and runs e2e tests
     cmds:
       - task: build
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+      - task: run-e2e
 
   test-e2e-ci:
-    desc: Runs e2e tests in parallel with race detection enabled
+    desc: Builds race binaries and runs e2e tests in parallel
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+      - task: run-e2e
 
   test-e2e-ci-post-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and posts latest activation immediately
+    desc: Builds race binaries and runs e2e tests with immediate latest activation
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
+      - task: run-e2e-post-latest
 
   test-e2e-ci-schedule-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
+    desc: Builds race binaries and runs e2e tests with scheduled latest activation
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m'
+      - task: run-e2e-schedule-latest
 
   test-e2e-existing-ci:
-    desc: Runs e2e tests with an existing network [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
+    desc: Builds race binaries and runs serial E2E network-reuse tests
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}'
+      - task: run-e2e-existing
 
   test-e2e-kube:
     desc: Runs e2e tests against a network deployed to kube
@@ -563,10 +568,32 @@ tasks:
   test-e2e-kube-ci:
     # Free github action runners do not have sufficient resources to reliably run a full e2e run against a kube-hosted network
     desc: Runs the xsvm e2e tests in serial against a network deployed to kube
+    cmds:
+      - task: run-e2e-kube
+
+  run-e2e:
+    desc: Runs E2E tests with existing binaries
+    cmd: 'bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+
+  run-e2e-post-latest:
+    desc: Runs E2E tests with existing binaries and immediate latest activation
+    cmd: 'bash -x ./scripts/tests.e2e.sh --activate-latest-after=0 {{.CLI_ARGS}}'
+
+  run-e2e-schedule-latest:
+    desc: Runs E2E tests with existing binaries and scheduled latest activation
+    cmd: 'bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m {{.CLI_ARGS}}'
+
+  run-e2e-existing:
+    desc: Runs serial E2E network-reuse tests with existing binaries
     env:
       E2E_SERIAL: 1
-    cmds:
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
+    cmd: 'bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}'
+
+  run-e2e-kube:
+    desc: Runs serial Kube E2E tests with an existing test binary
+    env:
+      E2E_SERIAL: 1
+    cmd: 'bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
 
   # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
   # For comprehensive fuzzing, use test-fuzz-long FUZZEXECS=[value].
@@ -673,10 +700,14 @@ tasks:
     cmd: '{{.NIX_RUN}} go test ./ids -run "^TestID$"'
 
   test-upgrade:
-    desc: Runs upgrade tests
+    desc: Builds avalanchego and runs upgrade tests
     cmds:
       - task: build
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
+      - task: run-upgrade
+
+  run-upgrade:
+    desc: Runs upgrade tests with an existing avalanchego binary
+    cmd: 'bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"

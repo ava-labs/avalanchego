@@ -20,6 +20,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Test platforms and test configuration](#test-platforms-and-test-configuration)
+  - [E2E and Upgrade artifact pipeline](#e2e-and-upgrade-artifact-pipeline)
 - [Validation](#validation)
 
 ## Principles
@@ -304,15 +305,42 @@ key has no restore prefix, because a binary built from a different
 `tools/external` or Go version must not be reused. A miss is not a failure;
 `scripts/run_task.sh` still builds `task` itself.
 
-The full workflow runs a second setup job, `setup-blacksmith`. Blacksmith
-runners redirect the Actions cache API to their own colocated cache instead of
-GitHub's backend, so a cache saved on a GitHub-hosted runner is invisible to
-them and vice versa. Without a Blacksmith-side setup job, every Blacksmith job
-misses the dependency cache and downloads its whole module graph. That job uses
-the smallest Blacksmith instance because it only downloads, and it is gated on
-`run_premerge_jobs` because every Blacksmith job in this workflow is pre-merge
-only. When you move a job onto or off a Blacksmith runner, move its `needs`
-between the two setup jobs at the same time.
+The full workflow runs a second setup job, `setup-blacksmith`, for Blacksmith
+jobs that need the Go dependency cache. Blacksmith runners redirect the Actions
+cache API to their colocated cache instead of GitHub's backend. A cache saved on
+a GitHub-hosted runner is not available to those jobs. Without a Blacksmith-side
+setup job, each such job downloads its whole module graph. The job uses the
+smallest Blacksmith instance because it only downloads. It runs only when
+`run_premerge_jobs` is true.
+
+The process E2E jobs are an exception. They run on Blacksmith, but they do not
+use the Blacksmith Go cache. They receive the test artifacts from `setup-e2e`.
+When you move a job onto or off a Blacksmith runner, move its `needs` to the
+setup job that provides its dependencies.
+
+### E2E and Upgrade artifact pipeline
+
+The Go E2E and Upgrade jobs share one set of non-race binaries. This avoids
+building avalanchego, XSVM, Ginkgo, and the E2E test binaries in every test job.
+
+`setup` restores and saves the Go dependency and tool caches. For pre-merge
+runs, it uploads a workflow-local artifact that contains `task`. `setup-e2e`
+restores the Go caches with `setup-go-for-ci`. It builds avalanchego, XSVM,
+Ginkgo, and the E2E and Upgrade test binaries. It uploads these binaries as one
+workflow-local artifact. This build uses the repository Go modules, so it
+continues to test the Go module configuration.
+
+Scheduled runs set `run_premerge_jobs` to false. They skip `setup-e2e`, the E2E
+jobs, and the Upgrade job. They do not upload these artifacts.
+
+The process E2E and Upgrade jobs download the `task` and binary artifacts. They
+call `run-*` tasks. These tasks run tests but do not build binaries. The consumer
+jobs must not use `setup-go-for-ci` or an Actions cache. Keep the build steps in
+`setup-e2e` and keep the test jobs artifact-only.
+
+Do not add race detection to the pre-merge artifact. Pull-request E2E tests use
+standard binaries. If CI needs race E2E tests later, create a separate producer
+and artifact for that configuration.
 
 The `c-chain-reexecution` job runs the C-Chain re-execution benchmark for pull
 requests. It shares this workflow's setup job, so the repository keeps one Go
@@ -405,8 +433,8 @@ When reviewing or changing this implementation:
 
 - keep dependency keys tied to the Go version source, every workspace and tool
   module file, and the dependency-download script and action
-- keep every Blacksmith job on `needs: setup-blacksmith` and every
-  GitHub-hosted job on `needs: setup`; the two caches do not reach each other
+- keep each job that needs a Go dependency cache on the setup job for its
+  runner; process E2E and Upgrade jobs are artifact-only consumers
 - keep `scripts/download_go_dependencies.sh` covering every resolution CI uses:
   the workspace build list in workspace mode, each module's build list with
   `GOWORK=off`, `tools/external`, and the versioned tools in

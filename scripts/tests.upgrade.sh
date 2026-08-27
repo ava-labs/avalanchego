@@ -6,6 +6,7 @@ set -euo pipefail
 # ./scripts/tests.upgrade.sh                                               # Use default version
 # ./scripts/tests.upgrade.sh 1.11.0                                        # Specify a version
 # AVALANCHEGO_PATH=./path/to/avalanchego ./scripts/tests.upgrade.sh 1.11.0 # Customization of avalanchego path
+# GINKGO_PATH=./build/ginkgo UPGRADE_TARGET=./build/upgrade.test ./scripts/tests.upgrade.sh
 if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -31,8 +32,15 @@ AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
 #################################
 # download avalanchego
 # https://github.com/ava-labs/avalanchego/releases
-GOARCH=$(go env GOARCH)
-GOOS=$(go env GOOS)
+case "$(uname -m)" in
+  x86_64) GOARCH=amd64 ;;
+  aarch64|arm64) GOARCH=arm64 ;;
+  *)
+    echo "unsupported architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+GOOS=$(uname -s | tr '[:upper:]' '[:lower:]')
 DOWNLOAD_URL=https://github.com/ava-labs/avalanchego/releases/download/v${VERSION}/avalanchego-linux-${GOARCH}-v${VERSION}.tar.gz
 DOWNLOAD_PATH=/tmp/avalanchego.tar.gz
 if [[ ${GOOS} == "darwin" ]]; then
@@ -65,6 +73,6 @@ source ./scripts/constants.sh
 #################################
 # By default, it runs all upgrade test cases!
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
-./bin/ginkgo -v ./tests/upgrade -- \
+"${GINKGO_PATH:-./bin/ginkgo}" -v "${UPGRADE_TARGET:-./tests/upgrade}" -- \
   --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
   --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"

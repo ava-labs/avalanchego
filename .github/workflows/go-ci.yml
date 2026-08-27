@@ -34,6 +34,7 @@ jobs:
     needs:
       - setup
       - setup-blacksmith
+      - setup-e2e
       - unit-all
       - unit-avalanchego
       - unit-coreth
@@ -110,6 +111,17 @@ jobs:
         with:
           platform_name: ${{ inputs.platform_name }}
           initial_setup: true
+      - name: Archive prebuilt task
+        if: ${{ inputs.run_premerge_jobs }}
+        shell: bash
+        run: tar -czf "$RUNNER_TEMP/ci-task.tar.gz" -C "$HOME/.cache/avalanchego/tool-bin" task
+      - name: Upload prebuilt task
+        if: ${{ inputs.run_premerge_jobs }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-task.tar.gz
+          retention-days: 1
 
   # Blacksmith runners redirect the Actions cache API to their own colocated
   # cache instead of GitHub's backend, so they cannot see anything the `setup`
@@ -220,10 +232,34 @@ jobs:
       - name: test-fuzz
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
+  setup-e2e:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Build shared E2E test binaries
+        run: task build-e2e-test-artifacts
+      - name: Archive E2E test binaries
+        shell: bash
+        run: tar -czf "$RUNNER_TEMP/e2e-binaries.tar.gz" build/avalanchego build/xsvm build/ginkgo build/e2e.test build/upgrade.test
+      - uses: actions/upload-artifact@v6
+        with:
+          name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/e2e-binaries.tar.gz
+          retention-days: 1
+
   e2e:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup-blacksmith
+    needs: setup-e2e
     runs-on: ${{ matrix.os }}
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
     strategy:
       fail-fast: false
       matrix:
@@ -232,13 +268,13 @@ jobs:
         os: [blacksmith-4vcpu-ubuntu-2404]
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci
+          run: task run-e2e
           artifact_prefix: e2e-${{ matrix.os }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -251,19 +287,23 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_schedule_latest:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup-blacksmith
+    needs: setup-e2e
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci-schedule-latest
+          run: task run-e2e-schedule-latest
           artifact_prefix: e2e-schedule-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -276,19 +316,23 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_latest:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup-blacksmith
+    needs: setup-e2e
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci-post-latest
+          run: task run-e2e-post-latest
           artifact_prefix: e2e-post-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -301,16 +345,19 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_kube:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-e2e
     runs-on: ubuntu-24.04
+    env:
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-kube-ci
+          run: task run-e2e-kube
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
@@ -324,17 +371,21 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_existing_network:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-e2e
     runs-on: ubuntu-24.04
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-existing-ci
+          run: task run-e2e-existing
           artifact_prefix: e2e-existing-network
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -346,17 +397,21 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
     if: ${{ inputs.run_premerge_jobs }}
-    needs: setup
+    needs: setup-e2e
     runs-on: ubuntu-24.04
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      UPGRADE_TARGET: ${{ github.workspace }}/build/upgrade.test
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - uses: ./.github/actions/use-e2e-artifacts
         with:
-          platform_name: ${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-upgrade
+          run: task run-upgrade
           artifact_prefix: upgrade
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
