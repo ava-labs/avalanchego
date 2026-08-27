@@ -170,6 +170,36 @@ that script's cleanup.
 
 Do not proceed to Phase 2 OCI rules until this completes.
 
+## Continuation results
+
+On commit `4a503489ae7a35bb0c2738437b041da31a13db51`, the required spike command
+completed successfully:
+
+```bash
+./scripts/nix_run.sh ./scripts/bazel_image_spike.sh
+```
+
+Both the amd64 and arm64 outputs reported the expected stamped commit, the
+expected Debian dynamic loader, and a successful `--version` run in fresh
+`debian:12-slim` containers. In particular, the previously failing amd64 Bazel
+binary ran successfully under Docker/QEMU, so the segfault did not reproduce.
+No bisection changes were made.
+
+A current-checkout Dockerfile amd64 image was also retained temporarily and
+passed the same runtime invocation. Its executable differs from Bazel's
+executable: Bazel links with gold and relro/now flags, uses the Bazel-only
+`nocmpopts` and `prod` tags, and does not expose Go module metadata through
+`go version -m`. These differences are not currently runtime failures.
+
+`task test-build-image` then passed. It built and ran the normal and race
+Dockerfile images for amd64 and arm64 through a local multiarch registry. The
+existing uncommitted `scripts/tests.build_image.sh` changes were preserved.
+
+The runtime-validation gate is now satisfied. Before starting Phase 2, decide
+how the inner builder will give `rules_img`'s `image_load` access to the host
+Docker daemon. The current wrapper does not mount the Docker socket, and the
+load target runs inside the inner-builder container.
+
 ## Working-tree state
 
 At handoff, `git status --short` showed existing user changes plus the work in
