@@ -239,7 +239,21 @@ func TestFillFromSnapshot(t *testing.T) {
 	tr, err := trie.New(trie.TrieID(root), trieDB)
 	require.NoError(t, err)
 
-	leaves := snap.Accounts
+	storageRoot, storageKeys, storageVals := synctest.FillTrie(t, trieDB, numLeaves)
+	storageTrie, err := trie.New(trie.TrieID(storageRoot), trieDB)
+	require.NoError(t, err)
+	storageAccount := common.Hash{0xaa}
+	storagePairs := make([]synctest.Pair, numLeaves)
+	for i := range storagePairs {
+		storagePairs[i] = synctest.Pair{
+			K: storageKeys[i],
+			V: storageVals[i],
+		}
+	}
+	snap.Storage = map[common.Hash][]synctest.Pair{
+		storageAccount: storagePairs,
+	}
+
 	// corrupt replaces the all the values from the pairs with the first value.
 	// It MUST produce well-formed values to avoid skipping snapshot iteration
 	// entirely.
@@ -251,22 +265,25 @@ func TestFillFromSnapshot(t *testing.T) {
 		return out
 	}
 
-	// The snapshot has various inaccuracies and missing values:
+	// The account snapshot has various inaccuracies and missing values:
 	const dropTo = 5*segmentLen + segmentLen/2
+	accounts := snap.Accounts
 	snap.Accounts = slices.Concat(
-		leaves[:segmentLen],                            // [0, 64)    valid
-		corrupt(leaves[segmentLen:2*segmentLen]),       // [64, 128)  corrupt
-		leaves[2*segmentLen:3*segmentLen],              // [128, 192) valid
-		corrupt(leaves[3*segmentLen:4*segmentLen]),     // [192, 256) corrupt
-		leaves[4*segmentLen:4*segmentLen+segmentLen/2], // [256, 288) valid
-		[]synctest.Pair{},                              // [288, 320) missing
-		leaves[dropTo:],                                // [320, 384) valid
+		accounts[:segmentLen],                            // [0, 64)    valid
+		corrupt(accounts[segmentLen:2*segmentLen]),       // [64, 128)  corrupt
+		accounts[2*segmentLen:3*segmentLen],              // [128, 192) valid
+		corrupt(accounts[3*segmentLen:4*segmentLen]),     // [192, 256) corrupt
+		accounts[4*segmentLen:4*segmentLen+segmentLen/2], // [256, 288) valid
+		[]synctest.Pair{},                                // [288, 320) missing
+		accounts[dropTo:],                                // [320, 384) valid
 	)
 
 	minKey := make([]byte, common.HashLength)
 	const earlyEnd = numLeaves - segmentLen/2
 	tests := []struct {
 		name     string
+		snapshot trieSnapshot
+		trie     *trie.Trie
 		r        *leafRange
 		openErr  error
 		iterErr  error
@@ -275,23 +292,38 @@ func TestFillFromSnapshot(t *testing.T) {
 	}{
 		{
 			name:     "bridges_every_divergence",
+			snapshot: accountSnapshot{s: snap},
+			trie:     tr,
 			r:        newLeafRange(minKey, earlyEnd),
 			want:     Leaves{Keys: keys[:earlyEnd], Vals: vals[:earlyEnd]},
 			wantMore: true,
 		},
 		{
-			name: "clean_tail_proves_in_one_shot",
-			r:    newLeafRange(keys[dropTo], numLeaves),
-			want: Leaves{Keys: keys[dropTo:], Vals: vals[dropTo:]},
+			name:     "clean_tail_proves_in_one_shot",
+			snapshot: accountSnapshot{s: snap},
+			trie:     tr,
+			r:        newLeafRange(keys[dropTo], numLeaves),
+			want:     Leaves{Keys: keys[dropTo:], Vals: vals[dropTo:]},
+		},
+		{
+			name:     "storage_trie_proves_in_one_shot",
+			snapshot: storageSnapshot{s: snap, account: storageAccount},
+			trie:     storageTrie,
+			r:        newLeafRange(minKey, numLeaves),
+			want:     Leaves{Keys: storageKeys, Vals: storageVals},
 		},
 		{
 			name:     "unopenable_snapshot_fills_nothing",
+			snapshot: accountSnapshot{s: snap},
+			trie:     tr,
 			r:        newLeafRange(minKey, numLeaves),
 			openErr:  errors.New("snapshot unavailable"),
 			wantMore: true,
 		},
 		{
 			name:     "failing_iterator_fills_nothing",
+			snapshot: storageSnapshot{s: snap, account: storageAccount},
+			trie:     storageTrie,
 			r:        newLeafRange(minKey, numLeaves),
 			iterErr:  errors.New("iteration failed"),
 			wantMore: true,
@@ -303,7 +335,7 @@ func TestFillFromSnapshot(t *testing.T) {
 			snap.OpenErr = test.openErr
 			snap.IterErr = test.iterErr
 
-			more, err := fillFromSnapshot(accountSnapshot{s: snap}, tr, test.r)
+			more, err := fillFromSnapshot(test.snapshot, test.trie, test.r)
 			require.NoError(t, err)
 			got := Leaves{Keys: test.r.keys, Vals: test.r.vals}
 			require.Empty(t, cmp.Diff(test.want, got, cmpopts.EquateEmpty()))
