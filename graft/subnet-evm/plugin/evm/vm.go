@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -702,26 +701,13 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	vm.Network.SetRequestHandler(networkHandler)
 
 	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
-	// parse nodeIDs from state sync IDs in vm config
-	var stateSyncIDs []ids.NodeID
-	if vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
-		nodeIDs := strings.Split(vm.config.StateSyncIDs, ",")
-		stateSyncIDs = make([]ids.NodeID, len(nodeIDs))
-		for i, nodeIDString := range nodeIDs {
-			nodeID, err := ids.NodeIDFromString(nodeIDString)
-			if err != nil {
-				return fmt.Errorf("failed to parse %s as NodeID: %w", nodeIDString, err)
-			}
-			stateSyncIDs[i] = nodeID
-		}
-	}
 
 	syncClient := client.New(
 		&client.Config{
 			Network:          vm.Network,
 			Codec:            vm.networkCodec,
 			Stats:            stats.NewClientSyncerStats(leafMetricsNames),
-			StateSyncNodeIDs: stateSyncIDs,
+			StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
 			BlockParser:      vm,
 		},
 	)
