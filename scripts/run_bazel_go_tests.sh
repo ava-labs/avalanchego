@@ -19,7 +19,8 @@ shift
 
 case "$scope" in
   all)
-    query_scope='//...'
+    query_scope='(//... except //bazel/image/...)'
+    dependency_target_patterns='//... -- -//bazel/image/...'
     ;;
   smoke)
     query_scope='//ids:ids_test'
@@ -40,5 +41,5 @@ done < <(bazelisk query "$query")
   exit 1
 }
 
-export BAZEL_CI_TARGET_PATTERNS="${query_scope}"
+export BAZEL_CI_TARGET_PATTERNS="${dependency_target_patterns:-${query_scope}}"
 exec "$(dirname "${BASH_SOURCE[0]}")/run_bazel_ci_command.sh" test "$@" "${targets[@]}"
