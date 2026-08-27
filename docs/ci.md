@@ -350,10 +350,11 @@ Do not add race detection to the pre-merge artifact. Pull-request E2E tests use
 standard binaries. Scheduled E2E tests use a separate race-built artifact.
 
 The `c-chain-reexecution` job runs the C-Chain re-execution benchmark for pull
-requests. It shares this workflow's setup job, so the repository keeps one Go
-dependency cache instead of two. It sets the benchmark action's
-`manage-go-caches` input to `false`, because two caches that save the same
-directory compete.
+requests. It is a top-level job because it needs `id-token: write` to assume a
+read-only AWS role and download benchmark data from S3. A reusable workflow
+cannot elevate its caller's permissions. The job runs `setup-go-for-ci` itself
+and sets the benchmark action's `manage-go-caches` input to `false`, because two
+caches that save the same directory compete.
 
 The `c-chain-reexecution-benchmark-*` workflows run the other benchmark
 configurations, on dispatch and on a schedule. Those runs keep
