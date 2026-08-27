@@ -50,7 +50,7 @@ func TestNewTrackedIDs(t *testing.T) {
 			net, err := New(
 				snowCtx,
 				&enginetest.Sender{},
-				WithStateSyncIDs(tt.trackedIDs),
+				WithAllowedTrackedPeers(tt.trackedIDs),
 			)
 			require.NoError(t, err, "New()")
 

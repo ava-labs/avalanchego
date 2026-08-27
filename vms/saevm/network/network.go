@@ -27,17 +27,19 @@ var (
 
 // config sets optional parameters for the P2P network.
 type config struct {
-	// stateSyncIDs provides an exclusive list of nodes that will be connected
+	// trackedPeers provides an exclusive list of nodes that will be connected
 	// through the [p2p.PeerTracker] on the [Network].
-	stateSyncIDs set.Set[ids.NodeID]
+	trackedPeers set.Set[ids.NodeID]
 }
 
-// An Option provides overrides to default network behavior
+// An Option provides overrides to default network behavior.
 type Option = options.Option[config]
 
-func WithStateSyncIDs(ids set.Set[ids.NodeID]) Option {
+// WithAllowedTrackedPeers restricts the peers available in the
+// [Network.PeerTracker] to only those in the provided set.
+func WithAllowedTrackedPeers(ids set.Set[ids.NodeID]) Option {
 	return options.Func[config](func(c *config) {
-		c.stateSyncIDs = ids
+		c.trackedPeers = ids
 	})
 }
 
@@ -62,6 +64,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("registering metrics: %w", err)
 	}
+	peers := &p2p.Peers{}
 	const maxValidatorSetStaleness = time.Minute
 	validatorPeers := p2p.NewValidators(
 		snowCtx.Log,
@@ -81,15 +84,15 @@ func New(
 		return nil, fmt.Errorf("creating peer tracker: %w", err)
 	}
 
-	peers := &p2p.Peers{}
+	const namespace = "network"
 	network, err := p2p.NewNetwork(
 		snowCtx.Log,
 		sender,
 		reg,
-		"p2p",
+		namespace,
 		peers,
 		validatorPeers,
-		withFilter(peerTracker, cfg.stateSyncIDs),
+		withFilter(peerTracker, cfg.trackedPeers),
 	)
 	if err != nil {
 		return nil, err

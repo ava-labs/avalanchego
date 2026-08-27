@@ -160,7 +160,7 @@ func (c config) stateSyncConfig() statesync.Config {
 
 func (c config) networkOptions() []network.Option {
 	return []network.Option{
-		network.WithStateSyncIDs(c.StateSyncIDs),
+		network.WithAllowedTrackedPeers(c.StateSyncIDs),
 	}
 }
 
