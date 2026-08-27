@@ -42,11 +42,32 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
-	// TargetExcess and SettledHeight are populated by the SAE block builder
-	// for subnet-evm chains running on top of avalanchego's SAE engine. They
-	// are ignored on legacy (non-SAE) chains.
-	TargetExcess  *acp176.TargetExcess
-	SettledHeight *uint64
+	// TargetExcess and the Settled* fields are populated by the SAE block
+	// builder for subnet-evm chains running on top of avalanchego's SAE
+	// engine. They are ignored on legacy (non-SAE) chains.
+	//
+	// The Settled* quartet encodes the SAE settlement marker (see
+	// hook.Settled): the height of the block settled by this header and the
+	// gas-time coordinates of that block's post-execution state. All four
+	// MUST be set together; a header with any of them missing is treated as
+	// synchronously executed (pre-SAE).
+	TargetExcess        *acp176.TargetExcess
+	SettledHeight       *uint64
+	SettledGasUnix      *uint64
+	SettledGasNumerator *uint64
+	SettledExcess       *uint64
+
+	// The GasConfig* quintet encodes the effective ACP-224 gas configuration
+	// derived from gaspricemanager precompile storage in the settled state,
+	// stamped by the SAE block builder's FinalizeHeader when the precompile
+	// is enabled at the settled timestamp. All five MUST be set together;
+	// their absence means ACP-176 defaults apply. Boolean values are encoded
+	// as 0/1.
+	GasConfigValidatorTargetGas    *uint64
+	GasConfigTargetGas             *uint64
+	GasConfigTargetToExcessScaling *uint64
+	GasConfigMinGasPrice           *uint64
+	GasConfigStaticPricing         *uint64
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -127,10 +148,22 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.TargetExcess
 		cp.TargetExcess = &e
 	}
-	if h.SettledHeight != nil {
-		s := *h.SettledHeight
-		cp.SettledHeight = &s
+	copyUint64Ptr := func(v *uint64) *uint64 {
+		if v == nil {
+			return nil
+		}
+		c := *v
+		return &c
 	}
+	cp.SettledHeight = copyUint64Ptr(h.SettledHeight)
+	cp.SettledGasUnix = copyUint64Ptr(h.SettledGasUnix)
+	cp.SettledGasNumerator = copyUint64Ptr(h.SettledGasNumerator)
+	cp.SettledExcess = copyUint64Ptr(h.SettledExcess)
+	cp.GasConfigValidatorTargetGas = copyUint64Ptr(h.GasConfigValidatorTargetGas)
+	cp.GasConfigTargetGas = copyUint64Ptr(h.GasConfigTargetGas)
+	cp.GasConfigTargetToExcessScaling = copyUint64Ptr(h.GasConfigTargetToExcessScaling)
+	cp.GasConfigMinGasPrice = copyUint64Ptr(h.GasConfigMinGasPrice)
+	cp.GasConfigStaticPricing = copyUint64Ptr(h.GasConfigStaticPricing)
 	SetHeaderExtra(dst, cp)
 }
 
@@ -196,6 +229,14 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
 	h.TargetExcess = (*uint64)(extras.TargetExcess)
 	h.SettledHeight = extras.SettledHeight
+	h.SettledGasUnix = extras.SettledGasUnix
+	h.SettledGasNumerator = extras.SettledGasNumerator
+	h.SettledExcess = extras.SettledExcess
+	h.GasConfigValidatorTargetGas = extras.GasConfigValidatorTargetGas
+	h.GasConfigTargetGas = extras.GasConfigTargetGas
+	h.GasConfigTargetToExcessScaling = extras.GasConfigTargetToExcessScaling
+	h.GasConfigMinGasPrice = extras.GasConfigMinGasPrice
+	h.GasConfigStaticPricing = extras.GasConfigStaticPricing
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -204,6 +245,14 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
 	extras.TargetExcess = (*acp176.TargetExcess)(h.TargetExcess)
 	extras.SettledHeight = h.SettledHeight
+	extras.SettledGasUnix = h.SettledGasUnix
+	extras.SettledGasNumerator = h.SettledGasNumerator
+	extras.SettledExcess = h.SettledExcess
+	extras.GasConfigValidatorTargetGas = h.GasConfigValidatorTargetGas
+	extras.GasConfigTargetGas = h.GasConfigTargetGas
+	extras.GasConfigTargetToExcessScaling = h.GasConfigTargetToExcessScaling
+	extras.GasConfigMinGasPrice = h.GasConfigMinGasPrice
+	extras.GasConfigStaticPricing = h.GasConfigStaticPricing
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -262,25 +311,47 @@ type HeaderSerializable struct {
 
 	// SettledHeight was added by Helicon (SAE) and is ignored in legacy headers.
 	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
+
+	// SettledGasUnix, SettledGasNumerator and SettledExcess complete the SAE
+	// settlement marker (see [HeaderExtra]) and are ignored in legacy headers.
+	SettledGasUnix      *uint64 `json:"settledGasUnix" rlp:"optional"`
+	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
+	SettledExcess       *uint64 `json:"settledExcess" rlp:"optional"`
+
+	// The GasConfig* quintet carries the effective ACP-224 gas configuration
+	// (see [HeaderExtra]) and is ignored in legacy headers.
+	GasConfigValidatorTargetGas    *uint64 `json:"gasConfigValidatorTargetGas" rlp:"optional"`
+	GasConfigTargetGas             *uint64 `json:"gasConfigTargetGas" rlp:"optional"`
+	GasConfigTargetToExcessScaling *uint64 `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
+	GasConfigMinGasPrice           *uint64 `json:"gasConfigMinGasPrice" rlp:"optional"`
+	GasConfigStaticPricing         *uint64 `json:"gasConfigStaticPricing" rlp:"optional"`
 }
 
 // field type overrides for gencodec
 type headerMarshaling struct {
-	Difficulty       *hexutil.Big
-	Number           *hexutil.Big
-	GasLimit         hexutil.Uint64
-	GasUsed          hexutil.Uint64
-	Time             hexutil.Uint64
-	Extra            hexutil.Bytes
-	BaseFee          *hexutil.Big
-	BlockGasCost     *hexutil.Big
-	Hash             common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	BlobGasUsed      *hexutil.Uint64
-	ExcessBlobGas    *hexutil.Uint64
-	TimeMilliseconds *hexutil.Uint64
-	MinDelayExcess   *hexutil.Uint64
-	TargetExcess     *hexutil.Uint64
-	SettledHeight    *hexutil.Uint64
+	Difficulty                     *hexutil.Big
+	Number                         *hexutil.Big
+	GasLimit                       hexutil.Uint64
+	GasUsed                        hexutil.Uint64
+	Time                           hexutil.Uint64
+	Extra                          hexutil.Bytes
+	BaseFee                        *hexutil.Big
+	BlockGasCost                   *hexutil.Big
+	Hash                           common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	BlobGasUsed                    *hexutil.Uint64
+	ExcessBlobGas                  *hexutil.Uint64
+	TimeMilliseconds               *hexutil.Uint64
+	MinDelayExcess                 *hexutil.Uint64
+	TargetExcess                   *hexutil.Uint64
+	SettledHeight                  *hexutil.Uint64
+	SettledGasUnix                 *hexutil.Uint64
+	SettledGasNumerator            *hexutil.Uint64
+	SettledExcess                  *hexutil.Uint64
+	GasConfigValidatorTargetGas    *hexutil.Uint64
+	GasConfigTargetGas             *hexutil.Uint64
+	GasConfigTargetToExcessScaling *hexutil.Uint64
+	GasConfigMinGasPrice           *hexutil.Uint64
+	GasConfigStaticPricing         *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

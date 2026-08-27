@@ -15,7 +15,10 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
@@ -55,13 +58,13 @@ type admitterFixture struct {
 func newAdmitterFixture(t *testing.T, keys *saetest.KeyChain, opts ...admitterOption) *admitterFixture {
 	t.Helper()
 
-	logger := saetest.NewTBLogger(t, logging.Warn)
+	logger := loggingtest.New(t, logging.Warn)
 	config := saetest.ChainConfig()
 	wallet := saetest.NewWalletWithKeyChain(keys, types.LatestSigner(config))
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, xdb, config, saetest.MaxAllocFor(keys.Addresses()...))
+	genesis := blockstest.NewGenesis(t, db, config, saetest.MaxAllocFor(keys.Addresses()...))
 	src := blocks.Source(blockstest.NewChainBuilder(genesis).GetBlock)
 
 	hooks := hookstest.NewStub(1e6)
@@ -69,7 +72,9 @@ func newAdmitterFixture(t *testing.T, keys *saetest.KeyChain, opts ...admitterOp
 		opt(hooks)
 	}
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hooks, logger)
+	tracker, err := saedb.NewTracker(db, saedb.Config{CommitInterval: saedb.DefaultCommitInterval}, genesis.EthBlock().Root(), t.TempDir(), logger)
+	require.NoError(t, err, "saedb.NewTracker()")
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, tracker, hooks, logger, prometheus.NewRegistry())
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)

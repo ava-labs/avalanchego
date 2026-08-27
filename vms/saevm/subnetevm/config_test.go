@@ -162,15 +162,14 @@ func TestConfig_Converters(t *testing.T) {
 	require.InDelta(t, 2.0, rp.TxFeeCap, 0)
 
 	db := c.toDBConfig()
-	require.NotNil(t, db.TrieDBConfig, "saedb.Config.TrieDBConfig must default to triedb.HashDefaults")
 	require.True(t, db.Archival, "PruningEnabled=false => Archival=true")
-	require.Equal(t, uint64(8192), db.TrieCommitInterval)
+	require.Equal(t, uint64(8192), db.CommitInterval)
 
 	// Defaults round-trip through the converter to the legacy-equivalent
 	// SAE state: pruning on (Archival=false), commit interval 4096.
 	d := DefaultConfig().toDBConfig()
 	require.False(t, d.Archival)
-	require.Equal(t, uint64(4096), d.TrieCommitInterval)
+	require.Equal(t, uint64(4096), d.CommitInterval)
 }
 
 func TestConfig_WarpMessages(t *testing.T) {

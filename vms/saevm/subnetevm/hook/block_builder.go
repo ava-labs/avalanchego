@@ -17,8 +17,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -119,7 +121,6 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
-			SettledHeight:    utils.PointerTo[uint64](0), // Populated in FinalizeHeader
 		},
 	), nil
 }
@@ -133,19 +134,36 @@ func (*blockBuilder) PotentialEndOfBlockOps(_ context.Context, _ *types.Header, 
 	return func(_ func(*Tx) bool) {}
 }
 
-// FinalizeHeader stamps the persisted `SettledHeight` field on `header` so
-// downstream hook lookups (e.g. [Points.GasConfigAfter]) can key into the
-// execution-results DB.
+var errZeroStoredGasPriceConfig = errors.New("gaspricemanager enabled but storage is zero")
+
+// FinalizeHeader stamps the header fields that depend on the settled block:
+// the effective ACP-224 gas-config group (read from gaspricemanager storage
+// in the settled state; see [headerGasConfig]) and `header.Coinbase` (see
+// [blockBuilder.resolveCoinbase]). Both gates use `settled.Time` (NOT
+// `header.Time`): a precompile activation `T` is only reflected in
+// `settledState` once a block with `T <= blockTime` has settled; using
+// header.Time would read an uninitialised slot.
 //
-// `Coinbase` is intentionally NOT stamped here: it depends on the
-// settled-state read of the rewardmanager precompile and is therefore
-// resolved at [blockBuilder.BuildBlock] time, where the worst-case state
-// reader is passed in explicitly. This separation keeps `FinalizeHeader` a
-// pure function of the headers it receives.
-func (*blockBuilder) FinalizeHeader(header *types.Header, settled *types.Header) error {
-	settledHeight := settled.Number.Uint64()
-	headerExtra := customtypes.GetHeaderExtra(header)
-	headerExtra.SettledHeight = &settledHeight
+// The gas-config group MUST be stamped here rather than in
+// [blockBuilder.BuildBlock] because SAE's worst-case projection reads it off
+// the header (via [Points.GasConfigAfter]) before BuildBlock runs.
+func (b *blockBuilder) FinalizeHeader(header, settled *types.Header, settledState libevm.StateReader) error {
+	configExtra := subnetevmparams.GetExtra(b.chainConfig)
+	if configExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress, settled.Time) {
+		stored := gaspricemanager.GetStoredGasPriceConfig(settledState, gaspricemanager.ContractAddress)
+		if stored == (commontype.GasPriceConfig{}) {
+			// Activation runs [gaspricemanager.Configure] which always writes
+			// a non-zero config (MinGasPrice > 0), and the only mutator path
+			// also enforces non-zero via [commontype.GasPriceConfig.Verify].
+			// Reaching here therefore indicates corrupt or missing storage at
+			// an activated precompile, which would cause silent divergence if
+			// papered over with defaults.
+			return fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Number)
+		}
+		stampGasConfig(customtypes.GetHeaderExtra(header), gasConfigFromStored(stored))
+	}
+
+	header.Coinbase = b.resolveCoinbase(settled, settledState)
 	return nil
 }
 
@@ -153,19 +171,15 @@ var errEmptyBlock = errors.New("empty block")
 
 func (b *blockBuilder) BuildBlock(
 	header *types.Header,
-	worstcaseState libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	_ []*Tx,
-	settled *types.Header,
+	settled saehook.Settled,
 ) (*types.Block, error) {
 	if len(txs) == 0 {
 		return nil, errEmptyBlock
 	}
-
-	// TODO (ceyonur): consider using settled state vs worstcaseState
-	header.Coinbase = b.resolveCoinbase(settled, worstcaseState)
 
 	rules := b.chainConfig.Rules(header.Number, subnetevmparams.IsMergeTODO, header.Time)
 	rulesExtra := subnetevmparams.GetRulesExtra(rules)
@@ -174,6 +188,14 @@ func (b *blockBuilder) BuildBlock(
 		return nil, fmt.Errorf("generating predicates: %w", err)
 	}
 	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, predicateBytes)
+
+	// Encode the settled marker into the header so [Points.SettledBy] can
+	// recover it.
+	he := customtypes.GetHeaderExtra(header)
+	he.SettledHeight = &settled.Height
+	he.SettledGasUnix = &settled.GasUnix
+	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	he.SettledExcess = (*uint64)(&settled.Excess)
 
 	return types.NewBlock(
 		header,
@@ -192,11 +214,9 @@ func (b *blockBuilder) BuildBlock(
 //     `customCoinbase`.
 //  3. otherwise: the address stored in the precompile's reward address slot.
 //
-// Gates use `settled.Time` (not `header.Time`): a precompile activation
-// `T` is only reflected in `worstcaseState` once a block with
-// `T <= blockTime` has settled. Using header.Time would read an
-// uninitialised slot.
-func (b *blockBuilder) resolveCoinbase(settled *types.Header, worstcaseState libevm.StateReader) common.Address {
+// Gates use `settled.Time` (not `header.Time`): see
+// [blockBuilder.FinalizeHeader].
+func (b *blockBuilder) resolveCoinbase(settled *types.Header, settledState libevm.StateReader) common.Address {
 	configExtra := subnetevmparams.GetExtra(b.chainConfig)
 	if !configExtra.IsPrecompileEnabled(rewardmanager.ContractAddress, settled.Time) {
 		if configExtra.AllowFeeRecipients {
@@ -205,7 +225,7 @@ func (b *blockBuilder) resolveCoinbase(settled *types.Header, worstcaseState lib
 		return constants.BlackholeAddr
 	}
 
-	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(worstcaseState)
+	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(settledState)
 	if allowFeeRecipients {
 		return b.coinbase
 	}

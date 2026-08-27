@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -201,16 +200,15 @@ func (c Config) toRPCConfig() rpc.Config {
 	}
 }
 
-// toDBConfig returns the SAE [saedb.Config] used by the SAE VM. The
-// `*triedb.Config` is always the daemon-default `triedb.HashDefaults`
-// (legacy `state-scheme` / trie-cache-size knobs have no SAE
-// equivalent today). `Archival` is the inverse of [Config.PruningEnabled];
-// `TrieCommitInterval` is taken verbatim from [Config.CommitInterval].
+// toDBConfig returns the SAE [saedb.Config] used by the SAE VM. Only the
+// fields with an operator-facing knob are set (legacy `state-scheme` /
+// trie-cache-size knobs have no SAE equivalent in this VM's config today);
+// the rest take saedb defaults. `Archival` is the inverse of
+// [Config.PruningEnabled]; `CommitInterval` is taken verbatim.
 func (c Config) toDBConfig() saedb.Config {
 	return saedb.Config{
-		TrieDBConfig:       triedb.HashDefaults,
-		Archival:           !c.PruningEnabled,
-		TrieCommitInterval: c.CommitInterval,
+		Archival:       !c.PruningEnabled,
+		CommitInterval: c.CommitInterval,
 	}
 }
 

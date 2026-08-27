@@ -247,8 +247,14 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+func (*hooks) CanExecuteTransaction(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
 	return nil
+}
+
+// RequiresTransactionAdmissionCheck returns false: [hooks.CanExecuteTransaction]
+// never rejects a transaction, so admission paths can skip it entirely.
+func (*hooks) RequiresTransactionAdmissionCheck(params.Rules) bool {
+	return false
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
@@ -425,6 +431,12 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			MinPriceExponent: &pe,
 		},
 	), nil
+}
+
+// FinalizeHeader is a no-op: every header field the C-Chain's hooks read is
+// stamped by [builder.BuildHeader] or [builder.BuildBlock].
+func (*builder) FinalizeHeader(*types.Header, *types.Header, libevm.StateReader) error {
+	return nil
 }
 
 // PotentialEndOfBlockOps returns the cross-chain transactions that should be

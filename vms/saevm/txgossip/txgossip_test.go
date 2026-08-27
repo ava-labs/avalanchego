@@ -122,7 +122,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(exec, pool, gossip.BloomSetConfig{})
+	set, err := NewSet(exec, pool, nil, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)

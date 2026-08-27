@@ -46,7 +46,15 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 	_tmp7 := obj.MinDelayExcess != nil
 	_tmp8 := obj.TargetExcess != nil
 	_tmp9 := obj.SettledHeight != nil
-	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	_tmp10 := obj.SettledGasUnix != nil
+	_tmp11 := obj.SettledGasNumerator != nil
+	_tmp12 := obj.SettledExcess != nil
+	_tmp13 := obj.GasConfigValidatorTargetGas != nil
+	_tmp14 := obj.GasConfigTargetGas != nil
+	_tmp15 := obj.GasConfigTargetToExcessScaling != nil
+	_tmp16 := obj.GasConfigMinGasPrice != nil
+	_tmp17 := obj.GasConfigStaticPricing != nil
+	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -56,7 +64,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BaseFee)
 		}
 	}
-	if _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	if _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.BlockGasCost == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -66,53 +74,109 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BlockGasCost)
 		}
 	}
-	if _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	if _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.BlobGasUsed == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.BlobGasUsed))
 		}
 	}
-	if _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	if _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.ExcessBlobGas == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.ExcessBlobGas))
 		}
 	}
-	if _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	if _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.ParentBeaconRoot == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteBytes(obj.ParentBeaconRoot[:])
 		}
 	}
-	if _tmp6 || _tmp7 || _tmp8 || _tmp9 {
+	if _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.TimeMilliseconds == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.TimeMilliseconds))
 		}
 	}
-	if _tmp7 || _tmp8 || _tmp9 {
+	if _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.MinDelayExcess == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.MinDelayExcess))
 		}
 	}
-	if _tmp8 || _tmp9 {
+	if _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.TargetExcess == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.TargetExcess))
 		}
 	}
-	if _tmp9 {
+	if _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
 		if obj.SettledHeight == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.SettledHeight))
+		}
+	}
+	if _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
+		if obj.SettledGasUnix == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.SettledGasUnix))
+		}
+	}
+	if _tmp11 || _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
+		if obj.SettledGasNumerator == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.SettledGasNumerator))
+		}
+	}
+	if _tmp12 || _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
+		if obj.SettledExcess == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.SettledExcess))
+		}
+	}
+	if _tmp13 || _tmp14 || _tmp15 || _tmp16 || _tmp17 {
+		if obj.GasConfigValidatorTargetGas == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.GasConfigValidatorTargetGas))
+		}
+	}
+	if _tmp14 || _tmp15 || _tmp16 || _tmp17 {
+		if obj.GasConfigTargetGas == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.GasConfigTargetGas))
+		}
+	}
+	if _tmp15 || _tmp16 || _tmp17 {
+		if obj.GasConfigTargetToExcessScaling == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.GasConfigTargetToExcessScaling))
+		}
+	}
+	if _tmp16 || _tmp17 {
+		if obj.GasConfigMinGasPrice == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.GasConfigMinGasPrice))
+		}
+	}
+	if _tmp17 {
+		if obj.GasConfigStaticPricing == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.GasConfigStaticPricing))
 		}
 	}
 	w.ListEnd(_tmp0)

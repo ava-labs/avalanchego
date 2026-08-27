@@ -13,3 +13,7 @@ import saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 type Tx struct{}
 
 func (*Tx) AsOp() saehook.Op { return saehook.Op{} }
+
+// Size returns 0: a [Tx] is never constructed, so it never contributes bytes
+// to a block.
+func (*Tx) Size() uint64 { return 0 }

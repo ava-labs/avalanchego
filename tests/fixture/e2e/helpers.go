@@ -449,10 +449,12 @@ func FindP2PMessage[T any](
 }
 
 // EthClient is the JSON-RPC client surface required by tests/load ([load.Worker],
-// [load.Wallet]) and warp e2e ([subnetValidator].client).
+// [load.Wallet]), warp e2e ([subnetValidator].client), and the C-Chain e2e
+// suite.
 type EthClient interface {
 	simulated.Client
 	EstimateBaseFee(ctx context.Context) (*big.Int, error)
+	AcceptedNonceAt(ctx context.Context, account libevmcommon.Address) (uint64, error)
 }
 
 // ethClient is a wrapper around an ethclient.Client that allows for additional methods
@@ -471,6 +473,17 @@ func (w *ethClient) PendingNonceAt(ctx context.Context, account libevmcommon.Add
 	var result hexutil.Uint64
 	client := w.Client
 	if err := client.Client().CallContext(ctx, &result, "eth_getTransactionCount", account, "pending"); err != nil {
+		return 0, err
+	}
+	return uint64(result), nil
+}
+
+// AcceptedNonceAt mirrors the Avalanche-extended ethclient method of the same
+// name, querying the transaction count at the "accepted" block tag.
+func (w *ethClient) AcceptedNonceAt(ctx context.Context, account libevmcommon.Address) (uint64, error) {
+	var result hexutil.Uint64
+	client := w.Client
+	if err := client.Client().CallContext(ctx, &result, "eth_getTransactionCount", account, "accepted"); err != nil {
 		return 0, err
 	}
 	return uint64(result), nil

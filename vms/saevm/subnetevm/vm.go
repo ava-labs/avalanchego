@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -46,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
@@ -64,7 +64,8 @@ import (
 // method that supports being asynchronous since genesis or after a previously
 // accepted synchronous block.
 type VM struct {
-	*sae.VM // created by [SinceGenesis.Initialize]
+	*sae.VM          // created by [VM.Initialize]
+	*network.Network // created by [VM.Initialize]
 
 	ctx *snow.Context
 
@@ -151,7 +152,7 @@ func (v *VM) Initialize(
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	tdb := triedb.NewDatabase(db, saeConfig.DBConfig.TrieDBConfig)
+	tdb := triedb.NewDatabase(db, saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log))
 
 	snowCtx.Log.Info("parsing genesis")
 
@@ -218,7 +219,12 @@ func (v *VM) Initialize(
 
 	snowCtx.Log.Info("constructing the sae VM")
 
-	inner, err := sae.NewVM(ctx, hooks, saeConfig, snowCtx, config, db, lastSync, appSender)
+	v.Network, err = network.New(snowCtx, appSender)
+	if err != nil {
+		return fmt.Errorf("creating network: %w", err)
+	}
+
+	inner, err := sae.NewVM(ctx, hooks, saeConfig, snowCtx, config, db, v.Network)
 	if err != nil {
 		return err
 	}
@@ -249,7 +255,7 @@ func (v *VM) Initialize(
 			warpVerifier,
 			snowCtx.WarpSigner,
 		)
-		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+		if err := v.Network.AddHandler(acp118.HandlerID, warpHandler); err != nil {
 			return fmt.Errorf("network.AddHandler(warp): %w", err)
 		}
 	}
@@ -376,7 +382,7 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 		return nil, err
 	}
 
-	service := subnetevmapi.NewValidatorsAPI(v.ctx.ValidatorState, v.ctx.SubnetID, v.validators.Tracker(), v.VM.ValidatorPeers)
+	service := subnetevmapi.NewValidatorsAPI(v.ctx.ValidatorState, v.ctx.SubnetID, v.validators.Tracker(), v.Network.ValidatorPeers)
 	handler, err := rpc.NewHandler(validatorsServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", validatorsServiceName, err)
@@ -394,22 +400,22 @@ func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) 
 	return v.VM.SetPreference(ctx, id, bCtx)
 }
 
-// Connected forwards to the embedded `*p2p.Network` (via `*sae.VM`)
-// AFTER notifying the validators manager.
+// Connected forwards to the embedded [network.Network] AFTER notifying the
+// validators manager.
 func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Application) error {
 	if err := v.validators.Connect(nodeID); err != nil {
 		return err
 	}
-	return v.VM.Connected(ctx, nodeID, ver)
+	return v.Network.Connected(ctx, nodeID, ver)
 }
 
-// Disconnected forwards to the embedded `*p2p.Network` (via `*sae.VM`)
-// AFTER notifying the validators manager.
+// Disconnected forwards to the embedded [network.Network] AFTER notifying the
+// validators manager.
 func (v *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := v.validators.Disconnect(nodeID); err != nil {
 		return err
 	}
-	return v.VM.Disconnected(ctx, nodeID)
+	return v.Network.Disconnected(ctx, nodeID)
 }
 
 // SetState forwards to `*sae.VM.SetState` and, on the first transition
