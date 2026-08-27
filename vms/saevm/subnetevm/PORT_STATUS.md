@@ -321,7 +321,7 @@ point.
 
 ## Current state
 
-Milestones 0-4 complete on `JonathanOppenheimer/subnetevm-sae-port`. The
+ALL MILESTONES COMPLETE on `JonathanOppenheimer/subnetevm-sae-port`. The
 merge of `origin/master` (`6c61faba62`) is committed; all four workspace
 modules build; `task lint` passes; all `vms/saevm/...` (incl. subnetevm),
 `vms/transitionvm` unit tests pass. The full subnetevm feature suite is
@@ -330,7 +330,8 @@ allowlists, nativeminter, rewardmanager (incl. forged-coinbase rejection via
 rebuild-hash-mismatch), gaspricemanager (activation transitions,
 pinned-config restart persistence — now via headers rather than the removed
 xdb artifact — settlement lag, validator-target-gas), feemanager retirement,
-state upgrades, and eth extras.
+state upgrades, and eth extras. See "Milestone 6 validation record" for the
+repo-wide and e2e results.
 
 Notable adaptations beyond the plan:
 
@@ -348,9 +349,18 @@ Notable adaptations beyond the plan:
 
 ### Next action
 
-Milestone 6 full validation: `task test-unit` (the no-race sweep already
-passed repo-wide), `task test-e2e-warp-sae`, and the pre-existing C-Chain
-e2e suite.
+All milestones are complete. The branch stays local until Jonathan reviews
+(no push, no PR — per the working agreement). Review focus suggestions:
+
+1. The D1 decision (header-encoded gas config replacing the spike's
+   persisted-artifact design) — see the Decisions log and the milestone-6
+   adversarial-review record.
+2. The public golden-hash update in
+   `graft/subnet-evm/plugin/evm/customtypes/header_ext_test.go` (new
+   optional header tail fields; legacy encodings unchanged).
+3. The deferred follow-ups at the end of the duplication audit (exponent
+   type unification across cchain/dynamic, vms/evm/acp226, and
+   subnetevm/hook/acp176; hook.Points.MinBlockDelayAfter).
 
 ## Milestone 6 validation record
 
@@ -368,6 +378,16 @@ e2e suite.
 - Pre-existing C-Chain e2e suite (`tests/e2e` with
   `--ginkgo.label-filter=c`): PASS 4/4 specs (ProposerVM API, Interchain
   Workflow, Dynamic Fees, ProposerVM Epoch).
+- Bonus: `task test-e2e-warp` (the same suite against the LEGACY subnet-evm
+  plugin): PASS 5/5, confirming the shared warp e2e suite serves both
+  plugins.
+- An adversarial consensus-safety review of the header-encoded gas-config
+  design (worst-case/actual divergence, forged headers, activation windows,
+  genesis determinism, restart recovery, float determinism, ingestion
+  coverage) found no refutation; its non-blocking hardening suggestions were
+  applied (genesisGasConfig gates on IsPrecompileEnabled; RLP
+  present-and-zero decoding documented on the syntax checks; genesis-read
+  constants documented as consensus-critical).
 - CI wiring: the spike's `e2e_warp` / `e2e_warp_sae` jobs were re-expressed
   into master's root `ci.yml` (the merge's master-wins policy had dropped
   the additions while keeping their removal from `subnet-evm-ci.yml`).
