@@ -6,7 +6,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176",
     visibility = ["//visibility:public"],
     deps = [
-        "//utils/math",
         "//vms/components/gas",
+        "//vms/evm/acp176",
     ],
 )
