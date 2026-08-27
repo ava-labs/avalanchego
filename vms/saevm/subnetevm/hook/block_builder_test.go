@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 // TestMain registers libevm extras required by [subnetevmparams.GetExtra]
@@ -57,8 +58,13 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
+	// Any non-zero marker works; it only needs to match on both sides for the
+	// hash-equality assertion.
+	settledMarker := saehook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
-	// Builder side: stamp `builderCoinbase` into a real block.
+	// Builder side: stamp `builderCoinbase` into a real block. The settled
+	// state reader is nil because neither rewardmanager nor gaspricemanager
+	// is enabled, so FinalizeHeader never reads it.
 	builderPts := NewPoints(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
@@ -66,9 +72,9 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	)
 	builderHdr, err := builderPts.blockBuilder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, builderPts.blockBuilder.FinalizeHeader(builderHdr, settled))
+	require.NoError(t, builderPts.blockBuilder.FinalizeHeader(builderHdr, settled, nil))
 	builderBlock, err := builderPts.blockBuilder.BuildBlock(
-		builderHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
+		builderHdr, nil, []*types.Transaction{tx}, nil, nil, settledMarker,
 	)
 	require.NoError(t, err)
 	require.Equal(t, builderCoinbase, builderBlock.Header().Coinbase,
@@ -81,9 +87,9 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled, nil))
 	rebuilt, err := rebuilder.BuildBlock(
-		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
+		rebuiltHdr, nil, []*types.Transaction{tx}, nil, nil, settledMarker,
 	)
 	require.NoError(t, err)
 	require.Equal(t, builderCoinbase, rebuilt.Header().Coinbase,
@@ -129,6 +135,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
+	settledMarker := saehook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
 	// "Builder" forges by skipping resolveCoinbase entirely and stamping
 	// `forgedCoinbase` directly into the header that will be served as the
@@ -151,9 +158,9 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled, nil))
 	rebuilt, err := rebuilder.BuildBlock(
-		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
+		rebuiltHdr, nil, []*types.Transaction{tx}, nil, nil, settledMarker,
 	)
 	require.NoError(t, err)
 

@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -126,7 +127,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	// Test will fail if any error log from libevm, or warn log from SAE, is emitted.
 	// Some warn logs from libevm are expected.
 	log.SetDefault(log.NewLogger(ethtest.NewTBLogHandler(t, log.LevelError)))
-	logger := saetest.NewTBLogger(t, logging.Info)
+	logger := loggingtest.New(t, logging.Info)
 	ctx := logger.CancelOnError(t.Context())
 
 	baseDB := memdb.New()

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -18,10 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -363,8 +361,12 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			forgedHdr.Coinbase = test.forgedCoinbase
 			forgedBlk := honestBlk.WithSeal(forgedHdr)
 
-			forged, err := blocks.New(forgedBlk, nil, nil, saetest.NewTBLogger(t, logging.Warn))
-			require.NoError(t, err)
+			// Round-trip through ParseBlock so the forged block is built by
+			// the VM's own hooks, exactly as a peer-delivered block would be.
+			forgedBytes, err := rlp.EncodeToBytes(forgedBlk)
+			require.NoError(t, err, "rlp.EncodeToBytes(forged block)")
+			forged, err := sut.vm.ParseBlock(sut.ctx, forgedBytes)
+			require.NoError(t, err, "sut.vm.ParseBlock(forged block)")
 
 			err = sut.vm.VerifyBlock(sut.ctx, nil, forged)
 			require.ErrorIs(t, err, sae.ErrHashMismatch,
