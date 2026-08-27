@@ -648,9 +648,9 @@ coverage. A future change will replace the Ubuntu smoke test with a non-smoke
 E2E test. Each setup job checks Bazel metadata and prefetches the full CI
 dependency list.
 
-The scheduled Bazel workflow runs the same focused E2E smoke test on each
-platform. Scheduled unit tests use `--nocache_test_results`. Thus, Bazel reruns
-tests with shuffled order and does not use a cached random test result.
+The scheduled Bazel workflow runs the full E2E suite with race-built binaries
+on each platform. Scheduled unit tests use `--nocache_test_results`. Thus, Bazel
+reruns tests with shuffled order and does not use a cached random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.

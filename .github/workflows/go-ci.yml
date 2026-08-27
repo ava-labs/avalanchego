@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: true
+      run_scheduled_e2e_jobs:
+        description: 'Run the full race-built E2E suite on a scheduled platform'
+        required: false
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,6 +47,7 @@ jobs:
       - unit-subnet-evm
       - Fuzz
       - e2e
+      - e2e-scheduled
       - e2e_schedule_latest
       - e2e_post_latest
       - e2e_kube
@@ -75,13 +81,18 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
           RUN_PREMERGE_JOBS: ${{ inputs.run_premerge_jobs }}
+          RUN_SCHEDULED_E2E_JOBS: ${{ inputs.run_scheduled_e2e_jobs }}
         run: |
           unexpected_jobs="$(
             jq -r \
               --arg run_premerge_jobs "$RUN_PREMERGE_JOBS" \
-              --argjson always_enabled '["setup", "unit-all", "unit-avalanchego", "unit-coreth", "unit-evm", "unit-subnet-evm"]' '
+              --arg run_scheduled_e2e_jobs "$RUN_SCHEDULED_E2E_JOBS" \
+              --argjson always_enabled '["setup", "unit-all", "unit-avalanchego", "unit-coreth", "unit-evm", "unit-subnet-evm"]' \
+              --argjson scheduled_e2e '["setup-e2e", "e2e-scheduled"]' '
                 to_entries[] as $entry
                 | if ($always_enabled | index($entry.key)) != null then
+                    $entry | select(.value.result != "success")
+                  elif $run_scheduled_e2e_jobs == "true" and ($scheduled_e2e | index($entry.key)) != null then
                     $entry | select(.value.result != "success")
                   elif $run_premerge_jobs == "true" then
                     $entry | select(.value.result != "success")
@@ -112,14 +123,14 @@ jobs:
           platform_name: ${{ inputs.platform_name }}
           initial_setup: true
       - name: Archive prebuilt task
-        if: ${{ inputs.run_premerge_jobs }}
+        if: ${{ inputs.run_premerge_jobs || inputs.run_scheduled_e2e_jobs }}
         shell: bash
         run: tar -czf "$RUNNER_TEMP/ci-task.tar.gz" -C "$HOME/.cache/avalanchego/tool-bin" task
       - name: Upload prebuilt task
-        if: ${{ inputs.run_premerge_jobs }}
+        if: ${{ inputs.run_premerge_jobs || inputs.run_scheduled_e2e_jobs }}
         uses: actions/upload-artifact@v6
         with:
-          name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
           path: ${{ runner.temp }}/ci-task.tar.gz
           retention-days: 1
 
@@ -233,22 +244,22 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
   setup-e2e:
-    if: ${{ inputs.run_premerge_jobs }}
+    if: ${{ inputs.run_premerge_jobs || inputs.run_scheduled_e2e_jobs }}
     needs: setup
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: ${{ inputs.platform_name }}
       - name: Build shared E2E test binaries
-        run: task build-e2e-test-artifacts
+        run: task ${{ inputs.run_scheduled_e2e_jobs && 'build-e2e-test-artifacts-race' || 'build-e2e-test-artifacts' }}
       - name: Archive E2E test binaries
         shell: bash
         run: tar -czf "$RUNNER_TEMP/e2e-binaries.tar.gz" build/avalanchego build/xsvm build/ginkgo build/e2e.test build/upgrade.test
       - uses: actions/upload-artifact@v6
         with:
-          name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
           path: ${{ runner.temp }}/e2e-binaries.tar.gz
           retention-days: 1
 
@@ -270,7 +281,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -285,6 +297,36 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  e2e-scheduled:
+    if: ${{ inputs.run_scheduled_e2e_jobs }}
+    needs: setup-e2e
+    runs-on: ${{ inputs.runner }}
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run race-built E2E tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: task run-e2e
+          artifact_prefix: e2e-scheduled-${{ inputs.platform_name }}
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
   e2e_schedule_latest:
     if: ${{ inputs.run_premerge_jobs }}
     needs: setup-e2e
@@ -299,7 +341,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -328,7 +371,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -354,7 +398,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: task run-e2e-kube
@@ -381,7 +426,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -407,7 +453,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/use-e2e-artifacts
         with:
-          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          task_artifact_name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

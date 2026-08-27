@@ -9,8 +9,13 @@ fi
 
 source ./scripts/constants.sh
 
+race=''
+if [[ "${1:-}" == '-r' ]]; then
+  race='-race'
+fi
+
 echo "Building xsvm plugin..."
-go build -o ./build/xsvm ./vms/example/xsvm/cmd/xsvm/
+go build ${race} -o ./build/xsvm ./vms/example/xsvm/cmd/xsvm/
 
 # Symlink to both global and local plugin directories to simplify
 # usage for testing. The local directory should be preferred but the

@@ -323,15 +323,23 @@ setup job that provides its dependencies.
 The Go E2E and Upgrade jobs share one set of non-race binaries. This avoids
 building avalanchego, XSVM, Ginkgo, and the E2E test binaries in every test job.
 
-`setup` restores and saves the Go dependency and tool caches. For pre-merge
-runs, it uploads a workflow-local artifact that contains `task`. `setup-e2e`
+`setup` restores and saves the Go dependency and tool caches. A run that needs
+E2E tests uploads a workflow-local artifact that contains `task`. `setup-e2e`
 restores the Go caches with `setup-go-for-ci`. It builds avalanchego, XSVM,
 Ginkgo, and the E2E and Upgrade test binaries. It uploads these binaries as one
 workflow-local artifact. This build uses the repository Go modules, so it
 continues to test the Go module configuration.
 
-Scheduled runs set `run_premerge_jobs` to false. They skip `setup-e2e`, the E2E
-jobs, and the Upgrade job. They do not upload these artifacts.
+Pre-merge CI uses standard binaries on its minimal platforms. Scheduled CI runs
+the full E2E suite with race-built binaries on these platforms:
+
+- Ubuntu 22.04 for AMD64 and ARM64
+- Ubuntu 24.04 for AMD64 and ARM64
+- macOS 26 for ARM64
+
+Each scheduled platform builds and uploads its own artifact. Artifacts must
+include the platform name because the scheduled reusable workflow calls run in
+parallel.
 
 The process E2E and Upgrade jobs download the `task` and binary artifacts. They
 call `run-*` tasks. These tasks run tests but do not build binaries. The consumer
@@ -339,8 +347,7 @@ jobs must not use `setup-go-for-ci` or an Actions cache. Keep the build steps in
 `setup-e2e` and keep the test jobs artifact-only.
 
 Do not add race detection to the pre-merge artifact. Pull-request E2E tests use
-standard binaries. If CI needs race E2E tests later, create a separate producer
-and artifact for that configuration.
+standard binaries. Scheduled E2E tests use a separate race-built artifact.
 
 The `c-chain-reexecution` job runs the C-Chain re-execution benchmark for pull
 requests. It shares this workflow's setup job, so the repository keeps one Go

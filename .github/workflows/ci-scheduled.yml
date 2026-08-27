@@ -39,4 +39,5 @@ jobs:
       runner: ${{ matrix.runner }}
       run_race_shuffle_unit_tests: true
       run_premerge_jobs: false
+      run_scheduled_e2e_jobs: true
     secrets: inherit

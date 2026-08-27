@@ -2,6 +2,8 @@ name: 'Use E2E CI artifacts'
 description: 'Restore the prebuilt task and Go E2E test artifacts'
 
 inputs:
+  task_artifact_name:
+    required: true
   e2e_artifact_name:
     required: true
 
@@ -10,7 +12,7 @@ runs:
   steps:
     - uses: actions/download-artifact@v6
       with:
-        name: ci-task-${{ github.run_id }}-${{ github.run_attempt }}
+        name: ${{ inputs.task_artifact_name }}
         path: ${{ runner.temp }}/ci-task
     - name: Install prebuilt task
       shell: bash

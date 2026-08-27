@@ -15,7 +15,7 @@ vars:
   # Go version from the project's go.mod. Avoid invoking Go so run-only CI
   # tasks can use a prebuilt task binary without a Go toolchain.
   PACKAGING_GO_VERSION:
-    sh: awk '/^go / { print $2; exit }' go.mod
+    sh: awk '/^go / { print $2; exit }' "{{.TASKFILE_DIR}}/../../go.mod"
   # Map uname -m to RPM arch names (arm64 -> aarch64).
   PACKAGING_RPM_HOST_ARCH:
     sh: |
