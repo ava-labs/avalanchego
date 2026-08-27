@@ -273,7 +273,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e
+          run: ./scripts/run_task.sh run-e2e
           artifact_prefix: e2e-${{ matrix.os }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -301,7 +301,7 @@ jobs:
       - name: Run race-built E2E tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e
+          run: ./scripts/run_task.sh run-e2e
           artifact_prefix: e2e-scheduled-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -331,7 +331,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e-schedule-latest
+          run: ./scripts/run_task.sh run-e2e-schedule-latest
           artifact_prefix: e2e-schedule-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -360,7 +360,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e-post-latest
+          run: ./scripts/run_task.sh run-e2e-post-latest
           artifact_prefix: e2e-post-latest
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -385,7 +385,7 @@ jobs:
           e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e-kube
+          run: ./scripts/run_task.sh run-e2e-kube
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
@@ -413,7 +413,7 @@ jobs:
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-e2e-existing
+          run: ./scripts/run_task.sh run-e2e-existing
           artifact_prefix: e2e-existing-network
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
@@ -439,7 +439,7 @@ jobs:
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: task run-upgrade
+          run: ./scripts/run_task.sh run-upgrade
           artifact_prefix: upgrade
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
