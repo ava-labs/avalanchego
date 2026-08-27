@@ -279,12 +279,13 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	}
 	var (
 		critical    = slices.Clone(chain)
-		unexecuted  = chain[1:] // [0] is [saexec.Executor.LastExecuted]
 		lastSettled = lastOf(chain)
 		unsettled   = chain[:len(chain)-1]
 	)
 
-	for _, b := range unexecuted {
+	// [recovery.executeAllAccepted] discarded the blocks we've just rebuilt,
+	// but execution artefacts are required for determining worst-case state.
+	for _, b := range critical[1:] { // [0] is [saexec.Executor.LastExecuted]
 		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
 			return err
 		}
