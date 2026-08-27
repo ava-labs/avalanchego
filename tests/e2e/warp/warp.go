@@ -403,7 +403,11 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 
 	tc.By("sending sendWarpMessage transaction", func() {
 		preFundedKey := w.sendingSubnet.Validators[0].preFundedKey
-		startingNonce, err := client.NonceAt(ctx, crypto.PubkeyToAddress(preFundedKey.PublicKey), nil)
+		// Use pending-nonce (pool-aware) rather than latest-state nonce: the
+		// same pre-funded key was used by earlier test combinations on this
+		// subnet, and under SAE the latest-state view can briefly lag the
+		// pool's head state by an in-flight transaction.
+		startingNonce, err := client.PendingNonceAt(ctx, crypto.PubkeyToAddress(preFundedKey.PublicKey))
 		require.NoError(err)
 
 		packedInput, err := warp.PackSendWarpMessage(defaultWarpTestPayload)
