@@ -27,6 +27,7 @@ import (
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 func TestMain(m *testing.M) {
@@ -243,7 +244,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				validTx,
 			},
-			wantErr: errNoBlockContext,
+			wantErr: saewarp.ErrNoBlockContext,
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",

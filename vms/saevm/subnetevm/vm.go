@@ -57,6 +57,7 @@ import (
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
+	sharedwarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	libevmcommon "github.com/ava-labs/libevm/common"
 )
 
@@ -206,7 +207,7 @@ func (v *VM) Initialize(
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
 	}
 
-	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+	warpStorage := sharedwarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
 		config,
@@ -508,7 +509,7 @@ type blockClient struct {
 	vm *sae.VM
 }
 
-var _ saewarp.BlockClient = (*blockClient)(nil)
+var _ sharedwarp.Backend = (*blockClient)(nil)
 
 func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
 	b, err := c.vm.GetBlock(ctx, blockID)

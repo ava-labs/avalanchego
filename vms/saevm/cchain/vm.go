@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -39,6 +38,7 @@ import (
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -141,7 +141,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.pending = txpool.NewPending()
-	warpStorage := warp.NewStorage(avaDB, warpMessages...)
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,

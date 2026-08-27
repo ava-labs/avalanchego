@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp/messages"
+
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 type blocks struct {
@@ -204,7 +206,7 @@ func TestVerifier(t *testing.T) {
 			}
 			v := NewVerifier(
 				newBlocks(test.acceptedBlocks...),
-				NewStorage(memdb.New(), test.acceptedMessages...),
+				saewarp.NewStorage(memdb.New(), test.acceptedMessages...),
 				uptime,
 			)
 			err := v.Verify(t.Context(), test.m, nil)

@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -55,7 +56,7 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 type hooks struct {
 	builder
 	state       *cchainstate.State
-	warpStorage *warp.Storage
+	warpStorage *saewarp.Storage
 	metrics     *metrics
 }
 
@@ -64,7 +65,7 @@ func newHooks(
 	state *cchainstate.State,
 	chainConfig *params.ChainConfig,
 	pool *txpool.Pending,
-	warpStorage *warp.Storage,
+	warpStorage *saewarp.Storage,
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,

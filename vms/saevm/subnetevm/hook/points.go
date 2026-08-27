@@ -30,6 +30,7 @@ import (
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	sharedwarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -37,7 +38,7 @@ var _ saehook.PointsG[*Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	warpStorage *warp.Storage
+	warpStorage *sharedwarp.Storage
 }
 
 // NewPoints constructs a new [Points] for use as a [saehook.PointsG].
@@ -47,7 +48,7 @@ func NewPoints(
 	now func() time.Time,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
-	warpStorage *warp.Storage,
+	warpStorage *sharedwarp.Storage,
 	configuredCoinbase common.Address,
 ) *Points {
 	return &Points{

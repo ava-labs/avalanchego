@@ -14,10 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	cchainwarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
-var _ cchainwarp.Backend = (*warpBackend)(nil)
+var _ saewarp.Backend = (*warpBackend)(nil)
 
 type warpBackend struct {
 	vm *sae.VM
@@ -44,13 +44,13 @@ func (w *warpBackend) IsAccepted(ctx context.Context, blkID ids.ID) error {
 func registerWarpHandler(
 	vm *sae.VM,
 	network *network.Network,
-	storage *cchainwarp.Storage,
+	storage *saewarp.Storage,
 	signer avalanchewarp.Signer,
 ) error {
 	const cacheSize = 512
 	handler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](cacheSize),
-		cchainwarp.NewVerifier(&warpBackend{vm}, storage),
+		saewarp.NewVerifier(&warpBackend{vm}, storage, nil),
 		signer,
 	)
 	return network.AddHandler(acp118.HandlerID, handler)

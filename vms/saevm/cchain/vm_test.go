@@ -34,6 +34,7 @@ import (
 
 	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -62,7 +63,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -457,7 +457,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.state,
 		s.chainConfig,
 		s.pending,
-		warp.NewStorage(s.db),
+		saewarp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
 		m,

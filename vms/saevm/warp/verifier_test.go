@@ -99,6 +99,7 @@ func TestVerifier(t *testing.T) {
 			v := NewVerifier(
 				backend(test.acceptedBlocks),
 				test.storage,
+				nil,
 			)
 			err := v.Verify(t.Context(), test.m, nil)
 			require.ErrorIsf(t, err, test.want, "%T.Verify(...)", v)
