@@ -241,8 +241,12 @@ func (s *SUT) sendWarpTx(
 
 	warpAddr := warpcontract.ContractAddress
 	tx := s.ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To:         &warpAddr,
-		Gas:        200_000,
+		To: &warpAddr,
+		// Predicate-carrying txs pay the warp signature-verification cost as
+		// intrinsic gas (see [subnetevmparams.RulesExtra.AccessListGas]), so
+		// the limit must cover well over GasCostPerSignatureVerification.
+		// Mirrors the legacy plugin's warp tests.
+		Gas:        1_000_000,
 		GasFeeCap:  big.NewInt(225 * params.GWei),
 		Value:      big.NewInt(0),
 		Data:       txPayload,

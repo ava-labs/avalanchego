@@ -18,13 +18,13 @@ Reference documents (read before changing anything):
 ## Milestones
 
 - [x] 0. Reconciliation plan written (this file)
-- [ ] 1. Merge of `origin/master` committed, conflicts resolved per policy
+- [x] 1. Merge of `origin/master` committed, conflicts resolved per policy
       (build may be broken)
-- [ ] 2. Workspace compiles (`go build ./...` in all 4 modules), `task lint`
+- [x] 2. Workspace compiles (`go build ./...` in all 4 modules), `task lint`
       passes
-- [ ] 3. cchain green: all `vms/saevm/...` (minus subnetevm) +
+- [x] 3. cchain green: all `vms/saevm/...` (minus subnetevm) +
       `vms/transitionvm` unit tests pass
-- [ ] 4. subnetevm green: all `vms/saevm/subnetevm/...` unit tests pass
+- [x] 4. subnetevm green: all `vms/saevm/subnetevm/...` unit tests pass
 - [ ] 5. Duplication audit done + hoists landed (see "Duplication audit"
       below); tests still green
 - [ ] 6. Full validation: `task test-unit`, `task test-e2e-warp-sae`, and the
@@ -260,17 +260,36 @@ Findings land here when milestone 5 executes.
 
 ## Current state
 
-Milestone 0 complete on `JonathanOppenheimer/subnetevm-sae-port` (branched
-off `origin/ceyonur/subnetevm-sae-spike-cleanup`, tip `066fda2407`). Target
-master is `origin/master` at `6c61faba62`. No merge attempted yet.
+Milestones 0-4 complete on `JonathanOppenheimer/subnetevm-sae-port`. The
+merge of `origin/master` (`6c61faba62`) is committed; all four workspace
+modules build; `task lint` passes; all `vms/saevm/...` (incl. subnetevm),
+`vms/transitionvm` unit tests pass. The full subnetevm feature suite is
+green: warp (incl. predicate verification), validators/uptime, tx/deployer
+allowlists, nativeminter, rewardmanager (incl. forged-coinbase rejection via
+rebuild-hash-mismatch), gaspricemanager (activation transitions,
+pinned-config restart persistence — now via headers rather than the removed
+xdb artifact — settlement lag, validator-target-gas), feemanager retirement,
+state upgrades, and eth extras.
+
+Notable adaptations beyond the plan:
+
+- The warp predicate test's tx gas limit rose from 200k to 1M: master's
+  subnet-evm charges warp signature-verification gas as intrinsic gas
+  (`RulesExtra.AccessListGas` with predicaters), enforced identically in
+  worst-case admission and actual execution. Mirrors the legacy plugin's
+  warp tests.
+- `sae.ErrHashMismatch` exported (spike re-add) for forged-header tests.
+- `loggingtest.New` (master's hoisting of the spike's
+  `saetest.NewTBLogger`) is used throughout.
+- The subnet-evm customtypes golden RLP/hash pin was updated for the new
+  optional tail fields (legacy headers encode unchanged — nil optional
+  fields are omitted).
 
 ### Next action
 
-Milestone 1: `git merge origin/master`, resolve per the policy above
-(master-wins paths via `--theirs` / `git rm` for master-deleted files,
-including spike-only additions under `vms/saevm/cchain/**` which get removed;
-branch-wins via `--ours`), regenerate go.sum/lock files as needed, commit
-with `--no-gpg-sign`. Build is allowed to be broken at this milestone.
+Milestone 5: duplication audit + hoists (see the target list below), then
+milestone 6 full validation (`task test-unit`, `task test-e2e-warp-sae`,
+C-Chain e2e).
 
 ## Decisions log
 
