@@ -1,0 +1,153 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@rules_cc//cc/private/toolchain:unix_cc_toolchain_config.bzl", "cc_toolchain_config")
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load(":builder_identity.bzl", "builder_identity")
+
+package(default_visibility = ["//visibility:public"])
+
+constraint_setting(name = "compiler_environment")
+
+# Do not select these compiler paths on ordinary host execution platforms.
+constraint_value(
+    name = "ubuntu_builder",
+    constraint_setting = ":compiler_environment",
+)
+
+string_flag(
+    name = "builder_digest",
+    build_setting_default = "",
+)
+
+builder_identity(
+    name = "builder_identity",
+    digest = ":builder_digest",
+)
+
+# Both native and cross compilers live in the container. rules_go includes
+# all_files in its CGO, standard-library, and linking action inputs, so the
+# identity file makes builder changes invalidate disk and remote cache results.
+cc_toolchain_config(
+    name = "ubuntu_aarch64_config",
+    abi_libc_version = "glibc-2.39",
+    abi_version = "aarch64",
+    compiler = "gcc",
+    cpu = "aarch64",
+    cxx_builtin_include_directories = [
+        "/usr/lib/gcc-cross/aarch64-linux-gnu/13/include",
+        "/usr/aarch64-linux-gnu/include",
+        "/usr/lib/gcc/aarch64-linux-gnu/13/include",
+        "/usr/include/aarch64-linux-gnu",
+        "/usr/include",
+    ],
+    host_system_name = "ubuntu-noble",
+    opt_compile_flags = ["-O2"],
+    supports_start_end_lib = True,
+    target_libc = "glibc-2.39",
+    target_system_name = "aarch64-linux-gnu",
+    tool_paths = {
+        "ar": "/usr/bin/aarch64-linux-gnu-ar",
+        "c++filt": "/usr/bin/aarch64-linux-gnu-c++filt",
+        "cpp": "/usr/bin/aarch64-linux-gnu-cpp",
+        "dwp": "/usr/bin/dwp",
+        "gcc": "/usr/bin/aarch64-linux-gnu-gcc",
+        "gcov": "/usr/bin/aarch64-linux-gnu-gcov",
+        "ld": "/usr/bin/aarch64-linux-gnu-ld",
+        "nm": "/usr/bin/aarch64-linux-gnu-nm",
+        "objcopy": "/usr/bin/aarch64-linux-gnu-objcopy",
+        "objdump": "/usr/bin/aarch64-linux-gnu-objdump",
+        "strip": "/usr/bin/aarch64-linux-gnu-strip",
+    },
+    toolchain_identifier = "ubuntu-noble-aarch64",
+)
+
+cc_toolchain(
+    name = "ubuntu_aarch64",
+    all_files = ":builder_identity",
+    ar_files = ":builder_identity",
+    as_files = ":builder_identity",
+    compiler_files = ":builder_identity",
+    dwp_files = ":builder_identity",
+    linker_files = ":builder_identity",
+    objcopy_files = ":builder_identity",
+    strip_files = ":builder_identity",
+    supports_param_files = 1,
+    toolchain_config = ":ubuntu_aarch64_config",
+    toolchain_identifier = "ubuntu-noble-aarch64",
+)
+
+toolchain(
+    name = "ubuntu_aarch64_toolchain",
+    exec_compatible_with = [
+        ":ubuntu_builder",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":ubuntu_aarch64",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+cc_toolchain_config(
+    name = "ubuntu_x86_64_config",
+    abi_libc_version = "glibc-2.39",
+    abi_version = "x86_64",
+    compiler = "gcc",
+    cpu = "x86_64",
+    cxx_builtin_include_directories = [
+        "/usr/lib/gcc-cross/x86_64-linux-gnu/13/include",
+        "/usr/x86_64-linux-gnu/include",
+        "/usr/lib/gcc/x86_64-linux-gnu/13/include",
+        "/usr/include/x86_64-linux-gnu",
+        "/usr/include",
+    ],
+    host_system_name = "ubuntu-noble",
+    opt_compile_flags = ["-O2"],
+    supports_start_end_lib = True,
+    target_libc = "glibc-2.39",
+    target_system_name = "x86_64-linux-gnu",
+    tool_paths = {
+        "ar": "/usr/bin/x86_64-linux-gnu-ar",
+        "c++filt": "/usr/bin/x86_64-linux-gnu-c++filt",
+        "cpp": "/usr/bin/x86_64-linux-gnu-cpp",
+        "dwp": "/usr/bin/dwp",
+        "gcc": "/usr/bin/x86_64-linux-gnu-gcc",
+        "gcov": "/usr/bin/x86_64-linux-gnu-gcov",
+        "ld": "/usr/bin/x86_64-linux-gnu-ld",
+        "nm": "/usr/bin/x86_64-linux-gnu-nm",
+        "objcopy": "/usr/bin/x86_64-linux-gnu-objcopy",
+        "objdump": "/usr/bin/x86_64-linux-gnu-objdump",
+        "strip": "/usr/bin/x86_64-linux-gnu-strip",
+    },
+    toolchain_identifier = "ubuntu-noble-x86_64",
+)
+
+cc_toolchain(
+    name = "ubuntu_x86_64",
+    all_files = ":builder_identity",
+    ar_files = ":builder_identity",
+    as_files = ":builder_identity",
+    compiler_files = ":builder_identity",
+    dwp_files = ":builder_identity",
+    linker_files = ":builder_identity",
+    objcopy_files = ":builder_identity",
+    strip_files = ":builder_identity",
+    supports_param_files = 1,
+    toolchain_config = ":ubuntu_x86_64_config",
+    toolchain_identifier = "ubuntu-noble-x86_64",
+)
+
+toolchain(
+    name = "ubuntu_x86_64_toolchain",
+    exec_compatible_with = [
+        ":ubuntu_builder",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":ubuntu_x86_64",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)

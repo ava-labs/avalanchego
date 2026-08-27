@@ -9,17 +9,19 @@ inputs:
     description: 'Working directory to run the command in'
     required: false
     default: '.'
+  preserve-docker-images:
+    description: 'Whether disk cleanup must keep Docker images prepared by an earlier step'
+    required: false
+    default: 'false'
   setup-qemu:
     description: 'Whether to set up QEMU before running the command'
     required: false
     default: 'false'
   binfmt-image:
-    description: 'Digest-pinned binfmt image for a Linux AMD64 Docker host'
+    description: 'Digest-pinned multi-platform binfmt image for Linux Docker hosts'
     required: false
-    # CI continues to use AMD64 build runners, so pin the AMD64 binfmt image.
-    # Multi-platform builds do not require the host to use AMD64.
-    # This digest selects one platform, not a multi-platform index.
-    default: docker.io/tonistiigi/binfmt@sha256:465d3fdd28d0f2b871ba4b4ec98bd183292e96167f00d9fd40bd249f8632d705
+    # Pin the image index so Docker selects the native installer on each host.
+    default: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
   docker-username:
     description: 'Docker Hub username for a binfmt cache miss'
     required: false
@@ -40,6 +42,7 @@ runs:
     - uses: ./.github/actions/ensure-disk-space
       with:
         diagnostic-groups: docker
+        remove-docker-images: ${{ inputs.preserve-docker-images != 'true' }}
 
     # Ensure golang is installed after tool cache removal by ensure-disk-space
     - uses: ./.github/actions/setup-go-for-project
@@ -50,7 +53,7 @@ runs:
       env:
         BINFMT_IMAGE: ${{ inputs.binfmt-image }}
       run: |
-        cache_key="binfmt-v1-${BINFMT_IMAGE#*@sha256:}-linux-amd64"
+        cache_key="binfmt-v1-${BINFMT_IMAGE#*@sha256:}-${RUNNER_OS}-${RUNNER_ARCH}"
         {
           echo "image=$BINFMT_IMAGE"
           echo "cache-key=$cache_key"

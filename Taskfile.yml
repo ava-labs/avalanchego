@@ -52,7 +52,7 @@ tasks:
 
   bazel-fmt:
     desc: Format BUILD.bazel files with buildifier
-    cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
+    cmd: 'find . -path ./.cache -prune -o -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE -o -name WORKSPACE.bazel -o -name "*.bzl" -o -name "*.bazel" \) -print0 | xargs -0 {{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier --'
 
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
@@ -79,6 +79,38 @@ tasks:
     cmds:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
+
+  bazel-prepare-image-inputs:
+    desc: Prepare Docker and inner Bazel dependency inputs for image validation
+    cmd: '{{.NIX_RUN}} ./scripts/build_image_bazel.sh --prepare-inputs'
+
+  bazel-update-image-inputs:
+    desc: Refresh the pinned Ubuntu image and package inputs
+    cmd: '{{.NIX_RUN}} ./scripts/update_bazel_image_inputs.sh'
+
+  test-bazel-image-builder-cache:
+    desc: Check builder digest inputs in native and cross-compilation actions (requires prepared image inputs)
+    cmd: '{{.NIX_RUN}} bash ./scripts/test_bazel_image_builder_cache.sh'
+
+  test-bazel-image-cache-keys:
+    desc: Test image cache key invalidation and platform separation
+    cmd: '{{.NIX_RUN}} bash ./scripts/test_bazel_image_cache_keys.sh'
+
+  test-bazel-image-inputs:
+    desc: Test Bazel image input preparation and download restrictions with Docker
+    cmd: '{{.NIX_RUN}} bash ./scripts/test_bazel_image_inputs.sh'
+
+  test-bazel-image-repository-cache:
+    desc: Check upstream override resolution without networking (requires prepared image inputs)
+    cmd: '{{.NIX_RUN}} bash ./scripts/test_bazel_image_repository_cache.sh'
+
+  bazel-build-image-avalanchego:
+    desc: Build the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/build_image_bazel.sh --build-only'
+
+  bazel-test-image-avalanchego:
+    desc: Test the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/build_image_bazel.sh'
 
   bazel-test-e2e:
     desc: Run E2E tests with Bazel-built runtime dependencies
@@ -487,6 +519,7 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-bazel-image-cache-keys
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
@@ -513,6 +546,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: test-ci-disk-space
+      - task: test-bazel-image-cache-keys
       - task: test-run-task-launcher
       - task: test-setup-task
       - task: test-sync-task-version

@@ -6,8 +6,8 @@ set -euo pipefail
 # without its cache behavior. It is derived from:
 # https://github.com/docker/setup-qemu-action/blob/ce360397dd3f832beb865e1373c09c0e9f86d70a/src/main.ts
 #
-# BINFMT_IMAGE must match the Docker host architecture. Current callers and
-# the default image use Linux AMD64. See docs/ci.md#binfmt-image-cache.
+# BINFMT_IMAGE must support the Docker host architecture. The default pins a
+# multi-platform index. See docs/ci.md#binfmt-image-cache.
 #
 # Docker save/load does not retain digest references, so save and run a local
 # tag derived from the pinned digest.
