@@ -82,10 +82,11 @@ func InMemoryBlockCount() int64 {
 // Block. The provided `hooks` MUST NOT be nil.
 func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
-		b:        eth,
-		executed: make(chan struct{}),
-		settled:  make(chan struct{}),
-		hooks:    hooks,
+		b:           eth,
+		synchronous: hook.Synchronous(hooks, eth.Header()),
+		executed:    make(chan struct{}),
+		settled:     make(chan struct{}),
+		hooks:       hooks,
 		log: log.With(
 			zap.Uint64("block_height", eth.NumberU64()),
 			zap.Stringer("block_hash", eth.Hash()),
@@ -139,6 +140,8 @@ func (b *Block) SetAncestors(parent, lastSettled *Block) error {
 			return fmt.Errorf("%w: constructing Block with parent height %v and own height %v", errBlockHeightNotIncrementing, parent.Number(), b.Number())
 		}
 	}
+	// TODO(arr4n) add invariant checks for `lastSettled` as
+	// [hook.Points.SettledBy] is analogous to the parent checks.
 	b.ancestry.Store(&ancestry{
 		parent:      parent,
 		lastSettled: lastSettled,
