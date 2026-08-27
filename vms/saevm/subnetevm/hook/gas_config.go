@@ -65,7 +65,10 @@ func stampGasConfig(he *customtypes.HeaderExtra, c headerGasConfig) {
 
 // readGasConfig recovers the group stamped by [stampGasConfig], reporting
 // `false` when the header does not carry a complete group (gaspricemanager
-// not enabled at the settled timestamp, or a pre-SAE header).
+// not enabled at the settled timestamp, or a pre-SAE header). A maliciously
+// crafted header CAN carry present-but-zero fields (RLP decodes empty
+// optional items as pointers to zero); such headers are rejected by the
+// rebuild-hash-equality check in block verification, never by this reader.
 func readGasConfig(he *customtypes.HeaderExtra) (headerGasConfig, bool) {
 	if he.GasConfigValidatorTargetGas == nil ||
 		he.GasConfigTargetGas == nil ||

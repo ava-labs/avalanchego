@@ -27,7 +27,7 @@ Reference documents (read before changing anything):
 - [x] 4. subnetevm green: all `vms/saevm/subnetevm/...` unit tests pass
 - [x] 5. Duplication audit done + hoists landed (see "Duplication audit"
       below); tests still green
-- [ ] 6. Full validation: `task test-unit`, `task test-e2e-warp-sae`, and the
+- [x] 6. Full validation: `task test-unit`, `task test-e2e-warp-sae`, and the
       pre-existing C-Chain e2e suite pass
 
 ## Merge resolution policy (decided up front)
@@ -351,6 +351,26 @@ Notable adaptations beyond the plan:
 Milestone 6 full validation: `task test-unit` (the no-race sweep already
 passed repo-wide), `task test-e2e-warp-sae`, and the pre-existing C-Chain
 e2e suite.
+
+## Milestone 6 validation record
+
+- `task test-unit` equivalent (race-enabled `scripts/build_test.sh`,
+  repo-wide): PASS (exit 0).
+- `graft/subnet-evm` unit scope (its CI exclusion of `tests/**` applied):
+  PASS. `graft/coreth` and `graft/evm` module tests: PASS (coreth's
+  `tests/warp` TestE2E needs a live network and is excluded from unit scope
+  on master too).
+- `task test-e2e-warp-sae`: PASS 5/5 specs after a fixture fix — the
+  SubnetA→SubnetA combination fetched a latest-state nonce for a key whose
+  nonce the earlier combinations had advanced, racing SAE's async execution;
+  the initial send now uses the pool-aware `PendingNonceAt` like the
+  delivery steps already did.
+- Pre-existing C-Chain e2e suite (`tests/e2e` with
+  `--ginkgo.label-filter=c`): PASS 4/4 specs (ProposerVM API, Interchain
+  Workflow, Dynamic Fees, ProposerVM Epoch).
+- CI wiring: the spike's `e2e_warp` / `e2e_warp_sae` jobs were re-expressed
+  into master's root `ci.yml` (the merge's master-wins policy had dropped
+  the additions while keeping their removal from `subnet-evm-ci.yml`).
 
 ## Decisions log
 

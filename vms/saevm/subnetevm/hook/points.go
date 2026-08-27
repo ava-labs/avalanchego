@@ -115,12 +115,17 @@ func (p *Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfi
 // gaspricemanager is enabled at the genesis timestamp `genesisTime`,
 // mirroring [gaspricemanager.Configure]. This is deterministic across nodes
 // because it is a pure function of the chain config.
+//
+// Unlike stamped headers, this value is re-derived from code constants at
+// read time: [commontype.DefaultGasPriceConfig] and [scalingFromTimeToDouble]
+// are consensus-critical for chains whose genesis activates gaspricemanager,
+// and changing them requires a network upgrade.
 func (p *Points) genesisGasConfig(genesisTime uint64) (headerGasConfig, bool) {
 	configExtra := subnetevmparams.GetExtra(p.chainConfig)
-	precompileConfig := configExtra.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
-	if precompileConfig == nil {
+	if !configExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress, genesisTime) {
 		return headerGasConfig{}, false
 	}
+	precompileConfig := configExtra.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
 	stored := commontype.DefaultGasPriceConfig()
 	if cfg, ok := precompileConfig.(*gaspricemanager.Config); ok && cfg.InitialGasPriceConfig != nil {
 		stored = *cfg.InitialGasPriceConfig
@@ -166,6 +171,12 @@ var (
 // parsed block: BlockGasCost is unused under SAE and MUST be zero, and the
 // optional Settled* and GasConfig* header-extra groups MUST each be fully
 // populated or fully absent.
+//
+// Note the all-or-nothing checks only reject suffix-truncated groups: RLP
+// decodes a present-but-empty (0x80) optional item as a pointer to zero, not
+// nil, so a crafted header can carry zero-valued group fields. That is safe —
+// an honest stamp is never all-zero, so such a header fails the
+// rebuild-hash-equality check in block verification.
 func (*Points) VerifyBlockSyntax(b *types.Block) error {
 	he := customtypes.GetHeaderExtra(b.Header())
 	if he.BlockGasCost != nil && he.BlockGasCost.Sign() != 0 {
