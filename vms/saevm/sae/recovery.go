@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,14 +21,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/unwind"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -266,15 +264,14 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := settler.PreciseTime().Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
+		end := rec.hooks.SettledBy(settler.Header()).Height
 
 		for {
 			switch b := lastOf(chain); {
 			case b.Synchronous():
 				return nil
 
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
+			case b.Height() == end:
 				if b.Settled() {
 					return nil
 				}
@@ -285,16 +282,12 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
-					return err
-				}
 				chain = append(chain, parent)
 
-				if !b.Settled() && !parent.Synchronous() {
-					continue
-				}
-				if err := parent.MarkSettled(blackhole); err != nil {
-					return err
+				if b.Settled() || parent.Synchronous() {
+					if err := parent.MarkSettled(blackhole); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -303,12 +296,20 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	if err := extend(exec.LastExecuted()); err != nil {
 		return err
 	}
-	lastSettled := lastOf(chain)
-	for _, b := range chain {
-		bMap.Store(b.Hash(), b)
+	var (
+		critical    = slices.Clone(chain)
+		unexecuted  = chain[1:] // [0] is [saexec.Executor.LastExecuted]
+		lastSettled = lastOf(chain)
+		unsettled   = chain[:len(chain)-1]
+	)
+
+	for _, b := range unexecuted {
+		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+			return err
+		}
 	}
 
-	for i, b := range chain[:len(chain)-1] {
+	for i, b := range unsettled {
 		if err := extend(b); err != nil {
 			return err
 		}
@@ -316,7 +317,10 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			return err
 		}
 	}
-	for _, b := range bMap.m {
+
+	for _, b := range critical {
+		bMap.Store(b.Hash(), b)
+
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {
 			stage = blocks.Settled

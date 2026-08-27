@@ -54,26 +54,30 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
+	db := rawdb.NewMemoryDatabase()
+	xdb := saetest.NewExecutionResultsDB()
+	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
+
+	settles := newBlock(t, newSynchronousEthBlock(t, 1, 0, nil), nil, nil)
+	settles.markExecutedForTests(t, db, xdb, tm)
+
+	parent := newBlock(t, newEthBlock(t, 2, 10, settles.EthBlock(), settles), settles, settles)
+
 	ethB, err := hookstest.BuildBlock(
 		&types.Header{
-			Number: big.NewInt(1),
-			Time:   42,
+			Number:     big.NewInt(3),
+			Time:       42,
+			ParentHash: parent.Hash(),
 		},
 		nil, // blockContext
 		txs,
 		nil, // receipts
 		nil, // ops
-		hook.Settled{Height: 1, GasUnix: 1},
+		hook.Settled{Height: settles.Height()},
 	)
-	require.NoError(t, err, "hookstest.BuildBlock()")
-	db := rawdb.NewMemoryDatabase()
+	require.NoError(t, err, "hookstest.BuildBlock(...)")
 	rawdb.WriteBlock(db, ethB)
-	xdb := saetest.NewExecutionResultsDB()
-
-	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
-	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
-	settles.markExecutedForTests(t, db, xdb, tm)
-	b := newBlock(t, ethB, nil, settles)
+	b := newBlock(t, ethB, parent, settles)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
