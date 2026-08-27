@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
 var (
@@ -34,12 +34,12 @@ type batchFetcher struct {
 	starts     [][]byte
 }
 
-func (f *batchFetcher) FetchLeaves(_ context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
+func (f *batchFetcher) FetchLeaves(_ context.Context, req hashdb.LeafRange) (hashdb.Leaves, bool, error) {
 	f.starts = append(f.starts, common.CopyBytes(req.Start))
 	if f.err != nil {
-		return evmstate.Leaves{}, false, f.err
+		return hashdb.Leaves{}, false, f.err
 	}
-	return evmstate.Leaves{
+	return hashdb.Leaves{
 		Keys: f.keys,
 		Vals: f.vals,
 	}, len(f.starts) == 1, nil

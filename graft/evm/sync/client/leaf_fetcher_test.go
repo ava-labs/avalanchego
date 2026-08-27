@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
 type stubLeafClient struct {
@@ -38,17 +38,17 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		name     string
 		reqType  message.LeafsRequestType
 		nodeType message.NodeType
-		req      evmstate.LeafRange
+		req      hashdb.LeafRange
 		resp     message.LeafsResponse
 		err      error
 		wantReq  message.LeafsRequest
-		want     evmstate.Leaves
+		want     hashdb.Leaves
 	}{
 		{
 			name:     "account_trie_over_subnet_evm",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req: evmstate.LeafRange{
+			req: hashdb.LeafRange{
 				Root:  root,
 				Limit: 1024,
 			},
@@ -61,7 +61,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Limit:    1024,
 				NodeType: message.StateTrieNode,
 			},
-			want: evmstate.Leaves{
+			want: hashdb.Leaves{
 				Keys: [][]byte{{0x01}},
 				Vals: [][]byte{{0x0a}},
 			},
@@ -70,11 +70,10 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 			name:     "storage_trie_over_coreth",
 			reqType:  message.CorethLeafsRequestType,
 			nodeType: message.NodeType(2),
-			req: evmstate.LeafRange{
+			req: hashdb.LeafRange{
 				Root:    root,
-				Account: account,
+				Account: &account,
 				Start:   []byte{0x01},
-				End:     []byte{0x02},
 				Limit:   16,
 			},
 			resp: message.LeafsResponse{
@@ -85,11 +84,10 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Root:     root,
 				Account:  account,
 				Start:    []byte{0x01},
-				End:      []byte{0x02},
 				Limit:    16,
 				NodeType: message.NodeType(2),
 			},
-			want: evmstate.Leaves{
+			want: hashdb.Leaves{
 				Keys: [][]byte{{0x03}},
 				Vals: [][]byte{{0x0c}},
 			},
@@ -99,7 +97,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 			name:     "proof_is_stripped_and_more_is_carried",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req: evmstate.LeafRange{
+			req: hashdb.LeafRange{
 				Root:  root,
 				Limit: 8,
 			},
@@ -114,7 +112,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Limit:    8,
 				NodeType: message.StateTrieNode,
 			},
-			want: evmstate.Leaves{
+			want: hashdb.Leaves{
 				Keys: [][]byte{{0x01}, {0x02}},
 				Vals: [][]byte{{0x0a}, {0x0b}},
 			},
@@ -123,7 +121,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 			name:     "client_error_propagates",
 			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
-			req: evmstate.LeafRange{
+			req: hashdb.LeafRange{
 				Root:  root,
 				Limit: 8,
 			},

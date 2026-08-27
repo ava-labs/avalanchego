@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
@@ -631,7 +631,7 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 	require.NoError(t, err)
 
 	stateSyncer, err := NewSyncer(
-		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, tracker),
+		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
 		clientEthDB,
 		root,
 		codeQueue,

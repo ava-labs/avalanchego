@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/utils",
-        "//vms/evm/sync/evmstate",
+        "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@org_golang_x_sync//errgroup",
     ],
@@ -20,7 +20,7 @@ graft_go_test(
     embed = [":leaf"],
     deps = [
         "//graft/evm/utils",
-        "//vms/evm/sync/evmstate",
+        "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
 var (
@@ -27,7 +27,7 @@ var (
 type Fetcher interface {
 	// FetchLeaves returns the leaves in ascending key order and reports whether
 	// the trie holds more past them.
-	FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error)
+	FetchLeaves(ctx context.Context, req hashdb.LeafRange) (hashdb.Leaves, bool, error)
 }
 
 // SyncTask represents a complete task to be completed by the leaf syncer.
@@ -87,10 +87,15 @@ func (c *CallbackSyncer) workerLoop(ctx context.Context) error {
 // starting at [task.Start] and invoking the callbacks as necessary.
 func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 	var (
-		root    = task.Root()
-		account = task.Account()
-		start   = task.Start()
+		root  = task.Root()
+		start = task.Start()
 	)
+
+	// LeafRange.Account is nil for the account trie, non-nil for a storage trie.
+	var account *common.Hash
+	if a := task.Account(); a != (common.Hash{}) {
+		account = &a
+	}
 
 	if skip, err := task.OnStart(); err != nil {
 		return err
@@ -104,9 +109,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			return err
 		}
 
-		// End is left unset, because [VerifyRangeProof] does not handle empty
-		// responses with a non-empty end key. The response is truncated below.
-		leaves, more, err := c.fetcher.FetchLeaves(ctx, evmstate.LeafRange{
+		leaves, more, err := c.fetcher.FetchLeaves(ctx, hashdb.LeafRange{
 			Root:    root,
 			Account: account,
 			Start:   start,

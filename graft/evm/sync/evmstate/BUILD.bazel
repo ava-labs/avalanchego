@@ -72,7 +72,7 @@ graft_go_test(
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/evm/sync/customrawdb",
-        "//vms/evm/sync/evmstate",
+        "//vms/evm/sync/hashdb",
         "//vms/evm/sync/synctest",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",

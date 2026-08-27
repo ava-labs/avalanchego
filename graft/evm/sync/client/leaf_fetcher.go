@@ -6,9 +6,11 @@ package client
 import (
 	"context"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
 // LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both
@@ -27,19 +29,25 @@ func NewLeafFetcher(c types.LeafClient, reqType message.LeafsRequestType, nodeTy
 	}
 }
 
-func (f *LeafFetcher) FetchLeaves(ctx context.Context, req evmstate.LeafRange) (evmstate.Leaves, bool, error) {
+func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (hashdb.Leaves, bool, error) {
+	var account common.Hash
+	if req.Account != nil {
+		account = *req.Account
+	}
+
+	// End is always nil, [hashdb.LeafRange] carries no end key.
 	leafsReq, err := message.NewLeafsRequest(
-		f.reqType, req.Root, req.Account, req.Start, req.End, req.Limit, f.nodeType,
+		f.reqType, req.Root, account, req.Start, nil, req.Limit, f.nodeType,
 	)
 	if err != nil {
-		return evmstate.Leaves{}, false, err
+		return hashdb.Leaves{}, false, err
 	}
 
 	resp, err := f.client.GetLeafs(ctx, leafsReq)
 	if err != nil {
-		return evmstate.Leaves{}, false, err
+		return hashdb.Leaves{}, false, err
 	}
-	return evmstate.Leaves{
+	return hashdb.Leaves{
 		Keys: resp.Keys,
 		Vals: resp.Vals,
 	}, resp.More, nil
