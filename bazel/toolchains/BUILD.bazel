@@ -1,0 +1,73 @@
+load("@rules_cc//cc/private/toolchain:unix_cc_toolchain_config.bzl", "cc_toolchain_config")
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "empty",
+    srcs = [],
+)
+
+# The compiler and its sysroot are installed in the locked Debian builder image,
+# not in the source checkout. The builder image digest is an inner-Bazel action
+# input; see scripts/bazel_image_spike.sh.
+cc_toolchain_config(
+    name = "debian_aarch64_config",
+    abi_libc_version = "glibc-2.36",
+    abi_version = "aarch64",
+    compiler = "gcc",
+    cpu = "aarch64",
+    cxx_builtin_include_directories = [
+        "/usr/lib/gcc-cross/aarch64-linux-gnu/12/include",
+        "/usr/aarch64-linux-gnu/include",
+        "/usr/include",
+    ],
+    host_system_name = "x86_64-linux-gnu",
+    opt_compile_flags = ["-O2"],
+    supports_start_end_lib = True,
+    target_libc = "glibc-2.36",
+    target_system_name = "aarch64-linux-gnu",
+    tool_paths = {
+        "ar": "/usr/bin/aarch64-linux-gnu-ar",
+        "c++filt": "/usr/bin/aarch64-linux-gnu-c++filt",
+        "cpp": "/usr/bin/aarch64-linux-gnu-cpp",
+        "dwp": "/usr/bin/dwp",
+        "gcc": "/usr/bin/aarch64-linux-gnu-gcc",
+        "gcov": "/usr/bin/aarch64-linux-gnu-gcov",
+        "ld": "/usr/bin/aarch64-linux-gnu-ld",
+        "nm": "/usr/bin/aarch64-linux-gnu-nm",
+        "objcopy": "/usr/bin/aarch64-linux-gnu-objcopy",
+        "objdump": "/usr/bin/aarch64-linux-gnu-objdump",
+        "strip": "/usr/bin/aarch64-linux-gnu-strip",
+    },
+    toolchain_identifier = "debian-bookworm-aarch64",
+)
+
+cc_toolchain(
+    name = "debian_aarch64",
+    all_files = ":empty",
+    ar_files = ":empty",
+    as_files = ":empty",
+    compiler_files = ":empty",
+    dwp_files = ":empty",
+    linker_files = ":empty",
+    objcopy_files = ":empty",
+    strip_files = ":empty",
+    supports_param_files = 1,
+    toolchain_config = ":debian_aarch64_config",
+    toolchain_identifier = "debian-bookworm-aarch64",
+)
+
+toolchain(
+    name = "debian_aarch64_toolchain",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":debian_aarch64",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)

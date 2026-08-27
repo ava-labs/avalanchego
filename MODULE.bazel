@@ -8,6 +8,18 @@ bazel_dep(name = "gazelle", version = "0.51.3", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2")
+bazel_dep(name = "rules_distroless", version = "0.9.4")
+bazel_dep(name = "rules_img", version = "0.3.19")
+bazel_dep(name = "rules_cc", version = "0.2.8")
+
+register_toolchains("//bazel/toolchains:debian_aarch64_toolchain")
+
+# Temporary until a BCR release contains apt.install(mergedusr = True).
+git_override(
+    module_name = "rules_distroless",
+    commit = "a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3",
+    remote = "https://github.com/bazel-contrib/rules_distroless.git",
+)
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
@@ -20,6 +32,60 @@ go_deps.from_file(go_work = "//:go.work")
 # Go-based repo tools used via Bazel fallback in CI.
 tool_go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps", isolate = True)
 tool_go_deps.from_file(go_mod = "//tools/external:go.mod")
+
+# Locked Debian Bookworm packages for the amd64 builder image. The arm64
+# compiler and sysroot packages are amd64/all Debian packages because they run
+# in the amd64 builder and emit arm64 code.
+apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
+apt.sources_list(
+    architectures = ["amd64"],
+    components = ["main"],
+    suites = ["bookworm"],
+    types = ["deb"],
+    uris = ["https://snapshot.debian.org/archive/debian/20250101T000000Z"],
+)
+apt.install(
+    dependency_set = "bookworm_builder",
+    mergedusr = True,
+    packages = [
+        "ca-certificates",
+        "g++",
+        "gcc",
+        "gcc-aarch64-linux-gnu",
+        "git",
+        "libc6-dev",
+        "libc6-dev-arm64-cross",
+        "patch",
+        "unzip",
+        "zip",
+    ],
+    suites = ["bookworm"],
+)
+apt.lock(into = "//bazel/image:bookworm.lock.json")
+use_repo(apt, "bookworm_builder")
+
+# The inner Bazel is pinned to .bazelversion. Use the full Bazel distribution,
+# which includes its JRE, instead of downloading a launcher at container run
+# time.
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "bazel_8_0_1_linux_amd64",
+    executable = True,
+    sha256 = "40f243b118f46d1c88842315e78ec5f9f6390980d67a90f7b64098613e60d65b",
+    urls = ["https://github.com/bazelbuild/bazel/releases/download/8.0.1/bazel-8.0.1-linux-x86_64"],
+)
+
+images = use_extension("@rules_img//img:extensions.bzl", "images")
+images.settings(hub_repo = "enabled")
+images.pull(
+    name = "debian_12_slim_amd64",
+    digest = "sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867",
+    registry = "index.docker.io",
+    repository = "library/debian",
+    tag = "12-slim",
+)
+use_repo(images, "rules_img_images.bzl")
 
 # Patches for external dependencies that need custom BUILD files or fixes.
 # See docs/bazel.md "Patched Dependencies" for details on each override.

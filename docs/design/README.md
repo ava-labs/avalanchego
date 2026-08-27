@@ -10,5 +10,7 @@ for preserving the reasoning a future reader will need after implementation.
 
 ## Documents
 
+- [Bazel multi-architecture AvalancheGo image](./bazel-multiarch-image.md) - plan
+  for building the Debian amd64/arm64 image from the Bazel dependency graph
 - [Multi-module release](./multi-module-release.md) - design-time context for
   multi-module release work

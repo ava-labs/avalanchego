@@ -58,6 +58,10 @@ tasks:
     desc: Regenerate BUILD files with Gazelle (all modules)
     cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
 
+  bazel-image-spike:
+    desc: Build the locked Debian builder and cross-compile AvalancheGo images
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh'
+
   bazel-generate-metadata:
     desc: Regenerate Bazel metadata for this source tree
     cmds:
