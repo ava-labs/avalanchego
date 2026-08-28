@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -185,19 +186,40 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 }
 
 func echoHandler(b []byte) p2p.Handler {
-	return p2p.TestHandler{
-		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-			return b, nil
-		},
-	}
+	h, _ := scriptedHandler(scriptResponse{
+		bytes: b,
+	})
+	return h
 }
 
 func errorHandler() p2p.Handler {
-	return p2p.TestHandler{
+	h, _ := scriptedHandler(scriptResponse{
+		appErr: &common.AppError{
+			Code:    42,
+			Message: "boom",
+		},
+	})
+	return h
+}
+
+type scriptResponse struct {
+	bytes  []byte
+	appErr *common.AppError
+}
+
+// scriptedHandler replies with each response in order, then repeats the last.
+func scriptedHandler(responses ...scriptResponse) (p2p.Handler, *atomic.Int32) {
+	var calls atomic.Int32
+	h := p2p.TestHandler{
 		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-			return nil, &common.AppError{Code: 42, Message: "boom"}
+			i := int(calls.Add(1)) - 1
+			if i >= len(responses) {
+				i = len(responses) - 1
+			}
+			return responses[i].bytes, responses[i].appErr
 		},
 	}
+	return h, &calls
 }
 
 // seedResponsive marks nodeID responsive so a later de-score is a real

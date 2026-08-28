@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -141,7 +140,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			handler, calls := scriptHandler(tt.responses...)
+			handler, calls := scriptedHandler(tt.responses...)
 			_, tracker := newTestTracker(t, nodeID)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
@@ -184,7 +183,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 	)
 	ctx := t.Context()
 
-	handler, _ := scriptHandler(scriptResponse{bytes: wantBytes})
+	handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
 	_, tracker := newTestTracker(t)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
 	c.policy = *options.ApplyTo(defaultRetryPolicy(),
@@ -213,7 +212,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	handler, calls := scriptHandler(scriptResponse{bytes: []byte{}})
+	handler, calls := scriptedHandler(scriptResponse{bytes: []byte{}})
 	_, tracker := newTestTracker(t, nodeID)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
@@ -283,24 +282,4 @@ func newRetryDispatcher(
 		WithNoPeersMaxBackoff(5*time.Millisecond),
 	)
 	return c
-}
-
-type scriptResponse struct {
-	bytes  []byte
-	appErr *common.AppError
-}
-
-// scriptHandler replies with each response in order, then repeats the last.
-func scriptHandler(responses ...scriptResponse) (p2p.Handler, *atomic.Int32) {
-	var calls atomic.Int32
-	h := p2p.TestHandler{
-		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-			i := int(calls.Add(1)) - 1
-			if i >= len(responses) {
-				i = len(responses) - 1
-			}
-			return responses[i].bytes, responses[i].appErr
-		},
-	}
-	return h, &calls
 }
