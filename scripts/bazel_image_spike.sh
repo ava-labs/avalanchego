@@ -22,6 +22,8 @@ registry_image="localhost:5000/avalanchego-bazel:phase3"
 registry_container_id=""
 
 cleanup() {
+  bazelisk shutdown > /dev/null 2>&1 || true
+
   if [[ -n "$registry_container_id" ]]; then
     docker stop "$registry_container_id" > /dev/null
   fi
@@ -31,6 +33,28 @@ trap cleanup EXIT
 outer_repository_cache="${BAZEL_IMAGE_REPOSITORY_CACHE:-${cache_root}/outer-repository}"
 outer_disk_cache="${cache_root}/outer-disk"
 inner_repository_cache="${cache_root}/inner-repository"
+
+# The inner Bazel processes use HOME=/cache/home, so they cannot read the
+# runner's ~/.bazelrc where setup-bazel configures the remote action cache.
+# Pass that configuration through explicitly. Cache compiler outputs, but not
+# the large image-layer outputs produced by the final image build.
+inner_remote_cache_env=()
+inner_remote_cache_args=()
+inner_binary_cache_args=()
+if [[ -n "${BAZEL_REMOTE_CACHE_URL:-}" && -n "${BAZEL_REMOTE_CACHE_AUTH_HEADER:-}" ]]; then
+  inner_remote_cache_env=(
+    --env BAZEL_REMOTE_CACHE_URL
+    --env BAZEL_REMOTE_CACHE_AUTH_HEADER
+  )
+  inner_remote_cache_args=(
+    "--remote_cache=${BAZEL_REMOTE_CACHE_URL}"
+    --remote_timeout=60
+    --remote_retries=3
+    --remote_cache_compression
+    "--remote_header=${BAZEL_REMOTE_CACHE_AUTH_HEADER}"
+  )
+  inner_binary_cache_args=(--remote_upload_local_results=true)
+fi
 
 if [[ ! -S /var/run/docker.sock ]]; then
   echo "Docker socket /var/run/docker.sock is required for the Bazel image load" >&2
@@ -81,6 +105,7 @@ for architecture in amd64 arm64; do
     --env USER=avalanchego \
     --env CC="$cc" \
     --env AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
+    "${inner_remote_cache_env[@]}" \
     --mount "type=bind,src=$avalanchego_path,dst=/workspace,readonly" \
     --mount "type=bind,src=$inner_repository_cache,dst=/cache/repository" \
     --mount "type=bind,src=${cache_root}/inner-disk-${architecture},dst=/cache/disk" \
@@ -90,18 +115,19 @@ for architecture in amd64 arm64; do
     --mount "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock" \
     "$builder_tag" \
     /usr/local/bin/bazel \
+      --batch \
       --output_user_root=/cache/output \
       "${bazel_command[@]}" \
       --symlink_prefix=/cache/output/bazel- \
       --repository_cache=/cache/repository \
       --disk_cache=/cache/disk \
+      "${inner_remote_cache_args[@]}" \
+      "${inner_binary_cache_args[@]}" \
       --lockfile_mode=error \
       --config=release \
       --workspace_status_command=/cache/workspace_status.sh \
       --compilation_mode=opt \
       --platforms="//bazel/image:linux_${architecture}" \
-      --toolchain_resolution_debug='@bazel_tools//tools/cpp:toolchain_type' \
-      --subcommands \
       --action_env=CC="$cc" \
       --action_env=AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
     2>&1 | tee "${cache_root}/inner-${architecture}.log"
@@ -118,7 +144,6 @@ for architecture in amd64 arm64; do
     echo "expected ${architecture} output to be ${expected_machine}" >&2
     exit 1
   fi
-  readelf --file-header --program-headers "$binary_path"
 
   if ! "$build_only"; then
     echo "running ${architecture} output in fresh Debian 12 slim"
@@ -152,6 +177,7 @@ docker run --rm \
   --env CC=gcc \
   --env IMG_INSECURE=1 \
   --env AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
+  "${inner_remote_cache_env[@]}" \
   --mount "type=bind,src=$avalanchego_path,dst=/workspace,readonly" \
   --mount "type=bind,src=$inner_repository_cache,dst=/cache/repository" \
   --mount "type=bind,src=${cache_root}/inner-disk-amd64,dst=/cache/disk" \
@@ -161,11 +187,14 @@ docker run --rm \
   --mount "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock" \
   "$builder_tag" \
   /usr/local/bin/bazel \
+    --batch \
     --output_user_root=/cache/output \
     "${image_command[@]}" \
     --symlink_prefix=/cache/output/bazel- \
     --repository_cache=/cache/repository \
     --disk_cache=/cache/disk \
+    "${inner_remote_cache_args[@]}" \
+    --remote_upload_local_results=false \
     --lockfile_mode=error \
     --config=release \
     --workspace_status_command=/cache/workspace_status.sh \

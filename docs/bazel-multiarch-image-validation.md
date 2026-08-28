@@ -6,6 +6,7 @@
 - [Use the validation](#use-the-validation)
 - [How the validation works](#how-the-validation-works)
 - [CI behavior](#ci-behavior)
+- [CI action cache](#ci-action-cache)
 - [Limits and safe changes](#limits-and-safe-changes)
 - [Validation checklist](#validation-checklist)
 
@@ -74,6 +75,7 @@ The builder and inner Bazel process use separate disk and output caches. The
 outer repository cache can use `BAZEL_IMAGE_REPOSITORY_CACHE`. CI sets this
 value to the repository cache prepared by the Bazel setup job.
 
+
 ## CI behavior
 
 The Linux `image` job in `.github/workflows/bazel-ci.yml` runs
@@ -87,6 +89,25 @@ image job fetch the builder dependencies for the first time.
 The normal Dockerfile/Buildx image validation remains in Go CI. Do not remove
 that path or treat the two paths as the same test. Compare their results when
 the Bazel image job changes.
+
+## CI action cache
+
+The setup action configures a remote Bazel action cache on the runner. The
+inner Bazel process has a different home directory. The validation script passes
+the cache URL and authorization header into that process when CI provides both
+values.
+
+The amd64 and arm64 binary builds read and write remote action results. The
+final image build reads those results. It does not upload image layers or the
+OCI index. These outputs can be large and have little value in the remote
+cache.
+
+Bazel keys each action result with its inputs, platform, toolchain, and build
+options. A result from one platform cannot satisfy an action for another
+platform. A builder-image digest is also an action input.
+
+Local validation works without remote-cache credentials. Do not add credentials
+to the builder image, the workspace, or command output.
 
 ## Limits and safe changes
 
@@ -132,3 +153,7 @@ Bazel BUILD file.
 
 A successful test reports both Linux platforms in the OCI index. It reports a
 successful `--version` run for both direct binaries and both image platforms.
+
+After a CI job fills the remote cache, run the job again without source changes.
+The inner binary builds must report remote cache hits. The final image build may
+run local image-layer actions.
