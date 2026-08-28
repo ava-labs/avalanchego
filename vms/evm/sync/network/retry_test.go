@@ -204,7 +204,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
-	require.Greater(t, elapsed, time.Duration(minElapsed),
+	require.Greater(t, elapsed, minElapsed,
 		"Send noticed the connected peer too soon, the no-peers wait is not escalating")
 }
 
