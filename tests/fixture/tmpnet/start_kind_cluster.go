@@ -46,6 +46,7 @@ const (
 	ingressReleaseName    = "traefik"
 	ingressChartRepo      = "https://traefik.github.io/charts"
 	ingressChartName      = "traefik/traefik"
+	ingressChartVersion   = "41.4.0"
 	ingressControllerName = "traefik"
 	// This port must match scripts/kind-with-registry.sh.
 	ingressNodePort       = 30791
@@ -364,6 +365,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 		"install",
 		ingressReleaseName,
 		ingressChartName,
+		"--version", ingressChartVersion,
 		"--namespace", ingressNamespace,
 		"--create-namespace",
 		"--wait",
