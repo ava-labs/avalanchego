@@ -26,6 +26,10 @@ tasks:
     desc: Build avalanchego with Bazel (optimized)
     cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
 
+  bazel-build-image:
+    desc: Build the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh --build-only'
+
   bazel-build-race:
     desc: Build avalanchego with Bazel (race detection)
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego'
@@ -91,6 +95,10 @@ tasks:
   bazel-build-e2e-race:
     desc: Build E2E binaries with Bazel and race detection
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego //vms/example/xsvm/cmd/xsvm:xsvm @com_github_onsi_ginkgo_v2//ginkgo:ginkgo //tests/e2e:e2e_test'
+
+  bazel-test-build-image:
+    desc: Test the local multi-platform AvalancheGo image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh'
 
   bazel-test-e2e:
     desc: Run E2E tests with Bazel-built binaries

@@ -249,3 +249,81 @@ should implement Phase 3: configure `image_from_binary` to produce the amd64
 and arm64 manifests and compose them into one image index. Load or push that
 index to a local registry, inspect its platform metadata, and run both
 architectures with explicit `--platform` selections.
+
+## Phase 3 continuation results
+
+Commit `9fc1165d58b83167b34a921946bdcba3b36a90d5` adds the multi-platform
+runtime-image spike. It changes only `bazel/image/BUILD.bazel` and
+`scripts/bazel_image_spike.sh`; the Dockerfile/Buildx path remains unchanged.
+`docs/design/bazel-multiarch-image.md` was not changed.
+
+- `image_from_binary(name = "avalanchego")` now specifies both
+  `:linux_amd64` and `:linux_arm64`. With two platforms, `rules_img` creates
+  an image index and uses platform transitions to create each manifest.
+- `push_avalanchego` pushes that index to
+  `localhost:5000/avalanchego-bazel:phase3` with `image_push`.
+- The spike starts a disposable `registry:2` container on the host network,
+  so the inner builder can reach it as `localhost:5000`. Its exit trap stops
+  only the registry it started.
+- The inner push uses `IMG_INSECURE=1` and `--insecure` because this local
+  registry serves plain HTTP. Do not copy that configuration to a production
+  registry.
+- The spike uses `docker buildx imagetools inspect` to print index metadata,
+  then runs the registry image with `--platform linux/amd64` and
+  `--platform linux/arm64`.
+
+The required command passed:
+
+```bash
+./scripts/nix_run.sh ./scripts/bazel_image_spike.sh
+```
+
+The resulting OCI index was reported as
+`sha256:a68b9357b727e769a85bd716470b17ef1bc5bdc4f626791dab7cf4071e315665`.
+`imagetools inspect` reported an amd64 manifest and an arm64/v8 manifest.
+Both explicit platform runs printed the expected AvalancheGo version stamped
+with commit `f7c242c5d0a3370e794dc7fbdbe41593d778011f`.
+
+`git diff --check`, ShellCheck on `scripts/bazel_image_spike.sh`, and
+Buildifier check mode on `bazel/image/BUILD.bazel` also passed. The registry is
+stopped after the spike, so its pushed image is deliberately not retained.
+
+### Review and maintenance constraints
+
+- This remains a spike, not a production publishing interface. The registry,
+  repository, and tag are intentionally hard-coded for local validation. A
+  supported path must make destination, authentication, TLS, and tagging
+  explicit instead of reusing `IMG_INSECURE`.
+- The fixed host port `5000` and `docker run --network host` require a Linux
+  Docker host with that port available. This is the simplest way for the
+  containerized inner Bazel process to reach a host-owned disposable registry;
+  it is not portable to all Docker Desktop network models.
+- Docker cannot load a multi-platform index into its legacy image store as one
+  local image. Pushing to a registry preserves the index and permits explicit
+  platform pulls. Do not replace the registry push with `image_load` if the
+  goal is to validate the combined index.
+- The script still builds and runs each bare binary before it pushes the index.
+  The index's split platform transitions then build/package both manifests in a
+  separate inner Bazel invocation. This duplicates analysis and can be slow,
+  but keeps Phase 1 binary validation independent from OCI packaging. Reduce
+  this duplication only after preserving equivalent binary and image runtime
+  checks.
+- The runtime image continues to use the pinned Debian 12 slim multi-platform
+  base and preserves `/avalanchego/build/avalanchego`,
+  `/avalanchego/build`, empty entrypoint, and `./avalanchego` command. Changes
+  to the base digest, executable path, or image config need a comparison with
+  the Dockerfile image and both-platform runtime validation.
+- The Docker socket remains a precondition because the outer Bazel target loads
+  the locked builder image. The inner push communicates with the registry over
+  the network; do not treat the socket mount as a general registry credential
+  or publishing mechanism.
+
+### Recommended next work
+
+First decide whether Bazel image publishing is intended to be a supported
+production path. If it is, define the registry naming, tag/stamping, TLS and
+credential model, retention policy, and CI ownership before generalizing the
+spike. Then add CI coverage that verifies the index platform list and runs
+both explicit platform selections. Keep the Dockerfile/Buildx test path as an
+independent comparison until image configuration and release semantics are
+agreed.

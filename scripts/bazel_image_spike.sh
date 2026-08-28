@@ -2,8 +2,18 @@
 
 set -euo pipefail
 
-# Build the locked Debian builder image, then build and push a multi-platform
+# Build the locked Debian builder image, then build or test a multi-platform
 # AvalancheGo runtime image from inside it.
+
+build_only=false
+case "${1:-}" in
+  "") ;;
+  --build-only) build_only=true ;;
+  *)
+    echo "usage: $0 [--build-only]" >&2
+    exit 2
+    ;;
+esac
 
 avalanchego_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cache_root="${BAZEL_IMAGE_CACHE_ROOT:-${avalanchego_path}/.cache/bazel-image}"
@@ -28,10 +38,6 @@ if [[ ! -S /var/run/docker.sock ]]; then
 fi
 
 docker_socket_gid="$(stat -c '%g' /var/run/docker.sock)"
-
-# Host networking makes this disposable registry available as localhost to the
-# inner builder that pushes the image index.
-registry_container_id="$(docker run --rm --detach --network host registry:2)"
 
 mkdir -p \
   "$outer_repository_cache" \
@@ -58,8 +64,10 @@ chmod 0755 "$workspace_status"
 for architecture in amd64 arm64; do
   if [[ "$architecture" == "amd64" ]]; then
     cc=gcc
+    expected_machine="Advanced Micro Devices X86-64"
   else
     cc=aarch64-linux-gnu-gcc
+    expected_machine="AArch64"
   fi
 
   bazel_command=(build //main:avalanchego)
@@ -98,25 +106,42 @@ for architecture in amd64 arm64; do
       --action_env=AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
     2>&1 | tee "${cache_root}/inner-${architecture}.log"
 
-  binary_path="$(find "${cache_root}/inner-output-${architecture}" -type f -path '*/execroot/_main/bazel-out/*/bin/main/main_/main' -print -quit)"
-  if [[ -z "$binary_path" ]]; then
-    echo "failed to find ${architecture} AvalancheGo output" >&2
+  binary_path="$(readlink "${cache_root}/inner-output-${architecture}/bazel-bin")/main/main_/main"
+  binary_path="${binary_path/#\/cache\/output/${cache_root}/inner-output-${architecture}}"
+  if [[ ! -f "$binary_path" ]]; then
+    echo "failed to find ${architecture} AvalancheGo output: ${binary_path}" >&2
     exit 1
   fi
 
   echo "inspecting ${architecture} output: ${binary_path}"
+  if ! readelf --file-header "$binary_path" | grep -Fq "Machine:                           ${expected_machine}"; then
+    echo "expected ${architecture} output to be ${expected_machine}" >&2
+    exit 1
+  fi
   readelf --file-header --program-headers "$binary_path"
 
-  echo "running ${architecture} output in fresh Debian 12 slim"
-  docker run --rm \
-    --platform "linux/${architecture}" \
-    --mount "type=bind,src=${binary_path},dst=/avalanchego,readonly" \
-    debian:12-slim \
-    /avalanchego --version
+  if ! "$build_only"; then
+    echo "running ${architecture} output in fresh Debian 12 slim"
+    docker run --rm \
+      --platform "linux/${architecture}" \
+      --mount "type=bind,src=${binary_path},dst=/avalanchego,readonly" \
+      debian:12-slim \
+      /avalanchego --version
+  fi
 done
 
-# Push the index after both direct binary checks. The index's platform
-# transitions package the amd64 and arm64 manifests in one registry reference.
+image_command=(build //bazel/image:avalanchego)
+image_arguments=()
+if ! "$build_only"; then
+  # Host networking makes this disposable registry available as localhost to
+  # the inner builder that pushes the image index.
+  registry_container_id="$(docker run --rm --detach --network host registry:2)"
+  image_command=(run //bazel/image:push_avalanchego)
+  image_arguments=(-- --insecure)
+fi
+
+# The image index transitions package the amd64 and arm64 manifests in one
+# image target. Test mode pushes that target to a disposable local registry.
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   --group-add "$docker_socket_gid" \
@@ -137,7 +162,7 @@ docker run --rm \
   "$builder_tag" \
   /usr/local/bin/bazel \
     --output_user_root=/cache/output \
-    run //bazel/image:push_avalanchego \
+    "${image_command[@]}" \
     --symlink_prefix=/cache/output/bazel- \
     --repository_cache=/cache/repository \
     --disk_cache=/cache/disk \
@@ -147,8 +172,12 @@ docker run --rm \
     --compilation_mode=opt \
     --action_env=CC=gcc \
     --action_env=AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
-    -- --insecure \
-  2>&1 | tee "${cache_root}/push.log"
+    "${image_arguments[@]}" \
+  2>&1 | tee "${cache_root}/image-${build_only}.log"
+
+if "$build_only"; then
+  exit 0
+fi
 
 docker buildx imagetools inspect "$registry_image"
 for architecture in amd64 arm64; do
