@@ -81,9 +81,7 @@ const (
 
 func classify(err error) retryClass {
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return retryFatal
-	case errors.Is(err, errMarshalRequest):
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, errMarshalRequest):
 		return retryFatal
 	case errors.Is(err, errNoPeers):
 		return retryNoPeers
@@ -115,8 +113,7 @@ func doRetry[Resp proto.Message](
 		attempts++
 		resp, nodeID, outcome, err := attempt()
 		var wait time.Duration
-		switch err {
-		case nil:
+		if err == nil {
 			// verify reports its own rejection, since only the caller knows what
 			// made the response wrong.
 			verifyErr := verify(resp, nodeID)
@@ -128,7 +125,7 @@ func doRetry[Resp proto.Message](
 			lastErr = verifyErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
-		default:
+		} else {
 			switch classify(err) {
 			case retryFatal:
 				return zero, retryFailure(err, lastErr, attempts)
