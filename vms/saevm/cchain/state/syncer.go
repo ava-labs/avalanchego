@@ -34,10 +34,9 @@ type Syncer struct {
 
 // NewSyncer creates a new atomic syncer. The syncer will start with a call to [Syncer.Sync].
 func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
-	const requestSize = 1024
-
 	tasks := make(chan leaf.SyncTask, 1)
-	// If the trie already has the target root there is nothing to fetch.
+	// The fetcher only responds to requests for non-empty roots. And if we
+	// already have the full state, no sense syncing again.
 	if state.currentRoot != root {
 		tasks <- &task{
 			state:      state,
@@ -59,7 +58,7 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 			),
 			tasks,
 			&leaf.SyncerConfig{
-				RequestSize: requestSize,
+				RequestSize: 1024,
 				NumWorkers:  1,
 			},
 		),
@@ -93,9 +92,6 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // firstKeyAfterHeight returns the first trie key that would need synced, assuming all
 // state up to currentHeight is already available.
 func firstKeyAfterHeight(currentHeight uint64) []byte {
-	if currentHeight == 0 {
-		return nil // need entire trie
-	}
 	return encodeTrieKey(currentHeight+1, ids.Empty)
 }
 
@@ -148,7 +144,7 @@ func (t *task) OnLeafs(_ context.Context, keys, vals [][]byte) error {
 		t.pendingHeight = height
 		t.pendingKeys = append(t.pendingKeys, key)
 		t.pendingVals = append(t.pendingVals, vals[i])
-		mergeRequests(t.pendingOps, chainID, req)
+		t.pendingOps[chainID] = req
 	}
 
 	return nil

@@ -230,20 +230,14 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 		if err != nil {
 			return nil, fmt.Errorf("getting atomic requests for tx %s: %w", t.ID(), err)
 		}
-		mergeRequests(ops, chainID, req)
+		if existing, ok := ops[chainID]; ok {
+			existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
+			existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
+		} else {
+			ops[chainID] = req
+		}
 	}
 	return ops, nil
-}
-
-// mergeRequests merges req into ops under chainID, concatenating the put and
-// remove requests when chainID is already present.
-func mergeRequests(ops map[ids.ID]*chainsatomic.Requests, chainID ids.ID, req *chainsatomic.Requests) {
-	if existing, ok := ops[chainID]; ok {
-		existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
-		existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
-	} else {
-		ops[chainID] = req
-	}
 }
 
 const keyLength = state.TrieKeyLength
