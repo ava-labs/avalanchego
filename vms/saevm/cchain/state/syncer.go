@@ -22,8 +22,8 @@ func RegisterSyncHandler(n *p2p.Network, state *State) error {
 	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength)
 }
 
-// Syncer fetches the atomic trie from peers, applies it to a [State], and
-// updates shared memory as it goes.
+// Syncer fetches the cross-chain state from peers, applies it to a [State],
+// and updates shared memory as it goes.
 type Syncer struct {
 	fetcher *hashdb.Client
 
@@ -32,7 +32,7 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new atomic syncer. The syncer will start with a call to [Syncer.Sync].
+// NewSyncer creates a new cross-chain trie syncer.
 func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
 	return &Syncer{
 		fetcher: hashdb.NewClient(
@@ -48,7 +48,7 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 	}
 }
 
-// Sync fetches the atomic trie from a peer and applies it to the state,
+// Sync fetches cross-chain state from a peer and applies it to the [State],
 // updating shared memory as it goes. Any error MUST be treated as fatal.
 func (s *Syncer) Sync(ctx context.Context) error {
 	// The fetcher only responds to requests for non-empty roots. And if we
@@ -60,7 +60,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	}
 
 	// Update the shared memory markers to tip, since we have the most recent state
-	// The recent blocks may not have had any atomic txs.
+	// The recent blocks MAY have had no cchain txs.
 	if s.state.currentHeight.Load() < s.targetHeight {
 		if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), s.targetHeight, s.targetRoot, nil); err != nil {
 			return fmt.Errorf("committing synced height %d: %w", s.targetHeight, err)
@@ -155,8 +155,8 @@ func (w *heightBatch) add(key, val []byte) {
 	w.vals = append(w.vals, val)
 }
 
-// commit inserts all pending operations at a height to the [triedb.Database]
-// and to shared memory.
+// commit inserts keys and values for a height to the [triedb.Database] and to
+// shared memory.
 func (s *Syncer) commit(b heightBatch) error {
 	if len(b.keys) == 0 {
 		return nil
