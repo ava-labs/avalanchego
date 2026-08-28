@@ -12,9 +12,11 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p",
+        "//utils/logging",
         "//utils/set",
         "@com_github_ava_labs_libevm//libevm/options",
         "@org_golang_google_protobuf//proto",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
@@ -32,6 +34,7 @@ go_test(
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//version",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_google_go_cmp//cmp",

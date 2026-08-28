@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -36,6 +38,7 @@ type ProtoMessage[T any] interface {
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
 type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
+	log    logging.Logger
 	client *p2p.Client
 	peers  *p2p.PeerTracker
 	policy retryPolicy
@@ -43,12 +46,15 @@ type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
 func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
+	log logging.Logger,
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
 	opts ...RetryOption,
 ) *Dispatcher[Req, V, Resp] {
 	return &Dispatcher[Req, V, Resp]{
+		// Tagged once, so every retry line names the RPC without each caller repeating it.
+		log:    log.With(zap.Uint64("handlerID", handlerID)),
 		client: n.NewClient(handlerID, noopSampler{}),
 		peers:  peers,
 		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
@@ -56,21 +62,21 @@ func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
 }
 
 // Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// Each attempt gets its own response.
+// verify receives the peer that served the response, so a rejection can name it.
 func (d *Dispatcher[Req, V, Resp]) Send(
 	ctx context.Context,
 	req Req,
-	verify func(Resp) error,
+	verify func(Resp, ids.NodeID) error,
 ) (Resp, error) {
-	return doRetry(ctx, d.policy, verify, func() (Resp, *Outcome, error) {
+	return doRetry(ctx, d.log, d.policy, verify, func() (Resp, ids.NodeID, *Outcome, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
 			var zero Resp
-			return zero, nil, errNoPeers
+			return zero, ids.EmptyNodeID, nil, errNoPeers
 		}
 		resp := Resp(new(V))
 		outcome, err := d.SendTo(ctx, nodeID, req, resp)
-		return resp, outcome, err
+		return resp, nodeID, outcome, err
 	})
 }
 

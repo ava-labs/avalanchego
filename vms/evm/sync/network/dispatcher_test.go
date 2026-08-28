@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/version"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -228,6 +229,7 @@ func newTestDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
 ) *Dispatcher[Req, V, Resp] {
 	t.Helper()
 	return &Dispatcher[Req, V, Resp]{
+		log:    loggingtest.New(t, logging.Debug),
 		client: p2ptest.NewSelfClient(t, ctx, nodeID, h),
 		peers:  peers,
 	}

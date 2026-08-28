@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -281,9 +282,12 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
 	resp, err := c.Send(ctx, req,
-		func(resp *syncpb.GetCodeResponse) error {
+		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) error {
 			if err := verifyCode(hashes, resp.GetData()); err != nil {
-				log.Debug("invalid code response, re-requesting", zap.Error(err))
+				log.Debug("invalid code response, re-requesting",
+					zap.Stringer("nodeID", nodeID),
+					zap.Error(err),
+				)
 				return err
 			}
 			return nil

@@ -11,7 +11,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // RetryOption overrides a retry setting on [NewDispatcher].
@@ -92,9 +96,10 @@ func classify(err error) retryClass {
 // error. attempt must return a fresh response each call so failures never merge.
 func doRetry[Resp proto.Message](
 	ctx context.Context,
+	log logging.Logger,
 	policy retryPolicy,
-	verify func(Resp) error,
-	attempt func() (Resp, *Outcome, error),
+	verify func(Resp, ids.NodeID) error,
+	attempt func() (Resp, ids.NodeID, *Outcome, error),
 ) (Resp, error) {
 	var (
 		zero           Resp
@@ -108,11 +113,13 @@ func doRetry[Resp proto.Message](
 		}
 
 		attempts++
-		resp, outcome, err := attempt()
+		resp, nodeID, outcome, err := attempt()
 		var wait time.Duration
 		switch err {
 		case nil:
-			verifyErr := verify(resp)
+			// verify reports its own rejection, since only the caller knows what
+			// made the response wrong.
+			verifyErr := verify(resp, nodeID)
 			if verifyErr == nil {
 				outcome.Success()
 				return resp, nil
@@ -126,10 +133,15 @@ func doRetry[Resp proto.Message](
 			case retryFatal:
 				return zero, retryFailure(err, lastErr, attempts)
 			case retryNoPeers:
+				log.Debug("no peer available, retrying", zap.Error(err))
 				lastErr = err
 				wait = policy.noPeersBackoff(noPeerAttempts)
 				noPeerAttempts++
 			default:
+				log.Debug("request failed, retrying",
+					zap.Stringer("nodeID", nodeID),
+					zap.Error(err),
+				)
 				lastErr = err
 				noPeerAttempts = 0
 				wait = policy.peerFailureBackoff

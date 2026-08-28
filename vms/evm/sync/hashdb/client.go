@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
@@ -45,6 +46,7 @@ func NewClient(
 	return &Client{
 		log: log,
 		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
+			log,
 			n,
 			handlerID,
 			peers,
@@ -82,10 +84,13 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 
 	var more bool
 	resp, err := c.sender.Send(ctx, reqPB,
-		func(resp *syncpb.GetLeafResponse) error {
+		func(resp *syncpb.GetLeafResponse, nodeID ids.NodeID) error {
 			m, err := verifyRange(c.minKey, req, resp)
 			if err != nil {
-				c.log.Debug("invalid leaf response, re-requesting", zap.Error(err))
+				c.log.Debug("invalid leaf response, re-requesting",
+					zap.Stringer("nodeID", nodeID),
+					zap.Error(err),
+				)
 				return err
 			}
 			more = m
