@@ -105,7 +105,7 @@ func TestFeeManagerHeliconRetirement(t *testing.T) {
 
 	for _, tc := range feemanagertest.RetirementCases(helicon) {
 		t.Run(tc.Name, func(t *testing.T) {
-			snowCtx, _ := newSnowCtx(t, upgradetest.GetConfig(upgradetest.Helicon))
+			snowCtx := newSnowCtx(t, upgradetest.GetConfig(upgradetest.Helicon))
 			vm, _, err := tryInitVM(t, t.Context(), snowCtx, memdb.New(), nil,
 				feemanagertest.EncodeGenesisJSON(t, base, tc),
 				feemanagertest.EncodeUpgradeBytesJSON(t, tc),

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 var _ Backend = (*backend)(nil)
@@ -32,6 +33,16 @@ func (b backend) IsAcceptedBlock(_ context.Context, id ids.ID) error {
 	return nil
 }
 
+// stubAddressedCallVerifier is an [AddressedCallVerifier] returning a fixed
+// result for every addressed call.
+type stubAddressedCallVerifier struct {
+	err *common.AppError
+}
+
+func (v stubAddressedCallVerifier) VerifyAddressedCall(*payload.AddressedCall) *common.AppError {
+	return v.err
+}
+
 func TestVerifier(t *testing.T) {
 	addressedCallMsg, _ := newAddressedCall(t)
 	hashMsg, hash := newHash(t)
@@ -39,10 +50,15 @@ func TestVerifier(t *testing.T) {
 	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, nil)
 	require.NoErrorf(t, err, "warp.NewUnsignedMessage(%s, %s, nil)", constants.UnitTestID, snowtest.XChainID)
 
+	errRefused := &common.AppError{
+		Code: 12345, // outside this package's reserved code range
+	}
+
 	tests := []struct {
 		name           string
 		acceptedBlocks set.Set[ids.ID]
 		storage        *Storage
+		addressedCall  AddressedCallVerifier
 		m              *warp.UnsignedMessage
 		want           *common.AppError
 	}{
@@ -80,6 +96,21 @@ func TestVerifier(t *testing.T) {
 			},
 		},
 		{
+			name:          "addressed_call_accepted_by_extension",
+			storage:       NewStorage(memdb.New()),
+			addressedCall: stubAddressedCallVerifier{},
+			m:             addressedCallMsg,
+		},
+		{
+			name:    "addressed_call_refused_by_extension",
+			storage: NewStorage(memdb.New()),
+			addressedCall: stubAddressedCallVerifier{
+				err: errRefused,
+			},
+			m:    addressedCallMsg,
+			want: errRefused,
+		},
+		{
 			name:           "accepted_block",
 			acceptedBlocks: set.Of(hash.Hash),
 			storage:        NewStorage(memdb.New()),
@@ -99,7 +130,7 @@ func TestVerifier(t *testing.T) {
 			v := NewVerifier(
 				backend(test.acceptedBlocks),
 				test.storage,
-				nil,
+				test.addressedCall,
 			)
 			err := v.Verify(t.Context(), test.m, nil)
 			require.ErrorIsf(t, err, test.want, "%T.Verify(...)", v)

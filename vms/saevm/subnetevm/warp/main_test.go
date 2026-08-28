@@ -4,8 +4,9 @@
 package warp
 
 import (
-	"os"
 	"testing"
+
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -16,5 +17,5 @@ import (
 func TestMain(m *testing.M) {
 	core.RegisterExtras()
 	params.RegisterExtras()
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }

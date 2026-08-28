@@ -55,6 +55,10 @@ func newAccessListTx(accessList types.AccessList) *types.Transaction {
 	return types.NewTx(&types.DynamicFeeTx{AccessList: accessList})
 }
 
+// TestVerifyBlock covers the subnet-evm glue around
+// [saewarp.VerifyBlockPredicates]: predicaters sourced from [extras.Rules] and
+// the block-context translation. The filtering and bit-indexing matrix is
+// pinned by the shared engine's own tests.
 func TestVerifyBlock(t *testing.T) {
 	var (
 		addr0 = common.Address{0}
@@ -65,16 +69,6 @@ func TestVerifyBlock(t *testing.T) {
 		})
 		invalidTx = newAccessListTx(types.AccessList{
 			{Address: addr0, StorageKeys: invalidPredicate},
-		})
-		mixedTx = newAccessListTx(types.AccessList{
-			{Address: addr0, StorageKeys: validPredicate},
-			{Address: addr1, StorageKeys: invalidPredicate},
-			{Address: addr0, StorageKeys: invalidPredicate},
-			{Address: addr0, StorageKeys: invalidPredicate},
-			{Address: addr1, StorageKeys: validPredicate},
-			{Address: addr1, StorageKeys: validPredicate},
-			{Address: addr1, StorageKeys: invalidPredicate},
-			{Address: addr1, StorageKeys: validPredicate},
 		})
 	)
 	tests := []struct {
@@ -90,11 +84,6 @@ func TestVerifyBlock(t *testing.T) {
 			txs:  []*types.Transaction{validTx},
 		},
 		{
-			name:      "no_predicates",
-			contracts: []common.Address{addr0},
-			txs:       []*types.Transaction{newAccessListTx(nil)},
-		},
-		{
 			name:      "filtered_predicates",
 			contracts: []common.Address{addr0},
 			txs: []*types.Transaction{newAccessListTx(types.AccessList{
@@ -108,41 +97,7 @@ func TestVerifyBlock(t *testing.T) {
 			wantErr:   saewarp.ErrNoBlockContext,
 		},
 		{
-			name:         "one_tx_one_address_one_predicate",
-			contracts:    []common.Address{addr0},
-			blockContext: &block.Context{},
-			txs:          []*types.Transaction{validTx},
-			want: predicate.BlockResults{
-				validTx.Hash(): {
-					addr0: set.NewBits(),
-				},
-			},
-		},
-		{
-			name:         "one_tx_one_address_one_invalid_predicate",
-			contracts:    []common.Address{addr0},
-			blockContext: &block.Context{},
-			txs:          []*types.Transaction{invalidTx},
-			want: predicate.BlockResults{
-				invalidTx.Hash(): {
-					addr0: set.NewBits(0),
-				},
-			},
-		},
-		{
-			name:         "two_addresses_mixed_predicates",
-			contracts:    []common.Address{addr0, addr1},
-			blockContext: &block.Context{},
-			txs:          []*types.Transaction{mixedTx},
-			want: predicate.BlockResults{
-				mixedTx.Hash(): {
-					addr0: set.NewBits(1, 2),
-					addr1: set.NewBits(0, 3),
-				},
-			},
-		},
-		{
-			name:         "multiple_txs",
+			name:         "valid_and_invalid_predicates",
 			contracts:    []common.Address{addr0},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{

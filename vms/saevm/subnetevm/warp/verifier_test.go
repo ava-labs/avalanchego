@@ -4,190 +4,107 @@
 package warp
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
-type blocks struct {
-	accepted set.Set[ids.ID]
-}
-
-func newBlocks(ids ...ids.ID) blocks {
-	return blocks{
-		set.Of(ids...),
-	}
-}
-
-func (b blocks) IsAcceptedBlock(_ context.Context, id ids.ID) error {
-	if !b.accepted.Contains(id) {
-		return database.ErrNotFound
-	}
-	return nil
-}
-
-// stubUptime is a minimal `UptimeSource` for tests. It
-// returns `uptime` for any `validationID` it has been told about
-// (via `set`), and `errNotFound` otherwise.
-type stubUptime struct {
-	uptimes map[ids.ID]time.Duration
-}
-
-func newStubUptime() *stubUptime {
-	return &stubUptime{uptimes: make(map[ids.ID]time.Duration)}
-}
-
-func (s *stubUptime) set(validationID ids.ID, d time.Duration) {
-	s.uptimes[validationID] = d
-}
+// stubUptime is a minimal [UptimeSource] mapping validation IDs to uptimes.
+// Unknown validation IDs return [errStubUptimeUnknown].
+type stubUptime map[ids.ID]time.Duration
 
 var errStubUptimeUnknown = errors.New("stub uptime: unknown validation id")
 
-func (s *stubUptime) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
-	d, ok := s.uptimes[validationID]
+func (s stubUptime) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
+	d, ok := s[validationID]
 	if !ok {
 		return 0, time.Time{}, errStubUptimeUnknown
 	}
 	return d, time.Time{}, nil
 }
 
-// newOffchainAddressedCall builds a `*payload.AddressedCall` with an
-// EMPTY source address (offchain message), wrapping `inner`. The
-// verifier requires source addresses to be empty for addressed calls,
-// so the storage_test.go helper (which hard-codes a 20-byte random
-// source) is unsuitable for verifier success-path tests.
-func newOffchainAddressedCall(tb testing.TB, inner []byte) *warp.UnsignedMessage {
+func newAddressedCall(tb testing.TB, sourceAddress, data []byte) *payload.AddressedCall {
 	tb.Helper()
-	p, err := payload.NewAddressedCall(nil, inner)
-	require.NoError(tb, err)
-	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
-	require.NoError(tb, err)
-	return m
+	p, err := payload.NewAddressedCall(sourceAddress, data)
+	require.NoError(tb, err, "payload.NewAddressedCall()")
+	return p
 }
 
-// newUptimeMessage builds an offchain (empty-source) addressed-call
-// warp message carrying a `*messages.ValidatorUptime` for
-// `validationID` claiming `totalUptime` seconds.
-func newUptimeMessage(tb testing.TB, validationID ids.ID, totalUptime uint64) *warp.UnsignedMessage {
+// newUptimeCall builds an offchain (empty-source) addressed call carrying a
+// `*messages.ValidatorUptime` for validationID claiming totalUptime seconds.
+func newUptimeCall(tb testing.TB, validationID ids.ID, totalUptime uint64) *payload.AddressedCall {
 	tb.Helper()
 	uptimeMsg, err := messages.NewValidatorUptime(validationID, totalUptime)
-	require.NoError(tb, err)
-	return newOffchainAddressedCall(tb, uptimeMsg.Bytes())
+	require.NoError(tb, err, "messages.NewValidatorUptime()")
+	return newAddressedCall(tb, nil, uptimeMsg.Bytes())
 }
 
-func TestVerifier(t *testing.T) {
-	addressedCallMsg := newAddressedCall(t, []byte("test"))
-	hashMsg, hash := newHash(t)
-
-	invalidPayloadMsg, err := warp.NewUnsignedMessage(networkID, sourceChainID, nil)
-	require.NoError(t, err)
-
-	// `addressedCallMsg` carries a non-empty source address (see
-	// `newAddressedCall` in storage_test.go), so it must trip the
-	// "source address should be empty" check.
-	nonEmptySourceMsg := addressedCallMsg
-
-	// Empty-source addressed call wrapping unknown inner bytes: must
-	// reach the inner `messages.Parse` arm and fail with ParseErrCode.
-	unknownInnerMsg := newOffchainAddressedCall(t, []byte("not a known message"))
-
-	var (
-		knownVID    = ids.GenerateTestID()
-		unknownVID  = ids.GenerateTestID()
-		uptimeOK    = newUptimeMessage(t, knownVID, 60)
-		uptimeShort = newUptimeMessage(t, knownVID, 120)
-		uptimeMiss  = newUptimeMessage(t, unknownVID, 1)
-	)
-
+// TestUptimeVerifier covers subnet-evm's [saewarp.AddressedCallVerifier]
+// extension. The shared verifier's storage/block/dispatch behaviour is pinned
+// by the shared package's own tests.
+func TestUptimeVerifier(t *testing.T) {
+	validationID := ids.GenerateTestID()
 	tests := []struct {
-		name             string
-		acceptedBlocks   []ids.ID
-		acceptedMessages []*warp.UnsignedMessage
-		uptime           func() *stubUptime
-		m                *warp.UnsignedMessage
-		want             *common.AppError
+		name   string
+		uptime UptimeSource
+		call   *payload.AddressedCall
+		want   *common.AppError
 	}{
 		{
-			name: "known_message",
-			acceptedMessages: []*warp.UnsignedMessage{
-				addressedCallMsg,
-			},
-			m: addressedCallMsg,
-		},
-		{
-			name: "invalid_payload",
-			m:    invalidPayloadMsg,
-			want: &common.AppError{
-				Code: ParseErrCode,
-			},
-		},
-		{
-			name: "addressed_call_non_empty_source_address",
-			m:    nonEmptySourceMsg,
+			name: "non_empty_source_address",
+			call: newAddressedCall(t, utils.RandomBytes(20), []byte("test")),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
 		},
 		{
-			name: "addressed_call_unknown_message_type",
-			m:    unknownInnerMsg,
+			name: "unknown_message_type",
+			call: newAddressedCall(t, nil, []byte("not a known message")),
 			want: &common.AppError{
 				Code: ParseErrCode,
 			},
 		},
 		{
-			name: "accepted_block",
-			acceptedBlocks: []ids.ID{
-				hash.Hash,
-			},
-			m: hashMsg,
-		},
-		{
-			name: "unaccepted_block",
-			m:    hashMsg,
+			name: "no_uptime_source",
+			call: newUptimeCall(t, validationID, 60),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
 		},
 		{
-			name: "uptime_ok",
-			uptime: func() *stubUptime {
-				s := newStubUptime()
-				s.set(knownVID, 60*time.Second)
-				return s
+			name: "uptime_sufficient",
+			uptime: stubUptime{
+				validationID: 60 * time.Second,
 			},
-			m: uptimeOK,
+			call: newUptimeCall(t, validationID, 60),
 		},
 		{
 			name: "uptime_insufficient",
-			uptime: func() *stubUptime {
-				s := newStubUptime()
-				s.set(knownVID, 60*time.Second)
-				return s
+			uptime: stubUptime{
+				validationID: 59 * time.Second,
 			},
-			m: uptimeShort,
+			call: newUptimeCall(t, validationID, 60),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
 		},
 		{
-			name:   "uptime_unknown_validation_id",
-			uptime: newStubUptime,
-			m:      uptimeMiss,
+			name:   "unknown_validation_id",
+			uptime: stubUptime{},
+			call:   newUptimeCall(t, validationID, 60),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
@@ -195,22 +112,23 @@ func TestVerifier(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Keep `uptime` as a genuinely nil
-			// `UptimeSource` interface (NOT a non-nil interface
-			// holding a nil `*stubUptime`) when the test does not
-			// configure one, so the verifier's `v.uptime == nil`
-			// check fires.
-			var uptime UptimeSource
-			if test.uptime != nil {
-				uptime = test.uptime()
-			}
-			v := NewVerifier(
-				newBlocks(test.acceptedBlocks...),
-				saewarp.NewStorage(memdb.New(), test.acceptedMessages...),
-				uptime,
-			)
-			err := v.Verify(t.Context(), test.m, nil)
-			require.ErrorIs(t, err, test.want)
+			v := &UptimeVerifier{uptime: test.uptime}
+			err := v.VerifyAddressedCall(test.call)
+			require.ErrorIs(t, err, test.want, "VerifyAddressedCall()")
 		})
 	}
+}
+
+// TestNewVerifier checks that [NewVerifier] wires the [UptimeVerifier] into
+// the shared verifier's addressed-call extension point.
+func TestNewVerifier(t *testing.T) {
+	validationID := ids.GenerateTestID()
+	call := newUptimeCall(t, validationID, 60)
+	m, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), call.Bytes())
+	require.NoError(t, err, "warp.NewUnsignedMessage()")
+
+	v := NewVerifier(nil, saewarp.NewStorage(memdb.New()), stubUptime{
+		validationID: 60 * time.Second,
+	})
+	require.Nil(t, v.Verify(t.Context(), m, nil), "Verify() of a sufficient uptime message")
 }

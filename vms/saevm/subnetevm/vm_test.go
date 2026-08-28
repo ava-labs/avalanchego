@@ -23,10 +23,12 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -37,15 +39,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api/client"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -63,8 +63,9 @@ type SUT struct {
 	client *client.Client
 
 	// Wallet for issuing transactions
-	ethWallet     *saetest.Wallet
-	validatorKeys []*localsigner.LocalSigner
+	ethWallet *saetest.Wallet
+	// BLS warp validator set served by the snow context's validator state.
+	validators *warptest.Validators
 
 	// See [SUT.verifyWarpMessage]
 	appResponse chan []byte
@@ -111,6 +112,11 @@ type (
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
+}
 
 func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	t.Helper()
@@ -197,16 +203,27 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 // Each boot constructs a new `snowCtx` so the embedded metrics registry
 // is fresh; otherwise the `"sae"` namespace would conflict on restart.
 // Validator-state customisations from [sutConfig.configureValidatorState]
-// are re-applied; the per-validator BLS keys are regenerated on each
-// boot, so tests that hold onto [SUT.validatorKeys] across a restart
-// must re-read them.
+// are re-applied; the validator set (and its BLS keys) is regenerated on
+// each boot, so tests that hold onto [SUT.validators] across a restart
+// must re-read it.
 func (s *SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	t.Helper()
 
-	snowCtx, validatorKeys := newSnowCtx(t, s.upgrades)
+	snowCtx := newSnowCtx(t, s.upgrades)
+	vdrs := warptest.NewValidators(t, warptest.WithMinimum(2))
+	warptest.SetValidators(t, snowCtx, vdrs)
+	// Safe: `newSnowCtx` always installs a `*validatorstest.State`.
+	validatorState := snowCtx.ValidatorState.(*validatorstest.State)
+	// Default to an empty current validator set so that tests which don't
+	// care about uptime tracking still drive `vm.SetState(NormalOp)`
+	// successfully (the uptime tracker calls `GetCurrentValidatorSet`
+	// during its first `Sync`). The uptime-specific tests overwrite this
+	// via [withCurrentValidatorSet].
+	validatorState.GetCurrentValidatorSetF = func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+		return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
+	}
 	if s.cfg.configureValidatorState != nil {
-		// Safe: `newSnowCtx` always installs a `*validatorstest.State`.
-		s.cfg.configureValidatorState(snowCtx.ValidatorState.(*validatorstest.State))
+		s.cfg.configureValidatorState(validatorState)
 	}
 
 	vm, appSender, shutdownVM, err := initVM(s.ctx, snowCtx, s.baseDB, clockTime, s.genesisBytes, s.upgradeBytes, s.configBytes)
@@ -236,7 +253,7 @@ func (s *SUT) bootVM(t *testing.T, clockTime *time.Time) {
 
 	s.vm = vm
 	s.snowCtx = snowCtx
-	s.validatorKeys = validatorKeys
+	s.validators = vdrs
 	s.client = c
 	s.shutdownVM = shutdownVM
 	s.apiServer = apiServer
@@ -756,70 +773,10 @@ func mustMarshalJSON(t *testing.T, v interface{}) []byte {
 	return bytes
 }
 
-func newSnowCtx(t *testing.T, upgrades upgrade.Config) (*snow.Context, []*localsigner.LocalSigner) {
+func newSnowCtx(t *testing.T, upgrades upgrade.Config) *snow.Context {
 	t.Helper()
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.NetworkUpgrades = upgrades
-	validatorState, validatorKeys := newValidatorState(snowCtx.SubnetID)
-	snowCtx.ValidatorState = validatorState
-	return snowCtx, validatorKeys
-}
-
-func newValidatorState(subnetID ids.ID) (*validatorstest.State, []*localsigner.LocalSigner) {
-	const (
-		numValidators      = 2
-		weightPerValidator = 50
-	)
-
-	secretKeys := make([]*localsigner.LocalSigner, numValidators)
-	nodeIDs := make([]ids.NodeID, numValidators)
-	for i := range numValidators {
-		key, _ := localsigner.New() // Uses rand, never returns error
-		secretKeys[i] = key
-		nodeIDs[i] = ids.GenerateTestNodeID()
-	}
-
-	return &validatorstest.State{
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
-		},
-		GetMinimumHeightF: func(context.Context) (uint64, error) {
-			return 0, nil
-		},
-		GetCurrentHeightF: func(context.Context) (uint64, error) {
-			return 0, nil
-		},
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return subnetID, nil
-		},
-		// Default to an empty current validator set so that tests which
-		// don't care about uptime tracking still drive `vm.SetState(NormalOp)`
-		// successfully (the uptime tracker calls
-		// `GetCurrentValidatorSet` during its first `Sync`). The
-		// uptime-specific tests overwrite this via [withCurrentValidatorSet].
-		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-			return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
-		},
-		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-			warpValidators := make([]*validators.Warp, numValidators)
-			for i := range numValidators {
-				warpValidators[i] = &validators.Warp{
-					PublicKey:      secretKeys[i].PublicKey(),
-					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(secretKeys[i].PublicKey()),
-					Weight:         50,
-					NodeIDs:        []ids.NodeID{nodeIDs[i]},
-				}
-			}
-			validatorSet := validators.WarpSet{
-				Validators:  warpValidators,
-				TotalWeight: weightPerValidator * numValidators,
-			}
-			utils.Sort(validatorSet.Validators)
-
-			return map[ids.ID]validators.WarpSet{
-				subnetID: validatorSet,
-			}, nil
-		},
-	}, secretKeys
+	return snowCtx
 }

@@ -6,7 +6,6 @@ package subnetevm
 import (
 	"maps"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -27,22 +25,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
-
-func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
-	os.Exit(m.Run())
-}
 
 // withWarpEnabled schedules the `warp` precompile at genesis so that the SAE
 // block builder populates predicate bytes in `header.Extra` and ABI calls to
@@ -152,25 +144,25 @@ func TestPredicateVerification(t *testing.T) {
 		{
 			name:           "valid warp message",
 			validPredicate: true,
-			signedMsg:      sut.signWarpMessage(t, addressedCallMessage),
+			signedMsg:      sut.validators.Sign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "invalid warp message",
 			validPredicate: false,
-			signedMsg:      fakeSign(t, addressedCallMessage),
+			signedMsg:      warptest.IncorrectlySign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "valid warp block hash",
 			validPredicate: true,
-			signedMsg:      sut.signWarpMessage(t, blockHashMessage),
+			signedMsg:      sut.validators.Sign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 		{
 			name:           "invalid warp block hash",
 			validPredicate: false,
-			signedMsg:      fakeSign(t, blockHashMessage),
+			signedMsg:      warptest.IncorrectlySign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 	}
@@ -255,48 +247,6 @@ func (s *SUT) sendWarpTx(
 
 	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
-}
-
-func (s *SUT) signWarpMessage(
-	t *testing.T,
-	unsignedMessage *avalancheWarp.UnsignedMessage,
-) *avalancheWarp.Message {
-	t.Helper()
-
-	signatures := make([]*bls.Signature, len(s.validatorKeys))
-	for i, key := range s.validatorKeys {
-		signature, err := key.Sign(unsignedMessage.Bytes())
-		require.NoError(t, err)
-		signatures[i] = signature
-	}
-
-	aggregatedSignature, err := bls.AggregateSignatures(signatures)
-	require.NoError(t, err)
-
-	signersBitSet := set.NewBits()
-	signersBitSet.Add(0)
-	signersBitSet.Add(1)
-
-	warpSignature := &avalancheWarp.BitSetSignature{
-		Signers: signersBitSet.Bytes(),
-	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregatedSignature))
-
-	signedMessage, err := avalancheWarp.NewMessage(unsignedMessage, warpSignature)
-	require.NoError(t, err)
-	return signedMessage
-}
-
-func fakeSign(t *testing.T, unsignedMessage *avalancheWarp.UnsignedMessage) *avalancheWarp.Message {
-	t.Helper()
-
-	warpSignature := &avalancheWarp.BitSetSignature{
-		Signers:   set.NewBits().Bytes(),
-		Signature: [96]byte{1, 2, 3},
-	}
-	signedMessage, err := avalancheWarp.NewMessage(unsignedMessage, warpSignature)
-	require.NoError(t, err)
-	return signedMessage
 }
 
 // verifyWarpMessage sends a message to the warp handler and verifies that the
