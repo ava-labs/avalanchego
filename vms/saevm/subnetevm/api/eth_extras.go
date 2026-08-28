@@ -15,7 +15,7 @@ import (
 	libevmparams "github.com/ava-labs/libevm/params"
 )
 
-// EthExtrasAPI serves the subnet-evm-specifi`eth_*` JSON-RPC
+// EthExtrasAPI serves the subnet-evm-specific `eth_*` JSON-RPC
 // methods, with wire shapes matching legacy subnet-evm.
 type EthExtrasAPI struct {
 	backend rpc.GethBackends
@@ -28,12 +28,17 @@ func NewEthExtrasAPI(backend rpc.GethBackends) *EthExtrasAPI {
 }
 
 // ActivePrecompilesResult is the per-precompile entry in
-// [ActiveRulesResult.ActivePrecompiles].
+// [ActiveRulesResult.ActivePrecompiles]. It mirrors the legacy type of the
+// same name in `graft/subnet-evm/internal/ethapi/api_extra.go`, which is
+// unimportable (internal); keep the two in sync.
 type ActivePrecompilesResult struct {
 	Timestamp uint64 `json:"timestamp"`
 }
 
-// ActiveRulesResult is the response shape of `eth_getActiveRulesAt`.
+// ActiveRulesResult is the response shape of `eth_getActiveRulesAt`. It
+// mirrors the legacy type of the same name in
+// `graft/subnet-evm/internal/ethapi/api_extra.go`, which is unimportable
+// (internal); keep the two in sync.
 type ActiveRulesResult struct {
 	EthRules          libevmparams.Rules                 `json:"ethRules"`
 	AvalancheRules    extras.AvalancheRules              `json:"avalancheRules"`

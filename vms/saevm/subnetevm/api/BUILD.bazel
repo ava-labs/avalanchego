@@ -11,6 +11,7 @@ go_library(
     deps = [
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/plugin/evm/client",
         "//ids",
         "//network/p2p",
         "//snow/validators",

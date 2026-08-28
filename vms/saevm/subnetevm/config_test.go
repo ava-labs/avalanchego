@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,7 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c, err := ParseConfig(test.bytes)
+			c, err := parseConfig(test.bytes)
 			require.ErrorIs(t, err, test.wantErr)
 			if test.wantErr == nil {
 				require.Equal(t, test.want, c.FeeRecipient)
@@ -70,22 +71,22 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 // that operator overrides via flat legacy-shaped JSON keys take
 // effect.
 func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
-	defaults := DefaultConfig()
+	defaults := defaultConfig()
 
 	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
-		c, err := ParseConfig(nil)
+		c, err := parseConfig(nil)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("empty_object_yields_defaults", func(t *testing.T) {
-		c, err := ParseConfig([]byte(`{}`))
+		c, err := parseConfig([]byte(`{}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := ParseConfig([]byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
+		c, err := parseConfig([]byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
 		require.NoError(t, err)
 		require.Equal(t, uint64(42), c.TxPoolPriceLimit)
 		require.Equal(t, uint64(1234), c.RPCGasCap)
@@ -99,7 +100,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		// `state-sync-enabled`, but stands in for ~60 others) must
 		// surface as an explicit decoder error rather than silently
 		// no-op.
-		_, err := ParseConfig([]byte(`{"state-sync-enabled":true}`))
+		_, err := parseConfig([]byte(`{"state-sync-enabled":true}`))
 		// JSON decoder does not expose a sentinel error for unknown fields,
 		// so we check for the presence of the field name and "unknown field" in the error message.
 		require.Contains(t, err.Error(), "state-sync-enabled")
@@ -108,12 +109,12 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 
 	t.Run("duration_accepts_string_and_numeric", func(t *testing.T) {
 		t.Run("string", func(t *testing.T) {
-			c, err := ParseConfig([]byte(`{"tx-pool-lifetime":"30m"}`))
+			c, err := parseConfig([]byte(`{"tx-pool-lifetime":"30m"}`))
 			require.NoError(t, err)
 			require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
 		})
 		t.Run("numeric_nanoseconds", func(t *testing.T) {
-			c, err := ParseConfig([]byte(`{"tx-pool-lifetime":900000000000}`))
+			c, err := parseConfig([]byte(`{"tx-pool-lifetime":900000000000}`))
 			require.NoError(t, err)
 			require.Equal(t, 15*time.Minute, c.TxPoolLifetime.Duration)
 		})
@@ -122,47 +123,50 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	t.Run("marshal_roundtrip", func(t *testing.T) {
 		out, err := json.Marshal(defaults)
 		require.NoError(t, err)
-		c, err := ParseConfig(out)
+		c, err := parseConfig(out)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("log_level_and_format", func(t *testing.T) {
-		c, err := ParseConfig([]byte(`{"log-level":"debug"}`))
+		c, err := parseConfig([]byte(`{"log-level":"debug"}`))
 		require.NoError(t, err)
 		require.Equal(t, "debug", c.LogLevel)
 	})
 }
 
-// TestConfig_Converters spot-checks the SAE-config-shape outputs of
-// the converter methods so the Initialize-time wiring keeps matching
-// what operators wrote.
-func TestConfig_Converters(t *testing.T) {
-	c := DefaultConfig()
+// TestConfig_SAEConfig spot-checks the [sae.Config] produced from operator
+// fields so the Initialize-time wiring keeps matching what operators wrote.
+func TestConfig_SAEConfig(t *testing.T) {
+	c := defaultConfig()
 	c.RPCGasCap = 1
 	c.RPCTxFeeCap = 2
 	c.LocalTxsEnabled = true
 	c.TxPoolPriceLimit = 3
-	c.TxPoolLifetime = Duration{42 * time.Second}
+	c.TxPoolLifetime = duration{42 * time.Second}
 	c.PruningEnabled = false
 	c.CommitInterval = 8192
 
-	mp := c.toMempoolConfig()
-	require.False(t, mp.NoLocals, "LocalTxsEnabled=true => NoLocals=false")
-	require.Equal(t, uint64(3), mp.PriceLimit)
-	require.Equal(t, 42*time.Second, mp.Lifetime)
+	got := c.saeConfig(nil)
+	require.False(t, got.MempoolConfig.NoLocals, "LocalTxsEnabled=true => NoLocals=false")
+	require.Equal(t, uint64(3), got.MempoolConfig.PriceLimit)
+	require.Equal(t, 42*time.Second, got.MempoolConfig.Lifetime)
+	require.Equal(t, uint64(1), got.RPCConfig.GasCap)
+	require.InDelta(t, 2.0, got.RPCConfig.TxFeeCap, 0)
+	require.True(t, got.DBConfig.Archival, "PruningEnabled=false => Archival=true")
+	require.Equal(t, uint64(8192), got.DBConfig.CommitInterval)
 
-	rp := c.toRPCConfig()
-	require.Equal(t, uint64(1), rp.GasCap)
-	require.InDelta(t, 2.0, rp.TxFeeCap, 0)
+	// Defaults round-trip to the legacy-equivalent SAE state: pruning on
+	// (Archival=false), commit interval at the saedb default.
+	d := defaultConfig().saeConfig(nil)
+	require.False(t, d.DBConfig.Archival)
+	require.Equal(t, uint64(saedb.DefaultCommitInterval), d.DBConfig.CommitInterval)
+}
 
-	db := c.toDBConfig()
-	require.True(t, db.Archival, "PruningEnabled=false => Archival=true")
-	require.Equal(t, uint64(8192), db.CommitInterval)
-
-	// Defaults round-trip through the converter to the legacy-equivalent
-	// SAE state: pruning on (Archival=false), commit interval 4096.
-	d := DefaultConfig().toDBConfig()
-	require.False(t, d.Archival)
-	require.Equal(t, uint64(4096), d.CommitInterval)
+// TestParseConfig_ValidatesSAEConfig pins parse-time validation of the
+// derived SAE configuration: values the SAE core would only reject at
+// runtime (or worse, divide by) MUST fail at chain-config parse time.
+func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
+	_, err := parseConfig([]byte(`{"commit-interval":0}`))
+	require.Error(t, err, "commit-interval 0 must be rejected at parse time")
 }

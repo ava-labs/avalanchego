@@ -39,7 +39,6 @@ go_library(
         "//api",
         "//api/metrics",
         "//database",
-        "//database/prefixdb",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",

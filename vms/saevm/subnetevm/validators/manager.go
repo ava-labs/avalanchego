@@ -4,9 +4,6 @@
 // Package validators owns the SAE-side validator-uptime lifecycle:
 // it wraps an `*uptimetracker.UptimeTracker` and runs the periodic
 // `Sync` goroutine that kicks in on `snow.NormalOp`.
-// `*subnetevm.VM` holds a single `*Manager` instead of a fistful of
-// fields, and its lifecycle methods (`Connected`, `Disconnected`,
-// `SetState`, `Shutdown`) forward into this package.
 package validators
 
 import (
@@ -35,14 +32,14 @@ const syncFrequency = 1 * time.Minute
 // `*uptimetracker.UptimeTracker`.
 var dbPrefix = []byte("validators")
 
-// Manager owns the validator-uptime lifecycle for `*subnetevm.VM`.
-// Construct via [New]; close via [Manager.Shutdown].
+// An Uptime owns the validator-uptime lifecycle for `*subnetevm.VM`.
+// Construct via [New]; close via [Uptime.Shutdown].
 //
-// Concurrency: `OnNormalOp` is one-shot (guarded by a `sync.Once`).
+// Concurrency: [Uptime.Dispatch] is one-shot (guarded by a `sync.Once`).
 // `Connect`/`Disconnect`/`GetUptime` are safe to call from any goroutine
 // once construction returns; the underlying tracker provides its own
 // serialisation.
-type Manager struct {
+type Uptime struct {
 	tracker *uptimetracker.UptimeTracker
 	log     logging.Logger
 
@@ -53,7 +50,7 @@ type Manager struct {
 	wg     sync.WaitGroup
 }
 
-// New constructs a `Manager` over a fresh `*uptimetracker.UptimeTracker`.
+// New constructs an [Uptime] over a fresh `*uptimetracker.UptimeTracker`.
 // `db` is scoped to a `validators` sub-prefix so callers can pass the
 // raw VM database. `clock` drives the tracker (production: unfaked;
 // tests: `*mockable.Clock.Set`).
@@ -63,7 +60,7 @@ func New(
 	db avadb.Database,
 	clock *mockable.Clock,
 	log logging.Logger,
-) (*Manager, error) {
+) (*Uptime, error) {
 	tracker, err := uptimetracker.New(
 		validatorState,
 		subnetID,
@@ -73,30 +70,19 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("uptimetracker.New: %w", err)
 	}
-	return &Manager{tracker: tracker, log: log}, nil
+	return &Uptime{tracker: tracker, log: log}, nil
 }
 
-// Tracker returns the underlying `*uptimetracker.UptimeTracker`.
-// Exposed primarily so `*subnetevm.VM` can pass it to the warp
-// verifier and the validators-API service (both of which depend on
-// their own `UptimeSource` interface that the tracker satisfies
-// structurally).
-func (m *Manager) Tracker() *uptimetracker.UptimeTracker {
-	return m.tracker
-}
-
-// GetUptime forwards to the tracker. Provided so tests can call
-// `vm.validators.GetUptime` without reaching through `Tracker()`, and
-// so `*Manager` itself satisfies the warp/api `UptimeSource`
-// interfaces structurally.
-func (m *Manager) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
+// GetUptime forwards to the tracker, satisfying the warp and
+// validators-API `UptimeSource` interfaces.
+func (m *Uptime) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
 	return m.tracker.GetUptime(validationID)
 }
 
 // Connect notifies the underlying tracker that `nodeID` is connected.
 // Mirrors `*subnetevm.VM.Connected` semantics: must be called BEFORE
 // the embedded `*p2p.Network.Connected`.
-func (m *Manager) Connect(nodeID ids.NodeID) error {
+func (m *Uptime) Connect(nodeID ids.NodeID) error {
 	if err := m.tracker.Connect(nodeID); err != nil {
 		return fmt.Errorf("uptimeTracker.Connect(%s): %w", nodeID, err)
 	}
@@ -105,22 +91,21 @@ func (m *Manager) Connect(nodeID ids.NodeID) error {
 
 // Disconnect notifies the underlying tracker that `nodeID` is
 // disconnected. Mirrors `*subnetevm.VM.Disconnected`.
-func (m *Manager) Disconnect(nodeID ids.NodeID) error {
+func (m *Uptime) Disconnect(nodeID ids.NodeID) error {
 	if err := m.tracker.Disconnect(nodeID); err != nil {
 		return fmt.Errorf("uptimeTracker.Disconnect(%s): %w", nodeID, err)
 	}
 	return nil
 }
 
-// Dispatch performs the one-shot work that needs to happen when[tracker]
-// is ready to start tracking validator (typicall on snow.NormalOp):
-// - an initial `tracker.Sync`,
-// followed by spawning a goroutine that re-syncs every `syncFrequency`.
-// The goroutine is cancelled by [Manager.Shutdown].
+// Dispatch performs the one-shot work that needs to happen when the tracker
+// is ready to start tracking validators (typically on snow.NormalOp): an
+// initial `tracker.Sync`, followed by spawning a goroutine that re-syncs
+// every `syncFrequency`. The goroutine is cancelled by [Uptime.Shutdown].
 //
 // Subsequent calls are no-ops (the underlying `sync.Once` only fires
 // once).
-func (m *Manager) Dispatch() error {
+func (m *Uptime) Dispatch() error {
 	var firstSyncErr error
 	m.once.Do(func() {
 		syncCtx, cancel := context.WithCancel(context.Background())
@@ -156,7 +141,7 @@ func (m *Manager) Dispatch() error {
 // Shutdown stops the periodic-sync goroutine (if running) and shuts
 // down the underlying tracker. Safe to call even if `Dispatch` was
 // never invoked.
-func (m *Manager) Shutdown() error {
+func (m *Uptime) Shutdown() error {
 	if m.cancel != nil {
 		m.cancel()
 		m.wg.Wait()

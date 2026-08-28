@@ -12,44 +12,30 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/set"
 
+	legacyclient "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/client"
 	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 )
 
-// UptimeSource is the slice of `*uptimetracker.UptimeTracker` consumed
-// by `ValidatorsAPI`. Pulled out as a one-method interface so call
-// sites do not bind to the concrete tracker type and so tests can
-// inject stubs without constructing a full tracker. The exported
-// signature matches `*uptimetracker.UptimeTracker.GetUptime` exactly:
-// the concrete tracker satisfies it without an adapter.
+// UptimeSource is the slice of `*uptimetracker.UptimeTracker` consumed by
+// [ValidatorsAPI]; the concrete tracker satisfies it without an adapter.
 type UptimeSource interface {
 	GetUptime(validationID ids.ID) (time.Duration, time.Time, error)
 }
 
-// CurrentValidator is one entry in the response of
-// `validators.getCurrentValidators`.
-type CurrentValidator struct {
-	ValidationID     ids.ID     `json:"validationID"`
-	NodeID           ids.NodeID `json:"nodeID"`
-	Weight           uint64     `json:"weight"`
-	StartTimestamp   uint64     `json:"startTimestamp"`
-	IsActive         bool       `json:"isActive"`
-	IsL1Validator    bool       `json:"isL1Validator"`
-	IsConnected      bool       `json:"isConnected"`
-	UptimePercentage float32    `json:"uptimePercentage"`
-	UptimeSeconds    uint64     `json:"uptimeSeconds"`
-}
-
-// GetCurrentValidatorsRequest filters the response to a specific set of
-// node IDs. An empty `NodeIDs` returns the full set.
-type GetCurrentValidatorsRequest struct {
-	NodeIDs []ids.NodeID `json:"nodeIDs"`
-}
-
-// GetCurrentValidatorsResponse is the response for
-// `validators.getCurrentValidators`.
-type GetCurrentValidatorsResponse struct {
-	Validators []CurrentValidator `json:"validators"`
-}
+// The `validators.getCurrentValidators` wire types are the legacy plugin's,
+// aliased so the compiler enforces wire identity for existing tooling. When
+// the legacy plugin retires, inline them here.
+type (
+	// CurrentValidator is one entry in the response of
+	// `validators.getCurrentValidators`.
+	CurrentValidator = legacyclient.CurrentValidator
+	// GetCurrentValidatorsRequest filters the response to a specific set of
+	// node IDs. An empty `NodeIDs` returns the full set.
+	GetCurrentValidatorsRequest = legacyclient.GetCurrentValidatorsRequest
+	// GetCurrentValidatorsResponse is the response for
+	// `validators.getCurrentValidators`.
+	GetCurrentValidatorsResponse = legacyclient.GetCurrentValidatorsResponse
+)
 
 // NewValidatorsAPI returns the gorilla-rpc service bound to the
 // supplied VM dependencies. Register the returned `*ValidatorsAPI`
@@ -101,7 +87,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(
 
 	validatorSet, _, err := api.validatorState.GetCurrentValidatorSet(ctx, api.subnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get current validator set: %w", err)
+		return fmt.Errorf("getting current validator set: %w", err)
 	}
 
 	requestedNodeIDs := set.NewSet[ids.NodeID](len(req.NodeIDs))
@@ -117,7 +103,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(
 
 		upDuration, lastUpdated, err := api.uptime.GetUptime(validationID)
 		if err != nil {
-			return fmt.Errorf("failed to get uptime for validation ID %s: %w", validationID, err)
+			return fmt.Errorf("getting uptime for validation ID %s: %w", validationID, err)
 		}
 
 		var uptimeFloat float64

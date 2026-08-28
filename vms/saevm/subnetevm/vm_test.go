@@ -148,7 +148,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	// test overrides layered on top. The legacypool journal is
 	// inherently disabled because `LocalTxsEnabled=false` by default
 	// (yields `NoLocals=true`), so no journal-path override is needed.
-	chainConfig := DefaultConfig()
+	chainConfig := defaultConfig()
 	if cfg.feeRecipient != nil {
 		chainConfig.FeeRecipient = cfg.feeRecipient.Hex()
 	}

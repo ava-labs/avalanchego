@@ -138,6 +138,9 @@ func (s *BlockChainAPI) GetActivePrecompilesAt(_ context.Context, blockTimestamp
 	return params.GetExtra(s.b.ChainConfig()).EnabledStatefulPrecompiles(timestamp)
 }
 
+// NOTE: the SAE plugin re-declares this wire shape in
+// `vms/saevm/subnetevm/api/eth_extras.go` because this package is internal;
+// keep the two in sync.
 type ActivePrecompilesResult struct {
 	Timestamp uint64 `json:"timestamp"`
 }

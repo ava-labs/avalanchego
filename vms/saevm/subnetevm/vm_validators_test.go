@@ -51,7 +51,7 @@ func TestUptimeTracker(t *testing.T) {
 	)
 
 	// (0) Validator known but not yet connected: 0 uptime, lastUpdated == baseTime.
-	upDuration, lastUpdated, err := sut.vm.validators.GetUptime(testValidationID)
+	upDuration, lastUpdated, err := sut.vm.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, time.Duration(0), upDuration, "initial uptime must be 0")
 	require.Equalf(t, baseTime, lastUpdated, "initial lastUpdated must be baseTime")
@@ -60,7 +60,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
 	sut.advanceTime(t, 1*time.Hour)
 
-	upDuration, lastUpdated, err = sut.vm.validators.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour, upDuration, "uptime after 1h connected must be 1h")
 	require.Equalf(t, baseTime.Add(1*time.Hour), lastUpdated, "lastUpdated must reflect new clock time")
@@ -70,7 +70,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.NoError(t, sut.vm.Disconnected(sut.ctx, testNodeID))
 	sut.advanceTime(t, 1*time.Hour)
 
-	upDuration, lastUpdated, err = sut.vm.validators.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour, upDuration, "uptime must NOT advance while disconnected")
 	require.Equalf(t, baseTime.Add(2*time.Hour), lastUpdated, "lastUpdated must still advance")
@@ -79,7 +79,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
 	sut.advanceTime(t, 30*time.Minute)
 
-	upDuration, lastUpdated, err = sut.vm.validators.GetUptime(testValidationID)
+	upDuration, lastUpdated, err = sut.vm.uptime.GetUptime(testValidationID)
 	require.NoError(t, err)
 	require.Equalf(t, 1*time.Hour+30*time.Minute, upDuration,
 		"uptime must be 1h30m (1h initial + 30m reconnect)")
@@ -93,7 +93,7 @@ func TestUptimeTracker(t *testing.T) {
 func TestUptimeTrackerUnknownValidationID(t *testing.T) {
 	sut := newSUT(t, withFork(upgradetest.Latest))
 
-	_, _, err := sut.vm.validators.GetUptime(ids.GenerateTestID())
+	_, _, err := sut.vm.uptime.GetUptime(ids.GenerateTestID())
 	require.ErrorIs(t, err, uptimetracker.ErrValidationIDNotFound)
 }
 

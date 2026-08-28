@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -76,10 +75,7 @@ type VM struct {
 	closed  bool
 }
 
-var (
-	ethDBPrefix      = []byte("ethdb")
-	errAlreadyClosed = errors.New("already closed")
-)
+var errAlreadyClosed = errors.New("already closed")
 
 // Initialize initializes the VM.
 func (vm *VM) Initialize(
@@ -157,10 +153,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating network: %w", err)
 	}
 
-	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
-	// This meant that the database's prefix was not compacted, because the
-	// provided database was wrapped by the rpcchainvm.
-	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
+	ethDB := types.NewChainEthDB(avaDB)
 
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)

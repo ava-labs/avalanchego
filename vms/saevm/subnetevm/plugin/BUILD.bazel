@@ -6,9 +6,16 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/plugin",
     visibility = ["//visibility:private"],
     deps = [
-        "//graft/subnet-evm/plugin/evm",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//utils/logging",
+        "//utils/ulimit",
         "//version",
-        "//vms/saevm/subnetevm/plugin/runner",
+        "//vms/rpcchainvm",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/subnetevm",
+        "@com_github_ava_labs_libevm//log",
     ],
 )
 

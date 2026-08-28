@@ -100,7 +100,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 func TestFeeManagerHeliconRetirement(t *testing.T) {
 	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix())
 	base := paramstest.ForkToChainConfig[upgradetest.Helicon]
-	chainConfig := DefaultConfig()
+	chainConfig := defaultConfig()
 	configBytes := mustMarshalJSON(t, &chainConfig)
 
 	for _, tc := range feemanagertest.RetirementCases(helicon) {
