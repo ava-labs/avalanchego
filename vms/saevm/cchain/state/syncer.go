@@ -70,9 +70,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 }
 
 func (s *Syncer) sync(ctx context.Context) error {
-	w := newHeightWriter(s.state)
-
-	for pair, err := range collectLeaves(ctx,
+	for batch, err := range collectLeaves(ctx,
 		s.fetcher,
 		s.targetRoot,
 		firstKeyAfterHeight(s.state.currentHeight.Load()),
@@ -80,16 +78,9 @@ func (s *Syncer) sync(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-
-		// add MAY commit to [State].
-		if err := w.add(pair.key, pair.val); err != nil {
+		if err := s.commit(batch); err != nil {
 			return err
 		}
-	}
-
-	// Any remaining data also needs committed.
-	if err := w.commit(); err != nil {
-		return err
 	}
 
 	if s.state.currentRoot != s.targetRoot {
@@ -98,21 +89,25 @@ func (s *Syncer) sync(ctx context.Context) error {
 	return nil
 }
 
-type pair struct {
-	key, val []byte
+// firstKeyAfterHeight returns the first trie key that would need synced, assuming all
+// state up to currentHeight is already available.
+func firstKeyAfterHeight(currentHeight uint64) []byte {
+	return encodeTrieKey(currentHeight+1, ids.Empty)
 }
 
 // collectLeaves fetches the target trie's leaves from peers, starting with
-// `start`. All returned [pair]s are in key order and have been proven to exist
-// in the trie. Any error returned is fatal.
+// `start`. All returned [heightBatch]s are in key order and have been proven to
+// exist in the trie. Only one [heightBatch] will be returned for any given
+// height. There MAY be skipped heights. Any error returned is fatal.
 func collectLeaves(
 	ctx context.Context,
 	client *hashdb.Client,
 	targetRoot common.Hash,
 	start []byte,
-) iter.Seq2[pair, error] {
+) iter.Seq2[heightBatch, error] {
 	const keyLimit = 1024
-	return func(yield func(pair, error) bool) {
+	return func(yield func(heightBatch, error) bool) {
+		batch := heightBatch{height: decodeTrieKeyHeight(start)}
 		for {
 			leaves, more, err := client.FetchLeaves(ctx, hashdb.LeafRange{
 				Root:  targetRoot,
@@ -120,17 +115,23 @@ func collectLeaves(
 				Limit: keyLimit,
 			})
 			if err != nil {
-				yield(pair{}, fmt.Errorf("fetching leaves: %w", err))
+				yield(heightBatch{}, fmt.Errorf("fetching leaves: %w", err))
 				return
 			}
 
 			for i, key := range leaves.Keys {
-				if !yield(pair{key, leaves.Vals[i]}, nil) {
-					return
+				if h := decodeTrieKeyHeight(key); h != batch.height {
+					if !yield(batch, nil) {
+						return
+					}
+					batch = heightBatch{height: h}
 				}
+
+				batch.add(key, leaves.Vals[i])
 			}
 
 			if !more {
+				yield(batch, nil)
 				return
 			}
 
@@ -141,73 +142,42 @@ func collectLeaves(
 	}
 }
 
-// firstKeyAfterHeight returns the first trie key that would need synced, assuming all
-// state up to currentHeight is already available.
-func firstKeyAfterHeight(currentHeight uint64) []byte {
-	return encodeTrieKey(currentHeight+1, ids.Empty)
-}
-
-// heightWriter accumulates the synced leaves of a single height, committing them
-// to the state once the height is complete.
-type heightWriter struct {
-	state *State
-
+// heightBatch accumulates the synced leaves of a single height.
+type heightBatch struct {
 	height uint64
 	keys   [][]byte
 	vals   [][]byte
-	ops    map[ids.ID]*atomic.Requests
 }
 
-func newHeightWriter(state *State) *heightWriter {
-	return &heightWriter{
-		state: state,
-		ops:   make(map[ids.ID]*atomic.Requests),
-	}
-}
-
-// add accumulates a single synced leaf. Leaves arrive in key order, so a new
-// height means all of the previous height's leaves have arrived and it can be
-// committed before accumulating this one.
-func (w *heightWriter) add(key, val []byte) error {
-	height, chainID := decodeTrieKey(key)
-	if height != w.height {
-		if err := w.commit(); err != nil {
-			return err
-		}
-		w.height = height
-	}
-
-	req := new(atomic.Requests)
-	if _, err := c.Unmarshal(val, req); err != nil {
-		return fmt.Errorf("unmarshaling atomic requests for chain %s: %w", chainID, err)
-	}
-
+// add accumulates a single synced leaf.
+func (w *heightBatch) add(key, val []byte) {
 	w.keys = append(w.keys, key)
 	w.vals = append(w.vals, val)
-	w.ops[chainID] = req
-	return nil
 }
 
-// commit inserts all pending operations to the [triedb.Database] and to
-// shared memory.
-//
-// This should be called whenever a new height is encountered and before
-// finishing the sync.
-func (w *heightWriter) commit() error {
-	if len(w.keys) == 0 {
+// commit inserts all pending operations at a height to the [triedb.Database]
+// and to shared memory.
+func (s *Syncer) commit(b heightBatch) error {
+	if len(b.keys) == 0 {
 		return nil
 	}
 
-	newRoot, err := applyTrie(w.state.trieDB, w.state.currentRoot, w.keys, w.vals)
+	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, b.keys, b.vals)
 	if err != nil {
-		return fmt.Errorf("applying synced trie at height %d: %w", w.height, err)
-	}
-	if err := w.state.writeToSharedMemory(w.state.db.NewBatch(), w.height, newRoot, w.ops); err != nil {
-		return fmt.Errorf("committing synced height %d: %w", w.height, err)
+		return fmt.Errorf("applying synced trie at height %d: %w", b.height, err)
 	}
 
-	w.keys = nil
-	w.vals = nil
-	w.ops = make(map[ids.ID]*atomic.Requests)
+	ops := make(map[ids.ID]*atomic.Requests)
+	for i, key := range b.keys {
+		req := new(atomic.Requests)
+		if _, err := c.Unmarshal(b.vals[i], req); err != nil {
+			return fmt.Errorf("unmarshaling atomic requests: %w", err)
+		}
+		ops[decodeTrieKeyChainID(key)] = req
+	}
+	if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), b.height, newRoot, ops); err != nil {
+		return fmt.Errorf("committing synced height %d: %w", b.height, err)
+	}
+
 	return nil
 }

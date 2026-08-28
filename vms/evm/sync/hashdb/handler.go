@@ -470,15 +470,15 @@ func dbValues(db *memorydb.Database) [][]byte {
 	return out
 }
 
-// NextKey adds 1 to a copy of b, with carry. All-0xff wraps to all-zeros.
-func NextKey(b []byte) []byte {
-	b = slices.Clone(b)
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] < 0xff {
-			b[i]++
-			return b
+// NextKey adds 1 to a copy of k, with carry. All-0xff wraps to all-zeros.
+func NextKey(k []byte) []byte {
+	k = slices.Clone(k)
+	for i := len(k) - 1; i >= 0; i-- {
+		if k[i] < 0xff {
+			k[i]++
+			return k
 		}
-		b[i] = 0
+		k[i] = 0
 	}
-	return b
+	return k
 }
