@@ -75,9 +75,14 @@ mkdir -p \
 
 cd "$avalanchego_path"
 
+# setup-bazel uses this server with test options. Start a new server before the
+# image build so Bazel does not discard its analysis cache when options change.
+bazelisk shutdown > /dev/null 2>&1 || true
+
 bazelisk run //bazel/image:load_builder \
   --repository_cache="$outer_repository_cache" \
-  --disk_cache="$outer_disk_cache"
+  --disk_cache="$outer_disk_cache" \
+  --remote_upload_local_results=false
 
 builder_digest="$(docker image inspect --format '{{.Id}}' "$builder_tag")"
 git_commit="$(git rev-parse HEAD)"
@@ -194,7 +199,7 @@ docker run --rm \
     --repository_cache=/cache/repository \
     --disk_cache=/cache/disk \
     "${inner_remote_cache_args[@]}" \
-    --remote_upload_local_results=false \
+    "${inner_binary_cache_args[@]}" \
     --lockfile_mode=error \
     --config=release \
     --workspace_status_command=/cache/workspace_status.sh \

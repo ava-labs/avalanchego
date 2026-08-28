@@ -1,119 +1,179 @@
-# Bazel Multiarch Image Phase 1 Spike Handoff
+# Bazel multi-architecture image handoff
 
-## Scope
+## Contents
 
-This record describes the Phase 1 builder-image spike. It does not change the
-multiarch image design or select the remaining C/C++ toolchain implementation.
+- [Status](#status)
+- [Current design](#current-design)
+- [Cache findings](#cache-findings)
+- [Builder-image cache decision](#builder-image-cache-decision)
+- [Known warnings](#known-warnings)
+- [Required next work](#required-next-work)
+- [Validation](#validation)
+- [Constraints](#constraints)
 
-The existing Dockerfile and Buildx path remain unchanged.
+## Status
 
-## Implemented files
+The Bazel validation path builds and tests an AvalancheGo OCI image for Linux
+amd64 and Linux arm64. It is a validation path. It does not publish a production
+image. The Dockerfile and Buildx path remain unchanged.
 
-- `MODULE.bazel`
-  - Adds `rules_img` `0.3.19`.
-  - Adds `rules_distroless` `0.9.4` with a temporary Git override at
-    `a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3`.
-  - Uses `apt.install(mergedusr = True)` from that override.
-  - Locks an amd64 Debian Bookworm snapshot from `20250101T000000Z`.
-  - Declares native GCC, `gcc-aarch64-linux-gnu`, native and arm64 libc
-    development packages, Git, certificates, patch, zip, and unzip.
-  - Pins the Debian 12 slim amd64 base manifest and Bazel `8.0.1`.
-- `MODULE.bazel.lock` and `bazel/image/bookworm.lock.json`
-  - Lock Bazel modules and the 116-package Debian closure.
-- `bazel/image/BUILD.bazel`
-  - Defines `linux_amd64` and `linux_arm64` platforms.
-  - Creates a `rules_img` builder manifest and `load_builder` target.
-  - Adds the full Bazel binary and generated CA bundle to the image.
-- `scripts/bazel_image_spike.sh`
-  - Builds and loads the outer builder image.
-  - Mounts the source tree read-only.
-  - Uses separate outer and inner repository, disk, and output caches under
-    `.cache/bazel-image/`.
-  - Creates a fixed workspace-status script from the host Git commit. This is
-    necessary because a read-only worktree mount does not include its external
-    Git worktree metadata.
-  - Builds `//main:avalanchego` with release stamping for amd64 and arm64.
-- `Taskfile.yml`
-  - Adds `bazel-image-spike`.
-- `.gitignore`
-  - Ignores `.cache/bazel-image/`.
+The Linux image CI job succeeds. It builds a locked Debian Bookworm builder,
+builds both binaries, creates an OCI index, pushes that index to a local
+registry, and runs both image platforms.
 
-## Temporary rules_distroless override
+The current design and user guidance are in
+[Bazel multi-architecture image validation](../bazel-multiarch-image-validation.md).
+The broader design is in
+[Bazel multi-architecture AvalancheGo image](./bazel-multiarch-image.md).
 
-The published BCR release `rules_distroless@0.9.4` cannot use
-`apt.install(mergedusr = True)`. Without this mode, package layers replace the
-Debian 12 `/bin -> /usr/bin` symlink with a directory. The resulting builder
-has no `/bin/sh`, and inner Bazel cannot run.
+## Current design
 
-This is the known upstream issue
-<https://github.com/bazel-contrib/rules_distroless/issues/53>.
+The outer Bazel process runs on the GitHub Linux runner. It builds and loads an
+amd64 Debian Bookworm builder image.
 
-Commit `a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3` adds `mergedusr` to the
-Bzlmod `apt.install` API. Keep the override until a BCR release contains that
-commit. Then remove `git_override` and use the released version.
+The inner Bazel process runs in that builder image. It builds AvalancheGo for
+amd64 and arm64. The builder contains native GCC and the Debian aarch64 cross
+compiler. The builder image digest is an action input. A result built with one
+builder image cannot satisfy an action that uses another builder image.
 
-## Validation completed
+`rules_distroless` supplies the locked Debian packages. The source override at
+`a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3` is required for
+`apt.install(mergedusr = True)`. Without this setting, the package layer breaks
+the Debian `/bin` symlink and the builder cannot run `/bin/sh`.
 
-Run:
+The BCR release does not yet contain this setting. Remove the override when a
+BCR release includes it.
 
-```bash
-./scripts/nix_run.sh ./scripts/bazel_image_spike.sh
-```
+## Cache findings
 
-Results:
+GitHub Actions restores a repository cache and a Go module cache. These caches
+contain downloaded inputs. They do not contain compiled AvalancheGo outputs.
 
-- The outer builder target built and loaded successfully.
-- The rebuilt builder preserves executable `/bin/sh`.
-- The builder contains native `gcc`, `aarch64-linux-gnu-gcc`, Git, the CA
-  bundle, and `/usr/aarch64-linux-gnu/lib/libc.so.6`.
-- The inner amd64 release build succeeded.
-- Its output is an x86-64 dynamically linked ELF binary. Its loader is
-  `/lib64/ld-linux-x86-64.so.2`.
-- An unchanged outer builder rebuild used action-cache hits.
-- `shellcheck scripts/bazel_image_spike.sh`,
-  `buildifier -mode=check MODULE.bazel bazel/image/BUILD.bazel`, and
-  `git diff --check` passed.
+The remote Bazel cache is configured on the runner. The inner builder uses a
+different home directory. The validation script passes the remote-cache URL and
+authorization header into the inner process when CI provides both values.
 
-The validation host was arm64 NixOS. Docker emulated the amd64 builder. Do not
-use its elapsed time as an amd64 CI measurement.
+The first cache-fill job was
+[run 33142777975](https://github.com/ava-labs/avalanchego/actions/runs/33142777975/job/98757322827?pr=5892).
+It took 11 minutes and 45 seconds. Both direct binary builds had one remote
+cache hit. The final image build ran 1,878 local actions.
 
-## Current blocker
+The next unchanged job was
+[run 33143521149](https://github.com/ava-labs/avalanchego/actions/runs/33143521149/job/98759771131?pr=5892).
+It took 9 minutes and 9 seconds. The direct amd64 build had 939 remote hits out
+of 950 actions. The direct arm64 build had 938 remote hits out of 949 actions.
+The final image build still ran 1,878 local actions.
 
-The inner arm64 command reaches Bazel analysis and fails with:
+The final image command had `--remote_upload_local_results=false`. This setting
+prevented the final image build from storing its binary actions. The direct
+binary builds use different Bazel configurations. Their results cannot satisfy
+the image target.
 
-```text
-Unable to find a CC toolchain using toolchain resolution.
-Target: @rules_cc//cc:current_cc_toolchain
-Platform: //bazel/image:linux_arm64
-```
+The pending change enables remote uploads for the final image command. It marks
+only the OCI layer, manifest, index, push, and builder targets with
+`no-remote-cache`. This lets Bazel cache the Debian-built binary actions while
+it does not upload changing OCI outputs.
 
-Setting `CC=aarch64-linux-gnu-gcc` is not enough. The CGO C targets require a
-Bazel-resolved C/C++ toolchain for `linux_arm64`.
+Do not assume that a cache hit for a direct binary build proves that the image
+target can reuse that result. Check the action summary for the final image
+command.
 
-Do not add AvalancheGo runtime OCI rules yet. First add and validate a Debian
-native and aarch64 cross C/C++ toolchain registration for the inner build.
+## Builder-image cache decision
+
+The builder image is a better cache candidate than the changing runtime image.
+It changes only when the Debian lock, Bazel version, or builder definition
+changes.
+
+The local builder image is about 993 MB. The current remote-cache proxy rejects
+its upload with HTTP 413, `Payload Too Large`. The builder build can still read
+smaller remote action results. The large builder-image result cannot be stored
+there.
+
+Do not use the current Bazel remote cache for the complete builder image. The
+current script disables its upload to prevent an HTTP 413 warning on every job.
+
+GitHub Container Registry (GHCR) is the candidate cache for the builder image.
+Use a separate package, such as
+`ghcr.io/ava-labs/avalanchego-bazel-builder`. Use an immutable tag derived from
+all builder inputs:
+
+- `.bazelversion`;
+- `MODULE.bazel.lock`;
+- `bazel/image/bookworm.lock.json`; and
+- the builder-image BUILD files.
+
+A CI job should pull this tag first. It should build and push the image only on
+a cache miss. The job must pass the pulled image digest into the inner Bazel
+action environment.
+
+Use `GITHUB_TOKEN` with `packages: write` only for trusted same-repository
+jobs. Fork pull requests must not push package versions. They can pull a public
+or authorized cache entry, or build the builder locally.
+
+Confirm GHCR retention and cleanup rules before implementation. The desired
+policy is a short retention period, such as 24 or 48 hours. Do not use GHCR for
+the changing runtime test image.
+
+The Debian base image is pinned by digest. `rules_img` pulls its base layers
+shallowly. The repository cache already preserves package inputs. A GHCR
+builder image would also preserve the assembled toolchain image.
+
+## Known warnings
+
+The image job has these warnings:
+
+- Bazel discards an analysis cache when `--test_env` changes after setup.
+  Start a new Bazel server before the outer image build. This removes the
+  option-change warning. Do not change test behavior to hide it.
+- `rules_distroless` reports unresolved arm64 cross-library symlinks and linker
+  script paths. The builder works because the flattened Debian package tree
+  contains the files. This is an upstream package-metadata warning. Do not
+  suppress it without an upstream fix or a test that proves the package model
+  is complete.
+- `rules_img` reports that the GitHub Docker daemon does not expose its
+  containerd store. It falls back to `docker load`. This runner limitation also
+  changes the locally loaded image digest. Do not treat that digest as the OCI
+  builder digest used for action keys.
 
 ## Required next work
 
-1. Research a maintained Bazel 8 C/C++ toolchain-definition method for Debian
-   host tools and `aarch64-linux-gnu-gcc`.
-2. Add the smallest platform-constrained native and arm64 C/C++ toolchains.
-3. Run the spike again. Capture `--toolchain_resolution_debug` and relevant
-   CGO compile/link commands.
-4. Confirm the arm64 output is an AArch64, dynamically linked ELF binary with
-   interpreter `/lib/ld-linux-aarch64.so.1`.
-5. Run the unchanged spike a second time. Check disk-cache hits for both
-   platforms.
-6. Run both binaries in fresh target `debian:12-slim` containers. The amd64
-   runner is the authoritative CI validation environment.
+1. Finish and commit the pending remote-cache changes.
+2. Run the image job once to fill the final image target cache.
+3. Run the job again without source changes.
+4. Check that the final image command reports remote cache hits for binary
+   actions. It may still run OCI layer, manifest, index, and push actions.
+5. Measure the total job time after the second run.
+6. Decide whether the measured builder build cost justifies a GHCR builder
+   cache. The current builder build takes about 30 seconds. Pulling and loading
+   a 993 MB image can cost more.
+7. If GHCR is justified, design the package name, immutable tag input hash,
+   trusted-write rule, fork fallback, and scheduled cleanup before adding it.
+8. Investigate the `rules_distroless` warnings upstream. Do not add a local
+   suppression that can hide missing cross-library files.
 
-## Constraints to retain
+## Validation
 
-- Keep the Dockerfile/Buildx path unchanged.
-- Scope only the standard AvalancheGo Debian image.
-- Keep Debian 12 slim and dynamic glibc linking.
-- CI uses one amd64 runner and cross-compiles amd64 plus arm64.
-- The builder is a Bazel OCI target. Docker runs it. Inner Bazel builds the
-  executable and later the final OCI images/index.
-- Keep outer and inner caches separate.
-- Do not change `docs/design/bazel-multiarch-image.md` without discussion.
+Run these checks after changes to the validation script, image rules, or CI
+configuration:
+
+```text
+task bazel-build-image
+task bazel-test-build-image
+bash -n scripts/bazel_image_spike.sh
+task lint-shell
+task lint-action
+git diff --check
+```
+
+For cache changes, run one cache-fill CI job and one unchanged CI job. Record
+the action summaries for the amd64 binary, arm64 binary, and final image build.
+
+## Constraints
+
+- Keep the Dockerfile and Buildx path unchanged.
+- Keep the Debian 12 slim runtime base and dynamic glibc linking.
+- Support Linux amd64 and Linux arm64 only.
+- Keep the outer and inner Bazel cache roots separate.
+- Do not put remote-cache or registry credentials in the builder image,
+  workspace, or command output.
+- Do not treat the local validation registry as a production publishing design.

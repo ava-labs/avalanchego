@@ -98,9 +98,10 @@ the cache URL and authorization header into that process when CI provides both
 values.
 
 The amd64 and arm64 binary builds read and write remote action results. The
-final image build reads those results. It does not upload image layers or the
-OCI index. These outputs can be large and have little value in the remote
-cache.
+final image build also writes binary action results. It does not upload image
+layers or the OCI index. These outputs can be large and have little value in
+the remote cache. The image rules use the `no-remote-cache` tag for those
+outputs.
 
 Bazel keys each action result with its inputs, platform, toolchain, and build
 options. A result from one platform cannot satisfy an action for another

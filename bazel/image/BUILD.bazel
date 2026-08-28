@@ -56,12 +56,15 @@ image_manifest(
     ],
     platform = ":linux_amd64",
     working_dir = "/workspace",
+    # The Debian builder image exceeds the remote cache proxy upload limit.
+    tags = ["no-remote-cache"],
 )
 
 image_load(
     name = "load_builder",
     image = ":builder",
     tag = "avalanchego-bazel-builder:phase1",
+    tags = ["no-remote-cache"],
 )
 
 # Keep the runtime image definition separate from the builder image. The
@@ -79,6 +82,8 @@ image_from_binary(
         ":linux_arm64",
     ],
     working_dir = "/avalanchego/build",
+    # Cache the binary actions. Do not cache the large OCI layer or index actions.
+    tags = ["no-remote-cache"],
 )
 
 # The Phase 3 spike starts a disposable registry at this address and pushes the
@@ -89,4 +94,5 @@ image_push(
     registry = "localhost:5000",
     repository = "avalanchego-bazel",
     tag = "phase3",
+    tags = ["no-remote-cache"],
 )
