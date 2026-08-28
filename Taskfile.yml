@@ -530,21 +530,22 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
 
   # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
-  # For comprehensive fuzzing, use test-fuzz-long FUZZTIME=[value in seconds].
-  # A value of `-1` will run until it encounters a failing output.
+  # For comprehensive fuzzing, use test-fuzz-long FUZZEXECS=[value].
+  #
+  # To fuzz until a failure: FUZZEXECS=0 FUZZ_TIMEOUT=0 task test-fuzz-long
 
   test-fuzz:
     desc: Smoke tests fuzz infrastructure with a quick package
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58'
+      FUZZEXECS: '{{.FUZZEXECS| default "1000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} ./utils/cb58'
 
   # To run only selected directories, pass them after --.
   test-fuzz-long:
-    desc: Runs each fuzz test for 180 seconds
+    desc: Runs each fuzz test for 10,000 executions
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "180"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
+      FUZZEXECS: '{{.FUZZEXECS| default "10000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} {{.CLI_ARGS}}'
 
   test-load:
     desc: Runs load tests
