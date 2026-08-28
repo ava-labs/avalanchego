@@ -24,3 +24,13 @@ while IFS= read -r target_set; do
   read -r -a target_args <<<"${target_set}"
   bazelisk fetch "${target_args[@]}"
 done < <(bazel_ci_target_patterns)
+
+# The image targets use Linux-only package configurations and must not be
+# fetched by the Darwin Bazel setup job.
+if [[ "$(uname -s)" == "Linux" ]]; then
+  while IFS= read -r target_set; do
+    [[ -n "${target_set}" ]] || continue
+    read -r -a target_args <<<"${target_set}"
+    bazelisk fetch "${target_args[@]}"
+  done < <(bazel_ci_linux_target_patterns)
+fi
