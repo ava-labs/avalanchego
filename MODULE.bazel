@@ -49,6 +49,7 @@ apt.install(
     mergedusr = True,
     packages = [
         "ca-certificates",
+        "docker.io",
         "g++",
         "gcc",
         "gcc-aarch64-linux-gnu",
@@ -79,8 +80,8 @@ http_file(
 images = use_extension("@rules_img//img:extensions.bzl", "images")
 images.settings(hub_repo = "enabled")
 images.pull(
-    name = "debian_12_slim_amd64",
-    digest = "sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867",
+    name = "debian_12_slim",
+    digest = "sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171",
     registry = "index.docker.io",
     repository = "library/debian",
     tag = "12-slim",

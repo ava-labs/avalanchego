@@ -217,3 +217,35 @@ this spike:
 ?? docs/design/bazel-multiarch-image-phase1-toolchain-debug-handoff.md
 ?? scripts/bazel_image_spike.sh
 ```
+
+## Phase 2 continuation results
+
+The first runtime-image slice was added without changing the Dockerfile/Buildx
+path:
+
+- `rules_img` now packages `//main:avalanchego` with `image_from_binary`.
+- The pinned Debian 12 slim base is referenced by its multi-platform index
+  digest, `sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171`.
+- The image preserves the current `/avalanchego/build/avalanchego` path,
+  `/avalanchego/build` working directory, empty entrypoint, and `./avalanchego`
+  command.
+- The amd64 image is loaded with `image_load` using the eager Docker strategy.
+  The inner builder mounts `/var/run/docker.sock` and includes the Debian
+  `docker.io` client package.
+
+The updated spike passed:
+
+```text
+./scripts/nix_run.sh ./scripts/bazel_image_spike.sh
+```
+
+The loaded amd64 Bazel image ran in a fresh `linux/amd64` Debian 12 slim
+container and reported the expected stamped commit. The arm64 Bazel binary
+also built and ran in a fresh `linux/arm64` Debian 12 slim container. Shellcheck,
+buildifier, and `git diff --check` passed.
+
+This is intentionally only the first amd64 runtime image. The next session
+should implement Phase 3: configure `image_from_binary` to produce the amd64
+and arm64 manifests and compose them into one image index. Load or push that
+index to a local registry, inspect its platform metadata, and run both
+architectures with explicit `--platform` selections.

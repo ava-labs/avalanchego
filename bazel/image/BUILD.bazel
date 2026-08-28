@@ -1,5 +1,5 @@
 load("@rules_distroless//distroless:defs.bzl", "cacerts")
-load("@rules_img//img:image.bzl", "image_manifest")
+load("@rules_img//img:image.bzl", "image_from_binary", "image_manifest")
 load("@rules_img//img:layer.bzl", "file_metadata", "image_layer")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_img_images.bzl", "image")
@@ -43,7 +43,7 @@ image_layer(
 # the builder itself is never executed as arm64.
 image_manifest(
     name = "builder",
-    base = image("debian_12_slim_amd64"),
+    base = image("debian_12_slim"),
     entrypoint = [],
     env = {
         "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
@@ -61,4 +61,25 @@ image_load(
     name = "load_builder",
     image = ":builder",
     tag = "avalanchego-bazel-builder:phase1",
+)
+
+# Keep the runtime image definition separate from the builder image. The
+# executable is selected by the inner build's target platform.
+image_from_binary(
+    name = "avalanchego",
+    base = image("debian_12_slim"),
+    binary = "//main:avalanchego",
+    cmd = ["./avalanchego"],
+    entrypoint = [],
+    include_runfiles = False,
+    path = "/avalanchego/build/avalanchego",
+    platforms = [":linux_amd64"],
+    working_dir = "/avalanchego/build",
+)
+
+image_load(
+    name = "load_avalanchego",
+    daemon = "docker",
+    image = ":avalanchego",
+    tag = "avalanchego-bazel:phase2",
 )
