@@ -168,6 +168,7 @@ cat >"${stub_dir}/bazelisk" <<EOF
 #!${bash_bin}
 set -euo pipefail
 if [[ "\$1" == "build" ]]; then
+  printf '%s\n' "\$*" >"${workdir}/bazel-build-args"
   exit 0
 fi
 if [[ "\$1" == "cquery" ]]; then
@@ -200,6 +201,7 @@ assert_file "${workdir}/gowork" "<unset>"
 RUN_TASK_PREFER_BAZEL=1 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
 assert_called fake-task "hello world"
 assert_pwd "${caller_dir}"
+assert_file "${workdir}/bazel-build-args" "build --test_env=HOME //tools/external:task"
 
 # If go is unavailable and Bazel was not requested, the launcher should fail
 # clearly.

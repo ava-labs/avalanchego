@@ -23,7 +23,9 @@ fi
 
 if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>&1; then
   cd "${AVALANCHE_PATH}"
-  bazelisk build //tools/external:task >/dev/null
+  # Match the preceding CI bootstrap fetch. Otherwise Bazel discards its
+  # analysis cache because .bazelrc sets test --test_env=HOME.
+  bazelisk build --test_env=HOME //tools/external:task >/dev/null
   task_bin="$(bazelisk cquery --output=files //tools/external:task 2>/dev/null)"
   if [[ "${task_bin}" != /* ]]; then
     task_bin="${AVALANCHE_PATH}/${task_bin}"

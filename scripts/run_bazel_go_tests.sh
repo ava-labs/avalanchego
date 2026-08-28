@@ -22,8 +22,8 @@ case "$scope" in
     query_scope='//...'
     ;;
   avalanchego)
-    query_scope='(//... except //graft/...)'
-    dependency_target_patterns='//... -- -//graft/...'
+    query_scope='(//... except //graft/... except //bazel/image/...)'
+    dependency_target_patterns='//... -- -//graft/... -//bazel/image/...'
     ;;
   coreth)
     query_scope='(//graft/coreth/... union //graft/evm/...)'

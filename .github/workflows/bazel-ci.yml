@@ -42,6 +42,7 @@ jobs:
       - unit-coreth
       - unit-subnet-evm
       - e2e
+      - image
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -79,6 +80,19 @@ jobs:
         if: failure()
         shell: bash
         run: ./scripts/run_task.sh log-ci-disk-state-bazel
+
+  image:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+      - name: Test multi-platform image with Bazel
+        if: ${{ runner.os == 'Linux' }}
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          run: BAZEL_IMAGE_REPOSITORY_CACHE="$HOME/.cache/bazel-repository-cache" ./scripts/run_task.sh bazel-test-build-image
 
   unit-avalanchego:
     needs: setup

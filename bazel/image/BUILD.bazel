@@ -1,0 +1,98 @@
+load("@rules_distroless//distroless:defs.bzl", "cacerts")
+load("@rules_img//img:image.bzl", "image_from_binary", "image_manifest")
+load("@rules_img//img:layer.bzl", "file_metadata", "image_layer")
+load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img//img:push.bzl", "image_push")
+load("@rules_img_images.bzl", "image")
+
+package(default_visibility = ["//visibility:public"])
+
+platform(
+    name = "linux_amd64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+)
+
+platform(
+    name = "linux_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:linux",
+    ],
+)
+
+# rules_distroless extracts Debian packages without running their maintainer
+# scripts. Generate the certificate bundle that ca-certificates would create.
+cacerts(
+    name = "ca_certificates",
+    package = "@bookworm_builder//ca-certificates:data",
+)
+
+image_layer(
+    name = "bazel_layer",
+    srcs = {
+        "/usr/local/bin/bazel": "@bazel_8_0_1_linux_amd64//file",
+    },
+    file_metadata = {
+        "/usr/local/bin/bazel": file_metadata(mode = "0755"),
+    },
+)
+
+# This is an amd64 build image. Its aarch64 compiler produces target binaries;
+# the builder itself is never executed as arm64.
+image_manifest(
+    name = "builder",
+    base = image("debian_12_slim"),
+    entrypoint = [],
+    env = {
+        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+    },
+    layers = [
+        "@bookworm_builder//:flat",
+        ":ca_certificates",
+        ":bazel_layer",
+    ],
+    platform = ":linux_amd64",
+    # The Debian builder image exceeds the remote cache proxy upload limit.
+    tags = ["no-remote-cache"],
+    working_dir = "/workspace",
+)
+
+image_load(
+    name = "load_builder",
+    image = ":builder",
+    tag = "avalanchego-bazel-builder:phase1",
+    tags = ["no-remote-cache"],
+)
+
+# Keep the runtime image definition separate from the builder image. The
+# image index transitions the executable build to each listed target platform.
+image_from_binary(
+    name = "avalanchego",
+    base = image("debian_12_slim"),
+    binary = "//main:avalanchego",
+    cmd = ["./avalanchego"],
+    entrypoint = [],
+    include_runfiles = False,
+    path = "/avalanchego/build/avalanchego",
+    platforms = [
+        ":linux_amd64",
+        ":linux_arm64",
+    ],
+    # Cache the binary actions. Do not cache the large OCI layer or index actions.
+    tags = ["no-remote-cache"],
+    working_dir = "/avalanchego/build",
+)
+
+# The Phase 3 spike starts a disposable registry at this address and pushes the
+# index plus both platform manifests to it.
+image_push(
+    name = "push_avalanchego",
+    image = ":avalanchego",
+    registry = "localhost:5000",
+    repository = "avalanchego-bazel",
+    tag = "phase3",
+    tags = ["no-remote-cache"],
+)
