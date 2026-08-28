@@ -36,6 +36,7 @@ func TestErrorSentinels(t *testing.T) {
 		"errMissingRoot":            errMissingRoot,
 		"errEmptyRoot":              errEmptyRoot,
 		"errRootNotFound":           errRootNotFound,
+		"errInvalidRoot":            errInvalidRoot,
 	})
 }
 
