@@ -746,20 +746,35 @@ func verifyAndExtractWarpMessage(
 	warpFilterer, err := NewIWarpMessengerFilterer(warp.Module.Address, client)
 	require.NoError(err)
 
-	iter, err := warpFilterer.FilterSendWarpMessage(
-		&bind.FilterOpts{
-			Start:   blockNumber,
-			End:     &blockNumber,
-			Context: ctx,
-		},
-		[]common.Address{sender},
-		nil, // messageID filter: any
-	)
-	require.NoError(err)
-	defer iter.Close()
+	// Retry the log filter: under SAE, transaction receipts are served from
+	// the executor's in-memory cache the moment execution finishes, while
+	// eth_getLogs reads the durably-indexed logs, which land slightly later.
+	// A filter issued immediately after WaitMined can therefore briefly see
+	// an empty result for the receipt's own block.
+	var event *IWarpMessengerSendWarpMessage
+	tc.Eventually(func() bool {
+		iter, err := warpFilterer.FilterSendWarpMessage(
+			&bind.FilterOpts{
+				Start:   blockNumber,
+				End:     &blockNumber,
+				Context: ctx,
+			},
+			[]common.Address{sender},
+			nil, // messageID filter: any
+		)
+		require.NoError(err)
+		defer iter.Close()
 
-	require.True(iter.Next(), "expected a SendWarpMessage event")
-	event := iter.Event
+		if !iter.Next() {
+			require.NoError(iter.Error())
+			return false
+		}
+		event = iter.Event
+		require.False(iter.Next(), "expected exactly one SendWarpMessage event")
+		require.NoError(iter.Error())
+		return true
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval,
+		"expected a SendWarpMessage event")
 
 	tc.Log().Info("Found SendWarpMessage event",
 		zap.String("sender", event.Sender.Hex()),
@@ -770,9 +785,6 @@ func verifyAndExtractWarpMessage(
 
 	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(event.Message)
 	require.NoError(err)
-
-	require.False(iter.Next(), "expected exactly one SendWarpMessage event")
-	require.NoError(iter.Error())
 
 	return unsignedMessage
 }
