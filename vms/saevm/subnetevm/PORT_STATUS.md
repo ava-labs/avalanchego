@@ -454,10 +454,47 @@ Owner decisions taken by default during the audit (FLAG FOR REVIEW):
    to parse addressed call message") to avoid changing wire-observable
    text; internal error wraps were reworded to repo style.
 
+## PR-ready summary
+
+**What this branch does**: revives the SAE Subnet-EVM L1 VM spike (PR #5387)
+against current master. `vms/saevm/subnetevm` is a working SAE-based
+subnet-evm VM (out-of-process rpcchainvm plugin) sharing master's SAE core
+with the C-Chain wrapper; the C-Chain VM's behavior is unchanged except
+where both wrappers were fixed together (journal disable, shared hoists).
+
+**Definitive validation** (single sweep on the final tree `a717578482`):
+`task lint` ALL SUCCESS; repo-wide race unit tests 230 packages, 0 failures;
+`task test-e2e-warp-sae` 5/5 specs; C-Chain e2e (`--ginkgo.label-filter=c`)
+4/4 specs; repo root left clean by the runs.
+
+**Load-bearing design decision**: ACP-224 runtime gas config is encoded in
+the header (GasConfig* extras group stamped by `FinalizeHeader` from settled
+state, read back by `GasConfigAfter`) instead of the spike's persisted
+per-block artifacts — see D1 and the adversarial-review record. Hook-surface
+delta against master's SAE core is minimal: `BlockBuilder.FinalizeHeader`,
+a `rules` param on `CanExecuteTransaction`,
+`RequiresTransactionAdmissionCheck`, and the txgossip `Admitter` extension
+point; subnet-evm's validator-uptime verification extends the shared warp
+verifier via `AddressedCallVerifier`.
+
+**Dedup outcome**: exactly one shared SAE warp implementation
+(`vms/saevm/warp` + `warptest`), shared acp176/acp226 types, cchain-idiom
+parity across config/lifecycle/metrics/tests — see the duplication audit and
+the systemic-audit sections for the full hoist/keep record.
+
+**Reviewer attention** (decisions taken by default, flagged): the six items
+at the end of the systemic-audit section; the reward-routing semantic change
+(post-London coinbase gets tip only — see README "Breaking Change"); the
+customtypes golden-hash update (new optional header tail fields); the
+e2e suite's two SAE-consistency accommodations (`PendingNonceAt`, log-filter
+retry) and the possible VM-side follow-up of serving `eth_getLogs` from the
+executor cache.
+
 ## Final validation record (post-audit tree)
 
 After the audit phases and doc refresh, the four gates were re-run
-sequentially on the final tree:
+sequentially (first on `6405bc7320`, then definitively on `a717578482` —
+all four PASS in that single final sweep):
 
 - `task lint`: PASS (ALL SUCCESS). The first run of this sweep found 7 real
   issues in the port (forbidigo `require.Error`, gci ordering x3,
