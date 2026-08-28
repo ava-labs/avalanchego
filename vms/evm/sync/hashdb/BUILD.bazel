@@ -6,7 +6,7 @@ go_library(
     srcs = [
         "client.go",
         "handler.go",
-        "leaf_iter.go",
+        "leaf_iterator.go",
         "snapshot.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb",
