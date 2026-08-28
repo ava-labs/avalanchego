@@ -30,7 +30,7 @@ func TestWrapCredentialCount(t *testing.T) {
 		{&txs.AddPermissionlessValidatorTx{BaseTx: base, Signer: &goPoP, ValidatorRewardsOwner: &goOneOwner, DelegatorRewardsOwner: &goOneOwner}, 3},
 		{&txs.AddPermissionlessDelegatorTx{BaseTx: base, DelegationRewardsOwner: &goOneOwner}, 3},
 		{&txs.TransferSubnetOwnershipTx{BaseTx: base, SubnetAuth: goAuth(), Owner: &goOneOwner}, 4},
-		{&txs.ImportTx{BaseTx: base, ImportedInputs: goIns(ins[:1])}, 4},
+		{&txs.ImportTx{BaseTx: base, ImportedInputs: goIns([]utxo{{TxID: ids.ID{0x12}, Amount: 1}})}, 4},
 		{&txs.ExportTx{BaseTx: base}, 3},
 		{&txs.ConvertSubnetToL1Tx{BaseTx: base, SubnetAuth: goAuth()}, 4},
 		{&txs.RegisterL1ValidatorTx{BaseTx: base}, 3},

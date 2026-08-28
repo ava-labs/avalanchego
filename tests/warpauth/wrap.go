@@ -42,10 +42,9 @@ func Wrap(signedMessage []byte) (*txs.Tx, ids.ShortID, error) {
 		return nil, ids.ShortEmpty, fmt.Errorf("parsing tx from warp payload: %w", err)
 	}
 
+	// InputIDs includes an ImportTx's imported inputs.
 	numCreds := len(unsigned.InputIDs())
-	switch tx := unsigned.(type) {
-	case *txs.ImportTx:
-		numCreds += len(tx.ImportedInputs)
+	switch unsigned.(type) {
 	case *txs.CreateChainTx, *txs.AddSubnetValidatorTx, *txs.RemoveSubnetValidatorTx,
 		*txs.TransferSubnetOwnershipTx, *txs.ConvertSubnetToL1Tx,
 		*txs.DisableL1ValidatorTx, *txs.SetAutoRenewedValidatorConfigTx:
