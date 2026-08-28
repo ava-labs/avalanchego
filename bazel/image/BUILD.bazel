@@ -55,9 +55,9 @@ image_manifest(
         ":bazel_layer",
     ],
     platform = ":linux_amd64",
-    working_dir = "/workspace",
     # The Debian builder image exceeds the remote cache proxy upload limit.
     tags = ["no-remote-cache"],
+    working_dir = "/workspace",
 )
 
 image_load(
@@ -81,9 +81,9 @@ image_from_binary(
         ":linux_amd64",
         ":linux_arm64",
     ],
-    working_dir = "/avalanchego/build",
     # Cache the binary actions. Do not cache the large OCI layer or index actions.
     tags = ["no-remote-cache"],
+    working_dir = "/avalanchego/build",
 )
 
 # The Phase 3 spike starts a disposable registry at this address and pushes the

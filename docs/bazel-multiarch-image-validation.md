@@ -71,9 +71,18 @@ The `push_avalanchego` target is a local validation action. Its name identifies
 the executable `image_push` target. It does not define production publishing
 semantics.
 
-The builder and inner Bazel process use separate disk and output caches. The
-outer repository cache can use `BAZEL_IMAGE_REPOSITORY_CACHE`. CI sets this
+The builder and inner Bazel process use separate disk and output caches. By
+default, local validation stores them in `.cache/bazel-image/`. Set
+`BAZEL_IMAGE_CACHE_ROOT` to use a different location. The script bind-mounts
+the inner caches into the builder container. This keeps them separate from the
+host Bazel cache in `~/.cache/bazel`.
+
+The outer repository cache can use `BAZEL_IMAGE_REPOSITORY_CACHE`. CI sets this
 value to the repository cache prepared by the Bazel setup job.
+
+Gazelle does not use `.gitignore`. The root `BUILD.bazel` excludes `.cache` so
+metadata generation does not scan inner Bazel execroots. Keep this exclusion
+when changing the local cache path.
 
 
 ## CI behavior
