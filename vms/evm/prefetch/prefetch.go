@@ -11,9 +11,13 @@ import (
 
 // WithConcurrentWorkers sets the maximum number of goroutines that trie
 // prefetching uses to load nodes.
+//
+// libevm calls the constructor one time for each prefetcher, and shares the
+// pool between that prefetcher's tries. You can therefore reuse the option.
 func WithConcurrentWorkers(prefetchers int) state.PrefetcherOption {
-	pool := newBoundedWorkers(prefetchers)
-	return state.WithWorkerPools(func() state.WorkerPool { return pool })
+	return state.WithWorkerPool(func() state.WorkerPool {
+		return newBoundedWorkers(prefetchers)
+	})
 }
 
 type boundedWorkers struct {
@@ -24,8 +28,7 @@ type boundedWorkers struct {
 	workClose sync.Once
 }
 
-// newBoundedWorkers returns an instance of [boundedWorkers] that
-// will spawn up to count goroutines.
+// newBoundedWorkers returns a pool that starts a maximum of count goroutines.
 func newBoundedWorkers(count int) *boundedWorkers {
 	return &boundedWorkers{
 		workerSpawner: make(chan struct{}, count),
@@ -33,27 +36,21 @@ func newBoundedWorkers(count int) *boundedWorkers {
 	}
 }
 
-// startWorker creates a new goroutine to execute [f] immediately and then keeps the goroutine
-// alive to continue executing new work.
+// startWorker starts a goroutine. The goroutine runs f, then runs more work
+// until [boundedWorkers.Done] closes the work channel.
 func (b *boundedWorkers) startWorker(f func()) {
-	b.outstandingWorkers.Add(1)
-
-	go func() {
-		defer b.outstandingWorkers.Done()
-
-		if f != nil {
-			f()
-		}
+	b.outstandingWorkers.Go(func() {
+		f()
 		for f := range b.work {
 			f()
 		}
-	}()
+	})
 }
 
-// Execute the given function on an existing goroutine waiting for more work or
-// a new goroutine.
+// Execute runs f on an idle goroutine. If no goroutine is idle, Execute starts
+// a new one, or waits if the pool is at its limit.
 //
-// Execute must not be called after Done, otherwise it might panic.
+// Do not call Execute after [boundedWorkers.Done]. Execute can panic.
 func (b *boundedWorkers) Execute(f func()) {
 	// Ensure we feed idle workers first
 	select {
@@ -73,10 +70,8 @@ func (b *boundedWorkers) Execute(f func()) {
 
 // Done returns after all enqueued work finishes and all goroutines exit.
 //
-// Done can only be called after ALL calls to [Execute] have returned.
-//
-// It is safe to call Done multiple times but not safe to call [Execute]
-// after [Done] has been called.
+// Done is safe to be called multiple times, but MUST be called after ALL calls
+// to [boundedWorkers.Execute] have returned.
 func (b *boundedWorkers) Done() {
 	b.workClose.Do(func() {
 		close(b.work)

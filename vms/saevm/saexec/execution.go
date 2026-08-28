@@ -119,11 +119,13 @@ func (e *Executor) processQueue() {
 var errFatal = errors.New("fatal execution error")
 
 const (
-	// triePrefetcherNamespace is the trie prefetcher's metrics namespace; it
-	// publishes statistics as `trie/prefetch/sae/*`.
+	// triePrefetcherNamespace names the prefetcher's metrics. libevm records
+	// them as `trie/prefetch/sae/*` on its global registry.
+	//
+	// TODO(JonathanOppenheimer): We need to register this namespace within
+	// SAE.
 	triePrefetcherNamespace = "sae"
-	// triePrefetcherParallelism caps the trie prefetcher's concurrent disk
-	// reads.
+	// triePrefetcherParallelism limits the prefetcher to 16 goroutines.
 	triePrefetcherParallelism = 16
 )
 
@@ -144,6 +146,12 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		return err
 	}
 
+	// The prefetcher loads trie nodes during execution which removes the loads
+	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
+	// from 99.76ms to 44.84ms:
+	// https://github.com/ava-labs/avalanchego/issues/5665#issuecomment-5372800462
+	//
+	// TODO(JonathanOppenheimer): measure this again after SAE is live!
 	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
 	defer stateDB.StopPrefetcher()
 
