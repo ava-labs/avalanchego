@@ -78,6 +78,10 @@ Do not assume that a cache hit for a direct binary build proves that the image
 target can reuse that result. Check the action summary for the final image
 command.
 
+The CI bootstrap fetch and Task-bootstrap build both use `--test_env=HOME`.
+This keeps their analysis configuration the same. Keep this option in
+`scripts/run_task.sh` when changing the bootstrap commands.
+
 ## Builder-image cache decision
 
 The builder image is a better cache candidate than the changing runtime image.
@@ -122,9 +126,6 @@ builder image would also preserve the assembled toolchain image.
 
 The image job has these warnings:
 
-- Bazel discards an analysis cache when `--test_env` changes after setup.
-  Start a new Bazel server before the outer image build. This removes the
-  option-change warning. Do not change test behavior to hide it.
 - `rules_distroless` reports unresolved arm64 cross-library symlinks and linker
   script paths. The builder works because the flattened Debian package tree
   contains the files. This is an upstream package-metadata warning. Do not
