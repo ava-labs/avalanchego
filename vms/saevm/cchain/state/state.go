@@ -253,12 +253,8 @@ func encodeTrieKey(height uint64, chainID ids.ID) []byte {
 
 // decodeTrieKey splits an atomic trie key into its height and chainID. The key
 // MUST be keyLength bytes.
-func decodeTrieKeyHeight(key []byte) uint64 {
-	return binary.BigEndian.Uint64(key[:wrappers.LongLen])
-}
-
-func decodeTrieKeyChainID(key []byte) ids.ID {
-	return ids.ID(key[wrappers.LongLen:])
+func decodeTrieKey(key []byte) (uint64, ids.ID) {
+	return binary.BigEndian.Uint64(key[:wrappers.LongLen]), ids.ID(key[wrappers.LongLen:])
 }
 
 func toKeyValues(ops map[ids.ID]*chainsatomic.Requests, height uint64) ([][]byte, [][]byte, error) {

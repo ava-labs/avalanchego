@@ -70,10 +70,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 }
 
 func (s *Syncer) sync(ctx context.Context) error {
-	for batch, err := range collectLeaves(ctx,
+	for batch, err := range iterateHeights(
+		ctx,
 		s.fetcher,
 		s.targetRoot,
-		firstKeyAfterHeight(s.state.currentHeight.Load()),
+		s.state.currentHeight.Load(),
 	) {
 		if err != nil {
 			return err
@@ -89,93 +90,135 @@ func (s *Syncer) sync(ctx context.Context) error {
 	return nil
 }
 
-// firstKeyAfterHeight returns the first trie key that would need synced, assuming all
-// state up to currentHeight is already available.
-func firstKeyAfterHeight(currentHeight uint64) []byte {
-	return encodeTrieKey(currentHeight+1, ids.Empty)
+// heightBatch is the complete set of one height's cross-chain requests.
+type heightBatch struct {
+	height uint64
+	ops    map[ids.ID]*atomic.Requests
 }
 
-// collectLeaves fetches the target trie's leaves from peers, starting with
-// `start`. All returned [heightBatch]s are in key order and have been proven to
-// exist in the trie. Only one [heightBatch] will be returned for any given
-// height. There MAY be skipped heights. Any error returned is fatal.
-func collectLeaves(
+// iterateHeights yields the operations at each height of the cross-chain trie
+// rooted at root, for heights strictly above afterHeight, in ascending height
+// order.
+//
+// A height is yielded only once all of its leaves have arrived, so its ops are
+// never partial. A [heightBatch] is always non-empty.
+func iterateHeights(
 	ctx context.Context,
 	client *hashdb.Client,
-	targetRoot common.Hash,
-	start []byte,
+	root common.Hash,
+	afterHeight uint64,
 ) iter.Seq2[heightBatch, error] {
-	const keyLimit = 1024
 	return func(yield func(heightBatch, error) bool) {
-		batch := heightBatch{height: decodeTrieKeyHeight(start)}
+		current := heightBatch{
+			ops: make(map[ids.ID]*atomic.Requests),
+		}
+		for l, err := range iterateLeaves(ctx, client, root, afterHeight) {
+			if err != nil {
+				yield(heightBatch{}, err)
+				return
+			}
+
+			if l.height != current.height && len(current.ops) > 0 {
+				if !yield(current, nil) {
+					return
+				}
+				current.ops = make(map[ids.ID]*atomic.Requests)
+			}
+
+			current.height = l.height
+			current.ops[l.chainID] = l.requests
+		}
+		if len(current.ops) > 0 {
+			yield(current, nil)
+		}
+	}
+}
+
+// leaf is one decoded entry of the cross-chain trie.
+type leaf struct {
+	height   uint64
+	chainID  ids.ID
+	requests *atomic.Requests
+}
+
+// iterateLeaves iterates through each leaf of the trie rooted at root with
+// heights strictly above afterHeight, decoded, in ascending key order.
+func iterateLeaves(
+	ctx context.Context,
+	client *hashdb.Client,
+	root common.Hash,
+	afterHeight uint64,
+) iter.Seq2[leaf, error] {
+	return func(yield func(leaf, error) bool) {
+		start := encodeTrieKey(afterHeight+1, ids.Empty)
 		for {
 			leaves, more, err := client.FetchLeaves(ctx, hashdb.LeafRange{
-				Root:  targetRoot,
+				Root:  root,
 				Start: start,
-				Limit: keyLimit,
+				Limit: 1024,
 			})
 			if err != nil {
-				yield(heightBatch{}, fmt.Errorf("fetching leaves: %w", err))
+				yield(leaf{}, fmt.Errorf("fetching leaves: %w", err))
 				return
 			}
 
 			for i, key := range leaves.Keys {
-				if h := decodeTrieKeyHeight(key); h != batch.height {
-					if !yield(batch, nil) {
-						return
-					}
-					batch = heightBatch{height: h}
+				if !yield(decodeLeaf(key, leaves.Vals[i])) {
+					return
 				}
-
-				batch.add(key, leaves.Vals[i])
 			}
-
 			if !more {
-				yield(batch, nil)
 				return
 			}
 
 			// The [hashdb.Client] guarantees to return a non-empty set of keys
 			// when `more` is true.
-			start = hashdb.NextKey(leaves.Keys[len(leaves.Keys)-1])
+			last := leaves.Keys[len(leaves.Keys)-1]
+			start = hashdb.NextKey(last)
 		}
 	}
 }
 
-// heightBatch accumulates the synced leaves of a single height.
-type heightBatch struct {
-	height uint64
-	keys   [][]byte
-	vals   [][]byte
-}
+// decodeLeaf splits an cross-chain trie entry into its height, chainID, and
+// requests.
+func decodeLeaf(key, val []byte) (leaf, error) {
+	if len(key) != keyLength {
+		return leaf{}, fmt.Errorf("unexpected trie key length %d, expected %d", len(key), keyLength)
+	}
+	height, chainID := decodeTrieKey(key)
 
-// add accumulates a single synced leaf.
-func (w *heightBatch) add(key, val []byte) {
-	w.keys = append(w.keys, key)
-	w.vals = append(w.vals, val)
+	requests := new(atomic.Requests)
+	if _, err := c.Unmarshal(val, requests); err != nil {
+		return leaf{}, fmt.Errorf("unmarshaling atomic requests for chain %s: %w", chainID, err)
+	}
+	return leaf{
+		height:   height,
+		chainID:  chainID,
+		requests: requests,
+	}, nil
 }
 
 // commit inserts keys and values for a height to the [triedb.Database] and to
 // shared memory.
 func (s *Syncer) commit(b heightBatch) error {
-	if len(b.keys) == 0 {
-		return nil
+	keys := make([][]byte, 0, len(b.ops))
+	vals := make([][]byte, 0, len(b.ops))
+	for chainID, requests := range b.ops {
+		k := encodeTrieKey(b.height, chainID)
+		v, err := c.Marshal(codecVersion, requests)
+		if err != nil {
+			return fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
+		}
+		keys = append(keys, k)
+		vals = append(vals, v)
 	}
 
-	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, b.keys, b.vals)
+	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, keys, vals)
 	if err != nil {
 		return fmt.Errorf("applying synced trie at height %d: %w", b.height, err)
 	}
 
-	ops := make(map[ids.ID]*atomic.Requests)
-	for i, key := range b.keys {
-		req := new(atomic.Requests)
-		if _, err := c.Unmarshal(b.vals[i], req); err != nil {
-			return fmt.Errorf("unmarshaling atomic requests: %w", err)
-		}
-		ops[decodeTrieKeyChainID(key)] = req
-	}
-	if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), b.height, newRoot, ops); err != nil {
+	if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), b.height, newRoot, b.ops); err != nil {
 		return fmt.Errorf("committing synced height %d: %w", b.height, err)
 	}
 
