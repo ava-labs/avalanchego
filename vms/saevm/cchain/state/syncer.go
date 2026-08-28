@@ -5,7 +5,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"iter"
 
@@ -73,7 +72,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 func (s *Syncer) sync(ctx context.Context) error {
 	w := newHeightWriter(s.state)
 
-	for leaves, err := range collectLeaves(ctx,
+	for pair, err := range collectLeaves(ctx,
 		s.fetcher,
 		s.targetRoot,
 		firstKeyAfterHeight(s.state.currentHeight.Load()),
@@ -82,15 +81,9 @@ func (s *Syncer) sync(ctx context.Context) error {
 			return err
 		}
 
-		for i, key := range leaves.Keys {
-			if len(key) != keyLength {
-				return fmt.Errorf("unexpected trie key length %d, expected %d", len(key), keyLength)
-			}
-
-			// add MAY commit to [State].
-			if err := w.add(key, leaves.Vals[i]); err != nil {
-				return err
-			}
+		// add MAY commit to [State].
+		if err := w.add(pair.key, pair.val); err != nil {
+			return err
 		}
 	}
 
@@ -105,19 +98,21 @@ func (s *Syncer) sync(ctx context.Context) error {
 	return nil
 }
 
-var errNoKeys = errors.New("no keys returned but more leaves expected")
+type pair struct {
+	key, val []byte
+}
 
 // collectLeaves fetches the target trie's leaves from peers, starting with
-// `start`. All returned [hashdb.Leaves] are in key order and have been proven
-// to exist in the trie. Any error returned is fatal.
+// `start`. All returned [pair]s are in key order and have been proven to exist
+// in the trie. Any error returned is fatal.
 func collectLeaves(
 	ctx context.Context,
 	client *hashdb.Client,
 	targetRoot common.Hash,
 	start []byte,
-) iter.Seq2[hashdb.Leaves, error] {
+) iter.Seq2[pair, error] {
 	const keyLimit = 1024
-	return func(yield func(hashdb.Leaves, error) bool) {
+	return func(yield func(pair, error) bool) {
 		for {
 			leaves, more, err := client.FetchLeaves(ctx, hashdb.LeafRange{
 				Root:  targetRoot,
@@ -125,28 +120,23 @@ func collectLeaves(
 				Limit: keyLimit,
 			})
 			if err != nil {
-				yield(hashdb.Leaves{}, fmt.Errorf("fetching leaves: %w", err))
+				yield(pair{}, fmt.Errorf("fetching leaves: %w", err))
 				return
 			}
 
-			// The consumer may retain and mutate the keys.
-			var lastKey []byte
-			if n := len(leaves.Keys); n > 0 {
-				lastKey = common.CopyBytes(leaves.Keys[n-1])
+			for i, key := range leaves.Keys {
+				if !yield(pair{key, leaves.Vals[i]}, nil) {
+					return
+				}
 			}
 
-			if !yield(leaves, nil) || !more {
-				return
-			}
-			if lastKey == nil {
-				yield(hashdb.Leaves{}, errNoKeys)
+			if !more {
 				return
 			}
 
-			// Update start to be one bit past the last returned key for the next
-			// request.
-			start = lastKey
-			hashdb.IncrementBytes(start)
+			// The [hashdb.Client] guarantees to return a non-empty set of keys
+			// when `more` is true.
+			start = hashdb.NextKey(leaves.Keys[len(leaves.Keys)-1])
 		}
 	}
 }
