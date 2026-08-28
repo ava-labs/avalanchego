@@ -80,14 +80,6 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
-  bazel-test:
-    desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //...'
-
-  bazel-test-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
-
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
     cmds:
@@ -97,7 +89,7 @@ tasks:
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-ci:
-    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
     env:
       E2E_SERIAL: 1
     cmds:
@@ -106,17 +98,49 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
-  bazel-test-fast:
-    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
+  bazel-test-e2e-smoke:
+    desc: Run an E2E smoke test with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
-  bazel-test-main:
-    desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+  bazel-test-unit-all:
+    desc: Run cacheable Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
 
-  bazel-test-subnet-evm:
-    desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+  bazel-test-unit-all-race-shuffle:
+    desc: Run Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race-shuffle --nocache_test_results'
+
+  bazel-test-unit-avalanchego:
+    desc: Run cacheable AvalancheGo Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh avalanchego'
+
+  bazel-test-unit-avalanchego-race-shuffle:
+    desc: Run AvalancheGo Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh avalanchego --config=race-shuffle --nocache_test_results'
+
+  bazel-test-unit-coreth:
+    desc: Run cacheable Coreth/EVM Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh coreth'
+
+  bazel-test-unit-coreth-race-shuffle:
+    desc: Run Coreth/EVM Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh coreth --config=race-shuffle --nocache_test_results'
+
+  bazel-test-unit-smoke:
+    desc: Run a cacheable Bazel Go unit-test smoke test
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh smoke --test_filter=TestID'
+
+  bazel-test-unit-subnet-evm:
+    desc: Run cacheable Subnet-EVM Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh subnet-evm'
+
+  bazel-test-unit-subnet-evm-race-shuffle:
+    desc: Run Subnet-EVM Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh subnet-evm --config=race-shuffle --nocache_test_results'
 
   build:
     desc: Builds avalanchego
