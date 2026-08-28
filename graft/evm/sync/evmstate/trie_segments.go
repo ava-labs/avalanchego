@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -356,7 +355,6 @@ func (t *trieSegment) String() string {
 func (t *trieSegment) Root() common.Hash                  { return t.trie.root }
 func (t *trieSegment) Account() common.Hash               { return t.trie.account }
 func (t *trieSegment) End() []byte                        { return t.end }
-func (*trieSegment) NodeType() message.NodeType           { return message.StateTrieNode }
 func (t *trieSegment) OnStart() (bool, error)             { return t.trie.task.OnStart() }
 func (t *trieSegment) OnFinish(ctx context.Context) error { return t.trie.segmentFinished(ctx, t.idx) }
 

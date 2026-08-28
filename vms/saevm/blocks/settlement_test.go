@@ -49,10 +49,21 @@ func ExampleRange() {
 func blockBuildingPreference() *Block { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 3, nil), nil, nil)
-
-	b := newBlock(t, newEthBlock(6, 10, parent.EthBlock()), parent, lastSettled)
+	lastSettled := newBlock(
+		t,
+		newSynchronousEthBlock(t, 3, 3, nil),
+		nil, nil,
+	)
+	parent := newBlock(
+		t,
+		newEthBlock(t, 4, 9, lastSettled.EthBlock(), lastSettled),
+		lastSettled, lastSettled,
+	)
+	b := newBlock(
+		t,
+		newEthBlock(t, 5, 10, parent.EthBlock(), lastSettled),
+		parent, lastSettled,
+	)
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
@@ -217,7 +228,15 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newChain(t, 0, 30, nil)
+
+	// TODO(arr4n): Although [newChain] sets the last-settled block of all
+	// asynchronous blocks (in this case to the genesis block), they are
+	// irrelevant for the rest of this test and will certainly diverge from the
+	// value returned by [LastToSettleAt]. Fixing this requires building the
+	// chain manually, and interleaving extension with calls to
+	// [LastToSettleAt], which is a major refactor for minimal benefit.
+	blocks := newChain(t, 0, 30, map[uint64]uint64{0: 0})
+
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
