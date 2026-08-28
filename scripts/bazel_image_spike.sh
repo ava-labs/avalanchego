@@ -2,13 +2,21 @@
 
 set -euo pipefail
 
-# Build the locked Debian builder image, then build AvalancheGo for both
-# supported Linux targets inside it. The amd64 build also packages and loads the
-# first Bazel runtime image for Phase 2 validation.
+# Build the locked Debian builder image, then build and push a multi-platform
+# AvalancheGo runtime image from inside it.
 
 avalanchego_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cache_root="${BAZEL_IMAGE_CACHE_ROOT:-${avalanchego_path}/.cache/bazel-image}"
 builder_tag="avalanchego-bazel-builder:phase1"
+registry_image="localhost:5000/avalanchego-bazel:phase3"
+registry_container_id=""
+
+cleanup() {
+  if [[ -n "$registry_container_id" ]]; then
+    docker stop "$registry_container_id" > /dev/null
+  fi
+}
+trap cleanup EXIT
 
 outer_repository_cache="${cache_root}/outer-repository"
 outer_disk_cache="${cache_root}/outer-disk"
@@ -20,6 +28,10 @@ if [[ ! -S /var/run/docker.sock ]]; then
 fi
 
 docker_socket_gid="$(stat -c '%g' /var/run/docker.sock)"
+
+# Host networking makes this disposable registry available as localhost to the
+# inner builder that pushes the image index.
+registry_container_id="$(docker run --rm --detach --network host registry:2)"
 
 mkdir -p \
   "$outer_repository_cache" \
@@ -51,17 +63,11 @@ for architecture in amd64 arm64; do
   fi
 
   bazel_command=(build //main:avalanchego)
-  bazel_run_args=()
-  if [[ "$architecture" == "amd64" ]]; then
-    # Phase 2 validates the first runtime image on the builder's native
-    # architecture. Docker only loads one platform from an index at a time.
-    bazel_command=(run //bazel/image:load_avalanchego)
-    bazel_run_args=(-- --platform linux/amd64)
-  fi
 
   docker run --rm \
     --user "$(id -u):$(id -g)" \
     --group-add "$docker_socket_gid" \
+    --network host \
     --workdir /workspace \
     --env HOME=/cache/home \
     --env USER=avalanchego \
@@ -90,7 +96,6 @@ for architecture in amd64 arm64; do
       --subcommands \
       --action_env=CC="$cc" \
       --action_env=AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
-      "${bazel_run_args[@]}" \
     2>&1 | tee "${cache_root}/inner-${architecture}.log"
 
   binary_path="$(find "${cache_root}/inner-output-${architecture}" -type f -path '*/execroot/_main/bazel-out/*/bin/main/main_/main' -print -quit)"
@@ -102,18 +107,53 @@ for architecture in amd64 arm64; do
   echo "inspecting ${architecture} output: ${binary_path}"
   readelf --file-header --program-headers "$binary_path"
 
-  if [[ "$architecture" == "amd64" ]]; then
-    echo "running loaded Bazel image in fresh Debian 12 slim"
-    docker run --rm \
-      --platform linux/amd64 \
-      avalanchego-bazel:phase2 \
-      /avalanchego/build/avalanchego --version
-  else
-    echo "running ${architecture} output in fresh Debian 12 slim"
-    docker run --rm \
-      --platform "linux/${architecture}" \
-      --mount "type=bind,src=${binary_path},dst=/avalanchego,readonly" \
-      debian:12-slim \
-      /avalanchego --version
-  fi
+  echo "running ${architecture} output in fresh Debian 12 slim"
+  docker run --rm \
+    --platform "linux/${architecture}" \
+    --mount "type=bind,src=${binary_path},dst=/avalanchego,readonly" \
+    debian:12-slim \
+    /avalanchego --version
+done
+
+# Push the index after both direct binary checks. The index's platform
+# transitions package the amd64 and arm64 manifests in one registry reference.
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  --group-add "$docker_socket_gid" \
+  --network host \
+  --workdir /workspace \
+  --env HOME=/cache/home \
+  --env USER=avalanchego \
+  --env CC=gcc \
+  --env IMG_INSECURE=1 \
+  --env AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
+  --mount "type=bind,src=$avalanchego_path,dst=/workspace,readonly" \
+  --mount "type=bind,src=$inner_repository_cache,dst=/cache/repository" \
+  --mount "type=bind,src=${cache_root}/inner-disk-amd64,dst=/cache/disk" \
+  --mount "type=bind,src=${cache_root}/inner-output-amd64,dst=/cache/output" \
+  --mount "type=bind,src=${cache_root}/home,dst=/cache/home" \
+  --mount "type=bind,src=$workspace_status,dst=/cache/workspace_status.sh,readonly" \
+  --mount "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock" \
+  "$builder_tag" \
+  /usr/local/bin/bazel \
+    --output_user_root=/cache/output \
+    run //bazel/image:push_avalanchego \
+    --symlink_prefix=/cache/output/bazel- \
+    --repository_cache=/cache/repository \
+    --disk_cache=/cache/disk \
+    --lockfile_mode=error \
+    --config=release \
+    --workspace_status_command=/cache/workspace_status.sh \
+    --compilation_mode=opt \
+    --action_env=CC=gcc \
+    --action_env=AVALANCHEGO_BUILDER_IMAGE_DIGEST="$builder_digest" \
+    -- --insecure \
+  2>&1 | tee "${cache_root}/push.log"
+
+docker buildx imagetools inspect "$registry_image"
+for architecture in amd64 arm64; do
+  docker run --rm \
+    --platform "linux/${architecture}" \
+    "$registry_image" \
+    /avalanchego/build/avalanchego --version
 done

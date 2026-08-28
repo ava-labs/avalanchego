@@ -2,6 +2,7 @@ load("@rules_distroless//distroless:defs.bzl", "cacerts")
 load("@rules_img//img:image.bzl", "image_from_binary", "image_manifest")
 load("@rules_img//img:layer.bzl", "file_metadata", "image_layer")
 load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img//img:push.bzl", "image_push")
 load("@rules_img_images.bzl", "image")
 
 package(default_visibility = ["//visibility:public"])
@@ -64,7 +65,7 @@ image_load(
 )
 
 # Keep the runtime image definition separate from the builder image. The
-# executable is selected by the inner build's target platform.
+# image index transitions the executable build to each listed target platform.
 image_from_binary(
     name = "avalanchego",
     base = image("debian_12_slim"),
@@ -73,13 +74,19 @@ image_from_binary(
     entrypoint = [],
     include_runfiles = False,
     path = "/avalanchego/build/avalanchego",
-    platforms = [":linux_amd64"],
+    platforms = [
+        ":linux_amd64",
+        ":linux_arm64",
+    ],
     working_dir = "/avalanchego/build",
 )
 
-image_load(
-    name = "load_avalanchego",
-    daemon = "docker",
+# The Phase 3 spike starts a disposable registry at this address and pushes the
+# index plus both platform manifests to it.
+image_push(
+    name = "push_avalanchego",
     image = ":avalanchego",
-    tag = "avalanchego-bazel:phase2",
+    registry = "localhost:5000",
+    repository = "avalanchego-bazel",
+    tag = "phase3",
 )
