@@ -43,23 +43,30 @@ jobs:
 
   # This job needs an OIDC token to assume the read-only AWS role that downloads
   # the benchmark's C-Chain data from S3. Keep it outside go-ci.yml: a reusable
-  # workflow cannot elevate the caller's permissions, and granting id-token to
-  # the reusable-workflow caller would make it available to every called job.
+  # workflow cannot elevate its caller's permissions without granting the token
+  # to every job in that workflow.
+  #
+  # GitHub Actions does not allow secrets in a job-level if. When a fork or
+  # Dependabot PR does not receive the role, the job runs but skips all steps.
   c-chain-reexecution:
-    if: ${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}
     name: C-Chain re-execution benchmark
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
+    env:
+      HAS_AWS_S3_READ_ONLY_ROLE: ${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-ci
+      - if: ${{ env.HAS_AWS_S3_READ_ONLY_ROLE == 'true' }}
+        uses: actions/checkout@v5
+      - if: ${{ env.HAS_AWS_S3_READ_ONLY_ROLE == 'true' }}
+        uses: ./.github/actions/setup-go-for-ci
         with:
           platform_name: linux-amd64
           initial_setup: true
       - name: Run C-Chain re-execution benchmark
+        if: ${{ env.HAS_AWS_S3_READ_ONLY_ROLE == 'true' }}
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           test: hashdb-101-250k
