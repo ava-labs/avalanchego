@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 interface IWarpMessenger {
     function sendWarpMessage(bytes calldata payload) external returns (bytes32 messageID);
+    function getBlockchainID() external view returns (bytes32 blockchainID);
 }
 
 /// Builds P-chain transactions owned by msg.sender and ships them over warp.
@@ -38,6 +39,8 @@ contract PChain {
     uint32 private constant TYPE_DISABLE_L1_VALIDATOR = 39;
     uint32 private constant TYPE_ADD_AUTO_RENEWED_VALIDATOR = 40;
     uint32 private constant TYPE_SET_AUTO_RENEWED_VALIDATOR_CONFIG = 41;
+    /// C-chain atomic tx codec (vms/saevm/cchain/tx).
+    uint32 private constant C_TYPE_IMPORT = 0;
 
     uint32 public immutable networkID;
     bytes32 public immutable pChainID;
@@ -116,6 +119,7 @@ contract PChain {
     error OwnersNotSorted();
     error BadThreshold();
     error BadLength();
+    error BadAmount();
 
     constructor(uint32 networkID_, bytes32 pChainID_, bytes32 avaxAssetID_) {
         networkID = networkID_;
@@ -359,6 +363,41 @@ contract PChain {
                 encodeAuth(auth),
                 autoCompoundRewardShares,
                 period
+            )
+        );
+    }
+
+    // ---- C-chain boundary ---------------------------------------------
+
+    /// Moves msg.value (whole nAVAX) to the P-chain as a UTXO owned by
+    /// msg.sender. The AVAX stays in this contract until the C-chain
+    /// executes the message, debits it and writes the UTXO to shared memory.
+    function exportToP() external payable returns (bytes32) {
+        if (msg.value == 0 || msg.value % 1e9 != 0) revert BadAmount();
+        return WARP.sendWarpMessage(abi.encodePacked(msg.sender, uint64(msg.value / 1e9)));
+    }
+
+    /// Imports [imported], UTXOs owned by msg.sender waiting in shared memory
+    /// from the P-chain, into msg.sender's C-chain balance; [fee] nAVAX is
+    /// burned. Encodes a C-chain ImportTx, not a P-chain tx.
+    function importFromP(UTXO[] calldata imported, uint64 fee) external returns (bytes32) {
+        uint64 total;
+        for (uint256 i = 0; i < imported.length; i++) {
+            total += imported[i].amount;
+        }
+        if (total <= fee) revert BadAmount();
+        return send(
+            abi.encodePacked(
+                CODEC_VERSION,
+                C_TYPE_IMPORT,
+                networkID,
+                WARP.getBlockchainID(),
+                pChainID,
+                encodeInputs(imported),
+                uint32(1),
+                msg.sender,
+                total - fee,
+                avaxAssetID
             )
         );
     }

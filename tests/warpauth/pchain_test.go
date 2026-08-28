@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm/runtime"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/params"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	cchaintx "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -200,7 +202,10 @@ func (h *harness) call(method string, args ...any) ([]byte, error) {
 	}
 	query, err := h.mock.Pack("last")
 	require.NoError(h.t, err)
+	value := h.cfg.Value
+	h.cfg.Value = nil
 	ret, _, err := runtime.Call(warp.ContractAddress, query, h.cfg)
+	h.cfg.Value = value
 	require.NoError(h.t, err)
 	var payload []byte
 	require.NoError(h.t, h.mock.UnpackIntoInterface(&payload, "last", ret))
@@ -313,6 +318,38 @@ func TestEncodeAllTxTypes(t *testing.T) {
 	h.expect("setAutoRenewedValidatorConfig", &txs.SetAutoRenewedValidatorConfigTx{
 		BaseTx: goBase(4), TxID: ids.ID{0x44}, Auth: goAuth(), AutoCompoundRewardShares: 30_000, Period: 86_400,
 	}, ins, uint64(4), ids.ID{0x44}, auth, uint32(30_000), uint64(86_400))
+}
+
+// The C-chain boundary: exportToP is owner || nAVAX, importFromP is a
+// C-chain ImportTx in the SAE codec.
+func TestEncodeCChainBoundary(t *testing.T) {
+	require := require.New(t)
+	h := newHarness(t)
+
+	h.cfg.State.AddBalance(common.Address(owner), uint256.NewInt(params.Ether))
+	h.cfg.Value = new(big.Int).Mul(big.NewInt(7), big.NewInt(params.GWei))
+	got, err := h.call("exportToP")
+	require.NoError(err)
+	require.Equal(append(owner[:], 0, 0, 0, 0, 0, 0, 0, 7), got)
+	h.cfg.Value = new(big.Int).Add(h.cfg.Value, big.NewInt(1))
+	_, err = h.call("exportToP")
+	require.ErrorContains(err, "execution reverted")
+	h.cfg.Value = nil
+
+	var unsigned cchaintx.Unsigned = &cchaintx.Import{
+		NetworkID:      networkID,
+		BlockchainID:   ids.ID{31: 0x0c}, // MockWarp.getBlockchainID
+		SourceChain:    pChainID,
+		ImportedInputs: goIns(ins),
+		Outs:           []cchaintx.Output{{Address: common.Address(owner), Amount: 5 + 6 + 7 - 3, AssetID: avaxAssetID}},
+	}
+	want, err := cchaintx.UnsignedBytes(unsigned)
+	require.NoError(err)
+	got, err = h.call("importFromP", ins, uint64(3))
+	require.NoError(err)
+	require.Equal(append(owner[:], want...), got)
+	_, err = h.call("importFromP", ins, uint64(18))
+	require.ErrorContains(err, "execution reverted")
 }
 
 func TestEncodeRejects(t *testing.T) {

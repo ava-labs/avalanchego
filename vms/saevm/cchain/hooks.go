@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"iter"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -29,18 +31,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -53,6 +60,11 @@ type hooks struct {
 	warpStorage *warp.Storage
 }
 
+// exportPayloadLen is owner (20 bytes) || amount in nAVAX (8 bytes). Warp
+// messages of this length from a helper are exports to the P-chain; P-chain
+// and C-chain tx payloads are always longer.
+const exportPayloadLen = 20 + 8
+
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
@@ -61,6 +73,7 @@ func newHooks(
 	warpStorage *warp.Storage,
 	now func() time.Time,
 	desired desiredParams,
+	warpHelpers set.Set[common.Address],
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -84,6 +97,8 @@ func newHooks(
 			now,
 			poolTxs,
 			desired,
+			warpStorage,
+			warpHelpers,
 		},
 		state,
 		warpStorage,
@@ -117,6 +132,8 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
 			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
 		},
+		h.warpStorage,
+		h.warpHelpers,
 	}, nil
 }
 
@@ -247,7 +264,11 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 		}
 	}
 
-	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
+	exports, err := h.exportRequests(statedb, receipts)
+	if err != nil {
+		return fmt.Errorf("collecting exports from receipts: %w", err)
+	}
+	if err := h.state.Apply(b.NumberU64(), txs, exports); err != nil {
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 
@@ -255,10 +276,67 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	if err != nil {
 		return fmt.Errorf("parsing warp messages from receipts: %w", err)
 	}
-	if err := h.warpStorage.Add(messages...); err != nil {
+	if err := h.warpStorage.Add(b.NumberU64(), messages...); err != nil {
 		return fmt.Errorf("storing warp messages from receipts: %w", err)
 	}
 	return nil
+}
+
+// exportRequests turns each export message a trusted helper emitted in this
+// block into a P-chain UTXO owned by the named owner, debiting the helper's
+// balance so that the AVAX is minted on the P-chain only after it left the
+// C-chain. The helper holds the caller's value until its message is
+// executed here, so the balance always suffices; a shortfall is a helper
+// bug and the export is skipped.
+func (h *hooks) exportRequests(statedb *state.StateDB, receipts types.Receipts) (*chainsatomic.Requests, error) {
+	var reqs chainsatomic.Requests
+	for _, r := range receipts {
+		for _, log := range r.Logs {
+			if log.Address != corethwarp.ContractAddress || !h.warpHelpers.Contains(common.BytesToAddress(log.Topics[1][:])) {
+				continue
+			}
+			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
+			if err != nil {
+				return nil, fmt.Errorf("parsing log data into warp message (TxHash: %s, LogIndex: %d): %w", log.TxHash, log.Index, err)
+			}
+			call, err := payload.ParseAddressedCall(m.Payload)
+			if err != nil || len(call.Payload) != exportPayloadLen {
+				continue
+			}
+			owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
+			amount := binary.BigEndian.Uint64(call.Payload[ids.ShortIDLen:])
+			helper := common.BytesToAddress(call.SourceAddress)
+			wei := new(uint256.Int).Mul(uint256.NewInt(amount), uint256.NewInt(params.GWei))
+			if statedb.GetBalance(helper).Lt(wei) {
+				h.ctx.Log.Error("helper cannot cover export; skipping",
+					zap.Stringer("helper", helper),
+					zap.Stringer("owner", owner),
+					zap.Uint64("amount", amount),
+				)
+				continue
+			}
+			statedb.SubBalance(helper, wei)
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.ID(log.TxHash), OutputIndex: uint32(log.Index)}, //#nosec G115 -- Won't overflow
+				Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          amount,
+					OutputOwners: secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{owner}},
+				},
+			}
+			utxoBytes, err := tx.MarshalUTXO(utxo)
+			if err != nil {
+				return nil, err
+			}
+			utxoID := utxo.InputID()
+			reqs.PutRequests = append(reqs.PutRequests, &chainsatomic.Element{
+				Key:    utxoID[:],
+				Value:  utxoBytes,
+				Traits: [][]byte{owner[:]},
+			})
+		}
+	}
+	return &reqs, nil
 }
 
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
@@ -269,6 +347,10 @@ type builder struct {
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
+	warpStorage  *warp.Storage
+	// warpHelpers are the contracts whose warp messages export AVAX to the
+	// P-chain and authorize imports from it.
+	warpHelpers set.Set[common.Address]
 }
 
 var errHeliconUnactivated = errors.New("helicon is not activated")
@@ -337,12 +419,18 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, err := ancestorInputIDs(building, settledHash, source)
+		inputs, settledHeight, err := ancestorInputIDs(building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),
 			)
 			return
+		}
+		// Every verifier has executed the settled block, so only messages
+		// emitted at or below it are known to all of them.
+		knownWarp := func(id ids.ID) bool {
+			height, err := b.warpStorage.Height(id)
+			return err == nil && height <= settledHeight
 		}
 
 		for t := range b.potentialTxs {
@@ -368,7 +456,7 @@ func (b *builder) PotentialEndOfBlockOps(
 			// verified against out-dated state, we need to ensure that import
 			// txs are consuming UTXOs that still exist so that our in-memory
 			// UTXO conflict checks are sufficient.
-			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
+			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory, knownWarp); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),
 					zap.Error(err),
@@ -387,26 +475,26 @@ func (b *builder) PotentialEndOfBlockOps(
 var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
-// in the block range (h, settled), both exclusive.
-func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
+// in the block range (h, settled), both exclusive, and the settled height.
+func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], uint64, error) {
 	var s set.Set[ids.ID]
 	for h.ParentHash != settled {
 		parentNumber := h.Number.Uint64() - 1
 		p, ok := source(h.ParentHash, parentNumber)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
+			return nil, 0, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, 0, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
 		}
 		h = p.Header()
 	}
-	return s, nil
+	return s, h.Number.Uint64() - 1, nil
 }
 
 var errEmptyBlock = errors.New("empty block")

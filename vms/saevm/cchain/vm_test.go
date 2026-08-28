@@ -334,6 +334,7 @@ func (s *SUT) hooks() *hooks {
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
+		nil,
 	)
 }
 

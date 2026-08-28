@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -152,9 +153,10 @@ var (
 	errUnmarshallingUTXO  = errors.New("unmarshalling UTXO")
 	errMismatchedAssetIDs = errors.New("mismatched asset IDs")
 	errVerifyingTransfer  = errors.New("verifying transfer")
+	errUnknownWarpMessage = errors.New("warp credential is not a message emitted by this chain")
 )
 
-func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
@@ -189,6 +191,17 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		}
 		if err := fx.VerifyTransfer(fxTx, in.In, creds[j], utxo.Out); err != nil {
 			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
+		}
+		// The fx checked the helper and the owner; the message is trusted
+		// because this chain emitted it, so no BLS signature is needed.
+		if cred, ok := creds[j].(*secp256k1fx.WarpCredential); ok {
+			msg, err := warp.ParseMessage(cred.Message)
+			if err != nil {
+				return fmt.Errorf("%w (%d): %w", errUnknownWarpMessage, j, err)
+			}
+			if !knownWarp(msg.UnsignedMessage.ID()) {
+				return fmt.Errorf("%w (%d): %s", errUnknownWarpMessage, j, msg.UnsignedMessage.ID())
+			}
 		}
 	}
 	return nil

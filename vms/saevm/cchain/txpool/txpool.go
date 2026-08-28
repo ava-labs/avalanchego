@@ -58,6 +58,10 @@ type Txpool struct {
 	// [Pending.lock] held will deadlock.
 	stateLock sync.RWMutex
 	state     libevm.StateReader
+
+	// knownWarp reports whether this chain emitted the warp message; it is
+	// a liveness pre-check, the block builder enforces the settled height.
+	knownWarp func(ids.ID) bool
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -73,6 +77,7 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
+	knownWarp func(ids.ID) bool,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
@@ -98,6 +103,8 @@ func New(
 		sub:     sub,
 		maxSize: maxSize,
 		state:   state,
+
+		knownWarp: knownWarp,
 	}
 	p.wg.Go(func() {
 		p.updateState(chainConfig, chain, executed)
@@ -198,7 +205,7 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	p.stateLock.RLock()
 	defer p.stateLock.RUnlock()
 
-	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
+	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory, p.knownWarp); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
 	if err := verifyOp(p.state, t.op); err != nil {

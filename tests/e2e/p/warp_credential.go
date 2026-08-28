@@ -4,11 +4,14 @@
 package p
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/hex"
 	"math/big"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/params"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -31,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -59,6 +64,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 		helper := crypto.CreateAddress(ethAddress, 0)
 		privateNetwork.PrimaryChainConfigs = map[string]tmpnet.ConfigMap{
 			"P": {"warp-helper-addresses": []string{ids.ShortID(helper).String()}},
+			"C": {"warp-helper-addresses": []string{helper.Hex()}},
 		}
 		env.StartPrivateNetwork(privateNetwork)
 		e2e.EmitMetricsLink = false
@@ -104,7 +110,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 		require.NoError(err)
 		require.Zero(nonce)
 		gasPrice := e2e.SuggestGasPrice(tc, ethClient)
-		send := func(to *common.Address, data []byte) *types.Receipt {
+		send := func(to *common.Address, value *big.Int, data []byte) *types.Receipt {
 			tx, err := types.SignTx(types.NewTx(&types.DynamicFeeTx{
 				ChainID:   cChainID,
 				Nonce:     nonce,
@@ -112,6 +118,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 				GasFeeCap: gasPrice,
 				Gas:       8_000_000,
 				To:        to,
+				Value:     value,
 				Data:      data,
 			}), signer, key.ToECDSA())
 			require.NoError(err)
@@ -129,15 +136,19 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			require.NoError(err)
 			ctorArgs, err := parsedABI.Pack("", networkID, constants.PlatformChainID, pContext.AVAXAssetID)
 			require.NoError(err)
-			require.Equal(helper, send(nil, append(initcode, ctorArgs...)).ContractAddress)
+			require.Equal(helper, send(nil, nil, append(initcode, ctorArgs...)).ContractAddress)
 		})
 
+		// The C-chain boundary needs SAE, which has no aggregation RPC, so it
+		// only runs with the external relayer.
+		externalRelayer := os.Getenv("WARPAUTH_RELAYER_CMD") != ""
 		tc.By("starting a keyless relayer", func() {
 			// WARPAUTH_RELAYER_CMD runs an external relayer (the icm-services
 			// pchain-relayer) instead of the in-process one; the shell gets
 			// NODE_URI and HELPER. Pair with --activate-latest-after 0 to
 			// run it against SAE, which has no aggregation RPC.
-			if cmd := os.Getenv("WARPAUTH_RELAYER_CMD"); cmd != "" {
+			if externalRelayer {
+				cmd := os.Getenv("WARPAUTH_RELAYER_CMD")
 				relayer := exec.Command("sh", "-c", "exec "+cmd)
 				relayer.Env = append(os.Environ(), "NODE_URI="+nodeURI.URI, "HELPER="+helper.Hex())
 				relayer.Stdout = os.Stdout
@@ -158,6 +169,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 					return warpClient.GetMessageAggregateSignature(ctx, msg.ID(), 67, "")
 				},
 				PChain: pClient,
+				CChain: cchain.NewClient(nodeURI.URI),
 				Helper: helper,
 			}
 			ctx, cancel := context.WithCancel(tc.DefaultContext())
@@ -170,7 +182,7 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 		command := func(method string, args ...any) {
 			data, err := parsedABI.Pack(method, args...)
 			require.NoError(err)
-			send(&helper, data)
+			send(&helper, nil, data)
 		}
 		subnetOwnedBy := func(subnetID ids.ID, addr ids.ShortID) bool {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
@@ -301,6 +313,93 @@ var _ = e2e.DescribePChain("[Warp Credential]", func() {
 			tc.Eventually(func() bool {
 				return balance() > before-fee
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "stake and reward not returned")
+		})
+
+		if !externalRelayer {
+			return
+		}
+		cClient := cchain.NewClient(nodeURI.URI)
+		pUTXOs := func(sourceChain string) []*avax.UTXO {
+			utxosBytes, _, _, err := pClient.GetAtomicUTXOs(tc.DefaultContext(), []ids.ShortID{owner}, sourceChain, 1024, ids.ShortEmpty, ids.Empty)
+			require.NoError(err)
+			utxos := make([]*avax.UTXO, len(utxosBytes))
+			for i, utxoBytes := range utxosBytes {
+				utxos[i] = &avax.UTXO{}
+				_, err := txs.Codec.Unmarshal(utxoBytes, utxos[i])
+				require.NoError(err)
+			}
+			return utxos
+		}
+		cUTXOs := func(sourceChain ids.ID) []*avax.UTXO {
+			utxos, _, _, err := cClient.GetUTXOs(tc.DefaultContext(), []ids.ShortID{owner}, sourceChain, 1024, ids.ShortEmpty, ids.Empty)
+			require.NoError(err)
+			return utxos
+		}
+		cChainBlockchainID, err := info.NewClient(nodeURI.URI).GetBlockchainID(tc.DefaultContext(), "C")
+		require.NoError(err)
+
+		const exportAmount = 5 * units.Avax
+		var exported *avax.UTXO
+		before = balance()
+		tc.By("exporting AVAX from the C-chain with one helper call", func() {
+			data, err := parsedABI.Pack("exportToP")
+			require.NoError(err)
+			send(&helper, new(big.Int).Mul(big.NewInt(int64(exportAmount)), big.NewInt(params.GWei)), data)
+			tc.Eventually(func() bool {
+				utxos := pUTXOs(cChainBlockchainID.String())
+				if len(utxos) == 0 {
+					return false
+				}
+				exported = utxos[0]
+				return true
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "export not in shared memory")
+			require.Equal(uint64(exportAmount), exported.Out.(avax.Amounter).Amount())
+		})
+
+		tc.By("importing it on the P-chain", func() {
+			command("importTx", []utxo{}, uint64(exportAmount-fee), cChainBlockchainID,
+				[]utxo{{TxID: exported.TxID, OutputIndex: exported.OutputIndex, Amount: exportAmount}})
+			tc.Eventually(func() bool {
+				return balance() == before+exportAmount-fee
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "import not on the P-chain")
+		})
+
+		tc.By("exporting it back from the P-chain", func() {
+			utxos := pUTXOs("")
+			ins := make([]utxo, 0, len(utxos))
+			var total uint64
+			for _, u := range utxos {
+				ins = append(ins, utxo{TxID: u.TxID, OutputIndex: u.OutputIndex, Amount: u.Out.(avax.Amounter).Amount()})
+				total += u.Out.(avax.Amounter).Amount()
+			}
+			slices.SortFunc(ins, func(a, b utxo) int {
+				return cmp.Or(bytes.Compare(a.TxID[:], b.TxID[:]), cmp.Compare(a.OutputIndex, b.OutputIndex))
+			})
+			command("exportTx", ins, uint64(0), cChainBlockchainID,
+				[]struct {
+					Amount uint64
+					Owners owners
+				}{{Amount: total - fee, Owners: owners{Threshold: 1, Addrs: []common.Address{ethAddress}}}})
+			tc.Eventually(func() bool {
+				utxos := cUTXOs(constants.PlatformChainID)
+				if len(utxos) == 0 {
+					return false
+				}
+				exported = utxos[0]
+				return true
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "export not in shared memory")
+		})
+
+		tc.By("importing it on the C-chain with one helper call", func() {
+			cBefore, err := ethClient.BalanceAt(tc.DefaultContext(), ethAddress, nil)
+			require.NoError(err)
+			amount := exported.Out.(avax.Amounter).Amount()
+			command("importFromP", []utxo{{TxID: exported.TxID, OutputIndex: exported.OutputIndex, Amount: amount}}, uint64(fee))
+			tc.Eventually(func() bool {
+				cAfter, err := ethClient.BalanceAt(tc.DefaultContext(), ethAddress, nil)
+				require.NoError(err)
+				return cAfter.Cmp(cBefore) > 0
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "import not on the C-chain")
 		})
 	})
 })

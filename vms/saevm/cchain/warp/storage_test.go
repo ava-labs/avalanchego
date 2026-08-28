@@ -50,7 +50,7 @@ func TestStorage(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			db := memdb.New()
 			s := NewStorage(db, test.overrides...)
-			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
+			require.NoErrorf(t, s.Add(1, test.add...), "%T.Add(%d)", s, len(test.add))
 
 			for _, name := range []string{"after_add", "fresh"} {
 				t.Run(name, func(t *testing.T) {

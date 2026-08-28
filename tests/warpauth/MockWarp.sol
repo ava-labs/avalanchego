@@ -9,4 +9,8 @@ contract MockWarp {
         last = payload;
         return keccak256(payload);
     }
+
+    function getBlockchainID() external pure returns (bytes32) {
+        return bytes32(uint256(0x0c));
+    }
 }

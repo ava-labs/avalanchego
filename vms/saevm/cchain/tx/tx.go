@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -78,8 +79,9 @@ type Unsigned interface {
 	asOp(avaxAssetID ids.ID) (op, error)
 
 	// verifyCredentials verifies that the transaction is authorized by the
-	// provided credentials.
-	verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error
+	// provided credentials. knownWarp reports whether this chain emitted the
+	// warp message with the given ID.
+	verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool, creds []Credential) error
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
@@ -98,10 +100,12 @@ type op struct {
 
 // Credential is used in [Tx] to authorize an input of a transaction.
 //
-// It is only implemented by [secp256k1fx.Credential]. An interface must be used
-// to correctly produce the canonical binary format during serialization.
+// It is implemented by [secp256k1fx.Credential] and, for imports authorized
+// by a trusted C-chain helper contract, [secp256k1fx.WarpCredential]. An
+// interface must be used to correctly produce the canonical binary format
+// during serialization.
 type Credential interface {
-	Self() *secp256k1fx.Credential
+	verify.Verifiable
 }
 
 // ID returns the unique hash of the transaction.
@@ -243,8 +247,10 @@ func (t *Tx) SanityCheck(ctx *snow.Context) error {
 }
 
 // VerifyCredentials verifies that the transaction is properly authorized.
-func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
-	return t.Unsigned.verifyCredentials(sm, t.Creds)
+// knownWarp reports whether this chain emitted the warp message with the
+// given ID; it backs [secp256k1fx.WarpCredential] verification.
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool) error {
+	return t.Unsigned.verifyCredentials(sm, knownWarp, t.Creds)
 }
 
 // AtomicRequests returns shared-memory modifications that this transaction
@@ -276,4 +282,11 @@ func UnsignedBytes(u Unsigned) ([]byte, error) {
 	// We MUST provide a pointer to an interface so that the returned slice is
 	// prefixed with the type ID.
 	return c.Marshal(codecVersion, &u)
+}
+
+// ParseUnsigned is the inverse of [UnsignedBytes].
+func ParseUnsigned(b []byte) (Unsigned, error) {
+	var u Unsigned
+	_, err := c.Unmarshal(b, &u)
+	return u, err
 }

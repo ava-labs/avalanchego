@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
@@ -64,6 +65,9 @@ type config struct {
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+	// WarpHelperAddresses are the contracts whose warp messages export AVAX
+	// to the P-chain and authorize imports from it on behalf of the caller.
+	WarpHelperAddresses []common.Address `json:"warp-helper-addresses"`
 
 	// internalConfig
 }

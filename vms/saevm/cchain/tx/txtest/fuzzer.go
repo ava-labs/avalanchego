@@ -319,7 +319,7 @@ func (e *encoder) unsigned(u tx.Unsigned) {
 }
 
 func (e *encoder) credential(c tx.Credential) {
-	sliceTo(e, c.Self().Sigs, (*encoder).signature)
+	sliceTo(e, c.(*secp256k1fx.Credential).Sigs, (*encoder).signature)
 }
 
 func (e *encoder) tx(tx *tx.Tx) {

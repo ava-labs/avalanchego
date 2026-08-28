@@ -6,7 +6,9 @@ package tx
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -23,6 +25,13 @@ func init() {
 	if err := fx.Bootstrapped(); err != nil {
 		panic(err)
 	}
+}
+
+// SetWarpHelpers sets the C-chain contracts whose warp messages authorize
+// imports on behalf of the owner named in the payload.
+// ponytail: package-level like fx itself; called once from VM init.
+func SetWarpHelpers(helpers set.Set[ids.ShortID]) {
+	fx.WarpHelpers = helpers
 }
 
 type fxVM struct {

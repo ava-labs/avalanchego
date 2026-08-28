@@ -144,6 +144,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 		NewPending(),
 		backend,
 		maxSize,
+		func(ids.ID) bool { return false },
 	)
 	require.NoError(tb, err)
 	tb.Cleanup(pool.Close)

@@ -16,12 +16,15 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
@@ -45,6 +48,7 @@ type Relayer struct {
 	// relayQuorum percent of the primary network stake.
 	Sign   func(context.Context, *avalanchewarp.UnsignedMessage) ([]byte, error)
 	PChain *platformvm.Client
+	CChain *cchain.Client
 	Helper common.Address
 }
 
@@ -96,6 +100,26 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 		r.Log.Warn("dropping unparsable log", zap.Error(err))
 		return nil
 	}
+	call, err := payload.ParseAddressedCall(unsigned.Payload)
+	if err != nil {
+		r.Log.Warn("dropping message that is not an addressed call", zap.Error(err))
+		return nil
+	}
+	if len(call.Payload) == exportPayloadLen {
+		// An export to the P-chain; the C-chain executes it by itself.
+		return nil
+	}
+
+	// A C-chain import needs no signatures: the C-chain checks its own log.
+	if tx, owner, err := WrapCChain(unsigned); err == nil {
+		return r.issue(ctx, unsigned.ID(), tx.ID(), tx.InputIDs(),
+			func() (set.Set[ids.ID], error) {
+				return r.cChainUTXOs(ctx, owner, constants.PlatformChainID)
+			},
+			func() error { return r.CChain.IssueTx(ctx, tx) },
+		)
+	}
+
 	signed, err := r.Sign(ctx, unsigned)
 	if err != nil {
 		return fmt.Errorf("aggregating signatures for %s: %w", unsigned.ID(), err)
@@ -105,49 +129,68 @@ func (r *Relayer) relay(ctx context.Context, logData []byte) error {
 		r.Log.Warn("dropping message with unparsable tx", zap.Stringer("messageID", unsigned.ID()), zap.Error(err))
 		return nil
 	}
+	return r.issue(ctx, unsigned.ID(), tx.ID(), tx.Unsigned.InputIDs(),
+		func() (set.Set[ids.ID], error) { return r.spendableUTXOs(ctx, owner, tx.Unsigned) },
+		func() error {
+			_, err := r.PChain.IssueTx(ctx, tx.Bytes())
+			return err
+		},
+	)
+}
 
-	// Issue until it lands or an input disappears: a missing input means the
-	// tx was accepted (ours or another relayer's) or was wrong to begin with.
+// issue submits a tx until it lands or an input disappears: a missing input
+// means the tx was accepted (ours or another relayer's) or was wrong to
+// begin with.
+func (r *Relayer) issue(
+	ctx context.Context,
+	messageID ids.ID,
+	txID ids.ID,
+	inputs set.Set[ids.ID],
+	spendable func() (set.Set[ids.ID], error),
+	issueTx func() error,
+) error {
+	log := r.Log.With(zap.Stringer("messageID", messageID), zap.Stringer("txID", txID))
 	for attempt := 1; ; attempt++ {
-		spendable, err := r.spendableUTXOs(ctx, owner, tx.Unsigned)
+		have, err := spendable()
 		if err != nil {
-			return fmt.Errorf("fetching UTXOs of %s: %w", owner, err)
+			return fmt.Errorf("fetching UTXOs: %w", err)
 		}
-		missing := tx.Unsigned.InputIDs()
-		missing.Difference(spendable)
+		missing := set.Of(inputs.List()...)
+		missing.Difference(have)
 		if missing.Len() > 0 {
-			r.Log.Info("dropping message whose inputs are spent",
-				zap.Stringer("messageID", unsigned.ID()),
-				zap.Stringer("txID", tx.ID()),
-			)
+			log.Info("dropping message whose inputs are spent")
 			return nil
 		}
-		txID, err := r.PChain.IssueTx(ctx, tx.Bytes())
+		err = issueTx()
 		if err == nil {
-			r.Log.Info("relayed warp message to the P-chain",
-				zap.Stringer("messageID", unsigned.ID()),
-				zap.Stringer("txID", txID),
-			)
+			log.Info("relayed warp message")
 			return nil
 		}
 		if attempt == relayMaxAttempts {
-			r.Log.Warn("P-chain kept rejecting tx; dropping message",
-				zap.Stringer("messageID", unsigned.ID()),
-				zap.Stringer("txID", tx.ID()),
-				zap.Error(err),
-			)
+			log.Warn("tx kept being rejected; dropping message", zap.Error(err))
 			return nil
 		}
-		r.Log.Info("P-chain rejected tx; rechecking inputs",
-			zap.Stringer("txID", tx.ID()),
-			zap.Error(err),
-		)
+		log.Info("tx rejected; rechecking inputs", zap.Error(err))
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(relayPoll):
 		}
 	}
+}
+
+// cChainUTXOs returns the IDs of the shared-memory UTXOs [owner] can import
+// into the C-chain from [sourceChain].
+func (r *Relayer) cChainUTXOs(ctx context.Context, owner ids.ShortID, sourceChain ids.ID) (set.Set[ids.ID], error) {
+	utxos, _, _, err := r.CChain.GetUTXOs(ctx, []ids.ShortID{owner}, sourceChain, maxUTXOs, ids.ShortEmpty, ids.Empty)
+	if err != nil {
+		return nil, err
+	}
+	utxoIDs := set.Set[ids.ID]{}
+	for _, utxo := range utxos {
+		utxoIDs.Add(utxo.InputID())
+	}
+	return utxoIDs, nil
 }
 
 // spendableUTXOs returns the IDs of the UTXOs [owner] can spend in [unsigned]:

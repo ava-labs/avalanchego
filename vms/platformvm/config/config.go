@@ -19,8 +19,8 @@ import (
 // `go run ./tests/warpauth/nick -network <name>` whenever PChain.sol changes;
 // tests/warpauth pins these to the contract bytes.
 var DefaultWarpHelperAddresses = map[uint32][]ids.ShortID{
-	constants.MainnetID: {mustShortID("0x01B8Ee353564FB752b7E9E768E0fb6F069796E99")},
-	constants.FujiID:    {mustShortID("0x23c6437426e186BbfFC4B54143c2B14aB3569e80")},
+	constants.MainnetID: {mustShortID("0x2c9Bf34aA13CC68309AE60D91A902413BabB6423")},
+	constants.FujiID:    {mustShortID("0x81B698Bf5D21E868Fa8cc1E30555E604A067B045")},
 }
 
 func mustShortID(hexAddr string) ids.ShortID {

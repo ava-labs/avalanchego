@@ -24,14 +24,17 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -123,6 +126,12 @@ func (vm *VM) Initialize(
 
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
+	warpHelpers := set.Of(userConfig.WarpHelperAddresses...)
+	fxHelpers := set.NewSet[ids.ShortID](warpHelpers.Len())
+	for helper := range warpHelpers {
+		fxHelpers.Add(ids.ShortID(helper))
+	}
+	tx.SetWarpHelpers(fxHelpers)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
@@ -131,6 +140,7 @@ func (vm *VM) Initialize(
 		warpStorage,
 		vm.now,
 		userConfig.desired(),
+		warpHelpers,
 	)
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
@@ -139,7 +149,10 @@ func (vm *VM) Initialize(
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize, func(id ids.ID) bool {
+		_, err := warpStorage.Get(id)
+		return err == nil
+	})
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
