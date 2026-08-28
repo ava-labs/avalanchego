@@ -44,6 +44,7 @@ avalanchego monorepo.
   - [What is cached](#what-is-cached)
   - [Cache key](#cache-key)
   - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
+  - [Platform-specific target patterns](#platform-specific-target-patterns)
   - [Enforcement](#enforcement)
   - [Changing this safely](#changing-this-safely)
   - [Apple CommandLineTools](#apple-commandlinetools)
@@ -748,6 +749,24 @@ bindings in `MODULE.bazel` are part of the same design: they let the setup job
 fetch Bazel-owned repo tools and warm caches for later jobs without making
 `bazel fetch` walk machine-specific workspace state.
 
+### Platform-specific target patterns
+
+Some Bazel packages only support Linux. For example, `//bazel/image/...` uses
+Debian packages that only support the `linux/amd64` platform. A Darwin setup job
+cannot analyze these targets.
+
+The dependency list has two target groups:
+
+- `bazel_ci_target_patterns` contains targets for every CI platform. It excludes
+  `//bazel/image/...`.
+- `bazel_ci_linux_target_patterns` contains Linux-only targets. The cache script
+  fetches this group only when `uname -s` returns `Linux`.
+
+Do not add Linux-only targets to the shared group. Exclude a platform-specific
+package from every broad shared pattern. When you change an exclusion, update
+`dependency_target_patterns` in `scripts/run_bazel_go_tests.sh` too. The helper
+must give the same pattern to CI dependency-list enforcement.
+
 ### Enforcement
 
 All Bazel CI tasks that consume this cache state use
@@ -771,6 +790,7 @@ preserve these invariants:
   expected to consume
 - the checked-in dependency list matches the Bazel target patterns actually run
   by the Bazel CI reusable workflows
+- shared target patterns do not select packages that require one platform
 - cache-prefetch behavior stays focused on external repositories and does not
   start depending on developer-specific workspace state
 - remote caching requires the cache URL and the authorization header
