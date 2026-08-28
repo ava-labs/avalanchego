@@ -94,9 +94,9 @@ func TestUptimeVerifier(t *testing.T) {
 		{
 			name: "uptime_insufficient",
 			uptime: stubUptime{
-				validationID: 59 * time.Second,
+				validationID: 60 * time.Second,
 			},
-			call: newUptimeCall(t, validationID, 60),
+			call: newUptimeCall(t, validationID, 61),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
@@ -104,7 +104,7 @@ func TestUptimeVerifier(t *testing.T) {
 		{
 			name:   "unknown_validation_id",
 			uptime: stubUptime{},
-			call:   newUptimeCall(t, validationID, 60),
+			call:   newUptimeCall(t, validationID, 1),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},

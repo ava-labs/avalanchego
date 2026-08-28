@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 func TestParseConfig_FeeRecipient(t *testing.T) {
@@ -168,5 +169,5 @@ func TestConfig_SAEConfig(t *testing.T) {
 // runtime (or worse, divide by) MUST fail at chain-config parse time.
 func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
 	_, err := parseConfig([]byte(`{"commit-interval":0}`))
-	require.Error(t, err, "commit-interval 0 must be rejected at parse time")
+	require.ErrorIs(t, err, saedb.ErrZeroCommitInterval, "parseConfig()")
 }

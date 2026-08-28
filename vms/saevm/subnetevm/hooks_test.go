@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 // TestBlockRebuilderFromOverridesValidatorCoinbase: in operator-chosen
