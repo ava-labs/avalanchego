@@ -66,7 +66,40 @@ the contract bytes.
   It deploys the contract, runs the relayer, creates and transfers a subnet,
   delegates 25 AVAX and watches stake and reward return to the 0x address.
 
+## The C-chain boundary
+
+Value still moves only through shared memory; only who may sign changes.
+
+- C to P: `PChain.exportToP{value}()`. The helper keeps the AVAX and emits
+  `owner || nAVAX` (28 bytes). When the C-chain executes that block,
+  `AfterExecutingBlock` (`vms/saevm/cchain/hooks.go`) debits the helper and
+  writes a P-chain UTXO owned by the caller to shared memory. One EVM tx, no
+  atomic tx, no nonce, no relayer. `PChain.importTx` finishes it on the
+  P-chain.
+- P to C: `PChain.exportTx` on the P-chain, then `PChain.importFromP(utxos,
+  fee)`. The helper encodes a C-chain ImportTx (`vms/saevm/cchain/tx`) as
+  `owner || unsigned bytes`. The relayer wraps it with the message as every
+  credential, no BLS signatures: the C-chain checks the message against its
+  own warp storage and only counts messages from blocks at or below the
+  settled block, so every verifier has executed them. The owner signs the
+  exact bytes, fee included, so nobody else can choose the fee or split the
+  amount.
+
+Both need the helper list in the C-chain config (`warp-helper-addresses`).
+Credential-less rules (derived address, owner-pays-self import) were
+rejected: anyone could burn legacy exports owned by ripemd160 addresses, and
+a pinned fee still allows dust splitting.
+
 ## Open points for review
+
+- SAE's `tx.Credential` is now any `verify.Verifiable`, so the codec parses
+  misplaced inputs or outputs as credentials (rejected at verification);
+  the P-chain has the same looseness.
+- Warp credentials are fee-priced as one secp signature on the P-chain but
+  cost a BLS aggregation each; charge `WarpComplexity` and verify each
+  distinct message once.
+- `warp-helper-addresses` is consensus-critical yet lives in node config on
+  both chains; make it a per-network constant.
 
 - Activation is on Granite only because Helicon switches the C-chain to SAE,
   which has no `warp_*` RPC yet; the ACP picks its own activation.
@@ -74,5 +107,3 @@ the contract bytes.
   `RegisterL1ValidatorTx`).
 - Inputs are single-owner AVAX UTXOs (all a new user ever has); multisig
   UTXOs and genesis stakeable-lock outputs are out of scope.
-- Moving AVAX between the C-chain and the P-chain without a secp signature
-  (export to a derived address, credential-less import) is a separate step.
