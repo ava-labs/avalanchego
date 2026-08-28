@@ -47,6 +47,7 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 type hooks struct {
 	builder
 	warpStorage *saewarp.Storage
+	metrics     *metrics
 }
 
 func newHooks(
@@ -56,6 +57,7 @@ func newHooks(
 	desired desiredParams,
 	warpStorage *saewarp.Storage,
 	configuredCoinbase common.Address,
+	metrics *metrics,
 ) *hooks {
 	return &hooks{
 		builder: builder{
@@ -66,6 +68,7 @@ func newHooks(
 			coinbase:    configuredCoinbase,
 		},
 		warpStorage: warpStorage,
+		metrics:     metrics,
 	}
 }
 
@@ -295,6 +298,10 @@ func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts)
 // later ACP-118 signature requests. It runs only during canonical execution,
 // which is exactly the once-per-block semantics warp storage requires.
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
+	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
+		h.metrics.setMinBlockDelay(mde.DelayDuration())
+	}
+
 	rules := h.chainConfig.Rules(b.Number(), subnetevmparams.IsMergeTODO, b.Time())
 	acceptCtx := &precompileconfig.AcceptContext{
 		SnowCtx: h.ctx,
@@ -334,26 +341,32 @@ type builder struct {
 	coinbase common.Address
 }
 
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+
+// earliestBlockTime returns the earliest wall-clock time at which a child of
+// `parent` may be built. When `parent` carries no `MinDelayExcess` the
+// ACP-226 minimum-delay rule does not apply (matching the consensus check in
+// `customheader.VerifyTime`), so there is no minimum; block-time monotonicity
+// is enforced by the SAE core regardless.
+func earliestBlockTime(parent *types.Header) time.Time {
+	e := customtypes.GetHeaderExtra(parent)
+	if e.MinDelayExcess == nil {
+		return time.Time{}
+	}
+	return hook.BlockTimeFrom(parent.Time, e.TimeMilliseconds).Add(e.MinDelayExcess.DelayDuration())
+}
+
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
+	if earliest := earliestBlockTime(parent); now.Before(earliest) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s",
+			errBelowMinBlockDelay, now, earliest)
+	}
 	nowMS := uint64(now.UnixMilli())
 
 	mde := acp226.InitialDelayExcess
 	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
 		mde = *pmde
-	}
-
-	{
-		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
-		if nowMS < parentTimeMS {
-			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
-		}
-
-		delay := nowMS - parentTimeMS
-		minDelay := mde.Delay()
-		if delay < minDelay {
-			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
-		}
 	}
 
 	if b.desired.delayExcess != nil {
@@ -453,11 +466,15 @@ func (b *builder) BuildBlock(
 
 	rules := b.chainConfig.Rules(header.Number, subnetevmparams.IsMergeTODO, header.Time)
 	rulesExtra := subnetevmparams.GetRulesExtra(rules)
-	predicateBytes, err := subnetevmwarp.PredicateBytes(b.ctx, blockCtx, rulesExtra, txs)
+	warpValidity, err := subnetevmwarp.VerifyBlock(b.ctx, blockCtx, rulesExtra, txs)
 	if err != nil {
-		return nil, fmt.Errorf("generating predicates: %w", err)
+		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
-	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, predicateBytes)
+	warpValidityBytes, err := warpValidity.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("serializing warp validity: %w", err)
+	}
+	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, warpValidityBytes)
 
 	// Encode the settled marker into the header so [hooks.SettledBy] can
 	// recover it.

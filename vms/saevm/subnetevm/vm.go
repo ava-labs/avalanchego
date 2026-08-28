@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
@@ -21,7 +20,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -35,9 +33,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/validators"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
-	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
 	subnetevmwarp "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -143,6 +141,15 @@ func (v *VM) Initialize(
 		return err
 	}
 
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "subnetevm")
+	if err != nil {
+		return fmt.Errorf("making metrics: %w", err)
+	}
+	chainMetrics, err := newMetrics(reg)
+	if err != nil {
+		return fmt.Errorf("registering subnetevm metrics: %w", err)
+	}
+
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
@@ -151,6 +158,7 @@ func (v *VM) Initialize(
 		userConfig.desired(),
 		warpStorage,
 		userConfig.feeRecipient(config, snowCtx.Log),
+		chainMetrics,
 	)
 
 	v.Network, err = network.New(snowCtx, appSender)
@@ -278,53 +286,43 @@ func (v *VM) SetState(ctx context.Context, state snow.State) error {
 	return v.uptime.Dispatch()
 }
 
-// Prevent busy looping when the chain is more advanced than the mempool.
-const waitForEventDelay = 100 * time.Millisecond
+// minWaitForEventDelay is the minimum spacing between consecutive
+// [VM.WaitForEvent] returns, preventing busy looping when the chain is more
+// advanced than the mempool.
+const minWaitForEventDelay = 100 * time.Millisecond
 
-// WaitForEvent waits for the next event from the VM.
+// WaitForEvent waits until both the ACP-226 minimum block delay since the
+// preferred block and the busy-loop throttle have elapsed, then waits for
+// the SAE VM to produce an event.
 func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
-	// Avoid busy looping if we seem like we are ready to build a block, but are
-	// encountering an error.
-	{
-		defer func() {
-			v.lastWaitForEvent.Set(time.Now())
-		}()
-
-		sinceLastCall := time.Since(v.lastWaitForEvent.Get())
-		timeToWait := waitForEventDelay - sinceLastCall
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(timeToWait):
-		}
+	until := v.lastWaitForEvent.Get().Add(minWaitForEventDelay)
+	if buildTime := earliestBlockTime(v.VM.GetPreference().Header()); buildTime.After(until) {
+		until = buildTime
+	}
+	if err := v.waitUntil(ctx, until); err != nil {
+		return 0, err
 	}
 
-	// Wait until we are allowed to build a block.
-	{
-		minTime := minNextBlockTime(v.VM.GetPreference().Header())
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(time.Until(minTime)):
-		}
+	msg, err := v.VM.WaitForEvent(ctx)
+	if err == nil {
+		v.lastWaitForEvent.Set(v.clock.Time())
 	}
-
-	return v.VM.WaitForEvent(ctx)
+	return msg, err
 }
 
-// minNextBlockTime calculates the minimum next block time based on the header.
-func minNextBlockTime(h *types.Header) time.Time {
-	e := customtypes.GetHeaderExtra(h)
-	// If the parent header has no min delay excess, there is nothing to wait
-	// for, because the rule does not apply to the block to be built.
-	if e.MinDelayExcess == nil {
-		return time.Time{}
+// waitUntil blocks until the VM clock reaches t, returning early with the
+// cancellation cause if ctx is canceled first.
+func (v *VM) waitUntil(ctx context.Context, t time.Time) error {
+	timeToWait := t.Sub(v.clock.Time())
+	if timeToWait <= 0 {
+		return nil
 	}
-
-	mde := *e.MinDelayExcess
-	// delay excess is already verified by consensus so this can not overflow.
-	delay := time.Duration(mde.Delay()) * time.Millisecond
-	return saehook.BlockTimeFrom(h.Time, e.TimeMilliseconds).Add(delay)
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case <-time.After(timeToWait):
+	}
+	return nil
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

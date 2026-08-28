@@ -4,8 +4,6 @@
 package warp
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
@@ -18,23 +16,19 @@ import (
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
-// PredicateBytes returns the marshalled predicate results of a block of
-// transactions, verified against subnet-evm's precompile registry.
-func PredicateBytes(
+// VerifyBlock verifies the predicates of every transaction in the block
+// against subnet-evm's precompile registry.
+func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
 	rules *extras.Rules,
 	txs []*types.Transaction,
-) ([]byte, error) {
-	if !rules.PredicatersExist() {
-		return nil, nil
-	}
-
+) (predicate.BlockResults, error) {
 	pc := &precompileconfig.PredicateContext{
 		SnowCtx:            snowContext,
 		ProposerVMBlockCtx: blockContext,
 	}
-	predicateResults, err := saewarp.VerifyBlockPredicates(
+	return saewarp.VerifyBlockPredicates(
 		rules,
 		blockContext != nil,
 		func(address common.Address, pred predicate.Predicate) error {
@@ -42,8 +36,4 @@ func PredicateBytes(
 		},
 		txs,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("block predicates: %w", err)
-	}
-	return predicateResults.Bytes()
 }

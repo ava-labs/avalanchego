@@ -7,6 +7,7 @@ package acp226
 
 import (
 	"sort"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 
@@ -41,6 +42,12 @@ func (t DelayExcess) Delay() uint64 {
 		gas.Gas(t),
 		ConversionRate,
 	))
+}
+
+// DelayDuration returns the minimum block delay ([DelayExcess.Delay], which
+// is denominated in milliseconds) as a [time.Duration].
+func (t DelayExcess) DelayDuration() time.Duration {
+	return time.Duration(t.Delay()) * time.Millisecond //#nosec G115 -- Delay() returns ms values that fit in int64 for centuries
 }
 
 // UpdateDelayExcess updates the DelayExcess to be as close as possible to the

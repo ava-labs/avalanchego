@@ -55,7 +55,7 @@ func newAccessListTx(accessList types.AccessList) *types.Transaction {
 	return types.NewTx(&types.DynamicFeeTx{AccessList: accessList})
 }
 
-func TestPredicateBytes(t *testing.T) {
+func TestVerifyBlock(t *testing.T) {
 	var (
 		addr0 = common.Address{0}
 		addr1 = common.Address{1}
@@ -83,16 +83,11 @@ func TestPredicateBytes(t *testing.T) {
 		blockContext *block.Context
 		txs          []*types.Transaction
 		want         predicate.BlockResults
-		// wantNilBytes asserts the nil short-circuit taken when no
-		// predicaters are registered at all, which is distinguishable from
-		// the marshalled empty [predicate.BlockResults].
-		wantNilBytes bool
 		wantErr      error
 	}{
 		{
-			name:         "no_predicaters",
-			txs:          []*types.Transaction{validTx},
-			wantNilBytes: true,
+			name: "no_predicaters",
+			txs:  []*types.Transaction{validTx},
 		},
 		{
 			name:      "no_predicates",
@@ -167,19 +162,12 @@ func TestPredicateBytes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
-			got, err := PredicateBytes(snowContext, test.blockContext, newRules(test.contracts...), test.txs)
-			require.ErrorIs(t, err, test.wantErr, "PredicateBytes()")
+			got, err := VerifyBlock(snowContext, test.blockContext, newRules(test.contracts...), test.txs)
+			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
 			if test.wantErr != nil {
 				return
 			}
-			if test.wantNilBytes {
-				require.Nil(t, got, "PredicateBytes()")
-				return
-			}
-
-			want, err := test.want.Bytes()
-			require.NoError(t, err, "predicate.BlockResults.Bytes()")
-			require.Equal(t, want, got, "PredicateBytes()")
+			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
 	}
 }

@@ -57,7 +57,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	builderPts := newHooks(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
-		desiredParams{}, nil, builderCoinbase,
+		desiredParams{}, nil, builderCoinbase, nil,
 	)
 	builderHdr, err := builderPts.builder.BuildHeader(parent)
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	// Rebuilder side: a DIFFERENT node (rebuilderCoinbase != builderCoinbase)
 	// rebuilds builderBlock. Its rebuilt block must carry builderCoinbase.
-	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, rebuilderCoinbase)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, rebuilderCoinbase, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(builderBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
@@ -142,7 +142,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
-	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, forgedCoinbase /* same as builder; doesn't matter */)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, forgedCoinbase /* same as builder; doesn't matter */, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(forgedBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)

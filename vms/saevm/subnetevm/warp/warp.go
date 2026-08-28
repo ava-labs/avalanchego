@@ -7,12 +7,3 @@
 // validator-uptime attestation signing.
 package warp
 
-import (
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
-)
-
-// The shared storage doubles as the warp message sink of subnet-evm's
-// precompile accept context.
-var _ precompileconfig.WarpMessageWriter = (*saewarp.Storage)(nil)
