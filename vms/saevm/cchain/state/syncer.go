@@ -5,12 +5,13 @@ package state
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"iter"
 
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
@@ -22,10 +23,10 @@ func RegisterSyncHandler(n *p2p.Network, state *State) error {
 	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength)
 }
 
-// Syncer is a [leaf.CallbackSyncer] that can fetch and apply the atomic trie to
-// a [State] and update shared memory.
+// Syncer fetches the atomic trie from peers, applies it to a [State], and
+// updates shared memory as it goes.
 type Syncer struct {
-	syncer *leaf.CallbackSyncer
+	fetcher *hashdb.Client
 
 	state        *State
 	targetRoot   common.Hash
@@ -34,33 +35,13 @@ type Syncer struct {
 
 // NewSyncer creates a new atomic syncer. The syncer will start with a call to [Syncer.Sync].
 func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
-	tasks := make(chan leaf.SyncTask, 1)
-	// The fetcher only responds to requests for non-empty roots. And if we
-	// already have the full state, no sense syncing again.
-	if state.currentRoot != root {
-		tasks <- &task{
-			state:      state,
-			targetRoot: root,
-			start:      firstKeyAfterHeight(state.currentHeight.Load()),
-			pendingOps: make(map[ids.ID]*atomic.Requests),
-		}
-	}
-	close(tasks) // no more tasks will be sent
-
 	return &Syncer{
-		syncer: leaf.NewCallbackSyncer(
-			hashdb.NewClient(
-				state.snowCtx.Log,
-				n,
-				p2p.EVMAtomicLeafRequestHandlerID,
-				keyLength,
-				pt,
-			),
-			tasks,
-			&leaf.SyncerConfig{
-				RequestSize: 1024,
-				NumWorkers:  1,
-			},
+		fetcher: hashdb.NewClient(
+			state.snowCtx.Log,
+			n,
+			p2p.EVMAtomicLeafRequestHandlerID,
+			keyLength,
+			pt,
 		),
 		targetRoot:   root,
 		targetHeight: height,
@@ -71,16 +52,16 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 // Sync fetches the atomic trie from a peer and applies it to the state,
 // updating shared memory as it goes. Any error MUST be treated as fatal.
 func (s *Syncer) Sync(ctx context.Context) error {
-	if err := s.syncer.Sync(ctx); err != nil {
-		return fmt.Errorf("syncing atomic trie: %w", err)
-	}
-
+	// The fetcher only responds to requests for non-empty roots. And if we
+	// already have the full state, no sense syncing again.
 	if s.state.currentRoot != s.targetRoot {
-		return fmt.Errorf("synced root (%s) does not match target (%s) for atomic trie", s.state.currentRoot, s.targetRoot)
+		if err := s.sync(ctx); err != nil {
+			return err
+		}
 	}
 
 	// Update the shared memory markers to tip, since we have the most recent state
-	// The recent blocks may not have had any atomic txs, so it wouldn't have been updated in [syncTask.OnFinish].
+	// The recent blocks may not have had any atomic txs.
 	if s.state.currentHeight.Load() < s.targetHeight {
 		if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), s.targetHeight, s.targetRoot, nil); err != nil {
 			return fmt.Errorf("committing synced height %d: %w", s.targetHeight, err)
@@ -89,92 +70,154 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return nil
 }
 
+func (s *Syncer) sync(ctx context.Context) error {
+	w := newHeightWriter(s.state)
+
+	for leaves, err := range collectLeaves(ctx,
+		s.fetcher,
+		s.targetRoot,
+		firstKeyAfterHeight(s.state.currentHeight.Load()),
+	) {
+		if err != nil {
+			return err
+		}
+
+		for i, key := range leaves.Keys {
+			if len(key) != keyLength {
+				return fmt.Errorf("unexpected trie key length %d, expected %d", len(key), keyLength)
+			}
+
+			// add MAY commit to [State].
+			if err := w.add(key, leaves.Vals[i]); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Any remaining data also needs committed.
+	if err := w.commit(); err != nil {
+		return err
+	}
+
+	if s.state.currentRoot != s.targetRoot {
+		return fmt.Errorf("synced root (%s) does not match target (%s) for cross-chain trie", s.state.currentRoot, s.targetRoot)
+	}
+	return nil
+}
+
+var errNoKeys = errors.New("no keys returned but more leaves expected")
+
+// collectLeaves fetches the target trie's leaves from peers, starting with
+// `start`. All returned [hashdb.Leaves] are in key order and have been proven
+// to exist in the trie. Any error returned is fatal.
+func collectLeaves(
+	ctx context.Context,
+	client *hashdb.Client,
+	targetRoot common.Hash,
+	start []byte,
+) iter.Seq2[hashdb.Leaves, error] {
+	const keyLimit = 1024
+	return func(yield func(hashdb.Leaves, error) bool) {
+		for {
+			leaves, more, err := client.FetchLeaves(ctx, hashdb.LeafRange{
+				Root:  targetRoot,
+				Start: start,
+				Limit: keyLimit,
+			})
+			if err != nil {
+				yield(hashdb.Leaves{}, fmt.Errorf("fetching leaves: %w", err))
+				return
+			}
+
+			// The consumer may retain and mutate the keys.
+			var lastKey []byte
+			if n := len(leaves.Keys); n > 0 {
+				lastKey = common.CopyBytes(leaves.Keys[n-1])
+			}
+
+			if !yield(leaves, nil) || !more {
+				return
+			}
+			if lastKey == nil {
+				yield(hashdb.Leaves{}, errNoKeys)
+				return
+			}
+
+			// Update start to be one bit past the last returned key for the next
+			// request.
+			start = lastKey
+			hashdb.IncrementBytes(start)
+		}
+	}
+}
+
 // firstKeyAfterHeight returns the first trie key that would need synced, assuming all
 // state up to currentHeight is already available.
 func firstKeyAfterHeight(currentHeight uint64) []byte {
 	return encodeTrieKey(currentHeight+1, ids.Empty)
 }
 
-var _ leaf.SyncTask = (*task)(nil)
+// heightWriter accumulates the synced leaves of a single height, committing them
+// to the state once the height is complete.
+type heightWriter struct {
+	state *State
 
-// task is supplied to the leaf syncer, tracking the pending state for the sync.
-type task struct {
-	state      *State
-	targetRoot common.Hash
-	start      []byte
-
-	// pending accumulates the current height's leaves until a height boundary, at
-	// which point they are committed together.
-	pendingHeight uint64
-	pendingKeys   [][]byte
-	pendingVals   [][]byte
-	pendingOps    map[ids.ID]*atomic.Requests
+	height uint64
+	keys   [][]byte
+	vals   [][]byte
+	ops    map[ids.ID]*atomic.Requests
 }
 
-func (*task) OnStart() (skip bool, _ error) { return false, nil }
+func newHeightWriter(state *State) *heightWriter {
+	return &heightWriter{
+		state: state,
+		ops:   make(map[ids.ID]*atomic.Requests),
+	}
+}
 
-func (t *task) Root() common.Hash  { return t.targetRoot }
-func (t *task) Start() []byte      { return t.start }
-func (*task) End() []byte          { return nil }
-func (*task) Account() common.Hash { return common.Hash{} }
-
-// OnLeafs is called on each batch from the [leaf.Syncer]. All state is queued
-// to be committed for each individual height. Any error returned will be
-// treated as fatal.
-func (t *task) OnLeafs(_ context.Context, keys, vals [][]byte) error {
-	for i, key := range keys {
-		if len(key) != keyLength {
-			return fmt.Errorf("unexpected trie key length %d, expected %d", len(key), keyLength)
+// add accumulates a single synced leaf. Leaves arrive in key order, so a new
+// height means all of the previous height's leaves have arrived and it can be
+// committed before accumulating this one.
+func (w *heightWriter) add(key, val []byte) error {
+	height, chainID := decodeTrieKey(key)
+	if height != w.height {
+		if err := w.commit(); err != nil {
+			return err
 		}
-		height, chainID := decodeTrieKey(key)
-
-		// A new height means all of the previous height's leaves have arrived, so
-		// it can be committed before accumulating this one.
-		if height != t.pendingHeight {
-			if err := t.flush(); err != nil {
-				return err
-			}
-		}
-
-		req := new(atomic.Requests)
-		if _, err := c.Unmarshal(vals[i], req); err != nil {
-			return fmt.Errorf("unmarshaling atomic requests for chain %s: %w", chainID, err)
-		}
-
-		t.pendingHeight = height
-		t.pendingKeys = append(t.pendingKeys, key)
-		t.pendingVals = append(t.pendingVals, vals[i])
-		t.pendingOps[chainID] = req
+		w.height = height
 	}
 
+	req := new(atomic.Requests)
+	if _, err := c.Unmarshal(val, req); err != nil {
+		return fmt.Errorf("unmarshaling atomic requests for chain %s: %w", chainID, err)
+	}
+
+	w.keys = append(w.keys, key)
+	w.vals = append(w.vals, val)
+	w.ops[chainID] = req
 	return nil
 }
 
-// OnFinish is called after the entire remote trie has been included in
-// [task.OnLeafs]. Any remaining leaves are pushed to disk, as the last
-// block with an atomic op.
-func (t *task) OnFinish(context.Context) error {
-	return t.flush()
-}
-
-// flush inserts the accumulated height's leaves into the trie, then commits the
-// resulting root and the height's shared memory atomically, and resets the
-// pending buffers. Leaf sync only delivers heights above the committed tip, so
-// the height is never already applied.
-func (t *task) flush() error {
-	if len(t.pendingKeys) == 0 {
+// commit inserts all pending operations to the [triedb.Database] and to
+// shared memory.
+//
+// This should be called whenever a new height is encountered and before
+// finishing the sync.
+func (w *heightWriter) commit() error {
+	if len(w.keys) == 0 {
 		return nil
 	}
-	newRoot, err := applyTrie(t.state.trieDB, t.state.currentRoot, t.pendingKeys, t.pendingVals)
+
+	newRoot, err := applyTrie(w.state.trieDB, w.state.currentRoot, w.keys, w.vals)
 	if err != nil {
-		return fmt.Errorf("applying synced trie at height %d: %w", t.pendingHeight, err)
+		return fmt.Errorf("applying synced trie at height %d: %w", w.height, err)
 	}
-	if err := t.state.writeToSharedMemory(t.state.db.NewBatch(), t.pendingHeight, newRoot, t.pendingOps); err != nil {
-		return fmt.Errorf("committing synced height %d: %w", t.pendingHeight, err)
+	if err := w.state.writeToSharedMemory(w.state.db.NewBatch(), w.height, newRoot, w.ops); err != nil {
+		return fmt.Errorf("committing synced height %d: %w", w.height, err)
 	}
 
-	t.pendingKeys = nil
-	t.pendingVals = nil
-	t.pendingOps = make(map[ids.ID]*atomic.Requests)
+	w.keys = nil
+	w.vals = nil
+	w.ops = make(map[ids.ID]*atomic.Requests)
 	return nil
 }

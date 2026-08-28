@@ -23,7 +23,6 @@ go_library(
         "//database",
         "//database/prefixdb",
         "//graft/coreth/plugin/evm/atomic/state",
-        "//graft/evm/sync/leaf",
         "//ids",
         "//network/p2p",
         "//snow",

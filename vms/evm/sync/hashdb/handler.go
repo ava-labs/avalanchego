@@ -285,7 +285,7 @@ func (l *leafRange) next() []byte {
 
 	last := l.keys[len(l.keys)-1]
 	next := slices.Clone(last)
-	incrementBytes(next)
+	IncrementBytes(next)
 	return next
 }
 
@@ -473,8 +473,8 @@ func dbValues(db *memorydb.Database) [][]byte {
 	return out
 }
 
-// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to all-zeros.
-func incrementBytes(b []byte) {
+// IncrementBytes adds 1 to b in place, with carry. All-0xff wraps to all-zeros.
+func IncrementBytes(b []byte) {
 	for i := len(b) - 1; i >= 0; i-- {
 		if b[i] < 0xff {
 			b[i]++
