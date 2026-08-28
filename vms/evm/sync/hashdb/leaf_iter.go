@@ -21,9 +21,8 @@ type Pair struct {
 }
 
 // LeafIterator opens a guarded leaf iterator over t, starting at start.
-// keyLength is the expected trie key length in bytes.
 //
-// start MUST be the same length as any key in the trie.
+// start MUST be the same length as every key in the trie.
 func LeafIterator(t *trie.Trie, start []byte) iter.Seq2[Pair, error] {
 	keyLength := len(start)
 	return func(yield func(Pair, error) bool) {
@@ -44,8 +43,8 @@ func LeafIterator(t *trie.Trie, start []byte) iter.Seq2[Pair, error] {
 			}
 
 			// While [trie.NodeIterator] forbids retaining LeafKey and LeafBlob past
-			// Next, the implementation never reuses their memory, so it.Key and
-			// it.Value are safe to retain (matching the existing handler behavior).
+			// Next, the implementation never reuses their memory, so the key and
+			// value are safe to retain.
 			if !yield(Pair{it.LeafKey(), it.LeafBlob()}, nil) {
 				return
 			}
