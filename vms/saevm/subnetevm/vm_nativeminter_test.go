@@ -55,7 +55,7 @@ func sendMintTx(t *testing.T, sut *SUT, from int, target common.Address, amount 
 //
 // The test asserts:
 //  1. The precompile is correctly enabled / disabled at the scheduled
-//     timestamp (via `BeforeExecutingBlock` -> `core.ApplyUpgrades`).
+//     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
 //  2. Admin / manager roles are observable via the generic
 //     [SUT.fetchAllowListRole] helper and follow the last-executed vs
 //     last-settled lag exactly as for the allowlists.
@@ -160,7 +160,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 		"target balance must reflect exactly one successful mint (want=%s got=%s)", mintAmount, postBalance)
 
 	// Step 1: advance past `disableTime` and produce the activation block.
-	// `BeforeExecutingBlock` runs the disable upgrade BEFORE tx execution
+	// `StartExecutingBlock` runs the disable upgrade BEFORE tx execution
 	// in that block, so the admin's mint in the same block sees the
 	// precompile already disabled.
 	//
@@ -183,7 +183,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	require.Zerof(t, postDisableBalance.Cmp(mintAmount),
 		"target balance must be unchanged after the precompile was disabled (want=%s got=%s)", mintAmount, postDisableBalance)
 
-	// (1) Disable upgrade fired inside `BeforeExecutingBlock`; precompile
+	// (1) Disable upgrade fired inside `StartExecutingBlock`; precompile
 	// is no longer enabled per chain config at the current timestamp.
 	require.False(t, sut.isPrecompileEnabledAtLatest(nativeminter.ContractAddress),
 		"nativeminter must be disabled after activation")
@@ -206,7 +206,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 
 	// Step 2: advance to `reenableTime` and produce the re-enable activation
-	// block. The upgrade fires in `BeforeExecutingBlock`, so a mint from
+	// block. The upgrade fires in `StartExecutingBlock`, so a mint from
 	// the now-promoted manager (`nonAdmin`) in this block sees the
 	// precompile already enabled with the new roles and succeeds.
 	sut.setTime(t, reenableTime)

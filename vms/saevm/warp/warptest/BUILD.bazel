@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "warptest",
     srcs = ["validators.go"],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/warp/warptest",
     visibility = ["//visibility:public"],
     deps = [
         "//ids",

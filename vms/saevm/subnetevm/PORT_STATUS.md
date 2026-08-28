@@ -8,10 +8,10 @@ session context: read this file plus `git status` / `git log` to resume.
 
 Reference documents (read before changing anything):
 
-- [`README.md`](README.md) and [`PORT_CONTEXT.md`](PORT_CONTEXT.md) — the
-  original author's design handover for this VM (feature map, state-timing
-  invariants, TODOs). Still authoritative for *what* the VM must do; this file
-  supersedes them on *how* it attaches to master's SAE core.
+- [`README.md`](README.md) — the design handover for this VM (feature map,
+  state-timing invariants, TODOs), updated during the port to the shipped
+  design. Authoritative for *what* the VM must do; this file supersedes it on
+  *how* the port got there. (`PORT_CONTEXT.md` is now just a pointer here.)
 - `vms/saevm/hook/hook.go` and `vms/saevm/cchain/hooks.go` on master — the
   current hook interface and its reference implementation.
 
@@ -349,18 +349,21 @@ Notable adaptations beyond the plan:
 
 ### Next action
 
-All milestones are complete. The branch stays local until Jonathan reviews
-(no push, no PR — per the working agreement). Review focus suggestions:
+All milestones are complete, including the post-review systemic dedup/idiom
+audit (W1-W27; see that section). The branch stays local until Jonathan
+reviews (no push, no PR — per the working agreement). Review focus:
 
 1. The D1 decision (header-encoded gas config replacing the spike's
    persisted-artifact design) — see the Decisions log and the milestone-6
    adversarial-review record.
-2. The public golden-hash update in
+2. The six defaulted owner decisions listed at the end of the systemic-audit
+   section (W19 x2, W20 header-bytes change, W21, W7, W12).
+3. The public golden-hash update in
    `graft/subnet-evm/plugin/evm/customtypes/header_ext_test.go` (new
    optional header tail fields; legacy encodings unchanged).
-3. The deferred follow-ups at the end of the duplication audit (exponent
-   type unification across cchain/dynamic, vms/evm/acp226, and
-   subnetevm/hook/acp176; hook.Points.MinBlockDelayAfter).
+4. The deferred follow-ups at the end of the duplication audit (exponent
+   type unification across cchain/dynamic and vms/evm/acp226; ActiveRules
+   wire-type move; uptimetracker loop hoist).
 
 ## Milestone 6 validation record
 
@@ -391,6 +394,65 @@ All milestones are complete. The branch stays local until Jonathan reviews
 - CI wiring: the spike's `e2e_warp` / `e2e_warp_sae` jobs were re-expressed
   into master's root `ci.yml` (the merge's master-wins policy had dropped
   the additions while keeping their removal from `subnet-evm-ci.yml`).
+
+## Systemic dedup/idiom audit (post-review follow-up)
+
+Jonathan's review of the first "complete" state found the dedup shallow
+("countless examples … this feels patchy"). A 5-lens audit workflow (88
+agents: duplication, dead-code, idiom-vs-cchain, staleness, API-surface
+lenses, each finding adversarially verified; 77 confirmed findings) produced
+a 28-item work plan (W1–W28). Implemented in phases, one commit per phase:
+
+- Phase A (`58c381335f`): W1 hooks flattened into package-root `hooks.go`
+  (hook/ subpackage deleted; unexported `hooks`/`builder` types, cchain
+  layout); W2 local acp176 copy deleted in favor of shared
+  `vms/evm/acp176.State` (+ `TargetExcess *gas.Gas` in customtypes).
+- Phases B+C (`9edcc16f39`): W3 warp/messages byte-copy deleted (imports
+  graft's); W4–W9 config.go rewritten (unexported config, saeConfig
+  assembly, parse-time RPC/DB verification, defaults from
+  saedb/legacypool constants); W10–W15 vm.go lifecycle aligned with cchain
+  (closeMu/onClose, idempotent Shutdown, rollback-before-lock Initialize,
+  metrics gauge, single config log, genesis parsing extracted to
+  genesis.go); W16 cchain uses shared `types.NewChainEthDB`; W17 plugin
+  runner deleted (stdlib flag + direct registration); W18 validators
+  `Manager` renamed `Uptime` (Tracker() dropped); W19 genesis decisions
+  (see flags below).
+- Phase D (`eff867b5ff`): W20 `VerifyBlock` returns `BlockResults`
+  (PredicatersExist short-circuit dropped — see flags); W21 ACP-226
+  `earliestBlockTime`/`waitUntil` WaitForEvent pacing (nil MinDelayExcess =>
+  no minimum); W22 `acp226.DelayExcess.DelayDuration()` added and shared.
+- Phase E (`17a33533ff`): W23 warptest hoisted to `vms/saevm/warp/warptest`
+  (cchain + subnetevm + corethgen SUTs consume it; hand-rolled BLS plumbing
+  deleted); W24 shared predicate engine + verifier extension dispatch get
+  direct unit tests, subnetevm warp tests trimmed to glue deltas; W25
+  goleak-verified TestMains matching cchain.
+- Phase F (this commit): W26 stale-comment sweep (StartExecutingBlock
+  naming, header-encoded gas-config narratives, satisfied TODOs deleted);
+  W27 README rewritten to the shipped header-encoded design (dead links and
+  resolved TODO rows removed), PORT_CONTEXT reduced to a pointer, package
+  doc added, `config.md` added.
+- W28 (delete PORT_STATUS/PORT_CONTEXT, fold into README/PR description) is
+  deliberately deferred: these files are the working agreement's resume
+  anchor until Jonathan reviews.
+
+Owner decisions taken by default during the audit (FLAG FOR REVIEW):
+
+1. W19: the commented-out `NetworkUpgradeOverrides` block was deleted (a
+   one-line TODO remains in genesis.go) rather than implemented.
+2. W19: `EmptyFeeConfig` is substituted with `DefaultFeeConfig` only when
+   the legacy feeManager precompile is configured (narrow fix; SAE
+   otherwise treats legacy FeeConfig as inert).
+3. W20: the `PredicatersExist` short-circuit was DROPPED, so blocks with no
+   predicate-carrying txs now stamp empty predicate-result bytes into
+   `header.Extra` (header-bytes change; acceptable pre-release, flagged
+   because it changes hashes vs the spike).
+4. W21: a parent header with nil `MinDelayExcess` yields no minimum
+   build-wait (consensus-matching; builder-side only).
+5. W7: no `validators-api-enabled` config gate was added (the API is always
+   served, matching the spike; legacy plugin has a gate).
+6. W12: peer-visible warp AppError strings were left verbatim (e.g. "failed
+   to parse addressed call message") to avoid changing wire-observable
+   text; internal error wraps were reworded to repo style.
 
 ## Decisions log
 

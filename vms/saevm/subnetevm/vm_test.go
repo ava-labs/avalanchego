@@ -126,9 +126,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		numAccounts: 1,
 	}, opts...)
 
-	// TODO(alarso16): this will need to be parameterizable
-	fork := cfg.fork
-	upgrades := upgradetest.GetConfig(fork)
+	upgrades := upgradetest.GetConfig(cfg.fork)
 
 	// Test will fail if any error log from libevm, or warn log from SAE, is emitted.
 	// Some warn logs from libevm are expected.
@@ -246,7 +244,8 @@ func (s *SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	c, err := client.NewClientWithURL(apiServer.URL)
 	require.NoError(t, err)
 
-	// TODO(alarso16): delete this - it should be on the VM
+	// Mimic the engine: on entering normal operation it points the VM at the
+	// last-accepted block before any BuildBlock call (matches cchain's SUT).
 	lastID, err := vm.LastAccepted(s.ctx)
 	require.NoError(t, err)
 	require.NoError(t, vm.SetPreference(s.ctx, lastID, nil))
@@ -684,14 +683,14 @@ func postHeliconStartTime(t *testing.T) time.Time {
 }
 
 // TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
-// `BeforeExecutingBlock` -> `subnetevmcore.ApplyUpgrades`.
+// `StartExecutingBlock` -> `subnetevmcore.ApplyUpgrades`.
 //
 // It schedules a single `extras.StateUpgrade` at `now + Tau` that:
 //   - bumps a known account's balance, and
 //   - writes a deterministic value to one of its storage slots.
 //
 // The deterministic clock is then advanced past activation; the next block
-// fires `BeforeExecutingBlock`, applies the upgrade, and we assert both
+// fires `StartExecutingBlock`, applies the upgrade, and we assert both
 // effects via `client.BalanceAt` / `client.StorageAt` at `LatestBlockNumber`.
 func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	const (
@@ -747,7 +746,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 
 	// Activation block: SAE block builders only fire on `PendingTxs`, so we
 	// piggy-back the activation on a trivial keychain-internal transfer.
-	// `BeforeExecutingBlock` runs the StateUpgrade BEFORE the tx executes,
+	// `StartExecutingBlock` runs the StateUpgrade BEFORE the tx executes,
 	// but `target` is not the tx recipient, so the upgrade's effects are
 	// observable in isolation.
 	sut.setTime(t, activationTime)

@@ -31,14 +31,12 @@ go_library(
 go_test(
     name = "warp_test",
     srcs = [
-        "helpers_test.go",
         "main_test.go",
         "predicates_test.go",
         "verifier_test.go",
     ],
     embed = [":warp"],
     deps = [
-        "//database",
         "//database/memdb",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
@@ -50,6 +48,7 @@ go_test(
         "//snow/engine/snowman/block",
         "//snow/snowtest",
         "//utils",
+        "//utils/constants",
         "//utils/set",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
@@ -58,5 +57,6 @@ go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )

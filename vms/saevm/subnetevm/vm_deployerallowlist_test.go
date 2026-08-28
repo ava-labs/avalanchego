@@ -31,7 +31,7 @@ import (
 // admission); see the design note on [hook.Points.CanExecuteTransaction].
 //
 //  1. The precompile is correctly enabled / disabled at the scheduled
-//     timestamp (via `BeforeExecutingBlock` -> `core.ApplyUpgrades`).
+//     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
 //  2. Admin / manager roles are observable via
 //     `deployerallowlist.GetContractDeployerAllowListStatus` and follow the
 //     last-executed vs last-settled lag exactly as for txallowlist.
@@ -121,7 +121,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	sut.requireDeployFailed(t, nonAdminDeploy)
 
 	// Step 1: advance past `disableTime` and produce the activation block.
-	// `BeforeExecutingBlock` runs the disable upgrade BEFORE tx execution
+	// `StartExecutingBlock` runs the disable upgrade BEFORE tx execution
 	// in that block, so `nonAdmin`'s deploy in the same block sees the
 	// precompile already disabled and `CanCreateContract` is a no-op.
 	sut.setTime(t, disableTime.Add(time.Second))
@@ -131,7 +131,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.Equal(t, postDisableDeploy.Hash(), block.Transactions()[0].Hash())
 	sut.requireDeploySucceeded(t, postDisableDeploy)
 
-	// (1) Disable upgrade fired inside `BeforeExecutingBlock`; precompile
+	// (1) Disable upgrade fired inside `StartExecutingBlock`; precompile
 	// is no longer enabled per chain config at the current timestamp.
 	require.False(t, sut.isPrecompileEnabledAtLatest(deployerallowlist.ContractAddress),
 		"deployerallowlist must be disabled after activation")
@@ -155,7 +155,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 
 	// Step 2: advance to `reenableTime` and produce the re-enable
 	// activation block. Same as step 1: the upgrade fires in
-	// `BeforeExecutingBlock`, so a deploy from the now-promoted manager
+	// `StartExecutingBlock`, so a deploy from the now-promoted manager
 	// (`nonAdmin`) in this block sees the precompile already enabled with
 	// the new roles and succeeds.
 	sut.setTime(t, reenableTime)

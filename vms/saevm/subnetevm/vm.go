@@ -1,6 +1,12 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package subnetevm implements the Subnet-EVM L1 VM atop [sae.VM]. It composes
+// the Subnet-EVM block-building hooks (precompile and state upgrades,
+// allowlist admission, reward routing, and the header-encoded ACP-224 runtime
+// gas config), the shared SAE warp service extended with validator-uptime
+// attestations, and the subnet-evm-specific JSON-RPC surface (eth extras and
+// the validators API).
 package subnetevm
 
 import (

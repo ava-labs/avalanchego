@@ -90,20 +90,20 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 // [TestBlockRebuilderFromOverridesValidatorCoinbase]: in DETERMINISTIC
 // branches of [resolveCoinbase] (where the chain pins a unique correct
 // Coinbase per block), a builder that ships a different `Coinbase` MUST
-// produce a block whose rebuilt twin has a DIFFERENT hash, so SAE's
-// `errHashMismatch` fires in [VM.VerifyBlock]. This is what makes the
+// produce a block whose rebuilt twin has a DIFFERENT hash, so
+// [sae.ErrHashMismatch] fires in [VM.VerifyBlock]. This is what makes the
 // pinned branches enforceable and not just advisory.
 //
 // Two pinned branches:
 //   - `!AllowFeeRecipients && rewardmanager not enabled` => MUST be BlackholeAddr.
 //   - `rewardmanager enabled && stored allowFeeRecipients == false` =>
 //     MUST be the stored reward address. (Not exercised here; it requires
-//     a `worstcaseState` with the precompile slot pre-populated, which
+//     a settled state with the rewardmanager slot populated, which
 //     belongs to the integration tests.)
 //
 // We simulate the malicious builder by stamping a non-deterministic
 // `Coinbase` into the received block's header BEFORE handing it to
-// `BlockRebuilderFrom`. The rebuilder's `BuildBlock` then ignores that
+// `BlockRebuilderFrom`. The rebuilder's `FinalizeHeader` then ignores that
 // override and stamps the deterministic value. We assert both the
 // resolved address and the resulting hash differ.
 func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
@@ -158,5 +158,5 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	require.NotEqual(t, forgedCoinbase, rebuilt.Header().Coinbase,
 		"rebuilder MUST NOT echo the forged Coinbase")
 	require.NotEqual(t, forgedBlock.Hash(), rebuilt.Hash(),
-		"rebuilt hash MUST diverge from forged block's hash; this is what triggers errHashMismatch in VerifyBlock")
+		"rebuilt hash MUST diverge from forged block's hash; this is what triggers sae.ErrHashMismatch in VerifyBlock")
 }

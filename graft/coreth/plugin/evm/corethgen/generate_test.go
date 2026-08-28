@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"

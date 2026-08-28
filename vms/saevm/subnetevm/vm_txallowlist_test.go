@@ -29,7 +29,7 @@ import (
 // timeline: genesis-enabled (admin only) -> disable -> re-enable (admin +
 // manager). At each step we assert all three properties of interest:
 //  1. The precompile is correctly enabled / disabled at the scheduled
-//     timestamp (via `BeforeExecutingBlock` -> `core.ApplyUpgrades`).
+//     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
 //  2. The configuration is correctly applied to state (admin / manager
 //     roles observable via `txallowlist.GetTxAllowListStatus`).
 //  3. Worst-case admission correctly blocks transfers from non-enabled
@@ -121,7 +121,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, disableActivationTx.Hash(), block.Transactions()[0].Hash())
 
-	// (1) Disable upgrade fires inside `BeforeExecutingBlock`; precompile is
+	// (1) Disable upgrade fires inside `StartExecutingBlock`; precompile is
 	// no longer enabled per chain config at the current timestamp.
 	require.False(t, sut.isPrecompileEnabledAtLatest(txallowlist.ContractAddress), "txallowlist must be disabled after activation")
 	// (2) State diverges between latest and finalized: latest reflects the
@@ -157,7 +157,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, reenableActivationTx.Hash(), block.Transactions()[0].Hash())
 
-	// (1) Re-enable upgrade fires inside `BeforeExecutingBlock`; precompile
+	// (1) Re-enable upgrade fires inside `StartExecutingBlock`; precompile
 	// is enabled again per chain config at the current timestamp.
 	require.True(t, sut.isPrecompileEnabledAtLatest(txallowlist.ContractAddress), "txallowlist must be re-enabled after activation")
 	// (2) Latest reflects the re-enable (admin + manager promotion); the

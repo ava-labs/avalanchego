@@ -71,9 +71,11 @@ func staticPricingConfig(minPrice uint64) commontype.GasPriceConfig {
 // TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE genesis-enables
 // `gaspricemanager` with a static-pricing config pinning `MinGasPrice` and
 // asserts that every subsequent block's `header.BaseFee` equals the pinned
-// value. This locks in the end-to-end runtime path: MarkSynchronous reads
-// genesis state for the bootstrap clock, and per-block GasConfigAfter calls
-// read the settled state at `header.Root` to keep the clock pinned.
+// value. This locks in the end-to-end runtime path: `FinalizeHeader` reads
+// the gas config from the settled state and stamps it into the header's
+// GasConfig* group, and per-block `GasConfigAfter` calls read it back from
+// the parent header (with the genesis-precompile fallback covering the
+// blocks before the first stamped header) to keep the clock pinned.
 func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -322,15 +324,16 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 //
 //   - `enable_first_async_block`: chain starts without gaspricemanager;
 //     `PrecompileUpgrades` activates it with `pinnedCfg` at the timestamp
-//     of the first async block. Locks in the artifact-writeback path when
+//     of the first async block. Locks in the header-stamping path when
 //     the activation height is the very first SAE-executed block.
 //   - `enable_mid_chain`: chain starts without gaspricemanager; activation
 //     fires `Tau` after genesis. Locks in the same path for `h > 0`.
 //   - `disable_mid_chain`: chain starts with `pinnedCfg` at genesis;
 //     `PrecompileUpgrades` disables it `Tau` after genesis. Locks in the
 //     `SelfDestruct + Finalise` storage-wipe path: post-settlement
-//     `GasConfigAfter` observes zero-valued storage and the chain begins
-//     decaying back toward ACP-176 defaults.
+//     builds observe zero-valued settled storage, stop stamping the
+//     GasConfig* group, and the chain begins decaying back toward ACP-176
+//     defaults.
 func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -468,16 +471,16 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 
 			// Activation block. The deploy tx is just a vehicle to trigger
 			// the SAE block-build path; the activator runs in
-			// `BeforeExecutingBlock`, so the activation block's BaseFee is
+			// `StartExecutingBlock`, so the activation block's BaseFee is
 			// sealed against the pre-activation gas clock.
 			sut.setTime(t, tc.activationTime)
 			activationTx := sut.sendDeployTx(t, adminIdx)
 			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, activationTx)
 
-			// Settle past the activation block so subsequent builds see
-			// `xdb[activationHeight].hookArtifact` (or its absence) at
-			// their `SettledHeight`-keyed lookup.
+			// Settle past the activation block so `FinalizeHeader` reads the
+			// post-activation gas config from the settled state and stamps
+			// it into subsequent headers' GasConfig* group.
 			_ = settleGasPriceManagerMutation(t, sut, fromIdx)
 
 			// Delivery: built after settlement has crossed the activation
@@ -493,9 +496,10 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 // TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE pins a static
 // gaspricemanager config at genesis, builds a settled block, then restarts
 // the VM against the same backing database and asserts that the next block
-// still carries the pinned `BaseFee`. Locks in the artifact-persistence
-// roundtrip across `MarkSynchronous` -> `markExecuted` -> restart ->
-// `GasConfigAfter` -> `blocks.HookArtifact`.
+// still carries the pinned `BaseFee`. Locks in the config roundtrip through
+// the header: `FinalizeHeader` stamps the GasConfig* group pre-restart, and
+// post-restart `GasConfigAfter` recovers it from the persisted parent header
+// with no auxiliary database state.
 func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -534,14 +538,13 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 		"pre-restart ExecutedBaseFee must reflect pinned MinGasPrice")
 
 	// Restart: shuts down the current VM, then reinitialises a fresh VM
-	// against the same `baseDB`. On the new boot, `MarkSynchronous` reads
-	// the genesis state to seed the bootstrap gas clock, and subsequent
-	// builds rely on the previously-persisted hook artifact in `xdb`.
+	// against the same `baseDB`. On the new boot, builds recover the gas
+	// config from the persisted parent header's GasConfig* group.
 	sut.restart(t)
 
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 	postRestart := sut.buildAcceptExecuteBlock(t)
 	require.Equal(t, wantPinned, postRestart.ExecutedBaseFee(),
-		"post-restart ExecutedBaseFee must still reflect pinned MinGasPrice (artifact roundtrip)")
+		"post-restart ExecutedBaseFee must still reflect pinned MinGasPrice (header roundtrip)")
 }
