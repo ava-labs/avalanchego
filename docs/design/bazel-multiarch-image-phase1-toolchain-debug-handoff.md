@@ -327,3 +327,70 @@ spike. Then add CI coverage that verifies the index platform list and runs
 both explicit platform selections. Keep the Dockerfile/Buildx test path as an
 independent comparison until image configuration and release semantics are
 agreed.
+
+## Phase 4 continuation results
+
+Commit `a445a45d2e` adds local Bazel image entrypoints and Bazel CI validation.
+It does not add a production publishing interface, and
+`docs/design/bazel-multiarch-image.md` remains unchanged.
+
+### Scope
+
+Bazel image publishing remains a local-validation spike only. The fixed
+`localhost:5000` registry, `IMG_INSECURE`, `--insecure`, and host networking
+remain limited to the test path. No production destination naming, tagging,
+TLS, authentication, credentials, retention policy, or publishing ownership
+has been defined.
+
+### Entrypoints and validation
+
+`Taskfile.yml` now provides:
+
+- `bazel-build-image`, which invokes `scripts/bazel_image_spike.sh
+  --build-only`. It builds the amd64 and arm64 binaries and the combined image
+  index, but does not start a registry or run containers.
+- `bazel-test-build-image`, which invokes the full script. It retains the
+  direct amd64 and arm64 binary runtime checks, pushes the index to the
+  disposable registry, inspects the index metadata, and runs both image
+  platforms explicitly.
+
+The script now resolves each direct binary through that architecture's
+`bazel-bin` symlink rather than selecting the first matching cached output.
+It checks that the ELF machine matches the requested architecture before each
+runtime check. This avoids stale output from a different target platform being
+validated as the requested one.
+
+The following passed locally with a fresh `BAZEL_IMAGE_CACHE_ROOT`:
+
+```bash
+BAZEL_IMAGE_CACHE_ROOT="$PWD/.cache/bazel-image-task-validation" \
+  task bazel-build-image
+BAZEL_IMAGE_CACHE_ROOT="$PWD/.cache/bazel-image-task-validation" \
+  task bazel-test-build-image
+```
+
+The test run reported an OCI index with `linux/amd64` and `linux/arm64/v8`
+manifests. Both direct binary checks and both explicit image-platform runs
+reported the stamped commit `9fc1165d58b83167b34a921946bdcba3b36a90d5`.
+
+ShellCheck, `bash -n`, Actionlint, Task dry-runs, and `git diff --check` also
+passed. The disposable registry was removed by the script. The pre-existing
+`kind-registry` container was not changed.
+
+### CI ownership
+
+`.github/workflows/bazel-ci.yml` has an `image` job. On Linux it prepares
+Bazel, sets up QEMU, and runs:
+
+```bash
+./scripts/run_task.sh bazel-test-build-image
+```
+
+The job is included in `bazel-required`. On non-Linux Bazel CI runners, the
+Docker-specific step is skipped and the job succeeds. The normal
+Dockerfile/Buildx image validation remains only in Go CI; it was not replaced
+or combined with the Bazel image job.
+
+The updated Bazel CI workflow has not run remotely yet. Its first run should
+compare its result with the independent Dockerfile/Buildx CI job. Do not move
+the local registry settings into a production publishing path.
