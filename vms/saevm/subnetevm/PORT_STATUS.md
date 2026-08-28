@@ -454,6 +454,38 @@ Owner decisions taken by default during the audit (FLAG FOR REVIEW):
    to parse addressed call message") to avoid changing wire-observable
    text; internal error wraps were reworded to repo style.
 
+## Final validation record (post-audit tree)
+
+After the audit phases and doc refresh, the four gates were re-run
+sequentially on the final tree:
+
+- `task lint`: PASS (ALL SUCCESS). The first run of this sweep found 7 real
+  issues in the port (forbidigo `require.Error`, gci ordering x3,
+  gofmt/gofumpt in warp/warp.go, unparam in verifier_test) — fixed in
+  `bdf649c8be`, including exporting `saedb.ErrZeroCommitInterval` so the
+  parse-time rejection is asserted by identity.
+- Repo-wide race unit sweep (`scripts/build_test.sh`): PASS, 230 packages,
+  0 failures.
+- `task test-e2e-warp-sae`: PASS 5/5. The first run flaked on
+  SubnetA→SubnetA at "expected a SendWarpMessage event": under SAE,
+  `eth_getTransactionReceipt` is served from the executor's in-memory cache
+  (`immediateReceipts`) the moment execution finishes, while `eth_getLogs`
+  reads the durably-indexed logs, which land slightly later — so
+  WaitMined-then-FilterLogs races by design. Fixed in `6405bc7320` by
+  polling the filter (suite default timeout) while keeping the
+  exactly-one-event assertion, mirroring the suite's existing
+  `PendingNonceAt` accommodation. A VM-side alternative (serving `GetLogs`
+  from the executor cache) is a shared-core semantics change, recorded as a
+  possible follow-up, not taken here.
+- Pre-existing C-Chain e2e (`--ginkgo.label-filter=c`): PASS 4/4.
+
+The sweep also caught the SAE wrappers journaling the legacypool to the
+node process's working directory when `local-txs-enabled=true` (observed as
+a stray `transactions.rlp` at the repo root during the warp-sae e2e — the
+fixture enables local txs). Both legacy plugins disable the journal
+(`TxPool.Journal = ""`); the subnetevm AND cchain saeConfig now do the
+same.
+
 ## Decisions log
 
 - 2026-08-27: Reconciliation plan written (this file). Header-encoded gas

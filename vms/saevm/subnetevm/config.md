@@ -44,7 +44,7 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `local-txs-enabled` | bool | Enable treatment of transactions from local accounts as local. Local transactions receive preferential admission and pricing in the mempool, and enable the on-disk transaction journal. | `false` |
+| `local-txs-enabled` | bool | Enable treatment of transactions from local accounts as local. Local transactions receive preferential admission and pricing in the mempool. The on-disk transaction journal stays disabled either way, matching the legacy plugin. | `false` |
 | `tx-pool-price-limit` | uint64 | Minimum gas price (in wei) to enforce for acceptance into the pool. | `1` |
 | `tx-pool-price-bump` | uint64 | Minimum price bump percentage to replace an already existing transaction (nonce). | `10` |
 | `tx-pool-account-slots` | uint64 | Maximum number of executable transaction slots per account. | `16` |

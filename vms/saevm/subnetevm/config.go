@@ -59,8 +59,9 @@ type config struct {
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// LocalTxsEnabled mirrors the legacy `local-txs-enabled` flag.
-	// When false (default), the legacypool runs with `NoLocals=true`
-	// and the on-disk transaction journal is disabled.
+	// When false (default), the legacypool runs with `NoLocals=true`.
+	// The on-disk transaction journal is disabled either way, matching
+	// the legacy plugin.
 	LocalTxsEnabled bool `json:"local-txs-enabled"`
 
 	// PruningEnabled mirrors the legacy `pruning-enabled` flag (defaults
@@ -194,6 +195,10 @@ func parseConfig(b []byte) (config, error) {
 // [saedb.Config] fields take saedb defaults.
 func (c config) saeConfig(now func() time.Time) sae.Config {
 	mempoolConfig := legacypool.DefaultConfig
+	// Disable the on-disk transaction journal, matching the legacy plugin.
+	// legacypool's default is the RELATIVE path "transactions.rlp", which
+	// would land in the node process's working directory.
+	mempoolConfig.Journal = ""
 	mempoolConfig.NoLocals = !c.LocalTxsEnabled
 	mempoolConfig.PriceLimit = c.TxPoolPriceLimit
 	mempoolConfig.PriceBump = c.TxPoolPriceBump

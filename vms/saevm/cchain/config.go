@@ -129,6 +129,10 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
 	mempoolConfig := legacypool.DefaultConfig
+	// Disable the on-disk transaction journal, matching the legacy plugin.
+	// legacypool's default is the RELATIVE path "transactions.rlp", which
+	// would land in the node process's working directory.
+	mempoolConfig.Journal = ""
 	mempoolConfig.NoLocals = !c.LocalTxsEnabled
 	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
 	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots

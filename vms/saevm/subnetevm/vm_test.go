@@ -148,10 +148,8 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
 	}
 
-	// Build per-chain config bytes from [DefaultConfig], with optional
-	// test overrides layered on top. The legacypool journal is
-	// inherently disabled because `LocalTxsEnabled=false` by default
-	// (yields `NoLocals=true`), so no journal-path override is needed.
+	// Build per-chain config bytes from [defaultConfig], with optional
+	// test overrides layered on top.
 	chainConfig := defaultConfig()
 	if cfg.feeRecipient != nil {
 		chainConfig.FeeRecipient = cfg.feeRecipient.Hex()
