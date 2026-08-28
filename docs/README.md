@@ -16,6 +16,7 @@ that span multiple areas of the tree.
 - [CI](./ci.md) - cross-cutting CI conventions for workflows and actions
 - [CI disk space](./ci-disk-space.md) - shared CI runner disk-space policy and diagnostics
 - [Bazel](./bazel.md) - Bazel-related repository guidance
+- [Bazel multi-architecture image validation](./bazel-multiarch-image-validation.md) - local validation for Bazel-built amd64/arm64 images
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs
 

@@ -28,7 +28,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-outer_repository_cache="${cache_root}/outer-repository"
+outer_repository_cache="${BAZEL_IMAGE_REPOSITORY_CACHE:-${cache_root}/outer-repository}"
 outer_disk_cache="${cache_root}/outer-disk"
 inner_repository_cache="${cache_root}/inner-repository"
 

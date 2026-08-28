@@ -28,5 +28,7 @@ bazel_ci_target_patterns() {
 //graft/coreth/... //graft/evm/...
 //graft/subnet-evm/...
 //ids:ids_test
+//bazel/image:load_builder
+//bazel/image:push_avalanchego
 EOF
 }

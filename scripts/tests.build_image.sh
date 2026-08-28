@@ -123,7 +123,8 @@ fi
 # Start the builder before a build and report its supported platforms. This
 # also verifies that QEMU was registered before the test started.
 docker buildx inspect --builder "$BUILDER_NAME" --bootstrap
-if ! docker buildx inspect --builder "$BUILDER_NAME" | grep -Fq 'network="host"'; then
+builder_inspect="$(docker buildx inspect --builder "$BUILDER_NAME")"
+if ! grep -Fq 'network="host"' <<<"$builder_inspect"; then
   echo "builder $BUILDER_NAME must use the host network to reach the local registry" >&2
   exit 1
 fi
