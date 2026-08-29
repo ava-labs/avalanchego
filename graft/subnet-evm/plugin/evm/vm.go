@@ -152,6 +152,9 @@ var (
 	errFirewoodSnapshotCacheDisabled              = errors.New("snapshot cache must be disabled for Firewood")
 	errFirewoodOfflinePruningUnsupported          = errors.New("offline pruning is not supported for Firewood")
 	errFirewoodMissingTrieRepopulationUnsupported = errors.New("missing trie repopulation is not supported for Firewood")
+	errStateHistoryRequiresFirewood               = errors.New("state history requires the Firewood state scheme")
+	errStateHistoryRequiresPruning                = errors.New("state history requires pruning: an archive (non-pruning) Firewood node already retains every revision")
+	errStateHistoryStateSyncUnsupported           = errors.New("state history is incompatible with state sync: it must capture every block from genesis")
 )
 
 // legacyApiNames maps pre geth v1.10.20 api names to their updated counterparts.
@@ -405,7 +408,19 @@ func (vm *VM) Initialize(
 	vm.ethConfig.TransactionHistory = vm.config.TransactionHistory
 	vm.ethConfig.SkipTxIndexing = vm.config.SkipTxIndexing
 	vm.ethConfig.StateScheme = vm.config.StateScheme
+	vm.ethConfig.StateHistoryEnabled = vm.config.StateHistoryEnabled
 
+	if vm.config.StateHistoryEnabled {
+		if vm.config.StateScheme != customrawdb.FirewoodScheme {
+			return errStateHistoryRequiresFirewood
+		}
+		if !vm.config.Pruning {
+			return errStateHistoryRequiresPruning
+		}
+		if vm.config.StateSyncEnabled {
+			return errStateHistoryStateSyncUnsupported
+		}
+	}
 	if vm.ethConfig.StateScheme == customrawdb.FirewoodScheme {
 		log.Warn("Firewood state scheme is enabled")
 		log.Warn("This is untested in production, use at your own risk")
@@ -486,6 +501,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
+		return err
+	}
+	if err := vm.verifyStateHistoryBaseline(lastAcceptedHeight); err != nil {
 		return err
 	}
 
@@ -635,6 +653,19 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 
 	vm.eth.Start()
 	return vm.initChainState(lastAccepted)
+}
+
+// verifyStateHistoryBaseline refuses to start when state history is enabled
+// but the store cannot cover [genesis, lastAccepted].
+func (vm *VM) verifyStateHistoryBaseline(lastAcceptedHeight uint64) error {
+	if !vm.config.StateHistoryEnabled {
+		return nil
+	}
+	tdb, ok := vm.blockChain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return errStateHistoryRequiresFirewood
+	}
+	return tdb.HistoryStore().VerifyBaseline(lastAcceptedHeight)
 }
 
 // initializeStateSyncClient initializes the client for performing state sync.

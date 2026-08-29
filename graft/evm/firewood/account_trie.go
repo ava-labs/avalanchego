@@ -35,9 +35,10 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 	}
 	return &accountTrie{
 		baseTrie: &baseTrie{
-			reader:     reader,
-			dirtyKeys:  make(map[string][]byte),
-			hasChanges: true, // Start with hasChanges true to allow computing the proposal hash
+			reader:         reader,
+			dirtyKeys:      make(map[string][]byte),
+			hasChanges:     true, // Start with hasChanges true to allow computing the proposal hash
+			captureHistory: db.historyStore != nil,
 		},
 		fw:         db,
 		parentRoot: root,
@@ -61,7 +62,7 @@ func (a *accountTrie) Hash() common.Hash {
 func (a *accountTrie) hash() (common.Hash, error) {
 	// If we haven't already hashed, we need to do so.
 	if a.hasChanges {
-		root, err := a.fw.createProposals(a.parentRoot, a.updateOps)
+		root, err := a.fw.createProposals(a.parentRoot, a.updateOps, a.historyOps)
 		if err != nil {
 			return common.Hash{}, err
 		}

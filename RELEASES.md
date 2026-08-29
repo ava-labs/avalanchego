@@ -4,6 +4,7 @@
 
 ### Config
 
+- Added `state-history-enabled` to subnet-evm (Firewood scheme only) to serve historical state from flat history rows on a pruned node.
 - Added `api-resolve-pending-to-last-executed` for SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
 
 ### Metrics
