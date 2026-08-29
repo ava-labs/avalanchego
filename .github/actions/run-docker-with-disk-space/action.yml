@@ -20,6 +20,8 @@ runs:
     - uses: ./.github/actions/ensure-disk-space
       with:
         diagnostic-groups: docker
+        # TEMP: force the deletion.
+        force-free-gb: '1'
 
     - name: Set up QEMU (required for cross-platform builds)
       if: ${{ inputs.setup-qemu == 'true' }}
