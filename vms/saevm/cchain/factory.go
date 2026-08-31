@@ -31,6 +31,6 @@ func (*Factory) New(log logging.Logger) (interface{}, error) {
 	}
 	return fullVM{
 		adaptor.Convert(vm),
-		adaptor.ConvertStateSync(&syncer{}),
+		adaptor.ConvertStateSync(vm),
 	}, nil
 }

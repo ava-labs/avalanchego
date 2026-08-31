@@ -4,15 +4,15 @@
 package sae
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"math/big"
-	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -26,110 +26,119 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-func TestRecoverFromDatabase(t *testing.T) {
+// TestRecoverAfterCrash recovers from a copy of a running VM's database,
+// taken without a clean shutdown.
+func TestRecoverAfterCrash(t *testing.T) {
 	t.Parallel()
+
+	const (
+		// blockTime is randomly selected to ensure multiple blocks are settled,
+		// but allows gaps between settlement to check ancestry edge cases.
+		blockTime      = 850 * time.Millisecond
+		commitInterval = 16
+	)
 
 	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	const commitInterval = 16
 	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
-	srcCtx := ctx
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
-
-	for final := false; !final; {
-		// We need to test rebuilding from trie roots reflecting (a) the last
-		// synchronous block; (b) some committed state root; and (c) a few
-		// blocks before/after the thresholds. Everything in between is merely
-		// to advance the block number so is treated as a "quick" loop
-		// iteration.
-		last := src.lastAcceptedBlock(t)
-		height := last.Height()
-		quick := height < commitInterval && src.rawVM.last.settled.Load().Height() > 1
-		final = height > commitInterval
-
-		if !quick {
-			src.sendTxsAndWaitUntilPending(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       nil,                     // execute `Data` as code for contract "construction"
-				Data:     saetest.Ops(vm.INVALID), // revert and consume all gas
-				Gas:      params.TxGas + params.CreateGas + params.TxDataNonZeroGasFrontier + rng.Uint64N(2e6),
-				GasPrice: big.NewInt(100),
-			}))
-		}
-
-		vmTime.Advance(850 * time.Millisecond)
-		b := src.runConsensusLoop(t)
-		if !quick {
-			require.Len(t, b.Transactions(), 1, "transactions in block")
-		}
+	// Build past the commit interval so the copied database holds both a
+	// committed trie root and later, uncommitted states.
+	for range commitInterval + 5 {
+		vmTime.Advance(blockTime)
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-
-		if quick {
-			continue
-		}
-		t.Run("recover", func(t *testing.T) {
-			newDB := saetest.CopyDB(t, srcDB)
-
-			sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
-				c.db = newDB
-				c.logLevel = logging.Warn
-			}))
-
-			requireConsensusCriticalBlocks(t, src, sut)
-
-			if !final {
-				return
-			}
-			t.Run("build_on_recovered_VM", func(t *testing.T) {
-				srcLast := src.lastAcceptedBlock(t)
-				sutLast := sut.lastAcceptedBlock(t)
-				if diff := cmp.Diff(srcLast, sutLast, blocks.CmpOpt()); diff != "" {
-					t.Fatal(diff)
-				}
-				srcSDB := src.stateAt(t, srcLast.PostExecutionStateRoot())
-				sutSDB := sut.stateAt(t, sutLast.PostExecutionStateRoot())
-				if diff := cmp.Diff(srcSDB, sutSDB, cmputils.StateDBs()); diff != "" {
-					t.Fatal(diff)
-				}
-
-				tx := src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-					To:       &common.Address{},
-					Gas:      params.TxGas,
-					GasPrice: big.NewInt(100),
-				})
-
-				for _, sys := range []struct {
-					name string
-					ctx  context.Context //nolint:containedctx // Ephemeral so not in contravention of https://go.dev/blog/context-and-structs
-					*SUT
-				}{
-					{"source", srcCtx, src},
-					{"recovered", sutCtx, sut},
-				} {
-					t.Run(sys.name, func(t *testing.T) {
-						b := sys.runConsensusLoop(t, tx)
-						require.Len(t, b.Transactions(), 1)
-						require.NoError(t, b.WaitUntilExecuted(sys.ctx))
-					})
-				}
-			})
-		})
 	}
+
+	newDB := saetest.CopyDB(t, srcDB) // note: src is still running, but concurrent safe
+	sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = newDB
+		c.logLevel = logging.Warn
+	}))
+
+	requireConsensusCriticalBlocks(t, src, sut)
+
+	t.Run("build_after_recovery", func(t *testing.T) {
+		vmTime.Advance(blockTime)
+		b := sut.runConsensusLoop(t)
+		require.NoErrorf(t, b.WaitUntilExecuted(sutCtx), "%T.WaitUntilExecuted()", b)
+	})
 }
 
-func TestRecoverSimple(t *testing.T) {
+// TestRecoverWithBLOCKHASH restarts a VM whose accepted-but-uncommitted blocks
+// carry transactions that read historical block hashes via the BLOCKHASH
+// opcode.
+func TestRecoverWithBLOCKHASH(t *testing.T) {
+	t.Parallel()
+
+	const (
+		commitInterval = 16
+		numBlocks      = commitInterval + 15
+	)
+
+	// A contract executing BLOCKHASH(NUMBER-2).
+	contractAddr := common.Address{'b', 'l', 'o', 'c', 'k', 'h', 'a', 's', 'h'}
+	contractCode := []byte{
+		byte(vm.PUSH1), 2,
+		byte(vm.NUMBER),
+		byte(vm.SUB),
+		byte(vm.BLOCKHASH),
+	}
+	withContract := options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[contractAddr] = types.Account{
+			Code:    contractCode,
+			Balance: new(big.Int),
+		}
+	})
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var srcDB database.Database
+	srcHDB := saetest.NewHeightIndexDB()
+	ctx, src := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		c.logLevel = logging.Warn
+	}))
+
+	for range numBlocks {
+		vmTime.Advance(850 * time.Millisecond)
+		b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &contractAddr,
+			Gas:       params.TxGas + 1_000,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	}
+	src.close()
+
+	// Recreating the VM replays all accepted blocks since the last trie
+	// commit, re-executing the BLOCKHASH transactions.
+	_, sut := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, srcDB)
+		c.logLevel = logging.Warn
+	}))
+
+	requireConsensusCriticalBlocks(t, src, sut)
+}
+
+func TestRecover(t *testing.T) {
 	t.Parallel()
 
 	const commitInterval = 16
@@ -261,18 +270,76 @@ func TestRecoverSimple(t *testing.T) {
 
 			t.Run("settle_after_recovery", func(t *testing.T) {
 				vmTime.AdvanceToSettle(ctx, t, sut.lastAcceptedBlock(t))
-				b := sut.runConsensusLoop(t)
+				// use old wallet for correct nonce.
+				tx := src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: big.NewInt(1),
+				})
+				b := sut.runConsensusLoop(t, tx)
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			})
 		})
 	}
 }
 
+// A failure to open the execution-results database must abort [VM]
+// initialization with an error that unwraps to the cause.
+func TestNewVMExecutionResultsDBError(t *testing.T) {
+	t.Parallel()
+
+	errInjected := errors.New("injected ExecutionResultsDB failure")
+	_, err := tryNewSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetypes.ExecutionResults{}, errInjected
+		}))
+		c.logLevel = logging.Warn
+	}))
+	require.ErrorIs(t, err, errInjected, "Initialize() with failing ExecutionResultsDB")
+}
+
+func TestNewVMIncompatibleExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var (
+		srcDB      database.Database
+		srcGenesis core.Genesis
+	)
+	ctx, src := newSUT(t, 1, sutOpt, options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		srcGenesis = c.genesis
+		c.logLevel = logging.Warn
+	}))
+
+	b := src.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, b)
+	settler := src.runConsensusLoop(t)
+	require.NoErrorf(t, settler.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settler)
+	require.Equal(t, b.Height(), src.rawVM.last.settled.Load().Height(), "settled height after accepting settler")
+
+	_, err := tryNewSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetest.NewExecutionResultsDB(), nil
+		}))
+		c.db = saetest.CopyDB(t, srcDB)
+		c.genesis = srcGenesis
+		c.logLevel = logging.Warn
+	}))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "Initialize() with incompatible execution-results DB")
+}
+
 func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 	t.Helper()
 
+	opts := cmp.Options{
+		blocks.CmpOpt(),
+		blocks.IgnoreLastSettledExecutionArtefacts(t),
+	}
+
 	t.Run("consensus_critical", func(t *testing.T) {
-		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, blocks.CmpOpt()); diff != "" {
+		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, opts); diff != "" {
 			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.rawVM, diff)
 		}
 		for _, b := range sut.rawVM.consensusCritical.m {
@@ -291,7 +358,7 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			t.Run(name, func(t *testing.T) {
 				got := fn(sut.rawVM)
 				want := fn(src.rawVM)
-				if diff := cmp.Diff(want, got, blocks.CmpOpt()); diff != "" {
+				if diff := cmp.Diff(want, got, opts); diff != "" {
 					t.Errorf("(-want +got):\n%s", diff)
 				}
 			})

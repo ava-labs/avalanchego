@@ -12,13 +12,17 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -57,36 +61,39 @@ type config struct {
 	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
-	BatchRequestLimit uint64 `json:"batch-request-limit"`
+	BatchRequestLimit            uint64 `json:"batch-request-limit"`
+	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
-	// StateSyncEnabled *bool `json:"state-sync-enabled"`
+	StateSyncEnabled bool `json:"state-sync-enabled"`
 
 	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 
-	// internalConfig
+	internalConfig
 }
 
-// // internalConfig holds undocumented, test-only options, kept out of config.md.
-// // Don't set these unless you know what you're doing.
-// type internalConfig struct {
-// 	// State sync
-// 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
-// }
+// internalConfig holds undocumented, test-only options, kept out of config.md.
+// Don't set these unless you know what you're doing.
+type internalConfig struct {
+	// State sync
+	StateSyncIDs set.Set[ids.NodeID] `json:"state-sync-ids"`
+}
 
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	return config{
-		Pruning:            true,
-		CommitInterval:     saedb.DefaultCommitInterval,
-		TrieCleanCache:     saedb.DefaultTrieCacheSizeMiB,
-		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
-		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
-		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
-		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
+		Pruning:                      true,
+		StateSyncEnabled:             true,
+		CommitInterval:               saedb.DefaultCommitInterval,
+		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
+		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
+		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
+		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
+		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
+		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
 	}
 }
 
@@ -135,10 +142,25 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
-			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
-			BatchRequestLimit:   c.BatchRequestLimit,
+			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
+			BatchRequestLimit:            c.BatchRequestLimit,
+			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,
+	}
+}
+
+func (c config) stateSyncConfig() statesync.Config {
+	saeCfg := c.saeConfig(nil)
+	return statesync.Config{
+		DBConfig: saeCfg.DBConfig,
+		Enabled:  c.StateSyncEnabled,
+	}
+}
+
+func (c config) networkOptions() []network.Option {
+	return []network.Option{
+		network.WithAllowedTrackedPeers(c.StateSyncIDs),
 	}
 }
 

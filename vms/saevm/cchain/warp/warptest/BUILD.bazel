@@ -16,6 +16,7 @@ go_library(
         "//utils/crypto/bls/signer/localsigner",
         "//utils/set",
         "//vms/platformvm/warp",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_stretchr_testify//require",
     ],
 )

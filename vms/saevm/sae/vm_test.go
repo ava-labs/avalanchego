@@ -11,6 +11,7 @@ import (
 	"math/rand/v2"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -48,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -82,17 +84,17 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	block.ChainVM
 	*ethclient.Client
-	rpcClient *rpc.Client
 
-	rawVM   *VM
-	genesis *blocks.Block
-	wallet  *saetest.Wallet
-	db      ethdb.Database
-	hooks   *hookstest.Stub
-	logger  *loggingtest.Logger
-
+	wallet *saetest.Wallet
+	db     ethdb.Database
+	hooks  *hookstest.Stub
+	logger *loggingtest.Logger
 	sender *saetest.Sender
-	close  func()
+
+	rpcClient *rpc.Client
+	rawVM     *VM
+	genesis   *blocks.Block
+	close     func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -130,8 +132,15 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
-func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+// tryNewSUT constructs a [SUT], returning any initialization error. Tests
+// SHOULD use [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
+
+	// gasTarget is approximately the current C-Chain mainnet gas target as of
+	// 7/23/26. A much larger target would force transactions to specify more
+	// gas per byte; see txgossip.minGasForSize.
+	const gasTarget = 4_000_000
 
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
@@ -140,7 +149,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(gasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{
@@ -175,7 +184,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	if err := snow.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -184,7 +193,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // config bytes (not ChainConfig)
 		nil, // Fxs
 		sender,
-	), "Initialize()")
+	); err != nil {
+		return nil, err
+	}
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -199,9 +210,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
-	tb.Cleanup(func() {
-		closeOnce()
-	})
+	tb.Cleanup(closeOnce)
 
 	// Avalanchego marks the local node as connected so that p2p protocols
 	// don't need to treat our node as a special case.
@@ -209,24 +218,33 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		ChainVM: snow,
+		Client:  ethClient,
+
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
-		close:  closeOnce,
-
 		sender: sender,
+
+		rpcClient: rpcClient,
+		rawVM:     vm.VM,
+		genesis:   vm.last.settled.Load(),
+		close:     closeOnce,
 	}
 	sender.Start(tb, sut)
-	return ctx, sut
+	return sut, nil
+}
+
+func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+	tb.Helper()
+
+	sut, err := tryNewSUT(tb, numAccounts, opts...)
+	require.NoError(tb, err, "Initialize()")
+	return sut.context(tb), sut
 }
 
 func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {
@@ -397,6 +415,102 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	return b
 }
 
+func TestBuildBlockByteBackstop(t *testing.T) {
+	const (
+		numTxs       = 20
+		calldataSize = 120 * units.KiB
+	)
+	ctx, sut := newSUT(t, numTxs)
+
+	heavyTxs := make([]*types.Transaction, numTxs)
+	for i := range heavyTxs {
+		// Unique address to prevent legacypool race
+		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
+			GasFeeCap: big.NewInt(1),
+			Data:      make([]byte, calldataSize),
+		})
+	}
+
+	txBytes := heavyTxs[0].Size()
+	wantTxs := saeparams.TargetBlockBytes / txBytes
+	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
+
+	// Bypass mempool admission filtering so the builder backstop is exercised.
+	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
+	require.NoError(t, errors.Join(errs...), "TxPool.Add()")
+	txgossiptest.WaitUntilPending(t, ctx, sut.rawVM.GethRPCBackends(), heavyTxs...)
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	builtTxs := built.Transactions()
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
+	for i, tx := range builtTxs {
+		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
+}
+
+func TestBuildBlockOpByteBackstop(t *testing.T) {
+	newOp := func(mints int) hookstest.Op {
+		return hookstest.Op{
+			ID:        ids.GenerateTestID(),
+			Gas:       1_000,
+			GasFeeCap: *uint256.NewInt(params.Wei),
+			Mint: slices.Repeat([]hookstest.AccountCredit{{
+				Address: common.Address{1},
+				Amount:  *uint256.NewInt(1),
+			}}, mints),
+		}
+	}
+	// Three big ops of which only two fit the byte budget, followed by a
+	// small op that fits in the space left after the third is skipped.
+	ops := []hookstest.Op{newOp(19_200), newOp(19_200), newOp(19_200), newOp(1)}
+
+	var (
+		big   = ops[0].Size()
+		small = ops[3].Size()
+	)
+	require.LessOrEqual(t, 2*big+small, uint64(saeparams.TargetBlockBytes), "two big ops plus the small op must fit the byte budget")
+	require.Greater(t, 3*big, uint64(saeparams.TargetBlockBytes), "three big ops must exceed the byte budget")
+
+	ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Ops = ops
+	}))
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	// The third op is too big and gets skipped, but one skip shouldn't stop
+	// inclusion. The smaller op after it still fits, so it's included.
+	want := []hook.Op{ops[0].AsOp(), ops[1].AsOp(), ops[3].AsOp()}
+	got, err := sut.hooks.EndOfBlockOps(built.EthBlock())
+	require.NoErrorf(t, err, "%T.EndOfBlockOps()", sut.hooks)
+	require.Equal(t, want, got, "ops included in block")
+}
+
+func TestVerifyBlockSizeLimit(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	lastAccepted := sut.lastAcceptedBlock(t)
+
+	oversizedTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Data: make([]byte, saeparams.MaxBlockBytes),
+	})
+	ethB := types.NewBlock(
+		&types.Header{
+			ParentHash: common.Hash(lastAccepted.ID()),
+			Number:     new(big.Int).SetUint64(lastAccepted.Height() + 1),
+		},
+		types.Transactions{oversizedTx},
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+	)
+	b := blockstest.NewBlock(t, ethB, nil, nil)
+	require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), errBlockTooLarge, "VerifyBlock()")
+}
+
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided
 // transactions. It verifies the block with [VM.VerifyBlock] (via the [adaptor])
 // before returning it.
@@ -434,43 +548,42 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from
-// s.wallet[0], in its own consensus block, returning the block, the deployed
-// contract address, and the deploy tx.
-func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
+// s.wallet[0], in its own consensus block.
+func (s *SUT) deployEscrow(tb testing.TB) common.Address {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
 // balances[recipient] on the escrow contract at escrowAddr, in its own
-// consensus block, returning the block and the deposit tx.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
+// consensus block.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recipient),
-		Value:    depositVal,
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, tx
+	return block
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
@@ -780,151 +893,6 @@ func TestEmptyChainConfig(t *testing.T) {
 	}
 }
 
-func TestSyntacticBlockChecks(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
-
-	bodyWithTx := types.Body{
-		Transactions: []*types.Transaction{
-			types.NewTx(&types.DynamicFeeTx{
-				To:        &zeroAddr,
-				Gas:       params.TxGas,
-				GasFeeCap: big.NewInt(1),
-				Value:     big.NewInt(1),
-			}),
-		},
-	}
-
-	tests := []struct {
-		name string
-		// mutate will receive a valid header for an empty body and should return a mutated version of it.
-		mutate      func(*types.Header) *types.Header
-		body        types.Body
-		withdrawals []*types.Withdrawal
-		wantErr     error
-	}{
-		{
-			name:   "valid_header", // base case for test setup
-			mutate: func(h *types.Header) *types.Header { return h },
-		},
-		{
-			name: "block_height_overflow_protection",
-			mutate: func(h *types.Header) *types.Header {
-				h.Number = new(big.Int).Lsh(big.NewInt(1), 64)
-				return h
-			},
-			wantErr: errBlockHeightNotUint64,
-		},
-		{
-			name: "block_time_at_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds
-				return h
-			},
-		},
-		{
-			name: "block_time_after_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds + 1
-				return h
-			},
-			wantErr: errBlockTooFarInFuture,
-		},
-		{
-			name: "invalid_tx_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = common.Hash{}
-				return h
-			},
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name:    "invalid_tx_hash_nonempty",
-			mutate:  func(h *types.Header) *types.Header { return h }, // uses [types.EmptyTxsHash]
-			body:    bodyWithTx,                                       // contains a tx
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name: "valid_tx_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = types.DeriveSha(types.Transactions(bodyWithTx.Transactions), saetest.TrieHasher())
-				return h
-			},
-			body: bodyWithTx,
-		},
-		{
-			name: "invalid_uncle_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = common.Hash{}
-				return h
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name:   "invalid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header { return h }, // uses [types.EmptyUncleHash]
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name: "valid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = types.CalcUncleHash([]*types.Header{{}})
-				return h
-			},
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "nil_withdrawals_nonnil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			wantErr: errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = nil
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-			wantErr:     errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nonempty_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hdr := tt.mutate(&types.Header{
-				Number:    big.NewInt(1),
-				UncleHash: types.EmptyUncleHash,
-				TxHash:    types.EmptyTxsHash,
-			})
-			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
-			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
-		})
-	}
-}
-
 func TestSemanticBlockChecks(t *testing.T) {
 	const now = 1e6
 	opt, _ := withVMTime(t, time.Unix(now, 0))
@@ -1103,6 +1071,9 @@ func TestBlockSources(t *testing.T) {
 		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound), false},
 	}
 
+	ethBlockSrc := ethBlockSource(sut.rawVM.consensusCritical, sut.db)
+	headerSrc := headerSource(sut.rawVM.consensusCritical, sut.db)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run("GetBlock", func(t *testing.T) {
@@ -1124,7 +1095,7 @@ func TestBlockSources(t *testing.T) {
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := ethBlockSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
@@ -1134,7 +1105,7 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := headerSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return

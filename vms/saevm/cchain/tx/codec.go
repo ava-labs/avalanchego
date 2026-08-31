@@ -5,6 +5,7 @@ package tx
 
 import (
 	"errors"
+	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -18,7 +19,10 @@ const codecVersion uint16 = 0
 var c codec.Manager
 
 func init() {
-	c = codec.NewDefaultManager()
+	// The codec marshals both individual transactions and transaction slices,
+	// so size is enforced by the p2p layer, mempool, and block builder rather
+	// than by the codec itself.
+	c = codec.NewManager(math.MaxInt)
 
 	// Registration order impacts the typeID included in the canonical format.
 	// We skip registrations in specific locations so that UTXOs in shared
