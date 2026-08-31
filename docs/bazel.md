@@ -803,10 +803,10 @@ Validate changes proportionally:
   external repos without traversing unintended local workspace state
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
-`bazel-required`, that depends on the other jobs in the workflow via
-`needs`.  Branch protection can require that one workflow-level job
-instead of tracking each underlying Bazel job separately. This reduces
-required-check maintenance to the workflow level.
+`bazel-required`, that depends on the other jobs in the workflow via `needs`.
+Branch protection can require that one workflow-level job instead of tracking
+each underlying Bazel job separately. This reduces required-check maintenance
+to the workflow level.
 
 If the `setup` job fails its metadata check in CI, rebase or merge the target
 branch, run `task bazel-generate-metadata`, commit the resulting changes, and
