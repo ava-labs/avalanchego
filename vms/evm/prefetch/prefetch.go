@@ -11,10 +11,9 @@ import (
 
 // WithConcurrentWorkers sets the maximum number of goroutines that trie
 // prefetching uses to load nodes.
-//
-// libevm calls the constructor one time for each prefetcher, and shares the
-// pool between that prefetcher's tries. You can therefore reuse the option.
 func WithConcurrentWorkers(prefetchers int) state.PrefetcherOption {
+	// libevm calls the constructor one time for each prefetcher, and shares the
+	// pool between that prefetcher's tries, so the option is reusable.
 	return state.WithWorkerPool(func() state.WorkerPool {
 		return newBoundedWorkers(prefetchers)
 	})
