@@ -33,7 +33,21 @@ if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>
 fi
 
 if command -v go >/dev/null 2>&1; then
-  exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@}"
+  # run_tool.sh runs `GOWORK=off go tool`, and `go tool` passes that assignment
+  # to the tool it launches. task then spawns every task command with the
+  # workspace disabled, which breaks tasks that span workspace modules: a
+  # workspace-wide `go test` resolves the graft modules through the root
+  # go.sum, which does not carry their transitive checksums.
+  #
+  # `go tool -n` builds the tool if needed and prints its path without running
+  # it, so the GOWORK=off assignment stays with the build and task inherits the
+  # caller's environment.
+  task_bin="$("${AVALANCHE_PATH}"/scripts/run_tool.sh -n task)"
+  if [[ -z "${task_bin}" ]]; then
+    echo "Unable to resolve the task binary from tools/external." >&2
+    exit 127
+  fi
+  exec "${task_bin}" "${@}"
 fi
 
 cat >&2 <<'EOF'

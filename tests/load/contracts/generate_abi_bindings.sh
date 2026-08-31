@@ -10,6 +10,9 @@ if ! command -v solc &> /dev/null; then
 fi
 
 CONTRACTS_DIR="$(dirname "$0")"
+REPO_ROOT="$(cd "${CONTRACTS_DIR}/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lib_go_tools.sh"
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
@@ -31,6 +34,17 @@ should_skip() {
   return 1
 }
 
+# `go run pkg@version` always queries the module proxy for the module's
+# deprecation notice, which is a @latest query rather than a pinned lookup. No
+# amount of module-cache warming satisfies it, so it cannot run under the
+# GOPROXY=off that CI test jobs use. CI therefore builds the pinned binary in
+# its setup job and points ABIGEN_BIN at it. Locally, `go run` is fine.
+if [[ -n "${ABIGEN_BIN:-}" && -x "${ABIGEN_BIN}" ]]; then
+  ABIGEN=("${ABIGEN_BIN}")
+else
+  ABIGEN=(go run "${ABIGEN_PKG}")
+fi
+
 for FILE in "${CONTRACTS_DIR}"/*.sol; do
   FILE_NAME=$(basename "$FILE")
   if should_skip "$FILE_NAME"; then
@@ -42,7 +56,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
+  "${ABIGEN[@]}" \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \

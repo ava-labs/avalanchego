@@ -1,0 +1,179 @@
+name: 'Set up Go for CI'
+description: 'Install Go and manage separate workspace dependency and per-job build caches'
+
+inputs:
+  platform_name:
+    description: 'Stable platform identifier used in cache keys'
+    required: true
+  initial_setup:
+    description: 'Populate and save the workspace dependency cache'
+    required: false
+    default: 'false'
+  cache_build_results:
+    description: 'Restore and save GOCACHE for a cacheable test job'
+    required: false
+    default: 'false'
+  build_cache_scope:
+    description: 'Suite-specific GOCACHE namespace'
+    required: false
+    default: ''
+  allow_dependency_download:
+    description: 'Let a consumer job download modules instead of failing on a cache miss'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        {
+          echo "module=$(go env GOMODCACHE)"
+          echo "build=$(go env GOCACHE)"
+        } >> "$GITHUB_OUTPUT"
+
+    # This step saves only after the setup job completes. Consumers wait for
+    # that job, so they cannot observe or save a partially populated cache.
+    - name: Restore and save workspace Go dependencies
+      if: ${{ inputs.initial_setup == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.module }}
+        key: go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum', 'go.work', 'go.work.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/download_go_dependencies.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        restore-keys: |
+          go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Restore workspace Go dependencies
+      if: ${{ inputs.initial_setup != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.module }}
+        key: go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum', 'go.work', 'go.work.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/download_go_dependencies.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+        restore-keys: |
+          go-dependencies-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-
+
+    # Every cache key here is hashed before the download step below runs.
+    # `go mod download` rewrites go.sum and tools/external/go.sum, so a key
+    # evaluated after it hashes different bytes in the setup job than in its
+    # consumers, and the two never match. Keep cache steps ahead of it.
+    # Two tools are shared as prebuilt binaries rather than resolved per job.
+    #
+    # task: every job that does not find it on PATH builds it from
+    # tools/external, which costs about 15 seconds. Caching the binary instead
+    # of the GOCACHE that produced it moves ~13MB rather than ~150MB, and avoids
+    # restoring a second cache into the GOCACHE path this action already manages
+    # for cacheable test jobs.
+    #
+    # abigen: `go run pkg@version` always queries the proxy for the module's
+    # deprecation notice, which is a @latest query rather than a pinned version.
+    # No amount of module-cache warming satisfies it, so under GOPROXY=off the
+    # only way to run a versioned tool is to have the binary already built.
+    - id: tool-bin
+      shell: bash
+      run: echo "dir=${HOME}/.cache/avalanchego/tool-bin" >> "$GITHUB_OUTPUT"
+
+    - name: Restore and save the tool binaries
+      if: ${{ inputs.initial_setup == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.tool-bin.outputs.dir }}
+        key: go-tools-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/lib_go_tools.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+
+    # The key covers what determines the binaries: the tool module files, the
+    # versioned tool pins, and the Go version source. Keep it a subset of the
+    # dependency-cache inputs, which are known to hash the same in the setup job
+    # and its consumers.
+    #
+    # No restore-keys: a binary built from different pins or a different Go
+    # version must not be reused.
+    - name: Restore the tool binaries
+      if: ${{ inputs.initial_setup != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.tool-bin.outputs.dir }}
+        key: go-tools-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'tools/external/go.mod', 'tools/external/go.sum', 'scripts/lib_go_tools.sh', '.github/actions/setup-go-for-ci/action.yml') }}
+
+    - name: Build the tool binaries
+      if: ${{ inputs.initial_setup == 'true' }}
+      shell: bash
+      run: |
+        source ./scripts/lib_go_tools.sh
+        dir="${{ steps.tool-bin.outputs.dir }}"
+        mkdir -p "${dir}"
+
+        if [[ -x "${dir}/task" ]]; then
+          echo "Reusing the cached task binary."
+        else
+          cp "$(./scripts/run_tool.sh -n task)" "${dir}/task"
+          chmod +x "${dir}/task"
+        fi
+
+        if [[ -x "${dir}/abigen" ]]; then
+          echo "Reusing the cached abigen binary."
+        else
+          GOWORK=off GOBIN="${dir}" go install "${ABIGEN_PKG}"
+        fi
+
+    # Putting task on PATH also keeps run_task.sh off its go fallback, which
+    # has to build task with GOWORK=off. A task miss is not fatal, since that
+    # fallback still works; an abigen miss fails under GOPROXY=off.
+    - name: Use the cached tool binaries
+      shell: bash
+      run: |
+        dir="${{ steps.tool-bin.outputs.dir }}"
+        if [[ -x "${dir}/task" ]]; then
+          echo "${dir}" >> "$GITHUB_PATH"
+        else
+          echo "No cached task binary; run_task.sh will build one."
+        fi
+        # Named explicitly rather than found on PATH, so an unrelated abigen on
+        # a developer's PATH cannot silently generate bindings.
+        if [[ -x "${dir}/abigen" ]]; then
+          echo "ABIGEN_BIN=${dir}/abigen" >> "$GITHUB_ENV"
+        else
+          echo "No cached abigen binary; generation will use go run."
+        fi
+
+    - name: Download workspace Go dependencies
+      if: ${{ inputs.initial_setup == 'true' }}
+      shell: bash
+      run: ./scripts/download_go_dependencies.sh
+
+    # The steps above must leave every module the rest of the job needs in
+    # GOMODCACHE. GOPROXY=off turns a miss into an immediate failure that names
+    # the module. A silent download would instead hide an incomplete download
+    # script and pay the download cost in every job.
+    #
+    # This step runs after the download step, so a job that populates its own
+    # cache is checked too. Jobs that resolve module versions the download
+    # script cannot predict, such as `go mod tidy`, set
+    # allow_dependency_download.
+    - name: Require cached dependencies
+      if: ${{ inputs.allow_dependency_download != 'true' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
+
+    - name: Validate build-cache inputs
+      if: ${{ inputs.cache_build_results == 'true' && inputs.build_cache_scope == '' }}
+      shell: bash
+      run: |
+        echo 'build_cache_scope is required when cache_build_results is true' >&2
+        exit 1
+
+    # Scheduled race/shuffle callers leave cache_build_results false. Only
+    # cacheable pre-merge jobs restore and save test results.
+    - name: Restore and save Go build and test results
+      if: ${{ inputs.cache_build_results == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.go-cache-paths.outputs.build }}
+        key: go-build-${{ inputs.build_cache_scope }}-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        restore-keys: |
+          go-build-${{ inputs.build_cache_scope }}-${{ inputs.platform_name }}-${{ runner.os }}-${{ runner.arch }}-

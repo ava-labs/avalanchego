@@ -1,0 +1,114 @@
+name: Go Smoke Test Jobs
+
+# Reusable non-Bazel Go CI workflow for cross-platform smoke tests.
+on:
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  go-smoke-required:
+    if: ${{ always() }}
+    needs:
+      - setup
+      - smoke-avalanchego
+      - smoke-coreth
+      - smoke-evm
+      - smoke-subnet-evm
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
+  setup:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          initial_setup: true
+
+  smoke-avalanchego:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: avalanchego-smoke
+      - run: ./scripts/run_task.sh test-unit-smoke
+
+  smoke-coreth:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/coreth
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: coreth-smoke
+      - run: ../../scripts/run_task.sh test-unit-smoke
+
+  smoke-evm:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: evm-smoke
+      - run: ../../scripts/run_task.sh test-unit-smoke
+
+  smoke-subnet-evm:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: subnet-evm-smoke
+      - run: ../../scripts/run_task.sh test-unit-smoke

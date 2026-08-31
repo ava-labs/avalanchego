@@ -80,31 +80,45 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
+  bazel-build-e2e:
+    desc: Build E2E binaries with Bazel
+    cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego //vms/example/xsvm/cmd/xsvm:xsvm @com_github_onsi_ginkgo_v2//ginkgo:ginkgo //tests/e2e:e2e_test'
+
+  bazel-build-e2e-race:
+    desc: Build E2E binaries with Bazel and race detection
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego //vms/example/xsvm/cmd/xsvm:xsvm @com_github_onsi_ginkgo_v2//ginkgo:ginkgo //tests/e2e:e2e_test'
+
   bazel-test-e2e:
-    desc: Run E2E tests with bazel-built binary
+    desc: Run E2E tests with Bazel-built binaries
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
+      - task: bazel-build-e2e
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-ci:
-    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
+    desc: Run the E2E network-reuse smoke test with Bazel-built binaries [serially with race detection]
     env:
       E2E_SERIAL: 1
     cmds:
-      - task: bazel-build-race
-      - task: build-xsvm
+      - task: bazel-build-e2e-race
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-smoke:
-    desc: Run an E2E smoke test with bazel-built binary
+    desc: Run an E2E smoke test with Bazel-built binaries
+    env:
+      E2E_SERIAL: 1
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
+      - task: bazel-build-e2e
       - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+
+  bazel-test-e2e-race:
+    desc: Run all E2E tests with race-built Bazel binaries
+    cmds:
+      - task: bazel-build-e2e-race
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'xsvm_path=$(bazelisk cquery --output=files //vms/example/xsvm/cmd/xsvm:xsvm 2>/dev/null); e2e_path=$(bazelisk cquery --output=files //tests/e2e:e2e_test 2>/dev/null); mkdir -p build; ln -sf "$PWD/$e2e_path" build/e2e.test; for plugin_dir in "$HOME/.avalanchego/plugins" "$PWD/build/plugins"; do mkdir -p "$plugin_dir"; ln -sf "$PWD/$xsvm_path" "$plugin_dir/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"; done; AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) GINKGO_PATH=$(bazelisk cquery --output=files @com_github_onsi_ginkgo_v2//ginkgo:ginkgo 2>/dev/null) E2E_TARGET="$PWD/build/e2e.test" bash -x ./scripts/tests.e2e.sh'
 
   bazel-test-unit-all:
     desc: Run cacheable Go unit tests with Bazel
@@ -191,6 +205,24 @@ tasks:
     desc: Builds xsvm plugin
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm.sh'
 
+  build-xsvm-race:
+    desc: Builds xsvm plugin with race detection
+    cmd: '{{.NIX_RUN}} ./scripts/build_xsvm.sh -r'
+
+  build-e2e-test-artifacts:
+    desc: Builds the Ginkgo, E2E, and upgrade test binaries for CI
+    cmds:
+      - task: build
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} ./scripts/build_e2e_test_artifacts.sh'
+
+  build-e2e-test-artifacts-race:
+    desc: Builds race Ginkgo, E2E, and upgrade test binaries for CI
+    cmds:
+      - task: build-race
+      - task: build-xsvm-race
+      - cmd: '{{.NIX_RUN}} ./scripts/build_e2e_test_artifacts.sh -r'
+
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm_image.sh'
@@ -253,7 +285,7 @@ tasks:
     desc: Checks that go module configuration is consistent (requires a clean git working tree)
     cmds:
       - task: go-mod-tidy
-      - task: check-clean-branch
+      - cmd: '{{.NIX_RUN}} .github/workflows/check-clean-branch.sh "task go-mod-tidy"'
 
   check-go-version:
     desc: Checks that go version directives are consistent across all modules
@@ -352,6 +384,10 @@ tasks:
       # Update use_repo() in MODULE.bazel to match go.mod dependencies
       - cmd: '{{.NIX_RUN}} bazelisk mod tidy'
 
+  download-go-dependencies:
+    desc: Downloads every Go module dependency graph used by CI
+    cmd: '{{.NIX_RUN}} ./scripts/download_go_dependencies.sh'
+
   install-nix:
     desc: Installs nix with an OS-appropriate installer
     cmd: '{{.NIX_RUN}} ./scripts/install_nix.sh'
@@ -386,6 +422,7 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-download-go-dependencies
       - check-go-version
       - check-require-directives
 
@@ -405,6 +442,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: test-ci-disk-space
+      - task: test-download-go-dependencies
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -437,11 +475,13 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/setup_cchain_data.sh'
 
   sync-go-work:
-    desc: Downloads module dependencies and syncs go.work.sum
+    desc: Syncs workspace dependencies and go.work.sum
     cmds:
-      - cmd: '{{.NIX_RUN}} go mod download'
-      # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
+      # go work sync can leave go.work.sum without module content hashes. See
+      # https://github.com/golang/go/issues/63901.
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+      - cmd: '{{.NIX_RUN}} env GOWORK="" go mod download'
+      - cmd: '{{.NIX_RUN}} env GOWORK="" go list -m all'
 
   tags-create:
     desc: Creates tags for avalanchego and submodules
@@ -504,41 +544,39 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
 
   test-e2e:
-    desc: Runs e2e tests
+    desc: Builds binaries and runs e2e tests
     cmds:
       - task: build
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+      - task: run-e2e
 
   test-e2e-ci:
-    desc: Runs e2e tests in parallel with race detection enabled
+    desc: Builds race binaries and runs e2e tests in parallel
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+      - task: run-e2e
 
   test-e2e-ci-post-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and posts latest activation immediately
+    desc: Builds race binaries and runs e2e tests with immediate latest activation
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
+      - task: run-e2e-post-latest
 
   test-e2e-ci-schedule-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
+    desc: Builds race binaries and runs e2e tests with scheduled latest activation
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m'
+      - task: run-e2e-schedule-latest
 
   test-e2e-existing-ci:
-    desc: Runs e2e tests with an existing network [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
+    desc: Builds race binaries and runs serial E2E network-reuse tests
     cmds:
       - task: build-race
       - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}'
+      - task: run-e2e-existing
 
   test-e2e-kube:
     desc: Runs e2e tests against a network deployed to kube
@@ -548,10 +586,32 @@ tasks:
   test-e2e-kube-ci:
     # Free github action runners do not have sufficient resources to reliably run a full e2e run against a kube-hosted network
     desc: Runs the xsvm e2e tests in serial against a network deployed to kube
+    cmds:
+      - task: run-e2e-kube
+
+  run-e2e:
+    desc: Runs E2E tests with existing binaries
+    cmd: 'bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+
+  run-e2e-post-latest:
+    desc: Runs E2E tests with existing binaries and immediate latest activation
+    cmd: 'bash -x ./scripts/tests.e2e.sh --activate-latest-after=0 {{.CLI_ARGS}}'
+
+  run-e2e-schedule-latest:
+    desc: Runs E2E tests with existing binaries and scheduled latest activation
+    cmd: 'bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m {{.CLI_ARGS}}'
+
+  run-e2e-existing:
+    desc: Runs serial E2E network-reuse tests with existing binaries
     env:
       E2E_SERIAL: 1
-    cmds:
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
+    cmd: 'bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}'
+
+  run-e2e-kube:
+    desc: Runs serial Kube E2E tests with an existing test binary
+    env:
+      E2E_SERIAL: 1
+    cmd: 'bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
 
   # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
   # For comprehensive fuzzing, use test-fuzz-long FUZZEXECS=[value].
@@ -620,27 +680,52 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
 
+  test-download-go-dependencies:
+    desc: Tests the workspace dependency-download module list and command
+    cmd: '{{.NIX_RUN}} ./scripts/test_download_go_dependencies.sh'
+
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
   test-unit:
-    desc: Runs unit tests
+    desc: Runs cacheable unit tests without race detection or shuffled order
     # Invoking with bash ensures compatibility with CI execution on Windows
+    env:
+      NO_SHUFFLE: TRUE
+      NO_RACE: TRUE
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
 
-  test-unit-fast:
-    desc: Runs unit tests
+  test-unit-all:
+    desc: Runs all workspace unit tests without race detection or shuffled order
+    # Invoking with bash ensures compatibility with CI execution on Windows
     env:
-      NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Tests are much faster without race detection
+      NO_SHUFFLE: TRUE
+      NO_RACE: TRUE
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-all-race-shuffle:
+    desc: Runs all workspace unit tests with race detection and shuffled order
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unit tests with race detection and shuffled order
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+
+  # Tests ./ids TestID as a cross-platform unit-test smoke check.
+  test-unit-smoke:
+    desc: Runs the cacheable ids TestID unit-test smoke check
+    cmd: '{{.NIX_RUN}} go test ./ids -run "^TestID$"'
 
   test-upgrade:
-    desc: Runs upgrade tests
+    desc: Builds avalanchego and runs upgrade tests
     cmds:
       - task: build
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
+      - task: run-upgrade
+
+  run-upgrade:
+    desc: Runs upgrade tests with an existing avalanchego binary
+    cmd: 'bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"

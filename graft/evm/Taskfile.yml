@@ -17,9 +17,21 @@ vars:
 tasks:
   default: '{{.NIX_RUN}} ./scripts/run_task.sh --list'
 
-  build-test:
-    desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
+  test-unit:
+    desc: Runs cacheable unit tests without race detection or shuffled order
+    env:
+      NO_RACE: TRUE
+      NO_SHUFFLE: TRUE
     cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unit tests with race detection and shuffled order
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  # Tests utils TestBigEqual as a cross-platform unit-test smoke check.
+  test-unit-smoke:
+    desc: Runs the cacheable utils unit-test smoke check
+    cmd: '{{.NIX_RUN}} go test ./utils -run "^TestBigEqual$"'
 
   check-clean-branch:
     desc: Checks that the git working tree is clean

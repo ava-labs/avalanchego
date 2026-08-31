@@ -1,13 +1,4 @@
 {
-    "pull_request": {
-        "include": [
-            {
-                "runner": "avalanche-avalanchego-runner-2ti",
-                "test": "hashdb-archive-101-250k",
-                "timeout-minutes": 30
-            }
-        ]
-    },
     "schedule": {
         "include": [
             {

@@ -1,0 +1,811 @@
+name: Go Full Test Jobs
+
+# Reusable non-Bazel Go CI workflow. The callers select the platform, test
+# configuration, and whether pre-merge-only jobs run.
+on:
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      run_premerge_jobs:
+        description: 'Run lint, generation, image, E2E, load, and upgrade jobs'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  go-required:
+    if: ${{ always() }}
+    needs:
+      - setup
+      - setup-blacksmith
+      - setup-e2e
+      - unit-all
+      - unit-avalanchego
+      - unit-coreth
+      - unit-evm
+      - unit-subnet-evm
+      - Fuzz
+      - e2e
+      - e2e_schedule_latest
+      - e2e_post_latest
+      - e2e_kube
+      - e2e_existing_network
+      - Upgrade
+      - Lint
+      - tausecondslint
+      - links-lint
+      - check_generated_protobuf
+      - check_mockgen
+      - check_canotogen
+      - check_contract_bindings
+      - check_go_mod_tidy
+      - test_build_image
+      - test_build_antithesis_avalanchego_images
+      - e2e_bootstrap_monitor
+      - load
+      - robustness
+      - lint-coreth
+      - e2e-warp-coreth
+      - lint-evm
+      - lint-subnet-evm
+      - e2e-warp-subnet-evm
+      - e2e-load-subnet-evm
+      - test-build-image-subnet-evm
+      - test-build-antithesis-images-subnet-evm
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Fail unless every enabled job succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          RUN_PREMERGE_JOBS: ${{ inputs.run_premerge_jobs }}
+        run: |
+          unexpected_jobs="$(
+            jq -r \
+              --arg run_premerge_jobs "$RUN_PREMERGE_JOBS" \
+              --argjson always_enabled '["setup", "unit-all", "unit-avalanchego", "unit-coreth", "unit-evm", "unit-subnet-evm"]' '
+                to_entries[] as $entry
+                | if ($always_enabled | index($entry.key)) != null then
+                    $entry | select(.value.result != "success")
+                  elif $run_premerge_jobs == "true" then
+                    $entry | select(.value.result != "success")
+                  else
+                    $entry | select(.value.result != "skipped")
+                  end
+                | .key + ": " + .value.result
+              ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$unexpected_jobs" ]]; then
+            echo "Jobs with unexpected results:"
+            printf '%s\n' "$unexpected_jobs"
+            exit 1
+          fi
+
+  setup:
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      has-aws-role: ${{ steps.check-aws-role.outputs.available }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check AWS Role Availability
+        id: check-aws-role
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          initial_setup: true
+  # Blacksmith runners redirect the Actions cache API to their own colocated
+  # cache instead of GitHub's backend, so they cannot see anything the `setup`
+  # job saved on a GitHub-hosted runner. Populate the Blacksmith-side cache
+  # separately, on the smallest instance available, since this job only
+  # downloads dependencies. Gated with the jobs that need it: every Blacksmith
+  # job here is pre-merge only.
+  # See https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions
+  setup-blacksmith:
+    if: ${{ inputs.run_premerge_jobs }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          initial_setup: true
+
+  # Run the combined suite beside the module-specific jobs to compare cold and
+  # warm execution cost before deciding whether it can replace their fan-out.
+  unit-all:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: all
+      - name: Run all workspace unit tests
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-all
+
+  unit-avalanchego:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: avalanchego
+      - name: Run avalanchego unit tests
+        shell: bash
+        run: ./scripts/run_task.sh test-unit
+        env:
+          TIMEOUT: ${{ env.TIMEOUT }}
+
+  unit-coreth:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/coreth
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: coreth
+      - run: ../../scripts/run_task.sh test-unit
+      - run: ../../scripts/run_task.sh coverage
+
+  unit-evm:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: evm
+      - run: ../../scripts/run_task.sh test-unit
+      - run: ../../scripts/run_task.sh coverage
+
+  unit-subnet-evm:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          cache_build_results: true
+          build_cache_scope: subnet-evm
+      - run: ../../scripts/run_task.sh test-unit
+      - run: ../../scripts/run_task.sh coverage
+
+  Fuzz:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: test-fuzz
+        shell: bash
+        run: ./scripts/run_task.sh test-fuzz
+  setup-e2e:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Build shared E2E test binaries
+        run: task build-e2e-test-artifacts
+      - name: Archive E2E test binaries
+        shell: bash
+        run: tar -czf "$RUNNER_TEMP/e2e-binaries.tar.gz" build/avalanchego build/xsvm build/ginkgo build/e2e.test build/upgrade.test
+      - uses: actions/upload-artifact@v6
+        with:
+          name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+          path: ${{ runner.temp }}/e2e-binaries.tar.gz
+          retention-days: 1
+
+  e2e:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    runs-on: ${{ matrix.os }}
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    strategy:
+      fail-fast: false
+      matrix:
+        # The default free runners lack the resources for parallel execution, so
+        # a beefier runner is required.
+        os: [blacksmith-4vcpu-ubuntu-2404]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e
+          artifact_prefix: e2e-${{ matrix.os }}
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+
+  e2e_schedule_latest:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    # The default free runners lack the resources for parallel execution, so a beefier
+    # runner is required.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e-schedule-latest
+          artifact_prefix: e2e-schedule-latest
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e_post_latest:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    # The default free runners lack the resources for parallel execution, so a beefier
+    # runner is required.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e-post-latest
+          artifact_prefix: e2e-post-latest
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e_kube:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    runs-on: ubuntu-24.04
+    env:
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e-kube
+          runtime: kube
+          artifact_prefix: e2e-kube
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e_existing_network:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    runs-on: ubuntu-24.04
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      E2E_TARGET: ${{ github.workspace }}/build/e2e.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run e2e tests with existing network
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-e2e-existing
+          artifact_prefix: e2e-existing-network
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  Upgrade:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-e2e
+    runs-on: ubuntu-24.04
+    env:
+      AVALANCHEGO_PATH: ${{ github.workspace }}/build/avalanchego
+      GINKGO_PATH: ${{ github.workspace }}/build/ginkgo
+      UPGRADE_TARGET: ${{ github.workspace }}/build/upgrade.test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/use-e2e-artifacts
+        with:
+          e2e_artifact_name: e2e-binaries-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.platform_name }}
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh run-upgrade
+          artifact_prefix: upgrade
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  Lint:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - uses: ./.github/actions/install-nix
+      - name: Runs all lint checks
+        run: ./scripts/run_task.sh lint-all-ci
+  tausecondslint:
+    if: ${{ inputs.run_premerge_jobs }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check for TauSeconds misuse with time.Add()
+        run: |
+          if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
+            echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
+            echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
+  links-lint:
+    if: ${{ inputs.run_premerge_jobs }}
+    name: Markdown Links Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
+        with:
+          fail_level: any
+  check_generated_protobuf:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Up-to-date protobuf
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
+      - uses: ./.github/actions/install-nix
+      - run: ./scripts/run_task.sh check-generate-protobuf
+  check_mockgen:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Up-to-date mocks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-mocks
+  check_canotogen:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Up-to-date canoto
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-canoto
+  check_contract_bindings:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Up-to-date contract bindings
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - uses: ./.github/actions/install-nix
+      - run: task check-generate-load-contract-bindings
+  check_go_mod_tidy:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Up-to-date go.mod and go.sum
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
+      - shell: bash
+        run: ./scripts/run_task.sh check-go-mod-tidy
+  test_build_image:
+    if: ${{ inputs.run_premerge_jobs }}
+    name: Image build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check image build
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          run: ./scripts/run_task.sh test-build-image
+  test_build_antithesis_avalanchego_images:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Build Antithesis avalanchego images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Check image build for avalanchego test setup
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
+  e2e_bootstrap_monitor:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Run bootstrap monitor e2e tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
+      - uses: ./.github/actions/install-nix
+      - name: Run e2e tests
+        run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
+      - name: Log Docker disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-docker
+      - name: Collect kind diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-kind-diagnostics
+        with:
+          artifact_name: bootstrap-monitor-kind-diagnostics
+
+  load:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Run process-based load test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-load-ci
+          artifact_prefix: load
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
+  # load_kube_kind:
+  #   name: Run load test on kind cluster
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: ./.github/actions/run-monitored-tmpnet-cmd
+  #       with:
+  #         run: ./scripts/run_task.sh test-load-kube-kind-ci
+  #         runtime: kube
+  #         artifact_prefix: load-kube
+  #         prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+  #         prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+  #         prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+  #         prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+  #         loki_url: ${{ secrets.LOKI_URL || '' }}
+  #         loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+  #         loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+  #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  robustness:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
+      - uses: ./.github/actions/install-nix
+      # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
+      - name: Deploy kind with chaos mesh
+        run: ./scripts/run_task.sh test-robustness
+      - name: Log Docker disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-docker
+      - name: Collect kind diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-kind-diagnostics
+        with:
+          artifact_name: robustness-kind-diagnostics
+
+  lint-coreth:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Lint
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+        working-directory: ./graft/coreth
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
+      - uses: ./.github/actions/install-nix
+      - name: Run all lint checks
+        run: ../../scripts/run_task.sh lint-all-ci
+      - name: Check go.mod and go.sum are up-to-date
+        run: ../../scripts/run_task.sh check-go-mod-tidy
+  e2e-warp-coreth:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: E2E Warp Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Run Warp E2E Tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ../../scripts/run_task.sh test-e2e-warp-ci
+          working_directory: ./graft/coreth
+          artifact_prefix: warp
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  lint-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Lint
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ./graft/evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
+      - name: Run all lint checks
+        run: ../../scripts/run_task.sh lint-all-ci
+      - name: Check go.mod and go.sum are up-to-date
+        run: ../../scripts/run_task.sh check-go-mod-tidy
+  lint-subnet-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: Lint
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+        working-directory: ./graft/subnet-evm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+          # go mod tidy resolves module versions the setup job has no reason
+          # to have cached.
+          allow_dependency_download: 'true'
+      - uses: ./.github/actions/install-nix
+      - name: Run all lint checks
+        run: ../../scripts/run_task.sh lint-all-ci
+      - name: Check go.mod and go.sum are up-to-date
+        run: ../../scripts/run_task.sh check-go-mod-tidy
+  e2e-warp-subnet-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: e2e warp tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Run Warp E2E Tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ../../scripts/run_task.sh test-e2e-warp-ci
+          working_directory: ./graft/subnet-evm
+          artifact_prefix: warp
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e-load-subnet-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup
+    name: e2e load tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Run E2E Load Tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ../../scripts/run_task.sh test-e2e-load-ci
+          working_directory: ./graft/subnet-evm
+          artifact_prefix: load
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  test-build-image-subnet-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    name: Image build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check image build
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          run: ../../scripts/run_task.sh test-build-image
+          working_directory: ./graft/subnet-evm
+  test-build-antithesis-images-subnet-evm:
+    if: ${{ inputs.run_premerge_jobs }}
+    needs: setup-blacksmith
+    name: Build Antithesis images
+    # Use a faster runner pending migration to bazel. The default free runners result
+    # in 20+ minute runtime, slowing down every PR and merge queue CI run.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-ci
+        with:
+          platform_name: ${{ inputs.platform_name }}
+      - name: Check image build for subnet-evm test setup
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm

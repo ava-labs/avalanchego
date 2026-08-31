@@ -24,6 +24,9 @@ inputs:
   runner_type:
     description: 'The type/label of the runner to include in the benchmark name for grouping results.'
     required: true
+  manage-go-caches:
+    description: 'This action manages the Go module cache and the build cache when true. Set it to false if the caller manages those directories. Two caches that save the same directory compete.'
+    default: 'true'
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
@@ -104,8 +107,12 @@ runs:
         gc-max-store-size-macos: 5G
     - run: echo "dependencies installed"
       shell: nix develop --command bash {0}
+    # A caller that manages these directories sets manage-go-caches to false.
+    # Two caches that save the same directory compete. The go-ci.yml job that
+    # uses setup-go-for-ci sets false for this reason.
     # Cache Go modules (architecture-independent)
     - uses: actions/cache@v5
+      if: inputs.manage-go-caches == 'true'
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
@@ -113,13 +120,14 @@ runs:
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
     - uses: actions/cache@v5
+      if: inputs.manage-go-caches == 'true'
       with:
         path: ~/.cache/go-build
         key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum') }}
         restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss
+    # Download modules only on cache miss.
     - run: go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+      if: inputs.manage-go-caches == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: nix develop --command bash -x {0}
     - name: Notify of metrics availability
       if: inputs.prometheus-username != ''

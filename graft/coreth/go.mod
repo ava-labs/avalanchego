@@ -191,3 +191,13 @@ replace (
 	github.com/ava-labs/avalanchego => ../../
 	github.com/ava-labs/avalanchego/graft/evm => ../evm
 )
+
+// Workaround for genproto ambiguous import conflict.
+// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+// Force use of newer split genproto to resolve ambiguity.
+//
+// Keep this version identical in go.work and in every module's go.mod. A
+// go.work replace overrides the member replaces, so a different version here
+// makes workspace mode and module mode resolve different genproto versions.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1

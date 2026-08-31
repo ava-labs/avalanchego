@@ -1,0 +1,19 @@
+name: 'Use E2E CI artifacts'
+description: 'Restore the prebuilt Go E2E test artifacts'
+
+inputs:
+  e2e_artifact_name:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v6
+      with:
+        name: ${{ inputs.e2e_artifact_name }}
+        path: ${{ runner.temp }}/e2e
+    - name: Install prebuilt E2E binaries
+      shell: bash
+      run: |
+        tar -xzf "${{ runner.temp }}/e2e/e2e-binaries.tar.gz" -C "$GITHUB_WORKSPACE"
+        ./scripts/setup_xsvm_plugin.sh

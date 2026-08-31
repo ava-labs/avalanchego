@@ -2,3 +2,4 @@ self-hosted-runner:
   labels:
     - avalanche-avalanchego-runner # Github Action Runner Controller
     - blacksmith-4vcpu-ubuntu-2404 # Beefier x86 runner
+    - blacksmith-2vcpu-ubuntu-2404 # Smallest Blacksmith instance; dependency setup only

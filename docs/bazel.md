@@ -40,7 +40,7 @@ avalanchego monorepo.
   - [Maintenance](#maintenance)
 - [Bazel CI External Dependency Caching](#bazel-ci-external-dependency-caching)
   - [Why this exists](#why-this-exists)
-  - [Test platforms and cache policy](#test-platforms-and-cache-policy)
+  - [Test platform policy](#test-platform-policy)
   - [What is cached](#what-is-cached)
   - [Cache key](#cache-key)
   - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
@@ -637,38 +637,30 @@ Go module data from the network in each job. Caching as much of that setup
 work as possible means fewer repeated network requests during the Bazel
 workflow, which reduces exposure to those infrastructure failures.
 
-### Test platforms and cache policy
+### Test platform policy
 
-Bazel CI uses a small pre-merge test set. GitHub-hosted runners can fail for
-reasons outside the repository. A smaller job set reduces that risk.
+See [Test platforms and test configuration](./ci.md#test-platforms-and-test-configuration)
+for the repository-wide CI policy.
 
-Non-scheduled Bazel CI runs these jobs:
+Pre-merge Bazel CI also runs a focused E2E smoke test on Ubuntu and macOS.
+The task selects the C-Chain ProposerVM API test. It does not provide full E2E
+coverage. A future change will replace the Ubuntu smoke test with a non-smoke
+E2E test. Each setup job checks Bazel metadata and prefetches the full CI
+dependency list.
 
-- Ubuntu 24.04 AMD64 CI runs full cacheable unit-test shards and a focused E2E
-  smoke test.
-- macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
-  E2E smoke test.
-
-The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
-the same task. It does not provide full E2E coverage. A future change will
-replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
-Bazel metadata and prefetches the full CI dependency list.
-
-The daily scheduled workflow runs full unit-test shards on Ubuntu 22.04 and
-24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Scheduled unit tests use race detection and
-shuffled test order. They use `--nocache_test_results`. Thus, Bazel runs them
-again and does not use a cached random test result.
+The scheduled Bazel workflow runs the full E2E suite with race-built binaries
+on each platform. Scheduled unit tests use `--nocache_test_results`. Thus, Bazel
+reruns tests with shuffled order and does not use a cached random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.
 
-The remote cache stores results from the cacheable pre-merge unit tests when
-CI provides the remote-cache URL and authorization header. This policy applies
-only to Bazel CI. Go module version CI remains unchanged because it checks
-compatibility for downstream consumers.
+The remote cache stores results from cacheable pre-merge tests when CI provides
+the remote-cache URL and authorization header. This policy applies only to
+Bazel CI. Go module version CI remains unchanged because it checks compatibility
+for downstream consumers.
 
-When you change the CI test set, update
+When you change the Bazel CI test set, update
 `./scripts/bazel_ci_dependency_list.sh`. The list must include every target
 pattern that `run_bazel_ci_command.sh` runs in CI.
 

@@ -19,6 +19,8 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
+- [Test platforms and test configuration](#test-platforms-and-test-configuration)
+  - [E2E and Upgrade artifact pipeline](#e2e-and-upgrade-artifact-pipeline)
 - [Validation](#validation)
 
 ## Principles
@@ -107,13 +109,25 @@ reserved for jobs with dependencies that another setup action does not provide.
 
 | Dependency | Provisioning mechanism | Use when |
 | --- | --- | --- |
-| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use Nix or Bazel to provide it. |
+| Go in unified CI | [`setup-go-for-ci`](../.github/actions/setup-go-for-ci/) | A unified Go workflow setup or consumer job needs the prepared workspace dependency cache. |
+| Go in other workflows | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use unified Go CI, Nix, or Bazel to provide it. |
 | Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel, which also provides Go. |
 | Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency supplied by the Nix dev shell, which also provides Go. |
 
-`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
-provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide.
+Outside unified Go CI, `setup-go-for-project`, `setup-bazel`, and `install-nix`
+are alternative Go provisioning mechanisms. A job that uses `setup-bazel` can
+also use `install-nix` for dependencies that Bazel does not provide.
+
+`install-nix` keeps its standalone Go caches off by default, so two cache
+actions do not restore or save the same `GOMODCACHE` or `GOCACHE` paths. A job
+that has no other source of Go dependencies turns them on with `cache_go`. Two
+jobs do that today: the Bazel e2e smoke tests, which build xsvm and ginkgo with
+plain `go` rather than Bazel. When both become Bazel targets, remove those
+opt-ins, and then `cache_go` has no callers left and can be deleted with the
+steps it gates.
+
+Docker-only image builds remain independent because their module downloads occur
+inside Docker build layers, not in the runner's prepared `GOMODCACHE`.
 
 ## Using Nix in GitHub Actions
 
@@ -225,6 +239,274 @@ When adding or upgrading a third-party action, review its source and its
 dependencies. Prefer actions that pin the third-party actions they invoke. Consider
 the action's permissions and the job's sensitivity when deciding how much review is
 needed.
+
+## Test platforms and test configuration
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) is the unified
+non-Bazel Go pre-merge entrypoint for avalanchego, Coreth, EVM, and Subnet-EVM.
+It runs for pull requests, merge groups, pushes to `master` and `dev`, and tag
+pushes. It calls the reusable full workflow for Ubuntu 24.04 AMD64 and the
+reusable smoke workflow for macOS 26 ARM64. The full workflow also contains the
+four suites' pre-merge lint, generation, image, E2E, load, and upgrade jobs.
+
+[`.github/workflows/go-ci.yml`](../.github/workflows/go-ci.yml) accepts a runner
+and platform name. Each invocation prepares dependencies once and then runs the
+four module-specific unit suites and one combined workspace suite. The combined
+suite runs beside the module suites so CI can compare their cold and warm costs
+before replacing the four-job fan-out.
+[`.github/workflows/go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml)
+uses the same runner and platform inputs and fans out the four
+`test-unit-smoke` tasks.
+
+Pre-merge CI uses fewer test platforms to reduce failures from hosted runners.
+It runs the four full cacheable module suites and the combined workspace suite
+on Ubuntu 24.04 AMD64. It runs one small smoke test from each module on macOS 26
+ARM64. The smoke tests prove that Go can build and run tests on macOS. They do
+not provide full macOS coverage.
+
+[`.github/workflows/ci-scheduled.yml`](../.github/workflows/ci-scheduled.yml)
+is the single daily non-Bazel Go entrypoint. It runs on Ubuntu 22.04 and 24.04
+on AMD64 and ARM64, and on macOS 26 ARM64. Every platform runs the four module
+suites, the combined workspace suite, and the race-built E2E suite. Scheduled
+workflows stay separate from pre-merge workflows so scheduled-only jobs do not
+appear as skipped checks.
+
+Each reusable workflow invocation runs its setup jobs before its Go jobs fan out.
+The setup job uses `scripts/download_go_dependencies.sh` to download the
+workspace build list, including dependencies used only by tests. It then
+downloads each module's own build list with `GOWORK=off`, because lint tooling,
+the per-module suites, and `go mod tidy` all resolve per module and can select
+versions the workspace resolution does not. It separately downloads the
+repository Go-tool module graph because `tools/external` is not in the
+workspace, and installs the tools pinned in `scripts/lib_go_tools.sh`, which are
+invoked as `go run pkg@version` and resolve a module graph of their own. It saves
+one platform-specific workspace `GOMODCACHE`. Consumer jobs restore that cache
+read-only. The cache key covers the Go version source, workspace files, every
+listed module file, and the dependency-download implementation.
+
+A workflow with no setup job sets `initial_setup` on the job that needs the
+dependencies. That job populates and saves its own cache.
+`firewood-chaos-test`, `firewood-load-test`, and `self-hosted-load-tests` work
+this way. The last two share a cache key, because they name the same runner, and
+the key is immutable: the job that finishes first populates it, and the other
+skips its save.
+
+The setup job also builds the `task` binary from `tools/external` and shares it
+through a small platform-specific cache. Consumer jobs restore it and put it on
+`PATH`. Without it every job that does not already have `task` on `PATH` rebuilds
+it, which measured about 15 seconds per job, and only the cacheable test jobs
+have a `GOCACHE` that could absorb that cost. The cache holds the binary rather
+than the `GOCACHE` that produced it: about 13MB instead of about 150MB, and no
+second cache restoring into the `GOCACHE` path this action already manages. The
+key has no restore prefix, because a binary built from a different
+`tools/external` or Go version must not be reused. A miss is not a failure;
+`scripts/run_task.sh` still builds `task` itself.
+
+The full workflow runs a second setup job, `setup-blacksmith`, for Blacksmith
+jobs that need the Go dependency cache. Blacksmith runners redirect the Actions
+cache API to their colocated cache instead of GitHub's backend. A cache saved on
+a GitHub-hosted runner is not available to those jobs. Without a Blacksmith-side
+setup job, each such job downloads its whole module graph. The job uses the
+smallest Blacksmith instance because it only downloads. It runs only when
+`run_premerge_jobs` is true.
+
+The process E2E jobs are an exception. They run on Blacksmith, but they do not
+use the Blacksmith Go cache. They receive the test artifacts from `setup-e2e`.
+When you move a job onto or off a Blacksmith runner, move its `needs` to the
+setup job that provides its dependencies.
+
+### E2E and Upgrade artifact pipeline
+
+The Go E2E and Upgrade jobs share one set of non-race binaries. This avoids
+building avalanchego, XSVM, Ginkgo, and the E2E test binaries in every test job.
+
+`setup` restores and saves the Go dependency and tool caches. A run that needs
+E2E tests uploads a workflow-local artifact that contains `task`. `setup-e2e`
+restores the Go caches with `setup-go-for-ci`. It builds avalanchego, XSVM,
+Ginkgo, and the E2E and Upgrade test binaries. It uploads these binaries as one
+workflow-local artifact. This build uses the repository Go modules, so it
+continues to test the Go module configuration.
+
+Pre-merge CI uses standard binaries on its minimal platforms. Scheduled CI runs
+the full E2E suite with race-built binaries on these platforms:
+
+- Ubuntu 22.04 for AMD64 and ARM64
+- Ubuntu 24.04 for AMD64 and ARM64
+- macOS 26 for ARM64
+
+Each scheduled platform builds and uploads its own artifact. Artifacts must
+include the platform name because the scheduled platform jobs run in parallel.
+
+The process E2E and Upgrade jobs download the `task` and binary artifacts. They
+call `run-*` tasks. These tasks run tests but do not build binaries. The consumer
+jobs must not use `setup-go-for-ci` or an Actions cache. Keep the build steps in
+`setup-e2e` and keep the test jobs artifact-only.
+
+Do not add race detection to the pre-merge artifact. Pull-request E2E tests use
+standard binaries. Scheduled E2E tests use a separate race-built artifact.
+
+The `c-chain-reexecution` job runs the C-Chain re-execution benchmark for pull
+requests. It is a top-level job because it needs `id-token: write` to assume a
+read-only AWS role and download benchmark data from S3. A reusable workflow
+cannot elevate its caller's permissions. The job runs `setup-go-for-ci` itself
+and sets the benchmark action's `manage-go-caches` input to `false`, because two
+caches that save the same directory compete.
+
+The `c-chain-reexecution-benchmark-*` workflows run the other benchmark
+configurations, on dispatch and on a schedule. Those runs keep
+`manage-go-caches` set to `true`. They also use Blacksmith runners and other
+self-hosted runners. The setup jobs here cannot reach those caches. The Bazel
+workflows do not use Blacksmith runners.
+
+`go-required` does not include `c-chain-reexecution`. GitHub skips that job for
+pull requests from forks and Dependabot, because the benchmark action assumes
+access to an AWS role identifier secret and GitHub OIDC permission to assume
+that role. Those events do not receive the secret. `go-required` treats a
+skipped pre-merge job as a failure.
+
+Do not use `c-chain-reexecution` as a required branch-protection check. It is
+skipped when the AWS role is unavailable, so it cannot enforce the benchmark for
+every pull request.
+
+Every job that uses `setup-go-for-ci` then runs with `GOPROXY=off`, so every
+module it needs must already be in the cache. A miss fails the job and names the
+missing module. A silent download would instead hide an incomplete
+dependency-download script and pay the download cost in every job. A job that
+populates its own cache is checked the same way, because the check is applied
+after its download. Jobs that resolve module versions the download script cannot
+predict, such as the `go mod tidy` checks, set `allow_dependency_download` on
+`setup-go-for-ci`.
+
+Dependency and test-result caching are separate. Each cacheable pre-merge full
+or smoke job manages its own suite- and platform-specific `GOCACHE`. The primary
+key includes `github.sha`, and a platform/suite prefix supplies a warm start from
+an earlier revision. Scheduled race/shuffle jobs do not restore or save
+`GOCACHE`, so their tests execute on every run.
+
+### Go cache lifecycle and trust boundary
+
+GitHub Actions scopes caches by Git ref. A pull request can restore matching
+caches from its base branch, but a cache saved by the pull request remains in
+the pull request's merge-ref scope. It cannot replace a cache used by `master`,
+another branch, or another pull request. Merging a pull request does not promote
+its caches. The post-merge `master` workflow must succeed and save its own cache
+before later pull requests can restore the merged cache state. Cache actions
+save only after their job succeeds, and cache entries are immutable for a given
+key.
+
+For `GOCACHE`, a new pull request revision normally misses the primary key
+because it contains the pull request merge SHA. The restore prefix then selects
+a recent accessible cache for the same suite and platform, normally from an
+earlier revision of that pull request or from `master`. Go, not the workflow,
+decides package-level reuse. It reuses only successful test results whose
+compiled test inputs, dependencies, cacheable flags, relevant environment, and
+observed file inputs still match. Changed packages and packages affected by
+changed dependencies run again. The job saves the resulting cache under its new
+revision-specific key.
+
+For `GOMODCACHE`, unchanged workspace dependency inputs produce an exact key
+match. Setup still runs the complete dependency-download command, which should
+find all required modules locally. If module inputs change, setup restores a
+recent same-platform cache as a warm start, downloads the missing module
+versions, and saves the completed cache under the new dependency key. Old module
+versions can remain in the cache; avoiding repeated downloads takes priority
+over minimizing cache size. Consumer jobs use `actions/cache/restore`, so they
+cannot save a partial or competing dependency cache.
+
+Pull requests can read base-branch caches. Never put credentials, private source,
+or other secrets in either Go cache. This repository caches public Go modules
+and derived build/test artifacts only. The workflows use `pull_request`, not the
+privileged `pull_request_target` event, and protected secrets are not available
+to untrusted pull request jobs. A pull request can affect cache contents within
+its own scope, but those entries do not become trusted-branch caches.
+
+`task check-go-mod-tidy` also validates workspace checksums, and its fix is
+`task go-mod-tidy`. After `go work sync`, the fix runs `go mod download` and
+`go list -m all` to record the checksums that `go work sync` leaves out. This
+works around [Go issue #63901](https://github.com/golang/go/issues/63901),
+where `go work sync` can leave `go.work.sum` incomplete. After adopting a Go
+release with that fix, test whether the extra commands can be removed.
+
+Every command that writes `go.work.sum` or a member `go.sum` belongs in that
+task. Warm-up steps elsewhere must leave the checked-in checksums untouched: a
+dirty tree breaks any later step that switches branches. The C-Chain benchmark
+comparison step switches to the gh-pages branch to read stored results, whether
+or not the job publishes.
+
+When reviewing or changing this implementation:
+
+- keep dependency keys tied to the Go version source, every workspace and tool
+  module file, and the dependency-download script and action
+- keep each job that needs a Go dependency cache on the setup job for its
+  runner; process E2E and Upgrade jobs are artifact-only consumers
+- keep `scripts/download_go_dependencies.sh` covering every resolution CI uses:
+  the workspace build list in workspace mode, each module's build list with
+  `GOWORK=off`, `tools/external`, and the versioned tools in
+  `scripts/lib_go_tools.sh`
+- add a tool to `tools/external` where Bazel allows it; pin it in
+  `scripts/lib_go_tools.sh` only when it cannot go there, and say why
+- keep dependency setup as the only `GOMODCACHE` writer and keep consumers on
+  restore-only behavior
+- keep `GOCACHE` keys revision-, suite-, and platform-specific, with a
+  suite/platform restore prefix
+- do not enable `GOCACHE` restore or save for scheduled race/shuffle tests
+- do not allow `install-nix` or a nested action to restore a second cache into a
+  path already managed by `setup-go-for-ci`
+- keep consumer jobs on `GOPROXY=off`; set `allow_dependency_download` only for
+  a job that must resolve module versions the setup job cannot predict
+- keep the `task` binary cache keyed exactly, with no restore prefix, and keep a
+  cache miss non-fatal
+- verify cold, warm, same-revision, post-merge `master`, and scheduled behavior
+  in CI logs after changing cache keys or scope
+
+The top-level `go-required` job replaces `tests-required`, `coreth-required`,
+`evm-shared-required`, and `subnet-evm-required`. Branch protection must remove
+the four old checks only after a pull request shows the exact displayed name of
+the new top-level check and confirms that it fails when either reusable call
+fails or is skipped. This repository-setting migration cannot be completed in
+workflow code.
+
+The migration retains these job destinations:
+
+- avalanchego full workflow: `Fuzz`, `e2e`, `e2e_schedule_latest`,
+  `e2e_post_latest`, `e2e_kube`, `e2e_existing_network`, `Upgrade`, `Lint`,
+  `tausecondslint`, `links-lint`, `check_generated_protobuf`, `check_mockgen`,
+  `check_canotogen`, `check_contract_bindings`, `check_go_mod_tidy`,
+  `test_build_image`, `test_build_antithesis_avalanchego_images`,
+  `e2e_bootstrap_monitor`, `load`, `robustness`, and `c-chain-reexecution`
+- Coreth full workflow: `lint-coreth` and `e2e-warp-coreth`
+- EVM full workflow: `lint-evm`
+- Subnet-EVM full workflow: `lint-subnet-evm`, `e2e-warp-subnet-evm`,
+  `e2e-load-subnet-evm`, `test-build-image-subnet-evm`, and
+  `test-build-antithesis-images-subnet-evm`
+- pre-merge reusable workflow: `unit-all`, `unit-avalanchego`, `unit-coreth`,
+  `unit-evm`, and `unit-subnet-evm`
+- scheduled workflow: the same five unit jobs with race detection and shuffled
+  order, plus `e2e`
+- reusable smoke workflow: `smoke-avalanchego`, `smoke-coreth`, `smoke-evm`,
+  and `smoke-subnet-evm`
+
+`load_kube_kind` remains commented out. Do not enable it while changing this
+workflow structure.
+
+The combined workspace suite must run with the Go workspace enabled. It loads
+packages from every workspace module in one `go test` invocation, so it depends
+on `go.work`. With the workspace off, the graft modules resolve through the root
+`go.sum`, which does not carry their transitive checksums, and the suite fails
+with `missing go.sum entry`. The module-specific suites are unaffected because
+each runs from inside its own module directory.
+
+Keeping the workspace enabled is not automatic. `scripts/run_tool.sh` needs
+`GOWORK=off` for `go tool -modfile`, and `go tool` passes that assignment to the
+tool it launches. When `task` is not on `PATH`, which is the case for every CI
+job, `scripts/run_task.sh` reaches task through that path. It therefore resolves
+the task binary with `go tool -n` and executes it as a separate step, so
+`GOWORK=off` stays with the build and task runs its commands in the caller's
+environment. `scripts/test_run_task_launcher.sh` covers this. Do not reintroduce
+a launcher that execs task through a `GOWORK=off` assignment.
+
+When you change a test platform or test configuration, update this policy and
+the related workflow and task entrypoints together.
 
 ## Validation
 

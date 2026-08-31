@@ -7,6 +7,8 @@ set -euo pipefail
 # ./scripts/tests.e2e.sh --ginkgo.label-filter=x                                       # All arguments are supplied to ginkgo
 # E2E_SERIAL=1 ./scripts/tests.e2e.sh                                                  # Run tests serially
 # E2E_TARGET=./graft/coreth/tests/warp ./scripts/tests.e2e.sh                          # Run the warp e2e tests
+# E2E_TARGET=./build/e2e.test ./scripts/tests.e2e.sh                                   # Run a prebuilt E2E test binary
+# GINKGO_PATH=./bin/ginkgo ./scripts/tests.e2e.sh                                      # Customization of ginkgo path
 # E2E_RANDOM_SEED=1234882 ./scripts/tests.e2e.sh                                       # Specify a specific seed to order test execution by
 # AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh                          # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
@@ -60,4 +62,4 @@ fi
 
 #################################
 # shellcheck disable=SC2086
-./bin/ginkgo ${GINKGO_ARGS} -v "${E2E_TARGET:-./tests/e2e}" -- "${E2E_ARGS[@]}"
+"${GINKGO_PATH:-./bin/ginkgo}" ${GINKGO_ARGS} -v "${E2E_TARGET:-./tests/e2e}" -- "${E2E_ARGS[@]}"
