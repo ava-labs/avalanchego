@@ -83,12 +83,12 @@ func TestSyncer_BonusBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			srcSUT := newSUT(t, withNetworkID(test.networkID))
-			srcSUT.apply(t, blocks...)
+			src := newSUT(t, withNetworkID(test.networkID))
+			src.apply(t, blocks...)
 
-			dstSUT := newSUT(t, withNetworkID(test.networkID))
-			require.NoError(t, sync(t, srcSUT, dstSUT), "sync()")
-			checkStatesMatch(t, srcSUT, dstSUT, blocks...)
+			dst := newSUT(t, withNetworkID(test.networkID))
+			require.NoError(t, sync(t, src, dst), "sync()")
+			checkStatesMatch(t, src, dst, blocks...)
 		})
 	}
 }
@@ -168,29 +168,29 @@ func TestSyncer_Crash(t *testing.T) {
 		{height: 5, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	src := newSUT(t)
-	src.apply(t, blocks...)
+	want := newSUT(t)
+	want.apply(t, blocks...)
 
 	wantDB := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-	require.NoError(t, sync(t, src, newSUT(t, withDB(wantDB))), "sync()")
+	require.NoError(t, sync(t, want, newSUT(t, withDB(wantDB))), "sync()")
 
 	for failAfter := range wantDB.Calls() {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			db := memdb.New()
 
 			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
-			err := sync(t, src, preCrash)
+			err := sync(t, want, preCrash)
 			require.ErrorIs(t, err, saetest.ErrInjected, "sync()")
 
 			// Clean re-run on the same DB must complete and match the source.
 			got := newSUT(t, withDB(db))
-			require.NoError(t, sync(t, src, got), "re-run sync()")
-			checkStatesMatch(t, src, got, blocks...)
+			require.NoError(t, sync(t, want, got), "re-run sync()")
+			checkStatesMatch(t, want, got, blocks...)
 		})
 	}
 }
 
-// TestSyncer_Stale tries to state sync to an older stae, and verifies no
+// TestSyncer_Stale tries to state sync to an older state, and verifies no
 // changes to the [State] are made.
 func TestSyncer_Stale(t *testing.T) {
 	var build builder
@@ -201,17 +201,17 @@ func TestSyncer_Stale(t *testing.T) {
 		{height: 5, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	// staleSUT is a block behind for [sync] to use an old height.
-	staleSUT := newSUT(t)
+	// stale is a block behind for [sync] to use an old height.
+	stale := newSUT(t)
 	staleHeight := len(blocks) - 2
-	staleSUT.apply(t, blocks[:staleHeight]...)
+	stale.apply(t, blocks[:staleHeight]...)
 
 	want := newSUT(t)
 	want.apply(t, blocks...)
 
 	got := newSUT(t)
 	got.apply(t, blocks...)
-	require.NoError(t, sync(t, staleSUT, got), "sync()")
+	require.NoError(t, sync(t, stale, got), "sync()")
 
 	// Syncing to earlier state shouldn't corrupt
 	checkStatesMatch(t, want, got, blocks...)
