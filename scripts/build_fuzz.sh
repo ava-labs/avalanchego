@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
-# First argument is the time, in seconds, to run each fuzz test for.
-# If not provided, defaults to 1 second.
+# First argument is the number of executions to fuzz each target for. Use 0 to
+# fuzz until a failure. Defaults to 1.
 #
 # Remaining arguments are the directories to run fuzz tests in.
 # If not provided, defaults to the current directory.
+#
+# TODO(JonathanOppenheimer): when we update to go v1.27, change the budget back
+# to durations. The bug that resulted in durations leading to flakes (false
+# failures reported) was fixed by https://go-review.googlesource.com/c/go/+/774140.
+# See golang/go#75804.
 
 set -euo pipefail
 
@@ -15,19 +20,20 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-fuzzTime=${1:-1}
+fuzzExecs=${1:-1}
 fuzzDirs=("${@:2}")
 if (( ${#fuzzDirs[@]} == 0 )); then
     fuzzDirs=(.)
 fi
 
-# Set go test timeout to fuzz time + 20 minutes to allow for compilation and setup.
-# A negative fuzz time (e.g. -1) means run until failure, so disable the timeout.
-if (( fuzzTime < 0 )); then
-    timeout=0
-else
-    timeout=$((fuzzTime + 1200))
+fuzzTimeArgs=()
+if (( fuzzExecs > 0 )); then
+    fuzzTimeArgs=(-fuzztime="${fuzzExecs}x")
 fi
+
+# A count budget has no time limit, so cap each target. Set FUZZ_TIMEOUT=0 to
+# disable, which fuzzing until a failure requires.
+timeout=${FUZZ_TIMEOUT:-20m}
 
 grepStatus=0
 files=$(grep -r --include='*_test.go' --files-with-matches 'func Fuzz' "${fuzzDirs[@]}") || grepStatus=$?
@@ -48,7 +54,7 @@ do
         # cd into parentDir so packages in sub-modules (e.g. ./graft/coreth)
         # resolve against their own go.mod rather than the main module.
         # If any of the fuzz tests fail, return exit code 1
-        if ! ( cd "$parentDir" && go test -tags test -timeout="${timeout}s" . -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s ); then
+        if ! ( cd "$parentDir" && go test -timeout="$timeout" . -run="$func" -fuzz="$func" "${fuzzTimeArgs[@]}" ); then
             failed=true
         fi
     done < <(grep -oP 'func \K(Fuzz\w*)' "$file")

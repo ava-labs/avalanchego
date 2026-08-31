@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -30,7 +28,7 @@ import (
 //nolint:testableexamples // Output is meaningless
 func ExampleRange() {
 	parent := blockBuildingPreference()
-	settle, ok, err := LastToSettleAt(vmHooks(), time.Now().Add(-params.Tau), parent)
+	settle, ok, err := LastToSettleAt(time.Now().Add(-params.Tau), parent)
 	if err != nil {
 		// Due to a malformed input to block verification.
 		return // err
@@ -47,15 +45,25 @@ func ExampleRange() {
 	_ = Range(settle, parent)
 }
 
-// blockBuildingPreference and vmHooks exist only to allow examples to build.
+// blockBuildingPreference exists only to allow examples to build.
 func blockBuildingPreference() *Block { return nil }
-func vmHooks() hook.Points            { return nil }
 
 func TestSettlementInvariants(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 3, nil), nil, nil)
-
-	b := newBlock(t, newEthBlock(6, 10, parent.EthBlock()), parent, lastSettled)
+	lastSettled := newBlock(
+		t,
+		newSynchronousEthBlock(t, 3, 3, nil),
+		nil, nil,
+	)
+	parent := newBlock(
+		t,
+		newEthBlock(t, 4, 9, lastSettled.EthBlock(), lastSettled),
+		lastSettled, lastSettled,
+	)
+	b := newBlock(
+		t,
+		newEthBlock(t, 5, 10, parent.EthBlock(), lastSettled),
+		parent, lastSettled,
+	)
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
@@ -220,7 +228,15 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newChain(t, 0, 30, nil)
+
+	// TODO(arr4n): Although [newChain] sets the last-settled block of all
+	// asynchronous blocks (in this case to the genesis block), they are
+	// irrelevant for the rest of this test and will certainly diverge from the
+	// value returned by [LastToSettleAt]. Fixing this requires building the
+	// chain manually, and interleaving extension with calls to
+	// [LastToSettleAt], which is a major refactor for minimal benefit.
+	blocks := newChain(t, 0, 30, map[uint64]uint64{0: 0})
+
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
@@ -353,7 +369,7 @@ func TestLastToSettleAt(t *testing.T) {
 		blocks[24].markExecutedForTests(t, db, xdb, tm)
 
 		partiallyExecutedAt := proxytime.New[gas.Gas](27, 1, 100)
-		blocks[25].SetInterimExecutionTime(partiallyExecutedAt)
+		blocks[25].SwapInterimExecutionTime(partiallyExecutedAt)
 
 		tests = append(tests, testCase{
 			settleAt: 26,
@@ -366,7 +382,7 @@ func TestLastToSettleAt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			settleAt := time.Unix(int64(tt.settleAt), 0) //#nosec G115 -- Hard-coded, non-overflowing values
-			got, gotOK, err := LastToSettleAt(hookstest.NewStub(0), settleAt, tt.parent)
+			got, gotOK, err := LastToSettleAt(settleAt, tt.parent)
 			if err != nil || gotOK != tt.wantOK {
 				t.Fatalf("LastToSettleAt(%d, [parent height %d]) got (_, %t, %v); want (_, %t, nil)", tt.settleAt, tt.parent.Height(), gotOK, err, tt.wantOK)
 			}

@@ -56,7 +56,7 @@ func TestDelayExponent(t *testing.T) {
 
 func TestBlockTime(t *testing.T) {
 	_, sut := newSUT(t)
-	hooks := sut.hooks()
+	hooks := sut.hooks(t)
 
 	tests := []struct {
 		name string
@@ -225,7 +225,7 @@ func TestTargetExponent(t *testing.T) {
 func TestSettledBy(t *testing.T) {
 	key := txtest.NewKey(t)
 	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
-	hooks := sut.hooks()
+	hooks := sut.hooks(t)
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)

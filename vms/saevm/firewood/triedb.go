@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -156,30 +155,19 @@ func New(config Config) (*TrieDB, error) {
 }
 
 // Close drops all proposals that have not yet been committed and closes the
-// underlying Firewood database.  If a reference to a [state.Trie] obtained
-// from this parent [state.Database] is still accessible during this call, an
-// error will be returned.
-//
-// TODO(alarso16): Force drop all pending revisions on close once supported.
+// underlying Firewood database.  Any references to a [state.Trie] obtained
+// from this parent [state.Database] will no longer be valid after this call.
 func (t *TrieDB) Close() error {
-	errs := make([]error, 0, t.committable.Len()+2)
-	for it := t.committable.NewIterator(); it.Next(); {
-		errs = append(errs, it.Value().Drop())
-	}
+	// The force close below will iterate through all open handles and free
+	// their Rust-side memory explicitly
 	t.committable.Clear()
-	if t.pending != nil {
-		errs = append(errs, t.pending.Drop())
-		t.pending = nil
-	}
+	t.pending = nil
 
-	// Allow some time for garbage collection and disk persistence of the
-	// last committed revision.
-	go runtime.GC()
+	// Firewood will iterate through all open handles and close them, but this
+	// isn't guaranteed to finish quickly.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	errs = append(errs, t.Firewood.Close(ctx))
-
-	return errors.Join(errs...)
+	return t.Firewood.Close(ctx, ffi.WithForceCloseHandles())
 }
 
 // Initialized indicates whether any state has been committed, typically used to

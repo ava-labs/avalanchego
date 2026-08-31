@@ -7,10 +7,14 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
-func (e *Executor) sendPostExecutionEvents(b *types.Block, results *ExecutionResults) {
-	e.metrics.markExecuted(b.NumberU64(), uint64(results.GasConsumed), b.GasLimit())
+func (e *Executor) sendPostExecutionEvents(block *blocks.Block, results *ExecutionResults) {
+	e.metrics.markExecuted(block, results)
+
+	b := block.EthBlock()
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
 	var n int

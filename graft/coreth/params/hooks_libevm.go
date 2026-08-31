@@ -63,6 +63,15 @@ func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
+// ShouldCreditBaseFeeToCoinbase returns true to credit the base fee to the
+// coinbase (the blackhole address on the C-Chain). The C-Chain has
+// historically credited the full fee (base + priority) to the blackhole
+// address, but by default libevm's state transition only credits the priority
+// fee and discards the base fee.
+func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return true
+}
+
 // AccessListGas computes the intrinsic gas for an access list.
 // When predicaters exist, it calculates gas per-tuple, delegating to predicate
 // contracts for addresses that have them. Otherwise, it returns override=false

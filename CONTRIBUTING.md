@@ -183,7 +183,10 @@ export DIRENV_LOG_FORMAT=
 ## Running tasks
 
 This repo uses the [Task](https://taskfile.dev/) task runner to simplify usage and discoverability
-of development tasks. To list available tasks:
+of development tasks. For the repo's task model and maintainer guidance, see
+[docs/tasks.md](./docs/tasks.md).
+
+To list available tasks:
 
 ```bash
 task
@@ -311,6 +314,10 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 ### Do you have questions about the source code?
 
 - Ask any question about AvalancheGo under GitHub [discussions](https://github.com/ava-labs/avalanchego/discussions/categories/q-a).
+
+### Do you want to trace a running node?
+
+- AvalancheGo can export OpenTelemetry traces. See the [trace package README](trace/README.md) for how to collect and visualize them.
 
 ### Do you want to contribute to the Avalanche documentation?
 

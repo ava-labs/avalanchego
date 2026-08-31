@@ -13,6 +13,7 @@ import (
 	"math/rand/v2"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -36,9 +37,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -67,11 +70,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	saedbConfig saedb.Config
-	chain       *blockstest.ChainBuilder
-	wallet      *saetest.Wallet
-	logger      *loggingtest.Logger
-	db          ethdb.Database
+	saedbConfig  saedb.Config
+	chain        *blockstest.ChainBuilder
+	wallet       *saetest.Wallet
+	logger       *loggingtest.Logger
+	db           ethdb.Database
+	chainDataDir string
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -83,6 +87,7 @@ type (
 		hooks          *saehookstest.Stub
 		archival       bool
 		commitInterval uint64
+		dbScheme       string
 		extraAlloc     types.GenesisAlloc
 	}
 	sutOption = options.Option[sutConfig]
@@ -96,21 +101,31 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	logger := loggingtest.New(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
+	chainDataDir := tb.TempDir()
 
 	sutCfg := options.ApplyTo(&sutConfig{
-		hooks: defaultHooks(),
+		hooks:          defaultHooks(),
+		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
 	config := saetest.ChainConfig()
+	saedbConfig := saedb.Config{
+		Archival:         sutCfg.archival,
+		CommitInterval:   sutCfg.commitInterval,
+		SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+		Scheme:           sutCfg.dbScheme,
+	}
+
 	db := rawdb.NewMemoryDatabase()
-	tdbConfig := &triedb.Config{}
 	xdb := saetest.NewExecutionResultsDB()
+
+	tdbCfg := saedbConfig.TrieDBConfig(chainDataDir, logger)
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
 	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithTrieDBConfig(tdbCfg),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -118,16 +133,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
+		blockstest.WithHooks(sutCfg.hooks),
 	)
 	chain := blockstest.NewChainBuilder(genesis, blockOpts)
 	src := blocks.Source(chain.GetBlock)
 
-	saedbConfig := saedb.Config{
-		TrieDBConfig:       tdbConfig,
-		Archival:           sutCfg.archival,
-		TrieCommitInterval: sutCfg.commitInterval,
-	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
+	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, logger)
+	require.NoError(tb, err, "saedb.NewTracker()")
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -135,13 +148,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:    e,
-		saedbConfig: saedbConfig,
-		chain:       chain,
-		wallet:      wallet,
-		logger:      logger,
-		db:          db,
-		closeOnce:   closeOnce,
+		Executor:     e,
+		saedbConfig:  saedbConfig,
+		chain:        chain,
+		wallet:       wallet,
+		logger:       logger,
+		db:           db,
+		chainDataDir: chainDataDir,
+		closeOnce:    closeOnce,
 	}
 }
 
@@ -473,6 +487,121 @@ func TestEndOfBlockOps(t *testing.T) {
 			t.Errorf("%T.ExecutedByGasTime() diff (-want +got):\n%s", b, diff)
 		}
 	})
+}
+
+func TestExecuteRejectsInvalidOptions(t *testing.T) {
+	_, sut := newSUT(t)
+	b := sut.chain.NewBlock(t, types.Transactions{
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{}),
+	})
+	tests := []struct {
+		name    string
+		opts    []Option
+		wantErr error
+	}{
+		{
+			name:    "excessive transaction count",
+			opts:    []Option{WithMaxNumTxs(2)},
+			wantErr: errTransactionCountOutOfRange,
+		},
+		{
+			name:    "partial end-of-block execution",
+			opts:    []Option{WithMaxNumTxs(0)},
+			wantErr: errPartialEndOfBlockExecution,
+		},
+		{
+			name:    "canonical without end-of-block operations",
+			opts:    []Option{asCanonical(), SkipEndOfBlockOps()},
+			wantErr: errCanonicalWithoutEndOfBlockOps,
+		},
+		{
+			name:    "nil receipt store",
+			opts:    []Option{WithReceiptStore(nil)},
+			wantErr: errNilReceiptStore,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.ErrorIsf(t, err, tt.wantErr, "Execute() with %s options", tt.name)
+		})
+	}
+}
+
+// TestExecuteRecordsOnlyCanonicalProgress verifies that non-canonical execution
+// does not overwrite an in-memory block's canonical progress.
+func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
+	makeTxs := func(t *testing.T, w *saetest.Wallet) types.Transactions {
+		t.Helper()
+		return types.Transactions{w.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &common.Address{},
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		})}
+	}
+
+	tests := []struct {
+		name            string
+		txs             func(*testing.T, *saetest.Wallet) types.Transactions
+		ops             []saehookstest.Op
+		opts            []Option
+		wantInterimTick *gas.Gas // nil implies nil interim execution time, not no tick
+	}{
+		{
+			name:            "non-canonical with transaction and end-of-block operation",
+			txs:             makeTxs,
+			ops:             []saehookstest.Op{{Gas: 1}},
+			wantInterimTick: nil, // not canonical
+		},
+		{
+			name:            "canonical with transaction only",
+			txs:             makeTxs,
+			ops:             nil,
+			opts:            []Option{asCanonical()},
+			wantInterimTick: utils.PointerTo(gas.Gas(params.TxGas)),
+		},
+		{
+			name:            "canonical with end-of-block operation only",
+			txs:             nil,
+			ops:             []saehookstest.Op{{Gas: 1}},
+			opts:            []Option{asCanonical()},
+			wantInterimTick: utils.PointerTo[gas.Gas](1),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t)
+
+			var txs types.Transactions
+			if tt.txs != nil {
+				txs = tt.txs(t, sut.wallet)
+			}
+			withOps := blockstest.WithEthBlockOptions(blockstest.WithOps(tt.ops))
+			b := sut.chain.NewBlock(t, txs, withOps)
+
+			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
+			require.NoError(t, err, "Executor.StateDB(parent root)")
+
+			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.NoError(t, err, "Execute()")
+
+			got := b.SwapInterimExecutionTime(proxytime.Of[gas.Gas](time.Time{}))
+			if tick := tt.wantInterimTick; tick == nil {
+				require.Nilf(t, got, "%T.SwapInterimExecutionTime(...)", b)
+			} else {
+				want := b.ParentBlock().ExecutedByGasTime()
+				want.BeforeBlock(b.PreciseTime())
+				want.Tick(*tick)
+
+				if diff := cmp.Diff(want.Time, got, proxytime.CmpOpt[gas.Gas]()); diff != "" {
+					t.Errorf("%T.SwapInterimExecutionTime(...); diff (-want +got):\n%s", b, diff)
+				}
+			}
+		})
+	}
 }
 
 func TestGasAccounting(t *testing.T) {
@@ -921,7 +1050,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
 	conf := snapshot.Config{
-		CacheSize: saedb.SnapshotCacheSizeMB,
+		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
 		NoBuild:   true, // i.e. MUST be loaded from disk
 	}
 	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
@@ -938,14 +1067,28 @@ func TestSnapshotPersistence(t *testing.T) {
 	})
 }
 
-func TestStateRootAvailability(t *testing.T) {
-	const commitInterval = 16
+func missingTrieNodeError(root common.Hash) testerr.Want {
+	return testerr.As(func(got *trie.MissingNodeError) string {
+		if got.NodeHash != root {
+			return fmt.Sprintf("%T for hash %#x", got, root)
+		}
+		return ""
+	})
+}
+
+// TestHashDBStateRootAvailability ensures the ability to dereference recent
+// states explicitly when no longer needed. This is not needed for Firewood,
+// which does this automatically, and any archival node, which never prunes.
+func TestHashDBStateRootAvailability(t *testing.T) {
+	const (
+		numBlocks      = 10
+		commitInterval = 2 * numBlocks // guarantee no states are committed
+	)
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.commitInterval = commitInterval
 	}))
 	e, chain := sut.Executor, sut.chain
 
-	const numBlocks = commitInterval + 10
 	for range numBlocks {
 		b := chain.NewBlock(t, types.Transactions{
 			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
@@ -968,18 +1111,13 @@ func TestStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval()):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced
 			default:
 				// don't expect the state to be available
-				want = testerr.As(func(got *trie.MissingNodeError) string {
-					if got.NodeHash != root {
-						return fmt.Sprintf("%T for hash %#x", got, root)
-					}
-					return ""
-				})
+				want = missingTrieNodeError(root)
 			}
 
 			_, err := e.StateDB(root)
@@ -1005,49 +1143,122 @@ func TestStateRootAvailability(t *testing.T) {
 	})
 }
 
-func TestArchivalStoresAll(t *testing.T) {
-	const commitInterval = 16
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.archival = true
-		c.commitInterval = commitInterval
-	}))
-	e, chain := sut.Executor, sut.chain
+// TestRecoveryStateAvailability checks that each configuration of the TrieDB
+// matches the expected state availability to avoid leaks and accurately
+// execute subsequent blocks.
+func TestRecoveryStateAvailability(t *testing.T) {
+	const (
+		commitInterval = 16
+		numBlocks      = commitInterval + 10
+	)
 
-	const numBlocks = commitInterval + 10
-	for range numBlocks {
-		b := chain.NewBlock(t, types.Transactions{
-			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+	tests := []struct {
+		name            string
+		scheme          string
+		archival        bool
+		expectAvailable func(height uint64) bool
+	}{
+		{
+			name:     "hash_archival",
+			scheme:   rawdb.HashScheme,
+			archival: true,
+			expectAvailable: func(height uint64) bool {
+				// All executed states MUST be available.
+				return height <= numBlocks
+			},
+		},
+		{
+			name:     "firewood_archival",
+			scheme:   customrawdb.FirewoodScheme,
+			archival: true,
+			expectAvailable: func(height uint64) bool {
+				// All settled states MUST be available.
+				// The last executed state MUST NOT be available, since
+				// Firewood guarantees recovery from the last committed proposal.
+				return height < numBlocks
+			},
+		},
+		{
+			name:     "firewood",
+			scheme:   customrawdb.FirewoodScheme,
+			archival: false,
+			expectAvailable: func(height uint64) bool {
+				// Only the last settled state should be available.
+				return height == numBlocks-1
+			},
+		},
+		{
+			name:     "hash",
+			scheme:   rawdb.HashScheme,
+			archival: false,
+			expectAvailable: func(height uint64) bool {
+				switch {
+				case saedb.ShouldCommitTrieDB(height+1, commitInterval):
+					// in this test, each block settles the previous
+					return true
+				case height == 0:
+					// genesis state
+					return true
+				default:
+					return false
+				}
+			},
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+				c.archival = tt.archival
+				c.commitInterval = commitInterval
+				c.dbScheme = tt.scheme
+			}))
+			e, chain := sut.Executor, sut.chain
 
-	final := chain.Last()
-	require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
+			for range numBlocks {
+				b := chain.NewBlock(t, types.Transactions{
+					sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+						To:       &common.Address{},
+						Gas:      params.TxGas,
+						GasPrice: big.NewInt(1),
+					}),
+				}, blockstest.WithEthBlockOptions(
+					blockstest.ModifyHeader(func(h *types.Header) {
+						h.Root = chain.Last().PostExecutionStateRoot() // settles previous block
+					}),
+				))
+				require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+			}
 
-	// Dereferencing doesn't do anything
-	for _, b := range chain.AllBlocks() {
-		e.Untrack(b.PostExecutionStateRoot())
-	}
-	require.NoErrorf(t, sut.Close(), "%T.Close()", e)
+			final := chain.Last()
+			require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
+			require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
 
-	t.Run("recover", func(t *testing.T) {
-		// Restart the chain to remove the TrieDB cache.
-		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, prometheus.NewRegistry())
-		require.NoError(t, err, "New()")
-		t.Cleanup(func() {
-			require.NoErrorf(t, e.Close(), "%T.Close()", e)
+			t.Run("recover", func(t *testing.T) {
+				// Restart the chain to remove the TrieDB cache.
+				src := blocks.Source(chain.GetBlock)
+				log := loggingtest.New(t, logging.Debug)
+				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
+				require.NoError(t, err, "saedb.NewTracker()")
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
+				require.NoError(t, err, "New()")
+				t.Cleanup(func() {
+					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+				})
+
+				for _, b := range chain.AllBlocks() {
+					var wantErr testerr.Want
+					root := b.PostExecutionStateRoot()
+					if !tt.expectAvailable(b.NumberU64()) {
+						wantErr = missingTrieNodeError(root)
+					}
+					_, err := e.StateDB(root)
+					if diff := testerr.Diff(err, wantErr); diff != "" {
+						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", e, b.NumberU64(), diff)
+					}
+				}
+			})
 		})
-
-		for _, b := range chain.AllBlocks() {
-			_, err := e.StateDB(b.PostExecutionStateRoot())
-			assert.NoErrorf(t, err, "%T.StateDB()", e)
-		}
-	})
+	}
 }
 
 // TestProcessBeaconBlockRoot verifies that block execution performs the
