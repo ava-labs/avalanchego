@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/heightindexdb/dbtest"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestInterface(t *testing.T) {
@@ -70,6 +73,38 @@ func TestSyncPersistence(t *testing.T) {
 	}
 }
 
+func TestOpenRejectsCheckpointPastPhysicalData(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithCheckpointInterval(1))
+	require.NoError(t, db.Put(0, []byte("first block")))
+	info, err := os.Stat(db.dataFilePath(0))
+	require.NoError(t, err)
+	firstEnd := info.Size()
+	require.NoError(t, db.Put(1, []byte("second block")))
+
+	// Simulate external data loss after the second checkpoint was persisted.
+	require.NoError(t, os.Truncate(db.dataFilePath(0), firstEnd))
+	require.NoError(t, db.Close())
+
+	_, err = New(db.config, logging.NoLog{})
+	require.ErrorIs(t, err, ErrCorrupted)
+}
+
+func TestSyncRetriesClosedCachedFile(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	block := []byte("block")
+	require.NoError(t, db.Put(0, block))
+
+	f, ok := db.fileCache.Get(0)
+	require.True(t, ok)
+	// Force Sync to reopen the cached data file after its handle is closed.
+	require.NoError(t, f.Close())
+
+	require.NoError(t, db.Sync(0, 0))
+	got, err := db.Get(0)
+	require.NoError(t, err)
+	require.Equal(t, block, got)
+}
+
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
@@ -80,11 +115,11 @@ func TestNew_Params(t *testing.T) {
 	}{
 		{
 			name:   "default config",
-			config: DefaultConfig().WithDir(tempDir),
+			config: DefaultConfig().WithDir(filepath.Join(tempDir, "default")),
 		},
 		{
 			name: "custom config",
-			config: DefaultConfig().WithDir(tempDir).
+			config: DefaultConfig().WithDir(filepath.Join(tempDir, "custom")).
 				WithMinimumHeight(100).
 				WithMaxDataFileSize(1024 * 1024). // 1MB
 				WithMaxDataFiles(50).
@@ -233,47 +268,75 @@ func TestIndexEntrySizePowerOfTwo(t *testing.T) {
 		"sizeOfIndexEntry (%d) is not a power of 2", sizeOfIndexEntry)
 }
 
-func TestNew_IndexFileConfigPrecedence(t *testing.T) {
-	// set up db
-	tempDir := t.TempDir()
-	initialConfig := DefaultConfig().WithDir(tempDir).WithMinimumHeight(100).WithMaxDataFileSize(1024 * 1024)
-	db, err := New(initialConfig, logging.NoLog{})
-	require.NoError(t, err)
-	require.NotNil(t, db)
+func TestNewIndexFileConfigMismatch(t *testing.T) {
+	const (
+		persistedMinimumHeight   = 100
+		persistedMaxDataFileSize = 1024 * 1024
+	)
+	tests := []struct {
+		name            string
+		minimumHeight   uint64
+		maxDataFileSize uint64
+	}{
+		{
+			name:            "minimum_height",
+			minimumHeight:   200,
+			maxDataFileSize: persistedMaxDataFileSize,
+		},
+		{
+			name:            "max_data_file_size",
+			minimumHeight:   persistedMinimumHeight,
+			maxDataFileSize: 512 * 1024,
+		},
+	}
 
-	// Write a block at height 100 and close db
-	testBlock := []byte("test block data")
-	require.NoError(t, db.Put(100, testBlock))
-	readBlock, err := db.Get(100)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			initConfig := DefaultConfig().
+				WithDir(tmpDir).
+				WithMinimumHeight(persistedMinimumHeight).
+				WithMaxDataFileSize(persistedMaxDataFileSize)
+			db, err := New(initConfig, logging.NoLog{})
+			require.NoError(t, err)
+			require.NoError(t, db.Close())
+
+			config := DefaultConfig().
+				WithDir(tmpDir).
+				WithMinimumHeight(tt.minimumHeight).
+				WithMaxDataFileSize(tt.maxDataFileSize)
+			_, err = New(config, logging.NoLog{})
+			require.ErrorIs(t, err, errConfigMismatch)
+		})
+	}
+}
+
+func TestMinimumHeightIndexOffset(t *testing.T) {
+	const minimumHeight = uint64(100)
+	dir := t.TempDir()
+	db, err := New(
+		DefaultConfig().WithDir(dir).WithMinimumHeight(minimumHeight),
+		logging.NoLog{},
+	)
 	require.NoError(t, err)
-	require.Equal(t, testBlock, readBlock)
+	require.NoError(t, db.Put(minimumHeight+1, []byte("block")))
 	require.NoError(t, db.Close())
 
-	// Reopen with different config that has minimum height of 200 and smaller max data file size
-	differentConfig := DefaultConfig().WithDir(tempDir).WithMinimumHeight(200).WithMaxDataFileSize(512 * 1024)
-	db2, err := New(differentConfig, logging.NoLog{})
+	info, err := os.Stat(filepath.Join(dir, indexFileName))
 	require.NoError(t, err)
-	require.NotNil(t, db2)
-	defer db2.Close()
+	require.Equal(t, int64(sizeOfIndexFileHeader+2*sizeOfIndexEntry), info.Size())
+}
 
-	// The database should still accept blocks between 100 and 200
-	testBlock2 := []byte("test block data 2")
-	require.NoError(t, db2.Put(150, testBlock2))
-	readBlock2, err := db2.Get(150)
+func TestGetRejectsUnrepresentableDataFileIndex(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithMaxDataFileSize(1))
+	indexOffset, err := db.indexEntryOffset(0)
 	require.NoError(t, err)
-	require.Equal(t, testBlock2, readBlock2)
+	require.NoError(t, db.writeIndexEntryAt(indexOffset, uint64(math.MaxInt)+1, 1))
+	db.maxBlockHeight.Store(0)
 
-	// Verify that writing below initial minimum height fails
-	err = db2.Put(50, []byte("invalid block"))
-	require.ErrorIs(t, err, ErrInvalidBlockHeight)
-
-	// Write a large block that would exceed the new config's 512KB limit
-	// but should succeed because we use the original 1MB limit from index file
-	largeBlock := make([]byte, 768*1024) // 768KB block
-	require.NoError(t, db2.Put(200, largeBlock))
-	readLargeBlock, err := db2.Get(200)
-	require.NoError(t, err)
-	require.Equal(t, largeBlock, readLargeBlock)
+	_, err = db.Get(0)
+	require.ErrorIs(t, err, ErrCorrupted)
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
 func TestFileCache_Eviction(t *testing.T) {
