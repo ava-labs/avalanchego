@@ -201,19 +201,7 @@ func decodeLeaf(key, val []byte) (leaf, error) {
 // commit inserts keys and values for a height to the [triedb.Database] and to
 // shared memory.
 func (s *Syncer) commit(b heightBatch) error {
-	keys := make([][]byte, 0, len(b.ops))
-	vals := make([][]byte, 0, len(b.ops))
-	for chainID, requests := range b.ops {
-		k := encodeTrieKey(b.height, chainID)
-		v, err := c.Marshal(codecVersion, requests)
-		if err != nil {
-			return fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
-		}
-		keys = append(keys, k)
-		vals = append(vals, v)
-	}
-
-	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, keys, vals)
+	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, b.height, b.ops)
 	if err != nil {
 		return fmt.Errorf("applying synced trie at height %d: %w", b.height, err)
 	}

@@ -147,11 +147,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err != nil {
 		return fmt.Errorf("merging atomic ops: %w", err)
 	}
-	keys, vals, err := toKeyValues(ops, height)
-	if err != nil {
-		return fmt.Errorf("converting atomic ops to key-values: %w", err)
-	}
-	newRoot, err := applyTrie(s.trieDB, s.currentRoot, keys, vals)
+	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
 	if err != nil {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
@@ -257,33 +253,14 @@ func decodeTrieKey(key []byte) (uint64, ids.ID) {
 	return binary.BigEndian.Uint64(key[:wrappers.LongLen]), ids.ID(key[wrappers.LongLen:])
 }
 
-func toKeyValues(ops map[ids.ID]*chainsatomic.Requests, height uint64) ([][]byte, [][]byte, error) {
-	keys := make([][]byte, 0, len(ops))
-	vals := make([][]byte, 0, len(ops))
-
-	for chainID, requests := range ops {
-		v, err := c.Marshal(codecVersion, requests)
-		if err != nil {
-			return nil, nil, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
-		}
-
-		keys = append(keys, encodeTrieKey(height, chainID))
-		vals = append(vals, v)
-	}
-	return keys, vals, nil
-}
-
 var errCleanTrieAfterUpdates = errors.New("clean trie after updates")
 
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
-func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, keys, vals [][]byte) (common.Hash, error) {
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
 	// Most blocks don't have atomic requests, so we avoid any unnecessary trie
 	// operations in that case.
-	if len(keys) != len(vals) {
-		return common.Hash{}, fmt.Errorf("keys and values length mismatch: %d vs %d", len(keys), len(vals))
-	}
-	if len(keys) == 0 {
+	if len(ops) == 0 {
 		return oldRoot, nil
 	}
 
@@ -294,11 +271,13 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, keys, vals [][]byte
 
 	// Since each map entry corresponds to a different entry in the trie, the
 	// trie root is order-independent.
-	for i, k := range keys {
-		if len(k) != keyLength {
-			return common.Hash{}, fmt.Errorf("unexpected key length %d, expected %d", len(k), keyLength)
+	for chainID, requests := range ops {
+		v, err := c.Marshal(codecVersion, requests)
+		if err != nil {
+			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
-		if err := tr.Update(k, vals[i]); err != nil {
+
+		if err := tr.Update(encodeTrieKey(height, chainID), v); err != nil {
 			return common.Hash{}, fmt.Errorf("inserting trie key: %w", err)
 		}
 	}
@@ -313,7 +292,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, keys, vals [][]byte
 	if nodes == nil {
 		return common.Hash{}, errCleanTrieAfterUpdates
 	}
-	if err := trieDB.Update(newRoot, oldRoot, 0 /*unused*/, trienode.NewWithNodeSet(nodes), nil); err != nil {
+	if err := trieDB.Update(newRoot, oldRoot, height, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
 	}
 
