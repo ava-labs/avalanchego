@@ -497,24 +497,27 @@ func main() {
 		syncHealth := validateMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
 		reportStateSyncDuration(tc, syncObservation, syncHealth)
 
-		// SimpleTestContext cleanup runs in registration order rather than LIFO,
-		// so the network-level cleanup may stop this ephemeral node before the
-		// bootstrap helper's cleanup runs. Clearing the URI avoids a best-effort
-		// metrics snapshot against an already-stopped node during cleanup.
-		bootstrapNode.URI = ""
-
 		switch {
 		case midChainTransition && stateSyncSupported:
-			partialNode := checkPartialBootstrap(tc, network, partialSeedDir, preTransitionHead, expectedSummaryHeight)
+			// The bootstrap node stays up to serve this scenario: the partial
+			// node is pinned to state sync from it alone, proving a node that
+			// initialized via state sync can serve a full state sync.
+			partialNode := checkPartialBootstrap(tc, network, bootstrapNode, partialSeedDir, preTransitionHead, expectedSummaryHeight)
 			partialClient := newWSClient(tc, []*tmpnet.Node{partialNode})
 			validatePostBootstrapState(tc, partialClient, snapshot, contracts)
-			// See the equivalent comment on bootstrapNode above.
+			// See the comment on bootstrapNode below.
 			partialNode.URI = ""
 		case midChainTransition:
 			tc.Log().Warn("skipping the partial-bootstrap scenario; the C-Chain cannot state sync the requested state scheme",
 				zap.String("stateScheme", stateScheme),
 			)
 		}
+
+		// SimpleTestContext cleanup runs in registration order rather than LIFO,
+		// so the network-level cleanup may stop this ephemeral node before the
+		// bootstrap helper's cleanup runs. Clearing the URI avoids a best-effort
+		// metrics snapshot against an already-stopped node during cleanup.
+		bootstrapNode.URI = ""
 	}
 }
 
@@ -1124,7 +1127,7 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*t
 		config.HealthCheckFreqKey: defaultBootstrapHealthCheckFreq.String(),
 	}
 
-	chainConfigContent, err := newBootstrapChainConfigContent(network)
+	chainConfigContent, err := newBootstrapChainConfigContent(network, nil)
 	require.NoError(err)
 	flags[config.ChainConfigContentKey] = chainConfigContent
 
@@ -1157,15 +1160,35 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*t
 // and no transition marker — a node that bootstrapped partway on coreth and
 // went offline across the transition — and validates that it eagerly
 // transitions and state syncs instead of resuming execution.
+//
+// The node is pinned to state sync exclusively from sourceNode, the fresh
+// bootstrap node that itself initialized via state sync, which proves a
+// state-synced node can serve a full state sync. The pinning needs two layers,
+// because summaries and sync data travel over different planes:
+//   - the state-sync-ids/state-sync-ips node flags replace the snowman
+//     syncer's summary beacons (snow/engine/snowman/syncer/config.go), so the
+//     summary frontier and its acceptance vote come from sourceNode alone —
+//     a non-validator is fine because the node manually tracks the given IP;
+//   - the state-sync-ids C-Chain config key restricts the data plane — the
+//     SAE C-Chain limits its sync PeerTracker to the listed peers
+//     (vms/saevm/cchain/config.go), and coreth pins its sync client the same
+//     way — so the leafs, code, and block requests hit sourceNode alone.
+//
+// The validators stay up on their executed state: they no longer serve any
+// part of the sync, but the post-sync snowman bootstrapping and consensus
+// still need them.
 func checkPartialBootstrap(
 	tc tests.TestContext,
 	network *tmpnet.Network,
+	sourceNode *tmpnet.Node,
 	seedDir string,
 	preTransitionHead uint64,
 	expectedSummaryHeight uint64,
 ) *tmpnet.Node {
 	require := require.New(tc)
-	tc.By("checking that a partially-bootstrapped pre-transition node state syncs after the transition")
+	tc.By("checking that a partially-bootstrapped pre-transition node state syncs from the state-synced bootstrap node after the transition")
+
+	require.NotZero(sourceNode.StakingAddress, "state sync source node %s has no staking address", sourceNode.NodeID)
 
 	subnetIDs := make([]string, len(network.Subnets))
 	for i, subnet := range network.Subnets {
@@ -1174,8 +1197,12 @@ func checkPartialBootstrap(
 	flags := tmpnet.FlagsMap{
 		config.TrackSubnetsKey:    strings.Join(subnetIDs, ","),
 		config.HealthCheckFreqKey: defaultBootstrapHealthCheckFreq.String(),
+		config.StateSyncIDsKey:    sourceNode.NodeID.String(),
+		config.StateSyncIPsKey:    sourceNode.StakingAddress.String(),
 	}
-	chainConfigContent, err := newBootstrapChainConfigContent(network)
+	chainConfigContent, err := newBootstrapChainConfigContent(network, tmpnet.ConfigMap{
+		"state-sync-ids": []ids.NodeID{sourceNode.NodeID},
+	})
 	require.NoError(err)
 	flags[config.ChainConfigContentKey] = chainConfigContent
 
@@ -1247,7 +1274,10 @@ func awaitBootstrapNode(tc tests.TestContext, node *tmpnet.Node, nodeStartedAt t
 	}
 }
 
-func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
+// newBootstrapChainConfigContent renders the chain config content for a
+// bootstrapping node. extraCChainConfig entries, if any, are applied to the
+// C-Chain config last, so they win over the shared configuration.
+func newBootstrapChainConfigContent(network *tmpnet.Network, extraCChainConfig tmpnet.ConfigMap) (string, error) {
 	chainConfigs := map[string]chains.ChainConfig{}
 	for alias, flags := range network.PrimaryChainConfigs {
 		nodeFlags := maps.Clone(flags)
@@ -1271,6 +1301,7 @@ func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
 				})
 			}
 			maps.Copy(nodeFlags, schemeConfig.chainConfig)
+			maps.Copy(nodeFlags, extraCChainConfig)
 		}
 		marshaledFlags, err := json.Marshal(nodeFlags)
 		if err != nil {

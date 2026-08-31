@@ -305,7 +305,28 @@ against the transitioned network:
 2. a node seeded with pre-transition shared state and no transition marker —
    captured from the generation node during the coreth era — started with
    `state-sync-enabled: true`, which must also transition eagerly and sync a
-   summary above its pre-transition head instead of resuming execution.
+   summary above its pre-transition head instead of resuming execution. This
+   node is pinned to state sync **exclusively from the first scenario's node**,
+   which stays up to serve it, so the final scenario additionally proves a node
+   that initialized via state sync can serve a full state sync.
+
+The pinning needs two layers, because summaries and sync data travel over
+different planes:
+
+- the `state-sync-ids`/`state-sync-ips` **node flags** replace the snowman
+  syncer's summary beacons (`snow/engine/snowman/syncer/config.go`), so the
+  summary frontier and its acceptance vote come from the state-synced node
+  alone; a non-validator works because the node manually tracks the given IP
+- the `state-sync-ids` **C-Chain config key** restricts the data plane: the SAE
+  C-Chain limits its sync `PeerTracker` to the listed peers
+  (`vms/saevm/cchain/config.go`), and coreth pins its sync client the same way,
+  so the leafs, code, and block requests hit the state-synced node alone
+
+The validators stay up on their executed state throughout: they no longer serve
+any part of the second sync, but the post-sync snowman bootstrapping and
+consensus still need them. Sync chain: the generation node executes → the fresh
+node state syncs from the validators → the partial node state syncs from the
+fresh node only.
 
 Phase order: start the generation node with Helicon at now+Δ → issue
 transfers so pre-transition blocks exist → stop the node, copy `db/` +
@@ -314,7 +335,8 @@ C-Chain reports the SAE VM's health details (coreth reports none), issuing
 the forcing transfers over HTTP and not waiting on their receipts, since
 transitionvm's API drain cannot protect a long-lived WebSocket connection
 across the transition → run the normal workload, serving restart, and
-summary refresh → validate both bootstrap scenarios.
+summary refresh → validate both bootstrap scenarios, the second syncing
+solely from the first scenario's still-running node.
 
 Δ must cover node startup plus the coreth-era transfers and seed capture;
 the harness fails with "increase --activate-latest-after" if the node
