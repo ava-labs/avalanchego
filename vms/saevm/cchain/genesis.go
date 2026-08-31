@@ -146,6 +146,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
+	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+		return corethparams.TestFixtureBerlinBlock
 	default:
 		return 0
 	}
@@ -157,6 +159,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
+	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+		return corethparams.TestFixtureLondonBlock
 	default:
 		return 0
 	}
@@ -167,19 +171,18 @@ var (
 	errNoHeadHeader        = errors.New("no head header")
 )
 
-// setup configures the database with genesis.
+// verifyAndWriteBlock verifies that the genesis is compatible with any
+// previously stored genesis state by checking the genesis block hash along with
+// the rules used to execute the head block.
 //
-// It verifies that the genesis is compatible with any previously setup genesis
-// state by checking the genesis block hash along with the rules used to execute
-// the head block.
-func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+// Once the chain is ready to be initialized, one must call
+// [genesis.setupTrieDB] to ensure the genesis state is available.
+func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	block, err := g.block()
 	if err != nil {
 		return fmt.Errorf("constructing genesis block: %w", err)
 	}
 
-	// We can't exit early here. Even if the genesis block is on disk, the
-	// genesis state might not be.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
@@ -194,39 +197,25 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr er
 
 	// If the rules change for the head block, it may have been executed
 	// incorrectly.
-	{
-		prev := rawdb.ReadChainConfig(db, hash)
-		if prev == nil {
-			return errNoStoredChainConfig
-		}
-		head := rawdb.ReadHeadHeader(db)
-		if head == nil {
-			return errNoHeadHeader
-		}
-		height, timestamp := head.Number.Uint64(), head.Time
-		// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-		// that bypasses this compatibility check; we need to make such a check
-		// unnecessary for the c-chain.
-		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
-			return fmt.Errorf("incompatible chain config: %w", err)
-		}
-		// We will be executing new blocks based on the new chain config, so we
-		// need to keep it up-to-date in the database for the next restart.
-		rawdb.WriteChainConfig(db, hash, g.Config)
+	prev := rawdb.ReadChainConfig(db, hash)
+	if prev == nil {
+		return errNoStoredChainConfig
 	}
-
-	tdb := triedb.NewDatabase(db, trieConfig)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
-
-	// Because some trie implementations prune old state, we need to defer to
-	// the trie to determine if the genesis was previously initialized.
-	if !tdb.Initialized(block.Root()) {
-		if _, err := g.writeState(db, tdb); err != nil {
-			return fmt.Errorf("writing genesis state: %w", err)
-		}
+	head := rawdb.ReadHeadHeader(db)
+	if head == nil {
+		return errNoHeadHeader
 	}
+	height, timestamp := head.Number.Uint64(), head.Time
+	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
+	// that bypasses this compatibility check; we need to make such a check
+	// unnecessary for the c-chain.
+	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
+		return fmt.Errorf("incompatible chain config: %w", err)
+	}
+	// We will be executing new blocks based on the new chain config, so we
+	// need to keep it up-to-date in the database for the next restart.
+	rawdb.WriteChainConfig(db, hash, g.Config)
+
 	return nil
 }
 
@@ -303,8 +292,10 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 
-		// The genesis block is synchronous and thus self-settling, so its settlement
-		// markers are never read.
+		// The genesis block is synchronous, so the markers must be zero to
+		// conform with [hook.Synchronous]. Most synchronous blocks omit these
+		// fields entirely. Genesis needs to include them with values that mark
+		// it as synchronous to allow future upgrade fields to be included.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)
@@ -327,6 +318,36 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 	return g.writeState(db, tdb)
+}
+
+// activatePrecompile marks the precompile's account as non-empty by setting
+// the nonce and code so it is not pruned as an empty account during state
+// finalization (EIP-161) and so it appears as a contract to EVM code
+// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
+func activatePrecompile(statedb *state.StateDB, addr common.Address) {
+	statedb.SetNonce(addr, 1)
+	statedb.SetCode(addr, []byte{0x01})
+}
+
+// setupTrieDB commits the genesis allocation to the state database if
+// it is not already present.
+func (g *genesis) setupTrieDB(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+	root, err := g.root()
+	if err != nil {
+		return fmt.Errorf("computing genesis root: %w", err)
+	}
+
+	tdb := triedb.NewDatabase(db, trieConfig)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
+	if tdb.Initialized(root) {
+		return nil
+	}
+
+	_, err = g.writeState(db, tdb)
+	return err
 }
 
 // writeState commits the genesis allocation to the state database and returns
@@ -353,18 +374,8 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
-	//
-	// When a precompile is activated, its account is marked as non-empty by
-	// setting the nonce and code so it is not pruned as an empty account during
-	// state finalization (EIP-161) and so it appears as a contract to EVM code
-	// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
-	const (
-		precompileNonce = 1
-		precompileCode  = "\x01"
-	)
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
-		statedb.SetNonce(warp.ContractAddress, precompileNonce)
-		statedb.SetCode(warp.ContractAddress, []byte(precompileCode))
+		activatePrecompile(statedb, warp.ContractAddress)
 	}
 
 	const deleteEmptyObjects = true

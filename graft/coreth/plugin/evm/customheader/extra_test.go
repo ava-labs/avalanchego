@@ -608,6 +608,22 @@ func TestVerifyExtra(t *testing.T) {
 			extra:    make([]byte, acp176.StateSize-1),
 			expected: errInvalidExtraLength,
 		},
+		{
+			name: "helicon_empty_valid",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:    nil,
+			expected: nil,
+		},
+		{
+			name: "helicon_non_empty_valid",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:    make([]byte, 1),
+			expected: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -678,6 +694,22 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 			extra: []byte{
 				acp176.StateSize: 5,
 			},
+			expected: []byte{5},
+		},
+		{
+			name: "helicon_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:    nil,
+			expected: nil,
+		},
+		{
+			name: "helicon_non_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:    []byte{5},
 			expected: []byte{5},
 		},
 	}
@@ -751,6 +783,24 @@ func TestSetPredicateBytesInExtra(t *testing.T) {
 			want: []byte{
 				acp176.StateSize: 2,
 			},
+		},
+		{
+			name: "extra_truncated_helicon",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:     []byte{1, 1},
+			predicate: []byte{2},
+			want:      []byte{2},
+		},
+		{
+			name: "extra_overwritten_helicon",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra:     []byte{1},
+			predicate: []byte{2, 2},
+			want:      []byte{2, 2},
 		},
 	}
 	for _, test := range tests {

@@ -51,12 +51,16 @@ go_library(
         "@com_github_ava_labs_libevm//eth",
         "@com_github_ava_labs_libevm//eth/filters",
         "@com_github_ava_labs_libevm//eth/tracers",
+        "@com_github_ava_labs_libevm//eth/tracers/js",
+        "@com_github_ava_labs_libevm//eth/tracers/native",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm/debug",
         "@com_github_ava_labs_libevm//libevm/ethapi",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//rpc",
+        "@org_uber_go_zap//:zap",
     ],
 )
 

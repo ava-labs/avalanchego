@@ -66,35 +66,30 @@ func New(
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
-	saedbConfig saedb.Config,
+	tracker *saedb.Tracker,
 	hooks hook.Points,
-	log logging.Logger,
+	logger logging.Logger,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
-	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
+	m, err := newMetrics(reg, lastExecuted)
 	if err != nil {
-		return nil, err
-	}
-
-	m, err := newMetrics(reg, lastExecuted.Height())
-	if err != nil {
-		return nil, fmt.Errorf("registering saexec metrics: %w", err)
+		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
-		Tracker: t,
+		Tracker: tracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
-		log:     log,
+		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan queuedBlock, 2*saedbConfig.CommitInterval()),
+		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
-			log,
+			logger,
 		},
 		chainConfig: chainConfig,
 		db:          db,

@@ -71,6 +71,12 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
+// ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
+// implementation of core for message or transaction execution.
+func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
+}
+
 // AccessListGas computes the intrinsic gas for an access list.
 // When predicaters exist, it calculates gas per-tuple, delegating to predicate
 // contracts for addresses that have them. Otherwise, it returns override=false

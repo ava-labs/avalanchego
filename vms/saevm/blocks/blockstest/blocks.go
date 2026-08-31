@@ -47,9 +47,10 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
+		settled: hook.Settled{Height: 1},
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, hook.Settled{})
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
@@ -58,6 +59,15 @@ type ethBlockProperties struct {
 	header   *types.Header
 	receipts types.Receipts
 	ops      []hookstest.Op
+	settled  hook.Settled
+}
+
+// WithSettled overrides the settlement information committed by [NewEthBlock].
+// The zero value makes the block synchronous (pre-SAE).
+func WithSettled(s hook.Settled) EthBlockOption {
+	return options.Func[ethBlockProperties](func(p *ethBlockProperties) {
+		p.settled = s
+	})
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -92,18 +102,26 @@ type BlockOption = options.Option[blockProperties]
 func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 
-	props := options.ApplyTo(&blockProperties{}, opts...)
-	if props.logger == nil {
-		props.logger = loggingtest.New(tb, logging.Warn)
-	}
+	props := options.ApplyTo(&blockProperties{
+		logger: loggingtest.New(tb, logging.Warn),
+		hooks:  hookstest.NewStub(0),
+	}, opts...)
 
-	b, err := blocks.New(eth, parent, lastSettled, props.logger)
+	b, err := blocks.New(eth, parent, lastSettled, props.hooks, props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }
 
 type blockProperties struct {
+	hooks  hook.Points
 	logger logging.Logger
+}
+
+// WithHooks overrides the hooks passed to [blocks.New] by [NewBlock].
+func WithHooks(h hook.Points) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.hooks = h
+	})
 }
 
 // WithLogger overrides the logger passed to [blocks.New] by [NewBlock].
@@ -133,6 +151,11 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 	}
 
 	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	defer func() {
+		// Close the trie database to prevent memory leak and guarantee all
+		// state changes are flushed to disk.
+		require.NoErrorf(tb, tdb.Close(), "%T.Close()", tdb)
+	}()
 	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
 

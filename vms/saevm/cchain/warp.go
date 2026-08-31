@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -42,6 +43,7 @@ func (w *warpBackend) IsAccepted(ctx context.Context, blkID ids.ID) error {
 
 func registerWarpHandler(
 	vm *sae.VM,
+	network *network.Network,
 	storage *cchainwarp.Storage,
 	signer avalanchewarp.Signer,
 ) error {
@@ -51,5 +53,5 @@ func registerWarpHandler(
 		cchainwarp.NewVerifier(&warpBackend{vm}, storage),
 		signer,
 	)
-	return vm.AddHandler(acp118.HandlerID, handler)
+	return network.AddHandler(acp118.HandlerID, handler)
 }

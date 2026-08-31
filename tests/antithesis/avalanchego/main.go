@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
@@ -88,7 +89,8 @@ func main() {
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
-	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: c.URIs[0]})
+	setupURI := c.URIs[0]
+	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: setupURI})
 	tc.Log().Info("synced wallet",
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
 	)
@@ -169,15 +171,46 @@ func main() {
 		workloads[i] = worker
 	}
 
+	upgrades, err := info.NewClient(setupURI).Upgrades(ctx)
+	require.NoError(err, "failed to fetch the upgrade schedule")
+	timeUntilHelicon := time.Until(upgrades.HeliconTime)
+	assert.Always(
+		timeUntilHelicon > 0,
+		"Helicon activates after worker initialization",
+		map[string]any{
+			"heliconTime":      upgrades.HeliconTime,
+			"timeUntilHelicon": timeUntilHelicon.String(),
+		},
+	)
+
 	lifecycle.SetupComplete(map[string]any{
-		"msg":        "initialized workers",
-		"numWorkers": NumKeys,
+		"msg":              "initialized workers",
+		"numWorkers":       NumKeys,
+		"timeUntilHelicon": timeUntilHelicon.String(),
 	})
+
+	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
+}
+
+// awaitHeliconActivation reports that Helicon activated. Nothing is reported if
+// ctx is canceled first, failing the reachability assertion for runs that end
+// before the activation.
+func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
+	timer := time.NewTimer(time.Until(heliconTime))
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		assert.Reachable("Helicon activating", map[string]any{
+			"heliconTime": heliconTime,
+		})
+	case <-ctx.Done():
+	}
 }
 
 type workload struct {

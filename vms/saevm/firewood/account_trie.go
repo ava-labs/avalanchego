@@ -4,12 +4,14 @@
 package firewood
 
 import (
+	"errors"
 	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"go.uber.org/zap"
 )
@@ -42,9 +44,13 @@ type accountTrie struct {
 
 func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
 	reader, err := db.Firewood.Revision(ffi.Hash(root))
-	if err != nil {
+	switch {
+	case errors.Is(err, ffi.ErrRevisionNotFound):
+		return nil, &trie.MissingNodeError{NodeHash: root}
+	case err != nil:
 		return nil, err
 	}
+
 	return &accountTrie{
 		baseTrie:   &baseTrie{reader: reader, updateOps: currentOps},
 		parentRoot: root,
