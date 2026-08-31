@@ -65,7 +65,6 @@ go_test(
         "//graft/coreth/plugin/evm/atomic/state",
         "//graft/coreth/plugin/evm/customtypes",
         "//ids",
-        "//network/p2p",
         "//snow/snowtest",
         "//utils/constants",
         "//utils/logging",

@@ -4,63 +4,51 @@
 package state
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
-// syncServer serves a source state's atomic trie to an in-memory p2p peer.
-type syncServer struct {
-	net     *p2p.Network
-	tracker *p2p.PeerTracker
-}
-
-func newSyncServer(t *testing.T, src *State) *syncServer {
-	t.Helper()
+func sync(t *testing.T, srcSUT, dstSUT *SUT) error {
+	src := srcSUT.stateImpl.(*State)
+	dst := dstSUT.stateImpl.(*State)
 
 	net, tracker := synctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
 	require.NoError(t, RegisterSyncHandler(net, src), "RegisterSyncHandler()")
-	return &syncServer{net: net, tracker: tracker}
+
+	syncer := NewSyncer(net, tracker, dst, src.currentRoot, src.CurrentHeight())
+	return syncer.Sync(t.Context())
 }
 
-// syncInto runs a syncer that pulls the served trie into dst.
-func (s *syncServer) syncInto(ctx context.Context, dst *State, target common.Hash, targetHeight uint64) error {
-	syncer := NewSyncer(s.net, s.tracker, dst, target, targetHeight)
-	return syncer.Sync(ctx)
-}
-
-func checkStatesMatch(t *testing.T, srcSUT, dstSUT *SUT, blocks ...block) {
+func checkStatesMatch(t *testing.T, wantSUT, gotSUT *SUT, blocks ...block) {
 	t.Helper()
 
 	var (
-		src = srcSUT.stateImpl.(*State)
-		dst = dstSUT.stateImpl.(*State)
+		want = wantSUT.stateImpl.(*State)
+		got  = gotSUT.stateImpl.(*State)
 	)
 
-	require.Equal(t, src.CurrentHeight(), dst.CurrentHeight(), "CurrentHeight()")
-	require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
-	require.Equal(t, src.currentRoot, dst.currentRoot, "current merkle root")
+	require.Equal(t, want.CurrentHeight(), got.CurrentHeight(), "CurrentHeight()")
+	require.Equal(t, dbEntries(t, wantSUT.sharedMemoryDB), dbEntries(t, gotSUT.sharedMemoryDB), "shared memory")
+	require.Equal(t, want.currentRoot, got.currentRoot, "current merkle root")
 
 	for _, b := range blocks {
 		if len(b.txs) == 0 {
 			// If the block has no transactions, the root is constant.
 			continue
 		}
-		wantRoot, err := src.GetRoot(b.height)
-		require.NoError(t, err, "src.GetRoot(%d)", b.height)
-		gotRoot, err := dst.GetRoot(b.height)
-		require.NoError(t, err, "dst.GetRoot(%d)", b.height)
+		wantRoot, err := want.GetRoot(b.height)
+		require.NoError(t, err, "want.GetRoot(%d)", b.height)
+		gotRoot, err := got.GetRoot(b.height)
+		require.NoError(t, err, "got.GetRoot(%d)", b.height)
 		require.Equal(t, wantRoot, gotRoot, "root at height %d", b.height)
 	}
 }
@@ -80,19 +68,16 @@ func TestSyncer_BonusBlock(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		networkID  uint32
-		wantBlocks []block // expected in shared memory
+		name      string
+		networkID uint32
 	}{
 		{
-			name:       "mainnet_skips_bonus",
-			networkID:  constants.MainnetID,
-			wantBlocks: blocks[:1],
+			name:      "mainnet_skips_bonus",
+			networkID: constants.MainnetID,
 		},
 		{
-			name:       "non_mainnet_applies_bonus",
-			networkID:  constants.FujiID,
-			wantBlocks: blocks,
+			name:      "non_mainnet_applies_bonus",
+			networkID: constants.FujiID,
 		},
 	}
 
@@ -100,14 +85,9 @@ func TestSyncer_BonusBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			srcSUT := newSUT(t, withNetworkID(test.networkID))
 			srcSUT.apply(t, blocks...)
-			src := srcSUT.stateImpl.(*State)
-
-			server := newSyncServer(t, src)
 
 			dstSUT := newSUT(t, withNetworkID(test.networkID))
-			dst := dstSUT.stateImpl.(*State)
-			require.NoError(t, server.syncInto(t.Context(), dst, src.currentRoot, src.CurrentHeight()), "Sync()")
-
+			require.NoError(t, sync(t, srcSUT, dstSUT), "sync()")
 			checkStatesMatch(t, srcSUT, dstSUT, blocks...)
 		})
 	}
@@ -169,20 +149,13 @@ func FuzzSyncer(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		blocks := blocksFromBytes(data)
-		srcSUT := newSUT(t)
-		srcSUT.apply(t, blocks...)
-		src := srcSUT.stateImpl.(*State)
 
-		target := src.currentRoot
-		targetHeight := src.CurrentHeight()
+		src := newSUT(t)
+		src.apply(t, blocks...)
 
-		server := newSyncServer(t, src)
-
-		dstSUT := newSUT(t)
-		dst := dstSUT.stateImpl.(*State)
-		require.NoError(t, server.syncInto(t.Context(), dst, target, targetHeight), "Sync()")
-
-		checkStatesMatch(t, srcSUT, dstSUT, blocks...)
+		dst := newSUT(t)
+		require.NoError(t, sync(t, src, dst), "sync()")
+		checkStatesMatch(t, src, dst, blocks...)
 	})
 }
 
@@ -195,34 +168,30 @@ func TestSyncer_Crash(t *testing.T) {
 		{height: 5, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	srcSUT := newSUT(t)
-	srcSUT.apply(t, blocks...)
-	src := srcSUT.stateImpl.(*State)
-	target := src.currentRoot
-	targetHeight := src.CurrentHeight()
-
-	server := newSyncServer(t, src)
+	src := newSUT(t)
+	src.apply(t, blocks...)
 
 	wantDB := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-	require.NoError(t, server.syncInto(t.Context(), newSUT(t, withDB(wantDB)).stateImpl.(*State), target, targetHeight))
+	require.NoError(t, sync(t, src, newSUT(t, withDB(wantDB))), "sync()")
 
 	for failAfter := range wantDB.Calls() {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			db := memdb.New()
 
 			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
-			err := server.syncInto(t.Context(), preCrash.stateImpl.(*State), target, targetHeight)
-			require.ErrorIs(t, err, saetest.ErrInjected, "Sync()")
+			err := sync(t, src, preCrash)
+			require.ErrorIs(t, err, saetest.ErrInjected, "sync()")
 
 			// Clean re-run on the same DB must complete and match the source.
 			got := newSUT(t, withDB(db))
-			require.NoError(t, server.syncInto(t.Context(), got.stateImpl.(*State), target, targetHeight), "re-run Sync()")
-
-			checkStatesMatch(t, srcSUT, got, blocks...)
+			require.NoError(t, sync(t, src, got), "re-run sync()")
+			checkStatesMatch(t, src, got, blocks...)
 		})
 	}
 }
 
+// TestSyncer_Stale tries to state sync to an older stae, and verifies no
+// changes to the [State] are made.
 func TestSyncer_Stale(t *testing.T) {
 	var build builder
 	blocks := []block{
@@ -232,20 +201,18 @@ func TestSyncer_Stale(t *testing.T) {
 		{height: 5, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	db := memdb.New()
-	srcSUT := newSUT(t, withDB(db))
-	srcSUT.apply(t, blocks...)
-	src := srcSUT.stateImpl.(*State)
+	// staleSUT is a block behind for [sync] to use an old height.
+	staleSUT := newSUT(t)
+	staleHeight := len(blocks) - 2
+	staleSUT.apply(t, blocks[:staleHeight]...)
 
-	const targetHeight = 4
-	target, err := src.GetRoot(targetHeight)
-	require.NoErrorf(t, err, "src.GetRoot(%d)", targetHeight)
+	want := newSUT(t)
+	want.apply(t, blocks...)
 
-	server := newSyncServer(t, src)
+	got := newSUT(t)
+	got.apply(t, blocks...)
+	require.NoError(t, sync(t, staleSUT, got), "sync()")
 
 	// Syncing to earlier state shouldn't corrupt
-	dstSUT := newSUT(t, withDB(saetest.CopyDB(t, db)))
-	dst := dstSUT.stateImpl.(*State)
-	require.NoError(t, server.syncInto(t.Context(), dst, target, targetHeight), "Sync()")
-	checkStatesMatch(t, srcSUT, dstSUT, blocks...)
+	checkStatesMatch(t, want, got, blocks...)
 }
