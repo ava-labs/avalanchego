@@ -92,8 +92,10 @@ func StandardTx(
 		}
 	}
 	standardExecutor := standardTxExecutor{
-		backend:       backend,
-		feeCalculator: feeCalculator,
+		backend: backend,
+		// Warp credentials cost an aggregate BLS check that the unsigned tx
+		// does not price; charge for them on top.
+		feeCalculator: fee.WithCredentials(feeCalculator, tx.Creds),
 		tx:            tx,
 		state:         state,
 	}

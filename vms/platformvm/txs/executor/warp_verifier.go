@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -40,9 +41,12 @@ func VerifyWarpMessages(
 	if err := tx.Unsigned.Visit(w); err != nil {
 		return err
 	}
+	// One message usually backs every credential of a tx; verify each
+	// distinct message once.
+	verified := set.Set[string]{}
 	for _, cred := range tx.Creds {
 		warpCred, ok := cred.(*secp256k1fx.WarpCredential)
-		if !ok {
+		if !ok || verified.Contains(string(warpCred.Message)) {
 			continue
 		}
 		msg, err := warp.ParseMessage(warpCred.Message)
@@ -55,6 +59,7 @@ func VerifyWarpMessages(
 		if err := w.verify(warpCred.Message); err != nil {
 			return err
 		}
+		verified.Add(string(warpCred.Message))
 	}
 	return nil
 }

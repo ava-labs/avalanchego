@@ -99,9 +99,6 @@ a pinned fee still allows dust splitting.
 - SAE's `tx.Credential` is now any `verify.Verifiable`, so the codec parses
   misplaced inputs or outputs as credentials (rejected at verification);
   the P-chain has the same looseness.
-- Warp credentials are fee-priced as one secp signature on the P-chain but
-  cost a BLS aggregation each; charge `WarpComplexity` and verify each
-  distinct message once.
 - `warp-helper-addresses` is consensus-critical yet lives in node config on
   both chains; make it a per-network constant.
 

@@ -516,6 +516,29 @@ func WarpComplexity(message []byte) (gas.Dimensions, error) {
 	}, nil
 }
 
+// CredentialComplexity returns the complexity credentials add beyond the
+// per-signature charge that [InputComplexity] and [AuthComplexity] already
+// include: each warp credential carries a signed message whose bandwidth and
+// aggregate BLS verification the unsigned tx does not account for.
+func CredentialComplexity(creds ...verify.Verifiable) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, cred := range creds {
+		warpCred, ok := cred.(*secp256k1fx.WarpCredential)
+		if !ok {
+			continue
+		}
+		warpComplexity, err := WarpComplexity(warpCred.Message)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+		complexity, err = complexity.Add(&warpComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
 type complexityVisitor struct {
 	output gas.Dimensions
 }
