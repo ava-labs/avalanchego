@@ -5,6 +5,7 @@ package state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -20,30 +22,40 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
-// runSyncRoundTrip applies blocks to a source state, then leaf-syncs the
-// resulting atomic trie into a fresh destination state over an in-memory p2p
-// network and asserts the destination trie and shared memory match.
+// syncBlocks applies blocks to a source SUT, then leaf-syncs the resulting
+// atomic trie into a fresh destination SUT over an in-memory p2p network, and
+// returns both.
+func syncBlocks(t *testing.T, blocks []block) (src, dst *SUT) {
+	t.Helper()
+
+	src = newSUT(t)
+	src.apply(t, blocks...)
+	srcState := src.stateImpl.(*State)
+
+	server := newSyncServer(t, srcState)
+
+	dst = newSUT(t)
+	require.NoError(t,
+		server.syncInto(t.Context(), dst.stateImpl.(*State), srcState.currentRoot, srcState.CurrentHeight()),
+		"Sync()",
+	)
+	return src, dst
+}
+
+// runSyncRoundTrip leaf-syncs blocks into a fresh state and asserts the
+// destination trie and shared memory match at the target height.
 func runSyncRoundTrip(t *testing.T, blocks []block) {
 	t.Helper()
 
-	srcSUT := newSUT(t)
-	srcSUT.apply(t, blocks...)
-	src := srcSUT.stateImpl.(*State)
-
-	target := src.currentRoot
+	src, dst := syncBlocks(t, blocks)
+	target := src.stateImpl.(*State).currentRoot
 	targetHeight := src.CurrentHeight()
-
-	server := newSyncServer(t, src)
-
-	dstSUT := newSUT(t)
-	dst := dstSUT.stateImpl.(*State)
-	require.NoError(t, server.syncInto(t.Context(), dst, target, targetHeight), "Sync()")
 
 	require.Equal(t, targetHeight, dst.CurrentHeight(), "CurrentHeight()")
 	gotRoot, err := dst.GetRoot(targetHeight)
 	require.NoErrorf(t, err, "GetRoot(%d)", targetHeight)
 	require.Equal(t, target, gotRoot, "GetRoot(%d)", targetHeight)
-	require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
+	require.Equal(t, dbEntries(t, src.sharedMemoryDB), dbEntries(t, dst.sharedMemoryDB), "shared memory")
 }
 
 // syncServer serves a source state's atomic trie to an in-memory p2p peer.
@@ -93,6 +105,118 @@ func TestSyncer_RoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runSyncRoundTrip(t, tt.blocks)
+		})
+	}
+}
+
+// TestSyncer_RootIndexIsSparse characterizes a known asymmetry between a
+// leaf-synced node and one that executed every block. The synced node's atomic
+// trie and shared memory are complete and identical to the executed node's — but
+// its height->root index (rootKey) is written only for heights that carried
+// atomic txs, plus the target height. State.Apply, by contrast, records a marker
+// for every height (op-free ones included, where newRoot == oldRoot), so op-free
+// interior heights have no marker on a synced node.
+//
+// This is not a state-correctness bug: nothing on the block verify/accept path
+// reads GetRoot. Its only consumer is statesync.SummaryHandler, and the impact
+// is a transient, self-healing degradation of a freshly-synced node's ability to
+// SERVE summaries — exercised end to end by
+// TestGetLastStateSummary_FreshlySyncedNodeServingWindow in the statesync
+// package. This test pins the exact shape of the index so that changing it (e.g.
+// writing markers densely) is a deliberate, visible decision.
+//
+// All scenarios apply every height in [1, tip] (some with no txs) so the
+// executed source has a dense index; only the synced destination is sparse.
+func TestSyncer_RootIndexIsSparse(t *testing.T) {
+	var build builder
+	tests := []struct {
+		name        string
+		blocks      []block
+		wantMissing []uint64 // heights the synced node fails to serve, today
+	}{
+		{
+			name: "single_gap",
+			blocks: []block{
+				{height: 1, txs: []*tx.Tx{build.newExport()}},
+				{height: 2, txs: nil},
+				{height: 3, txs: []*tx.Tx{build.newImport()}},
+			},
+			wantMissing: []uint64{2},
+		},
+		{
+			name: "consecutive_gaps",
+			blocks: []block{
+				{height: 1, txs: []*tx.Tx{build.newImport()}},
+				{height: 2, txs: nil},
+				{height: 3, txs: nil},
+				{height: 4, txs: nil},
+				{height: 5, txs: []*tx.Tx{build.newExport()}},
+			},
+			wantMissing: []uint64{2, 3, 4},
+		},
+		{
+			name: "interleaved_gaps",
+			blocks: []block{
+				{height: 1, txs: []*tx.Tx{build.newExport()}},
+				{height: 2, txs: nil},
+				{height: 3, txs: nil},
+				{height: 4, txs: []*tx.Tx{build.newImport()}},
+				{height: 5, txs: []*tx.Tx{build.newExport()}},
+				{height: 6, txs: nil},
+				{height: 7, txs: []*tx.Tx{build.newImport()}},
+			},
+			wantMissing: []uint64{2, 3, 6},
+		},
+		{
+			// The tip is always covered by Sync's final marker write, even when
+			// it is op-free, so only the interior gap is missing.
+			name: "op_free_tip",
+			blocks: []block{
+				{height: 1, txs: []*tx.Tx{build.newExport()}},
+				{height: 2, txs: nil},
+				{height: 3, txs: []*tx.Tx{build.newImport()}},
+				{height: 4, txs: nil},
+			},
+			wantMissing: []uint64{2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src, dst := syncBlocks(t, tt.blocks)
+			tip := src.CurrentHeight()
+
+			// The load-bearing state is complete: same height, byte-identical
+			// shared memory, and the target root is present and correct.
+			require.Equal(t, tip, dst.CurrentHeight(), "CurrentHeight()")
+			require.Equal(t, dbEntries(t, src.sharedMemoryDB), dbEntries(t, dst.sharedMemoryDB), "shared memory")
+			srcTip, err := src.GetRoot(tip)
+			require.NoErrorf(t, err, "executed node GetRoot(tip=%d)", tip)
+			dstTip, err := dst.GetRoot(tip)
+			require.NoErrorf(t, err, "synced node GetRoot(tip=%d)", tip)
+			require.Equal(t, srcTip, dstTip, "GetRoot(tip)")
+
+			// The only difference is the historical index. Collect the heights
+			// the executed node serves but the synced node does not, and where a
+			// marker is present assert it matches.
+			var missing []uint64
+			for h := uint64(0); h <= tip; h++ {
+				wantRoot, err := src.GetRoot(h)
+				require.NoErrorf(t, err, "executed node GetRoot(%d)", h)
+
+				gotRoot, err := dst.GetRoot(h)
+				if errors.Is(err, database.ErrNotFound) {
+					missing = append(missing, h)
+					continue
+				}
+				require.NoErrorf(t, err, "synced node GetRoot(%d)", h)
+				require.Equalf(t, wantRoot, gotRoot, "GetRoot(%d) value where present", h)
+			}
+
+			// The gap is exactly the op-free interior heights; the tip is always
+			// covered by Sync's final marker write.
+			require.Equalf(t, tt.wantMissing, missing,
+				"op-free interior heights absent from the synced index")
 		})
 	}
 }

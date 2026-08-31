@@ -16,13 +16,16 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -239,4 +242,142 @@ func TestAcceptSummary(t *testing.T) {
 	mode, err := handler.AcceptSummary(t.Context(), &summary{})
 	require.NoError(t, err)
 	require.Equal(t, block.StateSyncSkipped, mode)
+}
+
+// newHandler builds a [SummaryHandler] over an existing ethDB and atomic state,
+// leaving how that state was acquired (executed vs. synced) to the caller.
+func newHandler(t *testing.T, ethDB ethdb.Database, st *state.State) *SummaryHandler {
+	t.Helper()
+
+	handler, err := New(
+		saestatesync.Config{DBConfig: saedb.Config{CommitInterval: commitInterval}},
+		ethDB,
+		hookStub{},
+		st,
+		loggingtest.New(t, logging.Debug),
+	)
+	require.NoError(t, err, "New()")
+	t.Cleanup(func() {
+		require.NoErrorf(t, handler.Shutdown(t.Context()), "%T.Shutdown()", handler)
+	})
+	return handler
+}
+
+// leafSyncInto leaf-syncs src's atomic trie into a fresh state over an in-memory
+// p2p network and returns the synced state.
+func leafSyncInto(t *testing.T, src *state.State) *state.State {
+	t.Helper()
+
+	targetHeight := src.CurrentHeight()
+	target, err := src.GetRoot(targetHeight)
+	require.NoErrorf(t, err, "src.GetRoot(%d)", targetHeight)
+
+	net, tracker := synctest.NewSelfNetwork(t, t.Context(), ids.GenerateTestNodeID())
+	require.NoError(t, state.RegisterSyncHandler(net, src), "RegisterSyncHandler()")
+
+	dst := newState(t)
+	require.NoError(t, state.NewSyncer(net, tracker, dst, target, targetHeight).Sync(t.Context()), "Sync()")
+	return dst
+}
+
+// newCanonicalEthDB returns an in-memory ethdb with canonical blocks 0..upTo and
+// its head at upTo.
+func newCanonicalEthDB(t *testing.T, upTo uint64) ethdb.Database {
+	t.Helper()
+
+	ethDB := rawdb.NewMemoryDatabase()
+	for h := uint64(0); h <= upTo; h++ {
+		writeBlock(ethDB, newBlock(h))
+	}
+	return ethDB
+}
+
+// TestGetLastStateSummary_FreshlySyncedNodeServingWindow characterizes the real,
+// bounded impact of the sync path's sparse root index: a freshly leaf-synced node
+// temporarily declines to serve its last state summary, and recovers on its own
+// once it executes past its sync point.
+//
+// This is a serving-side degradation, not a state-correctness bug. The synced
+// node's atomic state is complete and it validates blocks normally; the only
+// consumer of the sparse index is SummaryHandler.wrap, which needs the atomic
+// root at a summary's settled height (settleLag behind the committed block). Right
+// after syncing to height H, the last committed summary settles a height that was
+// acquired by sync and, if op-free, has no marker — so serving fails. As the node
+// executes forward, its last committed summary settles a height it applied itself
+// (always marked), so serving succeeds again.
+func TestGetLastStateSummary_FreshlySyncedNodeServingWindow(t *testing.T) {
+	const syncHeight = 2 * commitInterval // 8, a committed height
+
+	// The height that a summary at syncHeight settles carries no atomic txs, so
+	// its root marker exists only on a node that executed it.
+	opFreeSettled := settledHeightFor(syncHeight, settleLag) // 5
+	require.Positivef(t, opFreeSettled, "settled height for %d must be non-genesis", syncHeight)
+
+	// Source: an export at every height in [1, syncHeight] except the op-free
+	// settled height.
+	src := newState(t)
+	var build exportBuilder
+	for h := uint64(1); h <= syncHeight; h++ {
+		var txs []*tx.Tx
+		if h != opFreeSettled {
+			txs = []*tx.Tx{build.newExport()}
+		}
+		require.NoErrorf(t, src.Apply(h, txs), "src.Apply(%d)", h)
+	}
+
+	// An executed-from-genesis node serves its last summary: its index is dense.
+	t.Run("executed_node_serves", func(t *testing.T) {
+		sut := newHandler(t, newCanonicalEthDB(t, syncHeight), src)
+		got, err := sut.GetLastStateSummary(t.Context())
+		require.NoError(t, err, "GetLastStateSummary()")
+		require.Equal(t, uint64(syncHeight), got.Height(), "summary height")
+	})
+
+	// A node that leaf-synced the identical trie, with its head at the sync
+	// point, shares one ethdb across the window so it advances in place.
+	dst := leafSyncInto(t, src)
+	require.Equal(t, uint64(syncHeight), dst.CurrentHeight(), "synced CurrentHeight()")
+	ethDB := newCanonicalEthDB(t, syncHeight)
+
+	// wrap() logs the expected serving-window miss at Error, so record logs
+	// rather than using loggingtest.New (which fails the test on Error logs).
+	// That Error-level logging of an expected, transient miss is itself worth
+	// noting; a recorder lets us assert it happens without failing.
+	rec := loggingtest.NewRecorder(logging.Debug)
+	sut, err := New(
+		saestatesync.Config{DBConfig: saedb.Config{CommitInterval: commitInterval}},
+		ethDB,
+		hookStub{},
+		dst,
+		rec,
+	)
+	require.NoError(t, err, "New()")
+	t.Cleanup(func() {
+		require.NoErrorf(t, sut.Shutdown(t.Context()), "%T.Shutdown()", sut)
+	})
+
+	t.Run("freshly_synced_declines", func(t *testing.T) {
+		// Last committed height is syncHeight, which settles the op-free height
+		// acquired by sync: no marker, so serving fails.
+		_, err := sut.GetLastStateSummary(t.Context())
+		require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() right after sync")
+		require.NotEmpty(t, rec.At(logging.Error), "the transient miss is logged at Error")
+	})
+
+	t.Run("self_heals_after_advancing", func(t *testing.T) {
+		// Execute forward past the sync point + settleLag. These heights are
+		// applied by this node, so their markers are written even though they are
+		// op-free.
+		const advancedHeight = syncHeight + commitInterval // 12
+		for h := uint64(syncHeight) + 1; h <= advancedHeight; h++ {
+			require.NoErrorf(t, dst.Apply(h, nil), "dst.Apply(%d)", h)
+			writeBlock(ethDB, newBlock(h))
+		}
+
+		// Last committed height is now advancedHeight, which settles a height
+		// this node applied itself, so serving succeeds again.
+		got, err := sut.GetLastStateSummary(t.Context())
+		require.NoError(t, err, "GetLastStateSummary() after advancing")
+		require.Equal(t, uint64(advancedHeight), got.Height(), "summary height")
+	})
 }
