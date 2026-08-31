@@ -50,6 +50,7 @@ go_test(
         "state_test.go",
         "syncer_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":state"],
     embedsrcs = ["bonus_block_consumers.json"],
     deps = [
