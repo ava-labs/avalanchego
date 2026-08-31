@@ -41,11 +41,9 @@ go_test(
         "//cache/lru",
         "//database",
         "//database/heightindexdb/dbtest",
-        "//utils",
         "//utils/compression",
         "//utils/logging",
         "//utils/math",
-        "@com_github_datadog_zstd//:zstd",
         "@com_github_stretchr_testify//require",
     ],
 )

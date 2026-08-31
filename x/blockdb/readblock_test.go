@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"math"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func TestReadOperations(t *testing.T) {
@@ -216,6 +218,99 @@ func TestReadOperations_Concurrency(t *testing.T) {
 
 	require.Zero(t, errorCount.Load(), "concurrent read operations had errors")
 	require.Zero(t, blockErrors.Load(), "block data mismatches detected")
+}
+
+func TestGetCorruptedRecord(t *testing.T) {
+	block := []byte("block")
+	blockSize := uint32(len(block))
+	checksum := calculateChecksum(block)
+	tests := []struct {
+		name        string
+		header      blockEntryHeader
+		indexedSize uint32
+	}{
+		{
+			name: "height_mismatch",
+			header: blockEntryHeader{
+				Height:   1,
+				Size:     blockSize,
+				Checksum: checksum,
+				Version:  BlockEntryVersion,
+			},
+			indexedSize: blockSize,
+		},
+		{
+			name: "indexed_size_mismatch",
+			header: blockEntryHeader{
+				Size:     blockSize,
+				Checksum: checksum,
+				Version:  BlockEntryVersion,
+			},
+			indexedSize: math.MaxUint32,
+		},
+		{
+			name: "zero_stored_size",
+			header: blockEntryHeader{
+				Checksum: checksum,
+				Version:  BlockEntryVersion,
+			},
+			indexedSize: blockSize,
+		},
+		{
+			name: "unsupported_version",
+			header: blockEntryHeader{
+				Size:     blockSize,
+				Checksum: checksum,
+				Version:  BlockEntryVersion + 1,
+			},
+			indexedSize: blockSize,
+		},
+		{
+			name: "checksum_mismatch",
+			header: blockEntryHeader{
+				Size:     blockSize,
+				Checksum: checksum + 1,
+				Version:  BlockEntryVersion,
+			},
+			indexedSize: blockSize,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newDatabase(t, DefaultConfig())
+			db.compressor = compression.NewNoCompressor()
+			require.NoError(t, db.Put(0, block))
+
+			entry, err := db.readIndexEntry(0)
+			require.NoError(t, err)
+			require.NoError(t, writeBlockHeader(db, int64(entry.Offset), tt.header))
+			indexOffset, err := db.indexEntryOffset(0)
+			require.NoError(t, err)
+			require.NoError(t, db.writeIndexEntryAt(indexOffset, entry.Offset, tt.indexedSize))
+
+			_, err = db.Get(0)
+			require.ErrorIs(t, err, ErrCorrupted)
+			require.NotErrorIs(t, err, database.ErrNotFound)
+			require.NoError(t, db.Close())
+		})
+	}
+}
+
+func TestGetMissingDataFileDoesNotCreate(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	require.NoError(t, db.Put(0, randomBlock(t)))
+
+	dataFilePath := db.dataFilePath(0)
+	// Force Get to reopen the missing file instead of reusing the cached handle.
+	db.fileCache.Flush()
+	require.NoError(t, os.Remove(dataFilePath))
+
+	_, err := db.Get(0)
+	require.ErrorIs(t, err, ErrCorrupted)
+	_, err = os.Stat(dataFilePath)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, db.Close())
 }
 
 func TestHasBlock(t *testing.T) {
