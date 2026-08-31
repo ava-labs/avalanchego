@@ -23,7 +23,10 @@ func RegisterSyncHandler(n *p2p.Network, state *State) error {
 }
 
 // Syncer fetches the cross-chain state from peers, applies it to a [State],
-// and updates shared memory as it goes.
+// and updates shared memory as it goes. If syncing finishes without error, it
+// is guaranteed that a full cross-chain state for the target root and height
+// is available in the [State].  The [State] MAY NOT have all intermediate
+// states.
 type Syncer struct {
 	fetcher *hashdb.Client
 
@@ -32,7 +35,8 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new cross-chain trie syncer.
+// NewSyncer creates a new cross-chain trie syncer. The [State] MUST NOT be
+// altered concurrently with the syncer.
 func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
 	return &Syncer{
 		fetcher: hashdb.NewClient(
@@ -79,7 +83,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := s.commit(batch); err != nil {
+		if err := s.state.commit(s.state.db.NewBatch(), batch.height, batch.ops); err != nil {
 			return err
 		}
 	}
@@ -182,10 +186,10 @@ func iterateLeaves(
 // decodeLeaf splits an cross-chain trie entry into its height, chainID, and
 // requests.
 func decodeLeaf(key, val []byte) (leaf, error) {
-	if len(key) != keyLength {
-		return leaf{}, fmt.Errorf("unexpected trie key length %d, expected %d", len(key), keyLength)
+	height, chainID, err := decodeTrieKey(key)
+	if err != nil {
+		return leaf{}, err
 	}
-	height, chainID := decodeTrieKey(key)
 
 	requests := new(atomic.Requests)
 	if _, err := c.Unmarshal(val, requests); err != nil {
@@ -196,19 +200,4 @@ func decodeLeaf(key, val []byte) (leaf, error) {
 		chainID:  chainID,
 		requests: requests,
 	}, nil
-}
-
-// commit inserts keys and values for a height to the [triedb.Database] and to
-// shared memory.
-func (s *Syncer) commit(b heightBatch) error {
-	newRoot, err := applyTrie(s.state.trieDB, s.state.currentRoot, b.height, b.ops)
-	if err != nil {
-		return fmt.Errorf("applying synced trie at height %d: %w", b.height, err)
-	}
-
-	if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), b.height, newRoot, b.ops); err != nil {
-		return fmt.Errorf("committing synced height %d: %w", b.height, err)
-	}
-
-	return nil
 }

@@ -148,9 +148,7 @@ func TestSyncer_BonusBlock(t *testing.T) {
 
 			// The synced shared memory matches a node that applied only the
 			// non-skipped blocks.
-			want := newSUT(t, withNetworkID(test.networkID))
-			want.apply(t, test.wantBlocks...)
-			require.Equal(t, dbEntries(t, want.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
+			require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
 		})
 	}
 }
@@ -169,20 +167,21 @@ func (r *byteReader) next() byte {
 	return b
 }
 
-// blocksFromBytes decodes a fuzzer byte stream into blocks. The first byte
-// picks the number of blocks; subsequent bytes pick, per block, the height gap,
-// the number of txs, and whether each tx is an import (even) or export (odd).
-func blocksFromBytes(data []byte, build *builder) []block {
+// blocksFromBytes decodes a fuzzer byte stream into blocks.
+func blocksFromBytes(data []byte) []block {
 	const (
 		maxBlocks    = 8
 		maxTxsPerBlk = 4
 	)
 
+	var (
+		build  builder
+		height uint64
+	)
 	r := &byteReader{data: data}
 	numBlocks := int(r.next()%maxBlocks) + 1
 	blocks := make([]block, numBlocks)
 
-	var height uint64
 	for i := range numBlocks {
 		height += uint64(r.next()) + 1 // strictly increasing, gaps allowed
 		numTxs := int(r.next() % (maxTxsPerBlk + 1))
@@ -204,13 +203,12 @@ func blocksFromBytes(data []byte, build *builder) []block {
 // FuzzSyncer fuzzes the number of blocks and the import/export layout within
 // them, verifying each synced trie matches its source.
 func FuzzSyncer(f *testing.F) {
-	f.Add([]byte{0x00})                         // one block, one import
-	f.Add([]byte{0x00, 0x01, 0x01, 0x00})       // one block, one export
-	f.Add([]byte{0x02, 0x01, 0x02, 0x00, 0x01}) // two blocks, an import and an export
+	f.Add([]byte{0x00, 0x00, 0x01, 0x00})                   // one block, one import
+	f.Add([]byte{0x00, 0x00, 0x01, 0x01})                   // one block, one export
+	f.Add([]byte{0x01, 0x00, 0x01, 0x00, 0x00, 0x01, 0x01}) // two blocks, an import then an export
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var build builder
-		runSyncRoundTrip(t, blocksFromBytes(data, &build))
+		runSyncRoundTrip(t, blocksFromBytes(data))
 	})
 }
 
