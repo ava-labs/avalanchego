@@ -9,6 +9,7 @@ import (
 	"iter"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -55,9 +56,12 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 // Sync fetches cross-chain state from a peer and applies it to the [State],
 // updating shared memory as it goes. Any error MUST be treated as fatal.
 func (s *Syncer) Sync(ctx context.Context) error {
-	// The fetcher only responds to requests for non-empty roots. And if we
-	// already have the full state, no sense syncing again.
-	if s.state.currentRoot != s.targetRoot {
+	if s.state.currentHeight.Load() >= s.targetHeight {
+		return nil
+	}
+
+	// The fetcher only responds to requests for non-empty roots.
+	if types.EmptyRootHash != s.targetRoot {
 		if err := s.sync(ctx); err != nil {
 			return err
 		}

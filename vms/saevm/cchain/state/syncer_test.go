@@ -40,7 +40,7 @@ func (s *syncServer) syncInto(ctx context.Context, dst *State, target common.Has
 	return syncer.Sync(ctx)
 }
 
-func checkStatesMatch(t *testing.T, srcSUT, dstSUT *SUT, blocks ...block) {
+func checkStatesMatch(t *testing.T, srcSUT, dstSUT *SUT) {
 	t.Helper()
 
 	var (
@@ -208,4 +208,31 @@ func TestSyncer_Crash(t *testing.T) {
 			checkStatesMatch(t, srcSUT, got)
 		})
 	}
+}
+
+func TestSyncer_Stale(t *testing.T) {
+	var build builder
+	blocks := []block{
+		{height: 1, txs: []*tx.Tx{build.newImport()}},
+		{height: 2, txs: []*tx.Tx{build.newExport(), build.newImport()}},
+		{height: 4, txs: []*tx.Tx{build.newExport()}},
+		{height: 5, txs: []*tx.Tx{build.newImport(), build.newExport()}},
+	}
+
+	db := memdb.New()
+	srcSUT := newSUT(t, withDB(db))
+	srcSUT.apply(t, blocks...)
+	src := srcSUT.stateImpl.(*State)
+
+	const targetHeight = 4
+	target, err := src.GetRoot(targetHeight)
+	require.NoErrorf(t, err, "src.GetRoot(%d)", targetHeight)
+
+	server := newSyncServer(t, src)
+
+	// Syncing to earlier state shouldn't corrupt
+	dstSUT := newSUT(t, withDB(saetest.CopyDB(t, db)))
+	dst := dstSUT.stateImpl.(*State)
+	require.NoError(t, server.syncInto(t.Context(), dst, target, targetHeight), "Sync()")
+	checkStatesMatch(t, srcSUT, dstSUT)
 }
