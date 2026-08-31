@@ -173,7 +173,14 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	return s.commit(batch, height, ops)
 }
 
-func (s *State) writeToSharedMemory(batch database.Batch, height uint64, newRoot common.Hash, ops map[ids.ID]*chainsatomic.Requests) error {
+// commit inserts keys and values for a height to the [triedb.Database] and to
+// shared memory.
+func (s *State) commit(batch database.Batch, height uint64, ops map[ids.ID]*chainsatomic.Requests) error {
+	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
+	if err != nil {
+		return fmt.Errorf("applying trie at height %d: %w", height, err)
+	}
+
 	if err := database.PutUInt64(batch, lastHeightKey, height); err != nil {
 		return fmt.Errorf("writing last height: %w", err)
 	}
@@ -243,28 +250,12 @@ func encodeTrieKey(height uint64, chainID ids.ID) []byte {
 	return k
 }
 
-// decodeTrieKey splits an atomic trie key into its height and chainID. The key
-// MUST be keyLength bytes.
+// decodeTrieKey splits an atomic trie key into its height and chainID.
 func decodeTrieKey(key []byte) (uint64, ids.ID, error) {
 	if len(key) != keyLength {
 		return 0, ids.ID{}, fmt.Errorf("invalid trie key length: expected %d, got %d", keyLength, len(key))
 	}
 	return binary.BigEndian.Uint64(key[:wrappers.LongLen]), ids.ID(key[wrappers.LongLen:]), nil
-}
-
-// commit inserts keys and values for a height to the [triedb.Database] and to
-// shared memory.
-func (s *State) commit(batch database.Batch, height uint64, ops map[ids.ID]*chainsatomic.Requests) error {
-	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
-	if err != nil {
-		return fmt.Errorf("applying synced trie at height %d: %w", height, err)
-	}
-
-	if err := s.writeToSharedMemory(batch, height, newRoot, ops); err != nil {
-		return fmt.Errorf("committing synced height %d: %w", height, err)
-	}
-
-	return nil
 }
 
 var errCleanTrieAfterUpdates = errors.New("clean trie after updates")

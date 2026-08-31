@@ -66,7 +66,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	// Update the shared memory markers to tip, since we have the most recent state
 	// The recent blocks MAY have had no cchain txs.
 	if s.state.currentHeight.Load() < s.targetHeight {
-		if err := s.state.writeToSharedMemory(s.state.db.NewBatch(), s.targetHeight, s.targetRoot, nil); err != nil {
+		if err := s.state.commit(s.state.db.NewBatch(), s.targetHeight, nil); err != nil {
 			return fmt.Errorf("committing synced height %d: %w", s.targetHeight, err)
 		}
 	}
@@ -74,16 +74,17 @@ func (s *Syncer) Sync(ctx context.Context) error {
 }
 
 func (s *Syncer) sync(ctx context.Context) error {
-	for batch, err := range iterateHeights(
+	blocks := iterateHeights(
 		ctx,
 		s.fetcher,
 		s.targetRoot,
 		s.state.currentHeight.Load(),
-	) {
+	)
+	for block, err := range blocks {
 		if err != nil {
 			return err
 		}
-		if err := s.state.commit(s.state.db.NewBatch(), batch.height, batch.ops); err != nil {
+		if err := s.state.commit(s.state.db.NewBatch(), block.height, block.ops); err != nil {
 			return err
 		}
 	}
@@ -183,7 +184,7 @@ func iterateLeaves(
 	}
 }
 
-// decodeLeaf splits an cross-chain trie entry into its height, chainID, and
+// decodeLeaf splits a cross-chain trie entry into its height, chainID, and
 // requests.
 func decodeLeaf(key, val []byte) (leaf, error) {
 	height, chainID, err := decodeTrieKey(key)
