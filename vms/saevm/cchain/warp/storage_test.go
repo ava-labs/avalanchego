@@ -23,16 +23,20 @@ func TestStorage(t *testing.T) {
 		id        ids.ID
 		want      *warp.UnsignedMessage
 		wantErr   error
+		wantHas   bool
 	}{
 		{
 			name: "add_get",
 			add: []*warp.UnsignedMessage{
 				msg,
 			},
-			id:   msg.ID(),
-			want: msg,
+			id:      msg.ID(),
+			want:    msg,
+			wantHas: true,
 		},
 		{
+			// Overrides are node-local off-chain messages: Get serves them,
+			// but Has, which backs consensus checks, must not.
 			name: "get_override",
 			overrides: []*warp.UnsignedMessage{
 				msg,
@@ -50,13 +54,14 @@ func TestStorage(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			db := memdb.New()
 			s := NewStorage(db, test.overrides...)
-			require.NoErrorf(t, s.Add(1, test.add...), "%T.Add(%d)", s, len(test.add))
+			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
 
 			for _, name := range []string{"after_add", "fresh"} {
 				t.Run(name, func(t *testing.T) {
 					msg, err := s.Get(test.id)
 					require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
 					require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
+					require.Equalf(t, test.wantHas, s.Has(test.id), "%T.Has(%s)", s, test.id)
 				})
 				s = NewStorage(db, test.overrides...)
 			}

@@ -149,9 +149,8 @@ func (vm *VM) Initialize(
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize, func(id ids.ID) bool {
-		_, err := warpStorage.Get(id)
-		return err == nil
+	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize, func(id ids.ID, _ uint64) bool {
+		return warpStorage.Has(id)
 	})
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)

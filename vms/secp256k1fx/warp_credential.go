@@ -18,14 +18,25 @@ var (
 	_ verify.Verifiable = (*WarpCredential)(nil)
 
 	ErrNilWarpCredential   = errors.New("nil warp credential")
-	ErrWrongWarpPayload    = errors.New("warp payload is not owner || unsigned tx bytes")
+	ErrWrongWarpPayload    = errors.New("warp payload is not owner || height || unsigned tx bytes")
 	ErrWrongWarpSourceAddr = errors.New("warp source address is not a trusted helper")
+)
+
+// Layout of a warp credential's AddressedCall payload:
+// owner || emission height || unsigned tx bytes. The height is the C-chain
+// block that emitted the message; the P-chain ignores it (BLS quorum is the
+// authenticity proof here), the C-chain checks it against its settled height.
+const (
+	WarpPayloadOwnerLen  = ids.ShortIDLen
+	WarpPayloadHeightLen = 8 // big-endian uint64
+	WarpPayloadTxOffset  = WarpPayloadOwnerLen + WarpPayloadHeightLen
 )
 
 // WarpCredential authorizes an input on behalf of a 20-byte owner address.
 // The message payload must be an AddressedCall whose Payload is
-// owner || unsigned tx bytes, sent by one of Fx.WarpHelpers. BLS quorum and
-// source chain are verified by the tx executor, not here.
+// owner || emission height || unsigned tx bytes, sent by one of
+// Fx.WarpHelpers. BLS quorum and source chain are verified by the tx
+// executor, not here.
 type WarpCredential struct {
 	Message []byte `serialize:"true" json:"message"`
 }
@@ -62,10 +73,10 @@ func (fx *Fx) VerifyWarpCredential(utx UnsignedTx, in *Input, cred *WarpCredenti
 	if err != nil || !fx.WarpHelpers.Contains(sender) {
 		return fmt.Errorf("%w: %x", ErrWrongWarpSourceAddr, call.SourceAddress)
 	}
-	if len(call.Payload) < ids.ShortIDLen || !bytes.Equal(call.Payload[ids.ShortIDLen:], utx.Bytes()) {
+	if len(call.Payload) < WarpPayloadTxOffset || !bytes.Equal(call.Payload[WarpPayloadTxOffset:], utx.Bytes()) {
 		return ErrWrongWarpPayload
 	}
-	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
+	owner := ids.ShortID(call.Payload[:WarpPayloadOwnerLen])
 
 	for _, index := range in.SigIndices {
 		if index >= uint32(len(out.Addrs)) {

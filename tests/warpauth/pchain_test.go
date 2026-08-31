@@ -5,8 +5,10 @@ package warpauth
 
 import (
 	_ "embed"
+	"encoding/binary"
 	"encoding/hex"
 	"math/big"
+	"slices"
 	"strings"
 	"testing"
 
@@ -128,6 +130,10 @@ var (
 	keys  = blsKeys{PublicKey: pkBytes[:], ProofOfPossession: popBytes[:]}
 	goPoP = signer.ProofOfPossession{PublicKey: pkBytes, ProofOfPossession: popBytes}
 	auth  = []uint32{0, 2}
+
+	// The EVM block the harness runs at; send() embeds it in the payload.
+	emitHeight  = uint64(1234)
+	heightBytes = binary.BigEndian.AppendUint64(nil, emitHeight)
 )
 
 func goIns(ins []utxo) []*avax.TransferableInput {
@@ -185,6 +191,7 @@ func newHarness(t *testing.T) *harness {
 		ChainConfig: params.MergedTestChainConfig,
 		State:       statedb,
 		GasLimit:    30_000_000,
+		BlockNumber: new(big.Int).SetUint64(emitHeight),
 		Random:      &common.Hash{},
 		Origin:      common.Address(owner),
 	}
@@ -218,7 +225,7 @@ func (h *harness) expect(method string, tx txs.UnsignedTx, args ...any) {
 	require.NoError(h.t, err)
 	got, err := h.call(method, args...)
 	require.NoError(h.t, err, method)
-	require.Equal(h.t, append(owner[:], b...), got, method)
+	require.Equal(h.t, slices.Concat(owner[:], heightBytes, b), got, method)
 }
 
 func TestEncodeAllTxTypes(t *testing.T) {
@@ -347,7 +354,7 @@ func TestEncodeCChainBoundary(t *testing.T) {
 	require.NoError(err)
 	got, err = h.call("importFromP", ins, uint64(3))
 	require.NoError(err)
-	require.Equal(append(owner[:], want...), got)
+	require.Equal(slices.Concat(owner[:], heightBytes, want), got)
 	_, err = h.call("importFromP", ins, uint64(18))
 	require.ErrorContains(err, "execution reverted")
 }

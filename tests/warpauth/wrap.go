@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	errShortPayload = errors.New("warp payload shorter than an owner address")
+	errShortPayload = errors.New("warp payload shorter than owner and height")
 	errNotImport    = errors.New("C-chain tx is not an import")
 )
 
@@ -33,12 +33,12 @@ func Wrap(signedMessage []byte) (*txs.Tx, ids.ShortID, error) {
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	if len(call.Payload) < ids.ShortIDLen {
+	if len(call.Payload) < secp256k1fx.WarpPayloadTxOffset {
 		return nil, ids.ShortEmpty, errShortPayload
 	}
-	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
+	owner := ids.ShortID(call.Payload[:secp256k1fx.WarpPayloadOwnerLen])
 	var unsigned txs.UnsignedTx
-	if _, err := txs.Codec.Unmarshal(call.Payload[ids.ShortIDLen:], &unsigned); err != nil {
+	if _, err := txs.Codec.Unmarshal(call.Payload[secp256k1fx.WarpPayloadTxOffset:], &unsigned); err != nil {
 		return nil, ids.ShortEmpty, fmt.Errorf("parsing tx from warp payload: %w", err)
 	}
 
@@ -71,11 +71,11 @@ func WrapCChain(unsigned *warp.UnsignedMessage) (*cchaintx.Tx, ids.ShortID, erro
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}
-	if len(call.Payload) < ids.ShortIDLen {
+	if len(call.Payload) < secp256k1fx.WarpPayloadTxOffset {
 		return nil, ids.ShortEmpty, errShortPayload
 	}
-	owner := ids.ShortID(call.Payload[:ids.ShortIDLen])
-	unsignedTx, err := cchaintx.ParseUnsigned(call.Payload[ids.ShortIDLen:])
+	owner := ids.ShortID(call.Payload[:secp256k1fx.WarpPayloadOwnerLen])
+	unsignedTx, err := cchaintx.ParseUnsigned(call.Payload[secp256k1fx.WarpPayloadTxOffset:])
 	if err != nil {
 		return nil, ids.ShortEmpty, err
 	}

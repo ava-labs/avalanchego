@@ -276,7 +276,7 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	if err != nil {
 		return fmt.Errorf("parsing warp messages from receipts: %w", err)
 	}
-	if err := h.warpStorage.Add(b.NumberU64(), messages...); err != nil {
+	if err := h.warpStorage.Add(messages...); err != nil {
 		return fmt.Errorf("storing warp messages from receipts: %w", err)
 	}
 	return nil
@@ -427,10 +427,11 @@ func (b *builder) PotentialEndOfBlockOps(
 			return
 		}
 		// Every verifier has executed the settled block, so only messages
-		// emitted at or below it are known to all of them.
-		knownWarp := func(id ids.ID) bool {
-			height, err := b.warpStorage.Height(id)
-			return err == nil && height <= settledHeight
+		// emitted at or below it are known to all of them. The emission
+		// height rides in the payload, which the message ID hashes, so a
+		// stored message vouches for its height.
+		knownWarp := func(id ids.ID, height uint64) bool {
+			return height <= settledHeight && b.warpStorage.Has(id)
 		}
 
 		for t := range b.potentialTxs {

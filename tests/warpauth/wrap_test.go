@@ -4,6 +4,7 @@
 package warpauth
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestWrapCredentialCount(t *testing.T) {
 		unsigned := test.tx
 		txBytes, err := txs.Codec.Marshal(txs.CodecVersion, &unsigned)
 		require.NoError(t, err)
-		call, err := payload.NewAddressedCall(ownerA[:], append(owner[:], txBytes...))
+		call, err := payload.NewAddressedCall(ownerA[:], slices.Concat(owner[:], heightBytes, txBytes))
 		require.NoError(t, err)
 		unsignedMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.Empty, call.Bytes())
 		require.NoError(t, err)

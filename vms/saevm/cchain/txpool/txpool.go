@@ -61,7 +61,7 @@ type Txpool struct {
 
 	// knownWarp reports whether this chain emitted the warp message; it is
 	// a liveness pre-check, the block builder enforces the settled height.
-	knownWarp func(ids.ID) bool
+	knownWarp func(ids.ID, uint64) bool
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -77,7 +77,7 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
-	knownWarp func(ids.ID) bool,
+	knownWarp func(ids.ID, uint64) bool,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)

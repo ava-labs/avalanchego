@@ -4,6 +4,7 @@
 package tx
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -156,7 +158,7 @@ var (
 	errUnknownWarpMessage = errors.New("warp credential is not a message emitted by this chain")
 )
 
-func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool, creds []Credential) error {
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID, uint64) bool, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
@@ -193,13 +195,23 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(
 			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
 		}
 		// The fx checked the helper and the owner; the message is trusted
-		// because this chain emitted it, so no BLS signature is needed.
+		// because this chain emitted it, so no BLS signature is needed. The
+		// message ID hashes the payload, so a stored message vouches for the
+		// emission height embedded in it.
 		if cred, ok := creds[j].(*secp256k1fx.WarpCredential); ok {
 			msg, err := warp.ParseMessage(cred.Message)
 			if err != nil {
 				return fmt.Errorf("%w (%d): %w", errUnknownWarpMessage, j, err)
 			}
-			if !knownWarp(msg.UnsignedMessage.ID()) {
+			call, err := payload.ParseAddressedCall(msg.Payload)
+			if err != nil {
+				return fmt.Errorf("%w (%d): %w", errUnknownWarpMessage, j, err)
+			}
+			if len(call.Payload) < secp256k1fx.WarpPayloadTxOffset {
+				return fmt.Errorf("%w (%d): payload too short", errUnknownWarpMessage, j)
+			}
+			height := binary.BigEndian.Uint64(call.Payload[secp256k1fx.WarpPayloadOwnerLen:secp256k1fx.WarpPayloadTxOffset])
+			if !knownWarp(msg.UnsignedMessage.ID(), height) {
 				return fmt.Errorf("%w (%d): %s", errUnknownWarpMessage, j, msg.UnsignedMessage.ID())
 			}
 		}

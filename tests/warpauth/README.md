@@ -11,8 +11,8 @@ A P-chain `OutputOwners` address is 20 bytes, so an EVM address is already a
 valid owner. `secp256k1fx.WarpCredential{Message}` is a new credential type,
 accepted wherever a `secp256k1fx.Credential` is today (`VerifyTransfer`,
 `VerifyPermission`). The message is an `AddressedCall` from the C-chain whose
-payload is `owner (20 bytes) || unsigned P-chain tx bytes`, and it is valid
-when:
+payload is `owner (20 bytes) || emission height (8 bytes, big-endian) ||
+unsigned P-chain tx bytes`, and it is valid when:
 
 - BLS quorum of the primary network signed it and its source chain is the
   C-chain (`txs/executor/warp_verifier.go`, same check as ACP-77 txs),
@@ -20,7 +20,8 @@ when:
   (`config.DefaultWarpHelperAddresses`, override with the P-chain chain
   config key `warp-helper-addresses`),
 - the tx bytes equal the tx being verified, and every owner slot the input
-  names is `owner` (`vms/secp256k1fx/warp_credential.go`).
+  names is `owner` (`vms/secp256k1fx/warp_credential.go`). The height is
+  ignored on the P-chain: BLS quorum is the authenticity proof there.
 
 No nonce or expiry: the credential is bound to one exact tx and that tx
 consumes its UTXOs, so it cannot replay. Warp credentials are rejected before
@@ -35,7 +36,8 @@ Granite (`txs/executor/standard_tx_executor.go`).
    in the Avalanche codec, prefixes `msg.sender` as the owner and calls
    `sendWarpMessage`. `msg.sender` at the precompile is the contract, so the
    P-chain trusts the contract's address to name the owner (the ACP-77
-   validator-manager pattern). All 17 user tx types are covered.
+   validator-manager pattern). The contract also embeds `block.number`, the
+   emission height, in the payload. All 17 user tx types are covered.
 3. Anyone runs a relayer (the icm-services `pchain-relayer` command, built on
    its signature aggregator; the e2e uses coreth's aggregation RPC): it
    watches the contract's `SendWarpMessage` logs, aggregates signatures
@@ -78,11 +80,13 @@ Value still moves only through shared memory; only who may sign changes.
   P-chain.
 - P to C: `PChain.exportTx` on the P-chain, then `PChain.importFromP(utxos,
   fee)`. The helper encodes a C-chain ImportTx (`vms/saevm/cchain/tx`) as
-  `owner || unsigned bytes`. The relayer wraps it with the message as every
-  credential, no BLS signatures: the C-chain checks the message against its
-  own warp storage and only counts messages from blocks at or below the
-  settled block, so every verifier has executed them. The owner signs the
-  exact bytes, fee included, so nobody else can choose the fee or split the
+  `owner || emission height || unsigned bytes`. The relayer wraps it with
+  the message as every credential, no BLS signatures: the C-chain checks
+  that its own warp storage holds the message (off-chain node-local messages
+  do not count) and that the emission height embedded in the payload, which
+  the message ID commits to, is at or below the settled block, so every
+  verifier has executed the block that emitted it. The owner signs the exact
+  bytes, fee included, so nobody else can choose the fee or split the
   amount.
 
 Both need the helper list in the C-chain config (`warp-helper-addresses`).

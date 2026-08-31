@@ -5,6 +5,8 @@ package platformvm
 
 import (
 	"context"
+	"encoding/binary"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,8 +83,10 @@ func TestWarpCredentialSpendsUTXO(t *testing.T) {
 	}}
 	require.NoError((&txs.Tx{Unsigned: unsigned}).Initialize(txs.Codec))
 
+	// The C-chain block that emitted the message; the P-chain ignores it.
+	emitHeight := binary.BigEndian.AppendUint64(nil, 7)
 	newTx := func(sender, claimedOwner ids.ShortID) *txs.Tx {
-		call, err := payload.NewAddressedCall(sender[:], append(claimedOwner[:], unsigned.Bytes()...))
+		call, err := payload.NewAddressedCall(sender[:], slices.Concat(claimedOwner[:], emitHeight, unsigned.Bytes()))
 		require.NoError(err)
 		unsignedMsg, err := warp.NewUnsignedMessage(vm.ctx.NetworkID, vm.ctx.CChainID, call.Bytes())
 		require.NoError(err)

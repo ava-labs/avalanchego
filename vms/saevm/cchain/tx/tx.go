@@ -80,8 +80,8 @@ type Unsigned interface {
 
 	// verifyCredentials verifies that the transaction is authorized by the
 	// provided credentials. knownWarp reports whether this chain emitted the
-	// warp message with the given ID.
-	verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool, creds []Credential) error
+	// warp message with the given ID at the given height.
+	verifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID, uint64) bool, creds []Credential) error
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
@@ -248,8 +248,9 @@ func (t *Tx) SanityCheck(ctx *snow.Context) error {
 
 // VerifyCredentials verifies that the transaction is properly authorized.
 // knownWarp reports whether this chain emitted the warp message with the
-// given ID; it backs [secp256k1fx.WarpCredential] verification.
-func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID) bool) error {
+// given ID at the given height; it backs [secp256k1fx.WarpCredential]
+// verification.
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory, knownWarp func(ids.ID, uint64) bool) error {
 	return t.Unsigned.verifyCredentials(sm, knownWarp, t.Creds)
 }
 

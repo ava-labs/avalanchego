@@ -1933,7 +1933,7 @@ func TestVerifyCredentials(t *testing.T) {
 			require.NoErrorf(t, err, "%T.Apply()", xMemory)
 
 			cMemory := memory.NewSharedMemory(cChainID)
-			err = test.tx.VerifyCredentials(cMemory, func(ids.ID) bool { return false })
+			err = test.tx.VerifyCredentials(cMemory, func(ids.ID, uint64) bool { return false })
 			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
 		})
 	}

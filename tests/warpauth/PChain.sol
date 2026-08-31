@@ -8,10 +8,11 @@ interface IWarpMessenger {
 
 /// Builds P-chain transactions owned by msg.sender and ships them over warp.
 /// The P-chain trusts this contract's address to name the owner in the
-/// payload (owner || unsigned tx bytes). Every input is an AVAX UTXO owned
-/// solely by msg.sender; [change] AVAX goes back to msg.sender and the rest
-/// of the inputs is burned as the fee. Callers pass inputs, outputs and
-/// owner addresses already sorted; the contract only checks the order.
+/// payload (owner || emission height || unsigned tx bytes). Every input is
+/// an AVAX UTXO owned solely by msg.sender; [change] AVAX goes back to
+/// msg.sender and the rest of the inputs is burned as the fee. Callers pass
+/// inputs, outputs and owner addresses already sorted; the contract only
+/// checks the order.
 contract PChain {
     IWarpMessenger private constant WARP = IWarpMessenger(0x0200000000000000000000000000000000000005);
 
@@ -405,7 +406,7 @@ contract PChain {
     // ---- encoding -----------------------------------------------------
 
     function send(bytes memory tx_) private returns (bytes32) {
-        return WARP.sendWarpMessage(abi.encodePacked(msg.sender, tx_));
+        return WARP.sendWarpMessage(abi.encodePacked(msg.sender, uint64(block.number), tx_));
     }
 
     function header(uint32 typeID) private view returns (bytes memory) {
