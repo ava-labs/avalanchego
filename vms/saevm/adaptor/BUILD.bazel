@@ -1,8 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "adaptor",
     srcs = [
+        "runner.go",
         "sync.go",
         "vm.go",
     ],
@@ -13,5 +15,21 @@ go_library(
         "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
+        "//utils",
+    ],
+)
+
+go_test(
+    name = "adaptor_test",
+    srcs = [
+        "runner_test.go",
+        "sync_test.go",
+    ],
+    embed = [":adaptor"],
+    deps = [
+        "//ids",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "@com_github_stretchr_testify//require",
     ],
 )

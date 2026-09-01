@@ -169,6 +169,7 @@ go_test(
         "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/dynamic",
