@@ -24,6 +24,7 @@ func (*Factory) New(log logging.Logger) (interface{}, error) {
 		pullGossipPeriod: time.Second,
 		pushGossipPeriod: 100 * time.Millisecond,
 		now:              time.Now,
+		syncRunner:       adaptor.NewRunner(),
 	}
 	type fullVM struct {
 		adaptor.ChainVMWithContext
@@ -31,6 +32,6 @@ func (*Factory) New(log logging.Logger) (interface{}, error) {
 	}
 	return fullVM{
 		adaptor.Convert(vm),
-		adaptor.ConvertStateSync(vm),
+		adaptor.ConvertStateSync(vm, vm.syncRunner),
 	}, nil
 }

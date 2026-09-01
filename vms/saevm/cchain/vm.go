@@ -60,6 +60,11 @@ type VM struct {
 	now              func() time.Time
 	lastWaitForEvent utils.Atomic[time.Time]
 
+	// syncRunner owns the state-sync goroutine. It is created alongside the
+	// VM (see [Factory.New]) so that the [adaptor.ConvertStateSync] adaptor
+	// and this VM read the same lifecycle.
+	syncRunner *adaptor.Runner
+
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
 	metrics     *metrics
@@ -179,7 +184,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}
-	vm.onClose = append(vm.onClose, vm.SummaryHandler.Shutdown)
+	vm.onClose = append(vm.onClose, vm.syncRunner.Shutdown)
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
 	// [VM.finishInitialize] adds the [sae.VM] after all necessary state is available.
@@ -332,7 +337,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.finishInitializeOnce.Do(func() {
-			if err = vm.SummaryHandler.Error(); err != nil {
+			if err = vm.syncRunner.Err(); err != nil {
 				return
 			}
 			err = vm.finishInitialize(ctx)
@@ -413,7 +418,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		<-ctx.Done()
 		return 0, context.Cause(ctx)
 	case snow.StateSyncing:
-		return vm.SummaryHandler.WaitForEvent(ctx)
+		return vm.syncRunner.WaitForEvent(ctx)
 	}
 
 	// Throttle to avoid busy looping: the txpools only clear after block

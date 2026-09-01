@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -68,10 +67,9 @@ func (s *SUT) produceBlocks(ctx context.Context, t *testing.T, w *wallet, ethW *
 	return blk
 }
 
-// startStateSync fetches src's last state summary and parses and accepts it
-// on dst, as the engine would, returning the accepted summary's height. The
-// sync then proceeds in the background until [awaitStateSync] observes its
-// completion.
+// startStateSync fetches src's last state summary and starts dst syncing to
+// it, as the engine would, returning the accepted summary's height. The sync
+// proceeds in the background until [awaitStateSync] observes its completion.
 func startStateSync(ctx context.Context, t *testing.T, src, dst *SUT) uint64 {
 	t.Helper()
 
@@ -83,9 +81,13 @@ func startStateSync(ctx context.Context, t *testing.T, src, dst *SUT) uint64 {
 	require.NoErrorf(t, err, "%T.ParseStateSummary()", dst.VM)
 	require.Equalf(t, summary.ID(), parsed.ID(), "%T.ParseStateSummary() round trip", dst.VM)
 
-	mode, err := dst.AcceptSummary(ctx, parsed)
-	require.NoErrorf(t, err, "%T.AcceptSummary()", dst.VM)
-	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary() mode", dst.VM)
+	should, err := dst.ShouldAcceptSummary(ctx, parsed)
+	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", dst.VM)
+	require.Truef(t, should, "%T.ShouldAcceptSummary()", dst.VM)
+
+	require.Truef(t, dst.syncRunner.Start(func(ctx context.Context) error {
+		return dst.Sync(ctx, parsed)
+	}), "%T.Start()", dst.syncRunner)
 	return parsed.Height()
 }
 
@@ -97,7 +99,7 @@ func awaitStateSync(ctx context.Context, t *testing.T, dst *SUT) {
 	msg, err := dst.WaitForEvent(ctx)
 	require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
 	require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
-	require.NoErrorf(t, dst.SummaryHandler.Error(), "%T.Error()", dst.SummaryHandler)
+	require.NoErrorf(t, dst.syncRunner.Err(), "%T.Err()", dst.syncRunner)
 }
 
 // bootstrapFrom transitions s to [snow.Bootstrapping], replays src's accepted
