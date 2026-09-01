@@ -5,6 +5,7 @@ package state
 
 import (
 	"bytes"
+	"fmt"
 	"maps"
 	"math"
 	"math/rand"
@@ -4496,4 +4497,114 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	require.Equal(accruedDelRewards, gotStakingInfo.AccruedDelegateeRewards)
 	require.Equal(autoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
 	require.Equal(period, gotStakingInfo.NextPeriod)
+}
+
+type stakeMetrics struct {
+	metrics.Metrics
+
+	local     uint64
+	delegated uint64
+	total     uint64
+}
+
+func (m *stakeMetrics) SetLocalStake(s uint64) {
+	m.local = s
+}
+
+func (m *stakeMetrics) SetLocalDelegatedStake(s uint64) {
+	m.delegated = s
+}
+
+func (m *stakeMetrics) SetTotalStake(s uint64) {
+	m.total = s
+}
+
+func newTestStateWithNodeID(t testing.TB, localNodeID ids.NodeID, m metrics.Metrics) *State {
+	s, err := New(
+		memdb.New(),
+		genesistest.NewBytes(t, genesistest.Config{
+			NodeIDs: []ids.NodeID{defaultValidatorNodeID},
+		}),
+		prometheus.NewRegistry(),
+		validators.NewManager(),
+		upgradetest.GetConfig(upgradetest.Latest),
+		&config.Default,
+		&snow.Context{
+			NetworkID: constants.UnitTestID,
+			NodeID:    localNodeID,
+			Log:       logging.NoLog{},
+		},
+		m,
+		reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		},
+	)
+	require.NoError(t, err)
+	return s
+}
+
+func TestStakeMetricsDelegated(t *testing.T) {
+	require := require.New(t)
+
+	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
+
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	s := newTestStateWithNodeID(t, defaultValidatorNodeID, m)
+
+	require.Equal(genesistest.DefaultValidatorWeight, m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
+
+	delegator := newTestStaker(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegator.Weight = delegatorWeight
+	require.NoError(s.PutCurrentDelegator(delegator))
+	s.SetHeight(1)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.local)
+	require.Equal(delegatorWeight, m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.total)
+
+	require.NoError(s.DeleteCurrentDelegator(delegator))
+	s.SetHeight(2)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight, m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
+}
+
+func TestStakeMetricsNotAValidator(t *testing.T) {
+	require := require.New(t)
+
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	newTestStateWithNodeID(t, ids.GenerateTestNodeID(), m)
+
+	require.Zero(m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
+}
+
+func TestUpdateStakeMetricsInconsistentValidatorWeight(t *testing.T) {
+	require := require.New(t)
+
+	s := newTestStateWithNodeID(t, defaultValidatorNodeID, metrics.Noop)
+	require.NoError(s.validators.RemoveWeight(
+		constants.PrimaryNetworkID,
+		defaultValidatorNodeID,
+		1,
+	))
+
+	err := s.updateStakeMetrics()
+	require.EqualError(
+		err,
+		fmt.Sprintf(
+			"local validator weight %d exceeds validator manager weight %d: underflow",
+			genesistest.DefaultValidatorWeight,
+			genesistest.DefaultValidatorWeight-1,
+		),
+	)
 }
