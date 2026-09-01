@@ -40,6 +40,8 @@ func (noopMetrics) AddValidatorSetsHeightDiff(uint64) {}
 
 func (noopMetrics) SetLocalStake(uint64) {}
 
+func (noopMetrics) SetLocalDelegatedStake(uint64) {}
+
 func (noopMetrics) SetTotalStake(uint64) {}
 
 func (noopMetrics) SetTimeUntilUnstake(time.Duration) {}

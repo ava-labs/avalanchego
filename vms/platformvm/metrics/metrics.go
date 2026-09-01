@@ -63,6 +63,8 @@ type Metrics interface {
 
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
+	// Mark that this much stake was delegated to the node.
+	SetLocalDelegatedStake(uint64)
 	// Mark that this much stake is staked in the network.
 	SetTotalStake(uint64)
 	// Mark when this node will unstake from the Primary Network.
@@ -89,6 +91,10 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "local_staked",
 			Help: "Amount (in nAVAX) of AVAX staked on this node",
+		}),
+		localDelegatedStake: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "local_delegated_staked",
+			Help: "Amount (in nAVAX) of AVAX delegated to this node",
 		}),
 		totalStake: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "total_staked",
@@ -152,6 +158,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.timeUntilUnstake),
 		registerer.Register(m.timeUntilSubnetUnstake),
 		registerer.Register(m.localStake),
+		registerer.Register(m.localDelegatedStake),
 		registerer.Register(m.totalStake),
 
 		registerer.Register(m.gasConsumed),
@@ -179,6 +186,7 @@ type metrics struct {
 	timeUntilUnstake       prometheus.Gauge
 	timeUntilSubnetUnstake *prometheus.GaugeVec
 	localStake             prometheus.Gauge
+	localDelegatedStake    prometheus.Gauge
 	totalStake             prometheus.Gauge
 
 	gasConsumed          prometheus.Counter
@@ -227,6 +235,10 @@ func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
 
 func (m *metrics) SetLocalStake(s uint64) {
 	m.localStake.Set(float64(s))
+}
+
+func (m *metrics) SetLocalDelegatedStake(s uint64) {
+	m.localDelegatedStake.Set(float64(s))
 }
 
 func (m *metrics) SetTotalStake(s uint64) {

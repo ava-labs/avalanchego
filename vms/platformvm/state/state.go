@@ -2705,13 +2705,37 @@ func (s *State) updateL1ValidatorManager(
 	return nil
 }
 
+// updateStakeMetrics must run after the validator manager is updated.
 func (s *State) updateStakeMetrics() error {
 	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network: %w", err)
 	}
 
-	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
+	s.metrics.SetLocalStake(localStake)
+
+	var delegatedStake uint64
+	if localStake != 0 {
+		vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
+		if err != nil {
+			return fmt.Errorf("failed to get local validator: %w", err)
+		}
+
+		// The manager's weight includes the validator's own stake. Underflow
+		// means the manager is inconsistent with the current staker state.
+		delegatedStake, err = safemath.Sub(localStake, vdr.Weight)
+		if err != nil {
+			return fmt.Errorf(
+				"local validator weight %d exceeds validator manager weight %d: %w",
+				vdr.Weight,
+				localStake,
+				err,
+			)
+		}
+	}
+	s.metrics.SetLocalDelegatedStake(delegatedStake)
+
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }
