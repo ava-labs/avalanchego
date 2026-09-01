@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
@@ -89,8 +90,15 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 		s.snowCtx.Log.Warn("no last accepted hash")
 		return false
 	}
-	height := rawdb.ReadHeaderNumber(s.db, hash)
-	return height == nil || *height == 0
+	if height := rawdb.ReadHeaderNumber(s.db, hash); height != nil && *height != 0 {
+		s.snowCtx.Log.Info("declining state sync summary; blocks already accepted",
+			zap.Uint64("summaryHeight", summary.AcceptedHeight),
+			zap.Stringer("summaryHash", summary.AcceptedHash),
+			zap.Uint64("localHeight", *height),
+		)
+		return false
+	}
+	return true
 }
 
 // Sync fetches all state associated with [Summary] and applies it to disk.
@@ -106,6 +114,11 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
+	s.snowCtx.Log.Info("starting state sync",
+		zap.Uint64("summaryHeight", summary.AcceptedHeight),
+		zap.Stringer("summaryHash", summary.AcceptedHash),
+	)
+
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
 		syncblock.NewClient(s.network.Network, s.network.PeerTracker, s.metrics.blocks),
@@ -115,9 +128,14 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		summary.AcceptedHeight,
 		numBlocksToFetch,
 	)
+	s.snowCtx.Log.Info("syncing blocks",
+		zap.Uint64("tipHeight", summary.AcceptedHeight),
+		zap.Int("numBlocks", numBlocksToFetch),
+	)
 	if err := blockSyncer.Sync(ctx); err != nil {
 		return err
 	}
+	s.snowCtx.Log.Info("block sync finished")
 
 	// With blocks now on disk, we can find the state root
 	hdr := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
@@ -137,6 +155,9 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
+	s.snowCtx.Log.Info("wiping snapshot before state sync",
+		zap.Stringer("targetRoot", hdr.Root),
+	)
 	if err := graftsnap.WipeSnapshotSync(ctx, s.db); err != nil {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
@@ -160,6 +181,9 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating evm state syncer: %w", err)
 	}
 
+	s.snowCtx.Log.Info("syncing EVM state and contract code",
+		zap.Stringer("stateRoot", hdr.Root),
+	)
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return codeSyncer.Sync(egCtx)
@@ -172,6 +196,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		// This is not required for correctness.
 		return errors.Join(err, evmSyncer.Finalize())
 	}
+	s.snowCtx.Log.Info("EVM state sync finished")
 	return nil
 }
 
@@ -193,6 +218,11 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 	if lastSettled == nil {
 		return fmt.Errorf("couldn't find last settled block at height %d", settledHeight)
 	}
+
+	s.snowCtx.Log.Info("finalizing state sync",
+		zap.Uint64("lastAcceptedHeight", summary.AcceptedHeight),
+		zap.Uint64("settledHeight", settledHeight),
+	)
 
 	if err := s.writeExecutionResults(lastSettled, lastAccepted); err != nil {
 		return err

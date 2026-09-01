@@ -6,6 +6,8 @@ package statesync
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -70,14 +72,24 @@ func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.St
 
 // sync runs the full sync for the accepted summary: the EVM state, the atomic
 // trie state, and the finalizing writes.
+//
+// Failures are logged at Info: the returned error is surfaced to the engine
+// via [Handler.Error], which treats it as fatal.
 func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, summary *summary) error {
 	if err := evmSyncer.Sync(ctx, &summary.summary); err != nil {
+		h.snowCtx.Log.Info("state sync failed", zap.Error(err))
 		return err
 	}
 	if err := h.syncCChainState(ctx, summary); err != nil {
+		h.snowCtx.Log.Info("atomic trie sync failed", zap.Error(err))
 		return err
 	}
-	return evmSyncer.WriteSynced(&summary.summary)
+	if err := evmSyncer.WriteSynced(&summary.summary); err != nil {
+		h.snowCtx.Log.Info("state sync finalization failed", zap.Error(err))
+		return err
+	}
+	h.snowCtx.Log.Info("state sync finished")
+	return nil
 }
 
 func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
@@ -86,6 +98,14 @@ func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
 		return err
 	}
 
+	h.snowCtx.Log.Info("syncing atomic trie",
+		zap.Stringer("atomicRoot", s.settledRoot),
+		zap.Uint64("settledHeight", settledHeight),
+	)
 	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight, h.atomicLeaves)
-	return syncer.Sync(ctx)
+	if err := syncer.Sync(ctx); err != nil {
+		return err
+	}
+	h.snowCtx.Log.Info("atomic trie sync finished")
+	return nil
 }
