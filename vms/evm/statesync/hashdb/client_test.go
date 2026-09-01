@@ -71,7 +71,7 @@ func TestClient_Retries(t *testing.T) {
 				p2p.EVMLeafRequestHandlerID,
 				statesynctest.NewCancelAfter(recording, cancelAfter, cancel),
 			)
-			client := NewClient(log, p2pClient, common.HashLength)
+			client := NewClient(log, p2pClient, common.HashLength, statesynctest.NewRequestMetrics(t))
 
 			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 			require.ErrorIs(t, err, tt.wantErr)
