@@ -58,10 +58,12 @@ go_test(
     ],
     embed = [":statesync"],
     deps = [
+        "//api/metrics",
         "//database",
         "//database/memdb",
         "//ids",
         "//snow",
+        "//snow/engine/enginetest",
         "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",

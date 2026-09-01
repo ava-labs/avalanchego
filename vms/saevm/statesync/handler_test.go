@@ -26,11 +26,11 @@ func TestBlock(t *testing.T) {
 	const numBlocks = defaultCommitInterval + 1
 	vm := newVM(t)
 	vm.acceptBlocks(t, numBlocks)
-	h := vm.summaryHandler
+	h := vm.SummaryHandler
 
 	t.Run("GetBlockIDAtHeight", func(t *testing.T) {
 		for height := uint64(0); height <= numBlocks; height++ {
-			want, err := vm.GetBlockIDAtHeight(t.Context(), height)
+			want, err := vm.vm.GetBlockIDAtHeight(t.Context(), height)
 			require.NoErrorf(t, err, "VM.GetBlockIDAtHeight(%d)", height)
 			got, err := h.GetBlockIDAtHeight(t.Context(), height)
 			require.NoErrorf(t, err, "GetBlockIDAtHeight(%d)", height)
@@ -62,7 +62,7 @@ func TestStateSummary(t *testing.T) {
 	const numBlocks = defaultCommitInterval + 1
 	vm := newVM(t)
 	vm.acceptBlocks(t, numBlocks)
-	h := vm.summaryHandler
+	h := vm.SummaryHandler
 	lastCommitted := vm.blockAtHeight(t, defaultCommitInterval).EthBlock() // last block at a commit boundary
 
 	t.Run("GetLastStateSummary", func(t *testing.T) {

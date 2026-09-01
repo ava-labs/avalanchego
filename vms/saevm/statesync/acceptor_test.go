@@ -69,7 +69,7 @@ func TestShouldAcceptSummary(t *testing.T) {
 			newHandler: func(t *testing.T) *SummaryHandler {
 				vm := newVM(t)
 				vm.acceptBlocks(t, defaultCommitInterval)
-				return vm.summaryHandler
+				return vm.SummaryHandler
 			},
 			getSummary: func(t *testing.T, sh *SummaryHandler) *Summary {
 				s, err := sh.GetLastStateSummary(t.Context())
@@ -112,8 +112,8 @@ func TestStateSyncEndToEnd(t *testing.T) {
 
 	ctx := t.Context()
 
-	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	summary, err := sourceVM.SummaryHandler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
 	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
@@ -132,8 +132,8 @@ func TestStateSyncEndToEnd(t *testing.T) {
 		b := sourceVM.blockAtHeight(t, height)
 		parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
 		require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
+		require.NoErrorf(t, clientVM.vm.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
+		require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
 		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
 	}
 
@@ -168,8 +168,8 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	client := newSUT(t, withDatabase(db), withXDB(xdb))
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	summary, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
 	require.Equal(t, b4.Height(), summary.Height(), "summary at last commit boundary")
 
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
@@ -215,8 +215,8 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		client := newSUT(t, withDatabase(fdb))
 		saetest.ConnectTo[saetest.Peer](t, client, source)
 
-		summary, err := source.summaryHandler.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.summaryHandler)
+		summary, err := source.GetLastStateSummary(ctx)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.SummaryHandler)
 
 		// Setup (e.g. the genesis commit) is done; arm the write budget.
 		fdb.SetFailAfter(failAfter)
@@ -251,8 +251,8 @@ func TestStateSyncLong(t *testing.T) {
 	client := newSUT(t, withDatabase(db), withXDB(xdb))
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-	summary, err := sourceVM.summaryHandler.GetLastStateSummary(t.Context())
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	summary, err := sourceVM.GetLastStateSummary(t.Context())
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
 
 	clientVM := newVM(t,

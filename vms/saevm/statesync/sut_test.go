@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,29 +42,26 @@ import (
 )
 
 type (
-	// vmSUT is a full VM node.
+	sut struct {
+		*SummaryHandler
+		*network.Network
+
+		cfg     *sutConfig
+		snowCtx *snow.Context
+		hooks   *hookstest.Stub
+		keys    *saetest.KeyChain
+		genesis *core.Genesis
+		db      ethdb.Database
+		sender  *saetest.Sender
+		clock   *saetest.Clock
+	}
+
 	vmSUT struct {
-		*sae.SinceGenesis[hookstest.Op]
-		*sutEnv
-
-		// summaryHandler is the state sync side of this node, sharing the VM's
-		// database, network, hooks, and snow context.
-		summaryHandler *SummaryHandler
-
+		*sut
+		vm     *sae.SinceGenesis[hookstest.Op]
 		wallet *saetest.Wallet
 	}
 
-	// shSUT is a standalone [SummaryHandler] node with its own network over a
-	// fresh database, exactly like a node that is about to state sync, with no
-	// VM yet.
-	shSUT struct {
-		*SummaryHandler
-		*network.Network
-		*sutEnv
-	}
-
-	// sutConfig is shared by all SUT constructors; each reads only the fields
-	// relevant to it.
 	sutConfig struct {
 		enabled        bool
 		commitInterval uint64
@@ -74,10 +72,7 @@ type (
 	sutOption = options.Option[sutConfig]
 )
 
-var (
-	_ saetest.Peer = (*vmSUT)(nil)
-	_ saetest.Peer = (*shSUT)(nil)
-)
+var _ saetest.Peer = (*sut)(nil)
 
 func withEnabled(e bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -92,6 +87,7 @@ func withDatabase(db database.Database) sutOption {
 	})
 }
 
+// withXDB provides an execution results database for the hooks.
 func withXDB(h saetypes.ExecutionResults) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.xdb = h
@@ -100,26 +96,12 @@ func withXDB(h saetypes.ExecutionResults) sutOption {
 
 // withTime sets the SUT's clock to a specific time at startup.
 //
-// This is ignored by [newNetworkedSH].
+// This is ignored by [newSUT].
 func withTime(t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.startTime = t
 	})
 }
-
-// sutEnv holds the pieces common to both SUTs.
-type sutEnv struct {
-	snowCtx *snow.Context
-	hooks   *hookstest.Stub
-	keys    *saetest.KeyChain
-	genesis *core.Genesis
-	db      ethdb.Database
-	sender  *saetest.Sender
-	clock   *saetest.Clock
-}
-
-func (e *sutEnv) NodeID() ids.NodeID      { return e.snowCtx.NodeID }
-func (e *sutEnv) Sender() *saetest.Sender { return e.sender }
 
 const (
 	genesisTimestamp      = saeparams.TauSeconds
@@ -139,7 +121,18 @@ var (
 	}
 )
 
-func newSUTEnv(t *testing.T, cfg *sutConfig) *sutEnv {
+// newSUT constructs a standalone [sut] over an otherwise untouched database.
+func newSUT(t *testing.T, opts ...sutOption) *sut {
+	t.Helper()
+
+	cfg := options.ApplyTo(&sutConfig{
+		enabled:        true,
+		commitInterval: defaultCommitInterval,
+		avaDB:          memdb.New(),
+		xdb:            saetest.NewExecutionResultsDB(),
+		startTime:      time.Unix(genesisTimestamp, 0),
+	}, opts...)
+
 	snowCtx := snowtest.Context(t, chainID)
 	snowCtx.Log = loggingtest.New(t, logging.Debug)
 	snowCtx.NodeID = ids.GenerateTestNodeID()
@@ -168,82 +161,20 @@ func newSUTEnv(t *testing.T, cfg *sutConfig) *sutEnv {
 		BaseFee:    big.NewInt(1),
 		Difficulty: big.NewInt(0), // irrelevant but required
 	}
-
-	return &sutEnv{
-		snowCtx: snowCtx,
-		hooks:   hooks,
-		keys:    keys,
-		genesis: genesis,
-		db:      saetypes.NewEthDB(cfg.avaDB),
-		sender:  saetest.NewSender(t, nil),
-		clock:   clock,
-	}
-}
-
-func defaultSUTConfig(opts ...sutOption) *sutConfig {
-	return options.ApplyTo(&sutConfig{
-		enabled:        true,
-		commitInterval: defaultCommitInterval,
-		avaDB:          memdb.New(),
-		xdb:            saetest.NewExecutionResultsDB(),
-		startTime:      time.Unix(genesisTimestamp, 0),
-	}, opts...)
-}
-
-// newSUT constructs a standalone [shSUT] with its own network over an
-// otherwise untouched database; no VM is created.
-func newSUT(t *testing.T, opts ...sutOption) *shSUT {
-	t.Helper()
-
-	cfg := defaultSUTConfig(opts...)
-	env := newSUTEnv(t, cfg)
-
-	net, err := network.New(env.snowCtx, env.sender)
-	require.NoError(t, err, "network.New()")
+	ethDB := saetypes.NewEthDB(cfg.avaDB)
 
 	// The [SummaryHandler] requires the genesis block on disk, but the state
 	// is deliberately committed to a throwaway trie database so that syncing
 	// tests start from an empty state.
-	dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	_, err = env.genesis.Commit(env.db, dummyTrieDB)
-	require.NoErrorf(t, err, "%T.Commit()", env.genesis)
-
-	sut := &shSUT{
-		SummaryHandler: newSummaryHandler(t, cfg, env.snowCtx, env.db, net, env.hooks),
-		Network:        net,
-		sutEnv:         env,
-	}
-	env.sender.Start(t, sut)
-	return sut
-}
-
-// syncTo emulates the behavior of any user would follow, by checking the
-// summary, state syncing, and marking as done.
-func (client *shSUT) syncTo(ctx context.Context, t *testing.T, s *Summary) error {
-	t.Helper()
-
-	should, err := client.ShouldAcceptSummary(s)
-	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", client.SummaryHandler)
-	require.True(t, should, "ShouldAcceptSummary()")
-
-	if err := client.Sync(ctx, s); err != nil {
-		return err
+	if rawdb.ReadCanonicalHash(ethDB, 0) == (ethcommon.Hash{}) {
+		dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
+		_, err := genesis.Commit(ethDB, dummyTrieDB)
+		require.NoErrorf(t, err, "%T.Commit()", genesis)
 	}
 
-	return client.WriteSynced(s)
-}
-
-// newSummaryHandler constructs a [SummaryHandler] over the given database and
-// network and registers its sync server so peers can sync from it.
-func newSummaryHandler(
-	t *testing.T,
-	cfg *sutConfig,
-	snowCtx *snow.Context,
-	db ethdb.Database,
-	net *network.Network,
-	hooks *hookstest.Stub,
-) *SummaryHandler {
-	t.Helper()
+	sender := saetest.NewSender(t, nil)
+	net, err := network.New(snowCtx, sender)
+	require.NoError(t, err, "network.New()")
 
 	handler, err := New(
 		Config{
@@ -252,45 +183,81 @@ func newSummaryHandler(
 			},
 			Enabled: cfg.enabled,
 		},
-		db,
+		ethDB,
 		snowCtx,
 		net,
 		hooks,
 	)
 	require.NoError(t, err, "New()")
-	return handler
+
+	s := &sut{
+		SummaryHandler: handler,
+		Network:        net,
+		cfg:            cfg,
+		snowCtx:        snowCtx,
+		hooks:          hooks,
+		keys:           keys,
+		genesis:        genesis,
+		db:             ethDB,
+		sender:         sender,
+		clock:          clock,
+	}
+
+	s.sender.Start(t, s)
+	return s
 }
 
-// newVM constructs and initializes a VM, ready for blocks to be accepted with
-// [vmSUT.acceptBlocks].
+func (s *sut) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
+func (s *sut) Sender() *saetest.Sender { return s.sender }
+
+// syncTo emulates the behavior any user would follow, by checking the summary,
+// state syncing, and marking as done. Any error in the latter two steps will be
+// returned.
+func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error {
+	t.Helper()
+
+	should, err := s.ShouldAcceptSummary(summary)
+	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", s.SummaryHandler)
+	require.True(t, should, "ShouldAcceptSummary()")
+
+	if err := s.Sync(ctx, summary); err != nil {
+		return err
+	}
+
+	return s.WriteSynced(summary)
+}
+
+// newVM constructs and initializes a VM and a summary handler.
 func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	t.Helper()
 
-	cfg := defaultSUTConfig(opts...)
-	env := newSUTEnv(t, cfg)
+	s := newSUT(t, opts...)
 	ctx := t.Context()
 
-	genesisBytes, err := json.Marshal(env.genesis)
-	require.NoErrorf(t, err, "json.Marshal(%T)", env.genesis)
+	genesisBytes, err := json.Marshal(s.genesis)
+	require.NoErrorf(t, err, "json.Marshal(%T)", s.genesis)
+
+	// The sut's network already registered the "p2p" metrics prefix.
+	s.snowCtx.Metrics = metrics.NewPrefixGatherer()
 
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = ""                // no on-disk journal in tests
-	vm := sae.NewSinceGenesis(env.hooks, sae.Config{
+	vm := sae.NewSinceGenesis(s.hooks, sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig: saedb.Config{
-			CommitInterval: cfg.commitInterval,
+			CommitInterval: s.cfg.commitInterval,
 		},
-		Now: env.clock.Now,
+		Now: s.clock.Now,
 	})
 	require.NoError(t, vm.Initialize(
 		ctx,
-		env.snowCtx,
-		cfg.avaDB,
+		s.snowCtx,
+		s.cfg.avaDB,
 		genesisBytes,
 		nil, // upgrade bytes
 		nil, // config bytes
 		nil, // fxs
-		env.sender,
+		s.sender,
 	), "Initialize()")
 	t.Cleanup(func() {
 		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)), "Shutdown()")
@@ -299,26 +266,21 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(vm.Network.Network, env.db, tdb, snaps, env.snowCtx.Log), "RegisterHandlers")
+	require.NoError(t, RegisterHandlers(s.Network.Network, s.db, tdb, snaps, s.snowCtx.Log), "RegisterHandlers")
 
-	s := &vmSUT{
-		SinceGenesis:   vm,
-		sutEnv:         env,
-		wallet:         saetest.NewWalletWithKeyChain(env.keys, types.LatestSigner(env.genesis.Config)),
-		summaryHandler: newSummaryHandler(t, cfg, env.snowCtx, env.db, vm.Network, env.hooks),
+	return &vmSUT{
+		sut:    s,
+		vm:     vm,
+		wallet: saetest.NewWalletWithKeyChain(s.keys, types.LatestSigner(s.genesis.Config)),
 	}
-
-	env.sender.Start(t, s)
-	return s
 }
 
-// lastAcceptedBlock returns the VM's last accepted block, which is the genesis
-// block if none have been accepted.
+// lastAcceptedBlock returns the VM's last accepted block.
 func (s *vmSUT) lastAcceptedBlock(t *testing.T) *blocks.Block {
 	t.Helper()
 	ctx := t.Context()
 
-	id, err := s.LastAccepted(ctx)
+	id, err := s.vm.LastAccepted(ctx)
 	require.NoError(t, err, "LastAccepted()")
 	return s.getBlock(t, id)
 }
@@ -326,7 +288,7 @@ func (s *vmSUT) lastAcceptedBlock(t *testing.T) *blocks.Block {
 // blockAtHeight returns the VM's accepted block at the given height.
 func (s *vmSUT) blockAtHeight(t *testing.T, height uint64) *blocks.Block {
 	t.Helper()
-	id, err := s.GetBlockIDAtHeight(t.Context(), height)
+	id, err := s.vm.GetBlockIDAtHeight(t.Context(), height)
 	require.NoErrorf(t, err, "GetBlockIDAtHeight(%d)", height)
 	return s.getBlock(t, id)
 }
@@ -334,7 +296,7 @@ func (s *vmSUT) blockAtHeight(t *testing.T, height uint64) *blocks.Block {
 // getBlock returns the VM's block with the given ID.
 func (s *vmSUT) getBlock(t *testing.T, id ids.ID) *blocks.Block {
 	t.Helper()
-	b, err := s.GetBlock(t.Context(), id)
+	b, err := s.vm.GetBlock(t.Context(), id)
 	require.NoErrorf(t, err, "GetBlock(%s)", id)
 	return b
 }
@@ -353,20 +315,20 @@ func (s *vmSUT) acceptBlock(t *testing.T) *blocks.Block {
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 	})
-	backends := s.GethRPCBackends()
+	backends := s.vm.GethRPCBackends()
 	require.NoErrorf(t, backends.SendTx(ctx, tx), "SendTx(%#x)", tx.Hash())
 	txgossiptest.WaitUntilPending(t, ctx, backends, tx)
 
-	parent, err := s.LastAccepted(ctx)
+	parent, err := s.vm.LastAccepted(ctx)
 	require.NoError(t, err, "LastAccepted()")
-	require.NoError(t, s.SetPreference(ctx, parent, nil), "SetPreference()")
+	require.NoError(t, s.vm.SetPreference(ctx, parent, nil), "SetPreference()")
 
-	b, err := s.BuildBlock(ctx, nil)
-	require.NoErrorf(t, err, "%T.BuildBlock()", s.VM)
-	require.Lenf(t, b.Transactions(), 1, "%T.BuildBlock() transactions", s.VM)
+	b, err := s.vm.BuildBlock(ctx, nil)
+	require.NoErrorf(t, err, "%T.BuildBlock()", s.vm)
+	require.Lenf(t, b.Transactions(), 1, "%T.BuildBlock() transactions", s.vm)
 
-	require.NoErrorf(t, s.VerifyBlock(ctx, nil, b), "%T.VerifyBlock()", s.VM)
-	require.NoErrorf(t, s.AcceptBlock(ctx, b), "%T.AcceptBlock()", s.VM)
+	require.NoErrorf(t, s.vm.VerifyBlock(ctx, nil, b), "%T.VerifyBlock()", s.vm)
+	require.NoErrorf(t, s.vm.AcceptBlock(ctx, b), "%T.AcceptBlock()", s.vm)
 	require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
 
 	return b
