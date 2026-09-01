@@ -54,7 +54,7 @@ type Block struct {
 	// Allows this block to be ruled out as able to be settled at a particular
 	// time (i.e. if this field is >= said time). The pointer MAY be nil if
 	// execution is yet to commence. For more details, see
-	// [Block.SetInterimExecutionTime for setting and [LastToSettleAt] for
+	// [Block.SwapInterimExecutionTime] for setting and [LastToSettleAt] for
 	// usage.
 	interimExecutionTime atomic.Pointer[proxytime.Time[gas.Gas]]
 
@@ -82,10 +82,11 @@ func InMemoryBlockCount() int64 {
 // Block. The provided `hooks` MUST NOT be nil.
 func New(eth *types.Block, parent, lastSettled *Block, hooks hook.Points, log logging.Logger) (*Block, error) {
 	b := &Block{
-		b:        eth,
-		executed: make(chan struct{}),
-		settled:  make(chan struct{}),
-		hooks:    hooks,
+		b:           eth,
+		synchronous: hook.Synchronous(hooks, eth.Header()),
+		executed:    make(chan struct{}),
+		settled:     make(chan struct{}),
+		hooks:       hooks,
 		log: log.With(
 			zap.Uint64("block_height", eth.NumberU64()),
 			zap.Stringer("block_hash", eth.Hash()),
@@ -139,6 +140,8 @@ func (b *Block) SetAncestors(parent, lastSettled *Block) error {
 			return fmt.Errorf("%w: constructing Block with parent height %v and own height %v", errBlockHeightNotIncrementing, parent.Number(), b.Number())
 		}
 	}
+	// TODO(arr4n) add invariant checks for `lastSettled` as
+	// [hook.Points.SettledBy] is analogous to the parent checks.
 	b.ancestry.Store(&ancestry{
 		parent:      parent,
 		lastSettled: lastSettled,

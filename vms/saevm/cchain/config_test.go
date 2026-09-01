@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
@@ -34,6 +35,7 @@ func TestParseConfig(t *testing.T) {
 		mod(&c)
 		return c
 	}
+	nodeID := ids.GenerateTestNodeID()
 
 	tests := []struct {
 		name      string
@@ -201,6 +203,15 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.StateSyncEnabled = false }),
 		},
 
+		// Internal
+		{
+			name: "internal/state_sync_ids",
+			json: fmt.Sprintf(`{"state-sync-ids":["%s"]}`, nodeID),
+			want: with(func(c *config) {
+				c.StateSyncIDs = set.Of(nodeID)
+			}),
+		},
+
 		// All active fields
 		{
 			name: "all_active_fields",
@@ -222,7 +233,8 @@ func TestParseConfig(t *testing.T) {
 				"batch-request-limit":50,
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"],
-				"api-resolve-pending-to-last-executed":true
+				"api-resolve-pending-to-last-executed":true,
+				"state-sync-ids":["` + nodeID.String() + `"]
 			}`,
 			want: config{
 				PriceTarget:                  utils.PointerTo(gas.Price(500)),
@@ -243,6 +255,9 @@ func TestParseConfig(t *testing.T) {
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
 				StateSyncEnabled:             false,
+				internalConfig: internalConfig{
+					StateSyncIDs: set.Of(nodeID),
+				},
 			},
 		},
 	}

@@ -5,11 +5,13 @@ package blocks
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -20,11 +22,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -49,23 +54,30 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 
-	ethB := types.NewBlock(
-		&types.Header{
-			Number: big.NewInt(1),
-			Time:   42,
-		},
-		txs,
-		nil, nil, // uncles, receipts
-		saetest.TrieHasher(),
-	)
 	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteBlock(db, ethB)
 	xdb := saetest.NewExecutionResultsDB()
-
-	settles := newBlock(t, newEthBlock(0, 0, nil), nil, nil)
 	tm := mustNewGasTime(t, time.Unix(0, 0), 1, 0, gastime.DefaultGasPriceConfig())
+
+	settles := newBlock(t, newSynchronousEthBlock(t, 1, 0, nil), nil, nil)
 	settles.markExecutedForTests(t, db, xdb, tm)
-	b := newBlock(t, ethB, nil, settles)
+
+	parent := newBlock(t, newEthBlock(t, 2, 10, settles.EthBlock(), settles), settles, settles)
+
+	ethB, err := hookstest.BuildBlock(
+		&types.Header{
+			Number:     big.NewInt(3),
+			Time:       42,
+			ParentHash: parent.Hash(),
+		},
+		nil, // blockContext
+		txs,
+		nil, // receipts
+		nil, // ops
+		hook.Settled{Height: settles.Height()},
+	)
+	require.NoError(t, err, "hookstest.BuildBlock(...)")
+	rawdb.WriteBlock(db, ethB)
+	b := newBlock(t, ethB, parent, settles)
 
 	t.Run("before_MarkExecuted", func(t *testing.T) {
 		require.False(t, b.Executed(), "Executed()")
@@ -169,28 +181,136 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
-func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
-	// need well-formed receipt hash for invariants check.
-	ethB := types.NewBlockWithHeader(&types.Header{
-		Number:      big.NewInt(1),
-		BaseFee:     big.NewInt(1),
-		Time:        42,
-		ReceiptHash: types.EmptyRootHash,
+// errAll requires the error to satisfy every `want`. [testerr] provides only
+// primitive matchers, leaving their composition to the caller.
+func errAll(wants ...testerr.Want) testerr.Want {
+	return testerr.Func(func(got error) string {
+		for _, w := range wants {
+			if diff := w.ErrDiff(got); diff != "" {
+				return diff
+			}
+		}
+		return ""
 	})
-	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteBlock(db, ethB)
+}
 
-	// An empty execution-results DB is what signals the block is synchronous.
-	xdb := saetest.NewExecutionResultsDB()
-	b := newBlock(t, ethB, nil, nil)
-	require.NoErrorf(t, b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
+// errIsNot requires that the error does NOT wrap `target`; a nil error
+// trivially satisfies this.
+func errIsNot(target error) testerr.Want {
+	return testerr.Func(func(got error) string {
+		if errors.Is(got, target) {
+			return testerr.DiffMessage(got, "error that is not %v", target)
+		}
+		return ""
+	})
+}
 
-	assert.Truef(t, b.Executed(), "%T.Executed()", b)
-	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
-	// See method comment re user responsibility for settlement.
-	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
-	// A synchronous block is its own last-settled block.
-	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
+func TestRestoreExecutionArtefacts(t *testing.T) {
+	const height = 2
+	asynchronous := hook.Settled{Height: height - 1}
+
+	markExecuted := func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
+		t.Helper()
+
+		hdr := ethB.Header()
+		target, cfg := hooks.GasConfigAfter(hdr)
+		tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
+		newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
+	}
+
+	putCorruptResults := func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, ethB *types.Block) {
+		t.Helper()
+		require.NoErrorf(t, xdb.Put(ethB.NumberU64(), []byte("not canoto")), "%T.Put()", xdb)
+	}
+
+	tests := []struct {
+		name     string
+		settled  hook.Settled
+		txs      []*types.Transaction
+		hookOpts []hookstest.HookOption
+		setupDBs func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
+		wantErr  testerr.Want
+	}{
+		{
+			name:    "asynchronous_missing_execution_results",
+			settled: asynchronous,
+			wantErr: testerr.Is(ErrMissingExecutionResults),
+		},
+		{
+			name:     "asynchronous_corrupt_execution_results",
+			settled:  asynchronous,
+			setupDBs: putCorruptResults,
+			wantErr:  testerr.Is(ErrMissingExecutionResults),
+		},
+		{
+			name:    "asynchronous_unreadable_execution_results",
+			settled: asynchronous,
+			setupDBs: func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, _ *types.Block) {
+				t.Helper()
+				require.NoErrorf(t, xdb.Close(), "%T.Close()", xdb)
+			},
+			wantErr: errAll(
+				testerr.Is(ErrMissingExecutionResults),
+				testerr.Is(database.ErrClosed),
+			),
+		},
+		{
+			name:     "asynchronous_missing_receipts",
+			settled:  asynchronous,
+			txs:      []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
+			setupDBs: markExecuted,
+			wantErr: errAll(
+				errIsNot(ErrMissingExecutionResults),
+				testerr.Contains("deriving receipt fields"),
+			),
+		},
+		{
+			name:     "synchronous_ignores_execution_results",
+			setupDBs: putCorruptResults,
+		},
+		{
+			name:     "synchronous_gas_time_error",
+			hookOpts: []hookstest.HookOption{hookstest.WithGasPriceConfig(gastime.GasPriceConfig{})},
+			wantErr:  testerr.Is(ErrMissingExecutionResults),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ethB, err := hookstest.BuildBlock(
+				&types.Header{
+					Number:  big.NewInt(height),
+					BaseFee: big.NewInt(1),
+					Time:    42,
+				},
+				nil, tt.txs, nil, nil, tt.settled,
+			)
+			require.NoError(t, err, "hookstest.BuildBlock()")
+
+			hooks := hookstest.NewStub(1e6, tt.hookOpts...)
+			db := rawdb.NewMemoryDatabase()
+			xdb := saetest.NewExecutionResultsDB()
+			if tt.setupDBs != nil {
+				tt.setupDBs(t, db, xdb, hooks, ethB)
+			}
+
+			b, err := New(ethB, nil, nil, hooks, loggingtest.New(t, logging.Warn))
+			require.NoError(t, err, "New()")
+			err = b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig())
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("%T.RestoreExecutionArtefacts() %s", b, diff)
+			}
+			if tt.wantErr != nil {
+				return
+			}
+
+			synchronous := hook.Synchronous(hooks, ethB.Header())
+			require.NoErrorf(t, b.CheckInvariants(Executed), "%T.CheckInvariants(Executed)", b)
+			require.Equalf(t, synchronous, b.Synchronous(), "%T.Synchronous()", b)
+			require.Falsef(t, b.Settled(), "%T.Settled()", b)
+			require.Equalf(t, synchronous, b == b.LastSettled(), "%T is its own LastSettled()", b)
+		})
+	}
 }
 
 // selfAsHasher adds a Hash() method to a common.Hash, returning itself.

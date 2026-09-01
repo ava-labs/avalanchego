@@ -85,17 +85,17 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	block.ChainVM
 	*ethclient.Client
-	rpcClient *rpc.Client
 
-	rawVM   *VM
-	genesis *blocks.Block
-	wallet  *saetest.Wallet
-	db      ethdb.Database
-	hooks   *hookstest.Stub
-	logger  *loggingtest.Logger
-
+	wallet *saetest.Wallet
+	db     ethdb.Database
+	hooks  *hookstest.Stub
+	logger *loggingtest.Logger
 	sender *saetest.Sender
-	close  func()
+
+	rpcClient *rpc.Client
+	rawVM     *VM
+	genesis   *blocks.Block
+	close     func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -133,7 +133,9 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
-func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+// tryNewSUT constructs a [SUT], returning any initialization error. Tests
+// SHOULD use [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
 
 	// gasTarget is approximately the current C-Chain mainnet gas target as of
@@ -184,7 +186,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	if err := snow.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -193,7 +195,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // config bytes (not ChainConfig)
 		nil, // Fxs
 		sender,
-	), "Initialize()")
+	); err != nil {
+		return nil, err
+	}
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -208,9 +212,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
-	tb.Cleanup(func() {
-		closeOnce()
-	})
+	tb.Cleanup(closeOnce)
 
 	// Avalanchego marks the local node as connected so that p2p protocols
 	// don't need to treat our node as a special case.
@@ -218,11 +220,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		ChainVM: snow,
+		Client:  ethClient,
+
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
@@ -230,12 +230,23 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
-		close:  closeOnce,
-
 		sender: sender,
+
+		rpcClient: rpcClient,
+		rawVM:     vm.VM,
+		genesis:   vm.last.settled.Load(),
+		close:     closeOnce,
 	}
 	sender.Start(tb, sut)
-	return ctx, sut
+	return sut, nil
+}
+
+func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+	tb.Helper()
+
+	sut, err := tryNewSUT(tb, numAccounts, opts...)
+	require.NoError(tb, err, "Initialize()")
+	return sut.context(tb), sut
 }
 
 func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {

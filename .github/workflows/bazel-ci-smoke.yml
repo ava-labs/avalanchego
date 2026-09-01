@@ -1,0 +1,94 @@
+name: Bazel Smoke Test Jobs
+
+# Reusable Bazel CI workflow for the unit-test and E2E smoke tests.
+on:
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
+  BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
+  BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Aggregate the per-platform Bazel checks into one stable required job.
+  bazel-required:
+    if: ${{ always() }}
+    needs:
+      - setup
+      - unit-smoke
+      - e2e-smoke
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
+  # Prepare Bazel CI for this platform before the smoke tests run.
+  setup:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+        with:
+          initial-setup: true
+      - name: Log Bazel disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-bazel
+
+  unit-smoke:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run Bazel unit-test smoke test
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh bazel-test-unit-smoke
+
+  e2e-smoke:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run E2E smoke test with Bazel-built binary
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh bazel-test-e2e-smoke
+          setup_bazel: 'true'
+          artifact_prefix: e2e-bazel-smoke-${{ inputs.platform_name }}
+          filter_by_owner: avalanchego-e2e
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
