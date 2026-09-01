@@ -6,6 +6,8 @@ package statesync
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -48,15 +50,24 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, summary *summary) (b
 		defer h.cancel()
 		defer close(h.done) // result barrier: h.err is now readable
 
+		// Failures are logged at Info: the error is surfaced to the engine
+		// via [SummaryHandler.Error], which treats it as fatal.
 		if err := h.SummaryHandler.StateSync(ctx, &summary.summary); err != nil {
+			h.log.Info("state sync failed", zap.Error(err))
 			h.err.Set(err)
 			return
 		}
 		if err := h.syncCChainState(ctx, summary); err != nil {
+			h.log.Info("atomic trie sync failed", zap.Error(err))
 			h.err.Set(err)
 			return
 		}
-		h.err.Set(h.OnFinish(&summary.summary))
+		if err := h.OnFinish(&summary.summary); err != nil {
+			h.log.Info("state sync finalization failed", zap.Error(err))
+			h.err.Set(err)
+			return
+		}
+		h.log.Info("state sync finished")
 	}()
 	return block.StateSyncStatic, nil
 }
@@ -67,6 +78,14 @@ func (h *SummaryHandler) syncCChainState(ctx context.Context, s *summary) error 
 		return err
 	}
 
+	h.log.Info("syncing atomic trie",
+		zap.Stringer("atomicRoot", s.settledRoot),
+		zap.Uint64("settledHeight", settledHeight),
+	)
 	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight, h.atomicLeaves)
-	return syncer.Sync(ctx)
+	if err := syncer.Sync(ctx); err != nil {
+		return err
+	}
+	h.log.Info("atomic trie sync finished")
+	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -66,11 +67,19 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.S
 		defer h.cancel()
 		defer close(h.done)
 
+		// Failures are logged at Info: the error is surfaced to the engine
+		// via [SummaryHandler.Error], which treats it as fatal.
 		if err := h.StateSync(ctx, s); err != nil {
+			h.snowCtx.Log.Info("state sync failed", zap.Error(err))
 			h.err.Set(fmt.Errorf("state sync failed: %w", err))
 			return
 		}
-		h.err.Set(h.OnFinish(s))
+		if err := h.OnFinish(s); err != nil {
+			h.snowCtx.Log.Info("state sync finalization failed", zap.Error(err))
+			h.err.Set(err)
+			return
+		}
+		h.snowCtx.Log.Info("state sync finished")
 	}()
 
 	return block.StateSyncStatic, nil
@@ -120,7 +129,15 @@ func (h *SummaryHandler) shouldAcceptSummary(s *Summary) (bool, error) {
 	if height := rawdb.ReadHeaderNumber(h.db, hash); height != nil {
 		localHeight = *height
 	}
-	return s.AcceptedHeight > localHeight, nil
+	if s.AcceptedHeight <= localHeight {
+		h.snowCtx.Log.Info("declining state sync summary at or below local height",
+			zap.Uint64("summaryHeight", s.AcceptedHeight),
+			zap.Stringer("summaryHash", s.AcceptedHash),
+			zap.Uint64("localHeight", localHeight),
+		)
+		return false, nil
+	}
+	return true, nil
 }
 
 // Error returns an error surfaced in [SummaryHandler.AcceptSummary]. To ensure
@@ -144,6 +161,10 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 	// sync started by a handler wrapping this one is also reported by
 	// [SummaryHandler.SyncProgressOf].
 	h.target.Set(s)
+	h.snowCtx.Log.Info("starting state sync",
+		zap.Uint64("summaryHeight", s.AcceptedHeight),
+		zap.Stringer("summaryHash", s.AcceptedHash),
+	)
 
 	blockSyncer := syncblock.NewSyncer(
 		h.snowCtx.Log,
@@ -154,9 +175,14 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		s.AcceptedHeight,
 		numBlocksToFetch,
 	)
+	h.snowCtx.Log.Info("syncing blocks",
+		zap.Uint64("tipHeight", s.AcceptedHeight),
+		zap.Int("numBlocks", numBlocksToFetch),
+	)
 	if err := blockSyncer.Sync(ctx); err != nil {
 		return err
 	}
+	h.snowCtx.Log.Info("block sync finished")
 
 	// With blocks now on disk, we can find the state root
 	hdr := rawdb.ReadHeader(h.db, s.AcceptedHash, s.AcceptedHeight)
@@ -171,6 +197,9 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		return fmt.Errorf("checking whether to wipe snapshot: %w", err)
 	}
 	if shouldWipe {
+		h.snowCtx.Log.Info("wiping stale snapshot before state sync",
+			zap.Stringer("targetRoot", hdr.Root),
+		)
 		if err := h.wipeSnapshot(ctx); err != nil {
 			return err
 		}
@@ -203,6 +232,9 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		return fmt.Errorf("creating evm state syncer: %w", err)
 	}
 
+	h.snowCtx.Log.Info("syncing EVM state and contract code",
+		zap.Stringer("stateRoot", hdr.Root),
+	)
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return codeSyncer.Sync(egCtx)
@@ -216,6 +248,7 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		}
 		return err
 	}
+	h.snowCtx.Log.Info("EVM state sync finished")
 	return nil
 }
 
@@ -372,6 +405,11 @@ func (h *SummaryHandler) OnFinish(s *Summary) error {
 	if lastSettled == nil {
 		return fmt.Errorf("couldn't find last settled block at height %d", settledHeight)
 	}
+
+	h.snowCtx.Log.Info("finalizing state sync",
+		zap.Uint64("lastAcceptedHeight", s.AcceptedHeight),
+		zap.Uint64("settledHeight", settledHeight),
+	)
 
 	if err := h.persistExecutionResults(lastSettled, lastAccepted); err != nil {
 		return err
