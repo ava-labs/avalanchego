@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,6 +18,15 @@ import (
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
+
+// newTestHandlerMetrics returns [handlerMetrics] on a registry private to the
+// test.
+func newTestHandlerMetrics(tb testing.TB) *handlerMetrics {
+	tb.Helper()
+	m, err := newHandlerMetrics(prometheus.NewRegistry())
+	require.NoError(tb, err, "newHandlerMetrics()")
+	return m
+}
 
 func TestResponder(t *testing.T) {
 	// The chain is longer than maxBlocksPerResponse so the cap truncates a full
@@ -80,8 +90,9 @@ func TestResponder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &responder{
-				log: loggingtest.New(t, logging.Debug),
-				db:  db,
+				log:     loggingtest.New(t, logging.Debug),
+				db:      db,
+				metrics: newTestHandlerMetrics(t),
 			}
 
 			ctx, cancel := context.WithCancel(t.Context())

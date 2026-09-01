@@ -18,6 +18,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync",
     visibility = ["//visibility:public"],
     deps = [
+        "//api/metrics",
         "//database",
         "//ids",
         "//network/p2p",
@@ -26,6 +27,7 @@ go_library(
         "//snow/engine/snowman/block",
         "//utils",
         "//utils/logging",
+        "//vms/evm/sync/network",
         "//vms/saevm/adaptor",
         "//vms/saevm/cchain/state",
         "//vms/saevm/hook",
@@ -37,6 +39,7 @@ go_library(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//triedb",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stephenbuttolph_canoto//:canoto",
         "@org_uber_go_zap//:zap",
     ],

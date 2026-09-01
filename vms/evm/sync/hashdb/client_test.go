@@ -71,7 +71,7 @@ func TestClient_Retries(t *testing.T) {
 				p2p.EVMLeafRequestHandlerID,
 				synctest.NewCancelAfter(recording, cancelAfter, cancel),
 			)
-			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker, synctest.NewRequestMetrics(t))
 
 			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 			require.ErrorIs(t, err, tt.wantErr)

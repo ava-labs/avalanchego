@@ -38,13 +38,7 @@ func (h *Handler) Error() error {
 //
 // AcceptSummary MUST only be called once.
 func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.StateSyncMode, error) {
-	evmSyncer := statesync.NewSyncer(
-		h.cfg,
-		h.hooks,
-		h.snowCtx,
-		h.network,
-		h.ethDB,
-	)
+	evmSyncer := h.Handler.Syncer()
 	shouldSync := evmSyncer.ShouldAcceptSummary(&summary.summary)
 	if !shouldSync {
 		return block.StateSyncSkipped, nil
@@ -56,22 +50,34 @@ func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.St
 		return block.StateSyncSkipped, nil
 	}
 
+	// Recorded before the sync goroutine starts, so a sync is never observable
+	// through its side effects without also being observable in the metrics.
+	h.Handler.MarkSyncStarted(&summary.summary)
+
 	ctx, h.cancel = context.WithCancel(context.Background())
 	go func() {
 		defer h.cancel()
 		defer close(h.done) // result barrier: h.err is now readable
 
-		if err := evmSyncer.Sync(ctx, &summary.summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		if err := h.syncCChainState(ctx, summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		h.err.Set(evmSyncer.WriteSynced(&summary.summary))
+		err := h.sync(ctx, evmSyncer, summary)
+		// Marked after the sync's final write and before done closes, so that
+		// an observer that saw the sync finish also sees its outcome.
+		h.Handler.MarkSyncFinished(err)
+		h.err.Set(err)
 	}()
 	return block.StateSyncStatic, nil
+}
+
+// sync runs the full sync for the accepted summary: the EVM state, the atomic
+// trie state, and the finalizing writes.
+func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, summary *summary) error {
+	if err := evmSyncer.Sync(ctx, &summary.summary); err != nil {
+		return err
+	}
+	if err := h.syncCChainState(ctx, summary); err != nil {
+		return err
+	}
+	return evmSyncer.WriteSynced(&summary.summary)
 }
 
 func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
@@ -80,6 +86,6 @@ func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
 		return err
 	}
 
-	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
+	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight, h.atomicLeaves)
 	return syncer.Sync(ctx)
 }

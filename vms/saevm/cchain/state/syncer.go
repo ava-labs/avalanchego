@@ -10,17 +10,19 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 )
 
 // RegisterSyncHandler allows the [State] to serve its data to state-syncing
-// peers.
-func RegisterSyncHandler(n *p2p.Network, state *State) error {
-	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength)
+// peers, counting the served requests on reg.
+func RegisterSyncHandler(n *p2p.Network, state *State, reg prometheus.Registerer) error {
+	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength, reg)
 }
 
 // Syncer fetches the cross-chain state from peers, applies it to a [State],
@@ -36,9 +38,9 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new cross-chain trie syncer. The [State] MUST NOT be
-// altered concurrently with the syncer.
-func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
+// NewSyncer creates a new cross-chain trie syncer, counting its requests on m.
+// The [State] MUST NOT be altered concurrently with the syncer.
+func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64, m *network.Metrics) *Syncer {
 	return &Syncer{
 		fetcher: hashdb.NewClient(
 			state.snowCtx.Log,
@@ -46,6 +48,7 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 			p2p.EVMAtomicLeafRequestHandlerID,
 			keyLength,
 			pt,
+			m,
 		),
 		targetRoot:   root,
 		targetHeight: height,

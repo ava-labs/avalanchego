@@ -237,9 +237,12 @@ func newTestDispatcher[Req, Resp proto.Message](
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
 	t.Helper()
+	m, err := NewMetrics(prometheus.NewRegistry(), "test")
+	require.NoError(t, err, "NewMetrics()")
 	return &Dispatcher[Req, Resp]{
-		client: p2ptest.NewSelfClient(t, ctx, nodeID, h),
-		peers:  peers,
+		client:  p2ptest.NewSelfClient(t, ctx, nodeID, h),
+		peers:   peers,
+		metrics: m,
 	}
 }
 

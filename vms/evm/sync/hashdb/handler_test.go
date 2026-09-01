@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,7 +43,16 @@ func TestErrorSentinels(t *testing.T) {
 
 func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
 	tb.Helper()
-	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, newTestHandlerMetrics(tb), opts...)
+}
+
+// newTestHandlerMetrics returns [handlerMetrics] on a registry private to the
+// test.
+func newTestHandlerMetrics(tb testing.TB) *handlerMetrics {
+	tb.Helper()
+	m, err := newHandlerMetrics(prometheus.NewRegistry())
+	require.NoError(tb, err, "newHandlerMetrics()")
+	return m
 }
 
 func TestResponder_AppErrors(t *testing.T) {
@@ -210,6 +220,7 @@ func TestResponder(t *testing.T) {
 				p2p.EVMLeafRequestHandlerID,
 				trieDB,
 				common.HashLength,
+				prometheus.NewRegistry(),
 				WithSnapshot(tt.snapshot),
 			))
 			client := NewClient(
@@ -218,6 +229,7 @@ func TestResponder(t *testing.T) {
 				p2p.EVMLeafRequestHandlerID,
 				common.HashLength,
 				tracker,
+				synctest.NewRequestMetrics(t),
 			)
 
 			got, more, err := client.FetchLeaves(ctx, tt.req)
@@ -336,7 +348,7 @@ func TestFillFromSnapshot(t *testing.T) {
 			snap.OpenErr = test.openErr
 			snap.IterErr = test.iterErr
 
-			more, err := fillFromSnapshot(test.snapshot, test.trie, test.r)
+			more, err := fillFromSnapshot(newTestHandlerMetrics(t), test.snapshot, test.trie, test.r)
 			require.NoError(t, err)
 			got := Leaves{Keys: test.r.keys, Vals: test.r.vals}
 			require.Empty(t, cmp.Diff(test.want, got, cmpopts.EquateEmpty()))

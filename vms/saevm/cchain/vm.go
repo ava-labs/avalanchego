@@ -302,7 +302,7 @@ func (vm *VM) Initialize(
 				// The triedb shouldn't share a cache with execution.
 				tdb := triedb.NewDatabase(ethDB, tdbConfig)
 				_, snaps := vm.VM.EVMState()
-				if err := statesync.RegisterServer(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
+				if err := vm.Handler.RegisterServer(tdb, snaps); err != nil {
 					return fmt.Errorf("registering state sync server: %w", err)
 				}
 			}

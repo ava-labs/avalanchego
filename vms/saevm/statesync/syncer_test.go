@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -100,6 +101,24 @@ func TestStateSyncEndToEnd(t *testing.T) {
 	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+	// The sync must be visible on both sides' metrics: the client counted the
+	// requests it sent, and the source counted the requests it served. Code is
+	// deliberately absent: the client's genesis commit already wrote the only
+	// contract's code to its database, so no code request is ever needed.
+	for _, name := range []string{
+		"sync_state_trie_leaves_requested",
+		"sync_state_trie_leaves_received",
+		"sync_blocks_received",
+	} {
+		requireCounterPositive(t, client.reg, name)
+	}
+	for _, name := range []string{
+		"leafs_request_count",
+		"block_request_count",
+	} {
+		requireCounterPositive(t, sourceVM.reg, name)
+	}
 
 	// During the sync, the network continued processing
 	sourceVM.acceptBlocks(t, numBlocks)
@@ -368,4 +387,25 @@ func TestSyncAfterAbandonedSync(t *testing.T) {
 	client = newSUT(t, withDatabase(db))
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+}
+
+// requireCounterPositive asserts that the counter named name is registered on
+// reg and has been incremented.
+func requireCounterPositive(t *testing.T, reg *prometheus.Registry, name string) {
+	t.Helper()
+
+	mfs, err := reg.Gather()
+	require.NoError(t, err, "reg.Gather()")
+	for _, mf := range mfs {
+		if mf.GetName() != name {
+			continue
+		}
+		var total float64
+		for _, m := range mf.GetMetric() {
+			total += m.GetCounter().GetValue()
+		}
+		require.Positivef(t, total, "counter %q", name)
+		return
+	}
+	t.Fatalf("counter %q not registered", name)
 }
