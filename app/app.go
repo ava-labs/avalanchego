@@ -153,9 +153,6 @@ func (a *app) Start() {
 		// If [p.node.Dispatch()] panics, then we should log the panic and
 		// then re-raise the panic. This is why the above defer is broken
 		// into two parts.
-		//
-		// StopOnPanic MUST be deferred directly. A wrapping closure puts the
-		// recover() call one frame too deep, where it always returns nil.
 		defer a.log.StopOnPanic()
 
 		err := a.node.Dispatch()

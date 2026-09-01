@@ -134,6 +134,9 @@ func (l *log) SetLevel(level Level) {
 	}
 }
 
+// StopOnPanic MUST be deferred directly (`defer l.StopOnPanic()`). Deferring a
+// closure that calls it puts this recover() one frame too deep, where it always
+// returns nil.
 func (l *log) StopOnPanic() {
 	if r := recover(); r != nil {
 		l.Fatal("panicking", zap.Any("reason", r), zap.Stack("from"))
