@@ -52,6 +52,17 @@ func (d duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
+const (
+	// defaultAPIMaxDuration is the [config.APIMaxDuration] used when an operator
+	// leaves it unset.
+	defaultAPIMaxDuration = 10 * time.Second
+	// rpcGasCap limits the gas an eth_call can use.
+	rpcGasCap = 50_000_000
+	// rpcTxFeeCap limits the fee, in AVAX, of a transaction sent over RPC. The
+	// fee is the gas price times the gas limit.
+	rpcTxFeeCap = 100
+)
+
 // config is the operator-supplied node configuration for the C-Chain, decoded
 // from the configBytes passed to [VM.Initialize].
 //
@@ -123,12 +134,15 @@ func defaultConfig() config {
 		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
 		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
-		APIMaxDuration:               duration{rpc.DefaultEVMTimeout},
+		APIMaxDuration:               duration{defaultAPIMaxDuration},
 		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
 	}
 }
 
-var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+var (
+	errProductionCommitInterval  = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+	errNonPositiveAPIMaxDuration = errors.New("api-max-duration must be positive")
+)
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values.
@@ -140,6 +154,9 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+	if c.APIMaxDuration.Duration <= 0 {
+		return config{}, fmt.Errorf("%w: %v", errNonPositiveAPIMaxDuration, c.APIMaxDuration.Duration)
 	}
 	saeCfg := c.saeConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
@@ -178,8 +195,8 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			EVMTimeout:          c.APIMaxDuration.Duration,
 			// gas and tx-fee caps are deliberately not operator-configurable
 			// but we must set them because their zero values disable the caps.
-			GasCap:                       rpc.DefaultGasCap,
-			TxFeeCap:                     rpc.DefaultTxFeeCap,
+			GasCap:                       rpcGasCap,
+			TxFeeCap:                     rpcTxFeeCap,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,

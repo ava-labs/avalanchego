@@ -65,7 +65,6 @@ import (
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
-	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
@@ -157,11 +156,6 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 			MempoolConfig: mempoolConf,
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
-			},
-			RPCConfig: saerpc.Config{
-				EVMTimeout: saerpc.DefaultEVMTimeout,
-				GasCap:     saerpc.DefaultGasCap,
-				TxFeeCap:   saerpc.DefaultTxFeeCap,
 			},
 		},
 		logLevel: logging.Debug,

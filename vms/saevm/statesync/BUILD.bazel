@@ -56,7 +56,6 @@ go_test(
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/params",
         "//vms/saevm/sae",
-        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/types",

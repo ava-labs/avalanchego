@@ -69,42 +69,24 @@ type Config struct {
 
 	// Resource limits
 	BlocksPerBloomSection uint64
-	BatchRequestLimit     uint64 // 0 = no limit
 	EVMTimeout            time.Duration
 	GasCap                uint64
+	BatchRequestLimit     uint64 // 0 = no limit
 
 	// Transaction submission
-	TxFeeCap            float64 // in whole units of the chain's native token
+	TxFeeCap            float64 // 0 = no cap
 	AllowUnprotectedTxs bool
 
 	ResolvePendingToLastExecuted bool
 }
 
-var (
-	// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an
-	// int.
-	ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
-	// ErrNonPositiveEVMTimeout means [Config.EVMTimeout] is zero or negative.
-	ErrNonPositiveEVMTimeout = errors.New("EVM timeout must be positive")
-	// ErrZeroGasCap means [Config.GasCap] is zero, which disables the cap.
-	ErrZeroGasCap = errors.New("gas cap must be non-zero")
-	// ErrNonPositiveTxFeeCap means [Config.TxFeeCap] is zero or negative.
-	ErrNonPositiveTxFeeCap = errors.New("tx fee cap must be positive")
-)
+// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
+var ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
 
 // Verify checks that all values in c are within usable bounds.
 func (c Config) Verify() error {
 	if c.BatchRequestLimit > math.MaxInt {
 		return fmt.Errorf("%w: %d > %d", ErrBatchRequestLimitTooLarge, c.BatchRequestLimit, math.MaxInt)
-	}
-	if c.EVMTimeout <= 0 {
-		return fmt.Errorf("%w: %v", ErrNonPositiveEVMTimeout, c.EVMTimeout)
-	}
-	if c.GasCap == 0 {
-		return ErrZeroGasCap
-	}
-	if c.TxFeeCap <= 0 {
-		return fmt.Errorf("%w: %v", ErrNonPositiveTxFeeCap, c.TxFeeCap)
 	}
 	return nil
 }

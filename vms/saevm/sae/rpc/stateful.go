@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -29,6 +30,14 @@ import (
 )
 
 var noopRelease tracers.StateReleaseFunc = func() {}
+
+func (b *backend) RPCEVMTimeout() time.Duration {
+	return b.config.EVMTimeout
+}
+
+func (b *backend) RPCGasCap() uint64 {
+	return b.config.GasCap
+}
 
 func (*backend) Engine() consensus.Engine {
 	return (*coinbaseAsAuthor)(nil)

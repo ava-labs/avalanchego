@@ -6,7 +6,6 @@ package rpc
 import (
 	"context"
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
@@ -17,26 +16,6 @@ import (
 
 func (b *backend) ChainDb() ethdb.Database { //nolint:staticcheck // this name required by ethapi.Backend interface
 	return b.DB()
-}
-
-const (
-	// DefaultEVMTimeout is the [Config.EVMTimeout] used when an operator leaves
-	// it unset.
-	DefaultEVMTimeout = 10 * time.Second
-	// DefaultGasCap limits the gas an eth_call can use.
-	DefaultGasCap = 50_000_000
-	// DefaultTxFeeCap limits the fee of a transaction sent over RPC, in whole
-	// units of the chain's native token. The fee is the gas price times the gas
-	// limit.
-	DefaultTxFeeCap = 100
-)
-
-func (b *backend) RPCEVMTimeout() time.Duration {
-	return b.config.EVMTimeout
-}
-
-func (b *backend) RPCGasCap() uint64 {
-	return b.config.GasCap
 }
 
 func (b *backend) RPCTxFeeCap() float64 {
