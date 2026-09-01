@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,6 +19,15 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+// newTestHandlerMetrics returns [handlerMetrics] on a registry private to the
+// test.
+func newTestHandlerMetrics(tb testing.TB) *handlerMetrics {
+	tb.Helper()
+	m, err := newHandlerMetrics(prometheus.NewRegistry())
+	require.NoError(tb, err, "newHandlerMetrics()")
+	return m
+}
 
 func TestResponder(t *testing.T) {
 	t.Parallel()
@@ -53,9 +63,11 @@ func TestResponder(t *testing.T) {
 			wantErr: errHashNotFound,
 		},
 		{
-			name:      "duplicate_hashes_served",
-			hashes:    []common.Hash{codeHash, codeHash},
-			wantCodes: [][]byte{codeBytes, codeBytes},
+			// A client never needs the same code twice in one request, and
+			// duplicates pad the response, so they are rejected as coreth does.
+			name:    "duplicate_hashes_rejected",
+			hashes:  []common.Hash{codeHash, codeHash},
+			wantErr: errDuplicateHashes,
 		},
 		{
 			name:    "too_many_hashes_rejected",
@@ -68,7 +80,7 @@ func TestResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := newResponder(loggingtest.New(t, logging.Debug), db)
+			r := newResponder(loggingtest.New(t, logging.Debug), db, newTestHandlerMetrics(t))
 			req := &syncpb.GetCodeRequest{Hashes: hashBytes(tt.hashes)}
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), req)
 			if tt.wantErr != nil {
@@ -87,7 +99,8 @@ func TestErrorSentinels(t *testing.T) {
 	t.Parallel()
 
 	synctest.RequireDistinctAppErrors(t, map[string]*avacommon.AppError{
-		"errTooManyHashes": errTooManyHashes,
-		"errHashNotFound":  errHashNotFound,
+		"errTooManyHashes":   errTooManyHashes,
+		"errHashNotFound":    errHashNotFound,
+		"errDuplicateHashes": errDuplicateHashes,
 	})
 }

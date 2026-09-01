@@ -13,11 +13,13 @@ import (
 // Client sends block-batch requests.
 type Client = network.Dispatcher[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
-// NewClient binds a [Client] at [p2p.EVMBlockRequestHandlerID] on n.
-func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
+// NewClient binds a [Client] at [p2p.EVMBlockRequestHandlerID] on n, counting
+// its requests on m.
+func NewClient(n *p2p.Network, peers *p2p.PeerTracker, m *network.Metrics) *Client {
 	return network.NewDispatcher[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse](
 		n,
 		p2p.EVMBlockRequestHandlerID,
 		peers,
+		m,
 	)
 }

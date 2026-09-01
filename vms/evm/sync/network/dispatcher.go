@@ -28,19 +28,23 @@ var (
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
 type Dispatcher[Req, Resp proto.Message] struct {
-	client *p2p.Client
-	peers  *p2p.PeerTracker
+	client  *p2p.Client
+	peers   *p2p.PeerTracker
+	metrics *Metrics
 }
 
-// NewDispatcher returns a [Dispatcher] bound to handlerID on n.
+// NewDispatcher returns a [Dispatcher] bound to handlerID on n, counting its
+// requests on m, which MUST be non-nil.
 func NewDispatcher[Req, Resp proto.Message](
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
+	m *Metrics,
 ) *Dispatcher[Req, Resp] {
 	return &Dispatcher[Req, Resp]{
-		client: n.NewClient(handlerID, noopSampler{}),
-		peers:  peers,
+		client:  n.NewClient(handlerID, noopSampler{}),
+		peers:   peers,
+		metrics: m,
 	}
 }
 
@@ -66,6 +70,7 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
 
+	d.metrics.requested.Inc()
 	d.peers.RegisterRequest(nodeID)
 	defer func() {
 		if retErr != nil {
@@ -84,26 +89,33 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 
 	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
+		d.metrics.failed.Inc()
 		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
 	select {
 	case <-ctx.Done():
+		d.metrics.failed.Inc()
 		return nil, ctx.Err()
 	case r := <-resultCh:
+		latency := time.Since(start)
 		if r.err != nil {
+			d.metrics.failed.Inc()
 			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
+		d.metrics.requestLatency.Observe(latency.Seconds())
 
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
+			d.metrics.invalidResponse.Inc()
 			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
 		const epsilon = 1e-6
-		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
+		bandwidth := float64(len(r.bytes)) / (latency.Seconds() + epsilon)
 		return &Outcome{
 			peers:     d.peers,
 			nodeID:    nodeID,
 			bandwidth: bandwidth,
+			metrics:   d.metrics,
 		}, nil
 	}
 }
@@ -116,6 +128,7 @@ type Outcome struct {
 	peers     *p2p.PeerTracker
 	nodeID    ids.NodeID
 	bandwidth float64
+	metrics   *Metrics
 	once      sync.Once
 }
 
@@ -126,12 +139,24 @@ func (o *Outcome) NodeID() ids.NodeID {
 
 // Success records the response as semantically valid.
 func (o *Outcome) Success() {
-	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
+	o.once.Do(func() {
+		o.metrics.succeeded.Inc()
+		o.peers.RegisterResponse(o.nodeID, o.bandwidth)
+	})
 }
 
 // Failure records the response as semantically invalid.
 func (o *Outcome) Failure() {
-	o.once.Do(func() { o.peers.RegisterFailure(o.nodeID) })
+	o.once.Do(func() {
+		o.metrics.invalidResponse.Inc()
+		o.peers.RegisterFailure(o.nodeID)
+	})
+}
+
+// MarkReceived counts n items delivered by the response, e.g. leaves, code
+// blobs, or blocks.
+func (o *Outcome) MarkReceived(n int) {
+	o.metrics.received.Add(float64(n))
 }
 
 var _ p2p.NodeSampler = noopSampler{}
