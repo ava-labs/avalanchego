@@ -64,7 +64,10 @@ func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
 // sync.
 func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 	const (
-		numBlocksToFetch   = 512 // min 256 for BLOCKHASH op, some extra for settlement...
+		// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from
+		// the last settled. We should find a way to guarantee sufficient
+		// blocks, but this overestimate will work for now.
+		numBlocksToFetch   = 512
 		maxLeafRequestSize = 1024
 	)
 
