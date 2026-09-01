@@ -186,8 +186,9 @@ func TestSyncer(t *testing.T) {
 
 			log := loggingtest.New(t, logging.Debug)
 			requests := statesynctest.NewRecordingResponder(&responder{
-				log: log,
-				db:  statesynctest.NewBlockDB(blocks),
+				log:     log,
+				db:      statesynctest.NewBlockDB(blocks),
+				metrics: newTestHandlerMetrics(t),
 			})
 			from := blocks[tt.fromHeight]
 			p2pClient := statesynctest.ServeResponder(
@@ -199,7 +200,7 @@ func TestSyncer(t *testing.T) {
 			)
 			syncer := NewSyncer(
 				log,
-				NewClient(log, p2pClient),
+				NewClient(log, p2pClient, statesynctest.NewRequestMetrics(t)),
 				target,
 				decodeBlock,
 				from.Hash(),
@@ -241,13 +242,14 @@ func TestSyncer_ResumesAfterCancellation(t *testing.T) {
 		log,
 		p2p.EVMBlockRequestHandlerID,
 		&responder{
-			log: log,
-			db:  statesynctest.NewBlockDB(blocks),
+			log:     log,
+			db:      statesynctest.NewBlockDB(blocks),
+			metrics: newTestHandlerMetrics(t),
 		},
 	)
 	syncer := NewSyncer(
 		log,
-		NewClient(log, p2pClient),
+		NewClient(log, p2pClient, statesynctest.NewRequestMetrics(t)),
 		target,
 		parse,
 		tip.Hash(),
@@ -291,8 +293,9 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 			// every later response is honest.
 			tamperer := statesynctest.NewMutatingResponder(
 				&responder{
-					log: log,
-					db:  statesynctest.NewBlockDB(blocks),
+					log:     log,
+					db:      statesynctest.NewBlockDB(blocks),
+					metrics: newTestHandlerMetrics(t),
 				},
 				1,
 				func(resp *syncpb.GetBlockResponse) {
@@ -311,7 +314,7 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 			target := rawdb.NewMemoryDatabase()
 			syncer := NewSyncer(
 				log,
-				NewClient(log, p2pClient),
+				NewClient(log, p2pClient, statesynctest.NewRequestMetrics(t)),
 				target,
 				decodeBlock,
 				tip.Hash(),
