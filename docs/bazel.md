@@ -660,9 +660,9 @@ Bazel metadata and prefetches the full CI dependency list.
 
 The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Scheduled unit tests use race detection and
-shuffled test order. They use `--nocache_test_results`. Thus, Bazel runs them
-again and does not use a cached random test result.
+E2E smoke test on each platform. Only the Ubuntu 24.04 AMD64 unit-test job uses
+race detection and shuffled test order. It uses `--nocache_test_results`. Thus,
+Bazel runs it again and does not use a cached random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.
