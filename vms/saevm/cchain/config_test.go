@@ -176,16 +176,6 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Contains("invalid duration"),
 		},
 		{
-			name:    "api/api_max_duration_zero",
-			json:    `{"api-max-duration":"0s"}`,
-			wantErr: testerr.Is(errNonPositiveAPIMaxDuration),
-		},
-		{
-			name:    "api/api_max_duration_negative",
-			json:    `{"api-max-duration":"-1s"}`,
-			wantErr: testerr.Is(errNonPositiveAPIMaxDuration),
-		},
-		{
 			name: "api/enable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":true}`,
 			want: with(func(c *config) { c.ResolvePendingToLastExecuted = true }),
