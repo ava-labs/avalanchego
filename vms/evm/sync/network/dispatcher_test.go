@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -233,9 +234,12 @@ func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any
 	peers *peertracker.PeerTracker,
 ) *Dispatcher[Req, In, Resp, Out] {
 	t.Helper()
+	m, err := NewMetrics(prometheus.NewRegistry(), "test")
+	require.NoError(t, err, "NewMetrics()")
 	return &Dispatcher[Req, In, Resp, Out]{
-		log:    loggingtest.New(t, logging.Debug),
-		client: peertrackertest.NewSelfClientWithTracker(t, ctx, nodeID, h, peers),
+		log:     loggingtest.New(t, logging.Debug),
+		client:  peertrackertest.NewSelfClientWithTracker(t, ctx, nodeID, h, peers),
+		metrics: m,
 	}
 }
 

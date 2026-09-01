@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -86,9 +87,25 @@ func TestStateSyncEndToEnd(t *testing.T) {
 	tests := []struct {
 		name string
 		opts []sutOption
+		// The sync must be visible on both sides' metrics: the client counted
+		// the requests it sent, and the source counted the requests it served.
+		// Code is deliberately absent: the client's genesis commit already
+		// wrote the only contract's code to its database, so no code request
+		// is ever needed.
+		clientMetrics []string
+		serverMetrics []string
 	}{
-		{name: "hashdb"},
-		{name: "firewood", opts: []sutOption{withFirewood()}},
+		{
+			name:          "hashdb",
+			clientMetrics: []string{"sync_state_trie_leaves_requested", "sync_blocks_succeeded"},
+			serverMetrics: []string{"leafs_request_count", "block_request_count"},
+		},
+		{
+			name:          "firewood",
+			opts:          []sutOption{withFirewood()},
+			clientMetrics: []string{"sync_requests_made", "sync_blocks_succeeded"},
+			serverMetrics: []string{"sync_proof_generation_seconds", "block_request_count"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -111,6 +128,13 @@ func TestStateSyncEndToEnd(t *testing.T) {
 			require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+			for _, name := range tt.clientMetrics {
+				requireCounterPositive(t, client.reg, name)
+			}
+			for _, name := range tt.serverMetrics {
+				requireCounterPositive(t, sourceVM.reg, name)
+			}
 
 			// During the sync, the network continued processing
 			sourceVM.acceptBlocks(t, numBlocks)
@@ -456,4 +480,26 @@ func TestSyncToSynchronousBlock(t *testing.T) {
 	syncer := client.syncer()
 	err = syncer.Sync(ctx, summary)
 	require.ErrorIsf(t, err, errSynchronousBlock, "%T.Sync(%v)", syncer, summary)
+}
+
+// requireCounterPositive asserts that the counter named name is registered on
+// reg and has been incremented.
+func requireCounterPositive(t *testing.T, reg *prometheus.Registry, name string) {
+	t.Helper()
+
+	mfs, err := reg.Gather()
+	require.NoError(t, err, "reg.Gather()")
+	for _, mf := range mfs {
+		if mf.GetName() != name {
+			continue
+		}
+		var total float64
+		for _, m := range mf.GetMetric() {
+			// Histograms count as their sample count, like tests.GetMetricValue.
+			total += m.GetCounter().GetValue() + float64(m.GetHistogram().GetSampleCount())
+		}
+		require.Positivef(t, total, "counter %q", name)
+		return
+	}
+	t.Fatalf("counter %q not registered", name)
 }

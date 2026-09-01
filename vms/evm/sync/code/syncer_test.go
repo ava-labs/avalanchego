@@ -110,7 +110,7 @@ func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
 	writeCode(clientDB, config.code)
 
 	log := loggingtest.New(t, logging.Debug)
-	responder := newResponder(log, clientDB)
+	responder := newResponder(log, clientDB, newTestHandlerMetrics(t))
 	recorder := synctest.NewRecordingResponder(responder)
 
 	var wrappedResponder codeResponder = recorder
@@ -124,7 +124,7 @@ func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
 		p2p.EVMCodeRequestHandlerID,
 		wrappedResponder,
 	)
-	client := NewClient(log, p2pClient)
+	client := NewClient(log, p2pClient, synctest.NewRequestMetrics(t))
 
 	avadb := memdb.New()
 	flakydb := saetest.NewFlakyDB(avadb, config.flake)

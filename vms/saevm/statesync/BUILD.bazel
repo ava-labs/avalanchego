@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "cmpopt.go",
         "handler.go",
+        "metrics.go",
         "server.go",
         "summary.canoto.go",
         "summary.go",
@@ -14,6 +15,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/statesync",
     visibility = ["//visibility:public"],
     deps = [
+        "//api/metrics",
         "//database",
         "//database/merkle/firewood/syncer",
         "//graft/evm/core/state/snapshot",
@@ -22,11 +24,11 @@ go_library(
         "//network/p2p",
         "//snow",
         "//snow/engine/snowman/block",
-        "//utils/logging",
         "//vms/evm/sync/block",
         "//vms/evm/sync/code",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/sync/hashdb",
+        "//vms/evm/sync/network",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/firewood",
@@ -56,6 +58,7 @@ go_test(
     name = "statesync_test",
     srcs = [
         "handler_test.go",
+        "metrics_test.go",
         "summary_test.go",
         "sut_test.go",
         "syncer_test.go",
