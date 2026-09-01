@@ -117,7 +117,7 @@ func (tc *SimpleTestContext) Recover() {
 // whose assertions may result in panics.  Such a panic is intended to be recovered
 // to allow cleanup functions to be called before the panic is rethrown.
 //
-// This method MUST call recover() directly. See Recover.
+// This method MUST call recover() directly. See [SimpleTestContext.Recover].
 func (tc *SimpleTestContext) RecoverAndRethrow() {
 	tc.handleRecovered(recover(), true /* rethrow */)
 }
