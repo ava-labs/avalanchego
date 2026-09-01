@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "cmpopt.go",
         "handler.go",
+        "metrics.go",
         "server.go",
         "summary.canoto.go",
         "summary.go",
@@ -14,6 +15,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/statesync",
     visibility = ["//visibility:public"],
     deps = [
+        "//api/metrics",
         "//database",
         "//database/merkle/firewood/syncer",
         "//graft/evm/core/state/snapshot",
@@ -27,6 +29,7 @@ go_library(
         "//vms/evm/sync/code",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/sync/hashdb",
+        "//vms/evm/sync/network",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/firewood",

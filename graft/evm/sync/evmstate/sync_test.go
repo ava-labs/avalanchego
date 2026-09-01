@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -38,6 +39,7 @@ import (
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	syncnet "github.com/ava-labs/avalanchego/vms/evm/sync/network"
 	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
@@ -626,14 +628,16 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 
 	log := loggingtest.New(t, logging.Debug)
 	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, leafproto.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, serverDB.TrieDB(), common.HashLength))
+	require.NoError(t, leafproto.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, serverDB.TrieDB(), common.HashLength, prometheus.NewRegistry()))
 
 	codeQueue, err := code.NewQueue(clientEthDB)
 	require.NoError(t, err)
 
+	leafMetrics, err := syncnet.NewMetrics(prometheus.NewRegistry(), "sync_state_trie_leaves")
+	require.NoError(t, err)
 	stateSyncer, err := NewSyncer(
 		log,
-		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
+		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker, leafMetrics),
 		clientEthDB,
 		root,
 		codeQueue,

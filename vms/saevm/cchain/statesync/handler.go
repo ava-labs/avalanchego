@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -25,8 +26,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 
-	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
+	syncnet "github.com/ava-labs/avalanchego/vms/evm/sync/network"
 )
+
+// atomicMetricsNamespace prefixes the atomic trie's state sync metrics,
+// keeping them apart from the state trie's, which live under the embedded
+// handler's namespace (see vms/saevm/statesync). It deliberately does not
+// start with that namespace: the metrics gatherer rejects overlapping
+// prefixes.
+const atomicMetricsNamespace = "atomic_statesync"
 
 var _ adaptor.SyncableVM[*summary] = (*Handler)(nil)
 
@@ -44,8 +52,13 @@ type Handler struct {
 	network *network.Network
 	ethDB   ethdb.Database
 	snowCtx *snow.Context
-	// syncClientReg receives metrics from the state trie syncer.
-	syncClientReg prometheus.Registerer
+
+	// atomicReg scopes the atomic trie's sync metrics under
+	// [atomicMetricsNamespace], keeping its served leafs_request_* counts apart
+	// from the state trie's, which the embedded handler registers under its own
+	// namespace. atomicLeaves counts the atomic leaf requests this node sends.
+	atomicReg    *prometheus.Registry
+	atomicLeaves *syncnet.Metrics
 
 	// Lifecycle management
 	mu      sync.Mutex
@@ -75,22 +88,25 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)
 	}
-	// Kept separate from the "sync_server" registry as the client and server
-	// halves of the Firewood syncer share a metrics namespace.
-	syncClientReg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sync_client")
+	atomicReg, err := metrics.MakeAndRegister(snowCtx.Metrics, atomicMetricsNamespace)
 	if err != nil {
-		return nil, fmt.Errorf("registering state sync client metrics: %w", err)
+		return nil, fmt.Errorf("making atomic trie sync metrics: %w", err)
+	}
+	atomicLeaves, err := syncnet.NewMetrics(atomicReg, "sync_atomic_trie_leaves")
+	if err != nil {
+		return nil, fmt.Errorf("registering atomic trie sync client metrics: %w", err)
 	}
 	return &Handler{
-		Handler:       inner,
-		cfg:           cfg,
-		state:         state,
-		hooks:         hooks,
-		network:       network,
-		ethDB:         db,
-		snowCtx:       snowCtx,
-		syncClientReg: syncClientReg,
-		done:          make(chan struct{}),
+		Handler:      inner,
+		cfg:          cfg,
+		state:        state,
+		hooks:        hooks,
+		network:      network,
+		ethDB:        db,
+		snowCtx:      snowCtx,
+		atomicReg:    atomicReg,
+		atomicLeaves: atomicLeaves,
+		done:         make(chan struct{}),
 	}, nil
 }
 

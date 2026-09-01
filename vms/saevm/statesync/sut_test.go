@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -225,14 +224,7 @@ func (s *sut) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
 func (s *sut) Sender() *saetest.Sender { return s.sender }
 
 func (s *sut) syncer() *Syncer {
-	return NewSyncer(
-		s.cfg.syncConfig,
-		settledOverride{Stub: s.hooks, height: s.cfg.lastSynchronous},
-		s.snowCtx,
-		s.Network,
-		s.db,
-		prometheus.NewRegistry(),
-	)
+	return s.Handler.Syncer()
 }
 
 // syncTo emulates the behavior any user would follow, by checking the summary,
@@ -284,7 +276,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
+	require.NoError(t, s.Handler.RegisterServer(tdb, snaps), "RegisterServer")
 
 	return &vmSUT{
 		sut:    s,

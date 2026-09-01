@@ -303,10 +303,6 @@ func (vm *VM) Initialize(
 
 		// Register state sync server
 		{
-			syncServerReg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sync_server")
-			if err != nil {
-				return fmt.Errorf("registering state sync server metrics: %w", err)
-			}
 			tdb, snaps := vm.VM.EVMState()
 			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
 				// The HashDB triedb shouldn't share a cache with execution.
@@ -317,7 +313,7 @@ func (vm *VM) Initialize(
 					return tdb.Close()
 				})
 			}
-			if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state, syncServerReg); err != nil {
+			if err := vm.Handler.RegisterServer(tdb, snaps); err != nil {
 				return fmt.Errorf("registering state sync server: %w", err)
 			}
 		}
