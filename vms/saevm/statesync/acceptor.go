@@ -166,6 +166,21 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		zap.Stringer("summaryHash", s.AcceptedHash),
 	)
 
+	// Persist the snapshot-disabled marker before the sync mutates anything,
+	// mirroring [evmsnapshot.Tree.Disable]: if the node dies mid-sync, the
+	// restarted node's snapshot loading (saedb.NewTracker) then constructs an
+	// inert tree instead of rebuilding a snapshot from the stale local state —
+	// background generation that would race a resumed sync's snapshot wipe and
+	// leaf writes, and discard its resume progress. A completed sync re-enables
+	// the snapshot in [SummaryHandler.rawdbInvariants]. There is no generator
+	// to stop here: the tracker, and with it any generation, is only
+	// constructed after the sync finishes (see cchain's finishInitialize).
+	disable := h.db.NewBatch()
+	rawdb.WriteSnapshotDisabled(disable)
+	if err := disable.Write(); err != nil {
+		return fmt.Errorf("marking snapshot disabled for state sync: %w", err)
+	}
+
 	blockSyncer := syncblock.NewSyncer(
 		h.snowCtx.Log,
 		syncblock.NewClient(h.network.Network, h.network.PeerTracker, h.clientMetrics.blocks),
@@ -477,5 +492,8 @@ func (h *SummaryHandler) rawdbInvariants(settled, settler *types.Header) error {
 	rawdb.WriteHeadBlockHash(batch, settled.Hash())
 	rawdb.WriteFinalizedBlockHash(batch, settled.Hash())
 	rawdb.WriteSnapshotRoot(batch, settler.Root) // post-execution settled
+	// Re-enable the snapshot that [SummaryHandler.StateSync] marked disabled:
+	// the synced leaves are now complete for the root written above.
+	rawdb.DeleteSnapshotDisabled(batch)
 	return batch.Write()
 }

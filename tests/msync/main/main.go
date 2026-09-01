@@ -107,6 +107,7 @@ var (
 	stateSyncMinBlocks      uint64
 	stateSyncCommitInterval uint64
 	stateScheme             string
+	restartDuringSync       bool
 
 	// Derived from --state-scheme in main before the network is configured.
 	schemeConfig stateSchemeConfig
@@ -377,6 +378,13 @@ func init() {
 			customrawdb.FirewoodScheme,
 			rawdb.HashScheme,
 		),
+	)
+
+	flag.BoolVar(
+		&restartDuringSync,
+		"restart-during-sync",
+		false,
+		"stop and restart the bootstrap node the first time its health reports an in-progress state sync, validating recovery from an interrupted sync",
 	)
 
 	flag.Parse()
@@ -1145,7 +1153,7 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*t
 		require.NoError(node.Stop(ctx))
 	})
 
-	observation, err := awaitBootstrapNode(tc, node, nodeStartedAt)
+	observation, err := awaitBootstrapNode(tc, network, node, nodeStartedAt)
 	require.NoError(err, "awaitBootstrapNode()")
 
 	for _, validator := range network.Nodes {
@@ -1229,7 +1237,7 @@ func checkPartialBootstrap(
 		require.NoError(node.Stop(ctx))
 	})
 
-	observation, err := awaitBootstrapNode(tc, node, nodeStartedAt)
+	observation, err := awaitBootstrapNode(tc, network, node, nodeStartedAt)
 	require.NoError(err, "awaitBootstrapNode()")
 
 	syncHealth := validateMerkleSyncEvidence(tc, network, node, expectedSummaryHeight)
@@ -1245,13 +1253,14 @@ func checkPartialBootstrap(
 // the C-Chain VM's health as it goes so that the harness can report how long
 // state sync took. It mirrors [tmpnet.Node.WaitForHealthy], which cannot be used
 // here because it discards the health replies.
-func awaitBootstrapNode(tc tests.TestContext, node *tmpnet.Node, nodeStartedAt time.Time) (syncObservation, error) {
+func awaitBootstrapNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node, nodeStartedAt time.Time) (syncObservation, error) {
 	ctx := tc.DefaultContext()
 	observation := syncObservation{nodeStartedAt: nodeStartedAt}
 
 	ticker := time.NewTicker(defaultHealthSampleInterval)
 	defer ticker.Stop()
 
+	restarted := !restartDuringSync
 	for {
 		reply, err := tmpnet.CheckNodeHealth(ctx, node.URI)
 		switch {
@@ -1264,6 +1273,27 @@ func awaitBootstrapNode(tc tests.TestContext, node *tmpnet.Node, nodeStartedAt t
 			)
 		default:
 			observation.record(reply)
+			if !restarted {
+				if vmHealth, checkedAt, err := chainVMHealth(reply); err == nil && vmHealth.StateSync.Status == syncStatusSyncing {
+					tc.Log().Info("restarting bootstrap node mid-sync",
+						zap.Stringer("nodeID", node.NodeID),
+						zap.Uint64("summaryHeight", vmHealth.StateSync.SummaryHeight),
+						zap.Time("checkedAt", checkedAt),
+					)
+					if err := node.Stop(ctx); err != nil {
+						return observation, fmt.Errorf("stopping node %s mid-sync: %w", node.NodeID, err)
+					}
+					if err := network.StartNode(ctx, node); err != nil {
+						return observation, fmt.Errorf("restarting node %s mid-sync: %w", node.NodeID, err)
+					}
+					tc.Log().Info("restarted bootstrap node mid-sync", zap.Stringer("nodeID", node.NodeID))
+					restarted = true
+					// The pre-restart process's health is stale; keep only the
+					// node start time so durations still cover the whole run.
+					observation = syncObservation{nodeStartedAt: nodeStartedAt}
+					continue
+				}
+			}
 			if reply.Healthy {
 				observation.healthyAt = time.Now()
 				return observation, nil

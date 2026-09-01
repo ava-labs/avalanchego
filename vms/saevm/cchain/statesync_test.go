@@ -9,11 +9,17 @@ import (
 	"math/big"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -23,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saevmtypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -343,5 +350,109 @@ func FuzzStateSyncDBFailure(f *testing.F) {
 				dst.assertChainsMatch(ctx, t, src)
 			})
 		}
+	})
+}
+
+// ethDBFor returns the eth-level view of a SUT's raw backing database,
+// mirroring the prefixing in [tryNewSUT] and [VM.Initialize].
+func ethDBFor(db database.Database) ethdb.Database {
+	return saevmtypes.NewEthDB(prefixdb.NewNested(ethDBPrefix, prefixdb.New(chainDBPrefix, db)))
+}
+
+// interruptedSyncDB returns a database in the state left behind by a node
+// killed mid-state-sync: a sync from src is run with a database fault injected
+// near its end, so the snapshot wipe and leaf download have already touched
+// disk when the sync dies.
+func interruptedSyncDB(t *testing.T, src *SUT, sharedOpts []sutOption) database.Database {
+	t.Helper()
+
+	// Probe a full sync to learn its total mutating-op count.
+	probe := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+	probeCtx, probeDst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(probe))...)
+	saetest.ConnectTo(t, probeDst, src)
+	startStateSync(probeCtx, t, src, probeDst)
+	awaitStateSync(probeCtx, t, probeDst)
+
+	// Fault injection is by op count, so the exact failing operation may vary
+	// between runs; scan down from the latest possible fault until a sync
+	// actually fails.
+	for n := probe.Calls() - 1; n > 0; n-- {
+		db := memdb.New()
+		flaky := saetest.NewFlakyDB(db, n)
+		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
+		saetest.ConnectTo(t, dst, src)
+		startStateSync(ctx, t, src, dst)
+		msg, err := dst.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
+		require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
+		if dst.SummaryHandler.Error() != nil {
+			return db
+		}
+	}
+	t.Fatal("no fault-injection point produced an interrupted sync")
+	return nil
+}
+
+// TestStateSyncInterruptedRestart checks the disk contract that lets a node
+// restart safely after being killed mid-state-sync. The sync marks the
+// snapshot disabled before mutating it, so a restarted node neither rebuilds
+// a snapshot from its stale pre-sync state — background generation that would
+// race the next sync's snapshot wipe and leaf writes, and discard its resume
+// progress — nor loads one until a completed sync re-enables it.
+func TestStateSyncInterruptedRestart(t *testing.T) {
+	const commitInterval = 4
+	key := txtest.NewKey(t)
+	ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	timeOpt, _ := withVMTime(testStartTime)
+	sharedOpts := []sutOption{
+		timeOpt,
+		withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
+		withCommitInterval(commitInterval),
+	}
+	srcCtx, src := newSUT(t, sharedOpts...)
+	w := newWallet(key, src.ctx, src.Client)
+	src.produceBlocks(srcCtx, t, w, ethW, commitInterval+1)
+
+	interrupted := interruptedSyncDB(t, src, sharedOpts)
+	require.True(t, rawdb.ReadSnapshotDisabled(ethDBFor(interrupted)),
+		"an in-progress sync must leave the snapshot marked disabled on disk")
+
+	// A restarted node that does not re-sync (e.g. the engine falls back to
+	// bootstrapping) must not start rebuilding a snapshot from its stale
+	// local state.
+	t.Run("restart_bootstraps_without_snapshot_rebuild", func(t *testing.T) {
+		db := saetest.CopyDB(t, interrupted)
+		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(db))...)
+
+		require.NoErrorf(t, dst.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
+
+		edb := ethDBFor(db)
+		require.Equalf(t, common.Hash{}, rawdb.ReadSnapshotRoot(edb),
+			"snapshot rebuilt from stale local state after a restart mid-sync")
+		// Snapshot generation is asynchronous; allow it to surface before
+		// asserting it never started.
+		time.Sleep(250 * time.Millisecond)
+		require.Equalf(t, common.Hash{}, rawdb.ReadSnapshotRoot(edb),
+			"background snapshot generation started after a restart mid-sync")
+	})
+
+	// A restarted node that re-syncs (the expected engine path) must complete
+	// the sync and re-enable the snapshot.
+	t.Run("restart_resyncs_and_reenables_snapshot", func(t *testing.T) {
+		db := saetest.CopyDB(t, interrupted)
+		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(db))...)
+		saetest.ConnectTo(t, dst, src)
+
+		summaryHeight := startStateSync(ctx, t, src, dst)
+		awaitStateSync(ctx, t, dst)
+
+		edb := ethDBFor(db)
+		require.False(t, rawdb.ReadSnapshotDisabled(edb),
+			"a completed sync must re-enable the snapshot")
+		require.NotEqualf(t, common.Hash{}, rawdb.ReadSnapshotRoot(edb),
+			"a completed sync must leave a snapshot root on disk")
+
+		dst.bootstrapFrom(ctx, t, src, summaryHeight)
+		dst.assertChainsMatch(ctx, t, src)
 	})
 }

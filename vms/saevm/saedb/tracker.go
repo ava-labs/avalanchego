@@ -343,8 +343,11 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 		// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
 		// SAE so we don't mind flattening all snapshot layers to disk. Note that
 		// calling `Cap([disk root], 0)` returns an error when it's actually a
-		// no-op, so we ensure there are changes.
-		if lastRoot != t.snaps.DiskRoot() {
+		// no-op, so we ensure there are changes. A zero disk root means the
+		// tree has no layers at all — snapshots are disabled on disk by an
+		// interrupted state sync (see vms/saevm/statesync) — so there is
+		// nothing to flatten.
+		if diskRoot := t.snaps.DiskRoot(); diskRoot != (common.Hash{}) && lastRoot != diskRoot {
 			if err := t.snaps.Cap(lastRoot, 0); err != nil {
 				errs = append(errs, fmt.Errorf("%T.Cap(%s, 0): %v", t.snaps, lastRoot, err))
 			}
