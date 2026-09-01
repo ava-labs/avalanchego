@@ -256,7 +256,8 @@ var apiServices = []apiService{
 		// - debug_traceBlockByNumber
 		// - debug_traceBlockFromFile
 		// - debug_traceCall
-		// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
+		// - debug_subscribe
+		//  - traceChain // TODO(JonathanOppenheimer): test this RPC
 		// - debug_traceTransaction
 		name: APITrace, namespace: "debug", defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return newTracerAPI(b) },
