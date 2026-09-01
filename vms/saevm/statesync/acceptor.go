@@ -18,8 +18,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
@@ -27,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
-	synctypes "github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
@@ -40,51 +37,6 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 	}
 
 	return h.cfg.Enabled, nil
-}
-
-// AcceptSummary performs the entire state sync given the provided summary. If
-// [SummaryHandler.StateSyncEnabled] returns false, this method should not be
-// called. If this method returns [block.StateSyncSkipped], no state changes
-// were made. Once the state sync is complete, [SummaryHandler.WaitForEvent]
-// will return [common.StateSyncDone].
-//
-// AcceptSummary MUST only be called once.
-func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
-	should, err := h.ShouldAcceptSummary(s)
-	if err != nil || !should {
-		return block.StateSyncSkipped, err
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.stopped {
-		return block.StateSyncSkipped, nil
-	}
-
-	ctx, h.cancel = context.WithCancel(context.Background())
-	go func() {
-		defer h.cancel()
-		defer close(h.done)
-
-		if err := h.StateSync(ctx, s); err != nil {
-			h.err.Set(fmt.Errorf("state sync failed: %w", err))
-			return
-		}
-		h.err.Set(h.OnFinish(s))
-	}()
-
-	return block.StateSyncStatic, nil
-}
-
-// WaitForEvent blocks until the state sync is complete, or the context is
-// canceled. Once the state sync is done, [common.StateSyncDone] is returned.
-func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, error) {
-	select {
-	case <-h.done:
-		return common.StateSyncDone, nil
-	case <-ctx.Done():
-		return 0, context.Cause(ctx)
-	}
 }
 
 // ShouldAcceptSummary returns true if the summary should be state synced to,
@@ -106,18 +58,11 @@ func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
 	return true, nil
 }
 
-// Error returns an error surfaced in [SummaryHandler.AcceptSummary]. To ensure
-// the state sync has finished (in success or failure), one must call
-// [SummaryHandler.WaitForEvent] before calling this method.
-func (h *SummaryHandler) Error() error {
-	return h.err.Get()
-}
-
-// StateSync fetches all state associated with [Summary] and applies it to disk.
-// Any error is returned, and MUST be treated as fatal. After this method
-// returns without error, one must call [SummaryHandler.OnFinish] to finalize
-// the state sync.
-func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
+// Sync fetches all state associated with [Summary] and applies it to disk.
+// Any error returned MUST be treated as fatal. After this method returns
+// without error, one MUST call [SummaryHandler.WriteSynced] to finalize the state
+// sync.
+func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 	const (
 		numBlocksToFetch   = 512 // min 256 for BLOCKHASH op, some extra for settlement...
 		maxLeafRequestSize = 1024
@@ -176,15 +121,18 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 		return evmSyncer.Sync(egCtx)
 	})
 	if err := eg.Wait(); err != nil {
-		if finalizer, ok := evmSyncer.(synctypes.Finalizer); ok {
-			err = errors.Join(err, finalizer.Finalize())
-		}
-		return err
+		// Finalize allows the EVM syncer to resume its progress on restart.
+		// This is not required for correctness.
+		return errors.Join(err, evmSyncer.Finalize())
 	}
 	return nil
 }
 
-func (h *SummaryHandler) OnFinish(s *Summary) error {
+// WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
+// start up from [Summary.AcceptedHash] as the last accepted block. It MUST be
+// called after a successful [SummaryHandler.Sync]. Any non-EVM state sync
+// behavior MUST have already completed.
+func (h *SummaryHandler) WriteSynced(s *Summary) error {
 	lastAccepted := rawdb.ReadHeader(h.db, s.AcceptedHash, s.AcceptedHeight)
 	if lastAccepted == nil {
 		return errors.New("couldn't find last accepted header")
@@ -208,8 +156,8 @@ func (h *SummaryHandler) OnFinish(s *Summary) error {
 	}
 
 	// MUST be called last since rawdb markers signal success.
-	if err := h.rawdbInvariants(lastSettled.Header(), lastAccepted); err != nil {
-		return fmt.Errorf("rawdb invariants failed: %w", err)
+	if err := h.writeRawDBInvariants(lastSettled.Header(), lastAccepted); err != nil {
+		return fmt.Errorf("writing rawdb invariants: %w", err)
 	}
 
 	return nil
@@ -260,7 +208,7 @@ func (h *SummaryHandler) updateBloomIndexer(settler *types.Header) error {
 	return idx.Close()
 }
 
-func (h *SummaryHandler) rawdbInvariants(settled, settler *types.Header) error {
+func (h *SummaryHandler) writeRawDBInvariants(settled, settler *types.Header) error {
 	batch := h.db.NewBatch()
 	rawdb.WriteHeadFastBlockHash(batch, settler.Hash())
 	rawdb.WriteHeadHeaderHash(batch, settled.Hash())

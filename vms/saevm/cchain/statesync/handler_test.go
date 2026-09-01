@@ -111,9 +111,6 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
-	t.Cleanup(func() {
-		require.NoErrorf(t, handler.Shutdown(t.Context()), "%T.Shutdown()", handler)
-	})
 	return &SUT{
 		SummaryHandler: handler,
 		state:          st,

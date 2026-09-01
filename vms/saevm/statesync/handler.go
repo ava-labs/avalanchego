@@ -8,7 +8,6 @@ package statesync
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -33,8 +30,6 @@ type Config struct {
 	Enabled  bool
 }
 
-var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
-
 // SummaryHandler implements [adaptor.SyncableVM] and provides the consensus-
 // critical block getters for [adaptor.ChainVM].
 type SummaryHandler struct {
@@ -43,13 +38,6 @@ type SummaryHandler struct {
 	hooks   hook.Points
 	snowCtx *snow.Context
 	network *network.Network
-
-	// Lifecycle management
-	mu      sync.Mutex
-	done    chan struct{}
-	stopped bool
-	cancel  context.CancelFunc
-	err     utils.Atomic[error]
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
@@ -70,31 +58,7 @@ func New(
 		snowCtx: snowCtx,
 		network: network,
 		hooks:   hooks,
-		done:    make(chan struct{}),
 	}, nil
-}
-
-// Shutdown cancels any ongoing sync and waits for its goroutine to exit,
-// returning early with the context's error if ctx expires first. After
-// Shutdown, no new sync can be started.
-func (h *SummaryHandler) Shutdown(ctx context.Context) error {
-	h.mu.Lock()
-	h.stopped = true
-	cancel := h.cancel
-	h.mu.Unlock()
-
-	if cancel == nil {
-		// no sync was ever started
-		return nil
-	}
-
-	cancel()
-	select {
-	case <-h.done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // GetLastStateSummary returns the summary of the last accepted block at
@@ -115,12 +79,6 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, err
 
 	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.DBConfig.CommitInterval)
 	return h.GetStateSummary(ctx, height)
-}
-
-// GetOngoingSyncStateSummary always returns [database.ErrNotFound].
-// TODO(alarso16): track ongoing sync summary to allow resume
-func (*SummaryHandler) GetOngoingSyncStateSummary(context.Context) (*Summary, error) {
-	return nil, database.ErrNotFound
 }
 
 // GetStateSummary returns the summary of the block at the given height, if it

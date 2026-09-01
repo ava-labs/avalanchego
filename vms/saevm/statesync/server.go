@@ -8,29 +8,30 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
-// RegisterServer registers the handlers for the state sync protocol.
+// RegisterHandlers registers the handlers for the state sync protocol.
 //
 // TODO(alarso16): Find a way to wire through Firewood.
-func (h *SummaryHandler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tree) error {
-	var (
-		log    = h.snowCtx.Log
-		p2pNet = h.network.Network
-		db     = h.db
-	)
-	if err := block.RegisterHandler(log, p2pNet, db); err != nil {
+func RegisterHandlers(
+	network *p2p.Network, db ethdb.Database,
+	tdb *triedb.Database, snap *snapshot.Tree,
+	log logging.Logger,
+) error {
+	if err := block.RegisterHandler(log, network, db); err != nil {
 		return fmt.Errorf("registering block handler: %w", err)
 	}
 
 	if err := hashdb.RegisterHandler(
-		log, p2pNet,
+		log, network,
 		p2p.EVMLeafRequestHandlerID,
 		tdb,
 		common.HashLength,
@@ -39,7 +40,7 @@ func (h *SummaryHandler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tre
 		return fmt.Errorf("registering hashdb handler: %w", err)
 	}
 
-	if err := code.RegisterHandler(log, p2pNet, db); err != nil {
+	if err := code.RegisterHandler(log, network, db); err != nil {
 		return fmt.Errorf("registering code handler: %w", err)
 	}
 
@@ -60,10 +61,10 @@ var _ hashdb.Snapshot = (*syncSnap)(nil)
 // syncSnap adapts a [snapshot.Tree] to the interface needed for a
 // [hashdb.Snapshot].
 //
-// TODO(alarso16): The iterators suffer from TOCTOU where the state can change
-// during use due to execution calling [snapshot.Tree.Cap]. In reality, the
-// state can change, but the iterators don't need to error. An optimization
-// can be made to iterate directly from disk, even if the state changes.
+// TODO(alarso16): The iterators suffer from a race where the state can change
+// during use due to execution calling [snapshot.Tree.Cap]. This doesn't
+// violate correctness, but the iterators will error. An optimization can be
+// made to iterate directly from disk, even if the state changes.
 type syncSnap struct {
 	snap *snapshot.Tree
 }

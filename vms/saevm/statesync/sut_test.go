@@ -23,8 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -219,16 +217,20 @@ func newSUT(t *testing.T, opts ...sutOption) *shSUT {
 	return sut
 }
 
+// syncTo emulates the behavior of any user would follow, by checking the
+// summary, state syncing, and marking as done.
 func (client *shSUT) syncTo(ctx context.Context, t *testing.T, s *Summary) error {
-	mode, err := client.AcceptSummary(ctx, s)
-	require.NoErrorf(t, err, "%T.AcceptSummary()", client.SummaryHandler)
-	require.Equal(t, block.StateSyncStatic, mode, "AcceptSummary() mode")
+	t.Helper()
 
-	msg, err := client.WaitForEvent(ctx)
-	require.NoErrorf(t, err, "%T.WaitForEvent()", client.SummaryHandler)
-	require.Equal(t, common.StateSyncDone, msg, "WaitForEvent() message")
+	should, err := client.ShouldAcceptSummary(s)
+	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", client.SummaryHandler)
+	require.True(t, should, "ShouldAcceptSummary()")
 
-	return client.Error()
+	if err := client.Sync(ctx, s); err != nil {
+		return err
+	}
+
+	return client.WriteSynced(s)
 }
 
 // newSummaryHandler constructs a [SummaryHandler] over the given database and
@@ -256,10 +258,6 @@ func newSummaryHandler(
 		hooks,
 	)
 	require.NoError(t, err, "New()")
-	t.Cleanup(func() {
-		require.NoError(t, handler.Shutdown(context.WithoutCancel(t.Context())), "SummaryHandler.Shutdown()")
-	})
-
 	return handler
 }
 
@@ -300,17 +298,17 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
-	sh := newSummaryHandler(t, cfg, env.snowCtx, env.db, vm.Network, env.hooks)
-	require.NoError(t, sh.RegisterServer(vm.EVMState()), "RegisterServer()")
+	tdb, snaps := vm.EVMState()
+	require.NoError(t, RegisterHandlers(vm.Network.Network, env.db, tdb, snaps, env.snowCtx.Log), "RegisterHandlers")
 
 	s := &vmSUT{
 		SinceGenesis:   vm,
 		sutEnv:         env,
 		wallet:         saetest.NewWalletWithKeyChain(env.keys, types.LatestSigner(env.genesis.Config)),
-		summaryHandler: sh,
+		summaryHandler: newSummaryHandler(t, cfg, env.snowCtx, env.db, vm.Network, env.hooks),
 	}
-	env.sender.Start(t, s)
 
+	env.sender.Start(t, s)
 	return s
 }
 

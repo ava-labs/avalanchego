@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
@@ -78,8 +79,10 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, err
 
 // GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
 // but the returned summary contains the settled C-Chain state root.
-func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetOngoingSyncStateSummary(ctx))
+//
+// TODO(alarso16): Allow resuming state sync.
+func (*SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
+	return nil, database.ErrNotFound
 }
 
 // wrap pairs an SAE summary with the C-Chain atomic trie root at the
