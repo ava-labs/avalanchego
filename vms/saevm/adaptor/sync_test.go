@@ -34,22 +34,27 @@ type stubSyncableVM struct {
 	synced    chan struct{}
 }
 
-func (vm *stubSyncableVM) StateSyncEnabled(context.Context) (bool, error) { return true, nil }
-func (vm *stubSyncableVM) GetLastStateSummary(context.Context) (stubSummary, error) {
+func (*stubSyncableVM) StateSyncEnabled(context.Context) (bool, error) { return true, nil }
+func (*stubSyncableVM) GetLastStateSummary(context.Context) (stubSummary, error) {
 	return stubSummary{}, nil
 }
-func (vm *stubSyncableVM) GetOngoingSyncStateSummary(context.Context) (stubSummary, error) {
+
+func (*stubSyncableVM) GetOngoingSyncStateSummary(context.Context) (stubSummary, error) {
 	return stubSummary{}, nil
 }
-func (vm *stubSyncableVM) GetStateSummary(context.Context, uint64) (stubSummary, error) {
+
+func (*stubSyncableVM) GetStateSummary(context.Context, uint64) (stubSummary, error) {
 	return stubSummary{}, nil
 }
-func (vm *stubSyncableVM) ParseStateSummary(context.Context, []byte) (stubSummary, error) {
+
+func (*stubSyncableVM) ParseStateSummary(context.Context, []byte) (stubSummary, error) {
 	return stubSummary{}, nil
 }
+
 func (vm *stubSyncableVM) ShouldAcceptSummary(context.Context, stubSummary) (bool, error) {
 	return vm.should, vm.shouldErr
 }
+
 func (vm *stubSyncableVM) Sync(context.Context, stubSummary) error {
 	close(vm.synced)
 	return nil
