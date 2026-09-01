@@ -53,6 +53,7 @@ import (
 
 	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func TestMain(m *testing.M) {
@@ -89,6 +90,7 @@ type (
 		commitInterval uint64
 		dbScheme       string
 		extraAlloc     types.GenesisAlloc
+		tracer         oteltrace.Tracer
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -140,7 +142,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, logger)
 	require.NoError(tb, err, "saedb.NewTracker()")
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, sutCfg.tracer, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -525,7 +527,7 @@ func TestExecuteRejectsInvalidOptions(t *testing.T) {
 			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
 			require.NoError(t, err, "Executor.StateDB(parent root)")
 
-			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			_, err = Execute(t.Context(), b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
 			require.ErrorIsf(t, err, tt.wantErr, "Execute() with %s options", tt.name)
 		})
 	}
@@ -585,7 +587,7 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 			stateDB, err := sut.StateDB(b.ParentBlock().PostExecutionStateRoot())
 			require.NoError(t, err, "Executor.StateDB(parent root)")
 
-			_, err = Execute(b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			_, err = Execute(t.Context(), b, stateDB, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
 			require.NoError(t, err, "Execute()")
 
 			got := b.SwapInterimExecutionTime(proxytime.Of[gas.Gas](time.Time{}))
@@ -828,7 +830,7 @@ func FuzzOpCodes(f *testing.F) {
 		var logger *loggingtest.Logger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
-		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)
+		require.NoErrorf(t, sut.execute(queuedBlock{block: b}, logger), "%T.execute()", sut.Executor)
 	})
 }
 
@@ -1239,7 +1241,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				log := loggingtest.New(t, logging.Debug)
 				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
 				require.NoError(t, err, "saedb.NewTracker()")
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
+				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), nil, log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)

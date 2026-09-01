@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var _ saedb.StateDBOpener = (*Executor)(nil)
@@ -37,6 +39,7 @@ type Executor struct {
 	*saedb.Tracker
 	quit, done chan struct{}
 	log        logging.Logger
+	tracer     oteltrace.Tracer
 	hooks      hook.Points
 
 	queue        chan queuedBlock
@@ -68,6 +71,7 @@ func New(
 	xdb saetypes.ExecutionResults,
 	tracker *saedb.Tracker,
 	hooks hook.Points,
+	tracer oteltrace.Tracer,
 	logger logging.Logger,
 	reg prometheus.Registerer,
 ) (*Executor, error) {
@@ -75,12 +79,16 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
+	if tracer == nil {
+		tracer = noop.NewTracerProvider().Tracer(tracerName)
+	}
 
 	e := &Executor{
 		Tracker: tracker,
 		quit:    make(chan struct{}), // closed by [Executor.Close]
 		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
 		log:     logger,
+		tracer:  tracer,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid

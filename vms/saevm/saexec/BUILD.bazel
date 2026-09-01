@@ -10,6 +10,7 @@ go_library(
         "receipts.go",
         "saexec.go",
         "subscription.go",
+        "tracing.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/saexec",
     visibility = ["//visibility:public"],
@@ -21,6 +22,7 @@ go_library(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/saedb",
+        "//vms/saevm/saetrace",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//consensus",
@@ -35,13 +37,20 @@ go_library(
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel//codes",
+        "@io_opentelemetry_go_otel_trace//:trace",
+        "@io_opentelemetry_go_otel_trace//noop",
         "@org_uber_go_zap//:zap",
     ],
 )
 
 go_test(
     name = "saexec_test",
-    srcs = ["saexec_test.go"],
+    srcs = [
+        "saexec_test.go",
+        "tracing_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
@@ -80,6 +89,10 @@ go_test(
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_sdk//trace",
+        "@io_opentelemetry_go_otel_sdk//trace/tracetest",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_uber_go_goleak//:goleak",
     ],
 )

@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,6 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -38,10 +43,13 @@ var (
 
 // queuedBlock pairs a queued block with the time it was enqueued so that
 // [Executor.processQueue] can record how long it spent in the queue, from
-// acceptance until its execution completed.
+// acceptance until its execution completed. The span active when the block was
+// enqueued is also recorded, to link the (asynchronous) execution span back to
+// the trace that enqueued the block.
 type queuedBlock struct {
-	block      *blocks.Block
-	enqueuedAt time.Time
+	block        *blocks.Block
+	enqueuedAt   time.Time
+	enqueuedSpan oteltrace.SpanContext
 }
 
 // Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
@@ -51,7 +59,11 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
 	select {
-	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
+	case e.queue <- queuedBlock{
+		block:        block,
+		enqueuedAt:   time.Now(),
+		enqueuedSpan: oteltrace.SpanContextFromContext(ctx),
+	}:
 		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
@@ -92,7 +104,7 @@ func (e *Executor) processQueue() {
 				zap.Int("tx_count", len(block.Transactions())),
 			)
 
-			err := e.execute(block, log)
+			err := e.execute(qb, log)
 			switch {
 			case errors.Is(err, errFatal):
 				log.Fatal( //nolint:gocritic // False positive, will not terminate the process
@@ -117,7 +129,8 @@ func (e *Executor) processQueue() {
 
 var errFatal = errors.New("fatal execution error")
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
+func (e *Executor) execute(qb queuedBlock, log logging.Logger) error {
+	b := qb.block
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
@@ -125,15 +138,34 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
+	// Execution is asynchronous so the enqueueing trace has typically moved on;
+	// a link, rather than a parent, is the conventional way to connect them.
+	attrs := []attribute.KeyValue{
+		saetrace.Int64Attr("saevm.block.height", b.Height()),
+		attribute.Stringer("saevm.block.hash", b.Hash()),
+		attribute.Int("saevm.block.txs", len(b.Transactions())),
+	}
+	if !qb.enqueuedAt.IsZero() {
+		attrs = append(attrs, attribute.Int64("saevm.executor.queue_wait_ms", time.Since(qb.enqueuedAt).Milliseconds()))
+	}
+	opts := []oteltrace.SpanStartOption{oteltrace.WithAttributes(attrs...)}
+	if qb.enqueuedSpan.IsValid() {
+		opts = append(opts, oteltrace.WithLinks(oteltrace.Link{SpanContext: qb.enqueuedSpan}))
+	}
+	ctx, span := e.tracer.Start(context.Background(), spanExecuteBlock, opts...)
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		e.metrics.observeExecuteDuration(time.Since(start))
 	}()
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 	result, err := Execute(
+		ctx,
 		b,
 		stateDB,
 		e.hooks,
@@ -144,9 +176,16 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
-	return e.afterExecution(b, stateDB, result)
+	span.SetAttributes(saetrace.Int64Attr("saevm.block.gas_consumed", uint64(result.GasConsumed)))
+
+	if err := e.afterExecution(ctx, b, stateDB, result); err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+	return nil
 }
 
 type (
@@ -261,6 +300,7 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // but are only published to a [ReceiptStore] when configured with
 // [WithReceiptStore].
 func Execute(
+	ctx context.Context,
 	b *blocks.Block,
 	stateDB *state.StateDB,
 	hooks hook.Points,
@@ -288,7 +328,9 @@ func Execute(
 	perTxClock := gasClock.Time.Clone()
 
 	rules := chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	if err := stateBeforeTransactions(hooks, rules, stateDB, parent.Header(), b.EthBlock()); err != nil {
+	if err := traced(ctx, spanStartExecutingBlock, func(context.Context) error {
+		return stateBeforeTransactions(hooks, rules, stateDB, parent.Header(), b.EthBlock())
+	}); err != nil {
 		return nil, err
 	}
 
@@ -311,56 +353,61 @@ func Execute(
 		Receipts: make(types.Receipts, len(txs)),
 	}
 
-	for ti, tx := range txs {
-		stateDB.SetTxContext(tx.Hash(), ti)
-		b.CheckSenderBalanceBound(stateDB, signer, tx)
+	if err := traced(ctx, spanExecuteTransactions, func(context.Context) error {
+		for ti, tx := range txs {
+			stateDB.SetTxContext(tx.Hash(), ti)
+			b.CheckSenderBalanceBound(stateDB, signer, tx)
 
-		// Executes the transaction and calls [state.StateDB.Finalise].
-		receipt, err := core.ApplyTransaction(
-			chainConfig,
-			chainCtx,
-			&header.Coinbase,
-			&gasPool,
-			stateDB,
-			header,
-			tx,
-			(*uint64)(&res.GasConsumed),
-			vm.Config{},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
-		}
+			// Executes the transaction and calls [state.StateDB.Finalise].
+			receipt, err := core.ApplyTransaction(
+				chainConfig,
+				chainCtx,
+				&header.Coinbase,
+				&gasPool,
+				stateDB,
+				header,
+				tx,
+				(*uint64)(&res.GasConsumed),
+				vm.Config{},
+			)
+			if err != nil {
+				return fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
+			}
 
-		perTxClock.Tick(gas.Gas(receipt.GasUsed))
-		// Interim execution time reports live canonical progress. Historical
-		// execution can run only part of the same in-memory block and overwrite
-		// that progress with an earlier time. This violates monotonicity and can
-		// change the settlement decision made by LastToSettleAt.
-		if config.canonical {
-			b.SwapInterimExecutionTime(perTxClock)
-			// TODO(arr4n) investigate calling the same method on pending blocks in
-			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
-			// returns false, meaning that execution is blocking consensus.
-		}
+			perTxClock.Tick(gas.Gas(receipt.GasUsed))
+			// Interim execution time reports live canonical progress. Historical
+			// execution can run only part of the same in-memory block and overwrite
+			// that progress with an earlier time. This violates monotonicity and can
+			// change the settlement decision made by LastToSettleAt.
+			if config.canonical {
+				b.SwapInterimExecutionTime(perTxClock)
+				// TODO(arr4n) investigate calling the same method on pending blocks in
+				// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
+				// returns false, meaning that execution is blocking consensus.
+			}
 
-		// The [types.Header] that we pass to [core.ApplyTransaction] is
-		// modified to reduce gas price from the worst-case value agreed by
-		// consensus. This changes the hash, which is what is copied to receipts
-		// and logs.
-		//
-		// [core.ApplyTransaction] also doesn't set [types.Receipt.EffectiveGasPrice].
-		// Fixing both here avoids needing to call [types.Receipt.DeriveFields].
-		receipt.BlockHash = b.Hash()
-		for _, l := range receipt.Logs {
-			l.BlockHash = b.Hash()
-		}
-		tip := tx.EffectiveGasTipValue(header.BaseFee)
-		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
+			// The [types.Header] that we pass to [core.ApplyTransaction] is
+			// modified to reduce gas price from the worst-case value agreed by
+			// consensus. This changes the hash, which is what is copied to receipts
+			// and logs.
+			//
+			// [core.ApplyTransaction] also doesn't set [types.Receipt.EffectiveGasPrice].
+			// Fixing both here avoids needing to call [types.Receipt.DeriveFields].
+			receipt.BlockHash = b.Hash()
+			for _, l := range receipt.Logs {
+				l.BlockHash = b.Hash()
+			}
+			tip := tx.EffectiveGasTipValue(header.BaseFee)
+			receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
-		if r, ok := config.receiptStore.Load(tx.Hash()); ok {
-			r.Put(&Receipt{receipt, signer, tx})
+			if r, ok := config.receiptStore.Load(tx.Hash()); ok {
+				r.Put(&Receipt{receipt, signer, tx})
+			}
+			res.Receipts[ti] = receipt
 		}
-		res.Receipts[ti] = receipt
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	if config.skipEndOfBlockOps {
@@ -371,24 +418,31 @@ func Execute(
 	}
 
 	numTxs := len(b.Transactions())
-	ops, err := hooks.EndOfBlockOps(b.EthBlock())
-	if err != nil {
-		return nil, fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, hooks, b.Hash(), err)
-	}
-	for i, o := range ops {
-		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
-		res.GasConsumed += o.Gas
-		perTxClock.Tick(o.Gas)
-		if config.canonical {
-			b.SwapInterimExecutionTime(perTxClock)
+	if err := traced(ctx, spanEndOfBlockOps, func(context.Context) error {
+		ops, err := hooks.EndOfBlockOps(b.EthBlock())
+		if err != nil {
+			return fmt.Errorf("%w: %T.EndOfBlockOps(%#x): %v", errFatal, hooks, b.Hash(), err)
 		}
+		for i, o := range ops {
+			b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
+			res.GasConsumed += o.Gas
+			perTxClock.Tick(o.Gas)
+			if config.canonical {
+				b.SwapInterimExecutionTime(perTxClock)
+			}
 
-		if err := o.ApplyTo(stateDB); err != nil {
-			return nil, fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+			if err := o.ApplyTo(stateDB); err != nil {
+				return fmt.Errorf("%w: applying end-of-block operation [%d](%v): %v", errFatal, i, o.ID, err)
+			}
 		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), res.Receipts); err != nil {
+	if err := traced(ctx, spanFinishExecutingBlock, func(context.Context) error {
+		return hooks.FinishExecutingBlock(stateDB, b.EthBlock(), res.Receipts)
+	}); err != nil {
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
@@ -410,18 +464,24 @@ func Execute(
 	return res, nil
 }
 
-func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *ExecutionResults) error {
-	if err := e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts); err != nil {
+func (e *Executor) afterExecution(ctx context.Context, b *blocks.Block, stateDB *state.StateDB, r *ExecutionResults) error {
+	if err := traced(ctx, spanAfterExecutingBlock, func(context.Context) error {
+		return e.hooks.AfterExecutingBlock(b.EthBlock(), r.Receipts)
+	}); err != nil {
 		return fmt.Errorf("after-executing-block hook: %v", err)
 	}
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
-	root, err := stateDB.Commit(b.NumberU64(), true)
-	if err != nil {
-		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
-	}
-	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
+	var root common.Hash
+	if err := traced(ctx, spanCommit, func(context.Context) error {
+		var err error
+		root, err = stateDB.Commit(b.NumberU64(), true)
+		if err != nil {
+			return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
+		}
+		return e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64())
+	}); err != nil {
 		return err
 	}
 

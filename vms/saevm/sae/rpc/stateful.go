@@ -163,6 +163,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	result, err := saexec.Execute(
+		ctx,
 		block,
 		stateDB,
 		b.Hooks(),
@@ -301,6 +302,7 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
 	_, err = saexec.Execute(
+		ctx,
 		block,
 		sdb,
 		b.Hooks(),
