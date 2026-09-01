@@ -19,8 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
@@ -36,47 +34,6 @@ import (
 // StateSyncEnabled checks whether the node should query for state summaries.
 func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 	return h.cfg.Enabled, nil
-}
-
-// AcceptSummary performs the entire state sync given the provided summary. If
-// [SummaryHandler.StateSyncEnabled] returns false, this method should not be
-// called. If this method returns [block.StateSyncSkipped], no state changes
-// were made. Once the state sync is complete, [SummaryHandler.WaitForEvent]
-// will return [common.StateSyncDone].
-//
-// AcceptSummary MUST only be called once.
-func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
-	should, err := h.ShouldAcceptSummary(ctx, s)
-	if err != nil || !should {
-		return block.StateSyncSkipped, err
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.stopped {
-		return block.StateSyncSkipped, nil
-	}
-
-	ctx, h.cancel = context.WithCancel(context.Background())
-	go func() {
-		defer h.cancel()
-		defer close(h.done)
-
-		h.err.Set(h.Sync(ctx, s))
-	}()
-
-	return block.StateSyncStatic, nil
-}
-
-// WaitForEvent blocks until the state sync is complete, or the context is
-// canceled. Once the state sync is done, [common.StateSyncDone] is returned.
-func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, error) {
-	select {
-	case <-h.done:
-		return common.StateSyncDone, nil
-	case <-ctx.Done():
-		return 0, context.Cause(ctx)
-	}
 }
 
 // ShouldAcceptSummary reports whether the summary should be state synced to,
@@ -105,13 +62,6 @@ func (h *SummaryHandler) ShouldAcceptSummary(_ context.Context, s *Summary) (boo
 		return false, nil
 	}
 	return true, nil
-}
-
-// Error returns an error surfaced in [SummaryHandler.AcceptSummary]. To ensure
-// the state sync has finished (in success or failure), one must call
-// [SummaryHandler.WaitForEvent] before calling this method.
-func (h *SummaryHandler) Error() error {
-	return h.err.Get()
 }
 
 // Sync satisfies [adaptor.SyncableVM]; it is [SummaryHandler.SyncWith] and

@@ -4,7 +4,6 @@
 package statesync
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -111,9 +109,6 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
-	t.Cleanup(func() {
-		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
-	})
 	return &SUT{
 		SummaryHandler: handler,
 		state:          st,
@@ -222,17 +217,11 @@ func TestOnlyGenesis(t *testing.T) {
 	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetStateSummary(0).settledRoot")
 }
 
-func TestWaitForEvent(t *testing.T) {
+// TestShouldAcceptSummarySkips checks that a zero-value summary (accepted
+// height 0, i.e. genesis) is skipped by [SummaryHandler.ShouldAcceptSummary].
+func TestShouldAcceptSummarySkips(t *testing.T) {
 	handler := newSUT(t)
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	_, err := handler.WaitForEvent(ctx)
-	require.ErrorIs(t, err, context.Canceled)
-}
-
-func TestAcceptSummary(t *testing.T) {
-	handler := newSUT(t)
-	mode, err := handler.AcceptSummary(t.Context(), &summary{})
-	require.NoError(t, err)
-	require.Equal(t, block.StateSyncSkipped, mode)
+	should, err := handler.ShouldAcceptSummary(t.Context(), &summary{})
+	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", handler)
+	require.Falsef(t, should, "%T.ShouldAcceptSummary()", handler)
 }

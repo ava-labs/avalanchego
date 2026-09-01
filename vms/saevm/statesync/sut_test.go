@@ -23,8 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -220,15 +218,8 @@ func newSUT(t *testing.T, opts ...sutOption) *shSUT {
 }
 
 func (client *shSUT) syncTo(ctx context.Context, t *testing.T, s *Summary) error {
-	mode, err := client.AcceptSummary(ctx, s)
-	require.NoErrorf(t, err, "%T.AcceptSummary()", client.SummaryHandler)
-	require.Equal(t, block.StateSyncStatic, mode, "AcceptSummary() mode")
-
-	msg, err := client.WaitForEvent(ctx)
-	require.NoErrorf(t, err, "%T.WaitForEvent()", client.SummaryHandler)
-	require.Equal(t, common.StateSyncDone, msg, "WaitForEvent() message")
-
-	return client.Error()
+	t.Helper()
+	return client.Sync(ctx, s)
 }
 
 // newSummaryHandler constructs a [SummaryHandler] over the given database and
@@ -256,9 +247,6 @@ func newSummaryHandler(
 		hooks,
 	)
 	require.NoError(t, err, "New()")
-	t.Cleanup(func() {
-		require.NoError(t, handler.Shutdown(context.WithoutCancel(t.Context())), "SummaryHandler.Shutdown()")
-	})
 
 	return handler
 }

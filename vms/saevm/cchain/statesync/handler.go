@@ -8,7 +8,6 @@ package statesync
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -38,14 +36,6 @@ type SummaryHandler struct {
 	ethDB   ethdb.Database
 	network *network.Network
 	log     logging.Logger
-
-	// Lifecycle management, mirroring the embedded handler: err MUST only be
-	// written before stateSyncDone is closed and only read after.
-	mu      sync.Mutex
-	stopped bool
-	cancel  context.CancelFunc
-	err     utils.Atomic[error]
-	done    chan struct{}
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
@@ -75,35 +65,7 @@ func New(
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
-		done:           make(chan struct{}),
 	}, nil
-}
-
-// Shutdown cancels any ongoing state sync (both the embedded handler's and
-// the atomic trie's) and waits for the sync goroutine to exit, returning early
-// with the context's error if ctx expires first. After Shutdown, no new sync
-// can be started.
-func (h *SummaryHandler) Shutdown(ctx context.Context) error {
-	h.mu.Lock()
-	h.stopped = true
-	cancel := h.cancel
-	h.mu.Unlock()
-
-	if err := h.SummaryHandler.Shutdown(ctx); err != nil {
-		return err
-	}
-
-	if cancel == nil {
-		// no sync was ever started
-		return nil
-	}
-	cancel()
-	select {
-	case <-h.done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],

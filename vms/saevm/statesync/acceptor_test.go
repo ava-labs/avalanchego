@@ -15,8 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -51,9 +49,9 @@ func TestStateSyncEnabled(t *testing.T) {
 	}
 }
 
-// TestAcceptSummarySkips checks the two cases in which
-// [SummaryHandler.AcceptSummary] refuses to state sync.
-func TestAcceptSummarySkips(t *testing.T) {
+// TestShouldAcceptSummarySkips checks the two cases in which
+// [SummaryHandler.ShouldAcceptSummary] refuses to state sync.
+func TestShouldAcceptSummarySkips(t *testing.T) {
 	tests := []struct {
 		name       string
 		newHandler func(t *testing.T) *SummaryHandler
@@ -90,32 +88,11 @@ func TestAcceptSummarySkips(t *testing.T) {
 			sh := tt.newHandler(t)
 			s := tt.getSummary(t, sh)
 
-			mode, err := sh.AcceptSummary(t.Context(), s)
-			require.NoErrorf(t, err, "%T.AcceptSummary()", sh)
-			require.Equalf(t, block.StateSyncSkipped, mode, "%T.AcceptSummary()", sh)
+			should, err := sh.ShouldAcceptSummary(t.Context(), s)
+			require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", sh)
+			require.Falsef(t, should, "%T.ShouldAcceptSummary()", sh)
 		})
 	}
-}
-
-func TestWaitForEventCanceled(t *testing.T) {
-	sut := newSUT(t)
-
-	type waitResult struct {
-		msg common.Message
-		err error
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	done := make(chan waitResult, 1)
-	go func() {
-		msg, err := sut.WaitForEvent(ctx)
-		done <- waitResult{msg: msg, err: err}
-	}()
-
-	cancel()
-	r := <-done
-	assert.ErrorIsf(t, r.err, context.Canceled, "%T.WaitForEvent()", sut.SummaryHandler) //nolint:testifylint // msg is informative
-	assert.Equalf(t, common.Message(0), r.msg, "%T.WaitForEvent()", sut.SummaryHandler)
 }
 
 // TestStateSyncEndToEnd syncs a fresh node from a source with non-trivial
@@ -212,22 +189,21 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	require.Equal(t, ids.ID(b4.Hash()), head, "client VM recovered the synced head")
 }
 
-func TestShutdownCancelsMidSync(t *testing.T) {
+// TestSyncCanceled checks that a stalled Sync returns once its context is
+// canceled.
+func TestSyncCanceled(t *testing.T) {
 	t.Parallel()
 
 	sut := newSUT(t)
 
-	// No peers are connected, so the sync stalls until canceled.
-	mode, err := sut.AcceptSummary(t.Context(), NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
-	require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
-	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary()", sut.SummaryHandler)
-
-	require.NoErrorf(t, sut.Shutdown(t.Context()), "%T.Shutdown()", sut.SummaryHandler)
-
-	msg, err := sut.WaitForEvent(t.Context())
-	require.NoErrorf(t, err, "%T.WaitForEvent()", sut.SummaryHandler)
-	require.Equal(t, common.StateSyncDone, msg, "WaitForEvent()")
-	require.ErrorIsf(t, sut.Error(), context.Canceled, "%T.Error()", sut.SummaryHandler)
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+	go func() {
+		// No peers are connected, so the sync stalls until canceled.
+		errCh <- sut.Sync(ctx, NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
+	}()
+	cancel()
+	require.ErrorIsf(t, <-errCh, context.Canceled, "%T.Sync() after cancel", sut.SummaryHandler)
 }
 
 // FuzzSyncErrorSurfacedViaError checks that any error in the sync process
