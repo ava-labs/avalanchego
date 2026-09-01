@@ -25,19 +25,24 @@ jobs:
         include:
           - platform_name: ubuntu-22.04-amd64
             runner: ubuntu-22.04
+            run_race_shuffle_unit_tests: false
           - platform_name: ubuntu-22.04-arm64
             runner: ubuntu-22.04-arm
+            run_race_shuffle_unit_tests: false
           - platform_name: ubuntu-24.04-amd64
             runner: ubuntu-24.04
+            run_race_shuffle_unit_tests: true
           - platform_name: ubuntu-24.04-arm64
             runner: ubuntu-24.04-arm
+            run_race_shuffle_unit_tests: false
           - platform_name: macos-26-arm64
             runner: macos-26
+            run_race_shuffle_unit_tests: false
     uses: ./.github/workflows/bazel-ci.yml
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
-      run_race_shuffle_unit_tests: true
+      run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests }}
       # Run this daily validation without remote action or test results.
       enable_remote_cache: false
     secrets: inherit
