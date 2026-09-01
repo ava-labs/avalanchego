@@ -301,7 +301,7 @@ func (vm *VM) Initialize(
 					return tdb.Close()
 				})
 			}
-			if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state, reg); err != nil {
+			if err := vm.Handler.RegisterServer(tdb, snaps); err != nil {
 				return fmt.Errorf("registering state sync server: %w", err)
 			}
 		}

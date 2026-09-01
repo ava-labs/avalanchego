@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
@@ -34,22 +35,26 @@ type ProtoMessage[T any] interface {
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
 type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
-	log    logging.Logger
-	client *peertracker.Client
-	policy retryPolicy
+	log     logging.Logger
+	client  *peertracker.Client
+	metrics *Metrics
+	policy  retryPolicy
 }
 
-// NewDispatcher returns a [Dispatcher] that sends through client.
+// NewDispatcher returns a [Dispatcher] that sends through client, counting
+// each attempt on m, which MUST be non-nil.
 func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	log logging.Logger,
 	client *peertracker.Client,
+	m *Metrics,
 	opts ...RetryOption,
 ) *Dispatcher[Req, In, Resp, Out] {
 	return &Dispatcher[Req, In, Resp, Out]{
 		// Tagged once, so every retry line names the RPC without each caller repeating it.
-		log:    log.With(zap.Uint64("handlerID", client.HandlerID())),
-		client: client,
-		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
+		log:     log.With(zap.Uint64("handlerID", client.HandlerID())),
+		client:  client,
+		metrics: m,
+		policy:  *options.ApplyTo(defaultRetryPolicy(), opts...),
 	}
 }
 
@@ -69,6 +74,9 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	})
 }
 
+// sendBytes makes one attempt, counted exactly once on [Metrics] as failed
+// (no response to validate), invalid_response (a response that decode or
+// parse rejected), or succeeded.
 func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 	ctx context.Context,
 	requestBytes []byte,
@@ -93,14 +101,27 @@ func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 		return err == nil
 	}
 
+	d.metrics.requested.Inc()
+	start := time.Now()
 	if err := d.client.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
+		d.metrics.failed.Inc()
 		return zero, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
 	select {
 	case r := <-resultCh:
+		switch {
+		case r.err == nil:
+			d.metrics.succeeded.Inc()
+			d.metrics.requestLatency.Observe(time.Since(start).Seconds())
+		case errors.Is(r.err, errHandlerFailed):
+			d.metrics.failed.Inc()
+		default:
+			d.metrics.invalidResponse.Inc()
+		}
 		return r.out, r.err
 	case <-ctx.Done():
+		d.metrics.failed.Inc()
 		return zero, ctx.Err()
 	}
 }

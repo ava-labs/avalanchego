@@ -15,7 +15,7 @@ import (
 type Client = network.Dispatcher[*syncpb.GetCodeRequest, syncpb.GetCodeResponse, *syncpb.GetCodeResponse, [][]byte]
 
 // NewClient returns a [Client] sending through client, which must be bound to
-// [p2p.EVMCodeRequestHandlerID].
-func NewClient(log logging.Logger, client *peertracker.Client) *Client {
-	return network.NewDispatcher[*syncpb.GetCodeRequest, syncpb.GetCodeResponse, *syncpb.GetCodeResponse, [][]byte](log, client)
+// [p2p.EVMCodeRequestHandlerID], counting its requests on m.
+func NewClient(log logging.Logger, client *peertracker.Client, m *network.Metrics) *Client {
+	return network.NewDispatcher[*syncpb.GetCodeRequest, syncpb.GetCodeResponse, *syncpb.GetCodeResponse, [][]byte](log, client, m)
 }

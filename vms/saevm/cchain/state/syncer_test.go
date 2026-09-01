@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -24,13 +25,14 @@ func sync(t *testing.T, srcSUT, dstSUT *SUT) error {
 	dst := dstSUT.State
 
 	net, tracker := synctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
-	require.NoError(t, RegisterSyncHandler(net, src), "RegisterSyncHandler()")
+	require.NoError(t, RegisterSyncHandler(net, src, prometheus.NewRegistry()), "RegisterSyncHandler()")
 
 	syncer := NewSyncer(
 		peertracker.NewClient(net, p2p.EVMAtomicLeafRequestHandlerID, tracker),
 		dst,
 		src.currentRoot,
 		src.CurrentHeight(),
+		synctest.NewRequestMetrics(t),
 	)
 	return syncer.Sync(t.Context())
 }

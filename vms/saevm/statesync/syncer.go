@@ -48,17 +48,22 @@ type Syncer struct {
 	network     *network.Network
 	db          ethdb.Database
 	blockParser syncblock.Parser
+	// metrics counts the requests this Syncer sends, registered under the
+	// [Handler]'s state sync metrics namespace.
+	metrics *clientMetrics
 }
 
-// Syncer returns a [Syncer] using the same data as the [Handler].
-func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database) *Syncer {
+// Syncer returns a [Syncer] using the same data as the [Handler], counting
+// the requests it sends with the handler's client metrics.
+func (h *Handler) Syncer() *Syncer {
 	return &Syncer{
-		cfg:         cfg,
-		hooks:       hooks,
-		snowCtx:     snowCtx,
-		network:     network,
-		db:          db,
-		blockParser: parser(hooks),
+		cfg:         h.cfg,
+		hooks:       h.hooks,
+		snowCtx:     h.snowCtx,
+		network:     h.network,
+		db:          h.db,
+		blockParser: parser(h.hooks),
+		metrics:     h.clientMetrics,
 	}
 }
 
@@ -102,7 +107,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.snowCtx.Log, blockClient),
+		syncblock.NewClient(s.snowCtx.Log, blockClient, s.metrics.blocks),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -130,7 +135,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.snowCtx.Log, codeClient),
+		code.NewClient(s.snowCtx.Log, codeClient, s.metrics.code),
 		s.db,
 	)
 	if err != nil {
@@ -207,7 +212,7 @@ func (s *Syncer) syncHashDB(ctx context.Context, root common.Hash, codeSyncer *c
 	// TODO(powerslider): Remove dependency on graft.
 	syncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
-		hashdb.NewClient(s.snowCtx.Log, c, common.HashLength),
+		hashdb.NewClient(s.snowCtx.Log, c, common.HashLength, s.metrics.stateTrieLeaves),
 		s.db,
 		root,
 		codeSyncer,

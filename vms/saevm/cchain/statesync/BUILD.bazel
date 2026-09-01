@@ -18,6 +18,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync",
     visibility = ["//visibility:public"],
     deps = [
+        "//api/metrics",
         "//database",
         "//ids",
         "//network/p2p",
@@ -25,7 +26,7 @@ go_library(
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//utils",
-        "//utils/logging",
+        "//vms/evm/sync/network",
         "//vms/saevm/adaptor",
         "//vms/saevm/cchain/state",
         "//vms/saevm/hook",
