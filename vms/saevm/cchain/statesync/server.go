@@ -17,7 +17,7 @@ import (
 //
 // TODO(alarso16): wire through snapshot.
 func (h *SummaryHandler) RegisterServer(tdb *triedb.Database, snaps *snapshot.Tree) error {
-	if err := state.RegisterSyncHandler(h.network.Network, h.state); err != nil {
+	if err := state.RegisterSyncHandler(h.network.Network, h.state, h.atomicReg); err != nil {
 		return fmt.Errorf("registering C-Chain state handler: %w", err)
 	}
 

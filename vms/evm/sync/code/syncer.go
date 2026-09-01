@@ -306,6 +306,7 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 		}
 
 		outcome.Success()
+		outcome.MarkReceived(len(codes))
 		return codes, nil
 	}
 }

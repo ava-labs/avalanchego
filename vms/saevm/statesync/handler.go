@@ -14,8 +14,10 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -45,6 +47,12 @@ type SummaryHandler struct {
 	snowCtx *snow.Context
 	network *network.Network
 
+	// reg scopes every state sync metric under [metricsNamespace]:
+	// clientMetrics counts the requests this node sends, and
+	// [SummaryHandler.RegisterServer] counts the requests it serves.
+	reg           *prometheus.Registry
+	clientMetrics *clientMetrics
+
 	// Lifecycle management
 	mu      sync.Mutex
 	done    chan struct{}
@@ -73,13 +81,23 @@ func New(
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
 	}
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, metricsNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("making state sync metrics: %w", err)
+	}
+	clientMetrics, err := newClientMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering state sync client metrics: %w", err)
+	}
 	return &SummaryHandler{
-		cfg:     cfg,
-		db:      db,
-		snowCtx: snowCtx,
-		network: network,
-		hooks:   hooks,
-		done:    make(chan struct{}),
+		cfg:           cfg,
+		db:            db,
+		snowCtx:       snowCtx,
+		network:       network,
+		hooks:         hooks,
+		reg:           reg,
+		clientMetrics: clientMetrics,
+		done:          make(chan struct{}),
 	}, nil
 }
 

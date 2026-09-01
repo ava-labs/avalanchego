@@ -143,6 +143,7 @@ func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64,
 		}
 
 		outcome.Success()
+		outcome.MarkReceived(len(blocks))
 		return blocks, nil
 	}
 }

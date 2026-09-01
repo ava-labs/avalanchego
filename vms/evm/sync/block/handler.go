@@ -5,9 +5,11 @@ package block
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,13 +23,18 @@ import (
 )
 
 // RegisterHandler serves block requests at [p2p.EVMBlockRequestHandlerID] on
-// net.
-func RegisterHandler(log logging.Logger, net *p2p.Network, db ethdb.Reader) error {
+// net, counting the requests on reg.
+func RegisterHandler(log logging.Logger, net *p2p.Network, db ethdb.Reader, reg prometheus.Registerer) error {
+	m, err := newHandlerMetrics(reg)
+	if err != nil {
+		return fmt.Errorf("registering block handler metrics: %w", err)
+	}
 	h := handlers.NewHandler(
 		log,
 		&responder{
-			log: log,
-			db:  db,
+			log:     log,
+			db:      db,
+			metrics: m,
 		},
 	)
 	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
@@ -37,8 +44,9 @@ var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*
 
 // responder serves the requested block and its accepted ancestors.
 type responder struct {
-	log logging.Logger
-	db  ethdb.Reader
+	log     logging.Logger
+	db      ethdb.Reader
+	metrics *handlerMetrics
 }
 
 const (
@@ -61,6 +69,12 @@ var errBlockNotFound = &common.AppError{
 }
 
 func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetBlockRequest) (*syncpb.GetBlockResponse, *common.AppError) {
+	r.metrics.count.Inc()
+	start := time.Now()
+	defer func() {
+		r.metrics.processingTime.Observe(time.Since(start).Seconds())
+	}()
+
 	ctx, cancel := context.WithTimeout(ctx, maxBlocksRetrievalTime)
 	defer cancel()
 
@@ -78,6 +92,7 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		return nil, handlers.Fault(r.log, nodeID, err)
 	}
 	if len(blocks) == 0 {
+		r.metrics.missingBlockHash.Inc()
 		r.log.Debug("rejecting request, requested block not found",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint64("height", height),
@@ -85,5 +100,6 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		)
 		return nil, errBlockNotFound
 	}
+	r.metrics.totalBlocks.Observe(float64(len(blocks)))
 	return &syncpb.GetBlockResponse{Blocks: blocks}, nil
 }

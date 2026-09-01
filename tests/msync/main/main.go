@@ -131,11 +131,13 @@ var (
 	// see the Firewood TODO in vms/saevm/statesync/server.go.
 	stateSyncSupported bool
 
-	// assertSyncMetrics reports whether the run asserts the requesting- and
-	// serving-side sync metrics. Those are coreth metrics: the SAE C-Chain syncs
-	// over vms/evm/sync, which exports no equivalent, so an SAE run asserts the
-	// sync through the VM's health details alone.
-	assertSyncMetrics bool
+	// codeRequestCountMetric and blockRequestCountMetric prove that the
+	// validators served code and block backfill requests. They default to the
+	// coreth names and are substituted for an SAE C-Chain run, whose sync
+	// handlers (vms/evm/sync, wired in vms/saevm/statesync) export their own
+	// metrics.
+	codeRequestCountMetric  = "avalanche_evm_eth_code_request_count"
+	blockRequestCountMetric = "avalanche_evm_eth_block_request_count"
 )
 
 // Values reported by the C-Chain VM's health check that this harness asserts
@@ -401,7 +403,6 @@ func main() {
 	// a positive value activates it that long after the network starts.
 	saeCChain = flagVars.ActivateLatestAfter() >= 0
 	stateSyncSupported = !saeCChain || stateScheme == rawdb.HashScheme
-	assertSyncMetrics = !saeCChain
 
 	// A positive --activate-latest-after schedules Helicon after network
 	// start, so the chain begins on coreth and transitions mid-run. This mode
@@ -412,16 +413,25 @@ func main() {
 	var schemeErr error
 	schemeConfig, schemeErr = newStateSchemeConfig(stateScheme)
 	require.NoError(schemeErr, "newStateSchemeConfig()")
+	if saeCChain && stateSyncSupported {
+		// The SAE C-Chain syncs over vms/evm/sync, whose metrics live under
+		// the statesync namespace (see vms/saevm/statesync); substitute the
+		// coreth names configured by newStateSchemeConfig. The transition
+		// segment comes from vms/transitionvm, which registers the
+		// post-transition chain's metrics under "transition".
+		schemeConfig.bootstrapRequestMetric = "avalanche_evm_transition_statesync_sync_state_trie_leaves_requested"
+		schemeConfig.servingRequestMetrics = []string{"avalanche_evm_transition_statesync_leafs_request_count"}
+		codeRequestCountMetric = "avalanche_evm_transition_statesync_code_request_count"
+		blockRequestCountMetric = "avalanche_evm_transition_statesync_block_request_count"
+	}
 	log.Info("configuring merkle sync harness",
 		zap.String("stateScheme", stateScheme),
 		zap.Bool("saeCChain", saeCChain),
 		zap.Bool("midChainTransition", midChainTransition),
 		zap.Bool("stateSyncSupported", stateSyncSupported),
-		zap.Bool("assertSyncMetrics", assertSyncMetrics),
 		zap.Duration("activateLatestAfter", flagVars.ActivateLatestAfter()),
 	)
-	switch {
-	case !stateSyncSupported:
+	if !stateSyncSupported {
 		// Skipping the sync evidence is the whole reason such a run is cheaper
 		// than one that syncs, so say so rather than let a green run imply the
 		// sync path was covered.
@@ -429,12 +439,6 @@ func main() {
 			zap.String("stateScheme", stateScheme),
 			zap.Uint64("stateSyncMinBlocks", stateSyncMinBlocks),
 			zap.Uint64("stateSyncCommitInterval", stateSyncCommitInterval),
-		)
-	case !assertSyncMetrics:
-		// The sync itself is still asserted through the VM's health details.
-		log.Warn("the SAE C-Chain's sync path exports none of coreth's sync metrics, so the run asserts the state sync through the VM health details alone; the requesting- and serving-side metrics are not asserted",
-			zap.String("bootstrapRequestMetric", schemeConfig.bootstrapRequestMetric),
-			zap.Strings("servingRequestMetrics", schemeConfig.servingRequestMetrics),
 		)
 	}
 
@@ -1412,7 +1416,7 @@ func validateMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, b
 }
 
 func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) (vmHealth, error) {
-	if assertSyncMetrics {
+	if stateSyncSupported {
 		if err := checkSyncMetrics(tc, network, bootstrapNode); err != nil {
 			return vmHealth{}, err
 		}
@@ -1464,8 +1468,9 @@ func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, boot
 }
 
 // checkSyncMetrics asserts that the bootstrap node made, and the validators
-// served, the state sync requests for the configured scheme. These are coreth
-// metrics; see [assertSyncMetrics].
+// served, the state sync requests for the configured scheme. The metric names
+// are the C-Chain implementation's: coreth's by default, or the SAE C-Chain's
+// (vms/saevm/statesync) when the run activates Helicon.
 func checkSyncMetrics(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node) error {
 	bootstrapMetrics, err := tests.GetNodeMetrics(tc.DefaultContext(), bootstrapNode.URI)
 	if err != nil {
@@ -1490,10 +1495,10 @@ func checkSyncMetrics(tc tests.TestContext, network *tmpnet.Network, bootstrapNo
 	if err != nil {
 		return err
 	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_code_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
+	if sumMetric(validatorMetrics, codeRequestCountMetric, prometheus.Labels{"chain": blockchainID}) <= 0 {
 		return errors.New("expected validators to serve code sync requests")
 	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_block_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
+	if sumMetric(validatorMetrics, blockRequestCountMetric, prometheus.Labels{"chain": blockchainID}) <= 0 {
 		return errors.New("expected validators to serve block backfill requests")
 	}
 	for _, metricName := range schemeConfig.servingRequestMetrics {

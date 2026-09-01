@@ -67,6 +67,6 @@ func (h *SummaryHandler) syncCChainState(ctx context.Context, s *summary) error 
 		return err
 	}
 
-	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
+	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight, h.atomicLeaves)
 	return syncer.Sync(ctx)
 }

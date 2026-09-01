@@ -7,6 +7,7 @@ go_library(
         "ancestors.go",
         "client.go",
         "handler.go",
+        "metrics.go",
         "syncer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/block",
@@ -24,6 +25,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -33,6 +35,7 @@ go_test(
     srcs = [
         "ancestors_test.go",
         "handler_test.go",
+        "metrics_test.go",
         "syncer_test.go",
     ],
     embed = [":block"],
@@ -50,6 +53,8 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

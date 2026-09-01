@@ -147,7 +147,7 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 
 	blockSyncer := syncblock.NewSyncer(
 		h.snowCtx.Log,
-		syncblock.NewClient(h.network.Network, h.network.PeerTracker),
+		syncblock.NewClient(h.network.Network, h.network.PeerTracker, h.clientMetrics.blocks),
 		h.db,
 		h.parseBlock,
 		s.AcceptedHash,
@@ -178,7 +178,7 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 
 	codeSyncer, err := code.NewSyncer(
 		h.snowCtx.Log,
-		code.NewClient(h.network.Network, h.network.PeerTracker),
+		code.NewClient(h.network.Network, h.network.PeerTracker, h.clientMetrics.code),
 		h.db,
 	)
 	if err != nil {
@@ -192,6 +192,7 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 			p2p.EVMLeafRequestHandlerID,
 			ethcommon.HashLength,
 			h.network.PeerTracker,
+			h.clientMetrics.stateTrieLeaves,
 		),
 		h.db,
 		hdr.Root,

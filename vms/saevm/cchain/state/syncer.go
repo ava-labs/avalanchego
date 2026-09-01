@@ -9,18 +9,20 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 )
 
 // RegisterSyncHandler returns a [p2p.Handler] that serves atomic trie leaves to
-// a [Syncer].
-func RegisterSyncHandler(n *p2p.Network, state *State) error {
-	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength)
+// a [Syncer], counting the served requests on reg.
+func RegisterSyncHandler(n *p2p.Network, state *State, reg prometheus.Registerer) error {
+	return hashdb.RegisterHandler(state.snowCtx.Log, n, p2p.EVMAtomicLeafRequestHandlerID, state.trieDB, keyLength, reg)
 }
 
 // Syncer is a [leaf.CallbackSyncer] that can fetch and apply the atomic trie to
@@ -33,8 +35,9 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new atomic syncer. The syncer will start with a call to [Syncer.Sync].
-func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
+// NewSyncer creates a new atomic syncer, counting its requests on m. The
+// syncer will start with a call to [Syncer.Sync].
+func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64, m *network.Metrics) *Syncer {
 	const requestSize = 1024
 
 	tasks := make(chan leaf.SyncTask, 1)
@@ -57,6 +60,7 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 				p2p.EVMAtomicLeafRequestHandlerID,
 				keyLength,
 				pt,
+				m,
 			),
 			tasks,
 			&leaf.SyncerConfig{

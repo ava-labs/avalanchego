@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -57,19 +59,20 @@ func runSyncRoundTrip(t *testing.T, blocks []block) {
 type syncServer struct {
 	net     *p2p.Network
 	tracker *p2p.PeerTracker
+	metrics *network.Metrics
 }
 
 func newSyncServer(t *testing.T, src *State) *syncServer {
 	t.Helper()
 
 	net, tracker := synctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
-	require.NoError(t, RegisterSyncHandler(net, src), "RegisterSyncHandler()")
-	return &syncServer{net: net, tracker: tracker}
+	require.NoError(t, RegisterSyncHandler(net, src, prometheus.NewRegistry()), "RegisterSyncHandler()")
+	return &syncServer{net: net, tracker: tracker, metrics: synctest.NewRequestMetrics(t)}
 }
 
 // syncInto runs a syncer that pulls the served trie into dst.
 func (s *syncServer) syncInto(ctx context.Context, dst *State, target common.Hash, targetHeight uint64) error {
-	syncer := NewSyncer(s.net, s.tracker, dst, target, targetHeight)
+	syncer := NewSyncer(s.net, s.tracker, dst, target, targetHeight, s.metrics)
 	return syncer.Sync(ctx)
 }
 

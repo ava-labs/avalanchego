@@ -25,7 +25,7 @@ func (h *SummaryHandler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tre
 		p2pNet = h.network.Network
 		db     = h.db
 	)
-	if err := block.RegisterHandler(log, p2pNet, db); err != nil {
+	if err := block.RegisterHandler(log, p2pNet, db, h.reg); err != nil {
 		return fmt.Errorf("registering block handler: %w", err)
 	}
 
@@ -34,12 +34,13 @@ func (h *SummaryHandler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tre
 		p2p.EVMLeafRequestHandlerID,
 		tdb,
 		common.HashLength,
+		h.reg,
 		hashdbOptions(snap)...,
 	); err != nil {
 		return fmt.Errorf("registering hashdb handler: %w", err)
 	}
 
-	if err := code.RegisterHandler(log, p2pNet, db); err != nil {
+	if err := code.RegisterHandler(log, p2pNet, db, h.reg); err != nil {
 		return fmt.Errorf("registering code handler: %w", err)
 	}
 
