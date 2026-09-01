@@ -27,6 +27,7 @@ go_library(
         "//snow/engine/snowman/block",
         "//utils",
         "//utils/logging",
+        "//vms/evm/sync/network",
         "//vms/saevm/adaptor",
         "//vms/saevm/cchain/state",
         "//vms/saevm/hook",

@@ -48,21 +48,26 @@ type Syncer struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	db          ethdb.Database
-	registerer  prometheus.Registerer
 	blockParser syncblock.Parser
+	// metrics counts the requests this Syncer sends, registered under the
+	// [Handler]'s state sync metrics namespace. registerer is that namespace's
+	// registry, on which the trie scheme's syncer registers its own metrics.
+	metrics    *clientMetrics
+	registerer prometheus.Registerer
 }
 
-// Syncer returns a [Syncer] using the same data as the [Handler]. Metrics
-// specific to the trie scheme's syncer are registered on registerer.
-func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database, registerer prometheus.Registerer) *Syncer {
+// Syncer returns a [Syncer] using the same data as the [Handler], counting
+// the requests it sends with the handler's client metrics.
+func (h *Handler) Syncer() *Syncer {
 	return &Syncer{
-		cfg:         cfg,
-		hooks:       hooks,
-		snowCtx:     snowCtx,
-		network:     network,
-		db:          db,
-		registerer:  registerer,
-		blockParser: parser(hooks),
+		cfg:         h.cfg,
+		hooks:       h.hooks,
+		snowCtx:     h.snowCtx,
+		network:     h.network,
+		db:          h.db,
+		blockParser: parser(h.hooks),
+		metrics:     h.clientMetrics,
+		registerer:  h.reg,
 	}
 }
 
@@ -106,7 +111,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
+		syncblock.NewClient(s.network.Network, s.network.PeerTracker, s.metrics.blocks),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -130,7 +135,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.network.Network, s.network.PeerTracker),
+		code.NewClient(s.network.Network, s.network.PeerTracker, s.metrics.code),
 		s.db,
 	)
 	if err != nil {
@@ -166,6 +171,7 @@ func (s *Syncer) syncHashDB(ctx context.Context, root common.Hash, codeSyncer *c
 			p2p.EVMLeafRequestHandlerID,
 			common.HashLength,
 			s.network.StateTriePeerTracker,
+			s.metrics.stateTrieLeaves,
 		),
 		s.db,
 		root,
