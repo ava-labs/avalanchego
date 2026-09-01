@@ -1,0 +1,32 @@
+name: Go Full Test Jobs
+
+# Reusable workflow for running Go tests with configurable race/shuffle
+on:
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      run_race_shuffle_unit_tests:
+        description: 'Run unit tests with race detection and shuffled test order'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run unit tests
+        shell: bash
+        run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+        env:
+          TIMEOUT: 900s
