@@ -14,10 +14,12 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
@@ -79,6 +81,21 @@ func TestShouldAcceptSummary(t *testing.T) {
 func TestStateSyncEndToEnd(t *testing.T) {
 	t.Parallel()
 
+	// The sync must be visible on both sides' chain metrics: the client counted
+	// the requests it sent, and the source counted the requests it served. Code
+	// is deliberately absent: the client's genesis commit already wrote the only
+	// contract's code to its database, so no code request is ever needed.
+	metrics := map[string]struct{ client, server []string }{
+		rawdb.HashScheme: {
+			client: []string{"statesync_sync_state_trie_leaves_requested", "statesync_sync_blocks_succeeded"},
+			server: []string{"statesync_leafs_request_count", "statesync_block_request_count"},
+		},
+		firewood.Scheme: {
+			client: []string{"syncer_firewood_sync_requests_made", "statesync_sync_blocks_succeeded"},
+			server: []string{"statesync_sync_proof_generation_seconds", "statesync_block_request_count"},
+		},
+	}
+
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
 			t.Parallel()
@@ -97,6 +114,13 @@ func TestStateSyncEndToEnd(t *testing.T) {
 			require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
 			require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+
+			for _, name := range metrics[scheme].client {
+				requireCounterPositive(t, client.snowCtx.Metrics, name)
+			}
+			for _, name := range metrics[scheme].server {
+				requireCounterPositive(t, sourceVM.snowCtx.Metrics, name)
+			}
 
 			// During the sync, the network continued processing
 			sourceVM.acceptBlocks(t, numBlocks)
@@ -375,4 +399,26 @@ func TestSyncToSynchronousBlock(t *testing.T) {
 	syncer := client.syncer()
 	err = syncer.Sync(ctx, summary)
 	require.ErrorIsf(t, err, errSynchronousBlock, "%T.Sync(%v)", syncer, summary)
+}
+
+// requireCounterPositive asserts that the counter named name is gathered by g
+// and has been incremented.
+func requireCounterPositive(t *testing.T, g prometheus.Gatherer, name string) {
+	t.Helper()
+
+	mfs, err := g.Gather()
+	require.NoError(t, err, "Gather()")
+	for _, mf := range mfs {
+		if mf.GetName() != name {
+			continue
+		}
+		var total float64
+		for _, m := range mf.GetMetric() {
+			// Histograms count as their sample count, like tests.GetMetricValue.
+			total += m.GetCounter().GetValue() + float64(m.GetHistogram().GetSampleCount())
+		}
+		require.Positivef(t, total, "counter %q", name)
+		return
+	}
+	t.Fatalf("counter %q not registered", name)
 }

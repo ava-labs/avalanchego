@@ -13,8 +13,10 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,6 +43,14 @@ type Handler struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	blockParser syncblocks.Parser
+
+	// reg scopes every state sync metric under [metricsNamespace]:
+	// clientMetrics counts the requests this node sends,
+	// [Handler.RegisterServer] counts the requests it serves, and lifecycle
+	// reports the sync's observable lifecycle (see [Handler.MarkSyncStarted]).
+	reg           *prometheus.Registry
+	clientMetrics *clientMetrics
+	lifecycle     *lifecycleMetrics
 }
 
 // New constructs a new [Handler] with the given configuration and
@@ -55,13 +65,28 @@ func New(
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
 	}
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, metricsNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("making state sync metrics: %w", err)
+	}
+	clientMetrics, err := newClientMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering state sync client metrics: %w", err)
+	}
+	lifecycle, err := newLifecycleMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering state sync lifecycle metrics: %w", err)
+	}
 	return &Handler{
-		cfg:         cfg,
-		db:          db,
-		snowCtx:     snowCtx,
-		network:     network,
-		hooks:       hooks,
-		blockParser: parser(hooks),
+		cfg:           cfg,
+		db:            db,
+		snowCtx:       snowCtx,
+		network:       network,
+		hooks:         hooks,
+		blockParser:   parser(hooks),
+		reg:           reg,
+		clientMetrics: clientMetrics,
+		lifecycle:     lifecycle,
 	}, nil
 }
 

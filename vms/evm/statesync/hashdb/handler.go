@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -15,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,18 +29,27 @@ import (
 	avacommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// RegisterHandler serves leaf-range requests at handlerID on net. Requests
-// name the trie to read by root, opened from trieDB. Every key in a served
-// trie is trieKeyLength bytes.
+// RegisterHandler serves leaf-range requests at handlerID on net, counting
+// the requests on reg. Requests name the trie to read by root, opened from
+// trieDB. Every key in a served trie is trieKeyLength bytes.
+//
+// Each registration counts on its own reg, so a node serving several tries
+// (e.g. the EVM state trie and the atomic trie) MUST give each handler a
+// distinctly prefixed registerer to keep their metrics apart.
 func RegisterHandler(
 	log logging.Logger,
 	net *p2p.Network,
 	handlerID uint64,
 	trieDB *triedb.Database,
 	trieKeyLength int,
+	reg prometheus.Registerer,
 	opts ...HandlerOption,
 ) error {
-	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, opts...))
+	m, err := newHandlerMetrics(reg)
+	if err != nil {
+		return fmt.Errorf("registering leafs handler metrics: %w", err)
+	}
+	h := handlers.NewHandler(log, newResponder(log, trieDB, trieKeyLength, m, opts...))
 	return net.AddHandler(handlerID, h)
 }
 
@@ -48,14 +60,16 @@ type responder struct {
 	trieDB   *triedb.Database
 	snapshot Snapshot // optional
 	minKey   []byte   // read-only stand-in for an absent start key
+	metrics  *handlerMetrics
 }
 
-func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, opts ...HandlerOption) *responder {
+func newResponder(log logging.Logger, trieDB *triedb.Database, trieKeyLength int, m *handlerMetrics, opts ...HandlerOption) *responder {
 	return &responder{
 		log:      log,
 		trieDB:   trieDB,
 		snapshot: options.As(opts...).snapshot,
 		minKey:   make([]byte, trieKeyLength),
+		metrics:  m,
 	}
 }
 
@@ -81,21 +95,36 @@ func WithSnapshot[V any, P SnapshotPointer[V]](s P) HandlerOption {
 }
 
 func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, reqPB *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, *avacommon.AppError) {
+	r.metrics.count.Inc()
+	start := time.Now()
+	defer func() {
+		r.metrics.processingTime.Observe(time.Since(start).Seconds())
+	}()
+
 	req, appErr := r.newRequest(reqPB)
 	if appErr != nil {
+		// A root this node has never held is a serving gap, not peer
+		// misbehavior, so it is counted apart from the malformed requests.
+		if appErr == errRootNotFound {
+			r.metrics.missingRoot.Inc()
+		} else {
+			r.metrics.invalid.Inc()
+		}
 		r.log.Debug("rejecting request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(appErr),
 		)
 		return nil, appErr
 	}
-	resp, err := getLeaves(req)
+	resp, err := getLeaves(r.metrics, req)
 	switch {
 	case errors.Is(err, errInvalidLeafKey):
 		return nil, errInvalidRoot
 	case err != nil:
 		return nil, handlers.Fault(r.log, nodeID, err)
 	}
+	r.metrics.totalLeafs.Observe(float64(len(resp.GetKeys())))
+	r.metrics.proofValsReturned.Observe(float64(len(resp.GetProofVals())))
 	return resp, nil
 }
 
@@ -211,18 +240,20 @@ func (r *responder) newRequest(reqPB *syncpb.GetLeafRequest) (*request, *avacomm
 }
 
 // getLeaves returns the response holding the leaf range and its proof.
-func getLeaves(req *request) (*syncpb.GetLeafResponse, error) {
+func getLeaves(m *handlerMetrics, req *request) (*syncpb.GetLeafResponse, error) {
 	r := newLeafRange(req.start, req.limit)
-	more, err := fillFromSnapshot(req.snapshot, req.trie, r)
+	readStart := time.Now()
+	more, err := fillFromSnapshot(m, req.snapshot, req.trie, r)
 	if err != nil {
 		return nil, err
 	}
 	if more && !r.full() {
-		more, err = fillFromTrie(req.trie, r)
+		more, err = fillFromTrie(m, req.trie, r)
 		if err != nil {
 			return nil, err
 		}
 	}
+	m.readTime.Observe(time.Since(readStart).Seconds())
 
 	resp := &syncpb.GetLeafResponse{
 		Keys:   r.keys,
@@ -234,7 +265,7 @@ func getLeaves(req *request) (*syncpb.GetLeafResponse, error) {
 		return resp, nil
 	}
 
-	proofDB, err := newRangeProof(req.trie, req.start, r.keys)
+	proofDB, err := newRangeProof(m, req.trie, req.start, r.keys)
 	if err != nil {
 		return nil, err
 	}
@@ -298,25 +329,32 @@ func (l *leafRange) next() []byte {
 // capacity, serving from the snapshot where it agrees with the trie. A nil
 // snapshot appends nothing. It returns whether the trie may hold leaves past
 // the response.
-func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) {
+func fillFromSnapshot(m *handlerMetrics, s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) {
 	if s == nil {
 		return true, nil
 	}
+	m.snapshotReadAttempt.Inc()
 
 	next := r.next()
+	readStart := time.Now()
 	keys, vals, err := readSnapshot(
 		s,
 		common.BytesToHash(next),
 		r.space(),
 	)
+	m.snapshotReadTime.Observe(time.Since(readStart).Seconds())
 	if err != nil || len(keys) == 0 {
+		if err != nil {
+			m.snapshotReadError.Inc()
+		}
 		// Since the snapshot is volatile, an error or an empty read falls
 		// back to the trie.
-		return true, nil //nolint:nilerr // The snapshot is only optimistic, an error is not fatal.
+		return true, nil
 	}
 
 	// The whole read often proves in one shot, avoiding per-segment proofs.
 	valid, more, err := isRangeValid(
+		m,
 		t,
 		&leafRange{
 			start: next,
@@ -328,6 +366,7 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) 
 		return false, err
 	}
 	if valid {
+		m.snapshotReadSuccess.Inc()
 		// TODO(StephenButtolph): In the case where the snapshot proved
 		// correctly and it isn't the full trie, we could avoid re-proving the
 		// range and just return the proof here.
@@ -335,7 +374,7 @@ func fillFromSnapshot(s trieSnapshot, t *trie.Trie, r *leafRange) (bool, error) 
 		return more, nil
 	}
 
-	return fillFromSegments(t, r, keys, vals)
+	return fillFromSegments(m, t, r, keys, vals)
 }
 
 // segmentLen balances proof overhead against waste. Larger segments amortize
@@ -352,7 +391,7 @@ const segmentLen = 64
 //	[C D] fails     mark the gap     -> r=[A B]
 //	[E]   proves    fill gap below E -> r=[A B C D]
 //	                append [E]       -> r=[A B C D E]
-func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, error) {
+func fillFromSegments(m *handlerMetrics, t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, error) {
 	// Only a proved segment establishes what lies past the response, so more
 	// starts pessimistic.
 	more := true
@@ -372,17 +411,19 @@ func fillFromSegments(t *trie.Trie, r *leafRange, keys, vals [][]byte) (bool, er
 			vals:  vals[i:end],
 		}
 
-		valid, moreAfterSeg, err := isRangeValid(t, segment)
+		valid, moreAfterSeg, err := isRangeValid(m, t, segment)
 		if err != nil {
 			return false, err
 		}
 		if !valid {
+			m.snapshotSegmentInvalid.Inc()
 			hasGap = true
 			continue
 		}
+		m.snapshotSegmentValid.Inc()
 		if hasGap {
 			// The trie supplies the gap, the segment supplies the rest.
-			if _, err := fillFromTrie(t, r, withBefore(segment.keys[0])); err != nil {
+			if _, err := fillFromTrie(m, t, r, withBefore(segment.keys[0])); err != nil {
 				return false, err
 			}
 			hasGap = false
@@ -415,7 +456,13 @@ func withBefore(end []byte) fillOption {
 // fillFromTrie appends trie leaves from [leafRange.next] to r, up to the
 // capacity. [withBefore] stops the fill before end. It returns whether the trie
 // holds leaves past the response.
-func fillFromTrie(t *trie.Trie, r *leafRange, opts ...fillOption) (bool, error) {
+func fillFromTrie(m *handlerMetrics, t *trie.Trie, r *leafRange, opts ...fillOption) (_ bool, retErr error) {
+	defer func() {
+		if retErr != nil {
+			m.trieError.Inc()
+		}
+	}()
+
 	c := options.As(opts...)
 	for pair, err := range LeafIterator(t, r.next()) {
 		if err != nil {
@@ -433,8 +480,8 @@ func fillFromTrie(t *trie.Trie, r *leafRange, opts ...fillOption) (bool, error) 
 
 // isRangeValid range-proves r against the trie. valid reports whether the proof
 // succeeded, and more reports whether the trie holds leaves past r.
-func isRangeValid(t *trie.Trie, r *leafRange) (valid, more bool, _ error) {
-	proofDB, err := newRangeProof(t, r.start, r.keys)
+func isRangeValid(m *handlerMetrics, t *trie.Trie, r *leafRange) (valid, more bool, _ error) {
+	proofDB, err := newRangeProof(m, t, r.start, r.keys)
 	if err != nil {
 		return false, false, err
 	}
@@ -442,8 +489,17 @@ func isRangeValid(t *trie.Trie, r *leafRange) (valid, more bool, _ error) {
 	return proofErr == nil, more, nil
 }
 
-// newRangeProof returns a range proof for [start, last(keys)].
-func newRangeProof(t *trie.Trie, start []byte, keys [][]byte) (*memorydb.Database, error) {
+// newRangeProof returns a range proof for [start, last(keys)], observing the
+// generation time and counting failures on m.
+func newRangeProof(m *handlerMetrics, t *trie.Trie, start []byte, keys [][]byte) (_ *memorydb.Database, retErr error) {
+	proofStart := time.Now()
+	defer func() {
+		m.generateRangeProofTime.Observe(time.Since(proofStart).Seconds())
+		if retErr != nil {
+			m.proofError.Inc()
+		}
+	}()
+
 	// [trie.VerifyRangeProof] requires the proof to resolve a full path for
 	// each edge key, even when the leaves would otherwise prove the range.
 	proofDB := memorydb.New()
