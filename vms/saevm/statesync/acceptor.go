@@ -46,7 +46,7 @@ func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
 //
 // AcceptSummary MUST only be called once.
 func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.StateSyncMode, error) {
-	should, err := h.ShouldAcceptSummary(s)
+	should, err := h.ShouldAcceptSummary(ctx, s)
 	if err != nil || !should {
 		return block.StateSyncSkipped, err
 	}
@@ -62,11 +62,7 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, s *Summary) (block.S
 		defer h.cancel()
 		defer close(h.done)
 
-		if err := h.StateSync(ctx, s); err != nil {
-			h.err.Set(fmt.Errorf("state sync failed: %w", err))
-			return
-		}
-		h.err.Set(h.OnFinish(s))
+		h.err.Set(h.Sync(ctx, s))
 	}()
 
 	return block.StateSyncStatic, nil
@@ -83,11 +79,13 @@ func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, erro
 	}
 }
 
-// ShouldAcceptSummary returns true if the summary should be state synced to,
-// given the current disk state.
+// ShouldAcceptSummary reports whether the summary should be state synced to,
+// given the current disk state. It is called under the chain's context lock
+// inside [block.StateSummary.Accept] and MUST stay cheap: disk reads only,
+// no network, no side effects.
 //
 // TODO(alarso16): Find a way to wire through Firewood.
-func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
+func (h *SummaryHandler) ShouldAcceptSummary(_ context.Context, s *Summary) (bool, error) {
 	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
 		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false, nil
@@ -116,11 +114,32 @@ func (h *SummaryHandler) Error() error {
 	return h.err.Get()
 }
 
-// StateSync fetches all state associated with [Summary] and applies it to disk.
-// Any error is returned, and MUST be treated as fatal. After this method
-// returns without error, one must call [SummaryHandler.OnFinish] to finalize
-// the state sync.
-func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
+// Sync satisfies [adaptor.SyncableVM]; it is [SummaryHandler.SyncWith] and
+// no extra work.
+func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
+	return h.SyncWith(ctx, s, nil)
+}
+
+// SyncWith fetches and finalizes all state for s, leaving a runnable VM on
+// nil return. A non-nil extra runs after block, code, and EVM state sync
+// have completed — it may read synced headers and blocks from the database —
+// and before the finalization markers are written.
+func (h *SummaryHandler) SyncWith(ctx context.Context, s *Summary, extra func(context.Context) error) error {
+	if err := h.fetch(ctx, s); err != nil {
+		return fmt.Errorf("state sync failed: %w", err)
+	}
+	if extra != nil {
+		if err := extra(ctx); err != nil {
+			return err
+		}
+	}
+	return h.finish(s)
+}
+
+// fetch is the fetch phase of [SummaryHandler.SyncWith]: it fetches all state
+// associated with [Summary] and applies it to disk. Any error is returned,
+// and MUST be treated as fatal.
+func (h *SummaryHandler) fetch(ctx context.Context, s *Summary) error {
 	const (
 		numBlocksToFetch   = 512 // min 256 for BLOCKHASH op, some extra for settlement...
 		maxLeafRequestSize = 1024
@@ -187,7 +206,8 @@ func (h *SummaryHandler) StateSync(ctx context.Context, s *Summary) error {
 	return nil
 }
 
-func (h *SummaryHandler) OnFinish(s *Summary) error {
+// finish MUST run last: the rawdb markers it writes signal a completed sync.
+func (h *SummaryHandler) finish(s *Summary) error {
 	lastAccepted := rawdb.ReadHeader(h.db, s.AcceptedHash, s.AcceptedHeight)
 	if lastAccepted == nil {
 		return errors.New("couldn't find last accepted header")

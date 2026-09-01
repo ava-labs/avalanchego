@@ -5,9 +5,11 @@ package statesync
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -265,4 +267,67 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
 		})
 	})
+}
+
+// TestSyncWithExtraOrdering checks the [SummaryHandler.SyncWith] contract:
+// the extra runs after block sync (the summary's header is on disk) and
+// before the finalization markers are written.
+func TestSyncWithExtraOrdering(t *testing.T) {
+	t.Parallel()
+
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, defaultCommitInterval)
+
+	client := newSUT(t)
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	ctx := t.Context()
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+
+	extraRan := false
+	err = client.SyncWith(ctx, summary, func(context.Context) error {
+		extraRan = true
+		require.NotNilf(t,
+			rawdb.ReadHeader(client.sutEnv.db, summary.AcceptedHash, summary.AcceptedHeight),
+			"synced header readable when extra runs",
+		)
+		require.NotEqualf(t,
+			summary.AcceptedHash, rawdb.ReadHeadFastBlockHash(client.sutEnv.db),
+			"finalization markers not yet written when extra runs",
+		)
+		return nil
+	})
+	require.NoErrorf(t, err, "%T.SyncWith()", client.SummaryHandler)
+	require.True(t, extraRan, "extra ran")
+	require.Equalf(t,
+		summary.AcceptedHash, rawdb.ReadHeadFastBlockHash(client.sutEnv.db),
+		"finalization markers written after SyncWith",
+	)
+}
+
+// TestSyncWithExtraError checks that an extra's error aborts the sync before
+// finalization: no markers are written and the error is returned.
+func TestSyncWithExtraError(t *testing.T) {
+	t.Parallel()
+
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, defaultCommitInterval)
+
+	client := newSUT(t)
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	ctx := t.Context()
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+
+	errExtra := errors.New("extra failed")
+	err = client.SyncWith(ctx, summary, func(context.Context) error {
+		return errExtra
+	})
+	require.ErrorIsf(t, err, errExtra, "%T.SyncWith() with failing extra", client.SummaryHandler)
+	require.NotEqualf(t,
+		summary.AcceptedHash, rawdb.ReadHeadFastBlockHash(client.sutEnv.db),
+		"no finalization markers after failed extra",
+	)
 }

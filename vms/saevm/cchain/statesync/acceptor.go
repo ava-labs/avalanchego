@@ -27,12 +27,30 @@ func (h *SummaryHandler) Error() error {
 	return h.err.Get()
 }
 
-// AcceptSummary delegates to the embedded handler and, once its sync
-// completes, syncs the atomic trie state.
+// ShouldAcceptSummary reports whether the summary should be state synced to,
+// given the current disk state.
+func (h *SummaryHandler) ShouldAcceptSummary(ctx context.Context, s *summary) (bool, error) {
+	return h.SummaryHandler.ShouldAcceptSummary(ctx, &s.summary)
+}
+
+// Sync runs the SAE state sync with the atomic-trie sync spliced in before
+// finalization. The closure runs after block sync, so it can read the
+// settled header from the database.
+func (h *SummaryHandler) Sync(ctx context.Context, s *summary) error {
+	return h.SummaryHandler.SyncWith(ctx, &s.summary, func(ctx context.Context) error {
+		settledHeight, err := h.settledHeight(s.summary.AcceptedHash, s.summary.AcceptedHeight)
+		if err != nil {
+			return err
+		}
+		return state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight).Sync(ctx)
+	})
+}
+
+// AcceptSummary delegates to [SummaryHandler.Sync] in the background.
 //
 // AcceptSummary MUST only be called once.
 func (h *SummaryHandler) AcceptSummary(ctx context.Context, summary *summary) (block.StateSyncMode, error) {
-	shouldSync, err := h.SummaryHandler.ShouldAcceptSummary(&summary.summary)
+	shouldSync, err := h.ShouldAcceptSummary(ctx, summary)
 	if err != nil || !shouldSync {
 		return block.StateSyncSkipped, err
 	}
@@ -47,26 +65,7 @@ func (h *SummaryHandler) AcceptSummary(ctx context.Context, summary *summary) (b
 	go func() {
 		defer h.cancel()
 		defer close(h.done) // result barrier: h.err is now readable
-
-		if err := h.SummaryHandler.StateSync(ctx, &summary.summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		if err := h.syncCChainState(ctx, summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		h.err.Set(h.OnFinish(&summary.summary))
+		h.err.Set(h.Sync(ctx, summary))
 	}()
 	return block.StateSyncStatic, nil
-}
-
-func (h *SummaryHandler) syncCChainState(ctx context.Context, s *summary) error {
-	settledHeight, err := h.settledHeight(s.summary.AcceptedHash, s.summary.AcceptedHeight)
-	if err != nil {
-		return err
-	}
-
-	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
-	return syncer.Sync(ctx)
 }
