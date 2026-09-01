@@ -68,9 +68,9 @@ func (r *Runner) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}
 }
 
-// Err returns the sync result. It MUST only be called after
-// [Runner.WaitForEvent] returns [common.StateSyncDone]. It is nil if no sync
-// was ever started.
+// Err returns the sync result. It MUST NOT be called while a sync is
+// running: wait for [Runner.WaitForEvent] to return [common.StateSyncDone]
+// first. It is nil if no sync was ever started.
 func (r *Runner) Err() error {
 	return r.err.Get()
 }
