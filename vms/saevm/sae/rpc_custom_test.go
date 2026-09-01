@@ -118,7 +118,10 @@ func TestNewAcceptedTransactions(t *testing.T) {
 func TestCallDetailed(t *testing.T) {
 	echoReverter := common.Address{'e', 'c', 'h', 'o'}
 	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
+	const gasCap = 100e6
 	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.GasCap = gasCap
+
 		c.genesis.Alloc[echoReverter] = types.Account{
 			Code: saetest.Ops(
 				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY, // https://www.evm.codes/#37
@@ -228,7 +231,7 @@ func TestCallDetailed(t *testing.T) {
 				latest,
 			},
 			want: saerpc.DetailedExecutionResult{
-				UsedGas: saerpc.GasCap,
+				UsedGas: gasCap,
 				Err:     vm.ErrInvalidJump.Error(),
 			},
 		},

@@ -173,9 +173,13 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
-			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
-			BatchRequestLimit:            c.BatchRequestLimit,
-			EVMTimeout:                   c.APIMaxDuration.Duration,
+			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
+			BatchRequestLimit:   c.BatchRequestLimit,
+			EVMTimeout:          c.APIMaxDuration.Duration,
+			// gas and tx-fee caps are deliberately not operator-configurable
+			// but we must set them because their zero values disable the caps.
+			GasCap:                       rpc.DefaultGasCap,
+			TxFeeCap:                     rpc.DefaultTxFeeCap,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,

@@ -108,6 +108,8 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		MempoolConfig: mempoolConf,
 		RPCConfig: rpc.Config{
 			EVMTimeout: rpc.DefaultEVMTimeout,
+			GasCap:     rpc.DefaultGasCap,
+			TxFeeCap:   rpc.DefaultTxFeeCap,
 		},
 	}
 	saeCfg.DBConfig.CommitInterval = cfg.commitInterval

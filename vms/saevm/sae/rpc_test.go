@@ -1213,22 +1213,36 @@ func TestRPCTxFeeCap(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		cap      float64
 		gasPrice uint64
 		wantErr  testerr.Want
 	}{
 		{
-			name:     "at_cap",
-			gasPrice: saerpc.TxFeeCap * perAVAX,
+			name:     "default_at_cap",
+			cap:      saerpc.DefaultTxFeeCap,
+			gasPrice: saerpc.DefaultTxFeeCap * perAVAX,
 		},
 		{
-			name:     "over_cap",
-			gasPrice: (saerpc.TxFeeCap + 1) * perAVAX,
+			name:     "default_over_cap",
+			cap:      saerpc.DefaultTxFeeCap,
+			gasPrice: (saerpc.DefaultTxFeeCap + 1) * perAVAX,
+			wantErr:  testerr.Contains("exceeds the configured cap"),
+		},
+		{
+			name:     "custom_at_cap",
+			cap:      1,
+			gasPrice: perAVAX,
+		},
+		{
+			name:     "custom_over_cap",
+			cap:      1,
+			gasPrice: 2 * perAVAX,
 			wantErr:  testerr.Contains("exceeds the configured cap"),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, sut := newSUT(t, 1)
+			_, sut := newSUT(t, 1, withTxFeeCap(tt.cap))
 			tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 				To:       &zeroAddr,
 				Gas:      params.TxGas,
@@ -1614,6 +1628,12 @@ func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
 			want:   hexutil.Bytes(nil),
 		},
 	}...)
+}
+
+func withTxFeeCap(feeCap float64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.TxFeeCap = feeCap
+	})
 }
 
 // withDebugAPI returns a sutOption that enables the debug API.

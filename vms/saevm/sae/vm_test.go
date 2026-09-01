@@ -160,6 +160,8 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 			},
 			RPCConfig: saerpc.Config{
 				EVMTimeout: saerpc.DefaultEVMTimeout,
+				GasCap:     saerpc.DefaultGasCap,
+				TxFeeCap:   saerpc.DefaultTxFeeCap,
 			},
 		},
 		logLevel: logging.Debug,

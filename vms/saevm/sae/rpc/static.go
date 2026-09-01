@@ -23,23 +23,24 @@ const (
 	// DefaultEVMTimeout is the [Config.EVMTimeout] used when an operator leaves
 	// it unset.
 	DefaultEVMTimeout = 10 * time.Second
-	// GasCap limits the gas an eth_call can use.
-	GasCap = 50_000_000
-	// TxFeeCap limits the fee, in AVAX, of a transaction sent over RPC. The fee
-	// is the gas price times the gas limit.
-	TxFeeCap = 100
+	// DefaultGasCap limits the gas an eth_call can use.
+	DefaultGasCap = 50_000_000
+	// DefaultTxFeeCap limits the fee of a transaction sent over RPC, in whole
+	// units of the chain's native token. The fee is the gas price times the gas
+	// limit.
+	DefaultTxFeeCap = 100
 )
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
 }
 
-func (*backend) RPCGasCap() uint64 {
-	return GasCap
+func (b *backend) RPCGasCap() uint64 {
+	return b.config.GasCap
 }
 
-func (*backend) RPCTxFeeCap() float64 {
-	return TxFeeCap
+func (b *backend) RPCTxFeeCap() float64 {
+	return b.config.TxFeeCap
 }
 
 func (b *backend) UnprotectedAllowed() bool {
