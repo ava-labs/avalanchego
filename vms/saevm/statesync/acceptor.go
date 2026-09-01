@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +34,11 @@ import (
 
 // StateSyncEnabled checks whether the node should query for state summaries.
 func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
+	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
+		return false, nil
+	}
+
 	return h.cfg.Enabled, nil
 }
 
@@ -85,14 +89,7 @@ func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, erro
 
 // ShouldAcceptSummary returns true if the summary should be state synced to,
 // given the current disk state.
-//
-// TODO(alarso16): Find a way to wire through Firewood.
 func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
-	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
-		return false, nil
-	}
-
 	if s.AcceptedHeight == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
 		return false, nil
@@ -219,14 +216,17 @@ func (h *SummaryHandler) OnFinish(s *Summary) error {
 }
 
 func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
+	// Synchronous blocks MUST NOT persist their execution results.
+	if hook.Synchronous(h.hooks, lastSettled.Header()) {
+		return nil
+	}
+
 	gt, err := hook.SettledGasTime(h.hooks, lastSettled.Header(), lastAccepted)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate settled gas time: %w", err)
 	}
 
-	xdb, err := h.hooks.ExecutionResultsDB(
-		filepath.Join(h.snowCtx.ChainDataDir, sae.ExecutionResultsDir),
-	)
+	xdb, err := h.hooks.ExecutionResultsDB(sae.ExecutionResultsPath(h.snowCtx.ChainDataDir))
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,6 @@ func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastA
 		return fmt.Errorf("creating block for last settled: %w", err)
 	}
 
-	blackhole := new(atomic.Pointer[blocks.Block])
 	return block.MarkExecuted(
 		h.db,
 		xdb,
@@ -248,7 +247,7 @@ func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastA
 		nil,        // base fee is unknown
 		nil,        // receipts are unknown
 		lastAccepted.Root,
-		blackhole, // last executed
+		new(atomic.Pointer[blocks.Block]), // last executed
 	)
 }
 

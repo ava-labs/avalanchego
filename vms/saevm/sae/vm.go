@@ -47,7 +47,11 @@ import (
 )
 
 // directory that stores execution results database under the chain data directory
-const ExecutionResultsDir = "sae_execution_results"
+const executionResultsDir = "sae_execution_results"
+
+func ExecutionResultsPath(chainDataDir string) string {
+	return filepath.Join(chainDataDir, executionResultsDir)
+}
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
@@ -139,7 +143,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	// ==========  Execution Results DB  ==========
-	xdbDir := filepath.Join(snowCtx.ChainDataDir, ExecutionResultsDir)
+	xdbDir := ExecutionResultsPath(snowCtx.ChainDataDir)
 	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)

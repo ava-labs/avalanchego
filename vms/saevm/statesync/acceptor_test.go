@@ -266,3 +266,33 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		})
 	})
 }
+
+// TestStateSyncLong ensures that the VM can startup with blocks missing, which
+// is the normal state-syncing case.
+func TestStateSyncLong(t *testing.T) {
+	const numBlocks = 1024 // > num blocks fetched by syncer
+
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, numBlocks)
+
+	xdb := saetest.NewExecutionResultsDB()
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(t.Context())
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+	clientVM := newVM(t,
+		withDatabase(db),
+		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
+		withTime(sourceVM.clock.Now()),
+	)
+
+	wantLast, err := sourceVM.LastAccepted(t.Context())
+	require.NoErrorf(t, err, "%T.LastAccepted()", sourceVM)
+	gotLast, err := clientVM.LastAccepted(t.Context())
+	require.NoErrorf(t, err, "%T.LastAccepted()", clientVM)
+	require.Equal(t, wantLast, gotLast, "last accepted ID")
+}
