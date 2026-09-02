@@ -25,6 +25,33 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
+// duration is a [time.Duration] that JSON-unmarshals from a duration string
+// parsed by [time.ParseDuration] (e.g. "10s", "2h45m"). Valid units are "ns",
+// "us", "ms", "s", "m" and "h".
+type duration struct {
+	time.Duration
+}
+
+var _ json.Marshaler = (*duration)(nil)
+
+func (d *duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	parsed, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.Duration = parsed
+	return nil
+}
+
+func (d duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
 // config is the operator-supplied node configuration for the C-Chain, decoded
 // from the configBytes passed to [VM.Initialize].
 //
@@ -61,8 +88,11 @@ type config struct {
 	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
-	BatchRequestLimit            uint64 `json:"batch-request-limit"`
-	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
+	BatchRequestLimit uint64 `json:"batch-request-limit"`
+	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs.
+	// Non-positive values result in no limit. Defaults to no limit.
+	APIMaxDuration               duration `json:"api-max-duration"`
+	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -142,8 +172,14 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
-			AllowUnprotectedTxs:          c.AllowUnprotectedTxs,
-			BatchRequestLimit:            c.BatchRequestLimit,
+			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
+			BatchRequestLimit:   c.BatchRequestLimit,
+			EVMTimeout:          c.APIMaxDuration.Duration,
+			// GasCap and TxFeeCap are set to reasonable values for mainnet
+			// C-Chain. They are left unconfigurable to minimize the size of the
+			// user config.
+			GasCap:                       50_000_000,
+			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,
