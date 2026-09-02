@@ -1347,9 +1347,8 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 
 	// Ensure that key1 has sufficient funds in the genesis block for all of the tests.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
-	// Use TestGraniteChainConfig (Helicon NOT active) so the
-	// feeManager genesis precompile below does not trip the post-Helicon
-	// retirement rule in feemanager.Config.Verify.
+	// Keep Helicon inactive so this legacy executor test exercises its
+	// transaction allowlist hook; SAE owns that admission check after Helicon.
 	config := params.Copy(params.TestGraniteChainConfig)
 	// Set all of the required config parameters
 	params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
