@@ -177,6 +177,36 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.MinDelayExcess != nil {
 		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
 	}
+	if h.TargetExcess != nil {
+		m["targetExcess"] = hexutil.Uint64(*h.TargetExcess)
+	}
+	if h.SettledHeight != nil {
+		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
+	}
+	if h.SettledGasUnix != nil {
+		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
+	}
+	if h.SettledGasNumerator != nil {
+		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
+	}
+	if h.SettledExcess != nil {
+		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
+	if h.GasConfigValidatorTargetGas != nil {
+		m["gasConfigValidatorTargetGas"] = hexutil.Uint64(*h.GasConfigValidatorTargetGas)
+	}
+	if h.GasConfigTargetGas != nil {
+		m["gasConfigTargetGas"] = hexutil.Uint64(*h.GasConfigTargetGas)
+	}
+	if h.GasConfigTargetToExcessScaling != nil {
+		m["gasConfigTargetToExcessScaling"] = hexutil.Uint64(*h.GasConfigTargetToExcessScaling)
+	}
+	if h.GasConfigMinGasPrice != nil {
+		m["gasConfigMinGasPrice"] = hexutil.Uint64(*h.GasConfigMinGasPrice)
+	}
+	if h.GasConfigStaticPricing != nil {
+		m["gasConfigStaticPricing"] = hexutil.Uint64(*h.GasConfigStaticPricing)
+	}
 }
 
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {

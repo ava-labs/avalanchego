@@ -14,13 +14,14 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestMain(m *testing.M) {
@@ -54,6 +55,29 @@ func TestHeaderJSON(t *testing.T) {
 	// Note we ignore the returned encoded bytes because we don't
 	// need to compare them to a JSON gold standard.
 	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal)
+}
+
+func TestHeaderExtraPostRPCMarshal(t *testing.T) {
+	header, extra := headerWithNonZeroFields()
+	got := make(map[string]any)
+	extra.PostRPCMarshal(header, got)
+
+	want := map[string]any{
+		"blockGasCost":                   (*hexutil.Big)(big.NewInt(23)),
+		"timestampMilliseconds":          hexutil.Uint64(24),
+		"minDelayExcess":                 hexutil.Uint64(25),
+		"targetExcess":                   hexutil.Uint64(26),
+		"settledHeight":                  hexutil.Uint64(27),
+		"settledGasUnix":                 hexutil.Uint64(28),
+		"settledGasNumerator":            hexutil.Uint64(29),
+		"settledExcess":                  hexutil.Uint64(30),
+		"gasConfigValidatorTargetGas":    hexutil.Uint64(31),
+		"gasConfigTargetGas":             hexutil.Uint64(32),
+		"gasConfigTargetToExcessScaling": hexutil.Uint64(33),
+		"gasConfigMinGasPrice":           hexutil.Uint64(34),
+		"gasConfigStaticPricing":         hexutil.Uint64(35),
+	}
+	require.Equal(t, want, got, "HeaderExtra.PostRPCMarshal()")
 }
 
 func testHeaderEncodeDecode(
