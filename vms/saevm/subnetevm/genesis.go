@@ -5,15 +5,13 @@ package subnetevm
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -114,33 +112,9 @@ func feeManagerConfigured(configExtra *extras.ChainConfig) bool {
 	return false
 }
 
-var lastSyncKey = prefixdb.MakePrefix([]byte("lastSync"))
-
-// readLastSync returns the RLP encoding of the last synchronously executed
-// block, when one was recorded.
-//
-// TODO: nothing writes this key yet; transition support (materializing a
-// legacy chain's tip as the last synchronous block) will reintroduce a
-// writer.
-func readLastSync(db database.KeyValueReader) ([]byte, error) {
-	return db.Get(lastSyncKey)
-}
-
-// lastSynchronousBlock returns the block SAE resumes from: the recorded
-// last synchronous block when one exists (see [readLastSync]), otherwise the
-// genesis block.
-func lastSynchronousBlock(db database.KeyValueReader, genesis *core.Genesis) (*types.Block, error) {
-	lastSyncBytes, err := readLastSync(db)
-	switch {
-	case err == nil:
-		lastSync := new(types.Block)
-		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
-			return nil, fmt.Errorf("rlp.DecodeBytes(..., %T): %w", lastSync, err)
-		}
-		return lastSync, nil
-	case errors.Is(err, database.ErrNotFound):
-		return genesis.ToBlock(), nil
-	default:
-		return nil, err
+func readLastAcceptedHash(db ethdb.KeyValueReader, genesisHash common.Hash) common.Hash {
+	if hash := rawdb.ReadHeadFastBlockHash(db); hash != (common.Hash{}) {
+		return hash
 	}
+	return genesisHash
 }

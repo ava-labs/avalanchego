@@ -50,9 +50,7 @@ import (
 
 var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
 
-// VM is a harness around an [sae.VM], providing an `Initialize`
-// method that supports being asynchronous since genesis or after a previously
-// accepted synchronous block. See [readLastSync] for the resume path.
+// VM is a harness around an [sae.VM].
 type VM struct {
 	*sae.VM          // created by [VM.Initialize]
 	*network.Network // created by [VM.Initialize]
@@ -128,16 +126,13 @@ func (v *VM) Initialize(
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
 
-	lastSync, err := lastSynchronousBlock(avaDB, genesis)
-	if err != nil {
-		return fmt.Errorf("establishing last synchronous block: %w", err)
-	}
+	genesisHash := genesis.ToBlock().Hash()
+	lastAcceptedHash := readLastAcceptedHash(db, genesisHash)
 	snowCtx.Log.Info("setting up the genesis",
-		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
-		zap.Uint64("lastHeight", lastSync.NumberU64()),
+		zap.Stringer("lastAcceptedID", ids.ID(lastAcceptedHash)),
 	)
 
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis, lastSync.Hash(), false /*skipChainConfigCheckCompatible*/)
+	config, _, err := core.SetupGenesisBlock(db, tdb, genesis, lastAcceptedHash, false /*skipChainConfigCheckCompatible*/)
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
