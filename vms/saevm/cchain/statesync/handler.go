@@ -25,10 +25,10 @@ import (
 
 var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 
-// SummaryHandler wraps the SAE [statesync.SummaryHandler] with the C-Chain
+// SummaryHandler wraps the SAE [statesync.Handler] with the C-Chain
 // atomic trie state at the settled height.
 type SummaryHandler struct {
-	*statesync.SummaryHandler
+	*statesync.Handler
 
 	cfg   statesync.Config
 	hooks hook.Points
@@ -58,25 +58,25 @@ func New(
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)
 	}
 	return &SummaryHandler{
-		SummaryHandler: inner,
-		cfg:            cfg,
-		state:          state,
-		hooks:          hooks,
-		ethDB:          db,
-		log:            snowCtx.Log,
+		Handler: inner,
+		cfg:     cfg,
+		state:   state,
+		hooks:   hooks,
+		ethDB:   db,
+		log:     snowCtx.Log,
 	}, nil
 }
 
-// GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
+// GetStateSummary is the same as [statesync.Handler.GetStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetStateSummary(ctx, height))
+	return h.wrap(h.Handler.GetStateSummary(ctx, height))
 }
 
-// GetLastStateSummary is the same as [statesync.SummaryHandler.GetLastStateSummary],
+// GetLastStateSummary is the same as [statesync.Handler.GetLastStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetLastStateSummary(ctx))
+	return h.wrap(h.Handler.GetLastStateSummary(ctx))
 }
 
 // GetOngoingSyncStateSummary is not implemented. It always returns

@@ -18,30 +18,30 @@ import (
 )
 
 // TestShouldAcceptSummary checks the cases in which
-// [SummaryHandler.ShouldAcceptSummary] refuses to state sync.
+// [Handler.ShouldAcceptSummary] refuses to state sync.
 func TestShouldAcceptSummary(t *testing.T) {
 	tests := []struct {
 		name       string
-		newHandler func(t *testing.T) *SummaryHandler
-		getSummary func(t *testing.T, sh *SummaryHandler) *Summary
+		newHandler func(t *testing.T) *Handler
+		getSummary func(t *testing.T, sh *Handler) *Summary
 	}{
 		{
 			name: "summary_at_genesis_height",
-			newHandler: func(t *testing.T) *SummaryHandler {
-				return newSUT(t).SummaryHandler
+			newHandler: func(t *testing.T) *Handler {
+				return newSUT(t).Handler
 			},
-			getSummary: func(*testing.T, *SummaryHandler) *Summary {
+			getSummary: func(*testing.T, *Handler) *Summary {
 				return &Summary{}
 			},
 		},
 		{
 			name: "blocks_already_accepted",
-			newHandler: func(t *testing.T) *SummaryHandler {
+			newHandler: func(t *testing.T) *Handler {
 				vm := newVM(t)
 				vm.acceptBlocks(t, defaultCommitInterval)
-				return vm.SummaryHandler
+				return vm.Handler
 			},
-			getSummary: func(t *testing.T, sh *SummaryHandler) *Summary {
+			getSummary: func(t *testing.T, sh *Handler) *Summary {
 				s, err := sh.GetLastStateSummary(t.Context())
 				require.NoErrorf(t, err, "%T.GetLastStateSummary()", sh)
 				require.NotZerof(t, s.Height(), "%T.GetLastStateSummary().Height()", sh)
@@ -50,11 +50,11 @@ func TestShouldAcceptSummary(t *testing.T) {
 		},
 		{
 			name: "not_enabled",
-			newHandler: func(t *testing.T) *SummaryHandler {
+			newHandler: func(t *testing.T) *Handler {
 				sut := newSUT(t, withEnabled(false))
-				return sut.SummaryHandler
+				return sut.Handler
 			},
-			getSummary: func(*testing.T, *SummaryHandler) *Summary {
+			getSummary: func(*testing.T, *Handler) *Summary {
 				return &Summary{AcceptedHeight: 1}
 			},
 		},
@@ -66,7 +66,8 @@ func TestShouldAcceptSummary(t *testing.T) {
 			sh := tt.newHandler(t)
 			s := tt.getSummary(t, sh)
 
-			require.Falsef(t, sh.ShouldAcceptSummary(s), "%T.ShouldAcceptSummary()", sh)
+			syncer := sh.Syncer()
+			require.Falsef(t, syncer.ShouldAcceptSummary(s), "%T.ShouldAcceptSummary()", sh)
 		})
 	}
 }
@@ -90,8 +91,8 @@ func TestStateSyncEndToEnd(t *testing.T) {
 
 	ctx := t.Context()
 
-	summary, err := sourceVM.SummaryHandler.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
+	summary, err := sourceVM.Handler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
@@ -147,7 +148,7 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
 	summary, err := sourceVM.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 	require.Equal(t, b4.Height(), summary.Height(), "summary at last commit boundary")
 
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
@@ -169,12 +170,13 @@ func TestShutdownCancelsMidSync(t *testing.T) {
 	t.Parallel()
 
 	sut := newSUT(t)
+	syncer := sut.Handler.Syncer()
 
 	// No peers are connected, so the sync stalls until canceled.
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	err := sut.Sync(ctx, NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
-	require.ErrorIsf(t, err, context.Canceled, "%T.StateSync", sut.SummaryHandler)
+	err := syncer.Sync(ctx, NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
+	require.ErrorIsf(t, err, context.Canceled, "%T.Sync", syncer)
 }
 
 // FuzzSyncErrorSurfacedViaError checks that any error in the sync process
@@ -194,7 +196,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		saetest.ConnectTo[saetest.Peer](t, client, source)
 
 		summary, err := source.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.SummaryHandler)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
 
 		// Setup (e.g. the genesis commit) is done; arm the write budget.
 		fdb.SetFailAfter(failAfter)
@@ -230,7 +232,7 @@ func TestStateSyncLong(t *testing.T) {
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
 	summary, err := sourceVM.GetLastStateSummary(t.Context())
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
 
 	clientVM := newVM(t,

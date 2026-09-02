@@ -43,7 +43,7 @@ import (
 
 type (
 	sut struct {
-		*SummaryHandler
+		*Handler
 		*network.Network
 
 		cfg     *sutConfig
@@ -191,16 +191,16 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	require.NoError(t, err, "New()")
 
 	s := &sut{
-		SummaryHandler: handler,
-		Network:        net,
-		cfg:            cfg,
-		snowCtx:        snowCtx,
-		hooks:          hooks,
-		keys:           keys,
-		genesis:        genesis,
-		db:             ethDB,
-		sender:         sender,
-		clock:          clock,
+		Handler: handler,
+		Network: net,
+		cfg:     cfg,
+		snowCtx: snowCtx,
+		hooks:   hooks,
+		keys:    keys,
+		genesis: genesis,
+		db:      ethDB,
+		sender:  sender,
+		clock:   clock,
 	}
 
 	s.sender.Start(t, s)
@@ -216,13 +216,15 @@ func (s *sut) Sender() *saetest.Sender { return s.sender }
 func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error {
 	t.Helper()
 
-	require.True(t, s.ShouldAcceptSummary(summary), "ShouldAcceptSummary()")
+	syncer := s.Handler.Syncer()
 
-	if err := s.Sync(ctx, summary); err != nil {
+	require.True(t, syncer.ShouldAcceptSummary(summary), "ShouldAcceptSummary()")
+
+	if err := syncer.Sync(ctx, summary); err != nil {
 		return err
 	}
 
-	return s.WriteSynced(summary)
+	return syncer.WriteSynced(summary)
 }
 
 // newVM constructs and initializes a VM and a summary handler.

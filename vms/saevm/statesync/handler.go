@@ -24,15 +24,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
-// Config provides all user-configurable information for the [SummaryHandler].
+// Config provides all user-configurable information for the [Handler].
 type Config struct {
 	DBConfig saedb.Config
 	Enabled  bool
 }
 
-// SummaryHandler implements [adaptor.SyncableVM] and provides the consensus-
+// Handler implements [adaptor.SyncableVM] and provides the consensus-
 // critical block getters for [adaptor.ChainVM].
-type SummaryHandler struct {
+type Handler struct {
 	cfg     Config
 	db      ethdb.Database
 	hooks   hook.Points
@@ -40,7 +40,7 @@ type SummaryHandler struct {
 	network *network.Network
 }
 
-// New constructs a new [SummaryHandler] with the given configuration and
+// New constructs a new [Handler] with the given configuration and
 // database. See the README for the guarantees expected of the database.
 func New(
 	cfg Config,
@@ -48,11 +48,11 @@ func New(
 	snowCtx *snow.Context,
 	network *network.Network,
 	hooks hook.Points,
-) (*SummaryHandler, error) {
+) (*Handler, error) {
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
 	}
-	return &SummaryHandler{
+	return &Handler{
 		cfg:     cfg,
 		db:      db,
 		snowCtx: snowCtx,
@@ -63,7 +63,7 @@ func New(
 
 // GetLastStateSummary returns the summary of the last accepted block at
 // multiple of [syncCommitInterval] height.
-func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, error) {
+func (h *Handler) GetLastStateSummary(ctx context.Context) (*Summary, error) {
 	hash, err := h.lastAcceptedHash()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, err
 // is available to be served. Otherwise, [database.ErrNotFound] is returned.
 //
 // TODO(alarso16): don't serve summaries for synchronous blocks.
-func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
+func (h *Handler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
 	if !saedb.ShouldCommitTrieDB(height, h.cfg.DBConfig.CommitInterval) {
 		// can't serve committed state at this height
 		return nil, database.ErrNotFound
@@ -101,7 +101,7 @@ func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*S
 // ParseBlock parses the given bytes into a [blocks.Block] via [blocks.ParseEth]
 // if it is well-formed. Any returned block is safe to be used after state sync
 // finishes.
-func (h *SummaryHandler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks.Block, error) {
+func (h *Handler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks.Block, error) {
 	ethB, err := h.parseBlock(blkBytes)
 	if err != nil {
 		return nil, err
@@ -109,13 +109,13 @@ func (h *SummaryHandler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks
 	return blocks.New(ethB, nil, nil, h.hooks, h.snowCtx.Log)
 }
 
-func (h *SummaryHandler) parseBlock(bytes []byte) (*types.Block, error) {
+func (h *Handler) parseBlock(bytes []byte) (*types.Block, error) {
 	return blocks.ParseEth(bytes, h.hooks)
 }
 
 // GetBlock returns the block with the given ID. If the block is not found, it
 // returns [database.ErrNotFound].
-func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, error) {
+func (h *Handler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, error) {
 	height := rawdb.ReadHeaderNumber(h.db, common.Hash(id))
 	if height == nil {
 		return nil, database.ErrNotFound
@@ -133,7 +133,7 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 
 // LastAccepted returns the ID of the last accepted block. If no blocks have
 // been accepted, it returns the ID of the genesis block.
-func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
+func (h *Handler) LastAccepted(context.Context) (ids.ID, error) {
 	hash, err := h.lastAcceptedHash()
 	if err != nil {
 		return ids.Empty, err
@@ -143,7 +143,7 @@ func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
 
 // GetBlockIDAtHeight returns the ID of the block at the given height. If no
 // block exists at that height, it returns [database.ErrNotFound].
-func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+func (h *Handler) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	hash := rawdb.ReadCanonicalHash(h.db, height)
 	if hash == (common.Hash{}) {
 		return ids.Empty, database.ErrNotFound
@@ -153,7 +153,7 @@ func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (i
 
 // lastAcceptedHash returns the hash of the last accepted block, and whether
 // one exists.
-func (h *SummaryHandler) lastAcceptedHash() (common.Hash, error) {
+func (h *Handler) lastAcceptedHash() (common.Hash, error) {
 	// The database is guaranteed to have this populated.
 	hash := rawdb.ReadHeadFastBlockHash(h.db)
 	if hash == (common.Hash{}) {

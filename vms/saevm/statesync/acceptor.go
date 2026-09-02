@@ -13,55 +13,78 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
+type Syncer struct {
+	cfg   Config
+	hooks hook.Points
+
+	snowCtx    *snow.Context
+	network    *network.Network
+	db         ethdb.Database
+	parseBlock syncblock.Parser
+}
+
+func (h *Handler) Syncer() *Syncer {
+	return &Syncer{
+		cfg:        h.cfg,
+		hooks:      h.hooks,
+		snowCtx:    h.snowCtx,
+		network:    h.network,
+		db:         h.db,
+		parseBlock: h.parseBlock,
+	}
+}
+
 // ShouldAcceptSummary returns true if the summary should be state synced to,
 // given the current disk state.
-func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) bool {
-	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
+func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
+	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false
 	}
 
-	if !h.cfg.Enabled {
+	if !s.cfg.Enabled {
 		return false
 	}
 
-	if s.AcceptedHeight == 0 {
+	if summary.AcceptedHeight == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
 		return false
 	}
 
 	// If any blocks have been accepted, don't state sync.
-	hash, err := h.lastAcceptedHash()
-	if err != nil {
-		h.snowCtx.Log.Warn("getting last accepted hash", zap.Error(err))
+	hash := rawdb.ReadHeadFastBlockHash(s.db)
+	if hash == (ethcommon.Hash{}) {
+		s.snowCtx.Log.Warn("no last accepted hash")
 		return false
 	}
-	height := rawdb.ReadHeaderNumber(h.db, hash)
+	height := rawdb.ReadHeaderNumber(s.db, hash)
 	return height == nil || *height == 0
 }
 
 // Sync fetches all state associated with [Summary] and applies it to disk.
 // Any error returned MUST be treated as fatal. After this method returns
-// without error, one MUST call [SummaryHandler.WriteSynced] to finalize the state
+// without error, one MUST call [Handler.WriteSynced] to finalize the state
 // sync.
-func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
+func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	const (
 		// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from
 		// the last settled. We should find a way to guarantee sufficient
@@ -71,12 +94,12 @@ func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 	)
 
 	blockSyncer := syncblock.NewSyncer(
-		h.snowCtx.Log,
-		syncblock.NewClient(h.network.Network, h.network.PeerTracker),
-		h.db,
-		h.parseBlock,
-		s.AcceptedHash,
-		s.AcceptedHeight,
+		s.snowCtx.Log,
+		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
+		s.db,
+		s.parseBlock,
+		summary.AcceptedHash,
+		summary.AcceptedHeight,
 		numBlocksToFetch,
 	)
 	if err := blockSyncer.Sync(ctx); err != nil {
@@ -84,15 +107,15 @@ func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 	}
 
 	// With blocks now on disk, we can find the state root
-	hdr := rawdb.ReadHeader(h.db, s.AcceptedHash, s.AcceptedHeight)
+	hdr := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
 	if hdr == nil {
-		return fmt.Errorf("couldn't find header %s at height %d", s.AcceptedHash, s.AcceptedHeight)
+		return fmt.Errorf("couldn't find header %s at height %d", summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
 	codeSyncer, err := code.NewSyncer(
-		h.snowCtx.Log,
-		code.NewClient(h.network.Network, h.network.PeerTracker),
-		h.db,
+		s.snowCtx.Log,
+		code.NewClient(s.network.Network, s.network.PeerTracker),
+		s.db,
 	)
 	if err != nil {
 		return fmt.Errorf("creating code syncer: %w", err)
@@ -100,13 +123,13 @@ func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 
 	evmSyncer, err := evmstate.NewSyncer(
 		hashdb.NewClient(
-			h.snowCtx.Log,
-			h.network.Network,
+			s.snowCtx.Log,
+			s.network.Network,
 			p2p.EVMLeafRequestHandlerID,
 			ethcommon.HashLength,
-			h.network.PeerTracker,
+			s.network.PeerTracker,
 		),
-		h.db,
+		s.db,
 		hdr.Root,
 		codeSyncer,
 		maxLeafRequestSize,
@@ -132,51 +155,51 @@ func (h *SummaryHandler) Sync(ctx context.Context, s *Summary) error {
 
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
 // start up from [Summary.AcceptedHash] as the last accepted block. It MUST be
-// called after a successful [SummaryHandler.Sync]. Any non-EVM state sync
+// called after a successful [Handler.Sync]. Any non-EVM state sync
 // behavior MUST have already completed.
-func (h *SummaryHandler) WriteSynced(s *Summary) error {
-	lastAccepted := rawdb.ReadHeader(h.db, s.AcceptedHash, s.AcceptedHeight)
+func (s *Syncer) WriteSynced(summary *Summary) error {
+	lastAccepted := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
 	if lastAccepted == nil {
 		return errors.New("couldn't find last accepted header")
 	}
-	settledHeight := h.hooks.SettledBy(lastAccepted).Height
-	settledHash := rawdb.ReadCanonicalHash(h.db, settledHeight)
+	settledHeight := s.hooks.SettledBy(lastAccepted).Height
+	settledHash := rawdb.ReadCanonicalHash(s.db, settledHeight)
 	if settledHash == (ethcommon.Hash{}) {
 		return fmt.Errorf("no canonical hash for settled block at height %d", settledHeight)
 	}
-	lastSettled := rawdb.ReadBlock(h.db, settledHash, settledHeight)
+	lastSettled := rawdb.ReadBlock(s.db, settledHash, settledHeight)
 	if lastSettled == nil {
 		return fmt.Errorf("couldn't find last settled block at height %d", settledHeight)
 	}
 
-	if err := h.persistExecutionResults(lastSettled, lastAccepted); err != nil {
+	if err := s.persistExecutionResults(lastSettled, lastAccepted); err != nil {
 		return err
 	}
 
-	if err := h.updateBloomIndexer(lastAccepted); err != nil {
+	if err := s.updateBloomIndexer(lastAccepted); err != nil {
 		return fmt.Errorf("updating bloom indexer: %w", err)
 	}
 
 	// MUST be called last since rawdb markers signal success.
-	if err := h.writeRawDBInvariants(lastSettled.Header(), lastAccepted); err != nil {
+	if err := s.writeRawDBInvariants(lastSettled.Header(), lastAccepted); err != nil {
 		return fmt.Errorf("writing rawdb invariants: %w", err)
 	}
 
 	return nil
 }
 
-func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
+func (s *Syncer) persistExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
 	// Synchronous blocks MUST NOT persist their execution results.
-	if hook.Synchronous(h.hooks, lastSettled.Header()) {
+	if hook.Synchronous(s.hooks, lastSettled.Header()) {
 		return nil
 	}
 
-	gt, err := hook.SettledGasTime(h.hooks, lastSettled.Header(), lastAccepted)
+	gt, err := hook.SettledGasTime(s.hooks, lastSettled.Header(), lastAccepted)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate settled gas time: %w", err)
 	}
 
-	xdb, err := h.hooks.ExecutionResultsDB(sae.ExecutionResultsPath(h.snowCtx.ChainDataDir))
+	xdb, err := s.hooks.ExecutionResultsDB(sae.ExecutionResultsPath(s.snowCtx.ChainDataDir))
 	if err != nil {
 		return err
 	}
@@ -184,13 +207,13 @@ func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastA
 		retErr = errors.Join(retErr, xdb.Close())
 	}()
 
-	block, err := blocks.New(lastSettled, nil, nil, h.hooks, h.snowCtx.Log)
+	block, err := blocks.New(lastSettled, nil, nil, s.hooks, s.snowCtx.Log)
 	if err != nil {
 		return fmt.Errorf("creating block for last settled: %w", err)
 	}
 
 	return block.MarkExecuted(
-		h.db,
+		s.db,
 		xdb,
 		gt,
 		time.Now(), // time only used for metrics
@@ -202,16 +225,16 @@ func (h *SummaryHandler) persistExecutionResults(lastSettled *types.Block, lastA
 }
 
 // Assumes that settler.Number is a multiple of [params.BloomBitsBlocks].
-func (h *SummaryHandler) updateBloomIndexer(settler *types.Header) error {
+func (s *Syncer) updateBloomIndexer(settler *types.Header) error {
 	const sectionSize = params.BloomBitsBlocks
-	idx := core.NewBloomIndexer(h.db, sectionSize, 0)
+	idx := core.NewBloomIndexer(s.db, sectionSize, 0)
 	section := (settler.Number.Uint64() - 1) / sectionSize
 	idx.AddCheckpoint(section, settler.ParentHash)
 	return idx.Close()
 }
 
-func (h *SummaryHandler) writeRawDBInvariants(settled, settler *types.Header) error {
-	batch := h.db.NewBatch()
+func (s *Syncer) writeRawDBInvariants(settled, settler *types.Header) error {
+	batch := s.db.NewBatch()
 	rawdb.WriteHeadFastBlockHash(batch, settler.Hash())
 	rawdb.WriteHeadHeaderHash(batch, settled.Hash())
 	rawdb.WriteHeadBlockHash(batch, settled.Hash())

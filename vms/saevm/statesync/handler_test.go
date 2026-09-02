@@ -26,7 +26,7 @@ func TestBlock(t *testing.T) {
 	const numBlocks = defaultCommitInterval + 1
 	vm := newVM(t)
 	vm.acceptBlocks(t, numBlocks)
-	h := vm.SummaryHandler
+	h := vm.Handler
 
 	t.Run("GetBlockIDAtHeight", func(t *testing.T) {
 		for height := uint64(0); height <= numBlocks; height++ {
@@ -62,7 +62,7 @@ func TestStateSummary(t *testing.T) {
 	const numBlocks = defaultCommitInterval + 1
 	vm := newVM(t)
 	vm.acceptBlocks(t, numBlocks)
-	h := vm.SummaryHandler
+	h := vm.Handler
 	lastCommitted := vm.blockAtHeight(t, defaultCommitInterval).EthBlock() // last block at a commit boundary
 
 	t.Run("GetLastStateSummary", func(t *testing.T) {
