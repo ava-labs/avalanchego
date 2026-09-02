@@ -23,7 +23,7 @@ fi
 
 if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>&1; then
   cd "${AVALANCHE_PATH}"
-  bazelisk build //tools/external:task >/dev/null
+  "${AVALANCHE_PATH}/scripts/run_bazel_with_cache_fallback.sh" build //tools/external:task >/dev/null
   task_bin="$(bazelisk cquery --output=files //tools/external:task 2>/dev/null)"
   if [[ "${task_bin}" != /* ]]; then
     task_bin="${AVALANCHE_PATH}/${task_bin}"

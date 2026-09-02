@@ -86,4 +86,4 @@ if [[ -n "${BAZEL_CI_ENFORCE_DEPENDENCY_LIST-}" ]]; then
   assert_target_patterns_are_listed "${target_patterns}"
 fi
 
-exec bazelisk "${subcommand}" "$@"
+exec "${REPO_ROOT}/scripts/run_bazel_with_cache_fallback.sh" "${subcommand}" "$@"

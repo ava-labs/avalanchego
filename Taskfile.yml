@@ -20,11 +20,11 @@ tasks:
 
   bazel-build:
     desc: Build avalanchego with Bazel
-    cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_with_cache_fallback.sh build //main:avalanchego'
 
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
-    cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_with_cache_fallback.sh build --compilation_mode=opt //main:avalanchego'
 
   bazel-build-race:
     desc: Build avalanchego with Bazel (race detection)
@@ -362,6 +362,7 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-bazel-cache-fallback
       - check-go-version
       - check-require-directives
 
@@ -381,6 +382,7 @@ tasks:
       - task: lint-action
       - task: lint-shell
       - task: test-ci-disk-space
+      - task: test-bazel-cache-fallback
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -595,6 +597,10 @@ tasks:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
+
+  test-bazel-cache-fallback:
+    desc: Tests retrying Bazel commands without the remote cache
+    cmd: '{{.NIX_RUN}} ./scripts/test_run_bazel_with_cache_fallback.sh'
 
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
