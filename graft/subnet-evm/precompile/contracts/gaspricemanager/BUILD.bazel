@@ -30,9 +30,10 @@ graft_go_test(
     srcs = [
         "config_test.go",
         "contract_test.go",
+        "export_test.go",
     ],
+    embed = [":gaspricemanager"],
     deps = [
-        ":gaspricemanager",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/precompile/allowlist",

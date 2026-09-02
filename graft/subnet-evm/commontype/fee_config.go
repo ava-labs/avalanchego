@@ -132,8 +132,6 @@ func (f *FeeConfig) Verify() error {
 }
 
 // Equal checks if given [other] is same with this FeeConfig.
-//
-// Deprecated: see [FeeConfig].
 func (f *FeeConfig) Equal(other *FeeConfig) bool {
 	if other == nil {
 		return false

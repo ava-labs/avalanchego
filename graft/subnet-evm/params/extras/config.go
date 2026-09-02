@@ -111,12 +111,8 @@ type ChainConfig struct {
 
 	// FeeConfig configures the legacy pre-Helicon dynamic fee algorithm.
 	//
-	// Deprecated: see [commontype.FeeConfig]. Retained on this struct
-	// for the legacy `graft/subnet-evm` plugin and for JSON
-	// round-trip compatibility (`eth_getChainConfig` continues to
-	// return it). The new SAE binary (`vms/saevm/subnetevm`) does not read
-	// or validate this field; ACP-176 owns gas pricing and ACP-224
-	// owns runtime fee config.
+	// Deprecated: ACP-176 and ACP-224 own post-Helicon gas pricing. This field
+	// remains required for pre-Helicon compatibility and JSON round trips.
 	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
