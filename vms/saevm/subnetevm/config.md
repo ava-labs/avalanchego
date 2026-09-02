@@ -9,7 +9,7 @@ This document describes the configuration options available for the SAE Subnet-E
 
 Default values are overridden only if specified in the given config file. It is recommended to only provide values which are different from the default, as that makes the config more resilient to future default changes. Otherwise, if defaults change, your node will remain with the old values, which might adversely affect your node operation.
 
-Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for the subset this VM supports, so existing operator config blobs keep working for those fields. **Unknown fields are rejected**: legacy-only knobs (e.g. gossip tuning, `state-sync-enabled`, `use-standalone-database`, `offline-pruning-*`, `admin-api-enabled`) surface as a startup error rather than silently no-opping. Remove them from the config file before pointing it at this VM.
+Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for the subset this VM supports, so existing operator config blobs keep working for those fields. **Unknown fields are rejected**: legacy-only knobs (e.g. gossip tuning, `state-sync-enabled`, `use-standalone-database`, `offline-pruning-*`, `admin-api-enabled`) surface as a startup error rather than silently no-opping. Remove them from the config file before pointing it at this VM. The file must contain exactly one JSON value; trailing non-whitespace data is rejected.
 
 ## Example Configuration
 

@@ -89,13 +89,13 @@ the parts a reviewer should not expect to match line-for-line.
 | Config surface | Broad legacy operator config, including standalone DB and legacy fee knobs | Narrow SAE config in [`config.go`](config.go); unsupported legacy knobs are deferred rather than silently reinterpreted |
 | Database mode | Supports standalone per-chain database mode | Uses the AvalancheGo-provided database; standalone DB is deferred |
 | State sync | Legacy plugin state-sync paths remain in `graft/subnet-evm` | Not ported in this wrapper |
-| Network upgrade overrides | Legacy supports `networkUpgradeOverrides` | Not a port target yet; see the TODO in [`genesis.go`](genesis.go) |
+| Network upgrade overrides | Supports `networkUpgradeOverrides` | Supported from upgrade bytes and applied before chain-config validation and Ethereum-fork alignment |
 | Legacy `feeManager` | Retired at Helicon through shared `graft/subnet-evm` retirement helpers | Same retirement helpers are called during SAE genesis parsing |
 | Gas price manager | Precompile package and registry live under `graft/subnet-evm` | Runtime base-fee path reads the precompile config from the parent header (stamped from settled state at build time) |
 | `txallowlist` admission | Legacy libevm hook path | RPC/mempool ingress uses [`../sae/admitter.go`](../sae/admitter.go); worst-case uses [`hooks.go`](hooks.go) |
 | `deployerallowlist` | libevm `CanCreateContract` frame-local revert | Same enforcement layer; SAE does not add a separate admission check |
 | RPC extras | Legacy exposes older Subnet-EVM extras, including deprecated surfaces | This VM serves `eth_getActiveRulesAt`; `eth_getActivePrecompilesAt` and `eth_feeConfig` are intentionally not served |
-| Validators API | Legacy `/validators` service | Re-hosted under [`api/validators.go`](api/validators.go) with SAE uptime tracking |
+| Validators API | Legacy `/validators` service with an operator enablement gate | Always served under [`api/validators.go`](api/validators.go) with SAE uptime tracking |
 | Plugin loading | Legacy Subnet-EVM plugin binary | Standalone SAE plugin under [`plugin/`](plugin/) |
 | Test strategy | Legacy package has broad historical VM coverage | SAE wrapper keeps focused per-feature SUT tests and relies on `graft/subnet-evm` package tests for precompile internals |
 
@@ -111,6 +111,11 @@ not part of this port. The SAE wrapper accepts the subset it can implement
 cleanly and leaves the rest as explicit TODOs instead of silently accepting
 unsupported behavior.
 
+ACP-118 verification intentionally uses the shared SAE verifier's ordering and
+error-code space: parse failures use code 2 and uptime verification failures
+use code 4, rather than the legacy verifier's 1/2 codes. The Subnet-EVM-specific
+message encodings remain unchanged.
+
 ## Design Decisions and Alternatives
 
 ### Genesis and Upgrade Config
@@ -120,6 +125,11 @@ Genesis precompiles and `upgradeBytes` are parsed through the shared
 both the legacy plugin and this wrapper. The SAE hook applies timestamped
 `PrecompileUpgrades` and `StateUpgrades` in the `(parent.Time, block.Time]`
 window before EVM transactions execute.
+
+`networkUpgradeOverrides` from upgrade bytes are applied before chain-config
+validation and Ethereum-fork alignment. On restart, compatibility is checked
+against the canonical last-accepted block read from the chain database,
+falling back to genesis only when the database is empty.
 
 This is intentionally separate from the read paths below. Activation mutates
 the child block's post-execution state. Any value that affects block building,
@@ -139,6 +149,19 @@ validators control the target, that field continues its bounded per-block
 evolution. `BlockGasCost` remains in the header for layout compatibility but
 is always stamped to zero. ACP-226 and ACP-176 own block delay and gas pricing
 under SAE.
+
+SAE-only fields are built and rebuilt only at or after the effective Helicon
+timestamp. They are optional tail fields, so nil values preserve legacy RLP
+encodings; the legacy VM rejects headers that populate them. Standard block
+RPC responses expose these fields. When the first SAE block follows a parent
+without `MinDelayExponent`, no ACP-226 minimum delay applies, but SAE still
+enforces monotonic block time. Blocks always carry the canonical predicate
+results encoding, including an encoded empty result when no transaction has a
+predicate.
+
+[`vms/evm/dynamic`](../../evm/dynamic) is the single owner of scalar delay,
+target, and price exponent logic. [`vms/evm/acp176`](../../evm/acp176) retains
+the composite gas-time state and delegates scalar target operations to it.
 
 ### Settled-State System Configuration Reads
 
@@ -209,6 +232,10 @@ header, ACP-176 defaults otherwise. An activated precompile whose storage
 reads back zero-valued is an error, not a silent fallback, so corrupt storage
 cannot cause divergence.
 
+The genesis fallback converts configured `TargetGas` through
+`DesiredTargetExcess`, using the same canonical target representation as
+stamped headers.
+
 This makes recovery, historical replay, and rebuild-verification
 self-contained at the header level: no per-block side artifacts are persisted
 and no historical state roots need to be reopened.
@@ -231,9 +258,10 @@ existing chains cannot change immutable genesis bytes. Any `feeManager`
 `PrecompileUpgrades` entry at or after Helicon is rejected instead; operators
 can remove those upgrade bytes before restart. If `feeManager` is live before
 Helicon, the parser injects a synthetic disable at Helicon so its storage is
-wiped at the transition. Legacy `FeeConfig` remains for legacy startup, but SAE
-treats the zero value as inert and skips validation because ACP-176 and
-`gaspricemanager` own runtime gas pricing here.
+wiped at the transition. Legacy `FeeConfig` is otherwise inert and unvalidated
+under SAE. If a pre-Helicon `feeManager` is configured without
+`initialFeeConfig`, parsing substitutes `DefaultFeeConfig` because that
+compatibility activation still reads it.
 
 ### Plugin and Factory
 
@@ -247,34 +275,9 @@ Subnet-EVM libevm extras process-wide before serving.
 | --- | --- | --- |
 | High | Standalone per-chain database support | Skipped for this port. Legacy Subnet-EVM supports per-chain DB engines and paths; SAE currently uses the AvalancheGo-provided DB. Revisit only if operator isolation or per-chain engine selection becomes required. |
 | Medium | Full legacy operator config compatibility | Plumb the legacy `graft/subnet-evm/plugin/evm/config` surface into this VM's [`config.go`](config.go) where fields have SAE equivalents. This is needed before claiming full operator-config compatibility with existing Subnet-EVM deployments. |
-| Medium | `networkUpgradeOverrides` support | Not a port target yet. The legacy plugin can apply them, but this VM deliberately keeps a support-decision TODO in [`genesis.go`](genesis.go) because accepting override timestamps would need fresh tests across SAE build, execute, and settle timing. |
 | Medium | `eth_feeConfig` for `gaspricemanager` | Deferred. If tooling needs live fee-config answers, add an `eth_feeConfig`-shaped method to [`api/eth_extras.go`](api/eth_extras.go), but serialize the new `GasPriceConfig` shape rather than reviving legacy `FeeConfig`. |
+| Medium | Legacy-to-SAE transition with active `gaspricemanager` state | Unsupported until transition code materializes the inherited configuration in the first SAE header, because legacy headers have no `GasConfig*` group. |
 | Medium | Post-Helicon cleanup | Once Helicon is permanently active on all supported networks, remove the shared `feeManager` retirement compatibility, the `IsHelicon` precompile-config interface tail, test fixture pinning, and legacy `FeeConfig` deprecation scaffolding. |
 | Medium | Recovery-sensitive future hooks | If a future hook needs historical state again, revisit SAE tracker/root lifetime before adding per-block state opens. The header-encoded gas config was chosen specifically to avoid that recovery issue. |
 | Low | Admitter state cache | Deferred performance work in [`../sae/admitter.go`](../sae/admitter.go). The current per-call state open is correct and bounded; cache only if profiling shows inbound allowlist admission is hot. |
 | Low | Log JSON format support | [`vm.go`](vm.go) wires `log-level` into libevm and the AvalancheGo logger, but JSON log formatting is still a TODO. Add it only if operator config needs parity with legacy logging behavior. |
-
-## Commit Map
-
-Final signed feature commits, mapped to the parent-plan todo ids:
-
-| Commit | Title | Todo ids |
-| --- | --- | --- |
-| `0075f0e2bd` | `sae/subnetevm: copy coreth VM scaffold` | `bootstrap-copy` |
-| `991b5bfc07` | `sae/subnetevm: remove coreth-only plumbing` | `remove-atomic`, `remove-nativeasset-avax` |
-| `4147c5d953` | `sae/subnetevm: switch to subnet-evm config and hooks` | `swap-chainconfig`, `header-extras`, `hook-rewrite` |
-| `e76fdd74dd` | `sae/subnetevm: add standalone plugin entrypoint` | `factory-plugin` |
-| `8f863e4765` | `sae/subnetevm: wire warp support` | `wire-warp` |
-| `e6f72123bc` | `sae/subnetevm: serve validators API` | `validators-api` |
-| `28f4dd8d7f` | `sae/subnetevm: apply state upgrades at activation` | `state-upgrades` |
-| `457df4c38e` | `sae/subnetevm: wire allowlist precompiles` | `wire-deployer-tx-allowlist` |
-| `a94e61e2c6` | `sae/subnetevm: wire native minter precompile` | `wire-nativeminter` |
-| `ca41b2de1c` | `sae/subnetevm: route fees through reward manager` | `wire-rewardmanager` |
-| `6ca592dede` | `sae/subnetevm: clean up legacy fee controls` | `force-disable-legacy-feemanager-at-helicon`, `force-disable-legacy-feemanager-at-helicon-tests`, `defer-relax-feeconfig-validations-under-sae` |
-| `29e2cc20e2` | `sae/subnetevm: register gas price manager precompile` | `deferred-acp224feemanager` |
-| `29b8480a26` | `sae/subnetevm: drive gas pricing from gas price manager` | `deferred-gaspricemanager-runtime`, `deferred-validatortargetgas-override`, `deferred-sae-recovery-settledroot-tracking` |
-| `51ef742c0d` | `sae/subnetevm: add subnet-evm eth extras API` | `rpc-active-precompiles-rules` |
-| `d45ac0b0b1` | `sae/subnetevm: document unsupported network upgrade overrides` | `tests-audit-legacy-subnetevm-vm-test` follow-up |
-| `61348a6ab4` | `sae/subnetevm: polish validators warp and reward tests` | follow-up test/doc polish |
-
-Generated build metadata is intentionally omitted from the feature map.
