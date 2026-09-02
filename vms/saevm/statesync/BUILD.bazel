@@ -15,6 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//database",
+        "//graft/evm/core/state/snapshot",
         "//graft/evm/sync/evmstate",
         "//ids",
         "//network/p2p",

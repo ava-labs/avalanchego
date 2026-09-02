@@ -173,7 +173,8 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 }
 
 // TestStateSyncSynchronousSettled confirms that a state sync finishes and
-// starts the VM with the correct state if the last settled block is
+// starts the VM with the correct state if the last settled bl
+// ock is
 // synchronous.
 func TestStateSyncSynchronousSettled(t *testing.T) {
 	t.Parallel()
@@ -224,7 +225,7 @@ func TestShutdownCancelsMidSync(t *testing.T) {
 }
 
 // FuzzSyncErrorSurfacedViaError checks that any error in the sync process
-// gracefully fatals,
+// gracefully fatals.
 func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 	for _, failAfter := range []int{0, 1, 4, 16, 64, math.MaxInt} {
 		f.Add(failAfter)
@@ -242,7 +243,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		summary, err := source.GetLastStateSummary(ctx)
 		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
 
-		// Setup (e.g. the genesis commit) is done; arm the write budget.
+		// Setup (e.g. the genesis commit) is done.
 		fdb.SetFailAfter(failAfter)
 
 		err = client.syncTo(ctx, t, summary)
@@ -346,4 +347,41 @@ func TestUpdateBloomIndexer(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSyncAfterAbandonedSync checks that a sync MUST succeed over a database
+// holding the results of an earlier sync to a different summary that was never
+// finalized. This is the disk state of a node that shut down before
+// [Syncer.WriteSynced] and was offered a newer summary on restart.
+func TestSyncAfterAbandonedSync(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, defaultCommitInterval)
+
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	abandoned, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+	syncer := client.Handler.Syncer()
+	require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
+	// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
+
+	// The network moved on while the node was down.
+	sourceVM.acceptBlocks(t, defaultCommitInterval)
+	summary, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+
+	// Test invariant: the two summaries commit to different state.
+	abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
+	summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
+	require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
+
+	// A restarted node constructs a fresh handler over the same database.
+	client = newSUT(t, withDatabase(db))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
 }

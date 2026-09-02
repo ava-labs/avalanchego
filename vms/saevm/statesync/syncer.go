@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 )
 
@@ -121,7 +122,10 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
-	if err := wipeSnapshot(s.db); err != nil {
+	// The snapshot MUST either be empty or match the requested root.
+	// It will be regenerated anyway, so we can always wipe it.
+	// TODO(powerslider): Push into EVM syncer.
+	if err := graftsnap.WipeSnapshotSync(s.db, true); err != nil {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
 
@@ -155,17 +159,6 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return errors.Join(err, evmSyncer.Finalize())
 	}
 	return nil
-}
-
-// wipeSnapshot restores the snapshot state to empty by clearing all related
-// database markers.
-func wipeSnapshot(db ethdb.Database) error {
-	batch := db.NewBatch()
-	rawdb.DeleteSnapshotRoot(batch)
-	rawdb.DeleteSnapshotJournal(batch)
-	rawdb.DeleteSnapshotGenerator(batch)
-	rawdb.DeleteSnapshotRecoveryNumber(batch)
-	return batch.Write()
 }
 
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
