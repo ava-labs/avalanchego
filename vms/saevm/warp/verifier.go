@@ -51,8 +51,8 @@ type Backend interface {
 
 // An AddressedCallVerifier decides whether this node should sign a
 // [payload.AddressedCall] message that is not already in [Storage] — e.g.
-// subnet-evm's validator-uptime attestations. Implementations SHOULD return
-// error codes outside the range reserved by this package.
+// subnet-evm's validator-uptime attestations. Implementations MAY reuse this
+// package's error codes when their failures have the same classification.
 type AddressedCallVerifier interface {
 	VerifyAddressedCall(*payload.AddressedCall) *common.AppError
 }
