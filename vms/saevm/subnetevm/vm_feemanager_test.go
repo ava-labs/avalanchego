@@ -12,13 +12,10 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 
@@ -88,41 +85,6 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 	require.Equal(t, zeroFeeConfig(),
 		feeManagerStoredFeeConfigAt(t, sut, rpc.LatestBlockNumber),
 		"stored fee config must be zeroed after SelfDestruct")
-}
-
-// TestFeeManagerHeliconRetirement drives the canonical
-// [feemanagertest.RetirementCases] table through SAE `vm.Initialize`.
-// Case definitions and JSON encoders live in [feemanagertest]; this
-// test owns the loop, the VM-specific init (via [tryInitVM]), and
-// asserts the post-init `GenesisPrecompiles` and `PrecompileUpgrades`
-// match each case's expected shape (covers genesis normalization
-// + synthetic-disable injection end-to-end).
-func TestFeeManagerHeliconRetirement(t *testing.T) {
-	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix()) // #nosec G115 -- known positive test timestamp
-	base := paramstest.ForkToChainConfig[upgradetest.Helicon]
-	chainConfig := defaultConfig()
-	configBytes := mustMarshalJSON(t, &chainConfig)
-
-	for _, tc := range feemanagertest.RetirementCases(helicon) {
-		t.Run(tc.Name, func(t *testing.T) {
-			snowCtx := newSnowCtx(t, upgradetest.GetConfig(upgradetest.Helicon))
-			vm, _, err := tryInitVM(t, t.Context(), snowCtx, memdb.New(), nil,
-				feemanagertest.EncodeGenesisJSON(t, base, tc),
-				feemanagertest.EncodeUpgradeBytesJSON(t, tc),
-				configBytes,
-			)
-			require.ErrorIs(t, err, tc.WantErr)
-			if err != nil {
-				return
-			}
-
-			extra := subnetevmparams.GetExtra(vm.GethRPCBackends().ChainConfig())
-			require.Equal(t, tc.WantGenesisPrecompiles, extra.GenesisPrecompiles,
-				"post-Initialize GenesisPrecompiles mismatch")
-			require.Equal(t, tc.WantPrecompileUpgrades, extra.PrecompileUpgrades,
-				"post-Initialize PrecompileUpgrades mismatch")
-		})
-	}
 }
 
 // feeManagerStatusAt reads the feeManager allowlist role for `address`

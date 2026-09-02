@@ -70,12 +70,9 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 	// and inject the synthetic disable that wipes pre-existing
 	// storage at the Helicon block.
 	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
-		normalizedGenesisPrecompiles, err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS)
-		if err != nil {
+		if err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS); err != nil {
 			return nil, err
 		}
-		configExtra.GenesisPrecompiles = normalizedGenesisPrecompiles
-		configExtra.PrecompileUpgrades = retirement.ForceDisableAtHelicon(configExtra, heliconTS)
 	}
 
 	if err := configExtra.Verify(); err != nil {

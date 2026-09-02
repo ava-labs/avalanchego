@@ -104,7 +104,6 @@ go_test(
         "//graft/subnet-evm/precompile/allowlist",
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",
-        "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
         "//graft/subnet-evm/precompile/contracts/gaspricemanager",
         "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",

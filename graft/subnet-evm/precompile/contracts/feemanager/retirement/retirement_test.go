@@ -5,86 +5,118 @@ package retirement_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const helicon = uint64(100)
+func TestReconcileForHelicon(t *testing.T) {
+	const (
+		helicon     = uint64(100)
+		preHelicon  = helicon - 5
+		postHelicon = helicon + 5
+	)
 
-// TestRetirementCases drives the canonical
-// [feemanagertest.RetirementCases] table through the same helper
-// composition `parseGenesis` uses, without spinning up a VM. Asserts
-// the post-reconcile chain config matches each case's expected
-// `GenesisPrecompiles` and `PrecompileUpgrades`.
-func TestRetirementCases(t *testing.T) {
-	for _, tc := range feemanagertest.RetirementCases(helicon) {
-		t.Run(tc.Name, func(t *testing.T) {
-			cfg, err := simulateParseGenesis(t, tc, helicon)
-			require.ErrorIs(t, err, tc.WantErr)
+	fmEnable := func(timestamp uint64) extras.PrecompileUpgrade {
+		return extras.PrecompileUpgrade{Config: feemanager.NewConfig(utils.PointerTo(timestamp), nil, nil, nil, nil)}
+	}
+	fmDisable := func(timestamp uint64) extras.PrecompileUpgrade {
+		return extras.PrecompileUpgrade{Config: feemanager.NewDisableConfig(utils.PointerTo(timestamp))}
+	}
+	mintEnable := func(timestamp uint64) extras.PrecompileUpgrade {
+		return extras.PrecompileUpgrade{Config: nativeminter.NewConfig(utils.PointerTo(timestamp), nil, nil, nil, nil)}
+	}
+	mintDisable := func(timestamp uint64) extras.PrecompileUpgrade {
+		return extras.PrecompileUpgrade{Config: nativeminter.NewDisableConfig(utils.PointerTo(timestamp))}
+	}
+	fmGenesis := func(timestamp *uint64) extras.Precompiles {
+		return extras.Precompiles{
+			feemanager.ConfigKey: feemanager.NewConfig(timestamp, nil, nil, nil, nil),
+		}
+	}
+	mintGenesis := nativeminter.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil, nil)
+
+	tests := []struct {
+		name             string
+		genesisTimestamp uint64
+		genesis          extras.Precompiles
+		upgrades         []extras.PrecompileUpgrade
+		wantGenesis      extras.Precompiles
+		wantUpgrades     []extras.PrecompileUpgrade
+		wantErr          error
+	}{
+		{name: "no fee manager"},
+		{
+			name:         "genesis activation is disabled at Helicon",
+			genesis:      fmGenesis(utils.PointerTo[uint64](0)),
+			wantGenesis:  fmGenesis(utils.PointerTo[uint64](0)),
+			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(helicon)},
+		},
+		{
+			name:         "upgrade activation is disabled at Helicon",
+			upgrades:     []extras.PrecompileUpgrade{fmEnable(preHelicon)},
+			wantUpgrades: []extras.PrecompileUpgrade{fmEnable(preHelicon), fmDisable(helicon)},
+		},
+		{
+			name:         "existing disable is preserved",
+			genesis:      fmGenesis(utils.PointerTo[uint64](0)),
+			upgrades:     []extras.PrecompileUpgrade{fmDisable(preHelicon)},
+			wantGenesis:  fmGenesis(utils.PointerTo[uint64](0)),
+			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(preHelicon)},
+		},
+		{
+			name:     "upgrade at Helicon is rejected",
+			upgrades: []extras.PrecompileUpgrade{fmEnable(helicon)},
+			wantErr:  retirement.ErrFeeManagerEnabledAfterHelicon,
+		},
+		{
+			name:             "stale genesis activation is removed",
+			genesisTimestamp: preHelicon,
+			genesis: extras.Precompiles{
+				feemanager.ConfigKey:   feemanager.NewConfig(utils.PointerTo(postHelicon), nil, nil, nil, nil),
+				nativeminter.ConfigKey: mintGenesis,
+			},
+			wantGenesis: extras.Precompiles{nativeminter.ConfigKey: mintGenesis},
+		},
+		{
+			name:        "synthetic disable preserves global upgrade order",
+			genesis:     fmGenesis(utils.PointerTo[uint64](0)),
+			upgrades:    []extras.PrecompileUpgrade{mintEnable(preHelicon), mintDisable(postHelicon)},
+			wantGenesis: fmGenesis(utils.PointerTo[uint64](0)),
+			wantUpgrades: []extras.PrecompileUpgrade{
+				mintEnable(preHelicon),
+				fmDisable(helicon),
+				mintDisable(postHelicon),
+			},
+		},
+		{
+			name:             "post-Helicon genesis is rejected",
+			genesisTimestamp: helicon,
+			genesis:          fmGenesis(nil),
+			wantErr:          retirement.ErrFeeManagerEnabledAfterHelicon,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := extras.ChainConfig{
+				GenesisPrecompiles: test.genesis,
+				UpgradeConfig: extras.UpgradeConfig{
+					PrecompileUpgrades: test.upgrades,
+				},
+			}
+			err := retirement.ReconcileForHelicon(&got, test.genesisTimestamp, helicon)
+			require.ErrorIs(t, err, test.wantErr, "ReconcileForHelicon()")
 			if err != nil {
 				return
 			}
-			require.Equal(t, tc.WantGenesisPrecompiles, cfg.GenesisPrecompiles,
-				"post-reconcile GenesisPrecompiles mismatch")
-			require.Equal(t, tc.WantPrecompileUpgrades, cfg.PrecompileUpgrades,
-				"post-reconcile PrecompileUpgrades mismatch")
+			require.Equal(t, test.wantGenesis, got.GenesisPrecompiles, "ReconcileForHelicon() genesis precompiles")
+			require.Equal(t, test.wantUpgrades, got.PrecompileUpgrades, "ReconcileForHelicon() precompile upgrades")
 		})
 	}
-}
-
-// simulateParseGenesis applies the same `feeManager`-related helper
-// composition that `parseGenesis` runs on each VM:
-//  1. [retirement.ReconcileForHelicon] on the chain config.
-//  2. [retirement.ForceDisableAtHelicon] on the post-reconcile config.
-//  3. [extras.ChainConfig.Verify] on the post-reconcile config; this
-//     covers the per-entry post-Helicon enable rejection.
-//
-// Returns the post-reconcile chain config (so callers can assert on
-// `GenesisPrecompiles` + `PrecompileUpgrades`) and the first error
-// produced; nil when the case is accepted.
-//
-// The `cfg.GenesisPrecompiles` defaults to `extras.Precompiles{}`
-// when the case has no input genesis, mirroring the JSON unmarshal
-// path that `vm.Initialize` runs (which always produces a non-nil
-// map via [extras.Precompiles.UnmarshalJSON]).
-func simulateParseGenesis(t *testing.T, tc feemanagertest.RetirementCase, helicon uint64) (*extras.ChainConfig, error) {
-	t.Helper()
-
-	genesisPrecompiles := tc.GenesisPrecompiles
-	if genesisPrecompiles == nil {
-		genesisPrecompiles = extras.Precompiles{}
-	}
-
-	chainConfig := *extras.TestHeliconChainConfig
-	chainConfig.HeliconTimestamp = utils.PointerTo(helicon)
-	// SnowCtx must be non-nil because [extras.ChainConfig.Verify] reads
-	// `c.SnowCtx.NetworkUpgrades`. We mirror the chain config (all
-	// pre-Helicon forks at time 0, Helicon at `helicon`) so
-	// `verifyNetworkUpgrades` accepts every per-fork timestamp.
-	agoUpgrades := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, time.Unix(0, 0))
-	chainConfig.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: &snow.Context{NetworkUpgrades: agoUpgrades},
-	}
-	chainConfig.GenesisPrecompiles = genesisPrecompiles
-	chainConfig.PrecompileUpgrades = tc.Upgrades
-
-	genesis, err := retirement.ReconcileForHelicon(&chainConfig, tc.GenesisTimestamp, helicon)
-	if err != nil {
-		return nil, err
-	}
-	chainConfig.GenesisPrecompiles = genesis
-	chainConfig.PrecompileUpgrades = retirement.ForceDisableAtHelicon(&chainConfig, helicon)
-
-	if err := chainConfig.Verify(); err != nil {
-		return nil, err
-	}
-	return &chainConfig, nil
 }

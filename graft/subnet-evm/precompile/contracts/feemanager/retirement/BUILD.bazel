@@ -14,7 +14,6 @@ go_library(
     deps = [
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contracts/feemanager",
-        "//graft/subnet-evm/precompile/precompileconfig",
         "//utils",
         "@com_github_ava_labs_libevm//log",
     ],
@@ -26,9 +25,8 @@ graft_go_test(
     deps = [
         ":retirement",
         "//graft/subnet-evm/params/extras",
-        "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
-        "//snow",
-        "//upgrade/upgradetest",
+        "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//utils",
         "@com_github_stretchr_testify//require",
     ],

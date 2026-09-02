@@ -4,44 +4,46 @@
 package evm
 
 import (
+	"encoding/json"
+	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// TestLegacyFeeManagerHeliconRetirement drives the canonical
-// [feemanagertest.RetirementCases] table through legacy
-// `vm.Initialize`. Case definitions and JSON encoders live in
-// [feemanagertest]; this test owns the loop, the VM-specific init,
-// and asserts the post-init `GenesisPrecompiles` and
-// `PrecompileUpgrades` match each case's expected shape (covers
-// genesis normalization + synthetic-disable injection end-to-end).
-func TestLegacyFeeManagerHeliconRetirement(t *testing.T) {
-	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix())
-	base := params.TestSubnetEVMChainConfig
-
-	for _, tc := range feemanagertest.RetirementCases(helicon) {
-		t.Run(tc.Name, func(t *testing.T) {
-			tvm, err := tryNewVM(t, testVMConfig{
-				fork:        utils.PointerTo(upgradetest.Helicon),
-				genesisJSON: string(feemanagertest.EncodeGenesisJSON(t, base, tc)),
-				upgradeJSON: string(feemanagertest.EncodeUpgradeBytesJSON(t, tc)),
-			})
-			require.ErrorIs(t, err, tc.WantErr)
-			if err != nil {
-				return
-			}
-
-			extra := params.GetExtra(tvm.vm.ChainConfig())
-			require.Equal(t, tc.WantGenesisPrecompiles, extra.GenesisPrecompiles,
-				"post-Initialize GenesisPrecompiles mismatch")
-			require.Equal(t, tc.WantPrecompileUpgrades, extra.PrecompileUpgrades,
-				"post-Initialize PrecompileUpgrades mismatch")
-		})
+func TestLegacyFeeManagerRetirement(t *testing.T) {
+	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix()) // #nosec G115 -- known positive test timestamp
+	chainConfig := params.Copy(params.TestSubnetEVMChainConfig)
+	extra := params.GetExtra(&chainConfig)
+	extra.GenesisPrecompiles = extras.Precompiles{
+		feemanager.ConfigKey: feemanager.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil, nil),
 	}
+	genesis := &core.Genesis{
+		Config:     &chainConfig,
+		Difficulty: big.NewInt(0),
+		GasLimit:   8_000_000,
+		Alloc:      types.GenesisAlloc{},
+	}
+	genesisJSON, err := json.Marshal(genesis)
+	require.NoError(t, err, "json.Marshal(genesis)")
+
+	tvm, err := tryNewVM(t, testVMConfig{
+		fork:        utils.PointerTo(upgradetest.Helicon),
+		genesisJSON: string(genesisJSON),
+	})
+	require.NoError(t, err, "tryNewVM()")
+
+	got := params.GetExtra(tvm.vm.ChainConfig()).PrecompileUpgrades
+	want := []extras.PrecompileUpgrade{
+		{Config: feemanager.NewDisableConfig(utils.PointerTo(helicon))},
+	}
+	require.Equal(t, want, got, "feeManager retirement upgrades")
 }

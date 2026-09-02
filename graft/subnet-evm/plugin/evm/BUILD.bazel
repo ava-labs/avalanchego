@@ -174,7 +174,6 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",
-        "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
         "//graft/subnet-evm/precompile/contracts/warp",
