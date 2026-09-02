@@ -44,6 +44,7 @@ graft_go_test(
         "//vms/components/gas",
         "//vms/evm/acp226",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",

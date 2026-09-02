@@ -155,6 +155,7 @@ go_test(
         "@com_github_ava_labs_libevm//libevm/ethtest",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_gogo_protobuf//proto",

@@ -557,7 +557,8 @@ The follow-up duplication audit also found three smaller sharing wins:
 
 The review also restores `tests/load` exactly to `origin/master` and removes
 the unreferenced spike-only `spam-c-chain` example; neither is used by the SAE
-warp suite.
+warp suite. The post-review Gazelle pass succeeds and adds the direct test
+dependencies required by the new header and genesis coverage.
 
 Exact next action: regenerate/check Bazel metadata, run lint and all four
 module builds, then run the repo-wide unit, SAE warp e2e, and C-Chain e2e gates
