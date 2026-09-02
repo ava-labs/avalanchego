@@ -216,9 +216,7 @@ func (s *sut) Sender() *saetest.Sender { return s.sender }
 func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error {
 	t.Helper()
 
-	should, err := s.ShouldAcceptSummary(summary)
-	require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", s.SummaryHandler)
-	require.True(t, should, "ShouldAcceptSummary()")
+	require.True(t, s.ShouldAcceptSummary(summary), "ShouldAcceptSummary()")
 
 	if err := s.Sync(ctx, summary); err != nil {
 		return err

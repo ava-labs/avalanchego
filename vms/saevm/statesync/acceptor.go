@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
@@ -29,33 +30,31 @@ import (
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-// StateSyncEnabled checks whether the node should query for state summaries.
-func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
-	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
-		return false, nil
-	}
-
-	return h.cfg.Enabled, nil
-}
-
 // ShouldAcceptSummary returns true if the summary should be state synced to,
 // given the current disk state.
-func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) (bool, error) {
+func (h *SummaryHandler) ShouldAcceptSummary(s *Summary) bool {
+	if h.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		h.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
+		return false
+	}
+
+	if !h.cfg.Enabled {
+		return false
+	}
+
 	if s.AcceptedHeight == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
-		return false, nil
+		return false
 	}
 
 	// If any blocks have been accepted, don't state sync.
 	hash, err := h.lastAcceptedHash()
 	if err != nil {
-		return false, err
+		h.snowCtx.Log.Warn("getting last accepted hash", zap.Error(err))
+		return false
 	}
-	if height := rawdb.ReadHeaderNumber(h.db, hash); height != nil && *height > 0 {
-		return false, nil
-	}
-	return true, nil
+	height := rawdb.ReadHeaderNumber(h.db, hash)
+	return height == nil || *height == 0
 }
 
 // Sync fetches all state associated with [Summary] and applies it to disk.

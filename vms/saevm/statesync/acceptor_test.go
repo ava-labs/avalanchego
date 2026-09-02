@@ -8,7 +8,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -17,35 +16,6 @@ import (
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
-
-// TestStateSyncEnabled checks that the configured value is reported back by
-// [SummaryHandler.StateSyncEnabled].
-func TestStateSyncEnabled(t *testing.T) {
-	tests := []struct {
-		name    string
-		enabled bool
-	}{
-		{
-			name:    "disabled",
-			enabled: false,
-		},
-		{
-			name:    "enabled",
-			enabled: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			sut := newSUT(t, withEnabled(tt.enabled))
-
-			gotEnabled, err := sut.StateSyncEnabled(t.Context())
-			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
-			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
-		})
-	}
-}
 
 // TestShouldAcceptSummary checks the cases in which
 // [SummaryHandler.ShouldAcceptSummary] refuses to state sync.
@@ -78,6 +48,16 @@ func TestShouldAcceptSummary(t *testing.T) {
 				return s
 			},
 		},
+		{
+			name: "not_enabled",
+			newHandler: func(t *testing.T) *SummaryHandler {
+				sut := newSUT(t, withEnabled(false))
+				return sut.SummaryHandler
+			},
+			getSummary: func(*testing.T, *SummaryHandler) *Summary {
+				return &Summary{AcceptedHeight: 1}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,9 +66,7 @@ func TestShouldAcceptSummary(t *testing.T) {
 			sh := tt.newHandler(t)
 			s := tt.getSummary(t, sh)
 
-			should, err := sh.ShouldAcceptSummary(s)
-			require.NoErrorf(t, err, "%T.ShouldAcceptSummary()", sh)
-			require.Falsef(t, should, "%T.ShouldAcceptSummary()", sh)
+			require.Falsef(t, sh.ShouldAcceptSummary(s), "%T.ShouldAcceptSummary()", sh)
 		})
 	}
 }

@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+// StateSyncEnabled checks whether the node should query for state summaries.
+func (h *SummaryHandler) StateSyncEnabled(context.Context) (bool, error) {
+	return h.cfg.Enabled, nil
+}
+
 // AcceptSummary is not yet implemented. It always returns
 // [block.StateSyncSkipped] and no error.
 //

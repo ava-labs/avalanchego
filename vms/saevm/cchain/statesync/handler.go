@@ -30,6 +30,7 @@ var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 type SummaryHandler struct {
 	*statesync.SummaryHandler
 
+	cfg   statesync.Config
 	hooks hook.Points
 	state *state.State
 	ethDB ethdb.Database
@@ -58,6 +59,7 @@ func New(
 	}
 	return &SummaryHandler{
 		SummaryHandler: inner,
+		cfg:            cfg,
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
@@ -77,8 +79,8 @@ func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, err
 	return h.wrap(h.SummaryHandler.GetLastStateSummary(ctx))
 }
 
-// GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
-// but the returned summary contains the settled C-Chain state root.
+// GetOngoingSyncStateSummary is not implemented. It always returns
+// [database.ErrNotFound].
 //
 // TODO(alarso16): Allow resuming state sync.
 func (*SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
