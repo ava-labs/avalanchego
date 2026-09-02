@@ -42,6 +42,7 @@ avalanchego monorepo.
   - [Why this exists](#why-this-exists)
   - [Test platforms and cache policy](#test-platforms-and-cache-policy)
   - [What is cached](#what-is-cached)
+  - [Remote action-cache failure recovery](#remote-action-cache-failure-recovery)
   - [Cache key](#cache-key)
   - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
   - [Enforcement](#enforcement)
@@ -700,6 +701,59 @@ The remote cache is separate from the GitHub Actions caches. Bazel reads it and
 writes to it during configured pre-merge builds and tests. It stores action
 outputs and cacheable test results. The scheduled workflow does not read from or
 write to the remote cache.
+
+### Remote action-cache failure recovery
+
+The remote action cache can stall a Bazel command even when the connection
+continues to transfer data. Bazel's HTTP `--remote_timeout` measures inactivity,
+so it does not bound this failure. See [bazelbuild/bazel#11782](https://github.com/bazelbuild/bazel/issues/11782).
+
+`setup-bazel` writes the remote-cache options to
+`$HOME/.bazelrc.avalanchego-remote-cache`. The main `$HOME/.bazelrc` imports that
+file only when it exists. The file includes the cache authorization header.
+It must remain under `$HOME`. Do not print its contents or upload it as an
+artifact.
+
+When this file exists, `scripts/run_bazel_with_cache_fallback.sh` runs `bazel
+build`, `bazel test`, and `bazel run` with two protection layers:
+
+1. Bazel makes up to two short HTTP retries. Each request has a 30-second
+   inactivity timeout.
+2. An external Bash watchdog stops the first command after 900 seconds by
+   default. It then removes the remote-cache rc file, runs `bazelisk shutdown`,
+   and retries once without the remote cache. The retry has a 1,800-second
+   default deadline.
+
+The watchdog uses Bash `sleep`, `kill`, and `wait`. GitHub-hosted macOS runners
+do not provide GNU `timeout`. Installing Nix for this utility would add setup
+time to all Bazel jobs. A Python implementation would add another dependency.
+
+The retry retains the repository cache, the disk cache, and `GOMODCACHE`. It is
+remote-cache-free, not a cold build. The wrapper does nothing when the
+remote-cache rc file is absent. Local commands and CI jobs that disable the
+remote cache then run once without a deadline or retry.
+
+Bazel uses the same nonzero status for cache transport failures and normal build
+or test failures. The wrapper retries every failed cache-enabled command once
+instead of matching unstable error text. This can run a flaky test twice. A
+second failure still fails CI. If that trade-off is not acceptable, restrict the
+retry to deadlines and stable transport errors. Do not add more retries.
+
+Do not use this wrapper for `bazel fetch` or `bazel cquery`. Fetch failures
+involve repository downloads. `cquery` does not run actions. These failures
+need separate recovery rules.
+
+The deadline values are set with `BAZEL_CACHE_ATTEMPT_TIMEOUT_SECONDS` and
+`BAZEL_CACHE_FALLBACK_TIMEOUT_SECONDS`. `BAZEL_CACHE_TERM_GRACE_SECONDS` sets
+the wait time after the watchdog sends `TERM`. Change these values only after
+measuring both paths on every CI platform. The values must be integer seconds.
+Keep the fallback deadline longer because it can rebuild action outputs locally.
+
+Run `task test-bazel-cache-fallback` after you change the wrapper or its
+configuration. This policy test checks the rc-file boundary, the single retry,
+timeout recovery, and failure propagation. It does not check Bazel rc parsing,
+cache authentication, or cache-server behavior. Add or maintain a CI integration
+check for those cases when this wrapper or the cache service changes.
 
 ### Cache key
 
