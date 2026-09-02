@@ -146,7 +146,7 @@ func (v *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	chainMetrics, err := newMetrics(reg)
+	chainMetrics, err := sae.NewMinBlockDelayMetric(reg)
 	if err != nil {
 		return fmt.Errorf("registering subnetevm metrics: %w", err)
 	}

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -47,7 +48,7 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 type hooks struct {
 	builder
 	warpStorage *saewarp.Storage
-	metrics     *metrics
+	metrics     *sae.MinBlockDelayMetric
 }
 
 func newHooks(
@@ -57,7 +58,7 @@ func newHooks(
 	desired desiredParams,
 	warpStorage *saewarp.Storage,
 	configuredCoinbase common.Address,
-	metrics *metrics,
+	metrics *sae.MinBlockDelayMetric,
 ) *hooks {
 	return &hooks{
 		builder: builder{
@@ -299,7 +300,7 @@ func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts)
 // which is exactly the once-per-block semantics warp storage requires.
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
-		h.metrics.setMinBlockDelay(mde.DelayDuration())
+		h.metrics.Set(mde.DelayDuration())
 	}
 
 	rules := h.chainConfig.Rules(b.Number(), subnetevmparams.IsMergeTODO, b.Time())

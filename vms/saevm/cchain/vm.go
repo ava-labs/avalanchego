@@ -59,7 +59,7 @@ type VM struct {
 
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
-	metrics     *metrics
+	metrics     *sae.MinBlockDelayMetric
 	pending     *txpool.Pending
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
@@ -131,7 +131,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	vm.metrics, err = newMetrics(reg)
+	vm.metrics, err = sae.NewMinBlockDelayMetric(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}

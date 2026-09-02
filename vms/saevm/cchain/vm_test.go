@@ -64,6 +64,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
@@ -450,8 +451,8 @@ func (s *SUT) SetState(ctx context.Context, state snow.State) error {
 func (s *SUT) hooks(tb testing.TB) *hooks {
 	tb.Helper()
 
-	m, err := newMetrics(prometheus.NewRegistry())
-	require.NoErrorf(tb, err, "newMetrics()")
+	m, err := sae.NewMinBlockDelayMetric(prometheus.NewRegistry())
+	require.NoErrorf(tb, err, "sae.NewMinBlockDelayMetric()")
 	return newHooks(
 		s.ctx,
 		s.state,

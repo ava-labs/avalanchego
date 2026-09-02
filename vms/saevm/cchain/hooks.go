@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -56,7 +57,7 @@ type hooks struct {
 	builder
 	state       *cchainstate.State
 	warpStorage *saewarp.Storage
-	metrics     *metrics
+	metrics     *sae.MinBlockDelayMetric
 }
 
 func newHooks(
@@ -67,7 +68,7 @@ func newHooks(
 	warpStorage *saewarp.Storage,
 	now func() time.Time,
 	desired desiredParams,
-	metrics *metrics,
+	metrics *sae.MinBlockDelayMetric,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -263,7 +264,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+	h.metrics.Set(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
