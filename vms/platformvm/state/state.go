@@ -2705,7 +2705,8 @@ func (s *State) updateL1ValidatorManager(
 	return nil
 }
 
-// updateStakeMetrics must run after the validator manager is updated.
+// updateStakeMetrics must run after updates to the validator manager and
+// current staker state.
 func (s *State) updateStakeMetrics() error {
 	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
