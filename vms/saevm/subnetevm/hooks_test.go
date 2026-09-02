@@ -23,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 func TestBuildHeaderHeliconOverride(t *testing.T) {
