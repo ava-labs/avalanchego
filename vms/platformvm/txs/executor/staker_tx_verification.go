@@ -49,22 +49,6 @@ var (
 
 func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) (state.StakingPeriod, error) {
 	stakingState := state.NewAdapter(chainState)
-	if subnetID == constants.PrimaryNetworkID {
-		validator, err := stakingState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-		if err == nil {
-			return validator.Period(), nil
-		}
-		if err != database.ErrNotFound {
-			return state.StakingPeriod{}, err
-		}
-
-		pendingValidator, err := stakingState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
-		if err != nil {
-			return state.StakingPeriod{}, err
-		}
-		return pendingValidator.Period(), nil
-	}
-
 	validator, err := stakingState.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
 		return validator.Period(), nil

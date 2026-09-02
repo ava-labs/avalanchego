@@ -194,12 +194,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	// Produce the UTXOs
 	avax.Produce(e.onCommitState, txID, tx.Outs)
 
-	validator, err := state.NewPendingValidator(txID, tx)
-	if err != nil {
-		return err
-	}
-
-	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx); err != nil {
 		return err
 	}
 
@@ -243,12 +238,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 	// Produce the UTXOs
 	avax.Produce(e.onCommitState, txID, tx.Outs)
 
-	validator, err := state.NewPendingValidator(txID, tx)
-	if err != nil {
-		return err
-	}
-
-	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx, validator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingValidator(e.tx); err != nil {
 		return err
 	}
 
@@ -293,12 +283,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	// Produce the UTXOs
 	avax.Produce(e.onCommitState, txID, tx.Outs)
 
-	delegator, err := state.NewPendingDelegator(txID, tx)
-	if err != nil {
-		return err
-	}
-
-	if err := state.NewAdapter(e.onCommitState).PutPendingDelegator(e.tx, delegator); err != nil {
+	if err := state.NewAdapter(e.onCommitState).PutPendingDelegator(e.tx); err != nil {
 		return err
 	}
 
@@ -475,7 +460,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 
 	// Abort: pay accrued validation + all delegatee rewards (the current
 	// cycle's potential reward is forfeited).
-	if err = e.mintRewardOnAbort(uStakerTx, autoRenewedValidator.AutoRenewedValidatorMetadata, stakingInfo.DelegateeReward); err != nil {
+	if err = e.mintRewardOnAbort(uStakerTx, autoRenewedValidator.AutoRenewedStakingPeriod, stakingInfo.DelegateeReward); err != nil {
 		return fmt.Errorf("minting reward on abort: %w", err)
 	}
 
@@ -736,7 +721,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) mintRewardOnAbort(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
-	metadata state.AutoRenewedValidatorMetadata,
+	metadata state.AutoRenewedStakingPeriod,
 	delegateeReward uint64,
 ) error {
 	// DelegateeReward tracks pending commission from completed delegator periods.
@@ -815,7 +800,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return errShouldBeAutoRenewedStaker
 	}
 	validator := autoRenewedValidator.CurrentValidator
-	metadata := autoRenewedValidator.AutoRenewedValidatorMetadata
+	metadata := autoRenewedValidator.AutoRenewedStakingPeriod
 	// Ignore the withdrawn portions from [reward.Split] because the restaked
 	// amounts may be capped below. Withdrawn rewards are computed later from the
 	// difference between total rewards and the amounts actually restaked.
@@ -968,8 +953,8 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 
 	metadata.AccruedValidationRewards = newAccruedRewards
 	metadata.AccruedDelegateeRewards = newAccruedDelegateeRewards
-	renewedValidator.AutoRenewedValidatorMetadata = metadata
-	if err := stakingState.PutAutoRenewedValidator(stakerTx, renewedValidator); err != nil {
+	renewedValidator.AutoRenewedStakingPeriod = metadata
+	if err := stakingState.PutAutoRenewedValidator(renewedValidator); err != nil {
 		return fmt.Errorf("putting renewed validator: %w", err)
 	}
 

@@ -69,6 +69,8 @@ func (tx *AddPermissionlessDelegatorTx) CurrentPriority() Priority {
 	return SubnetPermissionlessDelegatorCurrentPriority
 }
 
+func (*AddPermissionlessDelegatorTx) delegatorStaker() {}
+
 func (tx *AddPermissionlessDelegatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts
 }

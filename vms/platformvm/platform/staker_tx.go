@@ -49,6 +49,20 @@ type Staker interface {
 	CurrentPriority() Priority
 }
 
+// ValidatorStaker is the sealed set of staker transactions that register a
+// validator.
+type ValidatorStaker interface {
+	Staker
+	validatorStaker()
+}
+
+// DelegatorStaker is the sealed set of staker transactions that register a
+// delegator.
+type DelegatorStaker interface {
+	Staker
+	delegatorStaker()
+}
+
 // KeyedStaker is a staker whose transaction can register a BLS key. Only
 // Primary Network validators can, so a caller that needs the key must
 // type-assert to this interface rather than accepting any [Staker].

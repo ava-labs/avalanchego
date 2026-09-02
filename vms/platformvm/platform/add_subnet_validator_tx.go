@@ -41,6 +41,8 @@ func (*AddSubnetValidatorTx) CurrentPriority() Priority {
 	return SubnetPermissionedValidatorCurrentPriority
 }
 
+func (*AddSubnetValidatorTx) validatorStaker() {}
+
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {

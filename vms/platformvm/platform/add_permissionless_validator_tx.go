@@ -101,6 +101,8 @@ func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
 	return SubnetPermissionlessValidatorCurrentPriority
 }
 
+func (*AddPermissionlessValidatorTx) validatorStaker() {}
+
 func (tx *AddPermissionlessValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts
 }

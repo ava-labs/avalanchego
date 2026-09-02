@@ -108,6 +108,8 @@ func (*AddAutoRenewedValidatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkValidatorCurrentPriority
 }
 
+func (*AddAutoRenewedValidatorTx) validatorStaker() {}
+
 func (tx *AddAutoRenewedValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts
 }

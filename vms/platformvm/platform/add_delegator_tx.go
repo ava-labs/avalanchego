@@ -65,6 +65,8 @@ func (*AddDelegatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkDelegatorCurrentPriority
 }
 
+func (*AddDelegatorTx) delegatorStaker() {}
+
 func (tx *AddDelegatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts
 }

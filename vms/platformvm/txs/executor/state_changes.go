@@ -224,11 +224,7 @@ func advanceTimeTo(
 	}
 
 	for _, p := range validatorPromotions {
-		stakerTx, err := parentStakingState.GetStakerTx(p.pending.Period().TxID)
-		if err != nil {
-			return nil, false, fmt.Errorf("getting pending validator transaction: %w", err)
-		}
-		if err := changesStakingState.PutCurrentValidator(stakerTx, p.current); err != nil {
+		if err := changesStakingState.PutCurrentValidator(p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current validator: %w", err)
 		}
 		if err := changesStakingState.DeletePendingValidator(
@@ -240,11 +236,7 @@ func advanceTimeTo(
 	}
 
 	for _, p := range delegatorPromotions {
-		stakerTx, err := parentStakingState.GetStakerTx(p.pending.TxID)
-		if err != nil {
-			return nil, false, fmt.Errorf("getting pending delegator transaction: %w", err)
-		}
-		if err := changesStakingState.PutCurrentDelegator(stakerTx, p.current); err != nil {
+		if err := changesStakingState.PutCurrentDelegator(p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current delegator: %w", err)
 		}
 		if err := changesStakingState.DeletePendingDelegator(p.pending.TxID); err != nil {

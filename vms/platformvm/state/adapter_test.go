@@ -38,22 +38,26 @@ func TestStakingState(t *testing.T) {
 		NextTime:  now.Add(time.Hour),
 		Priority:  platform.SubnetPermissionedValidatorCurrentPriority,
 	}
-	require.NoError(t, typedState.PutCurrentValidator(newTestStakerTx(subnetValidator), currentValidatorRecord(subnetValidator)))
+	require.NoError(t, typedState.PutCurrentValidator(currentValidatorFromStaker(subnetValidator)))
 
 	gotSubnetValidator, err := typedState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
 	require.NoError(t, err)
-	require.Equal(t, currentValidatorRecord(subnetValidator), gotSubnetValidator)
+	require.Equal(t, currentValidatorFromStaker(subnetValidator), gotSubnetValidator)
 
 	gotNativeValidator, err := nativeState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
 	require.NoError(t, err)
 	require.Equal(t, subnetValidator, gotNativeValidator)
 
-	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
-		NodeID: defaultValidatorNodeID,
-		Start:  uint64(now.Unix()),
-		End:    uint64(now.Add(time.Minute).Unix()),
-		Wght:   1,
-	}}}
+	delegatorTx := &platform.Tx{
+		Unsigned: &platform.AddDelegatorTx{
+			Validator: platform.Validator{
+				NodeID: defaultValidatorNodeID,
+				Start:  uint64(now.Unix()),
+				End:    uint64(now.Add(time.Minute).Unix()),
+				Wght:   1,
+			},
+		},
+	}
 	nativeState.AddTx(delegatorTx, status.Committed)
 	delegator := &Staker{
 		TxID:            delegatorTx.ID(),
@@ -66,11 +70,11 @@ func TestStakingState(t *testing.T) {
 		NextTime:        now.Add(time.Minute),
 		Priority:        platform.PrimaryNetworkDelegatorCurrentPriority,
 	}
-	require.NoError(t, typedState.PutCurrentDelegator(delegatorTx, currentDelegator(delegator)))
+	require.NoError(t, typedState.PutCurrentDelegator(currentDelegatorFromStaker(delegator)))
 
 	delegatorIt, err := typedState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
-	require.Equal(t, []CurrentDelegator{currentDelegator(delegator)}, iterator.ToSlice(delegatorIt))
+	require.Equal(t, []CurrentDelegator{currentDelegatorFromStaker(delegator)}, iterator.ToSlice(delegatorIt))
 
 	require.NoError(t, typedState.DeleteCurrentDelegator(delegator.TxID))
 	require.NoError(t, typedState.DeleteCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
@@ -84,12 +88,16 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	typedState := NewAdapter(nativeState)
 
 	now := time.Now().Truncate(time.Second)
-	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
-		NodeID: defaultValidatorNodeID,
-		Start:  uint64(now.Add(time.Hour).Unix()),
-		End:    uint64(now.Add(2 * time.Hour).Unix()),
-		Wght:   1,
-	}}}
+	delegatorTx := &platform.Tx{
+		Unsigned: &platform.AddDelegatorTx{
+			Validator: platform.Validator{
+				NodeID: defaultValidatorNodeID,
+				Start:  uint64(now.Add(time.Hour).Unix()),
+				End:    uint64(now.Add(2 * time.Hour).Unix()),
+				Wght:   1,
+			},
+		},
+	}
 	nativeState.AddTx(delegatorTx, status.Committed)
 	delegator := &Staker{
 		TxID:      delegatorTx.ID(),
@@ -101,11 +109,11 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 		NextTime:  now.Add(time.Hour),
 		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 	}
-	require.NoError(t, typedState.PutPendingDelegator(delegatorTx, pendingDelegator(delegator)))
+	require.NoError(t, typedState.PutPendingDelegator(delegatorTx))
 
 	delegatorIt, err := typedState.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
-	require.Equal(t, []PendingDelegator{pendingDelegator(delegator)}, iterator.ToSlice(delegatorIt))
+	require.Equal(t, []PendingDelegator{pendingDelegatorFromStaker(delegator)}, iterator.ToSlice(delegatorIt))
 
 	gotNativeDelegatorIt, err := nativeState.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
@@ -114,50 +122,42 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	require.NoError(t, typedState.DeletePendingDelegator(delegator.TxID))
 }
 
-func TestPutCurrentDelegatorUsesTransactionID(t *testing.T) {
-	nativeState := newTestState(t, memdb.New())
-	typedState := NewAdapter(nativeState)
-
-	now := time.Now().Truncate(time.Second)
-	delegator := &Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    defaultValidatorNodeID,
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    1,
-		StartTime: now,
-		EndTime:   now.Add(time.Hour),
-		NextTime:  now.Add(time.Hour),
-		Priority:  platform.PrimaryNetworkDelegatorCurrentPriority,
-	}
-	tx := newTestStakerTx(delegator)
-	tx.TxID = ids.GenerateTestID()
-	require.NotEqual(t, delegator.TxID, tx.ID())
-
-	require.NoError(t, typedState.PutCurrentDelegator(tx, currentDelegator(delegator)))
-
-	it, err := nativeState.GetCurrentDelegatorIterator(delegator.SubnetID, delegator.NodeID)
-	require.NoError(t, err)
-	storedDelegators := iterator.ToSlice(it)
-	require.Len(t, storedDelegators, 1)
-	require.Equal(t, tx.ID(), storedDelegators[0].TxID)
-}
-
-func newTestStakerTx(staker *Staker) *platform.Tx {
-	return &platform.Tx{
-		Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
-			NodeID: staker.NodeID,
-			Start:  uint64(staker.StartTime.Unix()),
-			End:    uint64(staker.EndTime.Unix()),
-			Wght:   staker.Weight,
-		}},
-		TxID: staker.TxID,
-	}
-}
-
 // Embedding promotes currentStaker, so AutoRenewedValidator also inhabits the
 // CurrentStaker sum. Type switches over it must not assume newCurrentStaker
 // produces its only inhabitants.
 var _ CurrentStaker = AutoRenewedValidator{}
+
+// The tx-taking APIs must reject a transaction of the wrong staking role.
+// Cross-role construction is a compile error, so only these paths need
+// runtime coverage.
+func TestStakingStateRejectsCrossRoleTx(t *testing.T) {
+	nativeState := newTestState(t, memdb.New())
+	typedState := NewAdapter(nativeState)
+
+	now := time.Now().Truncate(time.Second)
+	validator := platform.Validator{
+		NodeID: defaultValidatorNodeID,
+		Start:  uint64(now.Add(time.Hour).Unix()),
+		End:    uint64(now.Add(2 * time.Hour).Unix()),
+		Wght:   1,
+	}
+	validatorTx := &platform.Tx{Unsigned: &platform.AddValidatorTx{Validator: validator}}
+	delegatorTx := &platform.Tx{Unsigned: &platform.AddDelegatorTx{Validator: validator}}
+	nativeState.AddTx(validatorTx, status.Committed)
+	nativeState.AddTx(delegatorTx, status.Committed)
+
+	err := typedState.PutPendingValidator(delegatorTx)
+	require.ErrorIs(t, err, errUnexpectedStaker)
+
+	err = typedState.PutPendingDelegator(validatorTx)
+	require.ErrorIs(t, err, errUnexpectedStaker)
+
+	err = typedState.DeleteCurrentDelegator(validatorTx.ID())
+	require.ErrorIs(t, err, errUnexpectedStaker)
+
+	err = typedState.DeletePendingDelegator(validatorTx.ID())
+	require.ErrorIs(t, err, errUnexpectedStaker)
+}
 
 func TestNewCurrentStakerClassifiesEveryPriority(t *testing.T) {
 	tests := []struct {
