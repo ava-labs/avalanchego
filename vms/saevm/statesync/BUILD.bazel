@@ -63,7 +63,6 @@ go_test(
         "//database/memdb",
         "//ids",
         "//snow",
-        "//snow/engine/enginetest",
         "//snow/snowtest",
         "//utils/logging",
         "//utils/logging/loggingtest",
