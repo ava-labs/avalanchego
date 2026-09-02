@@ -6,12 +6,17 @@ package statesync
 import (
 	"context"
 	"math"
+	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -58,6 +63,16 @@ func TestShouldAcceptSummary(t *testing.T) {
 				return &Summary{AcceptedHeight: 1}
 			},
 		},
+		{
+			name: "firewood_scheme",
+			newHandler: func(t *testing.T) *SummaryHandler {
+				sut := newSUT(t, withScheme(customrawdb.FirewoodScheme), withRecordedLog())
+				return sut.SummaryHandler
+			},
+			getSummary: func(*testing.T, *SummaryHandler) *Summary {
+				return &Summary{AcceptedHeight: 1}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,10 +98,7 @@ func TestStateSyncEndToEnd(t *testing.T) {
 	sourceVM.acceptBlocks(t, numBlocks)
 
 	// Handler to state sync
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+	client := sourceVM.newSyncClient(t)
 
 	ctx := t.Context()
 
@@ -96,15 +108,15 @@ func TestStateSyncEndToEnd(t *testing.T) {
 
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
 
+	accepted := sourceVM.blockAtHeight(t, summary.Height())
+	settled := sourceVM.blockAtHeight(t, sourceVM.hooks.SettledBy(accepted.Header()).Height)
+	requireSyncedMarkers(t, client, accepted, settled)
+
 	// During the sync, the network continued processing
 	sourceVM.acceptBlocks(t, numBlocks)
 
 	// catch up a new VM
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
+	clientVM := client.restartAsVM(t, sourceVM.clock.Now())
 	lastHeight := sourceVM.lastAcceptedBlock(t).Height()
 	for height := summary.Height() + 1; height <= lastHeight; height++ {
 		b := sourceVM.blockAtHeight(t, height)
@@ -115,11 +127,7 @@ func TestStateSyncEndToEnd(t *testing.T) {
 		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
 	}
 
-	sourceHead, err := sourceVM.LastAccepted(ctx)
-	require.NoError(t, err, "source LastAccepted()")
-	clientHead, err := clientVM.LastAccepted(ctx)
-	require.NoError(t, err, "client LastAccepted()")
-	require.Equal(t, sourceHead, clientHead, "client VM caught up to the source head")
+	requireVMHead(t, clientVM, sourceVM.lastAcceptedBlock(t).ID())
 }
 
 // TestStateSyncWithSettlementLag syncs a fresh node from a source
@@ -141,10 +149,7 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	require.Equal(t, b1.Height(), sourceVM.hooks.SettledBy(b3.Header()).Height, "SettledBy(b3)")
 	require.Equal(t, b2.Height(), sourceVM.hooks.SettledBy(b4.Header()).Height, "SettledBy(b4)")
 
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+	client := sourceVM.newSyncClient(t)
 
 	summary, err := sourceVM.GetLastStateSummary(ctx)
 	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
@@ -152,17 +157,103 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
 
+	requireSyncedMarkers(t, client, b4, b2)
+
 	// Recovery inside VM initialization must reconstruct the settlement of
 	// blocks 3 and 4, which settled blocks below the synced last settled block.
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
+	clientVM := client.restartAsVM(t, sourceVM.clock.Now())
 
-	head, err := clientVM.LastAccepted(ctx)
-	require.NoError(t, err, "client LastAccepted()")
-	require.Equal(t, ids.ID(b4.Hash()), head, "client VM recovered the synced head")
+	requireVMHead(t, clientVM, b4.ID())
+}
+
+// Syncs to a summary settled by genesis, which is synchronous, so no execution
+// results are persisted but the markers are.
+func TestStateSyncSynchronousSettled(t *testing.T) {
+	t.Parallel()
+
+	// Nothing settles without advancing the clock.
+	sourceVM := newVM(t)
+	for range defaultCommitInterval {
+		sourceVM.acceptBlock(t)
+	}
+
+	ctx := t.Context()
+	summary, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
+
+	accepted := sourceVM.blockAtHeight(t, summary.Height())
+	settled := sourceVM.blockAtHeight(t, sourceVM.hooks.SettledBy(accepted.Header()).Height)
+	require.Zerof(t, settled.Height(), "settled block is genesis, so %T.Synchronous", settled)
+
+	client := sourceVM.newSyncClient(t)
+
+	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+
+	requireSyncedMarkers(t, client, accepted, settled)
+
+	// The skip is the point: a synchronous block's results come from its header.
+	has, err := client.cfg.xdb.HeightIndex.Has(settled.Height())
+	require.NoErrorf(t, err, "%T.Has(%d)", client.cfg.xdb.HeightIndex, settled.Height())
+	require.Falsef(t, has, "execution results persisted for synchronous block %d", settled.Height())
+
+	// Starting a VM proves the skipped results were not needed.
+	clientVM := client.restartAsVM(t, sourceVM.clock.Now())
+	requireVMHead(t, clientVM, accepted.ID())
+}
+
+// Checks which bloom sections a sync marks as indexed.
+func TestUpdateBloomIndexer(t *testing.T) {
+	t.Parallel()
+
+	const sectionSize = params.BloomBitsBlocks
+	tests := []struct {
+		name         string
+		height       uint64
+		wantSections uint64
+	}{
+		{
+			// Right end state for the wrong reason: a checkpoint is written
+			// with a head the indexer rejects, rolling back to zero.
+			name:   "no_whole_section_indexed",
+			height: defaultCommitInterval,
+		},
+		{
+			name:         "first_section_boundary",
+			height:       sectionSize,
+			wantSections: 1,
+		},
+		{
+			name:         "third_section_boundary",
+			height:       3 * sectionSize,
+			wantSections: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sut := newSUT(t)
+			parent := ethcommon.Hash{0xbe, 0xef}
+			settler := &types.Header{
+				Number:     new(big.Int).SetUint64(tt.height),
+				ParentHash: parent,
+			}
+			// The head must be the canonical block ending the section.
+			rawdb.WriteCanonicalHash(sut.db, parent, tt.height-1)
+
+			require.NoErrorf(t, sut.updateBloomIndexer(settler), "updateBloomIndexer(%d)", tt.height)
+
+			// Only a fresh indexer re-validates the stored sections.
+			idx := core.NewBloomIndexer(sut.db, sectionSize, 0)
+			defer idx.Close()
+
+			gotSections, _, gotHead := idx.Sections()
+			require.Equalf(t, tt.wantSections, gotSections, "indexed sections after updateBloomIndexer(%d)", tt.height)
+			if tt.wantSections > 0 {
+				require.Equal(t, parent, gotHead, "head of the last indexed section")
+			}
+		})
+	}
 }
 
 func TestShutdownCancelsMidSync(t *testing.T) {
@@ -190,8 +281,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		source.acceptBlocks(t, defaultCommitInterval+2)
 
 		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		client := newSUT(t, withDatabase(fdb))
-		saetest.ConnectTo[saetest.Peer](t, client, source)
+		client := source.newSyncClient(t, withDatabase(fdb))
 
 		summary, err := source.GetLastStateSummary(ctx)
 		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.SummaryHandler)
@@ -209,8 +299,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		// Any error should be recoverable.
 		t.Run("second_try", func(t *testing.T) {
 			fdb.SetFailAfter(math.MaxInt)
-			client := newSUT(t, withDatabase(fdb))
-			saetest.ConnectTo[saetest.Peer](t, client, source)
+			client := source.newSyncClient(t, withDatabase(fdb))
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
 		})
 	})
@@ -224,24 +313,13 @@ func TestStateSyncLong(t *testing.T) {
 	sourceVM := newVM(t)
 	sourceVM.acceptBlocks(t, numBlocks)
 
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+	client := sourceVM.newSyncClient(t)
 
 	summary, err := sourceVM.GetLastStateSummary(t.Context())
 	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.SummaryHandler)
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
 
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
+	clientVM := client.restartAsVM(t, sourceVM.clock.Now())
 
-	wantLast, err := sourceVM.LastAccepted(t.Context())
-	require.NoErrorf(t, err, "%T.LastAccepted()", sourceVM)
-	gotLast, err := clientVM.LastAccepted(t.Context())
-	require.NoErrorf(t, err, "%T.LastAccepted()", clientVM)
-	require.Equal(t, wantLast, gotLast, "last accepted ID")
+	requireVMHead(t, clientVM, sourceVM.lastAcceptedBlock(t).ID())
 }

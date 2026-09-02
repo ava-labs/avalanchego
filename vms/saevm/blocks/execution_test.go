@@ -193,6 +193,56 @@ func errAll(wants ...testerr.Want) testerr.Want {
 	})
 }
 
+// Checks a stored root committing to receipts that are no longer on disk.
+func TestCheckInvariantsDetectsLostReceipts(t *testing.T) {
+	const height = 2
+	tx := types.NewTx(&types.LegacyTx{Gas: params.TxGas, To: &common.Address{}})
+	ethB, err := hookstest.BuildBlock(
+		&types.Header{
+			Number:  big.NewInt(height),
+			BaseFee: big.NewInt(1),
+			Time:    42,
+		},
+		nil, // blockContext
+		types.Transactions{tx},
+		nil, // receipts
+		nil, // ops
+		hook.Settled{Height: height - 1},
+	)
+	require.NoError(t, err, "hookstest.BuildBlock()")
+
+	hooks := hooks()
+	hdr := ethB.Header()
+	target, cfg := hooks.GasConfigAfter(hdr)
+	tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
+
+	receipts := types.Receipts{{
+		Type:              tx.Type(),
+		Status:            types.ReceiptStatusSuccessful,
+		TxHash:            tx.Hash(),
+		GasUsed:           params.TxGas,
+		CumulativeGasUsed: params.TxGas,
+		EffectiveGasPrice: big.NewInt(1),
+		BlockHash:         ethB.Hash(),
+		BlockNumber:       big.NewInt(height),
+	}}
+
+	db := rawdb.NewMemoryDatabase()
+	xdb := saetest.NewExecutionResultsDB()
+	require.NoError(t, newBlock(t, ethB, nil, nil).MarkExecuted(
+		db, xdb, tm, time.Time{}, hdr.BaseFee, receipts, common.Hash{}, new(atomic.Pointer[Block]),
+	), "MarkExecuted()")
+
+	// The stored root still commits to the receipts, but they are gone.
+	rawdb.DeleteReceipts(db, ethB.Hash(), height)
+
+	b := newBlock(t, ethB, nil, nil)
+	require.NoErrorf(t, b.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()),
+		"%T.RestoreExecutionArtefacts()", b)
+	require.Emptyf(t, testerr.Diff(b.CheckInvariants(Executed), testerr.Contains("receipts don't match root")),
+		"%T.CheckInvariants(Executed)", b)
+}
+
 func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
 	asynchronous := hook.Settled{Height: height - 1}

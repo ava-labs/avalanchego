@@ -64,6 +64,8 @@ type (
 
 	sutConfig struct {
 		enabled        bool
+		scheme         string
+		log            logging.Logger
 		commitInterval uint64
 		avaDB          database.Database
 		xdb            saetypes.ExecutionResults
@@ -77,6 +79,21 @@ var _ saetest.Peer = (*sut)(nil)
 func withEnabled(e bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.enabled = e
+	})
+}
+
+// withScheme sets the trie database scheme.
+func withScheme(scheme string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.scheme = scheme
+	})
+}
+
+// withRecordedLog records logs instead of propagating them to the test, for a
+// path that deliberately warns.
+func withRecordedLog() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.log = loggingtest.NewRecorder(logging.Debug)
 	})
 }
 
@@ -130,11 +147,12 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		commitInterval: defaultCommitInterval,
 		avaDB:          memdb.New(),
 		xdb:            saetest.NewExecutionResultsDB(),
+		log:            loggingtest.New(t, logging.Debug),
 		startTime:      time.Unix(genesisTimestamp, 0),
 	}, opts...)
 
 	snowCtx := snowtest.Context(t, chainID)
-	snowCtx.Log = loggingtest.New(t, logging.Debug)
+	snowCtx.Log = cfg.log
 	snowCtx.NodeID = ids.GenerateTestNodeID()
 
 	clock := saetest.NewClock(cfg.startTime, time.Nanosecond)
@@ -180,6 +198,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		Config{
 			DBConfig: saedb.Config{
 				CommitInterval: cfg.commitInterval,
+				Scheme:         cfg.scheme,
 			},
 			Enabled: cfg.enabled,
 		},
@@ -205,6 +224,48 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 
 	s.sender.Start(t, s)
 	return s
+}
+
+// requireSyncedMarkers asserts every rawdb marker [SummaryHandler.WriteSynced]
+// writes. A restarting node reads these instead of replaying from genesis.
+func requireSyncedMarkers(t *testing.T, client *sut, accepted, settled *blocks.Block) {
+	t.Helper()
+
+	require.Equal(t, accepted.Hash(), rawdb.ReadHeadFastBlockHash(client.db), "ReadHeadFastBlockHash()")
+	require.Equal(t, settled.Hash(), rawdb.ReadFinalizedBlockHash(client.db), "ReadFinalizedBlockHash()")
+	require.Equal(t, settled.Hash(), rawdb.ReadHeadBlockHash(client.db), "ReadHeadBlockHash()")
+	require.Equal(t, settled.Hash(), rawdb.ReadHeadHeaderHash(client.db), "ReadHeadHeaderHash()")
+	require.Equal(t, accepted.Header().Root, rawdb.ReadSnapshotRoot(client.db), "ReadSnapshotRoot()")
+}
+
+// newSyncClient returns a fresh node connected to s as a sync peer.
+func (s *vmSUT) newSyncClient(t *testing.T, opts ...sutOption) *sut {
+	t.Helper()
+
+	client := newSUT(t, opts...)
+	saetest.ConnectTo[saetest.Peer](t, client, s)
+	return client
+}
+
+// requireVMHead asserts the VM's last accepted block.
+func requireVMHead(t *testing.T, vm *vmSUT, want ids.ID) {
+	t.Helper()
+
+	got, err := vm.LastAccepted(t.Context())
+	require.NoErrorf(t, err, "%T.LastAccepted()", vm)
+	require.Equal(t, want, got, "last accepted block")
+}
+
+// restartAsVM starts a VM over the sut's database, as a node does once state
+// sync finishes.
+func (s *sut) restartAsVM(t *testing.T, at time.Time) *vmSUT {
+	t.Helper()
+
+	return newVM(t,
+		withDatabase(s.cfg.avaDB),
+		withXDB(saetest.CloneExecutionResultsDB(t, s.cfg.xdb)),
+		withTime(at),
+	)
 }
 
 func (s *sut) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
