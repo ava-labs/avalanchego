@@ -649,20 +649,22 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
 
 	// Initialize the state sync client
+	syncClient := client.New(
+		&client.Config{
+			Network:          vm.Network,
+			Codec:            vm.networkCodec,
+			Stats:            stats.NewClientSyncerStats(leafMetricsNames),
+			StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
+			BlockParser:      vm,
+		},
+	)
+
 	vm.Client = engine.NewClient(&engine.ClientConfig{
-		StateSyncDone: vm.stateSyncDone,
-		Chain:         newChainContextAdapter(vm.eth),
-		State:         vm.State,
-		SnowCtx:       vm.ctx,
-		Client: client.New(
-			&client.Config{
-				Network:          vm.Network,
-				Codec:            vm.networkCodec,
-				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
-				StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
-				BlockParser:      vm,
-			},
-		),
+		StateSyncDone:       vm.stateSyncDone,
+		Chain:               newChainContextAdapter(vm.eth),
+		State:               vm.State,
+		SnowCtx:             vm.ctx,
+		Client:              syncClient,
 		Enabled:             stateSyncEnabled,
 		SkipResume:          vm.config.StateSyncSkipResume,
 		MinBlocks:           vm.config.StateSyncMinBlocks,
@@ -674,6 +676,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
 		Extender:            vm.extensionConfig.SyncExtender,
+		LeafFetcher:         client.NewLeafFetcher(syncClient, message.CorethLeafsRequestType, message.StateTrieNode),
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

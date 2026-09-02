@@ -6,6 +6,7 @@ package hashdb
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
@@ -89,7 +90,10 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, reqPB *syncpb.
 		return nil, appErr
 	}
 	resp, err := getLeaves(req)
-	if err != nil {
+	switch {
+	case errors.Is(err, errInvalidLeafKey):
+		return nil, errInvalidRoot
+	case err != nil:
 		return nil, handlers.Fault(r.log, nodeID, err)
 	}
 	return resp, nil
@@ -126,6 +130,10 @@ var (
 	errRootNotFound = &avacommon.AppError{
 		Code:    3006,
 		Message: "requested trie root not found",
+	}
+	errInvalidRoot = &avacommon.AppError{
+		Code:    3007,
+		Message: "invalid trie root",
 	}
 )
 
@@ -283,10 +291,7 @@ func (l *leafRange) next() []byte {
 		return l.start
 	}
 
-	last := l.keys[len(l.keys)-1]
-	next := slices.Clone(last)
-	incrementBytes(next)
-	return next
+	return NextKey(l.keys[len(l.keys)-1])
 }
 
 // fillFromSnapshot appends leaves from [leafRange.next] to r, up to the
@@ -411,25 +416,19 @@ func withBefore(end []byte) fillOption {
 // capacity. [withBefore] stops the fill before end. It returns whether the trie
 // holds leaves past the response.
 func fillFromTrie(t *trie.Trie, r *leafRange, opts ...fillOption) (bool, error) {
-	// While [trie.Trie.NodeIterator] documents that it starts iterating after
-	// the given key, it actually starts at the key if it exists.
-	nodeIt, err := t.NodeIterator(r.next())
-	if err != nil {
-		return false, err
-	}
-	it := trie.NewIterator(nodeIt)
-
 	c := options.As(opts...)
-	for it.Next() {
-		if hitEnd := c.hasEnd && bytes.Compare(it.Key, c.end) >= 0; hitEnd || r.full() {
-			return true, it.Err
+	for pair, err := range LeafIterator(t, r.next()) {
+		if err != nil {
+			return false, err
 		}
-		// While [trie.NodeIterator] forbids retaining [trie.NodeIterator.LeafKey]
-		// and [trie.NodeIterator.LeafBlob] past Next, the implementation never
-		// reuses their memory, so it.Key and it.Value are safe to retain.
-		r.add(it.Key, it.Value)
+
+		hitEnd := c.hasEnd && bytes.Compare(pair.Key, c.end) >= 0
+		if hitEnd || r.full() {
+			return true, nil
+		}
+		r.add(pair.Key, pair.Value)
 	}
-	return false, it.Err
+	return false, nil
 }
 
 // isRangeValid range-proves r against the trie. valid reports whether the proof
@@ -473,13 +472,15 @@ func dbValues(db *memorydb.Database) [][]byte {
 	return out
 }
 
-// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to all-zeros.
-func incrementBytes(b []byte) {
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] < 0xff {
-			b[i]++
-			return
+// NextKey adds 1 to a copy of k, with carry. All-0xff wraps to all-zeros.
+func NextKey(k []byte) []byte {
+	k = slices.Clone(k)
+	for i := len(k) - 1; i >= 0; i-- {
+		if k[i] < 0xff {
+			k[i]++
+			return k
 		}
-		b[i] = 0
+		k[i] = 0
 	}
+	return k
 }

@@ -1,7 +1,6 @@
-name: Bazel Full Test Jobs
+name: Bazel Smoke Test Jobs
 
-# Reusable Bazel CI workflow. The pre-merge and scheduled callers select the platform
-# and test configuration.
+# Reusable Bazel CI workflow for the unit-test and E2E smoke tests.
 on:
   workflow_call:
     inputs:
@@ -11,21 +10,10 @@ on:
       runner:
         required: true
         type: string
-      run_race_shuffle_unit_tests:
-        description: 'Run unit tests with race detection and shuffled test order'
-        required: false
-        type: boolean
-        default: false
-      enable_remote_cache:
-        description: 'Enable the remote Bazel cache'
-        required: false
-        type: boolean
-        default: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
-  BAZEL_REMOTE_CACHE_ENABLED: ${{ inputs.enable_remote_cache }}
   BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
   BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
 
@@ -38,8 +26,8 @@ jobs:
     if: ${{ always() }}
     needs:
       - setup
-      - unit
-      - e2e
+      - unit-smoke
+      - e2e-smoke
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Fail unless all needed jobs succeeded
@@ -61,11 +49,7 @@ jobs:
             exit 1
           fi
 
-  # Prepare Bazel CI for this platform before the later jobs run. Similar in intent to
-  # setup-go, this job uses setup-bazel to check Bazel metadata and prepare cache
-  # state for the dependencies that subsequent jobs are expected to need. That shifts
-  # network access into one upfront step instead of having each later job discover
-  # missing dependencies on its own.
+  # Prepare Bazel CI for this platform before the smoke tests run.
   setup:
     runs-on: ${{ inputs.runner }}
     steps:
@@ -78,17 +62,17 @@ jobs:
         shell: bash
         run: ./scripts/run_task.sh log-ci-disk-state-bazel
 
-  unit:
+  unit-smoke:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - name: Run unit tests with Bazel
+      - name: Run Bazel unit-test smoke test
         uses: ./.github/actions/run-bazel-with-disk-space
         with:
-          run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'bazel-test-unit-race-shuffle' || 'bazel-test-unit' }}
+          run: ./scripts/run_task.sh bazel-test-unit-smoke
 
-  e2e:
+  e2e-smoke:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -98,7 +82,7 @@ jobs:
         with:
           run: ./scripts/run_task.sh bazel-test-e2e-smoke
           setup_bazel: 'true'
-          artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
+          artifact_prefix: e2e-bazel-smoke-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}

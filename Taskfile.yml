@@ -80,14 +80,6 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
-  bazel-test:
-    desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //...'
-
-  bazel-test-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
-
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
     cmds:
@@ -97,7 +89,7 @@ tasks:
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-ci:
-    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
     env:
       E2E_SERIAL: 1
     cmds:
@@ -106,17 +98,25 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
-  bazel-test-fast:
-    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
+  bazel-test-e2e-smoke:
+    desc: Run an E2E smoke test with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
-  bazel-test-main:
-    desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+  bazel-test-unit:
+    desc: Run cacheable Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
 
-  bazel-test-subnet-evm:
-    desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+  bazel-test-unit-race-shuffle:
+    desc: Run Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race-shuffle --nocache_test_results'
+
+  bazel-test-unit-smoke:
+    desc: Run a cacheable Bazel Go unit-test smoke test
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh smoke --test_filter=TestID'
 
   build:
     desc: Builds avalanchego
@@ -572,21 +572,22 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
 
   # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
-  # For comprehensive fuzzing, use test-fuzz-long FUZZTIME=[value in seconds].
-  # A value of `-1` will run until it encounters a failing output.
+  # For comprehensive fuzzing, use test-fuzz-long FUZZEXECS=[value].
+  #
+  # To fuzz until a failure: FUZZEXECS=0 FUZZ_TIMEOUT=0 task test-fuzz-long
 
   test-fuzz:
     desc: Smoke tests fuzz infrastructure with a quick package
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58'
+      FUZZEXECS: '{{.FUZZEXECS| default "1000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} ./utils/cb58'
 
   # To run only selected directories, pass them after --.
   test-fuzz-long:
-    desc: Runs each fuzz test for 180 seconds
+    desc: Runs each fuzz test for 10,000 executions
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "180"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
+      FUZZEXECS: '{{.FUZZEXECS| default "10000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} {{.CLI_ARGS}}'
 
   test-load:
     desc: Runs load tests

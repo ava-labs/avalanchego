@@ -8,7 +8,7 @@ CALLER_PATH="$(pwd)"
 # e.g.,
 # ./scripts/run_task.sh --list
 # ./scripts/run_task.sh bazel-check-metadata
-# RUN_TASK_PREFER_BAZEL=1 ./scripts/run_task.sh bazel-test-main   # CI path that gets task from Bazel
+# RUN_TASK_PREFER_BAZEL=1 ./scripts/run_task.sh bazel-test-unit   # CI path that gets task from Bazel
 #
 # Launcher policy:
 # 1. Use a real `task` from PATH when available.
