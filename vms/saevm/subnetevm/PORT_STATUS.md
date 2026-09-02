@@ -560,6 +560,12 @@ the unreferenced spike-only `spam-c-chain` example; neither is used by the SAE
 warp suite. The post-review Gazelle pass succeeds and adds the direct test
 dependencies required by the new header and genesis coverage.
 
+Follow-up: `2c79514a00` is superseded after review of upstream PR #5598. That
+PR establishes `dynamic.DelayExponent` as the canonical ACP-226 type and
+deletes `vms/evm/acp226`. The replacement work restores the dynamic
+implementation first, then moves it out of the C-Chain package to the shared
+`vms/evm/dynamic` boundary before applying the upstream migration.
+
 Exact next action: regenerate/check Bazel metadata, run lint and all four
 module builds, then run the repo-wide unit, SAE warp e2e, and C-Chain e2e gates
 on one final tree. Record the results here and check milestone 6 only if every

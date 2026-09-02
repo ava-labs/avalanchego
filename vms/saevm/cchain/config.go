@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -207,25 +205,25 @@ func (c config) networkOptions() []network.Option {
 // desiredParams bundles this node's votes for the dynamic consensus
 // parameters. A nil field means no vote.
 type desiredParams struct {
-	targetExcess  *gas.Gas
-	priceExponent *dynamic.PriceExponent
-	delayExcess   *acp226.DelayExcess
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
+	delayExponent  *dynamic.DelayExponent
 }
 
-// desired returns c's user-facing targets as consensus parameter votes.
+// desired returns c's user-facing targets as internal exponent votes.
 func (c config) desired() desiredParams {
 	var d desiredParams
 	if c.GasTarget != nil {
-		e := acp176.DesiredTargetExcess(*c.GasTarget)
-		d.targetExcess = &e
+		e := dynamic.DesiredTargetExponent(*c.GasTarget)
+		d.targetExponent = &e
 	}
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
 	}
 	if c.MinDelayTarget != nil {
-		e := acp226.DesiredDelayExcess(*c.MinDelayTarget)
-		d.delayExcess = &e
+		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
+		d.delayExponent = &e
 	}
 	return d
 }

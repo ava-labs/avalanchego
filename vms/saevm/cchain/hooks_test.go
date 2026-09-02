@@ -22,15 +22,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
-func TestDelayExcess(t *testing.T) {
+func TestDelayExponent(t *testing.T) {
 	tests := []struct {
 		name   string
 		header *types.Header
-		want   acp226.DelayExcess
+		want   dynamic.DelayExponent
 	}{
 		{
 			name: "header_carries_excess",
@@ -38,17 +39,17 @@ func TestDelayExcess(t *testing.T) {
 				&types.Header{},
 				&customtypes.HeaderExtra{MinDelayExcess: utils.PointerTo[acp226.DelayExcess](42)},
 			),
-			want: 42,
+			want: dynamic.DelayExponent(42),
 		},
 		{
 			name:   "no_field_defaults_to_initial",
 			header: &types.Header{},
-			want:   acp226.InitialDelayExcess,
+			want:   dynamic.InitialDelayExponent,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, delayExcess(tt.header), "delayExcess()")
+			require.Equal(t, tt.want, delayExponent(tt.header), "delayExponent()")
 		})
 	}
 }
@@ -158,32 +159,32 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 }
 
-func TestTargetExcess(t *testing.T) {
+func TestTargetExponent(t *testing.T) {
 	const fortunaTime = 100
 
 	tests := []struct {
 		name    string
 		header  *types.Header
-		want    gas.Gas
+		want    dynamic.TargetExponent
 		wantErr error
 	}{
 		{
 			name: "header_carries_exponent",
 			header: customtypes.WithHeaderExtra(
 				&types.Header{Number: big.NewInt(1)},
-				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[gas.Gas](42)},
+				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
 			),
 			want: 42,
 		},
 		{
 			name:   "no_field_pre_fortuna",
 			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
-			want:   0,
+			want:   dynamic.InitialTargetExponent,
 		},
 		{
 			name:   "no_field_genesis",
 			header: &types.Header{Time: fortunaTime, Number: big.NewInt(0)},
-			want:   0,
+			want:   dynamic.InitialTargetExponent,
 		},
 		{
 			name: "no_field_fortuna_legacy_state",
@@ -212,9 +213,9 @@ func TestTargetExcess(t *testing.T) {
 					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
 				},
 			}
-			got, err := targetExcess(fortuna, tt.header)
-			require.ErrorIs(t, err, tt.wantErr, "targetExcess()")
-			assert.Equal(t, tt.want, got, "targetExcess()")
+			got, err := targetExponent(fortuna, tt.header)
+			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
+			assert.Equal(t, tt.want, got, "targetExponent()")
 		})
 	}
 }

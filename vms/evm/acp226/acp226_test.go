@@ -6,7 +6,6 @@ package acp226
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -163,22 +162,6 @@ func TestDelay(t *testing.T) {
 	for _, test := range readerTests {
 		t.Run(test.name, func(t *testing.T) {
 			require.Equal(t, test.delay, test.excess.Delay())
-		})
-	}
-}
-
-func TestDelayDuration(t *testing.T) {
-	tests := []struct {
-		name   string
-		excess DelayExcess
-		want   time.Duration
-	}{
-		{name: "minimum_floor", excess: 0, want: time.Millisecond},
-		{name: "initial", excess: InitialDelayExcess, want: 2 * time.Second},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, tt.excess.DelayDuration(), "DelayExcess.DelayDuration()")
 		})
 	}
 }

@@ -125,9 +125,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		},
 		slices.Values(txs),
 		desiredParams{
-			targetExcess:  headerExtra.TargetExponent,
-			priceExponent: headerExtra.MinPriceExponent,
-			delayExcess:   headerExtra.MinDelayExcess,
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -145,21 +145,21 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-// delayExcess returns h's ACP-226 minimum block delay excess, defaulting to
-// [acp226.InitialDelayExcess] when the header does not carry one.
-func delayExcess(h *types.Header) acp226.DelayExcess {
+// delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
+// [dynamic.InitialDelayExponent] when the header does not carry one.
+func delayExponent(h *types.Header) dynamic.DelayExponent {
 	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
-		return *de
+		return dynamic.DelayExponent(*de)
 	}
-	return acp226.InitialDelayExcess
+	return dynamic.InitialDelayExponent
 }
 
-func targetExcess(config *extras.ChainConfig, h *types.Header) (gas.Gas, error) {
+func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}
 	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
-		return 0, nil
+		return dynamic.InitialTargetExponent, nil
 	}
 
 	// The block might be the last synchronous block running with ACP-176.
@@ -167,26 +167,24 @@ func targetExcess(config *extras.ChainConfig, h *types.Header) (gas.Gas, error) 
 	if err != nil {
 		return 0, fmt.Errorf("parsing fee state: %w", err)
 	}
-	return state.TargetExcess, nil
+	return dynamic.TargetExponent(state.TargetExcess), nil
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	config := corethparams.GetExtra(h.chainConfig)
-	te, err := targetExcess(config, header)
+	te, err := targetExponent(config, header)
 	if err != nil {
-		te = 0
-		state := acp176.State{TargetExcess: te}
+		te = dynamic.InitialTargetExponent
 		h.ctx.Log.Error("failed to get target exponent; defaulting to the initial target exponent",
 			zap.Stringer("blockHash", header.Hash()),
 			zap.Uint64("blockNumber", header.Number.Uint64()),
 			zap.Uint64("defaultTargetExponent", uint64(te)),
-			zap.Uint64("defaultGasTarget", uint64(state.Target())),
+			zap.Uint64("defaultGasTarget", uint64(te.Target())),
 			zap.Error(err),
 		)
 	}
 
-	state := acp176.State{TargetExcess: te}
-	return state.Target(), gastime.GasPriceConfig{
+	return te.Target(), gastime.GasPriceConfig{
 		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
 		MinPrice:              priceExponent(header).Price(),
 	}
@@ -262,7 +260,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	h.metrics.Set(delayExcess(b.Header()).DelayDuration())
+	h.metrics.Set(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
@@ -369,7 +367,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, errHeliconUnactivated
 	}
 
-	de := delayExcess(parent)
+	de := delayExponent(parent)
 	parentTime := blockTime(parent)
 	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
 		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
@@ -379,20 +377,15 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
 	config := corethparams.GetExtra(b.chainConfig)
-	te, err := targetExcess(config, parent)
+	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
 	// Move each dynamic parameter toward this node's vote (nil = no move).
-	if b.desired.delayExcess != nil {
-		de.UpdateDelayExcess(*b.desired.delayExcess)
-	}
-	targetState := acp176.State{TargetExcess: te}
-	if b.desired.targetExcess != nil {
-		targetState.UpdateTargetExcess(*b.desired.targetExcess)
-	}
-	te = targetState.TargetExcess
+	de = de.Toward(b.desired.delayExponent)
+	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -412,7 +405,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &de,
+			MinDelayExcess:   &minDelayExcess,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},

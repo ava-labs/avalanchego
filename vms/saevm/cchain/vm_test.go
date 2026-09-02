@@ -57,8 +57,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -240,7 +238,7 @@ func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
 
 // testStartTime pins the SUT clock at the genesis block's ACP-226 minimum
 // delay deadline, i.e. the earliest time a child of genesis may be built.
-var testStartTime = upgrade.InitiallyActiveTime.Add(acp226.InitialDelayExcess.DelayDuration())
+var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
 
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
 // the test move the clock forward (e.g. past Tau to settle a block). It also
@@ -1394,7 +1392,7 @@ func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 		{
 			name: "cheated_target_exponent",
 			tamper: func(_ *testing.T, e *customtypes.HeaderExtra) {
-				cheated := gas.Gas(math.MaxUint64)
+				cheated := dynamic.TargetExponent(math.MaxUint64)
 				e.TargetExponent = &cheated
 			},
 		},
@@ -1587,18 +1585,18 @@ func TestDynamicTargetExponent(t *testing.T) {
 	tests := []struct {
 		name    string
 		desired *gas.Gas
-		want    []gas.Gas
+		want    []dynamic.TargetExponent
 	}{
 		{
 			name: "unset",
-			want: []gas.Gas{
-				0,
+			want: []dynamic.TargetExponent{
+				dynamic.InitialTargetExponent,
 			},
 		},
 		{
 			name:    "max_diff",
 			desired: utils.PointerTo[gas.Gas](15_000_000),
-			want: []gas.Gas{
+			want: []dynamic.TargetExponent{
 				maxDiff,
 				2 * maxDiff,
 			},
@@ -1616,7 +1614,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 			ctx, sut := newSUT(t, opts...)
 			w := newWallet(key, sut.ctx, sut.Client)
 
-			var parentExponent gas.Gas
+			parentExponent := dynamic.InitialTargetExponent
 			for _, wantExponent := range test.want {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				header := blk.Header()
@@ -1625,8 +1623,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 				require.NotNilf(t, he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
 				assert.Equalf(t, wantExponent, *he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
 
-				parentState := acp176.State{TargetExcess: parentExponent}
-				wantGasLimit := uint64(parentState.Target()) * gastime.TargetToRate * saeparams.TauSeconds * saeparams.Lambda
+				wantGasLimit := uint64(parentExponent.Target()) * gastime.TargetToRate * saeparams.TauSeconds * saeparams.Lambda
 				assert.Equalf(t, wantGasLimit, header.GasLimit, "block %d %T.GasLimit", header.Number, header)
 
 				parentExponent = wantExponent
@@ -1643,26 +1640,26 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 	tests := []struct {
 		name    string
 		desired *uint64
-		want    []acp226.DelayExcess
+		want    []dynamic.DelayExponent
 	}{
 		{
 			name: "unset",
-			want: []acp226.DelayExcess{acp226.InitialDelayExcess},
+			want: []dynamic.DelayExponent{dynamic.InitialDelayExponent},
 		},
 		{
 			name:    "votes_up_capped",
 			desired: utils.PointerTo[uint64](4000), // above the ~2000ms initial
-			want: []acp226.DelayExcess{
-				acp226.InitialDelayExcess + maxDiff,
-				acp226.InitialDelayExcess + 2*maxDiff,
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent + maxDiff,
+				dynamic.InitialDelayExponent + 2*maxDiff,
 			},
 		},
 		{
 			name:    "votes_down_capped",
 			desired: utils.PointerTo[uint64](1000),
-			want: []acp226.DelayExcess{
-				acp226.InitialDelayExcess - maxDiff,
-				acp226.InitialDelayExcess - 2*maxDiff,
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent - maxDiff,
+				dynamic.InitialDelayExponent - 2*maxDiff,
 			},
 		},
 	}
@@ -1681,7 +1678,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				he := customtypes.GetHeaderExtra(blk.Header())
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
-				got := *he.MinDelayExcess
+				got := dynamic.DelayExponent(*he.MinDelayExcess)
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
 				clock.Advance(got.DelayDuration())
 			}
@@ -1842,7 +1839,7 @@ func TestWaitForEventThrottle(t *testing.T) {
 		require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
 
 		// Skip the min-delay pacing so only the throttle can block.
-		clock.Advance(2 * acp226.InitialDelayExcess.DelayDuration())
+		clock.Advance(2 * dynamic.InitialDelayExponent.DelayDuration())
 
 		// The throttle clock starts when a call returns, so this first
 		// (immediate) call is what forces the second one to wait.

@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -45,9 +44,7 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
-	// TargetExponent stores the ACP-176 target excess. The field name is
-	// preserved for wire compatibility.
-	TargetExponent   *gas.Gas
+	TargetExponent   *dynamic.TargetExponent
 	MinPriceExponent *dynamic.PriceExponent
 
 	SettledHeight       *uint64
@@ -260,7 +257,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
-	extras.TargetExponent = (*gas.Gas)(h.TargetExponent)
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix

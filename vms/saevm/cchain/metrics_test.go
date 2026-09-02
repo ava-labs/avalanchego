@@ -21,6 +21,6 @@ func TestMinBlockDelayMetric(t *testing.T) {
 
 	blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 
-	want := delayExcess(blk.Header()).DelayDuration().Seconds()
+	want := delayExponent(blk.Header()).DelayDuration().Seconds()
 	require.Equalf(t, want, testutil.ToFloat64(sut.metrics), "min block delay after executing block %d", blk.NumberU64())
 }
