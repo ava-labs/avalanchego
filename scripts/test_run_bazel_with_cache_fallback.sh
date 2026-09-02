@@ -84,8 +84,10 @@ run_runner() {
     HOME="${home_dir}" \
     BAZEL_REMOTE_CACHE_RC="${home_dir}/remote-cache.bazelrc" \
     BAZEL_FALLBACK_TEST_LOG="${workdir}/log" \
+    GITHUB_ACTIONS="${BAZEL_FALLBACK_TEST_GITHUB_ACTIONS:-}" \
     BAZEL_CACHE_ATTEMPT_TIMEOUT_SECONDS=1 \
     BAZEL_CACHE_FALLBACK_TIMEOUT_SECONDS=1 \
+    BAZEL_CACHE_TERM_GRACE_SECONDS=1 \
     "${bash_bin}" "${runner}" build //main:avalanchego
 }
 
@@ -94,7 +96,7 @@ run_runner() {
 # rc file, shut down the potentially stuck server, and retry once cache-free.
 printf 'build --remote_cache=https://cache.example\n' >"${home_dir}/remote-cache.bazelrc"
 : >"${workdir}/log"
-GITHUB_ACTIONS=true run_runner 2>"${workdir}/stderr"
+BAZEL_FALLBACK_TEST_GITHUB_ACTIONS=true run_runner 2>"${workdir}/stderr"
 assert_log $'build //main:avalanchego enabled\nshutdown disabled\n--noblock_for_lock build //main:avalanchego disabled'
 assert_stderr_contains '::warning::Bazel succeeded after retrying with the remote cache disabled.'
 

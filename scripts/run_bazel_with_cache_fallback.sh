@@ -31,6 +31,7 @@ fi
 # seconds so the Bash watchdog below works on GitHub's macOS runners.
 primary_timeout_seconds="${BAZEL_CACHE_ATTEMPT_TIMEOUT_SECONDS:-900}"
 fallback_timeout_seconds="${BAZEL_CACHE_FALLBACK_TIMEOUT_SECONDS:-1800}"
+term_grace_seconds="${BAZEL_CACHE_TERM_GRACE_SECONDS:-30}"
 
 # GitHub's macOS runners do not provide GNU timeout. Keep this implementation
 # in Bash rather than installing Nix or adding a Python dependency to every
@@ -47,28 +48,38 @@ run_with_timeout() {
 
   "$@" &
   local command_pid=$!
-  local timed_out_file
+  local timed_out_file sleep_pid_file
   timed_out_file="$(mktemp)"
+  sleep_pid_file="$(mktemp)"
 
   # Use a marker rather than the command's exit status to distinguish our
-  # deadline from a normal Bazel failure. The watchdog owns its sleep children
-  # and kills the active one when the command finishes, preventing a leftover
-  # watchdog from waking up during a later command.
+  # deadline from a normal Bazel failure. Bash cannot interrupt a `wait` and
+  # reliably run a trap while it waits for a child. Record each sleep PID so
+  # the parent can stop it before stopping the watchdog; otherwise completed
+  # commands leave 15-minute sleep processes for the Actions cleanup to reap.
   (
-    sleep "${timeout_seconds}" &
-    sleep_pid=$!
-    trap 'kill "${sleep_pid}" 2>/dev/null || true; exit 0' TERM
-    wait "${sleep_pid}"
+    wait_for_duration() {
+      sleep "$1" &
+      sleep_pid=$!
+      printf '%s\n' "${sleep_pid}" >"${sleep_pid_file}"
+      wait "${sleep_pid}"
+    }
+
+    wait_for_duration "${timeout_seconds}"
     if kill -0 "${command_pid}" 2>/dev/null; then
       printf 'timed out\n' >"${timed_out_file}"
       kill -TERM "${command_pid}" 2>/dev/null || true
-      sleep 30 &
-      sleep_pid=$!
-      wait "${sleep_pid}"
+      wait_for_duration "${term_grace_seconds}"
       kill -KILL "${command_pid}" 2>/dev/null || true
     fi
   ) &
   local watchdog_pid=$!
+
+  # Ensure the watchdog has recorded its first sleep before a very fast command
+  # completes and the cleanup below tries to stop it.
+  while [[ ! -s "${sleep_pid_file}" ]] && kill -0 "${watchdog_pid}" 2>/dev/null; do
+    :
+  done
 
   local status
   if wait "${command_pid}"; then
@@ -76,9 +87,18 @@ run_with_timeout() {
   else
     status=$?
   fi
-  kill "${watchdog_pid}" 2>/dev/null || true
-  wait "${watchdog_pid}" 2>/dev/null || true
 
+  if [[ -s "${timed_out_file}" ]]; then
+    # Let the watchdog complete its TERM grace period and send KILL.
+    # It owns the active sleep, so this path cannot orphan it.
+    wait "${watchdog_pid}" 2>/dev/null || true
+  else
+    kill "$(<"${sleep_pid_file}")" 2>/dev/null || true
+    kill "${watchdog_pid}" 2>/dev/null || true
+    wait "${watchdog_pid}" 2>/dev/null || true
+  fi
+
+  rm -f "${sleep_pid_file}"
   if [[ -s "${timed_out_file}" ]]; then
     rm -f "${timed_out_file}"
     return 124
