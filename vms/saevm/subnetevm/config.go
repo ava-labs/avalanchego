@@ -27,8 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	avawarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // config is the operator-supplied per-chain config for the SAE subnet-evm
@@ -243,12 +241,6 @@ func (c config) desired() desiredParams {
 		d.targetExcess = &e
 	}
 	return d
-}
-
-// WarpMessages parses and returns the messages encoded in
-// [config.WarpOffChainMessages].
-func (c config) WarpMessages() ([]*avawarp.UnsignedMessage, error) {
-	return saewarp.ParseOffChainMessages(c.WarpOffChainMessages)
 }
 
 // feeRecipient resolves the local node's preferred fee recipient for

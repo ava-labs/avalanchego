@@ -137,7 +137,7 @@ func (v *VM) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	warpMessages, err := userConfig.WarpMessages()
+	warpMessages, err := saewarp.ParseOffChainMessages(userConfig.WarpOffChainMessages)
 	if err != nil {
 		return err
 	}

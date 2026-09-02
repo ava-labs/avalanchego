@@ -17,15 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
-
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // duration is a [time.Duration] that JSON-unmarshals from a duration string
@@ -205,12 +202,6 @@ func (c config) networkOptions() []network.Option {
 	return []network.Option{
 		network.WithAllowedTrackedPeers(c.StateSyncIDs),
 	}
-}
-
-// WarpMessages parses and returns the messages encoded in
-// [config.WarpOffChainMessages].
-func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
-	return saewarp.ParseOffChainMessages(c.WarpOffChainMessages)
 }
 
 // desiredParams bundles this node's votes for the dynamic consensus
