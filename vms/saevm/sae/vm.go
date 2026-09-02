@@ -88,10 +88,6 @@ type VM struct {
 }
 
 // A Config configures construction of a new [VM].
-//
-// TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
-// (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
-// assume its caller validated the config.
 type Config struct {
 	MempoolConfig legacypool.Config
 	DBConfig      saedb.Config
@@ -99,6 +95,38 @@ type Config struct {
 
 	// Now defaults to [time.Now] if nil
 	Now func() time.Time `json:"-"`
+}
+
+// DefaultConfig returns the recommended SAE configuration.
+func DefaultConfig() Config {
+	mempoolConfig := legacypool.DefaultConfig
+	mempoolConfig.Journal = ""
+	mempoolConfig.NoLocals = true
+	return Config{
+		MempoolConfig: mempoolConfig,
+		DBConfig: saedb.Config{
+			TrieCacheMiB:     saedb.DefaultTrieCacheSizeMiB,
+			CommitInterval:   saedb.DefaultCommitInterval,
+			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+		},
+		RPCConfig: rpc.Config{
+			GasCap:                       50_000_000,
+			TxFeeCap:                     100,
+			BatchRequestLimit:            1000,
+			ResolvePendingToLastExecuted: true,
+		},
+	}
+}
+
+// Verify checks that all values in c are within usable bounds.
+func (c Config) Verify() error {
+	if err := c.DBConfig.Verify(); err != nil {
+		return fmt.Errorf("DB config: %w", err)
+	}
+	if err := c.RPCConfig.Verify(); err != nil {
+		return fmt.Errorf("RPC config: %w", err)
+	}
+	return nil
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
@@ -116,6 +144,10 @@ func NewVM[T hook.Transaction](
 	db ethdb.Database,
 	network *network.Network,
 ) (_ *VM, retErr error) {
+	if err := cfg.Verify(); err != nil {
+		return nil, fmt.Errorf("verifying config: %w", err)
+	}
+
 	var closers unwind.Closers
 	defer closers.CloseIfPointsToNonNil(&retErr)
 

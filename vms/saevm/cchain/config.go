@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
@@ -139,10 +138,7 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
 	saeCfg := c.saeConfig(nil)
-	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return config{}, err
-	}
-	if err := saeCfg.DBConfig.Verify(); err != nil {
+	if err := saeCfg.Verify(); err != nil {
 		return config{}, err
 	}
 	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
@@ -155,37 +151,22 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
-	mempoolConfig := legacypool.DefaultConfig
-	// Disable the on-disk transaction journal, matching the legacy plugin.
-	// legacypool's default is the RELATIVE path "transactions.rlp", which
-	// would land in the node process's working directory.
-	mempoolConfig.Journal = ""
-	mempoolConfig.NoLocals = !c.LocalTxsEnabled
-	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
-	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
-	return sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			Archival:          !c.Pruning,
-			Scheme:            c.StateScheme,
-			TrieCacheMiB:      c.TrieCleanCache,
-			CommitInterval:    c.CommitInterval,
-			SnapshotCacheMiB:  c.SnapshotCache,
-			AllowMissingTries: c.AllowMissingTries,
-		},
-		RPCConfig: rpc.Config{
-			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
-			BatchRequestLimit:   c.BatchRequestLimit,
-			EVMTimeout:          c.APIMaxDuration.Duration,
-			// GasCap and TxFeeCap are set to reasonable values for mainnet
-			// C-Chain. They are left unconfigurable to minimize the size of the
-			// user config.
-			GasCap:                       50_000_000,
-			TxFeeCap:                     100,
-			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
-		},
-		Now: now,
-	}
+	config := sae.DefaultConfig()
+	config.MempoolConfig.NoLocals = !c.LocalTxsEnabled
+	config.MempoolConfig.AccountSlots = c.TxPoolAccountSlots
+	config.MempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
+	config.DBConfig.Archival = !c.Pruning
+	config.DBConfig.Scheme = c.StateScheme
+	config.DBConfig.TrieCacheMiB = c.TrieCleanCache
+	config.DBConfig.CommitInterval = c.CommitInterval
+	config.DBConfig.SnapshotCacheMiB = c.SnapshotCache
+	config.DBConfig.AllowMissingTries = c.AllowMissingTries
+	config.RPCConfig.AllowUnprotectedTxs = c.AllowUnprotectedTxs
+	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
+	config.RPCConfig.EVMTimeout = c.APIMaxDuration.Duration
+	config.RPCConfig.ResolvePendingToLastExecuted = c.ResolvePendingToLastExecuted
+	config.Now = now
+	return config
 }
 
 func (c config) stateSyncConfig() statesync.Config {

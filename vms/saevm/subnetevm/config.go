@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -196,10 +195,7 @@ func parseConfig(b []byte) (config, error) {
 		return config{}, fmt.Errorf("%w: %q is not a valid hex address", errInvalidFeeRecipient, c.FeeRecipient)
 	}
 	saeCfg := c.saeConfig(nil)
-	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return config{}, err
-	}
-	if err := saeCfg.DBConfig.Verify(); err != nil {
+	if err := saeCfg.Verify(); err != nil {
 		return config{}, err
 	}
 	return c, nil
@@ -210,36 +206,24 @@ func parseConfig(b []byte) (config, error) {
 // have no SAE equivalent in this VM's config today, so the corresponding
 // [saedb.Config] fields take saedb defaults.
 func (c config) saeConfig(now func() time.Time) sae.Config {
-	mempoolConfig := legacypool.DefaultConfig
-	// Disable the on-disk transaction journal, matching the legacy plugin.
-	// legacypool's default is the RELATIVE path "transactions.rlp", which
-	// would land in the node process's working directory.
-	mempoolConfig.Journal = ""
-	mempoolConfig.NoLocals = !c.LocalTxsEnabled
-	mempoolConfig.PriceLimit = c.TxPoolPriceLimit
-	mempoolConfig.PriceBump = c.TxPoolPriceBump
-	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
-	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
-	mempoolConfig.AccountQueue = c.TxPoolAccountQueue
-	mempoolConfig.GlobalQueue = c.TxPoolGlobalQueue
-	mempoolConfig.Lifetime = c.TxPoolLifetime.Duration
-	return sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			Archival:         !c.PruningEnabled,
-			TrieCacheMiB:     saedb.DefaultTrieCacheSizeMiB,
-			CommitInterval:   c.CommitInterval,
-			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
-		},
-		RPCConfig: rpc.Config{
-			EVMTimeout:                   c.APIMaxDuration.Duration,
-			GasCap:                       c.RPCGasCap,
-			BatchRequestLimit:            c.BatchRequestLimit,
-			TxFeeCap:                     c.RPCTxFeeCap,
-			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
-		},
-		Now: now,
-	}
+	config := sae.DefaultConfig()
+	config.MempoolConfig.NoLocals = !c.LocalTxsEnabled
+	config.MempoolConfig.PriceLimit = c.TxPoolPriceLimit
+	config.MempoolConfig.PriceBump = c.TxPoolPriceBump
+	config.MempoolConfig.AccountSlots = c.TxPoolAccountSlots
+	config.MempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
+	config.MempoolConfig.AccountQueue = c.TxPoolAccountQueue
+	config.MempoolConfig.GlobalQueue = c.TxPoolGlobalQueue
+	config.MempoolConfig.Lifetime = c.TxPoolLifetime.Duration
+	config.DBConfig.Archival = !c.PruningEnabled
+	config.DBConfig.CommitInterval = c.CommitInterval
+	config.RPCConfig.EVMTimeout = c.APIMaxDuration.Duration
+	config.RPCConfig.GasCap = c.RPCGasCap
+	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
+	config.RPCConfig.TxFeeCap = c.RPCTxFeeCap
+	config.RPCConfig.ResolvePendingToLastExecuted = c.ResolvePendingToLastExecuted
+	config.Now = now
+	return config
 }
 
 // desired returns c's user-facing targets as internal excess votes.
