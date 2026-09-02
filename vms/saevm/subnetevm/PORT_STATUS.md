@@ -27,8 +27,8 @@ Reference documents (read before changing anything):
 - [x] 4. subnetevm green: all `vms/saevm/subnetevm/...` unit tests pass
 - [x] 5. Duplication audit done + hoists landed (see "Duplication audit"
       below); tests still green
-- [x] 6. Full validation: `task test-unit`, `task test-e2e-warp-sae`, and the
-      pre-existing C-Chain e2e suite pass
+- [ ] 6. Full validation: the gates passed before the post-implementation
+      review below. Revalidation of that review's final tree is pending.
 
 ## Merge resolution policy (decided up front)
 
@@ -524,6 +524,45 @@ fixture enables local txs). Both legacy plugins disable the journal
 same.
 
 ## Decisions log
+
+### 2026-09-02: Post-implementation correctness and simplification review
+
+The review found and fixed correctness gaps that the earlier final sweep did
+not cover:
+
+- `b832799273` restores Subnet-EVM RPC, batch-limit, pending-resolution, and
+  database-cache defaults.
+- `751eeb9347` exposes the SAE header extension fields through Subnet-EVM RPC.
+- `fcd4ad6660` applies Subnet-EVM network-upgrade overrides.
+- `291606e2b6` enforces the transaction allowlist after Helicon in both block
+  execution and txpool admission. The SAE execution path still bypasses the
+  legacy internal hook so the check runs exactly once.
+- `5f5663c207` replaces floating-point gas scaling with deterministic integer
+  rational arithmetic.
+- `2d8669841e` rejects SAE-only header fields in the legacy Subnet-EVM VM.
+- `c07cf5bcf7` evaluates upgrade compatibility at the accepted head on restart
+  and deletes the obsolete `lastSync` database record.
+
+The follow-up duplication audit also found three smaller sharing wins:
+
+- `30f4051e7b` hoists the identical C-Chain and Subnet-EVM minimum-delay metric
+  into `vms/saevm/sae`.
+- `2c79514a00` deletes C-Chain's private ACP-176 and ACP-226 math and uses the
+  shared implementations in `vms/evm`. The graft changes are limited to the
+  header type and genesis plumbing consumed by SAE; the legacy wire field name
+  and `uint64` encoding remain unchanged.
+- `4361a93058` deletes one-call configuration wrappers and invokes the shared
+  warp message parser directly. The execution-results injection seam remains
+  because SAE recovery tests use it.
+
+The review also restores `tests/load` exactly to `origin/master` and removes
+the unreferenced spike-only `spam-c-chain` example; neither is used by the SAE
+warp suite.
+
+Exact next action: regenerate/check Bazel metadata, run lint and all four
+module builds, then run the repo-wide unit, SAE warp e2e, and C-Chain e2e gates
+on one final tree. Record the results here and check milestone 6 only if every
+gate passes.
 
 - 2026-08-27: Reconciliation plan written (this file). Header-encoded gas
   config chosen over persisted artifacts (D1) — the spike README's own

@@ -126,11 +126,10 @@ func main() {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
 		require.NoError(err)
-		wrappedClient := e2e.NewE2EClient(client)
 
 		workers[i] = load.Worker{
 			PrivKey: keys[i].ToECDSA(),
-			Client:  wrappedClient,
+			Client:  client,
 		}
 	}
 
@@ -170,9 +169,9 @@ func newTokenContract(
 	recipients []load.Worker,
 ) (*contracts.ERC20, error) {
 	client := deployer.Client
-	txOpts, err := e2e.NewKeyedTxOpts(deployer.PrivKey, chainID, e2e.DefaultDeployGasLimit)
+	txOpts, err := bind.NewKeyedTransactorWithChainID(deployer.PrivKey, chainID)
 	if err != nil {
-		return nil, fmt.Errorf("e2e.NewKeyedTxOpts: %w", err)
+		return nil, err
 	}
 
 	var (
@@ -184,11 +183,11 @@ func newTokenContract(
 
 	_, tx, contract, err := contracts.DeployERC20(txOpts, client, totalSupply)
 	if err != nil {
-		return nil, fmt.Errorf("contracts.DeployERC20: %w", err)
+		return nil, err
 	}
 
 	if _, err := bind.WaitDeployed(ctx, client, tx); err != nil {
-		return nil, fmt.Errorf("bind.WaitDeployed: %w", err)
+		return nil, err
 	}
 
 	deployer.Nonce++
@@ -196,12 +195,12 @@ func newTokenContract(
 	for _, recipient := range recipients {
 		tx, err := contract.Transfer(txOpts, crypto.PubkeyToAddress(recipient.PrivKey.PublicKey), recipientAmount)
 		if err != nil {
-			return nil, fmt.Errorf("contract.Transfer: %w", err)
+			return nil, err
 		}
 
 		receipt, err := bind.WaitMined(ctx, client, tx)
 		if err != nil {
-			return nil, fmt.Errorf("bind.WaitMined: %w", err)
+			return nil, err
 		}
 
 		deployer.Nonce++

@@ -13,8 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
-
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/libevm/ethclient"
 )
 
 var errTxExecutionFailed = errors.New("transaction accepted but failed to execute entirely")
@@ -24,7 +23,7 @@ type Wallet struct {
 	nonce   uint64
 	chainID *big.Int
 	signer  types.Signer
-	client  e2e.EthClient
+	client  *ethclient.Client
 	metrics metrics
 }
 
@@ -32,7 +31,7 @@ func newWallet(
 	privKey *ecdsa.PrivateKey,
 	nonce uint64,
 	chainID *big.Int,
-	client e2e.EthClient,
+	client *ethclient.Client,
 	metrics metrics,
 ) *Wallet {
 	return &Wallet{

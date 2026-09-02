@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/load/contracts"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
@@ -39,7 +38,7 @@ func NewRandomTest(
 	source rand.Source,
 	tokenContract *contracts.ERC20,
 ) (*RandomWeightedTest, error) {
-	txOpts, err := e2e.NewKeyedTxOpts(worker.PrivKey, chainID, e2e.DefaultDeployGasLimit)
+	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +366,7 @@ func executeContractTx(
 ) {
 	require := require.New(tc)
 
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, e2e.DefaultContractCallGasLimit)
+	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
 	require.NoError(err)
 
 	tx, err := txFunc(txOpts)
@@ -376,22 +375,20 @@ func executeContractTx(
 	require.NoError(wallet.SendTx(tc.GetDefaultContextParent(), tx))
 }
 
-// newTxOpts returns transactions options for contract calls, with sending disabled.
-// All gas-related fields are set explicitly to avoid pending-state RPC queries
-// that are not supported by all EVM backends (e.g. SAE).
+// newTxOpts returns transactions options for contract calls, with sending disabled
 func newTxOpts(
 	key *ecdsa.PrivateKey,
 	chainID *big.Int,
 	maxFeeCap *big.Int,
-	gasLimit uint64,
+	nonce uint64,
 ) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transaction opts: %w", err)
 	}
+	txOpts.Nonce = new(big.Int).SetUint64(nonce)
 	txOpts.GasFeeCap = maxFeeCap
 	txOpts.GasTipCap = common.Big1
-	txOpts.GasLimit = gasLimit
 	txOpts.NoSend = true
 	return txOpts, nil
 }
