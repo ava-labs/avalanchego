@@ -13,15 +13,115 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
+
+func TestBuildHeaderHeliconOverride(t *testing.T) {
+	networkUpgrades := upgradetest.GetConfig(upgradetest.Helicon)
+	heliconTime := networkUpgrades.HeliconTime.Add(time.Hour)
+	snowCtx := newSnowCtx(t, networkUpgrades)
+	chainCfg := subnetevmparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
+	subnetevmparams.GetExtra(&chainCfg).Override(&extras.NetworkUpgrades{
+		HeliconTimestamp: utils.PointerTo(uint64(heliconTime.Unix())), //#nosec G115 -- known positive test timestamp
+	})
+	parent := &types.Header{
+		Number: new(big.Int),
+		Time:   uint64(heliconTime.Add(-10 * time.Second).Unix()), //#nosec G115 -- known positive test timestamp
+	}
+
+	tests := []struct {
+		name    string
+		now     time.Time
+		wantErr error
+	}{
+		{
+			name:    "before_override",
+			now:     heliconTime.Add(-time.Second),
+			wantErr: errHeliconUnactivated,
+		},
+		{
+			name: "at_override",
+			now:  heliconTime,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			points := newHooks(
+				snowCtx,
+				&chainCfg,
+				func() time.Time { return test.now },
+				desiredParams{},
+				nil,
+				common.Address{},
+				nil,
+			)
+			header, err := points.builder.BuildHeader(parent)
+			if test.wantErr != nil {
+				require.ErrorIs(t, err, test.wantErr, "builder.BuildHeader() at %s", test.now)
+				return
+			}
+			require.NoError(t, err, "builder.BuildHeader() at %s", test.now)
+			require.Equal(t, uint64(test.now.Unix()), header.Time, "builder.BuildHeader() at %s", test.now) //#nosec G115 -- known positive test timestamp
+		})
+	}
+}
+
+func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
+	tests := []struct {
+		name         string
+		storedTarget gas.Gas
+		want         gas.Gas
+	}{
+		{
+			name:         "exactly_representable",
+			storedTarget: 3_000_000,
+			want:         3_000_000,
+		},
+		{
+			name:         "rounded_up",
+			storedTarget: 1_000_000_000,
+			want:         1_000_000_006,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chainCfg := subnetevmparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
+			config := &commontype.GasPriceConfig{
+				TargetGas:    uint64(test.storedTarget),
+				MinGasPrice:  1,
+				TimeToDouble: 60,
+			}
+			subnetevmparams.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
+				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
+					utils.PointerTo[uint64](0),
+					nil,
+					nil,
+					nil,
+					config,
+				),
+			}
+			genesis := &types.Header{
+				Number: new(big.Int),
+				Time:   saeparams.TauSeconds,
+			}
+
+			got, _ := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, common.Address{}, nil).GasConfigAfter(genesis)
+			require.Equal(t, test.want, got, "hooks.GasConfigAfter() for stored target %d", test.storedTarget)
+		})
+	}
+}
 
 // TestBlockRebuilderFromOverridesValidatorCoinbase: in operator-chosen
 // Coinbase branches the rebuilt block MUST carry the BUILDER's Coinbase

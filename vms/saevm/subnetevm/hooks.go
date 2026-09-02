@@ -114,7 +114,8 @@ func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConf
 	if hdr.Number.Sign() == 0 {
 		if stored, ok := h.genesisGasConfig(hdr.Time); ok {
 			if !stored.ValidatorTargetGas {
-				headerTarget = gas.Gas(stored.TargetGas)
+				targetExcess := acp176.DesiredTargetExcess(gas.Gas(stored.TargetGas))
+				headerTarget = acp176Target(targetExcess)
 			}
 			return headerTarget, gasConfigFromStored(stored)
 		}
@@ -343,7 +344,10 @@ type builder struct {
 	coinbase common.Address
 }
 
-var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+var (
+	errHeliconUnactivated = errors.New("helicon is not activated")
+	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+)
 
 // earliestBlockTime returns the earliest wall-clock time at which a child of
 // `parent` may be built. When `parent` carries no `MinDelayExponent` the
@@ -360,6 +364,10 @@ func earliestBlockTime(parent *types.Header) time.Time {
 
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
+	configExtra := subnetevmparams.GetExtra(b.chainConfig)
+	if !configExtra.IsHelicon(uint64(now.Unix())) { //#nosec G115 -- block times are known non-negative
+		return nil, errHeliconUnactivated
+	}
 	if earliest := earliestBlockTime(parent); now.Before(earliest) {
 		return nil, fmt.Errorf("%w: block time %s is before the minimum %s",
 			errBelowMinBlockDelay, now, earliest)
