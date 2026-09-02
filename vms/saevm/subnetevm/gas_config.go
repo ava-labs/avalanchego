@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 )
@@ -107,5 +108,23 @@ func scalingFromTimeToDouble(ttd uint64) gas.Gas {
 	if ttd == 0 {
 		return gastime.DefaultTargetToExcessScaling
 	}
-	return gas.Gas(math.Round(float64(ttd) / math.Ln2))
+
+	// This continued-fraction convergent computes round(ttd / ln(2)) exactly
+	// throughout the uint64 domain without platform-dependent floating point.
+	const (
+		inverseLn2Numerator   uint64 = 4_403_748_962_482_230_453
+		inverseLn2Denominator uint64 = 3_052_446_177_238_342_414
+	)
+	quotient, remainder, err := intmath.MulDiv(
+		ttd,
+		inverseLn2Numerator,
+		inverseLn2Denominator,
+	)
+	if err != nil {
+		return math.MaxUint64
+	}
+	if remainder > inverseLn2Denominator/2 {
+		quotient = intmath.BoundedAdd(quotient, 1, uint64(math.MaxUint64))
+	}
+	return gas.Gas(quotient)
 }
