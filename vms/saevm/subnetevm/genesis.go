@@ -10,12 +10,10 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/snow"
 
@@ -62,15 +60,8 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 		configExtra.Override(overrides)
 	}
 
-	// The legacy `FeeConfig` is inert under SAE (ACP-176 and ACP-224 own gas
-	// pricing) and is left empty by SAE chain configs. The one consumer that
-	// still reads it is a pre-Helicon `feeManager` activation whose config
-	// omits `initialFeeConfig`: mirror the legacy plugin by substituting the
-	// default so activation does not seed zeroed storage.
-	if configExtra.FeeConfig == commontype.EmptyFeeConfig && feeManagerConfigured(configExtra) {
-		ctx.Log.Info("no fee config given in genesis with feeManager configured; using the default fee config",
-			zap.Reflect("defaultFeeConfig", subnetevmparams.DefaultFeeConfig),
-		)
+	if configExtra.FeeConfig == commontype.EmptyFeeConfig {
+		ctx.Log.Info("no fee config given in genesis; using the default fee config")
 		configExtra.FeeConfig = subnetevmparams.DefaultFeeConfig
 	}
 
@@ -96,20 +87,6 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 		return nil, fmt.Errorf("setting eth upgrades: %w", err)
 	}
 	return g, nil
-}
-
-// feeManagerConfigured reports whether the legacy `feeManager` precompile
-// appears anywhere in the chain config (genesis or upgrades).
-func feeManagerConfigured(configExtra *extras.ChainConfig) bool {
-	if _, ok := configExtra.GenesisPrecompiles[feemanager.ConfigKey]; ok {
-		return true
-	}
-	for _, upgrade := range configExtra.PrecompileUpgrades {
-		if upgrade.Key() == feemanager.ConfigKey {
-			return true
-		}
-	}
-	return false
 }
 
 func readLastAcceptedHash(db ethdb.KeyValueReader, genesisHash common.Hash) common.Hash {

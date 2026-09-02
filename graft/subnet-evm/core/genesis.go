@@ -36,7 +36,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -451,30 +450,17 @@ func (g *Genesis) MustCommit(db ethdb.Database, triedb *triedb.Database) *types.
 	return block
 }
 
-// Verify runs the legacy-only header-vs-feeconfig gas-limit
-// cross-check on top of [extras.ChainConfig.Verify]. SAE calls
-// [extras.ChainConfig.Verify] directly because ACP-176 owns gas
-// pricing.
-//
-// Deprecated: legacy-only; remove together with [commontype.FeeConfig]
-// in `post-helicon-cleanup`.
-// TODO(ceyonur): remove this method after post-Helicon cleanup.
 func (g *Genesis) Verify() error {
-	// Sentinel-skip the cross-check when FeeConfig is unset; legacy
-	// `parseGenesis` substitutes [params.DefaultFeeConfig] first, so
-	// strict checking is preserved for legacy. Mirrors
-	// [extras.ChainConfig.Verify].
-	feeConfig := params.GetExtra(g.Config).FeeConfig
-	if feeConfig != commontype.EmptyFeeConfig {
-		gasLimitConfig := feeConfig.GasLimit.Uint64()
-		if gasLimitConfig != g.GasLimit {
-			return fmt.Errorf(
-				"gas limit in fee config (%d) does not match gas limit in header (%d)",
-				gasLimitConfig,
-				g.GasLimit,
-			)
-		}
+	// Make sure genesis gas limit is consistent
+	gasLimitConfig := params.GetExtra(g.Config).FeeConfig.GasLimit.Uint64()
+	if gasLimitConfig != g.GasLimit {
+		return fmt.Errorf(
+			"gas limit in fee config (%d) does not match gas limit in header (%d)",
+			gasLimitConfig,
+			g.GasLimit,
+		)
 	}
+	// Verify config
 	if err := params.GetExtra(g.Config).Verify(); err != nil {
 		return err
 	}

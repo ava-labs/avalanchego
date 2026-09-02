@@ -129,27 +129,12 @@ func TestChainConfigVerify(t *testing.T) {
 		wantError error
 	}{
 		"invalid_feeconfig": {
-			// A partially-populated FeeConfig is NOT the [commontype.EmptyFeeConfig]
-			// sentinel, so it MUST still be validated (and fail).
 			config: ChainConfig{
 				FeeConfig: commontype.FeeConfig{
-					GasLimit:   nil,
-					MinBaseFee: big.NewInt(1),
+					GasLimit: nil,
 				},
 			},
 			wantError: commontype.ErrGasLimitNil,
-		},
-		"empty_feeconfig_skips_validation": {
-			// The zero-valued FeeConfig is what subnet-evm-sae callers leave
-			// behind (ACP-176/ACP-224 own gas pricing there) and is treated
-			// as inert: [ChainConfig.Verify] MUST skip its validation. The
-			// legacy plugin substitutes DefaultFeeConfig before Verify, so it
-			// never reaches this path.
-			config: func() ChainConfig {
-				c := validConfig(0)
-				c.FeeConfig = commontype.EmptyFeeConfig
-				return c
-			}(),
 		},
 		"invalid_precompile_upgrades": {
 			// Also see precompile_config_test.go TestVerifyWithChainConfig* tests

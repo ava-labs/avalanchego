@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -54,6 +55,26 @@ func TestParseGenesisNetworkUpgradeOverrides(t *testing.T) {
 		wantEtnaTimestamp,
 		*subnetevmparams.GetExtra(got.Config).EtnaTimestamp,
 		"parseGenesis() EtnaTimestamp",
+	)
+}
+
+func TestParseGenesisDefaultsFeeConfig(t *testing.T) {
+	genesis := newTestGenesis(upgradetest.Helicon, saetest.NewUNSAFEKeyChain(t, 1))
+	subnetevmparams.GetExtra(genesis.Config).FeeConfig = commontype.EmptyFeeConfig
+	genesisBytes, err := json.Marshal(genesis)
+	require.NoError(t, err, "json.Marshal(genesis)")
+
+	got, err := parseGenesis(
+		newSnowCtx(t, upgradetest.GetConfig(upgradetest.Helicon)),
+		genesisBytes,
+		nil,
+	)
+	require.NoError(t, err, "parseGenesis()")
+	require.Equal(
+		t,
+		subnetevmparams.DefaultFeeConfig,
+		subnetevmparams.GetExtra(got.Config).FeeConfig,
+		"parseGenesis() FeeConfig",
 	)
 }
 
