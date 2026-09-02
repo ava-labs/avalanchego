@@ -75,6 +75,10 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	}
 
 	// If any blocks have been accepted, don't state sync.
+	//
+	// TransitionVM assumes that a node will state-sync if state-sync is enabled
+	// and the node is at the genesis block. Until transitionvm is removed, this
+	// check MUST NOT change.
 	hash := rawdb.ReadHeadFastBlockHash(s.db)
 	if hash == (common.Hash{}) {
 		s.snowCtx.Log.Warn("no last accepted hash")
