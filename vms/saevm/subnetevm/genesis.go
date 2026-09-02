@@ -60,9 +60,9 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 		}
 		configExtra.UpgradeConfig = upgradeConfig
 	}
-
-	// TODO(ceyonur): Decide whether to support the legacy plugin's
-	// `networkUpgradeOverrides`; see the deferred-work table in README.md.
+	if overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides; overrides != nil {
+		configExtra.Override(overrides)
+	}
 
 	// The legacy `FeeConfig` is inert under SAE (ACP-176 and ACP-224 own gas
 	// pricing) and is left empty by SAE chain configs. The one consumer that
