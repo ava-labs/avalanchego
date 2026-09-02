@@ -171,3 +171,48 @@ func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
 	_, err := parseConfig([]byte(`{"commit-interval":0}`))
 	require.ErrorIs(t, err, saedb.ErrZeroCommitInterval, "parseConfig()")
 }
+
+func TestParseConfig_RPC(t *testing.T) {
+	tests := []struct {
+		name            string
+		config          string
+		wantDuration    time.Duration
+		wantBatchLimit  uint64
+		wantResolveLast bool
+	}{
+		{
+			name:            "string_duration",
+			config:          `{"api-max-duration":"5s","batch-request-limit":25,"api-resolve-pending-to-last-executed":true}`,
+			wantDuration:    5 * time.Second,
+			wantBatchLimit:  25,
+			wantResolveLast: true,
+		},
+		{
+			name:            "numeric_duration",
+			config:          `{"api-max-duration":5000000000,"batch-request-limit":50,"api-resolve-pending-to-last-executed":false}`,
+			wantDuration:    5 * time.Second,
+			wantBatchLimit:  50,
+			wantResolveLast: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := parseConfig([]byte(test.config))
+			require.NoError(t, err, "parseConfig(%q)", test.config)
+
+			rpcConfig := config.saeConfig(nil).RPCConfig
+			require.Equal(t, test.wantDuration, rpcConfig.EVMTimeout, "parseConfig(%q)", test.config)
+			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(%q)", test.config)
+			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(%q)", test.config)
+		})
+	}
+}
+
+func TestDefaultConfig_Resources(t *testing.T) {
+	config := defaultConfig().saeConfig(nil)
+	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, "defaultConfig().saeConfig(nil)")
+	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, "defaultConfig().saeConfig(nil)")
+	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, "defaultConfig().saeConfig(nil)")
+	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, "defaultConfig().saeConfig(nil)")
+}

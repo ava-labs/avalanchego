@@ -59,6 +59,9 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 |--------|------|-------------|---------|
 | `rpc-gas-cap` | uint64 | Maximum gas for `eth_call`/`eth_estimateGas`-style RPC execution. | `50000000` |
 | `rpc-tx-fee-cap` | float64 | Cap on transaction fees (in the native token) that can be sent via RPC APIs (`0` = no cap). | `100` |
+| `api-max-duration` | duration | Maximum duration of an `eth_call` or `eth_callDetailed`; non-positive values disable the limit. Accepts a duration string or nanoseconds. | `"0s"` |
+| `batch-request-limit` | uint64 | Maximum requests in a JSON-RPC batch (`0` = no limit). | `1000` |
+| `api-resolve-pending-to-last-executed` | bool | Resolve pending-state RPC requests against the last executed block. | `true` |
 
 ## Warp
 

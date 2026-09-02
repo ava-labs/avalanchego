@@ -54,9 +54,12 @@ type config struct {
 	// node will default to use the parent block's target gas per second.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
 
-	// API gas/price caps. Mirror legacy `rpc-gas-cap` / `rpc-tx-fee-cap`.
-	RPCGasCap   uint64  `json:"rpc-gas-cap"`
-	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
+	// API resource limits. Mirror legacy Subnet-EVM where equivalents exist.
+	RPCGasCap                    uint64   `json:"rpc-gas-cap"`
+	RPCTxFeeCap                  float64  `json:"rpc-tx-fee-cap"`
+	APIMaxDuration               duration `json:"api-max-duration"`
+	BatchRequestLimit            uint64   `json:"batch-request-limit"`
+	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
 	// LocalTxsEnabled mirrors the legacy `local-txs-enabled` flag.
 	// When false (default), the legacypool runs with `NoLocals=true`.
@@ -144,17 +147,19 @@ func (d duration) MarshalJSON() ([]byte, error) {
 // subset.
 func defaultConfig() config {
 	return config{
-		RPCGasCap:          50_000_000, // 50M gas limit
-		RPCTxFeeCap:        100,        // 100 AVAX
-		LocalTxsEnabled:    false,      // => NoLocals=true in legacypool
-		PruningEnabled:     true,       // => saedb.Config.Archival=false
-		CommitInterval:     saedb.DefaultCommitInterval,
-		TxPoolPriceLimit:   legacypool.DefaultConfig.PriceLimit,
-		TxPoolPriceBump:    legacypool.DefaultConfig.PriceBump,
-		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
-		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
-		TxPoolAccountQueue: legacypool.DefaultConfig.AccountQueue,
-		TxPoolGlobalQueue:  legacypool.DefaultConfig.GlobalQueue,
+		RPCGasCap:                    50_000_000, // 50M gas limit
+		RPCTxFeeCap:                  100,        // 100 AVAX
+		BatchRequestLimit:            1000,       // matches legacy Subnet-EVM and libevm
+		ResolvePendingToLastExecuted: true,
+		LocalTxsEnabled:              false, // => NoLocals=true in legacypool
+		PruningEnabled:               true,  // => saedb.Config.Archival=false
+		CommitInterval:               saedb.DefaultCommitInterval,
+		TxPoolPriceLimit:             legacypool.DefaultConfig.PriceLimit,
+		TxPoolPriceBump:              legacypool.DefaultConfig.PriceBump,
+		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
+		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
+		TxPoolAccountQueue:           legacypool.DefaultConfig.AccountQueue,
+		TxPoolGlobalQueue:            legacypool.DefaultConfig.GlobalQueue,
 		// The legacy plugin shortens the pool lifetime from legacypool's 3h
 		// default; see graft/subnet-evm/plugin/evm/config/default_config.go.
 		TxPoolLifetime: duration{10 * time.Minute},
@@ -210,12 +215,17 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
-			Archival:       !c.PruningEnabled,
-			CommitInterval: c.CommitInterval,
+			Archival:         !c.PruningEnabled,
+			TrieCacheMiB:     saedb.DefaultTrieCacheSizeMiB,
+			CommitInterval:   c.CommitInterval,
+			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
 		},
 		RPCConfig: rpc.Config{
-			GasCap:   c.RPCGasCap,
-			TxFeeCap: c.RPCTxFeeCap,
+			EVMTimeout:                   c.APIMaxDuration.Duration,
+			GasCap:                       c.RPCGasCap,
+			BatchRequestLimit:            c.BatchRequestLimit,
+			TxFeeCap:                     c.RPCTxFeeCap,
+			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
 		},
 		Now: now,
 	}
