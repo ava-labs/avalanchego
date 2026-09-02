@@ -10,10 +10,10 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/params"
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
