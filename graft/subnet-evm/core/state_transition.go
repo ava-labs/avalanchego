@@ -250,7 +250,8 @@ func (st *StateTransition) preCheck() error {
 
 		// Check that the sender is on the tx allow list if enabled
 		rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, params.IsMergeTODO, st.evm.Context.Time)
-		if err := rules.Hooks().CanExecuteTransaction(msg.From, msg.To, st.state); err != nil {
+		rulesExtra := params.RulesExtra(*params.GetRulesExtra(rules))
+		if err := rulesExtra.EnforceTxAllowList(msg.From, st.state); err != nil {
 			return err
 		}
 	}

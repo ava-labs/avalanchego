@@ -276,8 +276,8 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 	}
 
 	// If the tx allow list is enabled, return an error if the from address is not allow listed.
-	rules := opts.Rules
-	if err := rules.Hooks().CanExecuteTransaction(from, tx.To(), opts.State); err != nil {
+	rulesExtra := params.RulesExtra(*params.GetRulesExtra(opts.Rules))
+	if err := rulesExtra.EnforceTxAllowList(from, opts.State); err != nil {
 		return err
 	}
 

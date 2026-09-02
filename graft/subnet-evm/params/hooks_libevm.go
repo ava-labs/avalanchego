@@ -81,9 +81,9 @@ func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address
 
 // EnforceTxAllowList performs the txallowlist sender check using the receiver's
 // rules and the provided state. It exists so SAE consumers can re-use the same
-// check from outside the libevm hook (e.g. from a SAE [hook.Points]
-// implementation against the last-settled state) without inheriting the
-// Helicon short-circuit on [RulesExtra.CanExecuteTransaction].
+// check outside the libevm hook. SAE uses it against the last-settled state,
+// and the legacy executor and transaction pool use it to remain strict after
+// Helicon without changing SAE execution semantics.
 //
 // The receiver's rules MUST correspond to the same block as `state` so that
 // `IsPrecompileEnabled` agrees with whether txallowlist storage is populated
