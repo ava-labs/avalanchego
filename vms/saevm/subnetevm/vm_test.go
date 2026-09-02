@@ -314,28 +314,6 @@ func initVM(
 	return vm, appSender, shutdown, nil
 }
 
-// tryInitVM wraps [initVM] for parse-time tests that want to assert on a
-// specific `Initialize` failure. Successful inits register a `t.Cleanup`
-// shutdown.
-func tryInitVM(
-	t *testing.T,
-	ctx context.Context,
-	snowCtx *snow.Context,
-	db avadb.Database,
-	clockTime *time.Time,
-	genesisBytes, upgradeBytes, configBytes []byte,
-) (*VM, *enginetest.SenderStub, error) {
-	t.Helper()
-	vm, appSender, shutdown, err := initVM(ctx, snowCtx, db, clockTime, genesisBytes, upgradeBytes, configBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	t.Cleanup(func() {
-		require.NoError(t, shutdown())
-	})
-	return vm, appSender, nil
-}
-
 func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Genesis {
 	chainConfig := subnetevmparams.Copy(paramstest.ForkToChainConfig[fork])
 	return &core.Genesis{

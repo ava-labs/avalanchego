@@ -8,6 +8,7 @@ package dynamic
 
 import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+
 	evmdynamic "github.com/ava-labs/avalanchego/vms/evm/dynamic"
 )
 
