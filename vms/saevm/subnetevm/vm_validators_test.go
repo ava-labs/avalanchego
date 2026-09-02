@@ -39,7 +39,7 @@ func TestUptimeTracker(t *testing.T) {
 		testNodeID       = ids.GenerateTestNodeID()
 		testValidationID = ids.GenerateTestID()
 		baseTime         = time.Unix(0, 0)
-		startTime        = uint64(baseTime.Unix())
+		startTime        = uint64(baseTime.Unix()) // #nosec G115 -- known positive test timestamp
 		now              = baseTime
 	)
 
@@ -109,7 +109,7 @@ func TestGetCurrentValidatorsAPI(t *testing.T) {
 		testNodeID       = ids.GenerateTestNodeID()
 		testValidationID = ids.GenerateTestID()
 		baseTime         = time.Unix(0, 0)
-		startTime        = uint64(baseTime.Unix())
+		startTime        = uint64(baseTime.Unix()) // #nosec G115 -- known positive test timestamp
 		now              = baseTime
 	)
 

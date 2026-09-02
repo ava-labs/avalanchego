@@ -47,8 +47,9 @@ func fetchStoredGasPriceConfig(t *testing.T, sut *SUT, blockNumber rpc.BlockNumb
 // Returns the next block so callers can assert [blocks.Block.ExecutedBaseFee]
 // on the settlement block itself. `settleAdvance` is the shared Tau+1s cushion
 // defined in [vm_rewardmanager_test.go].
-func settleGasPriceManagerMutation(t *testing.T, sut *SUT, fromIdx int) *blocks.Block {
+func settleGasPriceManagerMutation(t *testing.T, sut *SUT) *blocks.Block {
 	t.Helper()
+	const fromIdx = 1
 	sut.advanceTime(t, settleAdvance)
 	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 	return sut.buildAcceptExecuteBlock(t)
@@ -128,7 +129,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	}
 
 	// Cross a settlement boundary and rebuild; the pin must still hold.
-	_ = settleGasPriceManagerMutation(t, sut, fromIdx)
+	_ = settleGasPriceManagerMutation(t, sut)
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
 	post := sut.buildAcceptExecuteBlock(t)
@@ -193,7 +194,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	// against settled state at genesis.Root (since at M's build, the
 	// chain's lastSettled was still genesis). So M+1 still sees the OLD
 	// floor.
-	next := settleGasPriceManagerMutation(t, sut, fromIdx)
+	next := settleGasPriceManagerMutation(t, sut)
 	require.Equal(t, uint256.NewInt(oldMinPrice), next.ExecutedBaseFee(),
 		"settle-next block ExecutedBaseFee must still use pre-mutation floor")
 
@@ -303,14 +304,13 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 	t.Run("validator_target_converges", func(t *testing.T) {
 		chain := buildChain(t, commontype.GasPriceConfig{
 			ValidatorTargetGas: true,
-			TargetGas:          0, // required to be 0 when ValidatorTargetGas=true
 			MinGasPrice:        1,
 			TimeToDouble:       60,
 		})
 
 		// GasLimit climbs monotonically toward `desiredGasTarget` (rate-limited
 		// per block) and plateaus once header.TargetExcess catches up.
-		for i := range numBlocks {
+		for i := uint64(0); i < numBlocks; i++ {
 			wantTargetExponent := min(
 				gas.Gas((i+1)*acp176.MaxTargetExcessDiff),
 				desiredTargetExcess,
@@ -407,7 +407,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	require.Equal(t, initialPinnedExponent, targetExponent(t, validatorMutation),
 		"validator authority must not apply before the mutation settles")
 
-	validatorActive := settleGasPriceManagerMutation(t, sut, fromIdx)
+	validatorActive := settleGasPriceManagerMutation(t, sut)
 	wantValidatorExponent := initialPinnedExponent - acp176.MaxTargetExcessDiff
 	require.Equal(t, wantValidatorExponent, targetExponent(t, validatorActive),
 		"validator authority must resume one bounded step from the pinned parent")
@@ -422,7 +422,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	require.Equal(t, wantValidatorExponent-acp176.MaxTargetExcessDiff, targetExponent(t, pinnedMutation),
 		"pinned authority must not apply before the mutation settles")
 
-	pinnedActive := settleGasPriceManagerMutation(t, sut, fromIdx)
+	pinnedActive := settleGasPriceManagerMutation(t, sut)
 	finalPinnedExponent := acp176.DesiredTargetExcess(gas.Gas(finalPinnedTarget))
 	require.Equal(t, finalPinnedExponent, targetExponent(t, pinnedActive),
 		"pinned authority must replace TargetExcess after the mutation settles")
@@ -477,7 +477,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	enableUpgrades := func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
 			Config: gaspricemanager.NewConfig(
-				utils.PointerTo(uint64(activationTime.Unix())),
+				utils.PointerTo(uint64(activationTime.Unix())), // #nosec G115 -- known positive test timestamp
 				[]common.Address{addresses[adminIdx]},
 				nil, nil, &pinnedCfg,
 			),
@@ -485,7 +485,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	}
 	disableUpgrades := func(_ []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
-			Config: gaspricemanager.NewDisableConfig(utils.PointerTo(uint64(activationTime.Unix()))),
+			Config: gaspricemanager.NewDisableConfig(utils.PointerTo(uint64(activationTime.Unix()))), // #nosec G115 -- known positive test timestamp
 		}}
 	}
 
@@ -595,7 +595,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 			// Settle past the activation block so `FinalizeHeader` reads the
 			// post-activation gas config from the settled state and stamps
 			// it into subsequent headers' GasConfig* group.
-			_ = settleGasPriceManagerMutation(t, sut, fromIdx)
+			_ = settleGasPriceManagerMutation(t, sut)
 
 			// Delivery: built after settlement has crossed the activation
 			// block. Pricing now reflects the new precompile state.

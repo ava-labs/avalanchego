@@ -104,7 +104,7 @@ func (v *UptimeVerifier) verifyUptime(uptimeMsg *messages.ValidatorUptime) *comm
 		}
 	}
 
-	currentUptimeSeconds := uint64(currentUptime.Seconds())
+	currentUptimeSeconds := uint64(currentUptime.Seconds()) //#nosec G115 -- uptime durations are non-negative and bounded by chain age
 	if currentUptimeSeconds < uptimeMsg.TotalUptime {
 		return &common.AppError{
 			Code: VerifyErrCode,

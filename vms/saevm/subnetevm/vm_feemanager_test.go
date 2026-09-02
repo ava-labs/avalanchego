@@ -98,7 +98,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 // match each case's expected shape (covers genesis normalization
 // + synthetic-disable injection end-to-end).
 func TestFeeManagerHeliconRetirement(t *testing.T) {
-	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix())
+	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix()) // #nosec G115 -- known positive test timestamp
 	base := paramstest.ForkToChainConfig[upgradetest.Helicon]
 	chainConfig := defaultConfig()
 	configBytes := mustMarshalJSON(t, &chainConfig)

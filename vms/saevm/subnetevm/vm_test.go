@@ -677,7 +677,7 @@ func postHeliconStartTime(t *testing.T) time.Time {
 
 	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Helicon))
 	require.NotNil(t, networkUpgrades.HeliconTimestamp)
-	return time.Unix(int64(*networkUpgrades.HeliconTimestamp), 0).Add(saeparams.Tau)
+	return time.Unix(int64(*networkUpgrades.HeliconTimestamp), 0).Add(saeparams.Tau) // #nosec G115 -- upgrade timestamp is far below MaxInt64
 }
 
 // TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
@@ -699,7 +699,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	var (
 		now            = time.Unix(saeparams.TauSeconds, 0).Add(saeparams.Tau)
 		activationTime = now.Add(saeparams.Tau)
-		activationTS   = uint64(activationTime.Unix())
+		activationTS   = uint64(activationTime.Unix()) // #nosec G115 -- known positive test timestamp
 
 		// `target` is intentionally NOT one of the funded keychain accounts;
 		// it starts with zero balance and empty storage, so the upgrade's

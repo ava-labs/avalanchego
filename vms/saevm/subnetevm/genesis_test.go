@@ -35,7 +35,7 @@ func TestParseGenesisNetworkUpgradeOverrides(t *testing.T) {
 	genesisBytes, err := json.Marshal(genesis)
 	require.NoError(t, err, "json.Marshal(genesis)")
 
-	wantEtnaTimestamp := uint64(upgrade.InitiallyActiveTime.Unix() + 2)
+	wantEtnaTimestamp := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
 	upgradeBytes, err := json.Marshal(extras.UpgradeConfig{
 		NetworkUpgradeOverrides: &extras.NetworkUpgrades{
 			EtnaTimestamp: utils.PointerTo(wantEtnaTimestamp),
@@ -81,7 +81,7 @@ func TestReadLastAcceptedHash(t *testing.T) {
 }
 
 func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
-	initialHelicon := uint64(upgrade.InitiallyActiveTime.Unix() + 2)
+	initialHelicon := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
 	upgradeBytes := func(timestamp uint64) []byte {
 		return mustMarshalJSON(t, extras.UpgradeConfig{
 			NetworkUpgradeOverrides: &extras.NetworkUpgrades{
@@ -94,7 +94,7 @@ func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(2),
-		withNow(time.Unix(int64(initialHelicon+100), 0)),
+		withNow(time.Unix(int64(initialHelicon+100), 0)), // #nosec G115 -- test timestamp is far below MaxInt64
 		withUpgradeConfig(func([]common.Address) []byte {
 			return upgradeBytes(initialHelicon)
 		}),

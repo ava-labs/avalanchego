@@ -15,7 +15,7 @@ import (
 func TestEthGetActiveRulesAtWarpEnabledAtGenesis(t *testing.T) {
 	sut := newSUT(t, withFork(upgradetest.Latest), withWarpEnabled())
 
-	warpActivation := uint64(upgrade.InitiallyActiveTime.Unix())
+	warpActivation := uint64(upgrade.InitiallyActiveTime.Unix()) // #nosec G115 -- known positive test timestamp
 
 	res, err := sut.client.GetActiveRulesAt(sut.ctx, &warpActivation)
 	require.NoError(t, err)

@@ -69,13 +69,13 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 			return mustMarshalJSON(t, &extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						Config: deployerallowlist.NewDisableConfig(utils.PointerTo(uint64(disableTime.Unix()))),
+						Config: deployerallowlist.NewDisableConfig(utils.PointerTo(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
 					},
 					{
 						// Re-enable promotes `nonAdminIdx` to manager so we
 						// can observe the new config land in state.
 						Config: deployerallowlist.NewConfig(
-							utils.PointerTo(uint64(reenableTime.Unix())),
+							utils.PointerTo(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
 							[]common.Address{addresses[adminIdx]},
 							nil,
 							[]common.Address{addresses[nonAdminIdx]},

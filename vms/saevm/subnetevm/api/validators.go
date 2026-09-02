@@ -107,7 +107,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(
 		}
 
 		var uptimeFloat float64
-		startTime := time.Unix(int64(validator.StartTime), 0)
+		startTime := time.Unix(int64(validator.StartTime), 0) // #nosec G115 -- Unix timestamps fit in int64 for centuries
 		bestPossibleUpDuration := lastUpdated.Sub(startTime)
 		if bestPossibleUpDuration == 0 {
 			uptimeFloat = 1

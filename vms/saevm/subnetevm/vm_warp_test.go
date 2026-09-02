@@ -62,7 +62,7 @@ func withWarpEnabled() sutOption {
 			if cpy == nil {
 				cpy = extras.Precompiles{}
 			}
-			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
+			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix())) // #nosec G115 -- known positive test timestamp
 			cpy[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
 			extra.GenesisPrecompiles = cpy
 		}
