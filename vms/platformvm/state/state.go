@@ -2722,7 +2722,8 @@ func (s *State) updateValidatorManager(updateValidators bool) error {
 	return s.updateStakeMetrics()
 }
 
-// updateStakeMetrics must run after the validator manager is updated.
+// updateStakeMetrics must run after updates to the validator manager and
+// current staker state.
 func (s *State) updateStakeMetrics() error {
 	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
 	s.metrics.SetLocalStake(localStake)
