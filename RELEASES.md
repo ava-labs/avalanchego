@@ -8,7 +8,7 @@
 
 ### Fixes
 
-- Updated the minimum Go version from `1.25.10` to `1.26.7`.
+- Updated the minimum Go version from `1.25.10` to `1.26.8`.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
