@@ -365,7 +365,8 @@ func earliestBlockTime(parent *types.Header) time.Time {
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	configExtra := subnetevmparams.GetExtra(b.chainConfig)
-	if !configExtra.IsHelicon(uint64(now.Unix())) { //#nosec G115 -- block times are known non-negative
+	nowUnix := uint64(now.Unix()) //#nosec G115 -- block times are known non-negative
+	if !configExtra.IsHelicon(nowUnix) {
 		return nil, errHeliconUnactivated
 	}
 	if earliest := earliestBlockTime(parent); now.Before(earliest) {
