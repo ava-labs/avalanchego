@@ -80,7 +80,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
@@ -538,10 +538,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*vm.config.GasTarget)
 	}
 
-	var desiredDelayExponent *dynamic.DelayExponent
+	var desiredDelayExcess *acp226.DelayExcess
 	if vm.config.MinDelayTarget != nil {
-		desiredDelayExponent = new(dynamic.DelayExponent)
-		*desiredDelayExponent = dynamic.DesiredDelayExponent(*vm.config.MinDelayTarget)
+		desiredDelayExcess = new(acp226.DelayExcess)
+		*desiredDelayExcess = acp226.DesiredDelayExcess(*vm.config.MinDelayTarget)
 	}
 
 	vm.eth, err = eth.New(
@@ -555,7 +555,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 			vm.extensionConfig.ConsensusCallbacks,
 			dummy.Mode{},
 			desiredTargetExcess,
-			desiredDelayExponent,
+			desiredDelayExcess,
 		),
 		vm.clock,
 	)

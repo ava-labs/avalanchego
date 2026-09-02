@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "acp226",
+    srcs = ["acp226.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/acp226",
+    visibility = ["//visibility:public"],
+    deps = ["//vms/evm/dynamic"],
+)

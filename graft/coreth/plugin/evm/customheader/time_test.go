@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestVerifyTime(t *testing.T) {
@@ -136,98 +136,98 @@ func TestVerifyTime(t *testing.T) {
 			extraConfig:  extras.TestFortunaChainConfig,
 		},
 		{
-			name: "granite_first_block_no_parent_min_delay_exponent",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			name: "granite_first_block_no_parent_min_delay_excess",
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeader(timeSeconds-1, nil), // Pre-Granite parent
 			extraConfig:  extras.TestGraniteChainConfig,
 		},
 		{
 			name: "granite_initial_delay_met",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000), // 2000 ms is the exact initial delay
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
 		{
 			name: "granite_initial_delay_not_met",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-1999), // 1 ms less than required
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
 		},
 		{
 			name: "granite_future_timestamp_within_limits",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+5, // 5 seconds in future
 				utils.PointerTo(timeMillis+5000),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
 		{
 			name: "granite_future_timestamp_abuse",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+15, // 15 seconds in future, exceeds MaxFutureBlockTime
 				utils.PointerTo(timeMillis+15000),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
 				utils.PointerTo(timeMillis-2000),
-				utils.PointerTo(dynamic.InitialDelayExponent),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrBlockTooFarInFuture,
 		},
 		{
-			name: "granite_zero_delay_exponent",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			name: "granite_zero_delay_excess",
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(dynamic.DelayExponent(0)),
+				utils.PointerTo(acp226.DelayExcess(0)),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				utils.PointerTo(timeMillis-1),             // 1ms delay, meets zero requirement
-				utils.PointerTo(dynamic.DelayExponent(0)), // Parent has zero delay exponent
+				utils.PointerTo(timeMillis-1),          // 1ms delay, meets zero requirement
+				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
 		{
-			name: "granite_zero_delay_exponent_but_zero_delay",
-			header: generateHeaderWithMinDelayExponentAndTime(
+			name: "granite_zero_delay_excess_but_zero_delay",
+			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
 				utils.PointerTo(timeMillis),
-				utils.PointerTo(dynamic.DelayExponent(0)),
+				utils.PointerTo(acp226.DelayExcess(0)),
 			),
-			parentHeader: generateHeaderWithMinDelayExponentAndTime(
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				utils.PointerTo(timeMillis),               // Same timestamp, zero delay
-				utils.PointerTo(dynamic.DelayExponent(0)), // Parent has zero delay exponent
+				utils.PointerTo(timeMillis),            // Same timestamp, zero delay
+				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
@@ -338,14 +338,14 @@ func generateHeader(timeSeconds uint64, timeMilliseconds *uint64) *types.Header 
 	)
 }
 
-func generateHeaderWithMinDelayExponentAndTime(timeSeconds uint64, timeMilliseconds *uint64, minDelayExponent *dynamic.DelayExponent) *types.Header {
+func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMilliseconds *uint64, minDelayExcess *acp226.DelayExcess) *types.Header {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			Time: timeSeconds,
 		},
 		&customtypes.HeaderExtra{
 			TimeMilliseconds: timeMilliseconds,
-			MinDelayExponent: minDelayExponent,
+			MinDelayExcess:   minDelayExcess,
 		},
 	)
 }

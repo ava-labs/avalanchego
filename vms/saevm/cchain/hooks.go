@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -126,7 +127,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  headerExtra.MinDelayExponent,
+			delayExponent:  asDelayExponent(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -147,10 +148,18 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 // delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
 // [dynamic.InitialDelayExponent] when the header does not carry one.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
-	if de := customtypes.GetHeaderExtra(h).MinDelayExponent; de != nil {
-		return *de
+	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
+		return dynamic.DelayExponent(*de)
 	}
 	return dynamic.InitialDelayExponent
+}
+
+func asDelayExponent(d *acp226.DelayExcess) *dynamic.DelayExponent {
+	if d == nil {
+		return nil
+	}
+	exponent := dynamic.DelayExponent(*d)
+	return &exponent
 }
 
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
@@ -384,6 +393,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	legacyDE := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -403,7 +413,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExponent: &de,
+			MinDelayExcess:   &legacyDE,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},

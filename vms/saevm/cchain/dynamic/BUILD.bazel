@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "dynamic",
+    srcs = ["dynamic.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/components/gas",
+        "//vms/evm/dynamic",
+    ],
+)

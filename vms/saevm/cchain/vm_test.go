@@ -1677,8 +1677,8 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 			for _, wantExponent := range test.want {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				he := customtypes.GetHeaderExtra(blk.Header())
-				require.NotNilf(t, he.MinDelayExponent, "block %d %T.MinDelayExponent", blk.Height(), he)
-				got := *he.MinDelayExponent
+				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
+				got := dynamic.DelayExponent(*he.MinDelayExcess)
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExponent", blk.Height(), he)
 				clock.Advance(got.DelayDuration())
 			}

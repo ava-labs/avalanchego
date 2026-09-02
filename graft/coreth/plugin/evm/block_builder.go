@@ -199,16 +199,16 @@ func (b *blockBuilder) calculateBlockBuildingDelay(
 // minNextBlockTime calculates the minimum next block time based on the current header.
 func minNextBlockTime(parent *types.Header) time.Time {
 	parentExtra := customtypes.GetHeaderExtra(parent)
-	// If the parent header has no min delay exponent, there is nothing to wait for, because the rule does not apply
+	// If the parent header has no min delay excess, there is nothing to wait for, because the rule does not apply
 	// to the block to be built.
-	if parentExtra.MinDelayExponent == nil {
+	if parentExtra.MinDelayExcess == nil {
 		return time.Time{}
 	}
 	parentTime := customtypes.BlockTime(parent)
-	delayExponent := *parentExtra.MinDelayExponent
-	// parent's delay exponent is already verified by consensus
+	acp226DelayExcess := *parentExtra.MinDelayExcess
+	// parent's delay excess is already verified by consensus
 	// so this should not overflow
-	requiredDelay := time.Duration(delayExponent.Delay()) * time.Millisecond
+	requiredDelay := time.Duration(acp226DelayExcess.Delay()) * time.Millisecond
 	return parentTime.Add(requiredDelay)
 }
 
