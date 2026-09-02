@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -177,6 +178,21 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
+			name: "api/api_max_duration",
+			json: `{"api-max-duration":"1m"}`,
+			want: with(func(c *config) { c.APIMaxDuration = duration{time.Minute} }),
+		},
+		{
+			name:    "api/api_max_duration_number",
+			json:    `{"api-max-duration":5000000000}`,
+			wantErr: errIsType[*json.UnmarshalTypeError](),
+		},
+		{
+			name:    "api/api_max_duration_unparseable",
+			json:    `{"api-max-duration":"not-a-duration"}`,
+			wantErr: testerr.Contains("invalid duration"),
+		},
+		{
 			name: "api/enable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":true}`,
 			want: with(func(c *config) { c.ResolvePendingToLastExecuted = true }),
@@ -231,6 +247,7 @@ func TestParseConfig(t *testing.T) {
 				"apis":["chain","trace"],
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
+				"api-max-duration":"30s",
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"],
 				"api-resolve-pending-to-last-executed":true,
@@ -252,6 +269,7 @@ func TestParseConfig(t *testing.T) {
 				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
 				AllowUnprotectedTxs:          true,
 				BatchRequestLimit:            50,
+				APIMaxDuration:               duration{30 * time.Second},
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
 				StateSyncEnabled:             false,
