@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
@@ -91,7 +92,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
-			case *dynamic.TargetExponent:
+			case *gas.Gas:
 				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.PriceExponent:
 				assertDifferentPointers(t, f, fieldCp)

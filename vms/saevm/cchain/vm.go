@@ -361,7 +361,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 // may be built.
 func earliestBuildTime(b *blocks.Block) time.Time {
 	h := b.Header()
-	return blockTime(h).Add(delayExponent(h).DelayDuration())
+	return blockTime(h).Add(delayExcess(h).DelayDuration())
 }
 
 // minWaitForEventDelay is the minimum spacing between consecutive

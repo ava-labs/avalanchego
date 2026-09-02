@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
@@ -201,8 +201,8 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	//
 	// Since each tx byte costs at least one gas, this also caps tx size at
 	// MinTarget bytes, bounding the pool's memory.
-	if t.op.Gas > dynamic.MinTarget {
-		return fmt.Errorf("%w: %d > %d", errExcessGas, t.op.Gas, dynamic.MinTarget)
+	if t.op.Gas > acp176.MinTargetPerSecond {
+		return fmt.Errorf("%w: %d > %d", errExcessGas, t.op.Gas, acp176.MinTargetPerSecond)
 	}
 
 	// TODO(JonathanOppenheimer): Consider raising the gas per byte of

@@ -4,11 +4,9 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "dynamic",
     srcs = [
-        "delay.go",
         "doc.go",
         "math.go",
         "price.go",
-        "target.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic",
     visibility = ["//visibility:public"],
@@ -21,10 +19,8 @@ go_library(
 go_test(
     name = "dynamic_test",
     srcs = [
-        "delay_test.go",
         "math_test.go",
         "price_test.go",
-        "target_test.go",
     ],
     embed = [":dynamic"],
     deps = [

@@ -56,6 +56,7 @@ go_library(
         "//graft/evm/triedb/pathdb",
         "//utils",
         "//utils/set",
+        "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/predicate",
