@@ -15,8 +15,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestBlockGetters(t *testing.T) {
@@ -26,24 +26,24 @@ func TestBlockGetters(t *testing.T) {
 		headerExtra          *HeaderExtra
 		wantBlockGasCost     *big.Int
 		wantTimeMilliseconds *uint64
-		wantMinDelayExcess   *acp226.DelayExcess
+		wantMinDelayExponent *dynamic.DelayExponent
 	}{
 		{
 			name:                 "empty",
 			headerExtra:          &HeaderExtra{},
 			wantTimeMilliseconds: nil,
-			wantMinDelayExcess:   nil,
+			wantMinDelayExponent: nil,
 		},
 		{
 			name: "fields_set",
 			headerExtra: &HeaderExtra{
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+				MinDelayExponent: utils.PointerTo(dynamic.DelayExponent(4)),
 			},
 			wantBlockGasCost:     big.NewInt(2),
 			wantTimeMilliseconds: utils.PointerTo[uint64](3),
-			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+			wantMinDelayExponent: utils.PointerTo(dynamic.DelayExponent(4)),
 		},
 	}
 	for _, test := range tests {
@@ -60,8 +60,8 @@ func TestBlockGetters(t *testing.T) {
 			timeMilliseconds := BlockTimeMilliseconds(block)
 			require.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
 
-			minDelayExcess := BlockMinDelayExcess(block)
-			require.Equal(t, test.wantMinDelayExcess, minDelayExcess, "BlockMinDelayExcess()")
+			minDelayExponent := BlockMinDelayExponent(block)
+			require.Equal(t, test.wantMinDelayExponent, minDelayExponent, "BlockMinDelayExponent()")
 		})
 	}
 }
@@ -133,7 +133,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
-			case *acp226.DelayExcess:
+			case *dynamic.DelayExponent:
 				assertDifferentPointers(t, f, fieldCp)
 			case *gas.Gas:
 				assertDifferentPointers(t, f, fieldCp)

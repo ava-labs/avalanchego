@@ -21,21 +21,21 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestGenesisCustomMinDelay(t *testing.T) {
 	tests := map[string]struct {
 		initialMinDelayMS uint64
-		wantDelayExcess   acp226.DelayExcess
+		wantDelayExcess   dynamic.DelayExponent
 	}{
 		"default": {
 			initialMinDelayMS: 0,
-			wantDelayExcess:   acp226.InitialDelayExcess,
+			wantDelayExcess:   dynamic.InitialDelayExponent,
 		},
 		"custom": {
 			initialMinDelayMS: 5,
-			wantDelayExcess:   acp226.DesiredDelayExcess(5),
+			wantDelayExcess:   dynamic.DesiredDelayExponent(5),
 		},
 	}
 
@@ -49,7 +49,7 @@ func TestGenesisCustomMinDelay(t *testing.T) {
 			params.GetExtra(&config).InitialMinDelayMS = test.initialMinDelayMS
 			block, err := (&Genesis{Config: &config}).Commit(db, tdb)
 			require.NoError(t, err)
-			require.Equal(t, test.wantDelayExcess, *customtypes.GetHeaderExtra(block.Header()).MinDelayExcess)
+			require.Equal(t, test.wantDelayExcess, *customtypes.GetHeaderExtra(block.Header()).MinDelayExponent)
 		})
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -89,7 +88,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
-			case *acp226.DelayExcess:
+			case *dynamic.DelayExponent:
 				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.TargetExponent:
 				assertDifferentPointers(t, f, fieldCp)
@@ -316,14 +315,14 @@ func TestBlockGetters(t *testing.T) {
 		wantVersion          uint32
 		wantExtData          []byte
 		wantTimeMilliseconds *uint64
-		wantMinDelayExcess   *acp226.DelayExcess
+		wantMinDelayExponent *dynamic.DelayExponent
 	}{
 		{
 			name:                 "empty",
 			headerExtra:          &HeaderExtra{},
 			blockExtra:           &BlockBodyExtra{},
 			wantTimeMilliseconds: nil,
-			wantMinDelayExcess:   nil,
+			wantMinDelayExponent: nil,
 		},
 		{
 			name: "fields_set",
@@ -331,7 +330,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+				MinDelayExponent: utils.PointerTo(dynamic.DelayExponent(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
@@ -342,7 +341,7 @@ func TestBlockGetters(t *testing.T) {
 			wantVersion:          3,
 			wantExtData:          []byte{4},
 			wantTimeMilliseconds: utils.PointerTo[uint64](3),
-			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+			wantMinDelayExponent: utils.PointerTo(dynamic.DelayExponent(4)),
 		},
 	}
 
@@ -370,8 +369,8 @@ func TestBlockGetters(t *testing.T) {
 			timeMilliseconds := BlockTimeMilliseconds(block)
 			require.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
 
-			minDelayExcess := BlockMinDelayExcess(block)
-			require.Equal(t, test.wantMinDelayExcess, minDelayExcess, "BlockMinDelayExcess()")
+			minDelayExponent := BlockMinDelayExponent(block)
+			require.Equal(t, test.wantMinDelayExponent, minDelayExponent, "BlockMinDelayExponent()")
 		})
 	}
 }

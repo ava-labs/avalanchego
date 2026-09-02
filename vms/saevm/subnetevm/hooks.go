@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -83,7 +83,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return h.BlockTime(header)
 		},
 		desired: desiredParams{
-			delayExcess:  headerExtra.MinDelayExcess,
+			delayExcess:  headerExtra.MinDelayExponent,
 			targetExcess: headerExtra.TargetExcess,
 		},
 		coinbase: header.Coinbase, // override with received block's Coinbase
@@ -299,7 +299,7 @@ func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts)
 // later ACP-118 signature requests. It runs only during canonical execution,
 // which is exactly the once-per-block semantics warp storage requires.
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
+	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExponent; mde != nil {
 		h.metrics.Set(mde.DelayDuration())
 	}
 
@@ -319,7 +319,7 @@ var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 // desiredParams bundles this node's votes for the dynamic consensus
 // parameters. A nil field means no vote.
 type desiredParams struct {
-	delayExcess  *acp226.DelayExcess
+	delayExcess  *dynamic.DelayExponent
 	targetExcess *gas.Gas
 }
 
@@ -345,16 +345,16 @@ type builder struct {
 var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // earliestBlockTime returns the earliest wall-clock time at which a child of
-// `parent` may be built. When `parent` carries no `MinDelayExcess` the
+// `parent` may be built. When `parent` carries no `MinDelayExponent` the
 // ACP-226 minimum-delay rule does not apply (matching the consensus check in
 // `customheader.VerifyTime`), so there is no minimum; block-time monotonicity
 // is enforced by the SAE core regardless.
 func earliestBlockTime(parent *types.Header) time.Time {
 	e := customtypes.GetHeaderExtra(parent)
-	if e.MinDelayExcess == nil {
+	if e.MinDelayExponent == nil {
 		return time.Time{}
 	}
-	return hook.BlockTimeFrom(parent.Time, e.TimeMilliseconds).Add(e.MinDelayExcess.DelayDuration())
+	return hook.BlockTimeFrom(parent.Time, e.TimeMilliseconds).Add(e.MinDelayExponent.DelayDuration())
 }
 
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -365,14 +365,12 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	}
 	nowMS := uint64(now.UnixMilli())
 
-	mde := acp226.InitialDelayExcess
-	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
+	mde := dynamic.InitialDelayExponent
+	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExponent; pmde != nil {
 		mde = *pmde
 	}
 
-	if b.desired.delayExcess != nil {
-		mde.UpdateDelayExcess(*b.desired.delayExcess)
-	}
+	mde = mde.Toward(b.desired.delayExcess)
 
 	te := targetExcess(parent)
 	if b.desired.targetExcess != nil {
@@ -403,7 +401,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// always stamped to zero by the SAE block builder.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
-			MinDelayExcess:   &mde,
+			MinDelayExponent: &mde,
 			TargetExcess:     &te,
 		},
 	), nil

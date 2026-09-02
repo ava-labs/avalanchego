@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestChainConfigDescription(t *testing.T) {
@@ -195,11 +195,11 @@ func TestChainConfigVerify(t *testing.T) {
 			wantError: nil,
 		},
 		"initial_min_delay_too_high": {
-			config:    validConfig(acp226.InitialDelayExcess.Delay() + 1), // one past the inclusive ceiling
+			config:    validConfig(dynamic.InitialDelayExponent.Delay() + 1), // one past the inclusive ceiling
 			wantError: errInitialMinDelayTooLarge,
 		},
 		"initial_min_delay_at_ceiling": {
-			config:    validConfig(acp226.InitialDelayExcess.Delay()), // ceiling is inclusive
+			config:    validConfig(dynamic.InitialDelayExponent.Delay()), // ceiling is inclusive
 			wantError: nil,
 		},
 	}

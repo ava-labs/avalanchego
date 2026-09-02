@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -361,7 +361,7 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	if maxDelayMS := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > maxDelayMS {
+	if maxDelayMS := dynamic.InitialDelayExponent.Delay(); c.InitialMinDelayMS > maxDelayMS {
 		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, maxDelayMS)
 	}
 

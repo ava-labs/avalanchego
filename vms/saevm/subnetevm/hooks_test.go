@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -43,7 +43,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
 		TimeMilliseconds: utils.PointerTo(parentTimeMS),
-		MinDelayExcess:   utils.PointerTo(acp226.InitialDelayExcess),
+		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
@@ -120,7 +120,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
 		TimeMilliseconds: utils.PointerTo(parentTimeMS),
-		MinDelayExcess:   utils.PointerTo(acp226.InitialDelayExcess),
+		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
@@ -138,7 +138,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	}
 	customtypes.SetHeaderExtra(forgedHdr, &customtypes.HeaderExtra{
 		TimeMilliseconds: utils.PointerTo(nowMS),
-		MinDelayExcess:   utils.PointerTo(acp226.InitialDelayExcess),
+		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 

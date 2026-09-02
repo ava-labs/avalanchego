@@ -1632,7 +1632,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 	}
 }
 
-// TestDynamicMinDelayExcess verifies each built block's MinDelayExcess steps
+// TestDynamicMinDelayExcess verifies each built block's MinDelayExponent steps
 // toward the node's ACP-226 vote by at most the per-block cap, and holds at the
 // initial value with no vote.
 func TestDynamicMinDelayExcess(t *testing.T) {
@@ -1677,9 +1677,9 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 			for _, wantExponent := range test.want {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				he := customtypes.GetHeaderExtra(blk.Header())
-				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
-				got := dynamic.DelayExponent(*he.MinDelayExcess)
-				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
+				require.NotNilf(t, he.MinDelayExponent, "block %d %T.MinDelayExponent", blk.Height(), he)
+				got := dynamic.DelayExponent(*he.MinDelayExponent)
+				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExponent", blk.Height(), he)
 				clock.Advance(got.DelayDuration())
 			}
 		})

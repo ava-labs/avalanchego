@@ -42,8 +42,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -385,12 +385,11 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
-			initialMinDelayExcess := acp226.InitialDelayExcess
+			initialMinDelayExponent := dynamic.InitialDelayExponent
 			if confExtra.InitialMinDelayMS != 0 {
-				initialMinDelayExcess = acp226.DesiredDelayExcess(confExtra.InitialMinDelayMS)
+				initialMinDelayExponent = dynamic.DesiredDelayExponent(confExtra.InitialMinDelayMS)
 			}
-			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
-			*headerExtra.MinDelayExcess = initialMinDelayExcess
+			headerExtra.MinDelayExponent = &initialMinDelayExponent
 		}
 	}
 

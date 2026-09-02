@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -233,7 +233,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 func (c config) desired() desiredParams {
 	var d desiredParams
 	if c.MinDelayTarget != nil {
-		e := acp226.DesiredDelayExcess(*c.MinDelayTarget)
+		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
 		d.delayExcess = &e
 	}
 	if c.GasTarget != nil {

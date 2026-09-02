@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -127,7 +126,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+			delayExponent:  headerExtra.MinDelayExponent,
 		},
 	}, nil
 }
@@ -148,8 +147,8 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 // delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
 // [dynamic.InitialDelayExponent] when the header does not carry one.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
-	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
-		return dynamic.DelayExponent(*de)
+	if de := customtypes.GetHeaderExtra(h).MinDelayExponent; de != nil {
+		return *de
 	}
 	return dynamic.InitialDelayExponent
 }
@@ -385,7 +384,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
-	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -405,7 +403,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &minDelayExcess,
+			MinDelayExponent: &de,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},
