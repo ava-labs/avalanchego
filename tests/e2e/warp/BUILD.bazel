@@ -12,9 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//api/info",
-        "//graft/coreth/cmd/simulator/load",
-        "//graft/coreth/cmd/simulator/metrics",
-        "//graft/coreth/cmd/simulator/txs",
         "//graft/coreth/precompile/contracts/warp",
         "//ids",
         "//message",
@@ -25,7 +22,6 @@ go_library(
         "//snow/engine/common",
         "//snow/networking/router",
         "//snow/validators",
-        "//tests/e2e/warp/testbinding",
         "//tests/fixture/e2e",
         "//tests/fixture/subnet",
         "//tests/fixture/tmpnet",

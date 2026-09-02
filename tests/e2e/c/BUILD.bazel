@@ -16,6 +16,7 @@ go_library(
         "//api/info",
         "//connectproto/pb/proposervm",
         "//connectproto/pb/proposervm/proposervmconnect",
+        "//graft/coreth/ethclient",
         "//graft/coreth/plugin/evm/upgrade/cortina",
         "//ids",
         "//tests",

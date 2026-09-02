@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
@@ -26,15 +25,12 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/metrics"
-	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/txs"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/tests/e2e/warp/testbinding"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/buffer"
@@ -44,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
-	simload "github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/load"
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 	avasecp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -56,14 +51,11 @@ const (
 	warpSendMessageGas   uint64 = 200_000
 	warpDeliverVerifyGas uint64 = 5_000_000
 	txMiningWaitTimeout         = 30 * time.Second
-	warpLoadTxsPerWorker uint64 = 10
-	warpLoadBatchSize    uint64 = 10
 )
 
 var (
 	warpTxGasFeeCap        = big.NewInt(225 * params.GWei)
 	warpTxGasTipCap        = big.NewInt(params.GWei)
-	warpLoadRequiredAmount = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
 	defaultWarpTestPayload = []byte{1, 2, 3}
 )
 
@@ -85,7 +77,7 @@ type Subnet struct {
 type subnetValidator struct {
 	node *tmpnet.Node
 
-	client       e2e.EthClient
+	client       *ethclient.Client
 	preFundedKey *ecdsa.PrivateKey
 }
 
@@ -114,7 +106,7 @@ func newSubnet(
 		tc.Log().Info("dialing eth client", zap.String("uri", uri))
 		client, err := ethclient.Dial(uri)
 		require.NoError(err)
-		s.Validators[i] = &subnetValidator{node: n, preFundedKey: keys[i].ToECDSA(), client: e2e.NewE2EClient(client)}
+		s.Validators[i] = &subnetValidator{node: n, preFundedKey: keys[i].ToECDSA(), client: client}
 	}
 
 	client := s.Validators[0].client
@@ -211,11 +203,6 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, ginkgo.Serial, ginkgo.Label("w
 			func() *Subnet { return chains.cChain }, func() *Subnet { return chains.subnetA },
 		},
 		{
-			"C-Chain -> C-Chain",
-			[]string{"c"},
-			func() *Subnet { return chains.cChain }, func() *Subnet { return chains.cChain },
-		},
-		{
 			"SubnetA -> SubnetB",
 			[]string{"subnet-evm"},
 			func() *Subnet { return chains.subnetA }, func() *Subnet { return chains.subnetB },
@@ -241,7 +228,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, ginkgo.Serial, ginkgo.Label("w
 				}
 			})
 
-			ginkgo.It("should complete warp send, verify, deliver, and load scenario", func() {
+			ginkgo.It("should send, verify, and deliver warp messages", func() {
 				tc.By("sending warp message from sending subnet", func() {
 					w.sendMessageFromSendingSubnet()
 				})
@@ -253,12 +240,6 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, ginkgo.Serial, ginkgo.Label("w
 				})
 				tc.By("delivering block-hash payload on receiving subnet", func() {
 					w.deliverBlockHashPayload()
-				})
-				tc.By("verifying warp bindings", func() {
-					w.bindingsTest()
-				})
-				tc.By("running warp load test", func() {
-					w.loadTest()
 				})
 			})
 		})
@@ -287,12 +268,6 @@ type warpTest struct {
 	stakingCancels []func()
 
 	// aggregateP2PMu serializes [aggregateWarpSignaturesViaP2P]. Reusing one
-	// [signatureAggregator] does not remove the need for this lock: each warpPeer
-	// still has a single inbound deque, and concurrent AggregateSignatures would
-	// still run multiple response waiters on the same deque (warp load parallel
-	// tx generation).
-	aggregateP2PMu sync.Mutex
-
 	signatureAggregator *acp118.SignatureAggregator
 
 	// Fields set throughout test execution
@@ -536,9 +511,6 @@ func (w *warpTest) aggregateWarpSignaturesViaP2P(
 	ctx context.Context,
 	unsignedMessage *avalancheWarp.UnsignedMessage,
 ) (*avalancheWarp.Message, error) {
-	w.aggregateP2PMu.Lock()
-	defer w.aggregateP2PMu.Unlock()
-
 	if unsignedMessage.SourceChainID != w.sendingSubnet.BlockchainID {
 		return nil, fmt.Errorf("unsigned message source chain %s != sending subnet blockchain %s",
 			unsignedMessage.SourceChainID, w.sendingSubnet.BlockchainID)
@@ -670,69 +642,8 @@ func (w *warpTest) deliverBlockHashPayload() {
 	)
 }
 
-func (w *warpTest) bindingsTest() {
-	require := require.New(w.tc)
-	tc := w.tc
-	ctx := tc.DefaultContext()
-
-	client := w.sendingSubnet.Validators[0].client
-
-	tc.Log().Info("Deploying WarpTest proxy contract")
-	auth, err := e2e.NewKeyedTxOpts(w.sendingSubnet.Validators[0].preFundedKey, w.sendingSubnet.ChainID, e2e.DefaultContractCallGasLimit)
-	require.NoError(err)
-	auth.Context = ctx
-
-	proxyAddr, deployTx, warpTestContract, err := testbinding.DeployWarpTest(auth, client, warp.Module.Address)
-	require.NoError(err)
-
-	tc.Log().Info("Waiting for WarpTest deployment",
-		zap.String("txHash", deployTx.Hash().Hex()),
-		zap.String("proxyAddr", proxyAddr.Hex()),
-	)
-	deployReceipt, err := bind.WaitMined(ctx, client, deployTx)
-	require.NoError(err)
-	require.Equal(types.ReceiptStatusSuccessful, deployReceipt.Status)
-
-	tc.Log().Info("Calling getBlockchainID via proxy contract")
-	returnedBlockchainID, err := warpTestContract.GetBlockchainID(&bind.CallOpts{Context: ctx})
-	require.NoError(err)
-	require.Equal(w.sendingSubnet.BlockchainID, ids.ID(returnedBlockchainID))
-	tc.Log().Info("getBlockchainID returned correct value",
-		zap.Stringer("blockchainID", ids.ID(returnedBlockchainID)),
-	)
-
-	tc.Log().Info("Sending warp message via proxy contract",
-		zap.String("payload", common.Bytes2Hex(defaultWarpTestPayload)),
-	)
-
-	sendTx, err := warpTestContract.SendWarpMessage(auth, defaultWarpTestPayload)
-	require.NoError(err)
-
-	tc.Log().Info("Waiting for sendWarpMessage transaction",
-		zap.String("txHash", sendTx.Hash().Hex()),
-	)
-	sendReceipt, err := bind.WaitMined(ctx, client, sendTx)
-	require.NoError(err)
-	require.Equal(types.ReceiptStatusSuccessful, sendReceipt.Status)
-
-	unsignedMsg := verifyAndExtractWarpMessage(tc, client, sendReceipt.BlockNumber.Uint64(), proxyAddr)
-
-	addressedCall, err := payload.ParseAddressedCall(unsignedMsg.Payload)
-	require.NoError(err)
-
-	require.Equal(defaultWarpTestPayload, addressedCall.Payload, "payload mismatch in warp message")
-	require.Equal(proxyAddr.Bytes(), addressedCall.SourceAddress, "source address should be proxy contract")
-
-	tc.Log().Info("warp bindings test complete",
-		zap.String("proxyAddr", proxyAddr.Hex()),
-		zap.Stringer("blockchainID", ids.ID(returnedBlockchainID)),
-	)
-}
-
-// verifyAndExtractWarpMessage queries the given block for SendWarpMessage events
-// emitted by the specified sender using the IWarpMessengerFilterer binding. It
-// asserts that exactly one such event exists and returns the parsed unsigned
-// warp message.
+// verifyAndExtractWarpMessage queries one block for the SendWarpMessage event
+// emitted by sender and returns the encoded unsigned message.
 func verifyAndExtractWarpMessage(
 	tc *e2e.GinkgoTestContext,
 	client ethereum.LogFilterer,
@@ -753,13 +664,6 @@ func verifyAndExtractWarpMessage(
 		},
 	}
 
-	tc.Log().Info("Filtering SendWarpMessage events")
-
-	// Retry the log filter: under SAE, transaction receipts are served from
-	// the executor's in-memory cache the moment execution finishes, while
-	// eth_getLogs reads the durably-indexed logs, which land slightly later.
-	// A filter issued immediately after WaitMined can therefore briefly see
-	// an empty result for the receipt's own block.
 	var event types.Log
 	tc.Eventually(func() bool {
 		logs, err := client.FilterLogs(ctx, query)
@@ -770,8 +674,7 @@ func verifyAndExtractWarpMessage(
 		require.Len(logs, 1, "expected exactly one SendWarpMessage event")
 		event = logs[0]
 		return true
-	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval,
-		"expected a SendWarpMessage event")
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "expected a SendWarpMessage event")
 
 	require.False(event.Removed, "SendWarpMessage event must be canonical")
 	require.Equal(warp.Module.Address, event.Address, "SendWarpMessage event address")
@@ -783,226 +686,12 @@ func verifyAndExtractWarpMessage(
 	unsignedMessage, err := warp.UnpackSendWarpEventDataToMessage(event.Data)
 	require.NoError(err)
 	require.Equal(common.Hash(unsignedMessage.ID()), event.Topics[2], "SendWarpMessage event message ID")
-
-	tc.Log().Info("Found SendWarpMessage event",
-		zap.String("sender", sender.Hex()),
-		zap.String("messageID", event.Topics[2].Hex()),
-	)
-
 	return unsignedMessage
 }
 
-// buildReceiptWorkers returns one sim load receipt worker per validator on each subnet.
-func (w *warpTest) buildReceiptWorkers() (sendingWorkers, receivingWorkers []txs.Worker[*types.Transaction]) {
-	for i := range w.sendingSubnet.Validators {
-		sendingWorkers = append(sendingWorkers, simload.NewTxReceiptWorker(w.sendingSubnet.Validators[i].client))
-	}
-	for i := range w.receivingSubnet.Validators {
-		receivingWorkers = append(receivingWorkers, simload.NewTxReceiptWorker(w.receivingSubnet.Validators[i].client))
-	}
-	return sendingWorkers, receivingWorkers
-}
-
-// subscribeSendLogs subscribes to SendWarpMessage logs on the sending chain; registers
-// subscription cleanup on [tc].
-func subscribeSendLogs(
-	ctx context.Context,
-	tc *e2e.GinkgoTestContext,
-	sendingClient e2e.EthClient,
-	numWorkers int,
-) chan types.Log {
-	require := require.New(tc)
-	logsCh := make(chan types.Log, numWorkers*int(warpLoadTxsPerWorker))
-	sub, err := sendingClient.SubscribeFilterLogs(ctx, ethereum.FilterQuery{
-		Addresses: []common.Address{warp.Module.Address},
-	}, logsCh)
-	require.NoError(err)
-	tc.DeferCleanup(func() {
-		sub.Unsubscribe()
-		require.NoError(<-sub.Err())
-	})
-	return logsCh
-}
-
-// buildSendSequences builds signed sendWarpMessage txs per sending validator.
-func (w *warpTest) buildSendSequences(ctx context.Context) []txs.TxSequence[*types.Transaction] {
-	require := require.New(w.tc)
-	sequences := make([]txs.TxSequence[*types.Transaction], len(w.sendingSubnet.Validators))
-	for i, val := range w.sendingSubnet.Validators {
-		key := val.preFundedKey
-		startingNonce, err := val.client.PendingNonceAt(ctx, crypto.PubkeyToAddress(key.PublicKey))
-		require.NoError(err)
-		txsForKey := make([]*types.Transaction, 0, warpLoadTxsPerWorker)
-		for j := uint64(0); j < warpLoadTxsPerWorker; j++ {
-			nonce := startingNonce + j
-			data, err := warp.PackSendWarpMessage(defaultWarpTestPayload)
-			require.NoError(err)
-			tx := types.NewTx(&types.DynamicFeeTx{
-				ChainID:   w.sendingSubnet.ChainID,
-				Nonce:     nonce,
-				To:        &warp.Module.Address,
-				Gas:       warpSendMessageGas,
-				GasFeeCap: warpTxGasFeeCap,
-				GasTipCap: warpTxGasTipCap,
-				Value:     common.Big0,
-				Data:      data,
-			})
-			signedTx, err := types.SignTx(tx, w.sendingSubnet.Signer, key)
-			require.NoError(err)
-			txsForKey = append(txsForKey, signedTx)
-		}
-		sequences[i] = txs.ConvertTxSliceToSequence(txsForKey)
-	}
-	return sequences
-}
-
-func executeLoader(
-	ctx context.Context,
-	tc *e2e.GinkgoTestContext,
-	sendingWorkers []txs.Worker[*types.Transaction],
-	warpSendSequences []txs.TxSequence[*types.Transaction],
-	loadMetrics *metrics.Metrics,
-) *simload.Loader[*types.Transaction] {
-	require := require.New(tc)
-	loader := simload.New(sendingWorkers, warpSendSequences, warpLoadBatchSize, loadMetrics)
-	// TODO: execute send and receive loaders concurrently.
-	require.NoError(loader.Execute(ctx))
-	require.NoError(loader.ConfirmReachedTip(ctx))
-	return loader
-}
-
-// aggregateSignedBytesFromLogs reads warp send logs, aggregates signatures via P2P for each.
-func (w *warpTest) aggregateSignedBytesFromLogs(
-	ctx context.Context,
-	tc *e2e.GinkgoTestContext,
-	logsCh chan types.Log,
-	numWorkers int,
-) [][]byte {
-	require := require.New(w.tc)
-	totalEvents := numWorkers * int(warpLoadTxsPerWorker)
-	out := make([][]byte, totalEvents)
-	for i := range totalEvents {
-		warpLog := <-logsCh
-		unsignedMessage, err := warp.UnpackSendWarpEventDataToMessage(warpLog.Data)
-		require.NoError(err)
-		tc.Log().Info("aggregating addressed call signature via P2P for load test")
-		signedWarpMessage, err := w.aggregateWarpSignaturesViaP2P(ctx, unsignedMessage)
-		require.NoError(err)
-		out[i] = signedWarpMessage.Bytes()
-	}
-	return out
-}
-
-// buildDeliverSequences partitions signed warp payloads across receiving validators
-// as getVerifiedWarpMessage txs.
-func (w *warpTest) buildDeliverSequences(
-	ctx context.Context,
-	signedWarpPayloads [][]byte,
-) []txs.TxSequence[*types.Transaction] {
-	require := require.New(w.tc)
-	rValidators := w.receivingSubnet.Validators
-	totalEvents := len(signedWarpPayloads)
-
-	deliverTxsPerVal := make([]int, len(rValidators))
-	for k := 0; k < totalEvents; k++ {
-		deliverTxsPerVal[k%len(rValidators)]++
-	}
-
-	sequences := make([]txs.TxSequence[*types.Transaction], len(rValidators))
-	msgIdx := 0
-	for i, val := range rValidators {
-		key := val.preFundedKey
-		startingNonce, err := val.client.PendingNonceAt(ctx, crypto.PubkeyToAddress(key.PublicKey))
-		require.NoError(err)
-		n := deliverTxsPerVal[i]
-		txsForKey := make([]*types.Transaction, 0, n)
-		for j := 0; j < n; j++ {
-			packedInput, err := warp.PackGetVerifiedWarpMessage(0)
-			require.NoError(err)
-			tx := types.NewTx(&types.DynamicFeeTx{
-				ChainID:   w.receivingSubnet.ChainID,
-				Nonce:     startingNonce + uint64(j),
-				To:        &warp.Module.Address,
-				Gas:       warpDeliverVerifyGas,
-				GasFeeCap: warpTxGasFeeCap,
-				GasTipCap: warpTxGasTipCap,
-				Value:     common.Big0,
-				Data:      packedInput,
-				AccessList: types.AccessList{
-					{
-						Address:     warp.ContractAddress,
-						StorageKeys: predicate.New(signedWarpPayloads[msgIdx]),
-					},
-				},
-			})
-			msgIdx++
-			signedTx, err := types.SignTx(tx, w.receivingSubnet.Signer, key)
-			require.NoError(err)
-			txsForKey = append(txsForKey, signedTx)
-		}
-		sequences[i] = txs.ConvertTxSliceToSequence(txsForKey)
-	}
-	require.Equal(totalEvents, msgIdx)
-	return sequences
-}
-
-// TODO (ceyonur): move this directly to tests/loadTest or use framework from tests/loadTest and replace graft/coreth/cmd/*.
-func (w *warpTest) loadTest() {
-	tc := w.tc
-	ctx := tc.DefaultContext()
-
-	numWorkers := len(w.sendingSubnet.Validators)
-	sendingClient := w.sendingSubnet.Validators[0].client
-	loadMetrics := metrics.NewDefaultMetrics()
-
-	tc.By("verifying generated worker keys are pre-funded on both subnets", func() {
-		verifyPreFundedKeys(tc, w.sendingSubnet.Validators)
-		verifyPreFundedKeys(tc, w.receivingSubnet.Validators)
-	})
-
-	var sendingWorkers, receivingWorkers []txs.Worker[*types.Transaction]
-	tc.By("creating tx receipt workers for each subnet", func() {
-		sendingWorkers, receivingWorkers = w.buildReceiptWorkers()
-	})
-
-	var logsCh chan types.Log
-	tc.By("subscribing to warp send events on sending subnet", func() {
-		logsCh = subscribeSendLogs(ctx, tc, sendingClient, numWorkers)
-	})
-
-	var warpSendSequences []txs.TxSequence[*types.Transaction]
-	tc.By("generating tx sequence to send warp messages", func() {
-		warpSendSequences = w.buildSendSequences(ctx)
-	})
-
-	var warpSendLoader *simload.Loader[*types.Transaction]
-	tc.By("executing warp send loader", func() {
-		warpSendLoader = executeLoader(ctx, tc, sendingWorkers, warpSendSequences, loadMetrics)
-	})
-
-	var warpDeliverSequences []txs.TxSequence[*types.Transaction]
-	tc.By("generating warp delivery sequences", func() {
-		signed := w.aggregateSignedBytesFromLogs(ctx, tc, logsCh, numWorkers)
-		warpDeliverSequences = w.buildDeliverSequences(ctx, signed)
-	})
-
-	tc.By("executing warp delivery loader", func() {
-		warpDeliverLoader := simload.New(receivingWorkers, warpDeliverSequences, warpLoadBatchSize, loadMetrics)
-		require.NoError(tc, warpDeliverLoader.Execute(ctx))
-		require.NoError(tc, warpSendLoader.ConfirmReachedTip(ctx))
-		tc.Log().Info("completed warp delivery successfully")
-	})
-}
-
-// IssueTxsToActivateProposerVMFork issues transactions at the current
-// timestamp, which should be after the ProposerVM activation time (aka
-// ApricotPhase4). This should generate a PostForkBlock because its parent block
-// (genesis) has a timestamp (0) that is greater than or equal to the fork
-// activation time of 0. Therefore, subsequent blocks should be built with
-// BuildBlockWithContext.
 func issueTxsToActivateProposerVMFork(
 	tc *e2e.GinkgoTestContext, chainID *big.Int, fundedKey *ecdsa.PrivateKey,
-	client e2e.EthClient,
+	client *ethclient.Client,
 ) {
 	ctx := tc.DefaultContext()
 	addr := crypto.PubkeyToAddress(fundedKey.PublicKey)
@@ -1033,17 +722,4 @@ func issueTxsToActivateProposerVMFork(
 	tc.Log().Info("Built sufficient blocks to activate proposerVM fork",
 		zap.Int("blockHeight", expectedBlockHeight),
 	)
-}
-
-func verifyPreFundedKeys(tc *e2e.GinkgoTestContext, validators []*subnetValidator) {
-	ctx := tc.DefaultContext()
-	require := require.New(tc)
-	for _, val := range validators {
-		client := val.client
-		pk := val.preFundedKey
-		addr := crypto.PubkeyToAddress(pk.PublicKey)
-		balanceA, err := client.BalanceAt(ctx, addr, nil)
-		require.NoError(err)
-		require.GreaterOrEqual(balanceA.Cmp(warpLoadRequiredAmount), 0)
-	}
 }

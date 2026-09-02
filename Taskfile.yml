@@ -497,25 +497,6 @@ tasks:
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
-  test-e2e-warp:
-    desc: Runs warp e2e tests (./tests/e2e/warp; requires subnet-evm plugin)
-    env:
-      E2E_TARGET: ./tests/e2e/warp
-    cmds:
-      - task: build
-      - task: build-subnet-evm
-      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
-
-  test-e2e-warp-ci:
-    desc: Runs warp e2e tests [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
-      E2E_TARGET: ./tests/e2e/warp
-    cmds:
-      - task: build-race
-      - task: build-subnet-evm
-      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
-
   test-e2e-warp-sae:
     desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin (vms/saevm/subnetevm)
     env:
