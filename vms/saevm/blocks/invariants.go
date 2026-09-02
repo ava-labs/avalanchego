@@ -189,10 +189,8 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 		if expect < Executed {
 			return b.brokenInvariantErr("unexpectedly executed")
 		}
-		if e.receipts != nil { // executed in SAE (i.e. not state-synced)
-			if e.receiptRoot != types.DeriveSha(e.receipts, trie.NewStackTrie(nil)) {
-				return b.brokenInvariantErr("receipts don't match root")
-			}
+		if e.receiptRoot != types.DeriveSha(e.receipts, trie.NewStackTrie(nil)) {
+			return b.brokenInvariantErr("receipts don't match root")
 		}
 	}
 

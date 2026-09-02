@@ -72,7 +72,7 @@ func (f *FlakyDB) Calls() int {
 	return f.calls
 }
 
-// Failed returns whether any op had failed.
+// Failed returns whether any op has failed.
 func (f *FlakyDB) Failed() bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()

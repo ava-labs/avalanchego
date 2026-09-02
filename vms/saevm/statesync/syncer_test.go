@@ -6,12 +6,18 @@ package statesync
 import (
 	"context"
 	"math"
+	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -166,6 +172,44 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	require.Equal(t, ids.ID(b4.Hash()), head, "client VM recovered the synced head")
 }
 
+// TestStateSyncSynchronousSettled confirms that a state sync finishes and
+// starts the VM with the correct state if the last settled block is
+// synchronous.
+func TestStateSyncSynchronousSettled(t *testing.T) {
+	t.Parallel()
+
+	// Nothing settles without advancing the clock.
+	sourceVM := newVM(t)
+	for range defaultCommitInterval {
+		sourceVM.acceptBlock(t)
+	}
+
+	ctx := t.Context()
+	summary, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+
+	accepted := sourceVM.blockAtHeight(t, summary.Height())
+	require.Falsef(t, hook.Synchronous(sourceVM.hooks, accepted.Header()), "hook.Synchronous() last accepted block")
+	settled := sourceVM.blockAtHeight(t, sourceVM.hooks.SettledBy(accepted.Header()).Height)
+	require.Truef(t, hook.Synchronous(sourceVM.hooks, settled.Header()), "hook.Synchronous() settled block")
+
+	xdb := saetest.NewExecutionResultsDB()
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+
+	clientVM := newVM(t,
+		withDatabase(db),
+		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
+		withTime(sourceVM.clock.Now()),
+	)
+	head, err := clientVM.LastAccepted(ctx)
+	require.NoError(t, err, "client LastAccepted()")
+	require.Equal(t, ids.ID(accepted.Hash()), head, "client VM recovered the synced head")
+}
+
 func TestShutdownCancelsMidSync(t *testing.T) {
 	t.Parallel()
 
@@ -246,4 +290,60 @@ func TestStateSyncLong(t *testing.T) {
 	gotLast, err := clientVM.LastAccepted(t.Context())
 	require.NoErrorf(t, err, "%T.LastAccepted()", clientVM)
 	require.Equal(t, wantLast, gotLast, "last accepted ID")
+}
+
+// Checks which bloom sections a sync marks as indexed.
+func TestUpdateBloomIndexer(t *testing.T) {
+	t.Parallel()
+
+	const sectionSize = params.BloomBitsBlocks
+	tests := []struct {
+		name         string
+		height       uint64
+		wantSections uint64
+	}{
+		{
+			// Right end state for the wrong reason: a checkpoint is written
+			// with a head the indexer rejects, rolling back to zero.
+			name:   "no_whole_section_indexed",
+			height: defaultCommitInterval,
+		},
+		{
+			name:         "first_section_boundary",
+			height:       sectionSize,
+			wantSections: 1,
+		},
+		{
+			name:         "third_section_boundary",
+			height:       3 * sectionSize,
+			wantSections: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sut := newSUT(t)
+			parent := ethcommon.Hash{0xbe, 0xef}
+			settler := &types.Header{
+				Number:     new(big.Int).SetUint64(tt.height),
+				ParentHash: parent,
+			}
+			// The head must be the canonical block ending the section.
+			rawdb.WriteCanonicalHash(sut.db, parent, tt.height-1)
+
+			syncer := sut.Syncer()
+			require.NoErrorf(t, syncer.writeBloomIndex(settler), "writeBloomIndex(%d)", tt.height)
+
+			// Only a fresh indexer re-validates the stored sections.
+			idx := core.NewBloomIndexer(sut.db, sectionSize, 0)
+			defer idx.Close()
+
+			gotSections, _, gotHead := idx.Sections()
+			require.Equalf(t, tt.wantSections, gotSections, "indexed sections after updateBloomIndexer(%d)", tt.height)
+			if tt.wantSections > 0 {
+				require.Equal(t, parent, gotHead, "head of the last indexed section")
+			}
+		})
+	}
 }
