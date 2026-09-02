@@ -172,6 +172,11 @@ func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
 	require.ErrorIs(t, err, saedb.ErrZeroCommitInterval, "parseConfig()")
 }
 
+func TestParseConfig_RejectsTrailingData(t *testing.T) {
+	_, err := parseConfig([]byte(`{} {}`))
+	require.ErrorIs(t, err, errTrailingConfigData, "parseConfig()")
+}
+
 func TestParseConfig_RPC(t *testing.T) {
 	tests := []struct {
 		name            string

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -164,7 +165,10 @@ func defaultConfig() config {
 	}
 }
 
-var errInvalidFeeRecipient = errors.New("invalid fee recipient")
+var (
+	errInvalidFeeRecipient = errors.New("invalid fee recipient")
+	errTrailingConfigData  = errors.New("unexpected trailing config data")
+)
 
 // parseConfig unmarshals operator-supplied per-chain config bytes on top of
 // [defaultConfig], rejecting unknown fields so legacy-only knobs surface as
@@ -176,6 +180,15 @@ func parseConfig(b []byte) (config, error) {
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&c); err != nil {
 			return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+		}
+
+		var trailing json.RawMessage
+		switch err := dec.Decode(&trailing); {
+		case errors.Is(err, io.EOF):
+		case err != nil:
+			return config{}, fmt.Errorf("decoding trailing config data: %w", err)
+		default:
+			return config{}, errTrailingConfigData
 		}
 	}
 
