@@ -57,14 +57,13 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	// The GasConfig* quintet encodes the effective ACP-224 gas configuration
+	// The GasConfig* group encodes the effective ACP-224 price configuration
 	// derived from gaspricemanager precompile storage in the settled state,
 	// stamped by the SAE block builder's FinalizeHeader when the precompile
-	// is enabled at the settled timestamp. All five MUST be set together;
-	// their absence means ACP-176 defaults apply. Boolean values are encoded
-	// as 0/1.
-	GasConfigValidatorTargetGas    *uint64
-	GasConfigTargetGas             *uint64
+	// is enabled at the settled timestamp. All three MUST be set together;
+	// their absence means ACP-176 defaults apply. Boolean values are encoded as
+	// 0/1. TargetExcess carries both validator-selected and precompile-pinned
+	// targets.
 	GasConfigTargetToExcessScaling *uint64
 	GasConfigMinGasPrice           *uint64
 	GasConfigStaticPricing         *uint64
@@ -159,8 +158,6 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 	cp.SettledGasUnix = copyUint64Ptr(h.SettledGasUnix)
 	cp.SettledGasNumerator = copyUint64Ptr(h.SettledGasNumerator)
 	cp.SettledExcess = copyUint64Ptr(h.SettledExcess)
-	cp.GasConfigValidatorTargetGas = copyUint64Ptr(h.GasConfigValidatorTargetGas)
-	cp.GasConfigTargetGas = copyUint64Ptr(h.GasConfigTargetGas)
 	cp.GasConfigTargetToExcessScaling = copyUint64Ptr(h.GasConfigTargetToExcessScaling)
 	cp.GasConfigMinGasPrice = copyUint64Ptr(h.GasConfigMinGasPrice)
 	cp.GasConfigStaticPricing = copyUint64Ptr(h.GasConfigStaticPricing)
@@ -191,12 +188,6 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	}
 	if h.SettledExcess != nil {
 		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
-	}
-	if h.GasConfigValidatorTargetGas != nil {
-		m["gasConfigValidatorTargetGas"] = hexutil.Uint64(*h.GasConfigValidatorTargetGas)
-	}
-	if h.GasConfigTargetGas != nil {
-		m["gasConfigTargetGas"] = hexutil.Uint64(*h.GasConfigTargetGas)
 	}
 	if h.GasConfigTargetToExcessScaling != nil {
 		m["gasConfigTargetToExcessScaling"] = hexutil.Uint64(*h.GasConfigTargetToExcessScaling)
@@ -262,8 +253,6 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = extras.SettledGasNumerator
 	h.SettledExcess = extras.SettledExcess
-	h.GasConfigValidatorTargetGas = extras.GasConfigValidatorTargetGas
-	h.GasConfigTargetGas = extras.GasConfigTargetGas
 	h.GasConfigTargetToExcessScaling = extras.GasConfigTargetToExcessScaling
 	h.GasConfigMinGasPrice = extras.GasConfigMinGasPrice
 	h.GasConfigStaticPricing = extras.GasConfigStaticPricing
@@ -278,8 +267,6 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = h.SettledGasNumerator
 	extras.SettledExcess = h.SettledExcess
-	extras.GasConfigValidatorTargetGas = h.GasConfigValidatorTargetGas
-	extras.GasConfigTargetGas = h.GasConfigTargetGas
 	extras.GasConfigTargetToExcessScaling = h.GasConfigTargetToExcessScaling
 	extras.GasConfigMinGasPrice = h.GasConfigMinGasPrice
 	extras.GasConfigStaticPricing = h.GasConfigStaticPricing
@@ -348,10 +335,8 @@ type HeaderSerializable struct {
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess" rlp:"optional"`
 
-	// The GasConfig* quintet carries the effective ACP-224 gas configuration
+	// The GasConfig* group carries the effective ACP-224 price configuration
 	// (see [HeaderExtra]) and is ignored in legacy headers.
-	GasConfigValidatorTargetGas    *uint64 `json:"gasConfigValidatorTargetGas" rlp:"optional"`
-	GasConfigTargetGas             *uint64 `json:"gasConfigTargetGas" rlp:"optional"`
 	GasConfigTargetToExcessScaling *uint64 `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
 	GasConfigMinGasPrice           *uint64 `json:"gasConfigMinGasPrice" rlp:"optional"`
 	GasConfigStaticPricing         *uint64 `json:"gasConfigStaticPricing" rlp:"optional"`
@@ -377,8 +362,6 @@ type headerMarshaling struct {
 	SettledGasUnix                 *hexutil.Uint64
 	SettledGasNumerator            *hexutil.Uint64
 	SettledExcess                  *hexutil.Uint64
-	GasConfigValidatorTargetGas    *hexutil.Uint64
-	GasConfigTargetGas             *hexutil.Uint64
 	GasConfigTargetToExcessScaling *hexutil.Uint64
 	GasConfigMinGasPrice           *hexutil.Uint64
 	GasConfigStaticPricing         *hexutil.Uint64

@@ -44,8 +44,6 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		SettledGasUnix                 *hexutil.Uint64  `json:"settledGasUnix" rlp:"optional"`
 		SettledGasNumerator            *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
 		SettledExcess                  *hexutil.Uint64  `json:"settledExcess" rlp:"optional"`
-		GasConfigValidatorTargetGas    *hexutil.Uint64  `json:"gasConfigValidatorTargetGas" rlp:"optional"`
-		GasConfigTargetGas             *hexutil.Uint64  `json:"gasConfigTargetGas" rlp:"optional"`
 		GasConfigTargetToExcessScaling *hexutil.Uint64  `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
 		GasConfigMinGasPrice           *hexutil.Uint64  `json:"gasConfigMinGasPrice" rlp:"optional"`
 		GasConfigStaticPricing         *hexutil.Uint64  `json:"gasConfigStaticPricing" rlp:"optional"`
@@ -79,8 +77,6 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.SettledGasUnix = (*hexutil.Uint64)(h.SettledGasUnix)
 	enc.SettledGasNumerator = (*hexutil.Uint64)(h.SettledGasNumerator)
 	enc.SettledExcess = (*hexutil.Uint64)(h.SettledExcess)
-	enc.GasConfigValidatorTargetGas = (*hexutil.Uint64)(h.GasConfigValidatorTargetGas)
-	enc.GasConfigTargetGas = (*hexutil.Uint64)(h.GasConfigTargetGas)
 	enc.GasConfigTargetToExcessScaling = (*hexutil.Uint64)(h.GasConfigTargetToExcessScaling)
 	enc.GasConfigMinGasPrice = (*hexutil.Uint64)(h.GasConfigMinGasPrice)
 	enc.GasConfigStaticPricing = (*hexutil.Uint64)(h.GasConfigStaticPricing)
@@ -118,8 +114,6 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		SettledGasUnix                 *hexutil.Uint64   `json:"settledGasUnix" rlp:"optional"`
 		SettledGasNumerator            *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
 		SettledExcess                  *hexutil.Uint64   `json:"settledExcess" rlp:"optional"`
-		GasConfigValidatorTargetGas    *hexutil.Uint64   `json:"gasConfigValidatorTargetGas" rlp:"optional"`
-		GasConfigTargetGas             *hexutil.Uint64   `json:"gasConfigTargetGas" rlp:"optional"`
 		GasConfigTargetToExcessScaling *hexutil.Uint64   `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
 		GasConfigMinGasPrice           *hexutil.Uint64   `json:"gasConfigMinGasPrice" rlp:"optional"`
 		GasConfigStaticPricing         *hexutil.Uint64   `json:"gasConfigStaticPricing" rlp:"optional"`
@@ -221,12 +215,6 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	}
 	if dec.SettledExcess != nil {
 		h.SettledExcess = (*uint64)(dec.SettledExcess)
-	}
-	if dec.GasConfigValidatorTargetGas != nil {
-		h.GasConfigValidatorTargetGas = (*uint64)(dec.GasConfigValidatorTargetGas)
-	}
-	if dec.GasConfigTargetGas != nil {
-		h.GasConfigTargetGas = (*uint64)(dec.GasConfigTargetGas)
 	}
 	if dec.GasConfigTargetToExcessScaling != nil {
 		h.GasConfigTargetToExcessScaling = (*uint64)(dec.GasConfigTargetToExcessScaling)

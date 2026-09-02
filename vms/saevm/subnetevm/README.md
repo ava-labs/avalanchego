@@ -132,10 +132,13 @@ The port reuses Subnet-EVM's `customtypes` instead of inventing a local SAE
 header package. SAE fields are appended to the existing header-extra shape:
 the `Settled*` quartet records which execution results the block settles,
 `TargetExcess` carries ACP-176's gas-target vote state, and the `GasConfig*`
-quintet carries the effective ACP-224 gas-pricing configuration (see the gas
-price manager section below). `BlockGasCost` remains in the header for layout
-compatibility but is always stamped to zero. ACP-226 and ACP-176 own block
-delay and gas pricing under SAE.
+triple carries the effective ACP-224 price configuration (see the gas price
+manager section below). When the precompile pins the gas target,
+`FinalizeHeader` writes its derived ACP-176 exponent into `TargetExcess`; when
+validators control the target, that field continues its bounded per-block
+evolution. `BlockGasCost` remains in the header for layout compatibility but
+is always stamped to zero. ACP-226 and ACP-176 own block delay and gas pricing
+under SAE.
 
 ### Settled-State System Configuration Reads
 

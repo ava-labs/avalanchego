@@ -36,8 +36,6 @@ func VerifyNoSAEHeaderFields(header *types.Header) error {
 		extra.SettledGasUnix != nil ||
 		extra.SettledGasNumerator != nil ||
 		extra.SettledExcess != nil ||
-		extra.GasConfigValidatorTargetGas != nil ||
-		extra.GasConfigTargetGas != nil ||
 		extra.GasConfigTargetToExcessScaling != nil ||
 		extra.GasConfigMinGasPrice != nil ||
 		extra.GasConfigStaticPricing != nil {

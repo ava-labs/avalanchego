@@ -160,3 +160,49 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	require.NotEqual(t, forgedBlock.Hash(), rebuilt.Hash(),
 		"rebuilt hash MUST diverge from forged block's hash; this is what triggers sae.ErrHashMismatch in VerifyBlock")
 }
+
+func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
+	one := utils.PointerTo[uint64](1)
+	tests := []struct {
+		name    string
+		extra   customtypes.HeaderExtra
+		wantErr error
+	}{
+		{name: "absent"},
+		{
+			name: "one_of_three",
+			extra: customtypes.HeaderExtra{
+				GasConfigTargetToExcessScaling: one,
+			},
+			wantErr: errPartialGasConfig,
+		},
+		{
+			name: "two_of_three",
+			extra: customtypes.HeaderExtra{
+				GasConfigTargetToExcessScaling: one,
+				GasConfigMinGasPrice:           one,
+			},
+			wantErr: errPartialGasConfig,
+		},
+		{
+			name: "complete",
+			extra: customtypes.HeaderExtra{
+				GasConfigTargetToExcessScaling: one,
+				GasConfigMinGasPrice:           one,
+				GasConfigStaticPricing:         one,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			header := customtypes.WithHeaderExtra(&types.Header{}, &test.extra)
+			err := (&hooks{}).VerifyBlockSyntax(types.NewBlockWithHeader(header))
+			if test.wantErr != nil {
+				require.ErrorIs(t, err, test.wantErr, "hooks.VerifyBlockSyntax()")
+				return
+			}
+			require.NoError(t, err, "hooks.VerifyBlockSyntax()")
+		})
+	}
+}

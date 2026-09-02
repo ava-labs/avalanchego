@@ -94,22 +94,22 @@ the trade-off:
 Mechanism:
 
 - `graft/subnet-evm` customtypes `HeaderExtra` gains an optional SAE
-  gas-config group carrying the *derived* values the artifact used to carry:
-  `ValidatorTargetGas bool`, `TargetGas gas.Gas`, plus the
-  `gastime.GasPriceConfig` triple (`TargetToExcessScaling`, `MinPrice`,
-  `StaticPricing`). Stamped by `FinalizeHeader` (see D2) from the
+  gas-config group carrying the derived `gastime.GasPriceConfig` triple
+  (`TargetToExcessScaling`, `MinPrice`, `StaticPricing`). `TargetExcess` is
+  the sole target authority: `FinalizeHeader` replaces it with the exponent
+  derived from `TargetGas` when `ValidatorTargetGas=false`, and preserves the
+  bounded validator update otherwise. The fields are stamped from the
   settled-state read of gaspricemanager storage, gated on
   `IsPrecompileEnabled(gaspricemanager, settled.Time)` — the same state view
   and gate the artifact producer used. Absent group = precompile not enabled
   at settled time.
 - `Points.GasConfigAfter(h)` (master signature, no error):
-  1. group present → `effective(headerTarget)` exactly as the spike's
-     `gasConfigArtifact.effective`: `ValidatorTargetGas=true` → target from
-     header `TargetExcess`; false → target pinned by `TargetGas`.
+  1. group present → target from `TargetExcess`, plus the price-config triple.
   2. group absent, `h.Number == 0`, and gaspricemanager is genesis-enabled →
      derive the same values from the chain config's
      `InitialGasPriceConfig` (mirroring what
-     `gaspricemanager.Configure` writes at activation). This covers
+     `gaspricemanager.Configure` writes at activation), including the raw
+     pinned target before an async header exists. This covers
      `synchronousGasTime(genesis)` and is deterministic. (cchain uses the
      same `h.Number.Sign() == 0` special-casing idiom in
      `targetExponent`.)
@@ -308,13 +308,11 @@ point.
 - **factory vs plugin**: in-process factory vs rpcchainvm plugin runner.
 - **api/metrics/log glue**: zero functional overlap.
 
-### Deferred follow-ups (coupled, cross-graft; not required for this port)
+### Deferred follow-ups (not required for this port)
 
-- Unify the exponent types: `cchain/dynamic.DelayExponent` duplicates shared
-  `vms/evm/acp226.DelayExcess` verbatim, `cchain/dynamic.TargetExponent` and
-  `subnetevm/hook/acp176.TargetExcess` are the same value under different
-  names. Both graft `customtypes` packages import the harness-local types
-  for header fields, so the move touches both grafts — sequenced separately.
+- `vms/evm/dynamic` is now the shared owner of delay, target, and price
+  exponent math. `vms/evm/acp176.State` retains composite gas-state encoding
+  and rescaling, and delegates its scalar target operations to `dynamic`.
 - A `hook.Points.MinBlockDelayAfter` extension would let the ACP-226
   block-separation gate and build pacing share one implementation (3 call
   sites per chain today, in different units).
@@ -361,9 +359,9 @@ reviews (no push, no PR — per the working agreement). Review focus:
 3. The public golden-hash update in
    `graft/subnet-evm/plugin/evm/customtypes/header_ext_test.go` (new
    optional header tail fields; legacy encodings unchanged).
-4. The deferred follow-ups at the end of the duplication audit (exponent
-   type unification across cchain/dynamic and vms/evm/acp226; ActiveRules
-   wire-type move; uptimetracker loop hoist).
+4. The remaining deferred follow-ups at the end of the duplication audit
+   (ActiveRules wire-type move and uptimetracker loop hoist). Exponent sharing
+   is complete in `vms/evm/dynamic`.
 
 ## Milestone 6 validation record
 
@@ -547,10 +545,10 @@ The follow-up duplication audit also found three smaller sharing wins:
 
 - `30f4051e7b` hoists the identical C-Chain and Subnet-EVM minimum-delay metric
   into `vms/saevm/sae`.
-- `2c79514a00` deletes C-Chain's private ACP-176 and ACP-226 math and uses the
-  shared implementations in `vms/evm`. The graft changes are limited to the
-  header type and genesis plumbing consumed by SAE; the legacy wire field name
-  and `uint64` encoding remain unchanged.
+- `ab3c1de04f` applies PR #5598's ACP-226 type migration while preserving the
+  newer SAE fields and wire name; `f870001f5f` then moves the complete dynamic
+  exponent package to `vms/evm/dynamic` and shares its target math with
+  `vms/evm/acp176`.
 - `4361a93058` deletes one-call configuration wrappers and invokes the shared
   warp message parser directly. The execution-results injection seam remains
   because SAE recovery tests use it.
@@ -560,11 +558,13 @@ the unreferenced spike-only `spam-c-chain` example; neither is used by the SAE
 warp suite. The post-review Gazelle pass succeeds and adds the direct test
 dependencies required by the new header and genesis coverage.
 
-Follow-up: `2c79514a00` is superseded after review of upstream PR #5598. That
-PR establishes `dynamic.DelayExponent` as the canonical ACP-226 type and
-deletes `vms/evm/acp226`. The replacement work restores the dynamic
-implementation first, then moves it out of the C-Chain package to the shared
-`vms/evm/dynamic` boundary before applying the upstream migration.
+Follow-up completed: `2c79514a00` was superseded after review of upstream PR
+#5598. Commit `ab3c1de04f` applies its canonical `dynamic.DelayExponent`
+migration while preserving the newer SAE fields, and `f870001f5f` moves the
+package to the shared `vms/evm/dynamic` boundary. ACP-224 now uses
+`TargetExcess` as the canonical target representation for both precompile
+pins and validator votes; the separate header group carries only its three
+price parameters.
 
 Exact next action: regenerate/check Bazel metadata, run lint and all four
 module builds, then run the repo-wide unit, SAE warp e2e, and C-Chain e2e gates

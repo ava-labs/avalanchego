@@ -97,11 +97,11 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 // GasConfigAfter derives the gas target and price config in effect after `h`
 // purely from the header (plus, for the genesis block, the chain config):
 //
-//  1. `hdr` carries a gas-config group (see [headerGasConfig], stamped by
+//  1. `hdr` carries a gas-config group (see [stampGasConfig], stamped by
 //     [builder.FinalizeHeader] whenever gaspricemanager is enabled at
-//     the settled timestamp): the group is authoritative.
-//     `ValidatorTargetGas=true` keeps the header's `TargetExcess` as the
-//     target authority; false pins the target from precompile storage.
+//     the settled timestamp): the group is authoritative for price config.
+//     `TargetExcess` is always the target authority; FinalizeHeader pins it
+//     to the precompile target when validator target selection is disabled.
 //  2. `hdr` is the genesis block (synchronously executed, so never stamped)
 //     and gaspricemanager is enabled at genesis: the group is derived from
 //     the chain config exactly as [gaspricemanager.Configure] seeded storage.
@@ -109,11 +109,14 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	headerTarget := acp176Target(targetExcess(hdr))
 	if cfg, ok := readGasConfig(customtypes.GetHeaderExtra(hdr)); ok {
-		return cfg.effective(headerTarget)
+		return headerTarget, cfg
 	}
 	if hdr.Number.Sign() == 0 {
-		if cfg, ok := h.genesisGasConfig(hdr.Time); ok {
-			return cfg.effective(headerTarget)
+		if stored, ok := h.genesisGasConfig(hdr.Time); ok {
+			if !stored.ValidatorTargetGas {
+				headerTarget = gas.Gas(stored.TargetGas)
+			}
+			return headerTarget, gasConfigFromStored(stored)
 		}
 	}
 	return headerTarget, gastime.DefaultGasPriceConfig()
@@ -128,17 +131,17 @@ func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConf
 // read time: [commontype.DefaultGasPriceConfig] and [scalingFromTimeToDouble]
 // are consensus-critical for chains whose genesis activates gaspricemanager,
 // and changing them requires a network upgrade.
-func (h *hooks) genesisGasConfig(genesisTime uint64) (headerGasConfig, bool) {
+func (h *hooks) genesisGasConfig(genesisTime uint64) (commontype.GasPriceConfig, bool) {
 	configExtra := subnetevmparams.GetExtra(h.chainConfig)
 	if !configExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress, genesisTime) {
-		return headerGasConfig{}, false
+		return commontype.GasPriceConfig{}, false
 	}
 	precompileConfig := configExtra.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
 	stored := commontype.DefaultGasPriceConfig()
 	if cfg, ok := precompileConfig.(*gaspricemanager.Config); ok && cfg.InitialGasPriceConfig != nil {
 		stored = *cfg.InitialGasPriceConfig
 	}
-	return gasConfigFromStored(stored), true
+	return stored, true
 }
 
 // targetExcess returns hdr's ACP-176 gas-target vote, defaulting to zero when
@@ -211,8 +214,6 @@ func (*hooks) VerifyBlockSyntax(b *types.Block) error {
 
 	gasConfigFields := 0
 	for _, set := range []bool{
-		he.GasConfigValidatorTargetGas != nil,
-		he.GasConfigTargetGas != nil,
 		he.GasConfigTargetToExcessScaling != nil,
 		he.GasConfigMinGasPrice != nil,
 		he.GasConfigStaticPricing != nil,
@@ -221,8 +222,8 @@ func (*hooks) VerifyBlockSyntax(b *types.Block) error {
 			gasConfigFields++
 		}
 	}
-	if gasConfigFields != 0 && gasConfigFields != 5 {
-		return fmt.Errorf("%w: %d of 5 fields set", errPartialGasConfig, gasConfigFields)
+	if gasConfigFields != 0 && gasConfigFields != 3 {
+		return fmt.Errorf("%w: %d of 3 fields set", errPartialGasConfig, gasConfigFields)
 	}
 	return nil
 }
@@ -420,7 +421,7 @@ var errZeroStoredGasPriceConfig = errors.New("gaspricemanager enabled but storag
 
 // FinalizeHeader stamps the header fields that depend on the settled block:
 // the effective ACP-224 gas-config group (read from gaspricemanager storage
-// in the settled state; see [headerGasConfig]) and `header.Coinbase` (see
+// in the settled state; see [gasConfigFromStored]) and `header.Coinbase` (see
 // [builder.resolveCoinbase]). Both gates use `settled.Time` (NOT
 // `header.Time`): a precompile activation `T` is only reflected in
 // `settledState` once a block with `T <= blockTime` has settled; using
@@ -442,7 +443,12 @@ func (b *builder) FinalizeHeader(header, settled *types.Header, settledState lib
 			// papered over with defaults.
 			return fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Number)
 		}
-		stampGasConfig(customtypes.GetHeaderExtra(header), gasConfigFromStored(stored))
+		headerExtra := customtypes.GetHeaderExtra(header)
+		if !stored.ValidatorTargetGas {
+			targetExcess := acp176.DesiredTargetExcess(gas.Gas(stored.TargetGas))
+			headerExtra.TargetExcess = &targetExcess
+		}
+		stampGasConfig(headerExtra, gasConfigFromStored(stored))
 	}
 
 	header.Coinbase = b.resolveCoinbase(settled, settledState)

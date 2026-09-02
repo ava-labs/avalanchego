@@ -13,54 +13,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 )
 
-// A headerGasConfig is the effective ACP-224 gas configuration carried by a
-// subnet-evm SAE header (the customtypes `GasConfig*` field group). It is the
-// projection of gaspricemanager precompile storage in the settled state,
-// stamped by [builder.FinalizeHeader] and read back by
-// [hooks.GasConfigAfter], making recovery and rebuilds self-contained at the
-// header level.
-type headerGasConfig struct {
-	// ValidatorTargetGas selects the gas-target authority: when true, the
-	// header's ACP-176 `TargetExcess` vote remains the source of truth;
-	// when false, TargetGas pins the target.
-	ValidatorTargetGas bool
-	TargetGas          gas.Gas
-	GasPriceConfig     gastime.GasPriceConfig
-}
-
-// effective returns the gas target and price config represented by the group.
-// Validity is the producer's responsibility: [builder.FinalizeHeader]
-// only stamps configs whose source passed [commontype.GasPriceConfig.Verify],
-// so consumer-side re-validation here would be redundant.
-func (c *headerGasConfig) effective(headerTarget gas.Gas) (gas.Gas, gastime.GasPriceConfig) {
-	if c.ValidatorTargetGas {
-		return headerTarget, c.GasPriceConfig
-	}
-	return c.TargetGas, c.GasPriceConfig
-}
-
 // gasConfigFromStored projects gaspricemanager storage into the derived
 // values carried by the header.
-func gasConfigFromStored(stored commontype.GasPriceConfig) headerGasConfig {
-	return headerGasConfig{
-		ValidatorTargetGas: stored.ValidatorTargetGas,
-		TargetGas:          gas.Gas(stored.TargetGas),
-		GasPriceConfig: gastime.GasPriceConfig{
-			TargetToExcessScaling: scalingFromTimeToDouble(stored.TimeToDouble),
-			MinPrice:              gas.Price(stored.MinGasPrice),
-			StaticPricing:         stored.StaticPricing,
-		},
+func gasConfigFromStored(stored commontype.GasPriceConfig) gastime.GasPriceConfig {
+	return gastime.GasPriceConfig{
+		TargetToExcessScaling: scalingFromTimeToDouble(stored.TimeToDouble),
+		MinPrice:              gas.Price(stored.MinGasPrice),
+		StaticPricing:         stored.StaticPricing,
 	}
 }
 
-// stampGasConfig writes the group into `he`. All five fields are always set
+// stampGasConfig writes the group into `he`. All three fields are always set
 // together; [readGasConfig] treats anything less as absent.
-func stampGasConfig(he *customtypes.HeaderExtra, c headerGasConfig) {
-	he.GasConfigValidatorTargetGas = boolToUint64Ptr(c.ValidatorTargetGas)
-	he.GasConfigTargetGas = (*uint64)(&c.TargetGas)
-	he.GasConfigTargetToExcessScaling = (*uint64)(&c.GasPriceConfig.TargetToExcessScaling)
-	he.GasConfigMinGasPrice = (*uint64)(&c.GasPriceConfig.MinPrice)
-	he.GasConfigStaticPricing = boolToUint64Ptr(c.GasPriceConfig.StaticPricing)
+func stampGasConfig(he *customtypes.HeaderExtra, c gastime.GasPriceConfig) {
+	he.GasConfigTargetToExcessScaling = (*uint64)(&c.TargetToExcessScaling)
+	he.GasConfigMinGasPrice = (*uint64)(&c.MinPrice)
+	he.GasConfigStaticPricing = boolToUint64Ptr(c.StaticPricing)
 }
 
 // readGasConfig recovers the group stamped by [stampGasConfig], reporting
@@ -69,22 +37,16 @@ func stampGasConfig(he *customtypes.HeaderExtra, c headerGasConfig) {
 // crafted header CAN carry present-but-zero fields (RLP decodes empty
 // optional items as pointers to zero); such headers are rejected by the
 // rebuild-hash-equality check in block verification, never by this reader.
-func readGasConfig(he *customtypes.HeaderExtra) (headerGasConfig, bool) {
-	if he.GasConfigValidatorTargetGas == nil ||
-		he.GasConfigTargetGas == nil ||
-		he.GasConfigTargetToExcessScaling == nil ||
+func readGasConfig(he *customtypes.HeaderExtra) (gastime.GasPriceConfig, bool) {
+	if he.GasConfigTargetToExcessScaling == nil ||
 		he.GasConfigMinGasPrice == nil ||
 		he.GasConfigStaticPricing == nil {
-		return headerGasConfig{}, false
+		return gastime.GasPriceConfig{}, false
 	}
-	return headerGasConfig{
-		ValidatorTargetGas: *he.GasConfigValidatorTargetGas != 0,
-		TargetGas:          gas.Gas(*he.GasConfigTargetGas),
-		GasPriceConfig: gastime.GasPriceConfig{
-			TargetToExcessScaling: gas.Gas(*he.GasConfigTargetToExcessScaling),
-			MinPrice:              gas.Price(*he.GasConfigMinGasPrice),
-			StaticPricing:         *he.GasConfigStaticPricing != 0,
-		},
+	return gastime.GasPriceConfig{
+		TargetToExcessScaling: gas.Gas(*he.GasConfigTargetToExcessScaling),
+		MinPrice:              gas.Price(*he.GasConfigMinGasPrice),
+		StaticPricing:         *he.GasConfigStaticPricing != 0,
 	}, true
 }
 

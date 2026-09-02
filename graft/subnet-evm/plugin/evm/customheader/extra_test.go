@@ -273,8 +273,6 @@ func TestVerifyNoSAEHeaderFields(t *testing.T) {
 		{name: "settled_gas_unix", extra: &customtypes.HeaderExtra{SettledGasUnix: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
 		{name: "settled_gas_numerator", extra: &customtypes.HeaderExtra{SettledGasNumerator: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
 		{name: "settled_excess", extra: &customtypes.HeaderExtra{SettledExcess: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
-		{name: "gas_config_validator_target", extra: &customtypes.HeaderExtra{GasConfigValidatorTargetGas: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
-		{name: "gas_config_target", extra: &customtypes.HeaderExtra{GasConfigTargetGas: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
 		{name: "gas_config_scaling", extra: &customtypes.HeaderExtra{GasConfigTargetToExcessScaling: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
 		{name: "gas_config_min_price", extra: &customtypes.HeaderExtra{GasConfigMinGasPrice: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
 		{name: "gas_config_static", extra: &customtypes.HeaderExtra{GasConfigStaticPricing: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
