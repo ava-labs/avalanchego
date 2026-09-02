@@ -75,6 +75,10 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	}
 
 	// If any blocks have been accepted, don't state sync.
+	//
+	// INVARIANT: with state sync enabled, this is the only reason to skip a
+	// non-genesis summary. A node still at the genesis MUST sync: a chain
+	// with a synchronous prefix cannot be executed from the genesis.
 	hash := rawdb.ReadHeadFastBlockHash(s.db)
 	if hash == (common.Hash{}) {
 		s.snowCtx.Log.Warn("no last accepted hash")

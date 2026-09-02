@@ -98,8 +98,10 @@ func setPreference(t *testing.T, ctx context.Context, vm *VM, blkID ids.ID, mode
 }
 
 type sutConfig struct {
-	db    database.Database
-	state *fakeState
+	db                  database.Database
+	state               *fakeState
+	preStateSyncEnabled bool
+	transitionTime      time.Time
 }
 
 // A sutOption overrides a default used by [newSUT].
@@ -119,22 +121,41 @@ func withState(state *fakeState) sutOption {
 	})
 }
 
+// withPreStateSyncEnabled makes the pre-transition chain report that it will
+// state sync (the default is that it won't).
+func withPreStateSyncEnabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.preStateSyncEnabled = true
+	})
+}
+
+// withTransitionTime overrides the transition time derived from
+// blocksUntilTransition.
+func withTransitionTime(at time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.transitionTime = at
+	})
+}
+
 // newSUT initializes a transition VM that transitions after accepting
 // blocksUntilTransition blocks on top of the genesis block.
 func newSUT(t *testing.T, blocksUntilTransition int, opts ...sutOption) *SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		db:    memdb.New(),
-		state: newFakeState(),
+		db:             memdb.New(),
+		state:          newFakeState(),
+		transitionTime: snowmantest.GenesisTimestamp.Add(time.Duration(blocksUntilTransition) * blockInterval),
 	}, opts...)
 
 	pre := newFakeVM(t, "pre", cfg.state)
+	// Initialize consults StateSyncEnabled for the eager-transition check.
+	pre.stateSyncEnabled = cfg.preStateSyncEnabled
 	post := newFakeVM(t, "post", cfg.state)
 	factory := &Factory{
 		PreFactory:      fakeFactory{vm: pre},
 		PostFactory:     fakeFactory{vm: post},
-		TransitionTime:  snowmantest.GenesisTimestamp.Add(time.Duration(blocksUntilTransition) * blockInterval),
+		TransitionTime:  cfg.transitionTime,
 		APIDrainTimeout: 100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
@@ -169,11 +190,13 @@ func newSUT(t *testing.T, blocksUntilTransition int, opts ...sutOption) *SUT {
 
 // restart rebuilds the VM against the same database and chain state, modeling a
 // node restart.
-func (s *SUT) restart(t *testing.T) *SUT {
+func (s *SUT) restart(t *testing.T, opts ...sutOption) *SUT {
 	t.Helper()
 	return newSUT(t, s.blocksUntilTransition,
-		withDatabase(s.db),
-		withState(s.pre.state),
+		append([]sutOption{
+			withDatabase(s.db),
+			withState(s.pre.state),
+		}, opts...)...,
 	)
 }
 
@@ -254,17 +277,19 @@ type fakeVM struct {
 	*blocktest.StateSyncableVM
 	initialized bool
 
-	name           string
-	state          *fakeState
-	verified       map[ids.ID]*fakeBlock
-	tip            *fakeBlock // tip is this VM's local building head.
-	appSender      common.AppSender
-	connected      map[ids.NodeID]*version.Application
-	consensusState snow.State
-	preference     ids.ID
-	chainCtx       *snow.Context
-	handlers       map[string]http.Handler // handlers is returned by CreateHandlers.
-	events         chan common.Message     // events feeds WaitForEvent.
+	name                string
+	state               *fakeState
+	stateSyncEnabled    bool
+	stateSyncEnabledErr error
+	verified            map[ids.ID]*fakeBlock
+	tip                 *fakeBlock // tip is this VM's local building head.
+	appSender           common.AppSender
+	connected           map[ids.NodeID]*version.Application
+	consensusState      snow.State
+	preference          ids.ID
+	chainCtx            *snow.Context
+	handlers            map[string]http.Handler // handlers is returned by CreateHandlers.
+	events              chan common.Message     // events feeds WaitForEvent.
 }
 
 func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
@@ -343,6 +368,10 @@ func (vm *fakeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
 
 func (vm *fakeVM) Version(context.Context) (string, error) {
 	return vm.name, nil
+}
+
+func (vm *fakeVM) StateSyncEnabled(context.Context) (bool, error) {
+	return vm.stateSyncEnabled, vm.stateSyncEnabledErr
 }
 
 func (vm *fakeVM) LastAccepted(context.Context) (ids.ID, error) {
@@ -497,4 +526,86 @@ func TestRestart(t *testing.T) {
 		require.NoErrorf(t, err, "%T.Has([transition marker])", sut.db)
 		require.Truef(t, got, "%T.Has([transition marker]) after restart without it", sut.db)
 	})
+}
+
+// TestEagerTransition verifies Initialize transitions without a transition
+// block iff the wall clock is past the transition time, the local chain is
+// still at the genesis, and the pre-transition chain will state sync.
+func TestEagerTransition(t *testing.T) {
+	tests := []struct {
+		name        string
+		newSUT      func(t *testing.T) *SUT
+		wantVersion string
+	}{
+		{
+			name: "fresh_node_syncing",
+			newSUT: func(t *testing.T) *SUT {
+				return newSUT(t, 10, withPreStateSyncEnabled())
+			},
+			wantVersion: "post",
+		},
+		{
+			// A node that accepted pre-transition blocks waits for the
+			// transition block instead of transitioning eagerly.
+			name: "partial_node_syncing_waits",
+			newSUT: func(t *testing.T) *SUT {
+				sut := newSUT(t, 10)
+				sut.BuildVerifyAccept(t, t.Context(), noContext)
+				return sut.restart(t, withPreStateSyncEnabled())
+			},
+			wantVersion: "pre",
+		},
+		{
+			name: "before_transition_time",
+			newSUT: func(t *testing.T) *SUT {
+				return newSUT(t, 10,
+					withPreStateSyncEnabled(),
+					withTransitionTime(time.Now().Add(time.Hour)),
+				)
+			},
+			wantVersion: "pre",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := tt.newSUT(t)
+			sut.requireVersion(t, tt.wantVersion)
+		})
+	}
+}
+
+// TestEagerTransitionIsDurable verifies the eager transition writes the
+// transition marker, so a restart comes up on the post-transition chain.
+func TestEagerTransitionIsDurable(t *testing.T) {
+	sut := newSUT(t, 10, withPreStateSyncEnabled())
+	sut.requireVersion(t, "post")
+
+	got, err := sut.db.Has(transitionedKey)
+	require.NoErrorf(t, err, "%T.Has([transition marker])", sut.db)
+	require.Truef(t, got, "%T.Has([transition marker]) after eager transition", sut.db)
+
+	sut = sut.restart(t)
+	sut.requireVersion(t, "post")
+}
+
+// TestEagerTransitionStateSyncEnabledError verifies a StateSyncEnabled error
+// fails Initialize.
+func TestEagerTransitionStateSyncEnabledError(t *testing.T) {
+	errStateSync := errors.New("state sync check failed")
+	state := newFakeState()
+	pre := newFakeVM(t, "pre", state)
+	pre.stateSyncEnabledErr = errStateSync
+	factory := &Factory{
+		PreFactory:      fakeFactory{vm: pre},
+		PostFactory:     fakeFactory{vm: newFakeVM(t, "post", state)},
+		TransitionTime:  snowmantest.GenesisTimestamp.Add(10 * blockInterval),
+		APIDrainTimeout: 100 * time.Millisecond,
+	}
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	intf, err := factory.New(ctx.Log)
+	require.NoErrorf(t, err, "%T.New()", factory)
+	vm := intf.(*VM)
+
+	err = vm.Initialize(t.Context(), ctx, memdb.New(), nil, nil, nil, nil, &enginetest.Sender{T: t})
+	require.ErrorIsf(t, err, errStateSync, "%T.Initialize()", vm)
 }

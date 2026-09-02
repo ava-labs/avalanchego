@@ -84,6 +84,52 @@ flowchart TD
     class E errCls;
 ```
 
+### Eager transition for state sync
+
+The engine runs state sync once, at startup, against the active VM — but a
+node starting after the transition faces peers that serve only the
+post-transition VM's summaries. So `Initialize` transitions *eagerly*, before
+any block requires it, when the wall clock is past `transitionTime`, the local
+chain is still at the genesis, and the pre-transition VM reports
+`StateSyncEnabled`. The transition marker is written before the sync runs, so
+the commitment is **one-way**: the node has bound itself to state syncing
+before seeing a single summary.
+
+The eager path adds two requirements to the VMs:
+
+- The **pre-transition VM must answer `StateSyncEnabled` during `Initialize`**,
+  before its normal startup completes.
+- The **post-transition VM must state sync any fresh database**: with state
+  sync enabled, accepted blocks are its only reason to decline a summary. This
+  cuts both ways. A node that already accepted pre-transition blocks is
+  refused — it never transitions eagerly, and instead bootstrap-executes to
+  the transition block at the cost of replaying the post-transition suffix. A
+  node at the genesis must take *some* summary, because a chain with a
+  synchronous prefix cannot be executed from the genesis. A malicious summary
+  can't force that node backwards: a summary at a pre-transition height is
+  rejected when its fetched header proves it synchronous, before any state is
+  written.
+
+An eagerly-transitioned node that cannot complete a sync fails the same way
+regardless of cause: it never falls back to executing pre-transition blocks,
+and retries state sync on every restart until peers serve a summary it
+accepts. The node strands *indefinitely* when no such summary can arrive:
+
+- **A wall-clock false positive.** A skewed clock, or a network that has not
+  yet built the transition block, strands the node until the network actually
+  transitions.
+- **A network that transitioned but has not yet crossed a post-transition
+  commit boundary.** There is no summary to serve yet; this resolves itself.
+- **Configurations the post-transition VM can never sync** (the Firewood
+  state scheme). Every summary is declined, forever, and the node falls
+  through to a bootstrap it cannot execute.
+
+To recover a stranded node, recreate the chain database — cheap, because an
+eagerly-transitioned node is fresh by construction. For configurations that
+can never sync, also disable state sync in the recreated node's configuration:
+disabling it on the marked node does nothing, since the marker was written
+before the first summary decision.
+
 ### Swapping the VM underneath the node
 
 The consensus engine, network, and API server treat a chain's VM as one
