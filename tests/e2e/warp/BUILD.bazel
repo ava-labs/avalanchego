@@ -4,7 +4,6 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "warp",
     srcs = [
-        "IWarpMessenger.bindings.go",
         "subnet_evm.go",
         "warp.go",
         "warp_acp118_client.go",
@@ -41,13 +40,11 @@ go_library(
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//:libevm",
-        "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//accounts/abi/bind",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethclient",
-        "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//params",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_prometheus_client_golang//prometheus",

@@ -735,56 +735,59 @@ func (w *warpTest) bindingsTest() {
 // warp message.
 func verifyAndExtractWarpMessage(
 	tc *e2e.GinkgoTestContext,
-	client bind.ContractFilterer,
+	client ethereum.LogFilterer,
 	blockNumber uint64,
 	sender common.Address,
 ) *avalancheWarp.UnsignedMessage {
 	require := require.New(tc)
 	ctx := tc.DefaultContext()
+	eventID := warp.WarpABI.Events["SendWarpMessage"].ID
+	senderTopic := common.BytesToHash(sender.Bytes())
+	query := ethereum.FilterQuery{
+		FromBlock: new(big.Int).SetUint64(blockNumber),
+		ToBlock:   new(big.Int).SetUint64(blockNumber),
+		Addresses: []common.Address{warp.Module.Address},
+		Topics: [][]common.Hash{
+			{eventID},
+			{senderTopic},
+		},
+	}
 
-	tc.Log().Info("Filtering SendWarpMessage events using binding")
-	warpFilterer, err := NewIWarpMessengerFilterer(warp.Module.Address, client)
-	require.NoError(err)
+	tc.Log().Info("Filtering SendWarpMessage events")
 
 	// Retry the log filter: under SAE, transaction receipts are served from
 	// the executor's in-memory cache the moment execution finishes, while
 	// eth_getLogs reads the durably-indexed logs, which land slightly later.
 	// A filter issued immediately after WaitMined can therefore briefly see
 	// an empty result for the receipt's own block.
-	var event *IWarpMessengerSendWarpMessage
+	var event types.Log
 	tc.Eventually(func() bool {
-		iter, err := warpFilterer.FilterSendWarpMessage(
-			&bind.FilterOpts{
-				Start:   blockNumber,
-				End:     &blockNumber,
-				Context: ctx,
-			},
-			[]common.Address{sender},
-			nil, // messageID filter: any
-		)
+		logs, err := client.FilterLogs(ctx, query)
 		require.NoError(err)
-		defer iter.Close()
-
-		if !iter.Next() {
-			require.NoError(iter.Error())
+		if len(logs) == 0 {
 			return false
 		}
-		event = iter.Event
-		require.False(iter.Next(), "expected exactly one SendWarpMessage event")
-		require.NoError(iter.Error())
+		require.Len(logs, 1, "expected exactly one SendWarpMessage event")
+		event = logs[0]
 		return true
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval,
 		"expected a SendWarpMessage event")
 
-	tc.Log().Info("Found SendWarpMessage event",
-		zap.String("sender", event.Sender.Hex()),
-		zap.String("messageID", common.Bytes2Hex(event.MessageID[:])),
-	)
+	require.False(event.Removed, "SendWarpMessage event must be canonical")
+	require.Equal(warp.Module.Address, event.Address, "SendWarpMessage event address")
+	require.Equal(blockNumber, event.BlockNumber, "SendWarpMessage event block")
+	require.Len(event.Topics, 3, "SendWarpMessage event topics")
+	require.Equal(eventID, event.Topics[0], "SendWarpMessage event signature")
+	require.Equal(senderTopic, event.Topics[1], "SendWarpMessage event sender")
 
-	require.Equal(sender, event.Sender)
-
-	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(event.Message)
+	unsignedMessage, err := warp.UnpackSendWarpEventDataToMessage(event.Data)
 	require.NoError(err)
+	require.Equal(common.Hash(unsignedMessage.ID()), event.Topics[2], "SendWarpMessage event message ID")
+
+	tc.Log().Info("Found SendWarpMessage event",
+		zap.String("sender", sender.Hex()),
+		zap.String("messageID", event.Topics[2].Hex()),
+	)
 
 	return unsignedMessage
 }
