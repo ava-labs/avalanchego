@@ -73,6 +73,7 @@ go_test(
     srcs = [
         "admitter_test.go",
         "always_test.go",
+        "config_test.go",
         "networked_test.go",
         "recovery_test.go",
         "rpc_custom_test.go",

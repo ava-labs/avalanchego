@@ -80,7 +80,6 @@ go_library(
         "//vms/saevm/hook",
         "//vms/saevm/network",
         "//vms/saevm/sae",
-        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/statesync",
         "//vms/saevm/types",

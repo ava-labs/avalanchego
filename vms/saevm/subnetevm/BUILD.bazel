@@ -49,7 +49,6 @@ go_library(
         "//vms/saevm/hook",
         "//vms/saevm/network",
         "//vms/saevm/sae",
-        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/subnetevm/api",
         "//vms/saevm/subnetevm/validators",
