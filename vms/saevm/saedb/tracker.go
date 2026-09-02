@@ -4,6 +4,7 @@
 package saedb
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
@@ -196,6 +198,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		if err != nil {
 			return nil, err
 		}
+		logSnapshotState(log, db, snaps, lastExecuted)
 	}
 	return &Tracker{
 		snaps:  snaps,
@@ -203,6 +206,64 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		config: c,
 		log:    log,
 	}, nil
+}
+
+// generatorState mirrors the RLP encoding of libevm's unexported
+// core/state/snapshot journalGenerator, persisted under
+// [rawdb.ReadSnapshotGenerator]. The format is stable: it is the on-disk
+// journal of generation progress, resumed across restarts.
+type generatorState struct {
+	Wiping   bool // deprecated upstream, kept for RLP compatibility
+	Done     bool
+	Marker   []byte
+	Accounts uint64
+	Slots    uint64
+	Storage  uint64
+}
+
+// logSnapshotState logs one line describing the snapshot's post-load health:
+// the disk layer root, whether generation is complete, and if not, where the
+// generation marker sits. A marker that never advances between restarts (or
+// between two reads of this line's inputs) means generation is failing
+// silently — e.g. because the trie at the disk root has been pruned.
+//
+// Failures to decode are logged rather than returned: this is diagnostics and
+// must never fail tracker construction.
+func logSnapshotState(log logging.Logger, db ethdb.Database, snaps *snapshot.Tree, requestedRoot common.Hash) {
+	fields := []zap.Field{
+		zap.Stringer("requestedRoot", requestedRoot),
+		zap.Stringer("diskRoot", snaps.DiskRoot()),
+	}
+
+	blob := rawdb.ReadSnapshotGenerator(db)
+	if len(blob) == 0 {
+		log.Info("snapshot loaded", append(fields, zap.Bool("generatorFound", false))...)
+		return
+	}
+	var gen generatorState
+	if err := rlp.DecodeBytes(blob, &gen); err != nil {
+		log.Warn("snapshot loaded; undecodable generator state", append(fields, zap.Error(err))...)
+		return
+	}
+
+	fields = append(fields,
+		zap.Bool("generationDone", gen.Done),
+		zap.Uint64("generatedAccounts", gen.Accounts),
+		zap.Uint64("generatedSlots", gen.Slots),
+	)
+	if !gen.Done {
+		// The marker is a position in the 32-byte account-hash keyspace, so
+		// its leading bytes give the fraction of the keyspace generated.
+		var pct float64
+		if len(gen.Marker) >= 4 {
+			pct = 100 * float64(binary.BigEndian.Uint32(gen.Marker)) / float64(math.MaxUint32)
+		}
+		fields = append(fields,
+			zap.String("generationMarker", common.Bytes2Hex(gen.Marker)),
+			zap.Float64("generationPct", pct),
+		)
+	}
+	log.Info("snapshot loaded", fields...)
 }
 
 // TrieDB returns the trie database used by [Tracker.StateDB].

@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"io"
 	"math"
 	"math/big"
 	"slices"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -290,6 +292,19 @@ func TestStateSyncDisabled(t *testing.T) {
 	dst.assertChainsMatch(ctx, t, src)
 }
 
+// faultTolerantLogger returns a logger for a node whose state sync is expected
+// to fail: library code (e.g. graft's evmstate syncer, surfaced through
+// vms/saevm/libevmlog) legitimately logs at ERROR while persisting progress
+// for an injected fault, which the default [loggingtest.Logger] would turn
+// into a test failure and a canceled context.
+func faultTolerantLogger() logging.Logger {
+	return logging.NewLogger("", logging.NewWrappedCore(
+		logging.Info,
+		nopWriteCloser{io.Discard},
+		logging.Plain.ConsoleEncoder(),
+	))
+}
+
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
 // engine.
 func TestStateSyncDBFailure(t *testing.T) {
@@ -310,7 +325,7 @@ func TestStateSyncDBFailure(t *testing.T) {
 
 	for numOps := 0; ; numOps++ {
 		flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
+		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky), withLogger(faultTolerantLogger()))...)
 		saetest.ConnectTo(t, dst, src)
 
 		flaky.SetFailAfter(numOps)

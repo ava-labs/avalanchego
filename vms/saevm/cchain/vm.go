@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/libevmlog"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -113,6 +114,9 @@ func (vm *VM) Initialize(
 	if lvl := userConfig.LogLevel; lvl != nil {
 		snowCtx.Log.SetLevel(*lvl)
 	}
+	// libevm's default logger discards everything, hiding snapshot lifecycle
+	// events (load failures, rebuilds, generation progress) among others.
+	libevmlog.Route(snowCtx.Log)
 	snowCtx.Log.Info("initializing C-Chain",
 		zap.Reflect("config", userConfig),
 	)

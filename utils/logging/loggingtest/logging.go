@@ -35,6 +35,10 @@ type logger struct {
 
 var _ logging.Logger = (*logger)(nil)
 
+func (l *logger) Enabled(lvl logging.Level) bool {
+	return lvl >= l.level
+}
+
 func (l *logger) With(fields ...zap.Field) logging.Logger {
 	return &logger{
 		level:   l.level,
