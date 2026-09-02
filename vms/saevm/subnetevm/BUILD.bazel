@@ -142,6 +142,7 @@ go_test(
         "//vms/saevm/subnetevm/api",
         "//vms/saevm/subnetevm/api/client",
         "//vms/saevm/subnetevm/warp",
+        "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/warp/warptest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",

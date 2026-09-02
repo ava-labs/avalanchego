@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -51,7 +52,8 @@ func settleGasPriceManagerMutation(t *testing.T, sut *SUT) *blocks.Block {
 	t.Helper()
 	const fromIdx = 1
 	sut.advanceTime(t, settleAdvance)
-	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
+	tx := sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
+	txgossiptest.WaitUntilPending(t, sut.ctx, sut.vm.GethRPCBackends(), tx)
 	return sut.buildAcceptExecuteBlock(t)
 }
 
