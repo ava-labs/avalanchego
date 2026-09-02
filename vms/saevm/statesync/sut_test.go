@@ -266,7 +266,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.Network.Network, s.db, tdb, snaps, s.snowCtx.Log), "RegisterHandlers")
+	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps), "RegisterHandlers")
 
 	return &vmSUT{
 		sut:    s,

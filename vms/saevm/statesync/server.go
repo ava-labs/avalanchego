@@ -22,16 +22,19 @@ import (
 //
 // TODO(alarso16): Find a way to wire through Firewood.
 func RegisterHandlers(
-	network *p2p.Network, db ethdb.Database,
-	tdb *triedb.Database, snap *snapshot.Tree,
 	log logging.Logger,
+	network *p2p.Network,
+	db ethdb.Database,
+	tdb *triedb.Database,
+	snap *snapshot.Tree,
 ) error {
 	if err := block.RegisterHandler(log, network, db); err != nil {
 		return fmt.Errorf("registering block handler: %w", err)
 	}
 
 	if err := hashdb.RegisterHandler(
-		log, network,
+		log,
+		network,
 		p2p.EVMLeafRequestHandlerID,
 		tdb,
 		common.HashLength,

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
-	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 type Syncer struct {
@@ -72,7 +72,7 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 
 	// If any blocks have been accepted, don't state sync.
 	hash := rawdb.ReadHeadFastBlockHash(s.db)
-	if hash == (ethcommon.Hash{}) {
+	if hash == (common.Hash{}) {
 		s.snowCtx.Log.Warn("no last accepted hash")
 		return false
 	}
@@ -121,12 +121,16 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
+	if err := wipeSnapshot(s.db); err != nil {
+		return fmt.Errorf("wiping snapshot: %w", err)
+	}
+
 	evmSyncer, err := evmstate.NewSyncer(
 		hashdb.NewClient(
 			s.snowCtx.Log,
 			s.network.Network,
 			p2p.EVMLeafRequestHandlerID,
-			ethcommon.HashLength,
+			common.HashLength,
 			s.network.PeerTracker,
 		),
 		s.db,
@@ -153,6 +157,17 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	return nil
 }
 
+// wipeSnapshot restores the snapshot state to empty by clearing all related
+// database markers.
+func wipeSnapshot(db ethdb.Database) error {
+	batch := db.NewBatch()
+	rawdb.DeleteSnapshotRoot(batch)
+	rawdb.DeleteSnapshotJournal(batch)
+	rawdb.DeleteSnapshotGenerator(batch)
+	rawdb.DeleteSnapshotRecoveryNumber(batch)
+	return batch.Write()
+}
+
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
 // start up from [Summary.AcceptedHash] as the last accepted block. It MUST be
 // called after a successful [Handler.Sync]. Any non-EVM state sync
@@ -164,7 +179,7 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 	}
 	settledHeight := s.hooks.SettledBy(lastAccepted).Height
 	settledHash := rawdb.ReadCanonicalHash(s.db, settledHeight)
-	if settledHash == (ethcommon.Hash{}) {
+	if settledHash == (common.Hash{}) {
 		return fmt.Errorf("no canonical hash for settled block at height %d", settledHeight)
 	}
 	lastSettled := rawdb.ReadBlock(s.db, settledHash, settledHeight)
@@ -172,23 +187,23 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 		return fmt.Errorf("couldn't find last settled block at height %d", settledHeight)
 	}
 
-	if err := s.persistExecutionResults(lastSettled, lastAccepted); err != nil {
+	if err := s.writeExecutionResults(lastSettled, lastAccepted); err != nil {
 		return err
 	}
 
-	if err := s.updateBloomIndexer(lastAccepted); err != nil {
+	if err := s.writeBloomIndex(lastAccepted); err != nil {
 		return fmt.Errorf("updating bloom indexer: %w", err)
 	}
 
 	// MUST be called last since rawdb markers signal success.
-	if err := s.writeRawDBInvariants(lastSettled.Header(), lastAccepted); err != nil {
+	if err := s.writeAcceptedMarkers(lastSettled.Hash(), lastAccepted.Hash()); err != nil {
 		return fmt.Errorf("writing rawdb invariants: %w", err)
 	}
 
 	return nil
 }
 
-func (s *Syncer) persistExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
+func (s *Syncer) writeExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
 	// Synchronous blocks MUST NOT persist their execution results.
 	if hook.Synchronous(s.hooks, lastSettled.Header()) {
 		return nil
@@ -224,8 +239,15 @@ func (s *Syncer) persistExecutionResults(lastSettled *types.Block, lastAccepted 
 	)
 }
 
-// Assumes that settler.Number is a multiple of [params.BloomBitsBlocks].
-func (s *Syncer) updateBloomIndexer(settler *types.Header) error {
+// writeBloomIndex adds a bloom indexer checkpoint to prevent the indexer from
+// attempting to iterate through blocks earlier than those fetched during the
+// sync and erroring.
+//
+// Assumes that settler.Number is a multiple of [params.BloomBitsBlocks]. The
+// indexer can only add checkpoints on that interval, but if settler.Number is
+// not a multiple, then we don't know the hash of the next block at that
+// interval.
+func (s *Syncer) writeBloomIndex(settler *types.Header) error {
 	const sectionSize = params.BloomBitsBlocks
 	idx := core.NewBloomIndexer(s.db, sectionSize, 0)
 	section := (settler.Number.Uint64() - 1) / sectionSize
@@ -233,12 +255,13 @@ func (s *Syncer) updateBloomIndexer(settler *types.Header) error {
 	return idx.Close()
 }
 
-func (s *Syncer) writeRawDBInvariants(settled, settler *types.Header) error {
+// writeAcceptedMarkers persists the database markers to complete the state sync,
+// allowing the [sae.VM] to start up from accepted by executing from settled.
+func (s *Syncer) writeAcceptedMarkers(settled, accepted common.Hash) error {
 	batch := s.db.NewBatch()
-	rawdb.WriteHeadFastBlockHash(batch, settler.Hash())
-	rawdb.WriteHeadHeaderHash(batch, settled.Hash())
-	rawdb.WriteHeadBlockHash(batch, settled.Hash())
-	rawdb.WriteFinalizedBlockHash(batch, settled.Hash())
-	rawdb.WriteSnapshotRoot(batch, settler.Root) // post-execution settled
+	rawdb.WriteHeadFastBlockHash(batch, accepted)
+	rawdb.WriteHeadHeaderHash(batch, settled)
+	rawdb.WriteHeadBlockHash(batch, settled)
+	rawdb.WriteFinalizedBlockHash(batch, settled)
 	return batch.Write()
 }

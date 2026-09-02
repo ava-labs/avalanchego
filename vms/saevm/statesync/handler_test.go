@@ -23,13 +23,13 @@ func TestMain(m *testing.M) {
 func TestBlock(t *testing.T) {
 	t.Parallel()
 
-	const numBlocks = defaultCommitInterval + 1
+	const numBlocks uint64 = defaultCommitInterval + 1
 	vm := newVM(t)
 	vm.acceptBlocks(t, numBlocks)
 	h := vm.Handler
 
 	t.Run("GetBlockIDAtHeight", func(t *testing.T) {
-		for height := uint64(0); height <= numBlocks; height++ {
+		for height := range numBlocks + 1 {
 			want, err := vm.vm.GetBlockIDAtHeight(t.Context(), height)
 			require.NoErrorf(t, err, "VM.GetBlockIDAtHeight(%d)", height)
 			got, err := h.GetBlockIDAtHeight(t.Context(), height)
@@ -42,7 +42,7 @@ func TestBlock(t *testing.T) {
 	})
 
 	t.Run("GetBlock", func(t *testing.T) {
-		for height := uint64(0); height <= numBlocks; height++ {
+		for height := range numBlocks + 1 {
 			want := vm.blockAtHeight(t, height)
 			id := ids.ID(want.Hash())
 			got, err := h.GetBlock(t.Context(), id)
