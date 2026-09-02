@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
     "//graft/subnet-evm:__subpackages__",
@@ -22,5 +23,19 @@ go_library(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//trie",
+    ],
+)
+
+graft_go_test(
+    name = "dummy_test",
+    srcs = ["consensus_test.go"],
+    embed = [":dummy"],
+    deps = [
+        "//graft/subnet-evm/plugin/evm/customheader",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//utils",
+        "//vms/components/gas",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
     ],
 )

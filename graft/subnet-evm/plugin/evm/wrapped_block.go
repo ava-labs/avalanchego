@@ -337,6 +337,9 @@ func (b *wrappedBlock) syntacticVerify() error {
 	}
 
 	ethHeader := b.ethBlock.Header()
+	if err := customheader.VerifyNoSAEHeaderFields(ethHeader); err != nil {
+		return err
+	}
 	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
 	rulesExtra := params.GetRulesExtra(rules)
 	// Perform block and header sanity checks

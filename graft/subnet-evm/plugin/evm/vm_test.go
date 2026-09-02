@@ -64,6 +64,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -1326,6 +1327,46 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	require.ErrorIs(t, err, errEmptyBlock)
 	verifyErr := emptyBlock.Verify(t.Context())
 	require.ErrorIs(t, verifyErr, errEmptyBlock)
+}
+
+func TestParseBlockRejectsSAEHeaderFields(t *testing.T) {
+	tvm := newVM(t, testVMConfig{genesisJSON: genesisJSONSubnetEVM})
+	t.Cleanup(func() {
+		require.NoError(t, tvm.vm.Shutdown(t.Context()), "VM.Shutdown()")
+	})
+
+	tx := types.NewTransaction(0, testEthAddrs[1], firstTxAmount, 21_000, big.NewInt(testMinGasPrice), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+	require.NoError(t, err, "types.SignTx()")
+	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})[0], "TxPool.AddRemotesSync()")
+
+	_, err = tvm.vm.WaitForEvent(t.Context())
+	require.NoError(t, err, "VM.WaitForEvent()")
+	blk, err := tvm.vm.BuildBlock(t.Context())
+	require.NoError(t, err, "VM.BuildBlock()")
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
+
+	tests := []struct {
+		name string
+		set  func(*customtypes.HeaderExtra)
+	}{
+		{name: "target", set: func(extra *customtypes.HeaderExtra) { extra.TargetExcess = avalancheutils.PointerTo(gas.Gas(1)) }},
+		{name: "settled", set: func(extra *customtypes.HeaderExtra) { extra.SettledHeight = avalancheutils.PointerTo[uint64](1) }},
+		{name: "gas_config", set: func(extra *customtypes.HeaderExtra) { extra.GasConfigMinGasPrice = avalancheutils.PointerTo[uint64](1) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			header := types.CopyHeader(ethBlock.Header())
+			extra := *customtypes.GetHeaderExtra(header)
+			test.set(&extra)
+			customtypes.SetHeaderExtra(header, &extra)
+			wrapped, err := wrapBlock(ethBlock.WithSeal(header), tvm.vm)
+			require.NoError(t, err, "wrapBlock()")
+
+			_, err = tvm.vm.ParseBlock(t.Context(), wrapped.Bytes())
+			require.ErrorIs(t, err, customheader.ErrSAEHeaderFieldsUnsupported, "VM.ParseBlock()")
+		})
+	}
 }
 
 // Regression test to ensure that a VM that verifies block B, C, then

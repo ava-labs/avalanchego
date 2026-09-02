@@ -206,6 +206,7 @@ graft_go_test(
         "//utils/timer/mockable",
         "//version",
         "//vms/components/chain",
+        "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/database",

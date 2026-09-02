@@ -52,6 +52,7 @@ graft_go_test(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/upgrade/subnetevm",
         "//utils",
+        "//vms/components/gas",
         "//vms/evm/acp226",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

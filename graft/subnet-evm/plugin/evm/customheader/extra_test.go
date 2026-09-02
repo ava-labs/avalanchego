@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 func TestMain(m *testing.M) {
@@ -256,6 +257,33 @@ func TestVerifyExtra(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := VerifyExtra(test.rules, test.extra)
 			require.ErrorIs(t, err, test.expected)
+		})
+	}
+}
+
+func TestVerifyNoSAEHeaderFields(t *testing.T) {
+	tests := []struct {
+		name  string
+		extra *customtypes.HeaderExtra
+		want  error
+	}{
+		{name: "none", extra: &customtypes.HeaderExtra{}},
+		{name: "target_excess", extra: &customtypes.HeaderExtra{TargetExcess: utils.PointerTo(gas.Gas(1))}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "settled_height", extra: &customtypes.HeaderExtra{SettledHeight: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "settled_gas_unix", extra: &customtypes.HeaderExtra{SettledGasUnix: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "settled_gas_numerator", extra: &customtypes.HeaderExtra{SettledGasNumerator: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "settled_excess", extra: &customtypes.HeaderExtra{SettledExcess: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "gas_config_validator_target", extra: &customtypes.HeaderExtra{GasConfigValidatorTargetGas: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "gas_config_target", extra: &customtypes.HeaderExtra{GasConfigTargetGas: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "gas_config_scaling", extra: &customtypes.HeaderExtra{GasConfigTargetToExcessScaling: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "gas_config_min_price", extra: &customtypes.HeaderExtra{GasConfigMinGasPrice: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+		{name: "gas_config_static", extra: &customtypes.HeaderExtra{GasConfigStaticPricing: utils.PointerTo[uint64](1)}, want: ErrSAEHeaderFieldsUnsupported},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			header := customtypes.WithHeaderExtra(&types.Header{}, test.extra)
+			require.ErrorIs(t, VerifyNoSAEHeaderFields(header), test.want, "VerifyNoSAEHeaderFields()")
 		})
 	}
 }
