@@ -5,6 +5,7 @@ set -euo pipefail
 # Why this exists:
 # Bazel's HTTP remote-cache timeout is an inactivity timeout. A connection that
 # continues to transfer bytes slowly can therefore block a build indefinitely.
+# See https://github.com/bazelbuild/bazel/issues/11782.
 # The CI jobs using the remote cache should fail within a known time and still
 # have one chance to complete when the cache or its network path is unhealthy.
 #
