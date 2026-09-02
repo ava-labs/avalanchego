@@ -30,8 +30,8 @@ type Config struct {
 	Enabled  bool
 }
 
-// Handler implements [adaptor.SyncableVM] and provides the consensus-
-// critical block getters for [adaptor.ChainVM].
+// Handler implements provides server-side [Summary] handling and parsing, as
+// well as providing critical block getters for a ChainVM.
 type Handler struct {
 	cfg     Config
 	db      ethdb.Database

@@ -95,8 +95,6 @@ func withXDB(h saetypes.ExecutionResults) sutOption {
 }
 
 // withTime sets the SUT's clock to a specific time at startup.
-//
-// This is ignored by [newSUT].
 func withTime(t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.startTime = t

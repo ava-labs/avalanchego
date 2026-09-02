@@ -29,16 +29,15 @@ func TestShouldAcceptSummary(t *testing.T) {
 	tests := []struct {
 		name       string
 		newHandler func(t *testing.T) *Handler
-		getSummary func(t *testing.T, sh *Handler) *Summary
+		summary    *Summary
+		want       bool
 	}{
 		{
 			name: "summary_at_genesis_height",
 			newHandler: func(t *testing.T) *Handler {
 				return newSUT(t).Handler
 			},
-			getSummary: func(*testing.T, *Handler) *Summary {
-				return &Summary{}
-			},
+			summary: &Summary{},
 		},
 		{
 			name: "blocks_already_accepted",
@@ -47,12 +46,7 @@ func TestShouldAcceptSummary(t *testing.T) {
 				vm.acceptBlocks(t, defaultCommitInterval)
 				return vm.Handler
 			},
-			getSummary: func(t *testing.T, sh *Handler) *Summary {
-				s, err := sh.GetLastStateSummary(t.Context())
-				require.NoErrorf(t, err, "%T.GetLastStateSummary()", sh)
-				require.NotZerof(t, s.Height(), "%T.GetLastStateSummary().Height()", sh)
-				return s
-			},
+			summary: &Summary{AcceptedHeight: 1},
 		},
 		{
 			name: "not_enabled",
@@ -60,20 +54,23 @@ func TestShouldAcceptSummary(t *testing.T) {
 				sut := newSUT(t, withEnabled(false))
 				return sut.Handler
 			},
-			getSummary: func(*testing.T, *Handler) *Summary {
-				return &Summary{AcceptedHeight: 1}
+			summary: &Summary{AcceptedHeight: 1},
+		},
+		{
+			name: "valid_summary",
+			newHandler: func(t *testing.T) *Handler {
+				return newSUT(t).Handler
 			},
+			summary: &Summary{AcceptedHeight: 1},
+			want:    true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
 			sh := tt.newHandler(t)
-			s := tt.getSummary(t, sh)
-
 			syncer := sh.Syncer()
-			require.Falsef(t, syncer.ShouldAcceptSummary(s), "%T.ShouldAcceptSummary()", sh)
+			require.Equalf(t, tt.want, syncer.ShouldAcceptSummary(tt.summary), "%T.ShouldAcceptSummary()", sh)
 		})
 	}
 }
@@ -173,8 +170,7 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 }
 
 // TestStateSyncSynchronousSettled confirms that a state sync finishes and
-// starts the VM with the correct state if the last settled bl
-// ock is
+// starts the VM with the correct state if the last settled block is
 // synchronous.
 func TestStateSyncSynchronousSettled(t *testing.T) {
 	t.Parallel()
@@ -211,7 +207,7 @@ func TestStateSyncSynchronousSettled(t *testing.T) {
 	require.Equal(t, ids.ID(accepted.Hash()), head, "client VM recovered the synced head")
 }
 
-func TestShutdownCancelsMidSync(t *testing.T) {
+func TestCancelSync(t *testing.T) {
 	t.Parallel()
 
 	sut := newSUT(t)
@@ -251,7 +247,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 			require.NoErrorf(t, err, "%T.syncTo", client)
 			return
 		}
-		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.Error()", client)
+		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
 
 		// Any error should be recoverable.
 		t.Run("second_try", func(t *testing.T) {
@@ -294,7 +290,7 @@ func TestStateSyncLong(t *testing.T) {
 }
 
 // Checks which bloom sections a sync marks as indexed.
-func TestUpdateBloomIndexer(t *testing.T) {
+func TestWriteBloomIndexer(t *testing.T) {
 	t.Parallel()
 
 	const sectionSize = params.BloomBitsBlocks
@@ -324,20 +320,19 @@ func TestUpdateBloomIndexer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sut := newSUT(t)
+			db := rawdb.NewMemoryDatabase()
 			parent := ethcommon.Hash{0xbe, 0xef}
 			settler := &types.Header{
 				Number:     new(big.Int).SetUint64(tt.height),
 				ParentHash: parent,
 			}
 			// The head must be the canonical block ending the section.
-			rawdb.WriteCanonicalHash(sut.db, parent, tt.height-1)
+			rawdb.WriteCanonicalHash(db, parent, tt.height-1)
 
-			syncer := sut.Syncer()
-			require.NoErrorf(t, syncer.writeBloomIndex(settler), "writeBloomIndex(%d)", tt.height)
+			require.NoErrorf(t, writeBloomIndex(db, settler), "writeBloomIndex(%d)", tt.height)
 
 			// Only a fresh indexer re-validates the stored sections.
-			idx := core.NewBloomIndexer(sut.db, sectionSize, 0)
+			idx := core.NewBloomIndexer(db, sectionSize, 0)
 			defer idx.Close()
 
 			gotSections, _, gotHead := idx.Sections()

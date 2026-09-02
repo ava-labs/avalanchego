@@ -33,6 +33,8 @@ import (
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 )
 
+// A Syncer can fully state-sync an EVM database, sufficient for execution with
+// an [sae.VM].
 type Syncer struct {
 	cfg   Config
 	hooks hook.Points
@@ -43,6 +45,7 @@ type Syncer struct {
 	parseBlock syncblock.Parser
 }
 
+// Syncer returns a [Syncer] using the same data as the [Handler].
 func (h *Handler) Syncer() *Syncer {
 	return &Syncer{
 		cfg:        h.cfg,
@@ -57,12 +60,12 @@ func (h *Handler) Syncer() *Syncer {
 // ShouldAcceptSummary returns true if the summary should be state synced to,
 // given the current disk state.
 func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
+	if !s.cfg.Enabled {
 		return false
 	}
 
-	if !s.cfg.Enabled {
+	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false
 	}
 
@@ -83,7 +86,7 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 
 // Sync fetches all state associated with [Summary] and applies it to disk.
 // Any error returned MUST be treated as fatal. After this method returns
-// without error, one MUST call [Handler.WriteSynced] to finalize the state
+// without error, one MUST call [Syncer.WriteSynced] to finalize the state
 // sync.
 func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	const (
@@ -129,6 +132,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
 
+	// TODO(powerslider): Remove dependency on graft.
 	evmSyncer, err := evmstate.NewSyncer(
 		hashdb.NewClient(
 			s.snowCtx.Log,
@@ -163,7 +167,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
 // start up from [Summary.AcceptedHash] as the last accepted block. It MUST be
-// called after a successful [Handler.Sync]. Any non-EVM state sync
+// called after a successful [Syncer.Sync]. Any non-EVM state sync
 // behavior MUST have already completed.
 func (s *Syncer) WriteSynced(summary *Summary) error {
 	lastAccepted := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
@@ -184,12 +188,12 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 		return err
 	}
 
-	if err := s.writeBloomIndex(lastAccepted); err != nil {
+	if err := writeBloomIndex(s.db, lastAccepted); err != nil {
 		return fmt.Errorf("updating bloom indexer: %w", err)
 	}
 
 	// MUST be called last since rawdb markers signal success.
-	if err := s.writeAcceptedMarkers(lastSettled.Hash(), lastAccepted.Hash()); err != nil {
+	if err := writeAcceptedMarkers(s.db, lastSettled.Hash(), lastAccepted.Hash()); err != nil {
 		return fmt.Errorf("writing rawdb invariants: %w", err)
 	}
 
@@ -240,9 +244,9 @@ func (s *Syncer) writeExecutionResults(lastSettled *types.Block, lastAccepted *t
 // indexer can only add checkpoints on that interval, but if settler.Number is
 // not a multiple, then we don't know the hash of the next block at that
 // interval.
-func (s *Syncer) writeBloomIndex(settler *types.Header) error {
+func writeBloomIndex(db ethdb.Database, settler *types.Header) error {
 	const sectionSize = params.BloomBitsBlocks
-	idx := core.NewBloomIndexer(s.db, sectionSize, 0)
+	idx := core.NewBloomIndexer(db, sectionSize, 0)
 	section := (settler.Number.Uint64() - 1) / sectionSize
 	idx.AddCheckpoint(section, settler.ParentHash)
 	return idx.Close()
@@ -250,8 +254,8 @@ func (s *Syncer) writeBloomIndex(settler *types.Header) error {
 
 // writeAcceptedMarkers persists the database markers to complete the state sync,
 // allowing the [sae.VM] to start up from accepted by executing from settled.
-func (s *Syncer) writeAcceptedMarkers(settled, accepted common.Hash) error {
-	batch := s.db.NewBatch()
+func writeAcceptedMarkers(db ethdb.Database, settled, accepted common.Hash) error {
+	batch := db.NewBatch()
 	rawdb.WriteHeadFastBlockHash(batch, accepted)
 	rawdb.WriteHeadHeaderHash(batch, settled)
 	rawdb.WriteHeadBlockHash(batch, settled)

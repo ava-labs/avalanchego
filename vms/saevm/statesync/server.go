@@ -72,12 +72,10 @@ type syncSnap struct {
 	snap *snapshot.Tree
 }
 
-// AccountIterator implements [hashdb.Snapshot].
 func (s *syncSnap) AccountIterator(start common.Hash) (snapshot.AccountIterator, error) {
 	return s.snap.AccountIterator(s.snap.DiskRoot(), start)
 }
 
-// StorageIterator implements [hashdb.Snapshot].
 func (s *syncSnap) StorageIterator(account common.Hash, start common.Hash) (snapshot.StorageIterator, error) {
 	return s.snap.StorageIterator(s.snap.DiskRoot(), account, start)
 }
