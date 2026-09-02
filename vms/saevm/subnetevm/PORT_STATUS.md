@@ -565,6 +565,12 @@ module builds, then run the repo-wide unit, SAE warp e2e, and C-Chain e2e gates
 on one final tree. Record the results here and check milestone 6 only if every
 gate passes.
 
+Validation progress on the post-review tree: Gazelle generation/check passes;
+`task lint` passes after correcting one import-grouping issue in
+`genesis_test.go`; and `go build ./...` passes in the root, `graft/coreth`,
+`graft/evm`, and `graft/subnet-evm` modules. Exact next action: run the
+repo-wide unit suite, followed by the two e2e gates.
+
 - 2026-08-27: Reconciliation plan written (this file). Header-encoded gas
   config chosen over persisted artifacts (D1) — the spike README's own
   recorded alternative — because master removed synchronous-block

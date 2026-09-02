@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/log"
-	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -28,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestParseGenesisNetworkUpgradeOverrides(t *testing.T) {
