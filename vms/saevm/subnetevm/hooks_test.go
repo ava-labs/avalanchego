@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"

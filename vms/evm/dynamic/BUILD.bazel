@@ -10,7 +10,7 @@ go_library(
         "price.go",
         "target.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/dynamic",
     visibility = ["//visibility:public"],
     deps = [
         "//utils/math",

@@ -80,8 +80,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"

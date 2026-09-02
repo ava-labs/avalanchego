@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )

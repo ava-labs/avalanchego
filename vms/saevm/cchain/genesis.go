@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"

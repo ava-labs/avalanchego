@@ -78,9 +78,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"

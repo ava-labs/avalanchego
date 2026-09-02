@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"

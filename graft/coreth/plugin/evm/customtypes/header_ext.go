@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

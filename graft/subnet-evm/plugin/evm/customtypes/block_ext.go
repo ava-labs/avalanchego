@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

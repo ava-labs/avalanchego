@@ -41,7 +41,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
