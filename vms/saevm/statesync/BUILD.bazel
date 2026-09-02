@@ -4,12 +4,12 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "statesync",
     srcs = [
-        "acceptor.go",
         "cmpopt.go",
         "handler.go",
         "server.go",
         "summary.canoto.go",
         "summary.go",
+        "syncer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/statesync",
     visibility = ["//visibility:public"],
@@ -51,10 +51,10 @@ go_library(
 go_test(
     name = "statesync_test",
     srcs = [
-        "acceptor_test.go",
         "handler_test.go",
         "summary_test.go",
         "sut_test.go",
+        "syncer_test.go",
     ],
     embed = [":statesync"],
     deps = [
