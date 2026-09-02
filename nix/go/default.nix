@@ -19,7 +19,7 @@ let
     };
 
   # Update the following to change the version:
-  goVersion = "1.26.7";
+  goVersion = "1.26.8";
   # The sha256 checksums can fetched from https://go.dev/dl/ for new versions.
   #
   # If using a version of nix < 2.25, it will be necessary to manually update the golang flake hash:
@@ -31,10 +31,10 @@ let
   #  mv flake.lock.tmp flake.lock
   #
   goSHA256s = {
-    "linux-amd64" = "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca";
-    "linux-arm64" = "5a4ec883379d51ee9ce1040d5e87f8d35e20387574dd8c947feb01eabc3c1b37";
-    "darwin-amd64" = "92e8b34bff3c89ab16404c595669ac8cb004cc2f676dcbd1f5b87a6b8def3b47";
-    "darwin-arm64" = "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d";
+    "linux-amd64" = "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b";
+    "linux-arm64" = "211ffced9dcb9633a55eac6364816ec0ddd951389a740e88fa8b3337971bdda0";
+    "darwin-amd64" = "186be014105aa6542b767d2c6ed5cca10a0214bdff809ef1724022a8c7894150";
+    "darwin-arm64" = "a012b25b571bd0138a03dcd25375ceba866fe5ca822f426d2c66a4de56fd3f4b";
   };
 
   targetSystem = parseSystem pkgs.stdenv.hostPlatform.system;
