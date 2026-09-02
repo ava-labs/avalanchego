@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -72,7 +73,12 @@ func withWarpEnabled() sutOption {
 // TestSendWarpMessage checks availability of warp verification requests
 // relative to block execution.
 func TestSendWarpMessage(t *testing.T) {
-	sut := newSUT(t, withWarpEnabled())
+	sut := newSUT(
+		t,
+		withFork(upgradetest.Helicon),
+		withNow(postHeliconStartTime(t)),
+		withWarpEnabled(),
+	)
 
 	payloadData := utils.RandomBytes(100)
 
@@ -120,7 +126,12 @@ func TestSendWarpMessage(t *testing.T) {
 }
 
 func TestPredicateVerification(t *testing.T) {
-	sut := newSUT(t, withWarpEnabled())
+	sut := newSUT(
+		t,
+		withFork(upgradetest.Helicon),
+		withNow(postHeliconStartTime(t)),
+		withWarpEnabled(),
+	)
 
 	sourceAddress := sut.ethWallet.Addresses()[0]
 	addressedPayload, err := payload.NewAddressedCall(sourceAddress.Bytes(), []byte{1, 2, 3})
@@ -169,6 +180,7 @@ func TestPredicateVerification(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			sut.advanceTime(t, blockBuildAdvance)
 			validateTx := sut.sendWarpTx(t, tt.txPayload, tt.signedMsg)
 
 			built := sut.buildAndVerifyBlock(t, &block.Context{PChainHeight: 0})

@@ -697,7 +697,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	)
 
 	var (
-		now            = time.Unix(saeparams.TauSeconds, 0).Add(saeparams.Tau)
+		now            = postHeliconStartTime(t)
 		activationTime = now.Add(saeparams.Tau)
 		activationTS   = uint64(activationTime.Unix()) // #nosec G115 -- known positive test timestamp
 
