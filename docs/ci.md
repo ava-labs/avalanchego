@@ -9,6 +9,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Principles](#principles)
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
+  - [Keep Go CI in one workflow](#keep-go-ci-in-one-workflow)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
@@ -53,6 +54,32 @@ For example, this workflow step runs the unit-test task:
 - name: Run unit tests
   run: ./scripts/run_task.sh test-unit
 ```
+
+### Keep Go CI in one workflow
+
+The `Go` workflow, defined in [`ci.yml`](../.github/workflows/ci.yml), checks
+the Go modules for avalanchego, Coreth, EVM, and Subnet-EVM. These modules must
+remain available to downstream consumers through Go tooling. Do not add a
+separate pre-merge Go workflow for one of these modules. Add its job to
+`ci.yml`.
+
+The `Bazel` workflow checks repository code that does not need this downstream
+Go-module interface. Keep Bazel checks out of `ci.yml`.
+
+This split keeps the Go-module test policy in one place. A change to runners,
+caches, test selection, race detection, or test shuffling can then apply to
+every Go module. The workflow has one required job. It checks every enabled
+job.
+
+Name a job `<check>-<component>`, such as `unit-avalanchego` or `lint-evm`.
+For a repository-wide check, omit the component. The aggregate job is an
+exception. Include the workflow name: `go-required`. This keeps the required
+check distinct in GitHub output. Matrix job names include `${{ matrix.os }}` so
+each platform check has a distinct name. Put `go-required` first. Sort all
+other job definitions and its `needs` list alphabetically.
+
+All jobs run for every event that starts the workflow. The `go-required` job
+fails if any job fails.
 
 ### Local composite actions define reusable GitHub Actions behavior
 

@@ -89,7 +89,7 @@ task bazel-build
 task bazel-build-opt
 
 # Run unit tests
-task bazel-test-unit-all
+task bazel-test-unit
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -464,10 +464,10 @@ rules and exclude manual tests.
 
 ```bash
 # Run all cacheable Go unit tests
-task bazel-test-unit-all
+task bazel-test-unit
 
 # Run all Go unit tests with race detection and shuffle
-task bazel-test-unit-all-race-shuffle
+task bazel-test-unit-race-shuffle
 
 # Run a specific test target
 bazel test //utils:set_test --test_filter=TestSet_Add
@@ -487,9 +487,6 @@ tests tagged `manual`. The unit-test tasks use this script for these scopes:
 | Scope | Rules selected |
 |-------|----------------|
 | `all` | All non-manual Go test rules |
-| `avalanchego` | Non-graft, non-manual Go test rules |
-| `coreth` | Coreth and EVM non-manual Go test rules |
-| `subnet-evm` | Subnet-EVM non-manual Go test rules |
 | `smoke` | The selected Go smoke test rule |
 
 This selection prevents Go test flags from reaching non-Go tests such as
@@ -644,21 +641,28 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Ubuntu 24.04 AMD64 CI runs full cacheable unit-test shards and a focused E2E
+- Ubuntu 24.04 AMD64 CI runs one full cacheable unit-test job and a focused E2E
   smoke test.
 - macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
+
+Previously, Bazel CI divided the full unit-test suite among three
+component-specific jobs. These jobs ran in parallel to keep the pre-merge
+runtime acceptable. Pre-merge tests now use remote caching and do not use race
+detection. These changes remove the need for separate jobs. Reconsider separate
+jobs if these conditions change or one job makes the pre-merge runtime
+unacceptable.
 
 The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
 the same task. It does not provide full E2E coverage. A future change will
 replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
 Bazel metadata and prefetches the full CI dependency list.
 
-The daily scheduled workflow runs full unit-test shards on Ubuntu 22.04 and
+The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Scheduled unit tests use race detection and
-shuffled test order. They use `--nocache_test_results`. Thus, Bazel runs them
-again and does not use a cached random test result.
+E2E smoke test on each platform. Only the Ubuntu 24.04 AMD64 unit-test job uses
+race detection and shuffled test order. It uses `--nocache_test_results`. Thus,
+Bazel runs it again and does not use a cached random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.
@@ -803,10 +807,10 @@ Validate changes proportionally:
   external repos without traversing unintended local workspace state
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
-`bazel-required`, that depends on the other jobs in the workflow via
-`needs`.  Branch protection can require that one workflow-level job
-instead of tracking each underlying Bazel job separately. This reduces
-required-check maintenance to the workflow level.
+`bazel-required`, that depends on the other jobs in the workflow via `needs`.
+Branch protection can require that one workflow-level job instead of tracking
+each underlying Bazel job separately. This reduces required-check maintenance
+to the workflow level.
 
 If the `setup` job fails its metadata check in CI, rebase or merge the target
 branch, run `task bazel-generate-metadata`, commit the resulting changes, and

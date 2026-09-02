@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-# Run only Go test rules in a named repository scope. Bazel target patterns can
-# include non-Go tests such as gazelle_test. Those tests do not accept Go test
-# flags, including the shuffle flag used by scheduled tests. Query rule types
-# first. This makes Bazel send Go flags only to Go test binaries.
+# Run Go test rules. Bazel target patterns can include non-Go tests such as
+# gazelle_test. Those tests do not accept Go test flags, including the shuffle
+# flag used by scheduled tests. Query rule types first so Bazel sends Go flags
+# only to Go test binaries.
 
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <all|avalanchego|coreth|subnet-evm|smoke> [bazel test options...]" >&2
+  echo "Usage: $0 <all|smoke> [bazel test options...]" >&2
   exit 1
 }
 
@@ -21,17 +21,6 @@ case "$scope" in
   all)
     query_scope='//...'
     ;;
-  avalanchego)
-    query_scope='(//... except //graft/...)'
-    dependency_target_patterns='//... -- -//graft/...'
-    ;;
-  coreth)
-    query_scope='(//graft/coreth/... union //graft/evm/...)'
-    dependency_target_patterns='//graft/coreth/... //graft/evm/...'
-    ;;
-  subnet-evm)
-    query_scope='//graft/subnet-evm/...'
-    ;;
   smoke)
     query_scope='//ids:ids_test'
     ;;
@@ -40,8 +29,6 @@ case "$scope" in
     ;;
 esac
 
-# Most scopes use the same syntax for Bazel queries and target patterns.
-dependency_target_patterns="${dependency_target_patterns:-${query_scope}}"
 query="kind(\"go_test rule\", ${query_scope} except attr(\"tags\", \"manual\", ${query_scope}))"
 targets=()
 while IFS= read -r target; do
@@ -53,5 +40,5 @@ done < <(bazelisk query "$query")
   exit 1
 }
 
-export BAZEL_CI_TARGET_PATTERNS="${dependency_target_patterns}"
+export BAZEL_CI_TARGET_PATTERNS="${query_scope}"
 exec "$(dirname "${BASH_SOURCE[0]}")/run_bazel_ci_command.sh" test "$@" "${targets[@]}"
