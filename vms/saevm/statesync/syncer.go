@@ -128,7 +128,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
-	if err := graftsnap.WipeSnapshotSync(s.db); err != nil {
+	if err := graftsnap.WipeSnapshotSync(ctx, s.db); err != nil {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
 

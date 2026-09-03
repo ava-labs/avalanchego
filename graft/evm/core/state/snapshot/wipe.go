@@ -29,6 +29,7 @@ package snapshot
 
 import (
 	"bytes"
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -51,7 +52,7 @@ func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe everything else asynchronously
 	wiper := make(chan struct{}, 1)
 	go func() {
-		if err := wipeContent(db); err != nil {
+		if err := wipeContent(context.Background(), db); err != nil {
 			log.Error("Failed to wipe state snapshot", "err", err) // Database close will trigger this
 			return
 		}
@@ -61,14 +62,14 @@ func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 }
 
 // WipeSnapshotSync wipes the snapshot data from the database synchronously.
-func WipeSnapshotSync(db ethdb.KeyValueStore) error {
+func WipeSnapshotSync(ctx context.Context, db ethdb.KeyValueStore) error {
 	batch := db.NewBatch()
 	rawdb.DeleteSnapshotRoot(batch)
 	rawdb.DeleteSnapshotGenerator(batch)
 	if err := batch.Write(); err != nil {
 		return err
 	}
-	return wipeContent(db)
+	return wipeContent(ctx, db)
 }
 
 // wipeContent iterates over the entire key-value database and deletes all the
@@ -76,11 +77,11 @@ func WipeSnapshotSync(db ethdb.KeyValueStore) error {
 // as the wiper is meant to run on a background thread but the root needs to be
 // removed in sync to avoid data races. After all is done, the snapshot range of
 // the database is compacted to free up unused data blocks.
-func wipeContent(db ethdb.KeyValueStore) error {
-	if err := wipeKeyRange(db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, true); err != nil {
+func wipeContent(ctx context.Context, db ethdb.KeyValueStore) error {
+	if err := wipeKeyRange(ctx, db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, true); err != nil {
 		return err
 	}
-	if err := wipeKeyRange(db, "storage", rawdb.SnapshotStoragePrefix, nil, nil, len(rawdb.SnapshotStoragePrefix)+2*common.HashLength, true); err != nil {
+	if err := wipeKeyRange(ctx, db, "storage", rawdb.SnapshotStoragePrefix, nil, nil, len(rawdb.SnapshotStoragePrefix)+2*common.HashLength, true); err != nil {
 		return err
 	}
 
@@ -92,7 +93,7 @@ func wipeContent(db ethdb.KeyValueStore) error {
 // specifying a particular key range for deletion.
 //
 // Origin is included for wiping and limit is excluded if they are specified.
-func wipeKeyRange(db ethdb.KeyValueStore, kind string, prefix []byte, origin []byte, limit []byte, keylen int, report bool) error {
+func wipeKeyRange(ctx context.Context, db ethdb.KeyValueStore, kind string, prefix []byte, origin []byte, limit []byte, keylen int, report bool) error {
 	// Batch deletions together to avoid holding an iterator for too long
 	var (
 		batch = db.NewBatch()
@@ -107,6 +108,10 @@ func wipeKeyRange(db ethdb.KeyValueStore, kind string, prefix []byte, origin []b
 		stop = append(prefix, limit...)
 	}
 	for it.Next() {
+		if ctx.Err() != nil {
+			return context.Cause(ctx)
+		}
+
 		// Skip any keys with the correct prefix but wrong length (trie nodes)
 		key := it.Key()
 		if !bytes.HasPrefix(key, prefix) {

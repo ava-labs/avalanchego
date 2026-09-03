@@ -199,22 +199,19 @@ func TestCancelSync(t *testing.T) {
 	require.ErrorIsf(t, err, context.Canceled, "%T.Sync", syncer)
 }
 
-// FuzzSyncErrorSurfacedViaError checks that any error in the sync process
-// gracefully fatals.
-func FuzzSyncErrorSurfacedViaError(f *testing.F) {
-	for _, failAfter := range []int{0, 1, 4, 16, 64, math.MaxInt} {
-		f.Add(failAfter)
-	}
-	f.Fuzz(func(t *testing.T, failAfter int) {
-		ctx := t.Context()
+// TestSyncErrorRecovers checks that any error in the sync process gracefully
+// errors and is recoverable.
+func TestSyncErrorRecovers(t *testing.T) {
+	ctx := t.Context()
 
-		source := newVM(t)
-		source.acceptBlocks(t, defaultCommitInterval+2)
+	source := newVM(t)
+	source.acceptBlocks(t, defaultCommitInterval+2)
 
-		summary, err := source.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
-		expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
+	summary, err := source.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
+	expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
 
+	for failAfter := 0; ; failAfter++ {
 		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
 		client := newSUT(t, withDatabase(fdb))
 		saetest.ConnectTo[saetest.Peer](t, client, source)
@@ -238,7 +235,7 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
 			requireSnapshotOnDisk(t, client.db, expectedRoot)
 		})
-	})
+	}
 }
 
 // requireSnapshotOnDisk checks that a completed sync left a snapshot that can
