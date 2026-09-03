@@ -15,7 +15,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	verify "github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	platform "github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	gomock "go.uber.org/mock/gomock"
 )
 

@@ -16,7 +16,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	platform "github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	gomock "go.uber.org/mock/gomock"
 )
