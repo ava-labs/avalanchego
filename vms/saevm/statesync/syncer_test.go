@@ -24,8 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 // TestShouldAcceptSummary checks the cases in which
@@ -197,7 +195,7 @@ func TestCancelSync(t *testing.T) {
 	// No peers are connected, so the sync stalls until canceled.
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	err := syncer.Sync(ctx, NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
+	err := syncer.Sync(ctx, NewSummary(common.Hash{0xde, 0xad}, defaultCommitInterval))
 	require.ErrorIsf(t, err, context.Canceled, "%T.Sync", syncer)
 }
 
@@ -315,7 +313,7 @@ func TestWriteBloomIndexer(t *testing.T) {
 			t.Parallel()
 
 			db := rawdb.NewMemoryDatabase()
-			parent := ethcommon.Hash{0xbe, 0xef}
+			parent := common.Hash{0xbe, 0xef}
 			settler := &types.Header{
 				Number:     new(big.Int).SetUint64(tt.height),
 				ParentHash: parent,

@@ -59,9 +59,9 @@ go_test(
     ],
     embed = [":statesync"],
     deps = [
-        "//api/metrics",
         "//database",
         "//database/memdb",
+        "//graft/coreth/params",
         "//ids",
         "//snow",
         "//snow/snowtest",
@@ -81,6 +81,7 @@ go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",

@@ -5,7 +5,6 @@ package statesync
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -19,9 +18,9 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -41,6 +40,8 @@ import (
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
+// TODO(alarso16): Reconsider scope of tests once full integration is added on
+// consumer VMs.
 type (
 	sut struct {
 		*Handler
@@ -58,7 +59,7 @@ type (
 
 	vmSUT struct {
 		*sut
-		vm     *sae.SinceGenesis[hookstest.Op]
+		vm     *sae.VM
 		wallet *saetest.Wallet
 	}
 
@@ -162,16 +163,9 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		BaseFee:    big.NewInt(1),
 		Difficulty: big.NewInt(0), // irrelevant but required
 	}
-	ethDB := saetypes.NewEthDB(cfg.avaDB)
 
-	// The [SummaryHandler] requires the genesis block on disk, but the state
-	// is deliberately committed to a throwaway trie database so that syncing
-	// tests start from an empty state.
-	if rawdb.ReadCanonicalHash(ethDB, 0) == (ethcommon.Hash{}) {
-		dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-		_, err := genesis.Commit(ethDB, dummyTrieDB)
-		require.NoErrorf(t, err, "%T.Commit()", genesis)
-	}
+	ethDB := saetypes.NewEthDB(cfg.avaDB)
+	setupGenesis(t, genesis, ethDB, nil /*triedb.Database*/)
 
 	sender := saetest.NewSender(t, nil)
 	net, err := network.New(snowCtx, sender)
@@ -248,29 +242,16 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	s := newSUT(t, opts...)
 	ctx := t.Context()
 
-	genesisBytes, err := json.Marshal(s.genesis)
-	require.NoErrorf(t, err, "json.Marshal(%T)", s.genesis)
-
-	// The sut's network already registered the "p2p" metrics prefix.
-	s.snowCtx.Metrics = metrics.NewPrefixGatherer()
+	chainConfig := setupGenesis(t, s.genesis, s.db, triedb.NewDatabase(s.db, nil))
 
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = ""                // no on-disk journal in tests
-	vm := sae.NewSinceGenesis(s.hooks, sae.Config{
+	vm, err := sae.NewVM(ctx, s.hooks, sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig:      s.cfg.syncConfig.DBConfig,
 		Now:           s.clock.Now,
-	})
-	require.NoError(t, vm.Initialize(
-		ctx,
-		s.snowCtx,
-		s.cfg.avaDB,
-		genesisBytes,
-		nil, // upgrade bytes
-		nil, // config bytes
-		nil, // fxs
-		s.sender,
-	), "Initialize()")
+	}, s.snowCtx, chainConfig, s.db, s.network)
+	require.NoError(t, err, "NewVM()")
 	t.Cleanup(func() {
 		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)), "Shutdown()")
 	})
@@ -366,4 +347,39 @@ func (s *vmSUT) compareVMs(t *testing.T, other *vmSUT) {
 	require.NoErrorf(t, lastAccepted.WaitUntilExecuted(t.Context()), "WaitUntilExecuted()")
 	require.NoErrorf(t, otherLastAccepted.WaitUntilExecuted(t.Context()), "WaitUntilExecuted()")
 	require.Equalf(t, lastAccepted.PostExecutionStateRoot(), otherLastAccepted.PostExecutionStateRoot(), "post-execution state root mismatch")
+}
+
+// setupGenesis can be used to initialize the chain state in a way friend to
+// statesync. To avoid changes to the triedb, provide it as nil.
+func setupGenesis(t *testing.T, genesis *core.Genesis, db ethdb.Database, tdb *triedb.Database) *params.ChainConfig {
+	if tdb == nil {
+		tdb = triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
+	}
+
+	priorAccepted := rawdb.ReadHeadFastBlockHash(db)
+	priorBlock := rawdb.ReadHeadBlockHash(db)
+	priorHeader := rawdb.ReadHeadHeaderHash(db)
+
+	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	require.NoErrorf(t, err, "core.SetupGenesisBlock(...): %v", err)
+
+	// These could have been clobbered by [core.SetupGenesisBlock] if the
+	// genesis state hadn't been committed.
+	if priorAccepted != (ethcommon.Hash{}) {
+		rawdb.WriteHeadFastBlockHash(db, priorAccepted)
+	}
+	if priorBlock != (ethcommon.Hash{}) {
+		rawdb.WriteHeadBlockHash(db, priorBlock)
+	}
+	if priorHeader != (ethcommon.Hash{}) {
+		rawdb.WriteHeadHeaderHash(db, priorHeader)
+	}
+
+	// [NewVM] assumes that the genesis block is "finalized", which does not
+	// happen in [core.SetupGenesisBlock].
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
+
+	return config
 }
