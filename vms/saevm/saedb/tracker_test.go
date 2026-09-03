@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/prometheus/client_golang/prometheus"
@@ -165,6 +167,53 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 	root, err := sdb.Commit(height, true /*EIP-158*/)
 	require.NoErrorf(tb, err, "%T.Commit(%d)", sdb, height)
 	return root
+}
+
+// TestTrackerClose verifies both the trie and the snapshot can be opened at the
+// state persisted by [Tracker.Close].
+func TestTrackerClose(t *testing.T) {
+	cfg := Config{
+		CommitInterval:   DefaultCommitInterval,
+		SnapshotCacheMiB: 1,
+	}
+	db := rawdb.NewMemoryDatabase()
+	log := loggingtest.New(t, logging.Debug)
+	tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker()")
+
+	// A snapshot persisted mid-generation loads but can't be verified until
+	// generation resumes, which NoBuild below forbids.
+	require.EventuallyWithT(t,
+		func(c *assert.CollectT) {
+			assert.NoErrorf(c, tr.snaps.Verify(types.EmptyRootHash), "%T.Verify([genesis root])", tr.snaps)
+		},
+		10*time.Second,      // timeout
+		10*time.Millisecond, // polling interval
+		"genesis snapshot generation",
+	)
+
+	root := writeBlock(t, tr, types.EmptyRootHash, 1)
+	tr.Track(root)
+	require.NoErrorf(t, tr.Close(root), "%T.Close([settled root])", tr)
+
+	cache := state.NewDatabase(db)
+	t.Run("trie_available", func(t *testing.T) {
+		_, err = state.New(root, cache, nil)
+		require.NoError(t, err, "state.New([root]) from disk")
+	})
+	t.Run("snapshot_available", func(t *testing.T) {
+		snaps, err := snapshot.New(
+			snapshot.Config{
+				CacheSize: 1,
+				NoBuild:   true,
+			},
+			db,
+			cache.TrieDB(),
+			root,
+		)
+		require.NoError(t, err, "snapshot.New(NoBuild, [root])")
+		require.NoErrorf(t, snaps.Verify(root), "%T.Verify([root])", snaps)
+	})
 }
 
 // TestTrackerMaybeCap checks that [Tracker.MaybeCommit] decreases memory

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -29,7 +28,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -1028,47 +1026,6 @@ func (e *blockNumSaver) store(h *types.Header) {
 	e.num = new(big.Int).Set(h.Number)
 }
 
-func TestSnapshotPersistence(t *testing.T) {
-	ctx, sut := newSUT(t)
-
-	e, chain, wallet := sut.Executor, sut.chain, sut.wallet
-
-	const n = 10
-	for range n {
-		b := chain.NewBlock(t, types.Transactions{
-			wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
-	}
-	last := chain.Last()
-	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
-
-	require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
-
-	// The crux of the test is whether we can recover the EOA nonce using only a
-	// new set of snapshots, recovered from the databases.
-	conf := snapshot.Config{
-		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
-		NoBuild:   true, // i.e. MUST be loaded from disk
-	}
-	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
-	require.NoError(t, err, "snapshot.New(..., [post-execution state root of last-executed block])")
-	snap := snaps.Snapshot(last.PostExecutionStateRoot())
-	require.NotNilf(t, snap, "%T.Snapshot([post-execution state root of last-executed block])", snaps)
-
-	t.Run("snap.Account(EOA)", func(t *testing.T) {
-		eoa := wallet.Addresses()[0]
-		got, err := snap.Account(crypto.Keccak256Hash(eoa.Bytes()))
-		require.NoError(t, err)
-		require.NotNil(t, got) // yes, this is still possible with nil error
-		require.Equalf(t, uint64(n), got.Nonce, "%T.Nonce", got)
-	})
-}
-
 func missingTrieNodeError(root common.Hash) testerr.Want {
 	return testerr.As(func(got *trie.MissingNodeError) string {
 		if got.NodeHash != root {
@@ -1174,10 +1131,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: true,
 			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available.
-				// The last executed state MUST NOT be available, since
-				// Firewood guarantees recovery from the last committed proposal.
-				return height < numBlocks
+				// All settled states MUST be available, as MUST the state
+				// committed at shutdown.
+				return height <= numBlocks
 			},
 		},
 		{
@@ -1185,8 +1141,8 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,
 			expectAvailable: func(height uint64) bool {
-				// Only the last settled state should be available.
-				return height == numBlocks-1
+				// Only the state committed at shutdown should be available.
+				return height == numBlocks
 			},
 		},
 		{
@@ -1197,6 +1153,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				switch {
 				case saedb.ShouldCommitTrieDB(height+1, commitInterval):
 					// in this test, each block settles the previous
+					return true
+				case height == numBlocks:
+					// state committed at shutdown
 					return true
 				case height == 0:
 					// genesis state

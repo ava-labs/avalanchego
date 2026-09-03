@@ -319,18 +319,31 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 	return state.New(root, t.cache, t.snaps)
 }
 
-// Close releases all resources associated with the `[triedb.Database]`
-// and cancel any snapshot generation.
-func (t *Tracker) Close(lastRoot common.Hash) error {
+// Close commits the state at root to disk, flattens any snapshot onto it, and
+// releases all resources associated with the [triedb.Database]. root SHOULD be
+// the state that a subsequent [NewTracker] opens at, otherwise the snapshot is
+// regenerated instead of loaded.
+//
+// TODO(StephenButtolph): Close fails if the snapshot layer at root was already
+// flattened away, which happens when settlement lags execution by more than the
+// number of retained diff layers. In this case, shutdown will report the error
+// and the next start will regenerate the snapshot.
+func (t *Tracker) Close(root common.Hash) error {
 	var errs []error
+
+	tdb := t.cache.TrieDB()
+	if err := tdb.Commit(root, false /* log */); err != nil {
+		errs = append(errs, fmt.Errorf("%T.Commit(%#x): %v", tdb, root, err))
+	}
+
 	if t.snaps != nil {
 		// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
 		// SAE so we don't mind flattening all snapshot layers to disk. Note that
 		// calling `Cap([disk root], 0)` returns an error when it's actually a
 		// no-op, so we ensure there are changes.
-		if lastRoot != t.snaps.DiskRoot() {
-			if err := t.snaps.Cap(lastRoot, 0); err != nil {
-				errs = append(errs, fmt.Errorf("%T.Cap(%s, 0): %v", t.snaps, lastRoot, err))
+		if root != t.snaps.DiskRoot() {
+			if err := t.snaps.Cap(root, 0); err != nil {
+				errs = append(errs, fmt.Errorf("%T.Cap(%#x, 0): %v", t.snaps, root, err))
 			}
 		}
 
@@ -340,8 +353,8 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 		t.snaps.Release()
 	}
 
-	if err := t.cache.TrieDB().Close(); err != nil {
-		errs = append(errs, fmt.Errorf("triedb.Database.Close(): %v", err))
+	if err := tdb.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("%T.Close(): %v", tdb, err))
 	}
 
 	return errors.Join(errs...)
