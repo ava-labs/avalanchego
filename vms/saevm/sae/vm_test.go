@@ -1276,8 +1276,8 @@ func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
 		// generation will halt until the disk root moves.
 		//
 		// TODO(StephenButtolph): Figure out a way to simulate slow snapshot
-		// generation without relying implementation details of the snapshot or
-		// being racy.
+		// generation without relying on implementation details of the snapshot
+		// or being racy.
 		c.db = saetest.NewUnreadableOnceDB(memdb.New(), storageRoot[:])
 	}))
 
