@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -195,7 +196,7 @@ func TestGetStateSummary(t *testing.T) {
 
 	// Only committed heights can be served. Each settles a distinct, earlier
 	// height, so an incorrect height selection would embed a different root.
-	for _, blockHeight := range []uint64{0, commitInterval, 2 * commitInterval} {
+	for _, blockHeight := range []uint64{commitInterval, 2 * commitInterval} {
 		t.Run(fmt.Sprintf("height_%d", blockHeight), func(t *testing.T) {
 			got, err := sut.GetStateSummary(t.Context(), blockHeight)
 			require.NoErrorf(t, err, "GetStateSummary(%d)", blockHeight)
@@ -203,6 +204,13 @@ func TestGetStateSummary(t *testing.T) {
 			require.Equalf(t, sut.wantRoot(t, blockHeight), got.settledRoot, "GetStateSummary(%d).settledRoot", blockHeight)
 		})
 	}
+
+	// The genesis block is synchronous, so its summary must not be served
+	// even though height 0 is a committed height.
+	t.Run("height_0", func(t *testing.T) {
+		_, err := sut.GetStateSummary(t.Context(), 0)
+		require.ErrorIs(t, err, database.ErrNotFound, "GetStateSummary(0)")
+	})
 }
 
 func TestGetLastStateSummary(t *testing.T) {
@@ -216,20 +224,6 @@ func TestGetLastStateSummary(t *testing.T) {
 	require.NoError(t, err, "GetLastStateSummary()")
 	require.Equal(t, uint64(lastCommitted), got.Height(), "GetLastStateSummary().Height()")
 	require.Equal(t, sut.wantRoot(t, lastCommitted), got.settledRoot, "GetLastStateSummary().settledRoot")
-}
-
-func TestOnlyGenesis(t *testing.T) {
-	handler := newSUT(t)
-
-	got, err := handler.GetLastStateSummary(t.Context())
-	require.NoError(t, err, "GetLastStateSummary()")
-	require.Equal(t, uint64(0), got.Height(), "GetLastStateSummary().Height()")
-	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetLastStateSummary().settledRoot")
-
-	got, err = handler.GetStateSummary(t.Context(), 0)
-	require.NoError(t, err, "GetStateSummary(0)")
-	require.Equal(t, uint64(0), got.Height(), "GetStateSummary(0).Height()")
-	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetStateSummary(0).settledRoot")
 }
 
 func TestWaitForEvent(t *testing.T) {
