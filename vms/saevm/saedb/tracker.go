@@ -212,6 +212,11 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 	}, nil
 }
 
+// TrieDB returns the trie database used by [Tracker.StateDB].
+func (t *Tracker) TrieDB() *triedb.Database {
+	return t.cache.TrieDB()
+}
+
 // Snapshot returns any snapshot that is used by a [state.StateDB] returned
 // by [Tracker.StateDB]. This MAY be nil.
 func (t *Tracker) Snapshot() *snapshot.Tree {

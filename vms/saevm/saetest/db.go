@@ -43,6 +43,7 @@ type FlakyDB struct {
 	lock      sync.Mutex
 	failAfter int
 	calls     int
+	failed    bool
 }
 
 // NewFlakyDB returns a [FlakyDB] whose ops succeed until failAfter of them have
@@ -54,6 +55,17 @@ func NewFlakyDB(db database.Database, failAfter int) *FlakyDB {
 	}
 }
 
+// SetFailAfter resets the op counter and arms the database to fail after a
+// further n mutating operations.
+func (f *FlakyDB) SetFailAfter(n int) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.calls = 0
+	f.failAfter = n
+	f.failed = false
+}
+
 // Calls returns the number of ops that have succeeded.
 func (f *FlakyDB) Calls() int {
 	f.lock.Lock()
@@ -62,11 +74,19 @@ func (f *FlakyDB) Calls() int {
 	return f.calls
 }
 
+// Failed returns whether any op has failed.
+func (f *FlakyDB) Failed() bool {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.failed
+}
+
 func (f *FlakyDB) shouldFail() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	if f.calls >= f.failAfter {
+		f.failed = true
 		return ErrInjected
 	}
 	f.calls++

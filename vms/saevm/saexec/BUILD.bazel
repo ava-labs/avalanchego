@@ -17,6 +17,7 @@ go_library(
         "//cache/lru",
         "//utils/logging",
         "//vms/components/gas",
+        "//vms/evm/prefetch",
         "//vms/saevm/blocks",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",

@@ -14,18 +14,19 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -51,6 +52,8 @@ type (
 	sutConfig struct {
 		// lastExecuted is the last block height that has been applied to the state.
 		lastExecuted uint64
+		// enabled indicates whether state sync is enabled.
+		enabled bool
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -60,6 +63,13 @@ type (
 func withNumExecutedBlocks(num uint64) sutOption {
 	return options.Func[sutConfig](func(cfg *sutConfig) {
 		cfg.lastExecuted = num
+	})
+}
+
+// withEnabled returns a [sutOption] that sets whether state sync is enabled.
+func withEnabled(enabled bool) sutOption {
+	return options.Func[sutConfig](func(cfg *sutConfig) {
+		cfg.enabled = enabled
 	})
 }
 
@@ -73,8 +83,17 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 
 	cfg := options.As(opts...)
 
+	db := memdb.New()
+	smDB := prefixdb.New([]byte("shared memory"), db)
+	mem := chainsatomic.NewMemory(smDB)
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	snowCtx.SharedMemory = mem.NewSharedMemory(snowtest.CChainID)
+
+	st, err := state.New(snowCtx, prefixdb.New([]byte("chain"), db))
+	require.NoError(t, err, "state.New()")
+
 	// Apply a distinct atomic root at every executed height.
-	st := newState(t)
 	var build exportBuilder
 	for h := uint64(1); h <= cfg.lastExecuted; h++ {
 		require.NoErrorf(t, st.Apply(h, []*tx.Tx{build.newExport()}), "Apply(%d)", h)
@@ -90,38 +109,25 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		writeBlock(ethDB, newBlock(h))
 	}
 
+	net, err := network.New(snowCtx, &enginetest.Sender{})
+	require.NoError(t, err, "network.New()")
+
 	handler, err := New(
-		saestatesync.Config{DBConfig: saedb.Config{CommitInterval: commitInterval}},
+		saestatesync.Config{
+			DBConfig: saedb.Config{CommitInterval: commitInterval},
+			Enabled:  cfg.enabled,
+		},
 		ethDB,
+		snowCtx,
+		net,
 		hookStub{},
 		st,
-		loggingtest.New(t, logging.Debug),
 	)
 	require.NoError(t, err, "New()")
-	t.Cleanup(func() {
-		require.NoErrorf(t, handler.Shutdown(t.Context()), "%T.Shutdown()", handler)
-	})
 	return &SUT{
 		SummaryHandler: handler,
 		state:          st,
 	}
-}
-
-// newState returns a [state.State] backed by a fresh db with working shared
-// memory, ready for [state.State.Apply].
-func newState(t *testing.T) *state.State {
-	t.Helper()
-
-	db := memdb.New()
-	smDB := prefixdb.New([]byte("shared memory"), db)
-	mem := chainsatomic.NewMemory(smDB)
-
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	snowCtx.SharedMemory = mem.NewSharedMemory(snowtest.CChainID)
-
-	st, err := state.New(snowCtx, prefixdb.New([]byte("chain"), db))
-	require.NoError(t, err, "state.New()")
-	return st
 }
 
 func writeBlock(ethDB ethdb.Database, blk *types.Block) {
@@ -239,4 +245,33 @@ func TestAcceptSummary(t *testing.T) {
 	mode, err := handler.AcceptSummary(t.Context(), &summary{})
 	require.NoError(t, err)
 	require.Equal(t, block.StateSyncSkipped, mode)
+}
+
+// TestStateSyncEnabled checks that the configured value is reported back by
+// [SummaryHandler.StateSyncEnabled].
+func TestStateSyncEnabled(t *testing.T) {
+	tests := []struct {
+		name    string
+		enabled bool
+	}{
+		{
+			name:    "disabled",
+			enabled: false,
+		},
+		{
+			name:    "enabled",
+			enabled: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sut := newSUT(t, withEnabled(tt.enabled))
+
+			gotEnabled, err := sut.StateSyncEnabled(t.Context())
+			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
+			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+		})
+	}
 }
