@@ -103,9 +103,9 @@ func withTime(t time.Time) sutOption {
 	})
 }
 
-// withLastSynchronous makes the [SummaryHandler]'s hooks report every block at
-// or below height as synchronous, deferring to the real [hookstest.Stub]
-// implementation above it.
+// withLastSynchronous makes the [Handler]'s hooks report every block at or
+// below height as synchronous, deferring to the real [hookstest.Stub]
+// implementation above it. This does NOT affect the [vmSUT].
 func withLastSynchronous(height uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.lastSynchronous = height

@@ -94,7 +94,7 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 
 // GetStateSummary returns the summary of the block at the given height, if it
 // is available to be served. Otherwise, [database.ErrNotFound] is returned.
-func (h *Handler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
+func (h *Handler) GetStateSummary(_ context.Context, height uint64) (*Summary, error) {
 	if !saedb.ShouldCommitTrieDB(height, h.cfg.DBConfig.CommitInterval) {
 		// can't serve committed state at this height
 		return nil, database.ErrNotFound

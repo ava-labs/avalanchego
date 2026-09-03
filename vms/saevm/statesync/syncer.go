@@ -120,7 +120,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	if hook.Synchronous(s.hooks, hdr) {
 		// This requires malicious summary providers, but would corrupt database.
-		return errSynchronousBlock
+		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
 	codeSyncer, err := code.NewSyncer(
