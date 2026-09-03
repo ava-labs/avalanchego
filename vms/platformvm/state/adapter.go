@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -182,24 +183,30 @@ func (a Adapter) SetRestakeConfig(subnetID ids.ID, nodeID ids.NodeID, config Res
 	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
 }
 
-type currentDelegatorIterator struct{ iterator.Iterator[*Staker] }
-
-func (it currentDelegatorIterator) Value() CurrentDelegator {
-	return currentDelegatorFromStaker(it.Iterator.Value())
+// stakerSeq adapts a native staker iterator into a single-use sequence of
+// typed records. The native iterator is released when iteration stops, so
+// the sequence must be ranged, even if the loop exits early.
+func stakerSeq[T any](it iterator.Iterator[*Staker], convert func(*Staker) T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		defer it.Release()
+		for it.Next() {
+			if !yield(convert(it.Value())) {
+				return
+			}
+		}
+	}
 }
 
-// GetCurrentDelegatorIterator returns the current delegators to the validator
-// on subnetID with nodeID, ordered by their removal from the current staker
-// set.
-//
-// TODO: use iter package
-func (a Adapter) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[CurrentDelegator], error) {
+// GetCurrentDelegators returns the current delegators to the validator on
+// subnetID with nodeID, ordered by their removal from the current staker
+// set. The sequence is single-use and must be ranged.
+func (a Adapter) GetCurrentDelegators(subnetID ids.ID, nodeID ids.NodeID) (iter.Seq[CurrentDelegator], error) {
 	it, err := a.legacy.GetCurrentDelegatorIterator(subnetID, nodeID)
 	if err != nil {
 		return nil, err
 	}
 
-	return currentDelegatorIterator{Iterator: it}, nil
+	return stakerSeq(it, currentDelegatorFromStaker), nil
 }
 
 // PutCurrentDelegator adds delegator to the current delegator set. As with
@@ -262,24 +269,16 @@ func (a Adapter) DeletePendingValidator(subnetID ids.ID, nodeID ids.NodeID) erro
 	return nil
 }
 
-type pendingDelegatorIterator struct{ iterator.Iterator[*Staker] }
-
-func (it pendingDelegatorIterator) Value() PendingDelegator {
-	return pendingDelegatorFromStaker(it.Iterator.Value())
-}
-
-// GetPendingDelegatorIterator returns the pending delegators to the validator
-// on subnetID with nodeID, ordered by their removal from the pending staker
-// set.
-//
-// TODO: use iter package
-func (a Adapter) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[PendingDelegator], error) {
+// GetPendingDelegators returns the pending delegators to the validator on
+// subnetID with nodeID, ordered by their removal from the pending staker
+// set. The sequence is single-use and must be ranged.
+func (a Adapter) GetPendingDelegators(subnetID ids.ID, nodeID ids.NodeID) (iter.Seq[PendingDelegator], error) {
 	it, err := a.legacy.GetPendingDelegatorIterator(subnetID, nodeID)
 	if err != nil {
 		return nil, err
 	}
 
-	return pendingDelegatorIterator{Iterator: it}, nil
+	return stakerSeq(it, pendingDelegatorFromStaker), nil
 }
 
 // PutPendingDelegator adds the delegation that tx registers to the pending set.
@@ -305,94 +304,72 @@ func (a Adapter) DeletePendingDelegator(delegator PendingDelegator) {
 	a.legacy.DeletePendingDelegator(pendingStaker(delegator.StakingPeriod))
 }
 
-type currentStakerIterator struct{ iterator.Iterator[*Staker] }
-
-func (it currentStakerIterator) Value() CurrentStaker {
-	return newCurrentStaker(it.Iterator.Value())
-}
-
-// GetCurrentStakerIterator returns all current stakers, ordered by their
-// removal from the current staker set.
-//
-// TODO: use iter package
-func (a Adapter) GetCurrentStakerIterator() (iterator.Iterator[CurrentStaker], error) {
+// GetCurrentStakers returns all current stakers, ordered by their removal
+// from the current staker set. The sequence is single-use and must be
+// ranged.
+func (a Adapter) GetCurrentStakers() (iter.Seq[CurrentStaker], error) {
 	it, err := a.legacy.GetCurrentStakerIterator()
 	if err != nil {
 		return nil, err
 	}
 
-	return currentStakerIterator{Iterator: it}, nil
+	return stakerSeq(it, newCurrentStaker), nil
 }
 
-type pendingStakerIterator struct{ iterator.Iterator[*Staker] }
-
-func (it pendingStakerIterator) Value() PendingStaker {
-	return newPendingStaker(it.Iterator.Value())
-}
-
-// GetPendingStakerIterator returns all pending stakers, ordered by their
-// removal from the pending staker set.
-//
-// TODO: use iter package
-func (a Adapter) GetPendingStakerIterator() (iterator.Iterator[PendingStaker], error) {
+// GetPendingStakers returns all pending stakers, ordered by their removal
+// from the pending staker set. The sequence is single-use and must be
+// ranged.
+func (a Adapter) GetPendingStakers() (iter.Seq[PendingStaker], error) {
 	it, err := a.legacy.GetPendingStakerIterator()
 	if err != nil {
 		return nil, err
 	}
 
-	return pendingStakerIterator{Iterator: it}, nil
+	return stakerSeq(it, newPendingStaker), nil
 }
 
-// DelegatorDiffIterator iterates over current delegator removals and pending
-// delegator additions in the order the changes take effect.
-// TODO: use iter package
-type DelegatorDiffIterator interface {
-	Next() bool
-	// Value returns the delegation that is changing, whether it is being
-	// added to the current delegator set, and the time the change takes
-	// effect.
-	Value() (StakingPeriod, bool, time.Time)
-	Release()
+// DelegatorDiff is one scheduled change to a validator's delegator set.
+type DelegatorDiff struct {
+	// Period is the staking period of the delegation that is changing.
+	Period StakingPeriod
+	// Added is whether the delegation is being added to the current
+	// delegator set; otherwise it is being removed.
+	Added bool
+	// Time is when the change takes effect.
+	Time time.Time
 }
 
-type delegatorDiffIterator struct {
-	StakerDiffIterator
-}
-
-type adapterCurrentDelegatorIterator struct {
-	iterator.Iterator[CurrentDelegator]
-}
-
-func (it adapterCurrentDelegatorIterator) Value() *Staker {
-	d := it.Iterator.Value()
-	return currentStaker(d.StakingPeriod, d.Reward())
-}
-
-type adapterPendingDelegatorIterator struct {
-	iterator.Iterator[PendingDelegator]
-}
-
-func (it adapterPendingDelegatorIterator) Value() *Staker {
-	return pendingStaker(it.Iterator.Value().StakingPeriod)
-}
-
-// NewDelegatorDiffIterator returns a typed delegator-diff iterator.
-// TODO: use iter package
-func NewDelegatorDiffIterator(
-	currentIterator iterator.Iterator[CurrentDelegator],
-	pendingIterator iterator.Iterator[PendingDelegator],
-) DelegatorDiffIterator {
-	return delegatorDiffIterator{
-		StakerDiffIterator: NewStakerDiffIterator(
-			adapterCurrentDelegatorIterator{Iterator: currentIterator},
-			adapterPendingDelegatorIterator{Iterator: pendingIterator},
-		),
+// GetDelegatorDiffs returns the changes to the delegator set of the
+// validator on subnetID with nodeID — current delegator removals and pending
+// delegator additions — in the order the changes take effect. The sequence
+// is single-use and must be ranged.
+func (a Adapter) GetDelegatorDiffs(subnetID ids.ID, nodeID ids.NodeID) (iter.Seq[DelegatorDiff], error) {
+	current, err := a.legacy.GetCurrentDelegatorIterator(subnetID, nodeID)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func (it delegatorDiffIterator) Value() (StakingPeriod, bool, time.Time) {
-	s, isAdded := it.StakerDiffIterator.Value()
-	return stakingPeriodFromStaker(s), isAdded, s.NextTime
+	pending, err := a.legacy.GetPendingDelegatorIterator(subnetID, nodeID)
+	if err != nil {
+		current.Release()
+		return nil, err
+	}
+
+	it := NewStakerDiffIterator(current, pending)
+	return func(yield func(DelegatorDiff) bool) {
+		defer it.Release()
+		for it.Next() {
+			s, added := it.Value()
+			diff := DelegatorDiff{
+				Period: stakingPeriodFromStaker(s),
+				Added:  added,
+				Time:   s.NextTime,
+			}
+			if !yield(diff) {
+				return
+			}
+		}
+	}, nil
 }
 
 // getPublicKey returns the BLS key to store for a validator on subnetID.

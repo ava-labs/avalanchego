@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -72,9 +73,9 @@ func TestStakingState(t *testing.T) {
 	}
 	require.NoError(t, typedState.PutCurrentDelegator(currentDelegatorFromStaker(delegator)))
 
-	delegatorIt, err := typedState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegators, err := typedState.GetCurrentDelegators(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
-	require.Equal(t, []CurrentDelegator{currentDelegatorFromStaker(delegator)}, iterator.ToSlice(delegatorIt))
+	require.Equal(t, []CurrentDelegator{currentDelegatorFromStaker(delegator)}, slices.Collect(delegators))
 
 	require.NoError(t, typedState.DeleteCurrentDelegator(currentDelegatorFromStaker(delegator)))
 	require.NoError(t, typedState.DeleteCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
@@ -111,9 +112,9 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	}
 	require.NoError(t, typedState.PutPendingDelegator(delegatorTx))
 
-	delegatorIt, err := typedState.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegators, err := typedState.GetPendingDelegators(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
-	require.Equal(t, []PendingDelegator{pendingDelegatorFromStaker(delegator)}, iterator.ToSlice(delegatorIt))
+	require.Equal(t, []PendingDelegator{pendingDelegatorFromStaker(delegator)}, slices.Collect(delegators))
 
 	gotNativeDelegatorIt, err := nativeState.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)

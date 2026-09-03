@@ -1035,17 +1035,20 @@ func unstakeUTXOs(stakerTx platform.PermissionlessStaker, txID ids.ID, state *st
 }
 
 func getNextStakerToReward(chainState state.Chain, tx platform.RewardTx) (*platform.Tx, state.CurrentStaker, error) {
-	currentStakerIterator, err := state.NewAdapter(chainState).GetCurrentStakerIterator()
+	currentStakers, err := state.NewAdapter(chainState).GetCurrentStakers()
 	if err != nil {
 		return nil, nil, err
 	}
-	defer currentStakerIterator.Release()
 
-	if !currentStakerIterator.Next() {
+	var stakerToReward state.CurrentStaker
+	for staker := range currentStakers {
+		stakerToReward = staker
+		break
+	}
+	if stakerToReward == nil {
 		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
 	}
 
-	stakerToReward := currentStakerIterator.Value()
 	period := stakerToReward.Period()
 
 	if period.TxID() != tx.StakerTxID() {

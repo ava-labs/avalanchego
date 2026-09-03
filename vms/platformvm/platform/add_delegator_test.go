@@ -41,48 +41,56 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
-	inputs := []*avax.TransferableInput{{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
-			OutputIndex: 2,
-		},
-		Asset: avax.Asset{ID: ctx.AVAXAssetID},
-		In: &secp256k1fx.TransferInput{
-			Amt:   uint64(5678),
-			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-	}}
-	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ctx.AVAXAssetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(1234),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
+	inputs := []*avax.TransferableInput{
+		{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.ID{'t', 'x', 'I', 'D'},
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   uint64(5678),
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		},
-	}}
-	stakes := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ctx.AVAXAssetID},
-		Out: &stakeable.LockOut{
-			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: validatorWeight,
+	}
+	outputs := []*avax.TransferableOutput{
+		{
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: uint64(1234),
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
-	}}
+	}
+	stakes := []*avax.TransferableOutput{
+		{
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			Out: &stakeable.LockOut{
+				Locktime: uint64(clk.Time().Add(time.Second).Unix()),
+				TransferableOut: &secp256k1fx.TransferOutput{
+					Amt: validatorWeight,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
+					},
+				},
+			},
+		},
+	}
 	addDelegatorTx = &AddDelegatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Outs:         outputs,
-			Ins:          inputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
+		BaseTx: BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+				Outs:         outputs,
+				Ins:          inputs,
+				Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
+			},
+		},
 		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),
@@ -140,48 +148,56 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	assetID := ids.GenerateTestID()
 	validatorWeight := uint64(2022)
-	inputs := []*avax.TransferableInput{{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
-			OutputIndex: 2,
-		},
-		Asset: avax.Asset{ID: assetID},
-		In: &secp256k1fx.TransferInput{
-			Amt:   uint64(5678),
-			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-	}}
-	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(1234),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
+	inputs := []*avax.TransferableInput{
+		{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.ID{'t', 'x', 'I', 'D'},
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   uint64(5678),
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
 			},
 		},
-	}}
-	stakes := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: assetID},
-		Out: &stakeable.LockOut{
-			Locktime: uint64(clk.Time().Add(time.Second).Unix()),
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: validatorWeight,
+	}
+	outputs := []*avax.TransferableOutput{
+		{
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: uint64(1234),
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
-	}}
+	}
+	stakes := []*avax.TransferableOutput{
+		{
+			Asset: avax.Asset{ID: assetID},
+			Out: &stakeable.LockOut{
+				Locktime: uint64(clk.Time().Add(time.Second).Unix()),
+				TransferableOut: &secp256k1fx.TransferOutput{
+					Amt: validatorWeight,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
+					},
+				},
+			},
+		},
+	}
 	addDelegatorTx = &AddDelegatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Outs:         outputs,
-			Ins:          inputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
+		BaseTx: BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+				Outs:         outputs,
+				Ins:          inputs,
+				Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
+			},
+		},
 		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),

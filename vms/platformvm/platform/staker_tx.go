@@ -46,7 +46,7 @@ type Staker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
 	Weight() uint64
-	// TODO deprecate
+	// TODO remove
 	CurrentPriority() Priority
 }
 

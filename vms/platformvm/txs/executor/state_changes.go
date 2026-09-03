@@ -192,14 +192,12 @@ func advanceTimeTo(
 	parentStakingState := state.NewAdapter(parentState)
 	changesStakingState := state.NewAdapter(changes)
 
-	pendingStakerIterator, err := parentStakingState.GetPendingStakerIterator()
+	pendingStakers, err := parentStakingState.GetPendingStakers()
 	if err != nil {
 		return nil, false, err
 	}
-	defer pendingStakerIterator.Release()
 
-	for pendingStakerIterator.Next() {
-		stakerToRemove := pendingStakerIterator.Value()
+	for stakerToRemove := range pendingStakers {
 		period := stakerToRemove.Period()
 
 		if period.Start().After(newChainTime) {
@@ -268,14 +266,12 @@ func advanceTimeTo(
 	// Invariant: It is not safe to modify the state while iterating over it,
 	// so we use the parentState's iterator rather than the changes iterator.
 	// ParentState must not be modified before this iterator is released.
-	currentStakerIterator, err := parentStakingState.GetCurrentStakerIterator()
+	currentStakers, err := parentStakingState.GetCurrentStakers()
 	if err != nil {
 		return nil, false, err
 	}
-	defer currentStakerIterator.Release()
 
-	for currentStakerIterator.Next() {
-		stakerToRemove := currentStakerIterator.Value()
+	for stakerToRemove := range currentStakers {
 		period := stakerToRemove.Period()
 
 		if period.End().After(newChainTime) {
