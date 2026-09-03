@@ -45,9 +45,7 @@ type StateUpgradeAccount struct {
 // Equal reports whether s and other describe the same state modifications.
 // It must treat a config as equal to its own JSON round-trip, since the copy
 // persisted by WriteChainConfig is compared against a fresh parse of the
-// upgrade bytes on every startup: nil and empty code/storage are equivalent
-// (matching their len/range handling in stateupgrade.Configure), and balance
-// changes are compared by value regardless of hex or decimal representation.
+// upgrade bytes on every startup.
 func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
 	if s == nil || other == nil {
 		return s == other

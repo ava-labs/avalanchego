@@ -156,12 +156,8 @@ func TestStateUpgradeEqual(t *testing.T) {
 	tests := []struct {
 		name    string
 		upgrade string
-		// other is compared against upgrade; if empty, the JSON round-trip
-		// of upgrade is used, mirroring how the config persisted by
-		// WriteChainConfig is compared against a fresh parse of the
-		// upgrade bytes at startup.
-		other string
-		want  bool
+		other   string // if empty, round-trips upgrade
+		want    bool
 	}{
 		{
 			name:    "round-trip full entry",
@@ -232,13 +228,13 @@ func TestStateUpgradeEqual(t *testing.T) {
 			var a StateUpgrade
 			require.NoError(json.Unmarshal([]byte(tt.upgrade), &a))
 			var b StateUpgrade
-			if tt.other == "" {
-				roundTripped, err := json.Marshal(a)
+			other := []byte(tt.other)
+			if len(other) == 0 {
+				var err error
+				other, err = json.Marshal(a)
 				require.NoError(err)
-				require.NoError(json.Unmarshal(roundTripped, &b))
-			} else {
-				require.NoError(json.Unmarshal([]byte(tt.other), &b))
 			}
+			require.NoError(json.Unmarshal(other, &b))
 			require.Equal(tt.want, a.Equal(&b))
 			require.Equal(tt.want, b.Equal(&a))
 		})
