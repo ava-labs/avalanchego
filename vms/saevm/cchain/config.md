@@ -26,6 +26,8 @@ Default values are overridden only if specified in the given config file. It is 
 
 Configuration is provided as a JSON object. All fields are optional unless otherwise specified.
 
+Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them. The one exception is [`eth-apis`](#deprecated-eth-apis), which is deprecated but still honoured.
+
 ## Block Building
 
 | Option | Type | Description | Default |
@@ -95,6 +97,31 @@ Note that `eth_subscribe` is only available over the websocket endpoint
 notifications. Both endpoints are served by the same node and therefore serve
 the same `apis`; to expose different method sets on each, run separately
 configured node fleets behind each path.
+
+### Deprecated: `eth-apis`
+
+`eth-apis` is the API allowlist of the pre-SAE C-Chain. It is deprecated and
+**WILL BE REMOVED in the next release**; migrate to `apis`. Until then,
+`eth-apis` continues to work. The node maps each name to the `apis` values that
+serve the same methods (see the table below). The node also logs a warning that
+contains the equivalent `apis` value; copy that value to migrate. If a config
+sets both options, `apis` wins and the node ignores `eth-apis` with a warning.
+An unrecognised `eth-apis` name is a fatal configuration error, as it was
+pre-SAE.
+
+| `eth-apis` name | `apis` equivalent |
+|-----------------|-------------------|
+| `web3` | `web3` |
+| `net` | `net` |
+| `eth-filter` | `subscriptions` |
+| `internal-eth` | `gas`, `avalanche` |
+| `internal-blockchain` | `chain`, `avalanche` |
+| `internal-transaction` | `transactions` |
+| `internal-tx-pool` | `txpool` |
+| `internal-debug` | `db` |
+| `debug-tracer`, `debug-file-tracer` | `trace` |
+| `debug-handler` | `profile` |
+| `eth`, `admin`, `debug`, `internal-account`, `internal-personal` | none: their methods (e.g. `eth_etherbase`, the `admin` and `personal` namespaces) no longer exist and the name is ignored with a warning |
 
 ## State Sync
 

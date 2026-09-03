@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -136,27 +139,77 @@ var errProductionCommitInterval = fmt.Errorf("production networks must use the c
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values.
-func parseConfig(b []byte, networkID uint32) (config, error) {
+//
+// The returned strings are warnings to log for the operator.
+func parseConfig(b []byte, networkID uint32) (config, []string, error) {
 	c := defaultConfig()
 	if len(b) == 0 {
-		return c, nil
+		return c, nil, nil
 	}
 
-	if err := json.Unmarshal(b, &c); err != nil {
-		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(b, &keys); err != nil {
+		return config{}, nil, fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
 	}
+	if err := json.Unmarshal(b, &c); err != nil {
+		return config{}, nil, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+	warnings, err := c.applyDeprecated(keys)
+	if err != nil {
+		return config{}, nil, err
+	}
+
+	var unrecognized []string
+	for key := range keys {
+		if !configKeys.Contains(key) {
+			unrecognized = append(unrecognized, key)
+		}
+	}
+	if len(unrecognized) > 0 {
+		warnings = append(warnings, "ignoring unrecognized options: "+quotedList(unrecognized))
+	}
+
 	saeCfg := c.saeConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return config{}, err
+		return config{}, nil, err
 	}
 	if err := saeCfg.DBConfig.Verify(); err != nil {
-		return config{}, err
+		return config{}, nil, err
 	}
 	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
 		constants.ProductionNetworkIDs.Contains(networkID) {
-		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
+		return config{}, nil, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
-	return c, nil
+	return c, warnings, nil
+}
+
+// configKeys are the JSON keys that unmarshal into a [config] field.
+// [parseConfig] warns about, and ignores, all other keys.
+var configKeys = jsonKeys(reflect.TypeFor[config]())
+
+// jsonKeys returns the JSON keys that unmarshal into t's fields, including the
+// fields of embedded structs.
+func jsonKeys(t reflect.Type) set.Set[string] {
+	fields := reflect.VisibleFields(t)
+	keys := set.NewSet[string](len(fields))
+	for _, f := range fields {
+		if f.Anonymous {
+			continue
+		}
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if name == "" {
+			name = f.Name // an untagged field unmarshals from its own name
+		}
+		keys.Add(name)
+	}
+	return keys
+}
+
+// quotedList returns elems, sorted, as a JSON array of strings.
+func quotedList[T ~string](elems []T) string {
+	slices.Sort(elems)
+	b, _ := json.Marshal(elems) // marshalling strings cannot fail
+	return string(b)
 }
 
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
@@ -177,7 +230,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowMissingTries: c.AllowMissingTries,
 		},
 		RPCConfig: rpc.Config{
-      APIs:                c.APIs,
+			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
 			EVMTimeout:          c.APIMaxDuration.Duration,

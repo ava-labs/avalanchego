@@ -39,11 +39,12 @@ func TestParseConfig(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	tests := []struct {
-		name      string
-		json      string
-		networkID uint32
-		want      config
-		wantErr   testerr.Want
+		name         string
+		json         string
+		networkID    uint32
+		want         config
+		wantWarnings []string
+		wantErr      testerr.Want
 	}{
 		// Defaults and errors
 		{
@@ -228,6 +229,14 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 
+		// Unrecognized options
+		{
+			name:         "unrecognized/options",
+			json:         `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
+			want:         with(func(c *config) { c.TrieCleanCache = 256 }),
+			wantWarnings: []string{`ignoring unrecognized options: ["hello austin larson","rpc-gas-cap"]`},
+		},
+
 		// All active fields
 		{
 			name: "all_active_fields",
@@ -282,11 +291,12 @@ func TestParseConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
-			got, err := parseConfig([]byte(test.json), test.networkID)
+			got, gotWarnings, err := parseConfig([]byte(test.json), test.networkID)
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
+			require.Equal(t, test.wantWarnings, gotWarnings, "parseConfig(...) warnings")
 		})
 	}
 }
