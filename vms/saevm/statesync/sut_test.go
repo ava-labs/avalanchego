@@ -365,21 +365,23 @@ func setupGenesis(t *testing.T, genesis *core.Genesis, db ethdb.Database, tdb *t
 
 	// These could have been clobbered by [core.SetupGenesisBlock] if the
 	// genesis state hadn't been committed.
+	batch := db.NewBatch()
 	if priorAccepted != (ethcommon.Hash{}) {
-		rawdb.WriteHeadFastBlockHash(db, priorAccepted)
+		rawdb.WriteHeadFastBlockHash(batch, priorAccepted)
 	}
 	if priorBlock != (ethcommon.Hash{}) {
-		rawdb.WriteHeadBlockHash(db, priorBlock)
+		rawdb.WriteHeadBlockHash(batch, priorBlock)
 	}
 	if priorHeader != (ethcommon.Hash{}) {
-		rawdb.WriteHeadHeaderHash(db, priorHeader)
+		rawdb.WriteHeadHeaderHash(batch, priorHeader)
 	}
 
 	// [NewVM] assumes that the genesis block is "finalized", which does not
 	// happen in [core.SetupGenesisBlock].
 	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
-		rawdb.WriteFinalizedBlockHash(db, hash)
+		rawdb.WriteFinalizedBlockHash(batch, hash)
 	}
 
+	require.NoError(t, batch.Write(), "batch.Write()")
 	return config
 }
