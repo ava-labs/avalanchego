@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/hashdb"
@@ -188,6 +190,12 @@ type Tracker struct {
 
 	config Config
 	log    logging.Logger
+
+	// pinMu guards pinnedDiskRoot: the snapshot disk layer root whose trie
+	// the Tracker keeps referenced so snapshot generation can always resolve
+	// it. See [Tracker.PinSnapshotDiskRoot].
+	pinMu          sync.Mutex
+	pinnedDiskRoot common.Hash
 }
 
 // NewTracker provides a new [Tracker] on the underlying database.
@@ -286,6 +294,79 @@ func (t *Tracker) TrieDB() *triedb.Database {
 // by [Tracker.StateDB]. This MAY be nil.
 func (t *Tracker) Snapshot() *snapshot.Tree {
 	return t.snaps
+}
+
+// SnapshotCapLayers is the number of in-memory snapshot diff layers retained
+// when [state.StateDB.Commit] caps the snapshot tree, as configured by
+// [Tracker.StateDBCommitOptions]. SAE has no reorgs, so deep diff layers
+// serve no purpose. A depth of 1 flattens block N-1's diff while committing
+// block N, when N-1's trie is still referenced (settlement-based pruning only
+// dereferences it ~Tau later); the snapshot generator, which proves each
+// account/storage range against the trie at the disk layer's root, therefore
+// always has a resolvable target and can complete. libevm's default of 128
+// would pin the disk root deep inside the range SAE has already pruned,
+// wedging generation forever.
+const SnapshotCapLayers = 1
+
+// StateDBCommitOptions returns options that MUST be passed to every
+// [state.StateDB.Commit] of a StateDB opened via [Tracker.StateDB].
+func (t *Tracker) StateDBCommitOptions() []stateconf.StateDBCommitOption {
+	if t.snaps == nil {
+		return nil
+	}
+	return []stateconf.StateDBCommitOption{
+		stateconf.WithSnapshotCapLayers(SnapshotCapLayers),
+	}
+}
+
+// PinSnapshotDiskRoot references the trie at the snapshot disk layer's
+// current root, releasing the reference held for the previous disk root. If
+// the disk root is unset (its zero value) it returns without releasing that
+// previous pin, so callers MUST NOT rely on it as an unconditional release.
+//
+// Snapshot generation proves each account/storage range against the trie at
+// the disk layer's root, so that trie MUST remain resolvable for as long as
+// the root is the disk layer's; settlement-based pruning would otherwise
+// dereference it. The Reference call relies on the disk root's node already
+// being in the HashDB's dirty set, put there by [Tracker.Track] of that same
+// root one block ago (depth-1 capping means today's disk root was
+// yesterday's execution head). hashdb's Reference silently no-ops for a root
+// that ISN'T in the dirty set (e.g. a boot root already flushed to disk);
+// that's safe, since such a root is already durably persisted and needs no
+// in-memory pin, but it means the call-site ordering —
+// [state.StateDB.Commit], then [Tracker.Track], then PinSnapshotDiskRoot — is
+// load-bearing, not stylistic. Call after each block's [state.StateDB.Commit]
+// and [Tracker.Track].
+func (t *Tracker) PinSnapshotDiskRoot() {
+	if t.snaps == nil {
+		return
+	}
+
+	t.pinMu.Lock()
+	defer t.pinMu.Unlock()
+	diskRoot := t.snaps.DiskRoot()
+	if diskRoot == t.pinnedDiskRoot || diskRoot == (common.Hash{}) {
+		return
+	}
+	// Never returns an error because it is a [triedb.HashDB].
+	if err := t.cache.TrieDB().Reference(diskRoot, common.Hash{}); err != nil {
+		t.log.Error("*triedb.Database.Reference() of snapshot disk root", zap.Error(err))
+	}
+	t.unpinLocked()
+	t.pinnedDiskRoot = diskRoot
+}
+
+// unpinLocked dereferences the currently pinned disk root, if any. t.pinMu
+// MUST be held.
+func (t *Tracker) unpinLocked() {
+	if t.pinnedDiskRoot == (common.Hash{}) {
+		return
+	}
+	// Never returns an error because it is a [triedb.HashDB].
+	if err := t.cache.TrieDB().Dereference(t.pinnedDiskRoot); err != nil {
+		t.log.Error("*triedb.Database.Dereference() of pinned snapshot disk root", zap.Error(err))
+	}
+	t.pinnedDiskRoot = common.Hash{}
 }
 
 // CommitInterval returns the number of blocks between guaranteed commits of the
@@ -419,6 +500,10 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 		// builds will race with the close.
 		t.snaps.Release()
 	}
+
+	t.pinMu.Lock()
+	t.unpinLocked()
+	t.pinMu.Unlock()
 
 	if err := t.cache.TrieDB().Close(); err != nil {
 		errs = append(errs, fmt.Errorf("triedb.Database.Close(): %v", err))
