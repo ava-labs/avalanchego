@@ -225,6 +225,16 @@ func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error 
 	return syncer.WriteSynced(summary)
 }
 
+func (s *sut) asVM(t *testing.T, at time.Time) *vmSUT {
+	t.Helper()
+
+	return newVM(t,
+		withDatabase(s.cfg.avaDB),
+		withXDB(saetest.CloneExecutionResultsDB(t, s.cfg.xdb)),
+		withTime(at),
+	)
+}
+
 // newVM constructs and initializes a VM and a summary handler.
 func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	t.Helper()
@@ -339,4 +349,17 @@ func (s *vmSUT) acceptBlocks(t *testing.T, n uint64) {
 	for range n {
 		s.clock.AdvanceToSettle(t.Context(), t, s.acceptBlock(t))
 	}
+}
+
+func (s *vmSUT) compareVMs(t *testing.T, other *vmSUT) {
+	t.Helper()
+
+	lastAccepted := s.lastAcceptedBlock(t)
+	otherLastAccepted := other.lastAcceptedBlock(t)
+	require.Equalf(t, lastAccepted.Height(), otherLastAccepted.Height(), "last accepted block height mismatch")
+	require.Equalf(t, lastAccepted.Hash(), otherLastAccepted.Hash(), "last accepted block hash mismatch")
+
+	require.NoErrorf(t, lastAccepted.WaitUntilExecuted(t.Context()), "WaitUntilExecuted()")
+	require.NoErrorf(t, otherLastAccepted.WaitUntilExecuted(t.Context()), "WaitUntilExecuted()")
+	require.Equalf(t, lastAccepted.PostExecutionStateRoot(), otherLastAccepted.PostExecutionStateRoot(), "post-execution state root mismatch")
 }

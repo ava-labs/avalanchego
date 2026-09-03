@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -104,11 +103,7 @@ func TestStateSyncEndToEnd(t *testing.T) {
 	sourceVM.acceptBlocks(t, numBlocks)
 
 	// catch up a new VM
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
+	clientVM := client.asVM(t, sourceVM.hooks.Now())
 	lastHeight := sourceVM.lastAcceptedBlock(t).Height()
 	for height := summary.Height() + 1; height <= lastHeight; height++ {
 		b := sourceVM.blockAtHeight(t, height)
@@ -118,12 +113,7 @@ func TestStateSyncEndToEnd(t *testing.T) {
 		require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
 		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
 	}
-
-	sourceHead, err := sourceVM.LastAccepted(ctx)
-	require.NoError(t, err, "source LastAccepted()")
-	clientHead, err := clientVM.LastAccepted(ctx)
-	require.NoError(t, err, "client LastAccepted()")
-	require.Equal(t, sourceHead, clientHead, "client VM caught up to the source head")
+	sourceVM.compareVMs(t, clientVM)
 }
 
 // TestStateSyncWithSettlementLag syncs a fresh node from a source
@@ -158,15 +148,8 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 
 	// Recovery inside VM initialization must reconstruct the settlement of
 	// blocks 3 and 4, which settled blocks below the synced last settled block.
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
-
-	head, err := clientVM.LastAccepted(ctx)
-	require.NoError(t, err, "client LastAccepted()")
-	require.Equal(t, ids.ID(b4.Hash()), head, "client VM recovered the synced head")
+	clientVM := client.asVM(t, sourceVM.clock.Now())
+	sourceVM.compareVMs(t, clientVM)
 }
 
 // TestStateSyncSynchronousSettled confirms that a state sync finishes and
@@ -197,14 +180,8 @@ func TestStateSyncSynchronousSettled(t *testing.T) {
 
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
 
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
-	head, err := clientVM.LastAccepted(ctx)
-	require.NoError(t, err, "client LastAccepted()")
-	require.Equal(t, ids.ID(accepted.Hash()), head, "client VM recovered the synced head")
+	clientVM := client.asVM(t, sourceVM.clock.Now())
+	sourceVM.compareVMs(t, clientVM)
 }
 
 func TestCancelSync(t *testing.T) {
@@ -276,11 +253,7 @@ func TestStateSyncLong(t *testing.T) {
 	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
 
-	clientVM := newVM(t,
-		withDatabase(db),
-		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
-		withTime(sourceVM.clock.Now()),
-	)
+	clientVM := client.asVM(t, sourceVM.hooks.Now())
 
 	wantLast, err := sourceVM.LastAccepted(t.Context())
 	require.NoErrorf(t, err, "%T.LastAccepted()", sourceVM)
