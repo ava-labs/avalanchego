@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -281,6 +282,67 @@ func TestRecover(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestRecoverSnapshotAfterShutdown cleanly restarts a VM. The snapshot
+// persisted at shutdown MUST be loaded as-is and MUST verify against the
+// recovered state.
+//
+// A snapshot that fails to load is regenerated, which may take hours on a
+// mainnet-sized state. Until that finishes, state reads and state-sync serving
+// fall back to the far slower trie. Clean restarts are routine and should not
+// result in a significant performance reduction.
+func TestRecoverSnapshotAfterShutdown(t *testing.T) {
+	t.Parallel()
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	// Block 2 commits block 1's state, the only trie on disk beyond genesis.
+	// Block 3 settles block 2 without committing it, so at shutdown the last
+	// settled state has no trie on disk. The snapshot MUST be persisted at a
+	// root that does, or the restart regenerates it.
+	const (
+		commitInterval = 2
+		numBlocks      = commitInterval + 1
+	)
+	sharedOpts := []options.Option[sutConfig]{
+		timeOpt,
+		withSnapshot(),
+		withCommitInterval(commitInterval),
+	}
+	db := memdb.New()
+	xdb := saetest.NewHeightIndexDB()
+	ctx, sut := newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	}))...)
+	// The genesis snapshot generates in the background. Waiting for it keeps
+	// the blocks below from interrupting generation.
+	requireSnapshotEventuallyVerified(t, sut)
+
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		vmTime.AdvanceToSettle(ctx, t, b)
+	}
+	sut.verifySnapshot(t)
+	snaps := sut.rawVM.exec.Snapshot()
+	sut.close()
+
+	// Closing flattens every diff layer into the disk layer before persisting
+	// it, so the root MUST be read afterwards.
+	diskRoot := snaps.DiskRoot()
+
+	_, sut = newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, db)
+	}))...)
+
+	snaps = sut.rawVM.exec.Snapshot()
+	require.NotNilf(t, snaps, "%T.Snapshot()", sut.rawVM.exec)
+	require.Equalf(t, diskRoot, snaps.DiskRoot(), "%T.DiskRoot() after restart MUST be the root persisted at shutdown", snaps)
+	sut.verifySnapshot(t)
 }
 
 // A failure to open the execution-results database must abort [VM]

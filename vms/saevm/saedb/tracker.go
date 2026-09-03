@@ -205,6 +205,12 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 	}, nil
 }
 
+// Snapshot returns any snapshot that is used by a [state.StateDB] returned
+// by [Tracker.StateDB]. This MAY be nil.
+func (t *Tracker) Snapshot() *snapshot.Tree {
+	return t.snaps
+}
+
 // CommitInterval returns the number of blocks between guaranteed commits of the
 // settled state, as configured in [Config.CommitInterval].
 func (t *Tracker) CommitInterval() uint64 {
