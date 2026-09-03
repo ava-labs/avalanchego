@@ -216,7 +216,7 @@ func TestTrackerClose(t *testing.T) {
 	})
 }
 
-// TestTrackerMaybeCap checks that [Tracker.MaybeCommit] decreases memory
+// TestTrackerMaybeCap checks that [Tracker.BlockExecuted] decreases memory
 // pressure to prevent a [triedb.Database.Commit] from being too expensive.
 func TestTrackerMaybeCap(t *testing.T) {
 	const (
@@ -251,14 +251,14 @@ func TestTrackerMaybeCap(t *testing.T) {
 	for height := uint64(1); height < cfg.CommitInterval; height++ {
 		root := writeBlock(t, tr, prevRoot, height)
 		before := inMemorySize()
-		require.NoErrorf(t, tr.MaybeCommit(common.Hash{}, root, height), "%T.MaybeCommit() at height %d", tr, height)
+		require.NoErrorf(t, tr.BlockExecuted(common.Hash{}, root, height), "%T.BlockExecuted() at height %d", tr, height)
 		after := inMemorySize()
 
 		// Invariant: whatever schedule maybeCap uses to shrink its target, the
-		// in-memory size never exceeds the configured maximum after MaybeCommit.
-		require.LessOrEqualf(t, after, common.StorageSize(maxCapBytes), "in-memory size exceeds the maximum cap after %T.MaybeCommit() at height %d", tr, height)
+		// in-memory size never exceeds the configured maximum after BlockExecuted.
+		require.LessOrEqualf(t, after, common.StorageSize(maxCapBytes), "in-memory size exceeds the maximum cap after %T.BlockExecuted() at height %d", tr, height)
 
-		// MaybeCommit can ONLY decrease memory pressure
+		// BlockExecuted can ONLY decrease memory pressure
 		if after < before {
 			capsFired++
 		}
@@ -271,7 +271,7 @@ func TestTrackerMaybeCap(t *testing.T) {
 	root := writeBlock(t, tr, prevRoot, commitInterval)
 	prevRoot = root // for cleanup
 	before := inMemorySize()
-	require.NoErrorf(t, tr.MaybeCommit(root, root, commitInterval), "%T.MaybeCommit() at height %d", tr, commitInterval)
+	require.NoErrorf(t, tr.BlockExecuted(root, root, commitInterval), "%T.BlockExecuted() at height %d", tr, commitInterval)
 	require.Less(t, inMemorySize(), before, "in-memory size did not drop after commit at the interval")
 }
 
@@ -362,7 +362,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 						peakDirty = max(peakDirty, dirty)
 
 						start := time.Now()
-						require.NoErrorf(b, tr.MaybeCommit(root, root, height), "%T.MaybeCommit() at height %d", tr, height)
+						require.NoErrorf(b, tr.BlockExecuted(root, root, height), "%T.BlockExecuted() at height %d", tr, height)
 						maxPause = max(maxPause, time.Since(start))
 
 						prevRoot = root

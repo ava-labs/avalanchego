@@ -1035,12 +1035,19 @@ func missingTrieNodeError(root common.Hash) testerr.Want {
 	})
 }
 
-// TestHashDBStateRootAvailability ensures the ability to dereference recent
-// states explicitly when no longer needed. This is not needed for Firewood,
-// which does this automatically, and any archival node, which never prunes.
+// TestHashDBStateRootAvailability checks that untracking a state prunes it from
+// memory unless the snapshot still retains it, and that tracked states remain
+// available. This is not needed for Firewood, which prunes automatically, nor
+// any archival node, which never prunes.
 func TestHashDBStateRootAvailability(t *testing.T) {
+	// Blocks form three contiguous sections by height, distinguished by whether
+	// their states are untracked below and whether they fall inside the
+	// snapshot's retention window of the last [core.TriesInMemory] states.
 	const (
-		numBlocks      = 10
+		numPruned      = 10                               // untracked, outside the window
+		numRetained    = 10                               // untracked, inside the window
+		numTracked     = core.TriesInMemory - numRetained // tracked, inside the window
+		numBlocks      = numPruned + numRetained + numTracked
 		commitInterval = 2 * numBlocks // guarantee no states are committed
 	)
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
@@ -1092,12 +1099,11 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 	})
 
 	t.Run("remove in memory state", func(t *testing.T) {
-		const numToDrop = 10
-		for _, b := range chain.AllBlocks()[:numToDrop] {
+		for _, b := range chain.AllExceptGenesis()[:numPruned+numRetained] {
 			e.Untrack(b.PostExecutionStateRoot())
 		}
 		checkStates(t, e, func(height uint64) bool {
-			return height >= numToDrop
+			return height > numPruned
 		})
 	})
 }

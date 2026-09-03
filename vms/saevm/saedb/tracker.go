@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -173,6 +174,12 @@ type Tracker struct {
 	snaps *snapshot.Tree
 	cache state.Database
 
+	// recent is a ring of the post-execution roots of the most recently
+	// executed blocks, each holding a reference that keeps its trie in memory
+	// for the snapshot generator. Unused when the snapshot is disabled.
+	recent     [core.TriesInMemory]common.Hash
+	recentNext int
+
 	config Config
 	log    logging.Logger
 }
@@ -230,8 +237,9 @@ func (t *Tracker) Track(root common.Hash) {
 	}
 }
 
-// MaybeCommit potentially calls [triedb.Database.Commit], based on the
-// following priorities:
+// BlockExecuted informs the Tracker that the block at height executed to
+// executionRoot, settling the state at settledRoot. It MAY call
+// [triedb.Database.Commit], based on the following priorities:
 //
 // 1. If [Config.Scheme] is [customrawdb.FirewoodScheme], the settled root is committed.
 // 2. If [Config.Archival] is true, then `executionRoot` will be committed.
@@ -239,8 +247,12 @@ func (t *Tracker) Track(root common.Hash) {
 // 4. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
 // 5. Otherwise, nothing is committed.
 //
-// This does NOT change in-memory tracking.
-func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uint64) error {
+// While the snapshot is enabled, the Tracker also holds its own reference to
+// the executed state, as if by [Tracker.Track], and releases it once
+// [core.TriesInMemory] later blocks have executed.
+func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height uint64) error {
+	t.retain(executionRoot)
+
 	var (
 		commit  common.Hash
 		because string
@@ -271,6 +283,23 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, commit, because, height, err)
 	}
 	return nil
+}
+
+// retain holds a reference to root until [core.TriesInMemory] later roots have
+// been retained. The snapshot's disk layer never falls further behind the
+// last-executed state, and generation resumes at its root, so that trie MUST
+// still be in memory.
+func (t *Tracker) retain(root common.Hash) {
+	if t.snaps == nil {
+		return
+	}
+	t.Track(root)
+	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {
+		t.Untrack(toEvict)
+	}
+	t.recent[t.recentNext] = root
+	t.recentNext++
+	t.recentNext %= len(t.recent)
 }
 
 // maybeCap checks if the in-memory state of a HashDB is too high for an efficient
