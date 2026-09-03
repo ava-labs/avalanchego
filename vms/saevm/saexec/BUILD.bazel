@@ -17,6 +17,7 @@ go_library(
         "//cache/lru",
         "//utils/logging",
         "//vms/components/gas",
+        "//vms/evm/prefetch",
         "//vms/saevm/blocks",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
@@ -31,6 +32,7 @@ go_library(
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm/eventual",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
@@ -44,6 +46,7 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
+        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/gas",

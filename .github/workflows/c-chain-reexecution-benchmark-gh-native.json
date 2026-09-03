@@ -2,18 +2,8 @@
     "pull_request": {
         "include": [
             {
-              "runner": "ubuntu-24.04",
-              "test": "hashdb-101-250k",
-              "timeout-minutes": 30
-            },
-            {
-                "runner": "blacksmith-4vcpu-ubuntu-2404",
+                "runner": "ubuntu-24.04",
                 "test": "hashdb-101-250k",
-                "timeout-minutes": 30
-            },
-            {
-                "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "test": "hashdb-archive-101-250k",
                 "timeout-minutes": 30
             }
         ]

@@ -157,8 +157,7 @@ function test_import_testing_only_in_tests {
   # Files in /tests/ are already excluded by the `find ... ! -path`
   INTENDED_FOR_TESTING="${IN_TEST_PKG}"
 
-  # -3 suppresses files that have test logic and have the "test" build tag
-  # -2 suppresses files that are tagged despite not having detectable test logic
+  # Report files with test-only dependencies outside a test package.
   UNTAGGED=$(comm -23 <(echo "${HAVE_TEST_LOGIC}" | sort -u) <(echo "${INTENDED_FOR_TESTING}" | sort -u))
   if [ -z "${UNTAGGED}" ]; then
     return 0

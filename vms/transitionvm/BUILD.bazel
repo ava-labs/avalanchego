@@ -15,6 +15,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/transitionvm",
     visibility = ["//visibility:public"],
     deps = [
+        "//api",
         "//api/metrics",
         "//database",
         "//database/prefixdb",
@@ -25,7 +26,6 @@ go_library(
         "//snow/engine/snowman/block",
         "//snow/validators",
         "//utils",
-        "//utils/lock",
         "//utils/logging",
         "//utils/set",
         "//version",

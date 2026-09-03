@@ -233,7 +233,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 |--------|------|-------------|---------|
 | `state-sync-enabled` | bool | Enable state sync | `false` |
 | `state-sync-skip-resume` | bool | Force state sync to use highest available summary block | `false` |
-| `state-sync-ids` | string | Comma-separated list of state sync IDs | - |
+| `state-sync-ids` | array | List of node IDs to request state from; If not specified (or empty), peers are selected at random. | - |
 | `state-sync-commit-interval` | uint64 | Commit interval for state sync (blocks) | `16384` |
 | `state-sync-min-blocks` | uint64 | Minimum blocks ahead required for state sync | `300000` |
 | `state-sync-request-size` | uint16 | Number of key/values to request per state sync request | `1024` |

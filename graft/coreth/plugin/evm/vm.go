@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -115,6 +114,7 @@ const (
 	ethMetricsPrefix        = "eth"
 	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
+	syncServerMetricsPrefix = "sync_server"
 )
 
 // Define the API endpoints for the VM
@@ -615,7 +615,15 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodProofHandlerID, syncer.NewGetProofHandler(tdb.Firewood)); err != nil {
+		syncServerMetrics := prometheus.NewRegistry()
+		if err := vm.ctx.Metrics.Register(syncServerMetricsPrefix, syncServerMetrics); err != nil {
+			return fmt.Errorf("registering sync server metrics: %w", err)
+		}
+		proofHandler, err := syncer.NewGetProofHandler(tdb.Firewood, syncServerMetrics)
+		if err != nil {
+			return fmt.Errorf("creating firewood proof handler: %w", err)
+		}
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, proofHandler); err != nil {
 			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
@@ -639,35 +647,24 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 
 	vm.Server = engine.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 	stateSyncEnabled := vm.stateSyncEnabled(lastAcceptedHeight)
-	// parse nodeIDs from state sync IDs in vm config
-	var stateSyncIDs []ids.NodeID
-	if stateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
-		nodeIDs := strings.Split(vm.config.StateSyncIDs, ",")
-		stateSyncIDs = make([]ids.NodeID, len(nodeIDs))
-		for i, nodeIDString := range nodeIDs {
-			nodeID, err := ids.NodeIDFromString(nodeIDString)
-			if err != nil {
-				return fmt.Errorf("failed to parse %s as NodeID: %w", nodeIDString, err)
-			}
-			stateSyncIDs[i] = nodeID
-		}
-	}
 
 	// Initialize the state sync client
+	syncClient := client.New(
+		&client.Config{
+			Network:          vm.Network,
+			Codec:            vm.networkCodec,
+			Stats:            stats.NewClientSyncerStats(leafMetricsNames),
+			StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
+			BlockParser:      vm,
+		},
+	)
+
 	vm.Client = engine.NewClient(&engine.ClientConfig{
-		StateSyncDone: vm.stateSyncDone,
-		Chain:         newChainContextAdapter(vm.eth),
-		State:         vm.State,
-		SnowCtx:       vm.ctx,
-		Client: client.New(
-			&client.Config{
-				Network:          vm.Network,
-				Codec:            vm.networkCodec,
-				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
-				StateSyncNodeIDs: stateSyncIDs,
-				BlockParser:      vm,
-			},
-		),
+		StateSyncDone:       vm.stateSyncDone,
+		Chain:               newChainContextAdapter(vm.eth),
+		State:               vm.State,
+		SnowCtx:             vm.ctx,
+		Client:              syncClient,
 		Enabled:             stateSyncEnabled,
 		SkipResume:          vm.config.StateSyncSkipResume,
 		MinBlocks:           vm.config.StateSyncMinBlocks,
@@ -679,6 +676,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
 		Extender:            vm.extensionConfig.SyncExtender,
+		LeafFetcher:         client.NewLeafFetcher(syncClient, message.CorethLeafsRequestType, message.StateTrieNode),
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume

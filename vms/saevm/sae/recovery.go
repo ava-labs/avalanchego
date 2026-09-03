@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,14 +21,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/unwind"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -45,7 +43,7 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	if err != nil {
 		return nil, err
 	}
-	return blocks.New(ethB, parent, nil, rec.snowCtx.Log)
+	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
 }
 
 // lastCommittedBlock returns the highest settled block whose post-execution
@@ -261,54 +259,39 @@ func lastOf[E any](s []E) E {
 // tracker.
 func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
-	blackhole := new(atomic.Pointer[blocks.Block])
 
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
-		tm := proxytime.Of[gas.Gas](settleAt)
-
-		for {
-			switch b := lastOf(chain); {
-			case b.Synchronous():
-				return nil
-
-			case b.ExecutedByGasTime().Compare(tm) <= 0:
-				if b.Settled() {
-					return nil
-				}
-				return b.MarkSettled(blackhole)
-
-			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
-				if err != nil {
-					return err
-				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
-					return err
-				}
-				chain = append(chain, parent)
-
-				if !b.Settled() && !parent.Synchronous() {
-					continue
-				}
-				if err := parent.MarkSettled(blackhole); err != nil {
-					return err
-				}
+		end := rec.hooks.SettledBy(settler.Header()).Height
+		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+			if err != nil {
+				return err
 			}
+			chain = append(chain, parent)
 		}
+		return nil
 	}
 
 	if err := extend(exec.LastExecuted()); err != nil {
 		return err
 	}
-	lastSettled := lastOf(chain)
-	for _, b := range chain {
-		bMap.Store(b.Hash(), b)
+	var (
+		critical    = slices.Clone(chain)
+		lastSettled = lastOf(chain)
+		unsettled   = chain[:len(chain)-1]
+	)
+
+	// [recovery.executeAllAccepted] discarded the blocks we've just rebuilt,
+	// but execution artefacts are required for determining worst-case state.
+	for _, b := range critical[1:] { // [0] is [saexec.Executor.LastExecuted]
+		if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+			return err
+		}
 	}
 
-	for i, b := range chain[:len(chain)-1] {
+	for i, b := range unsettled {
 		if err := extend(b); err != nil {
 			return err
 		}
@@ -316,7 +299,23 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 			return err
 		}
 	}
-	for _, b := range bMap.m {
+
+	var (
+		settled   = chain[len(unsettled):]
+		blackhole = new(atomic.Pointer[blocks.Block])
+	)
+	for _, b := range settled {
+		if b.Settled() { // e.g. genesis
+			continue
+		}
+		if err := b.MarkSettled(blackhole); err != nil {
+			return err
+		}
+	}
+
+	for _, b := range critical {
+		bMap.Store(b.Hash(), b)
+
 		stage := blocks.Executed
 		if b.Hash() == lastSettled.Hash() {
 			stage = blocks.Settled

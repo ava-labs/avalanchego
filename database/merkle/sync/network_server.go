@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
@@ -49,18 +50,29 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
-func NewProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *ProofHandler[R, C] {
+func NewProofHandler[R any, C any](
+	db DB[R, C],
+	rangeProofMarshaler Marshaler[R],
+	changeProofMarshaler Marshaler[C],
+	registerer prometheus.Registerer,
+) (*ProofHandler[R, C], error) {
+	metrics, err := newHandlerMetrics("sync", registerer)
+	if err != nil {
+		return nil, err
+	}
 	return &ProofHandler[R, C]{
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
-	}
+		metrics:              metrics,
+	}, nil
 }
 
 type ProofHandler[R any, C any] struct {
 	db                   DB[R, C]
 	rangeProofMarshaler  Marshaler[R]
 	changeProofMarshaler Marshaler[C]
+	metrics              *handlerMetrics
 }
 
 func (*ProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -114,6 +126,7 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 	}
 
 	for keyLimit > 0 {
+		generationStart := time.Now()
 		rangeProof, err := h.db.GetRangeProofAtRoot(
 			ctx,
 			root,
@@ -121,6 +134,7 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 			endKey,
 			keyLimit,
 		)
+		h.metrics.observeGeneration(proofTypeRange, time.Since(generationStart), err)
 		if err != nil {
 			if errors.Is(err, ErrInsufficientHistory) {
 				return nil, nil // drop request
@@ -143,10 +157,12 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 		}
 
 		if len(proofBytes) < int(bytesLimit) {
+			h.metrics.proofServed(proofTypeRange, len(proofBytes))
 			return proofBytes, nil
 		}
 		// The proof was too large. Try to shrink it.
 		keyLimit /= 2
+		h.metrics.proofShrunk(proofTypeRange, keyLimit)
 	}
 
 	return nil, errMinProofSizeIsTooLarge
@@ -176,7 +192,9 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 	}
 
 	for keyLimit > 0 {
+		generationStart := time.Now()
 		changeProof, err := h.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
+		h.metrics.observeGeneration(proofTypeChange, time.Since(generationStart), err)
 		if err != nil {
 			if !errors.Is(err, ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
@@ -219,11 +237,13 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 		}
 
 		if len(responseBytes) < bytesLimit {
+			h.metrics.proofServed(proofTypeChange, len(responseBytes))
 			return responseBytes, nil
 		}
 
 		// The proof was too large. Try to shrink it.
 		keyLimit /= 2
+		h.metrics.proofShrunk(proofTypeChange, int(keyLimit))
 	}
 
 	return nil, errMinProofSizeIsTooLarge

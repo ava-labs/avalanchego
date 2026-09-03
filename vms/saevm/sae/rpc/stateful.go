@@ -31,25 +31,6 @@ import (
 
 var noopRelease tracers.StateReleaseFunc = func() {}
 
-// noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
-// the tracer to skip end-of-block operations during partial replay.
-//
-// TODO(StephenButtolph): Properly abstract execution to not rely on method
-// suppression. It is fragile and could result in accidentially modifying the
-// block state or even disk state during tracing.
-type noEndOfBlockOps struct {
-	hook.Points
-}
-
-// EndOfBlockOps always returns nil.
-func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
-
-// AfterExecutingBlock always returns nil.
-func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
-	return nil
-}
-
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
 }
@@ -152,11 +133,8 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // StateAtTransaction returns the execution environment of a particular
 // transaction within a block. It replays all preceding transactions to produce
 // the state just before the target transaction, then returns the message and
-// block context needed for tracing.
-//
-// Replay calls [saexec.Execute] - the same pipeline used by
-// [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
-// operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
+// block context needed for tracing. Replay does not apply end-of-block
+// operations, record block progress, or publish receipts.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
@@ -177,18 +155,22 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
+	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
+	if err != nil {
+		return nil, bCtx, nil, nil, err
+	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	result, err := saexec.Execute(
 		block,
-		b,
-		txIndex,
-		noEndOfBlockOps{b.Hooks()},
+		stateDB,
+		b.Hooks(),
 		b.ChainConfig(),
 		b.ChainContext(),
-		&saexec.NullReceiptStore{},
 		b.Logger(),
+		saexec.WithMaxNumTxs(uint(txIndex)),
+		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
@@ -198,7 +180,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
+	return msg, result.BlockCtx, stateDB, noopRelease, nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
@@ -284,9 +266,9 @@ type tracerBackend struct {
 }
 
 // StateAtBlock returns the state served by [backend.StateAtBlock] with the
-// canonical child block's before-block state changes already applied, because
-// the block-tracing endpoints request the state that the child's transactions
-// ran on.
+// canonical child block's start-executing-block state changes already applied,
+// because the block-tracing endpoints request the state that the child's
+// transactions ran on.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
@@ -310,15 +292,25 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	if err != nil {
 		return nil, nil, err
 	}
-	rules := b.ChainConfig().Rules(child.Number(), true /*isMerge*/, child.Time())
-	// All parameters passed to [saexec.BeforeExecutingBlock] MUST exactly match
-	// those that [saexec.Execute] pass, so that the hooks see the same state.
-	// Parent will have a faked header, so we pass the restored parent block.
-	//
+	block, err := b.NewBlock(child, parentBlock, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("constructing SAE block: %v", err)
+	}
+
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
-	if err := saexec.BeforeExecutingBlock(b.Hooks(), rules, sdb, parentBlock.Header(), child); err != nil {
+	_, err = saexec.Execute(
+		block,
+		sdb,
+		b.Hooks(),
+		b.ChainConfig(),
+		b.ChainContext(),
+		b.Logger(),
+		saexec.WithMaxNumTxs(0),
+		saexec.SkipEndOfBlockOps(),
+	)
+	if err != nil {
 		return nil, nil, err
 	}
 	return sdb, noopRelease, nil
@@ -404,9 +396,9 @@ func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
 }
 
 // StateAtBlock returns the parent's post-execution state with the supplied
-// block's before-block changes applied. The hooks see the block as supplied,
-// not as re-sealed, so tracing a canonical block by RLP matches tracing it by
-// number.
+// block's start-executing-block changes applied. The hooks see the block as
+// supplied, not as re-sealed, so tracing a canonical block by RLP matches
+// tracing it by number.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
@@ -414,8 +406,8 @@ func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Bl
 }
 
 // traceCallBackend is [tracerBackend] except that StateAtBlock excludes the
-// child block's before-block changes. debug_traceCall is expected to behave as
-// if it is executing immediately after the requested block.
+// child block's start-executing-block changes. debug_traceCall is expected to
+// behave as if it is executing immediately after the requested block.
 type traceCallBackend struct {
 	*tracerBackend
 }

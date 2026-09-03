@@ -2,13 +2,8 @@
     "pull_request": {
         "include": [
             {
-                "runner": "ubuntu-24.04",
-                "test": "hashdb-101-250k",
-                "timeout-minutes": 30
-            },
-            {
                 "runner": "avalanche-avalanchego-runner-2ti",
-                "test": "hashdb-101-250k",
+                "test": "hashdb-archive-101-250k",
                 "timeout-minutes": 30
             }
         ]

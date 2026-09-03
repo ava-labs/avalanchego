@@ -203,7 +203,10 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 		if expect >= Settled {
 			return b.brokenInvariantErr("expected to be settled")
 		}
-		if b.SettledStateRoot() != b.LastSettled().PostExecutionStateRoot() {
+		// Although execution is a pre-requisite for settlement, execution
+		// artefacts aren't always restored during database recovery. In these
+		// cases, [Block.PostExecutionStateRoot] would block forever.
+		if s := b.LastSettled(); s.Executed() && b.SettledStateRoot() != s.PostExecutionStateRoot() {
 			return b.brokenInvariantErr("state root does not match last-settled post execution")
 		}
 	}

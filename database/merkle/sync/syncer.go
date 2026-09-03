@@ -139,7 +139,7 @@ type Syncer[R any, C any] struct {
 	closeOnce sync.Once
 
 	stateSyncNodeIdx uint32
-	metrics          SyncMetrics
+	metrics          *syncerMetrics
 }
 
 // TODO remove non-config values out of this struct
@@ -174,7 +174,7 @@ func NewSyncer[R any, C any](
 		return nil, ErrZeroWorkLimit
 	}
 
-	metrics, err := NewMetrics("sync", registerer)
+	metrics, err := newSyncerMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +435,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	s.metrics.RequestMade()
+	s.metrics.requestMade()
 }
 
 // Fetch and apply the range proof given by [work].
@@ -490,7 +490,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	s.metrics.RequestMade()
+	s.metrics.requestMade()
 }
 
 func (s *Syncer[_, _]) sendRequest(
@@ -529,11 +529,11 @@ func (s *Syncer[_, _]) shouldHandleResponse(
 	err error,
 ) error {
 	if err != nil {
-		s.metrics.RequestFailed()
+		s.metrics.requestFailed()
 		return err
 	}
 
-	s.metrics.RequestSucceeded()
+	s.metrics.requestSucceeded()
 
 	// TODO can we remove this?
 	select {
@@ -578,8 +578,12 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	if err := s.db.VerifyRangeProof(
+	s.metrics.proofReceived(proofTypeRange, len(responseBytes))
+
+	if err := s.verifyAndCommitRangeProof(
 		ctx,
+		targetRootID,
+		work,
 		rangeProof,
 		protoutils.ProtoToMaybe(request.StartKey),
 		protoutils.ProtoToMaybe(request.EndKey),
@@ -588,15 +592,6 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 	); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
 	}
-
-	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-	if err != nil {
-		s.setError(err)
-		return nil
-	}
-
-	s.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 
@@ -631,19 +626,27 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		if err != nil {
 			return err
 		}
-		if err := s.db.VerifyChangeProof(
+
+		s.metrics.proofReceived(proofTypeChange, len(responseBytes))
+
+		verificationStart := time.Now()
+		err = s.db.VerifyChangeProof(
 			ctx,
 			changeProof,
 			startKey,
 			endKey,
 			endRoot,
 			int(request.KeyLimit),
-		); err != nil {
+		)
+		s.metrics.observeVerification(proofTypeChange, time.Since(verificationStart), err)
+		if err != nil {
 			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
 
 		// if the proof wasn't empty, apply changes to the sync DB
+		commitStart := time.Now()
 		nextKey, err := s.db.CommitChangeProof(ctx, endKey, changeProof)
+		s.metrics.observeCommit(proofTypeChange, time.Since(commitStart), err)
 		if err != nil {
 			s.setError(err)
 			return nil
@@ -656,27 +659,20 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			return err
 		}
 
+		s.metrics.proofReceived(proofTypeRange, len(responseBytes))
+
 		// The server did not have enough history to send us a change proof
 		// so they sent a range proof instead.
-		if err := s.db.VerifyRangeProof(
+		return s.verifyAndCommitRangeProof(
 			ctx,
+			targetRootID,
+			work,
 			rangeProof,
 			startKey,
 			endKey,
 			endRoot,
 			int(request.KeyLimit),
-		); err != nil {
-			return err
-		}
-
-		// Add all the key-value pairs we got to the database.
-		nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-		if err != nil {
-			s.setError(err)
-			return nil
-		}
-
-		s.completeWorkItem(work, nextKey, targetRootID)
+		)
 	default:
 		return fmt.Errorf(
 			"%w: %T",
@@ -684,6 +680,38 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		)
 	}
 
+	return nil
+}
+
+// verifyAndCommitRangeProof verifies rangeProof for the keys in [start, end]
+// against root, replaces that key range in the database with the proof's
+// key-value pairs, and marks work complete.
+func (s *Syncer[R, _]) verifyAndCommitRangeProof(
+	ctx context.Context,
+	targetRootID ids.ID,
+	work *workItem,
+	rangeProof R,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
+	root ids.ID,
+	keyLimit int,
+) error {
+	verificationStart := time.Now()
+	err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit)
+	s.metrics.observeVerification(proofTypeRange, time.Since(verificationStart), err)
+	if err != nil {
+		return err
+	}
+
+	commitStart := time.Now()
+	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+	s.metrics.observeCommit(proofTypeRange, time.Since(commitStart), err)
+	if err != nil {
+		s.setError(err)
+		return nil
+	}
+
+	s.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 

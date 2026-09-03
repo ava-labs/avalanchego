@@ -5,7 +5,6 @@ package state
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -33,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -233,30 +233,32 @@ func (s *SUT) assertEqual(tb testing.TB, want *SUT) {
 		assert.Equalf(tb, wantRoot, gotRoot, "%T.GetRoot(%d)", s.stateImpl, h)
 	}
 
-	type entry struct {
-		Key   []byte
-		Value []byte
-	}
-	dbEntries := func(db database.Database) []entry {
-		tb.Helper()
-
-		it := db.NewIterator()
-		defer it.Release()
-
-		var out []entry
-		for it.Next() {
-			out = append(out, entry{
-				Key:   slices.Clone(it.Key()),
-				Value: slices.Clone(it.Value()),
-			})
-		}
-		require.NoErrorf(tb, it.Error(), "%T.Error()", it)
-		return out
-	}
-
-	wantEntries := dbEntries(want.sharedMemoryDB)
-	gotEntries := dbEntries(s.sharedMemoryDB)
+	wantEntries := dbEntries(tb, want.sharedMemoryDB)
+	gotEntries := dbEntries(tb, s.sharedMemoryDB)
 	assert.Equalf(tb, wantEntries, gotEntries, "shared memory")
+}
+
+type dbEntry struct {
+	Key   []byte
+	Value []byte
+}
+
+// dbEntries returns every key/value pair in db, in iteration order.
+func dbEntries(tb testing.TB, db database.Database) []dbEntry {
+	tb.Helper()
+
+	it := db.NewIterator()
+	defer it.Release()
+
+	var out []dbEntry
+	for it.Next() {
+		out = append(out, dbEntry{
+			Key:   slices.Clone(it.Key()),
+			Value: slices.Clone(it.Value()),
+		})
+	}
+	require.NoErrorf(tb, it.Error(), "%T.Error()", it)
+	return out
 }
 
 func (s *SUT) assertHasTxs(tb testing.TB, blocks []block) {
@@ -568,22 +570,22 @@ func TestCrash(t *testing.T) {
 		{height: 7, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	wantDB := newFlakyDB(memdb.New(), math.MaxInt)
+	wantDB := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
 	want := newSUT(t, withDB(wantDB))
 	want.apply(t, blocks...)
 
 	// Iterating over all of the calls made to the db allows us to crash at
 	// every possible point during Apply.
-	for failAfter := range wantDB.calls {
+	for failAfter := range wantDB.Calls() {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			t.Parallel()
 
 			db := memdb.New()
-			preCrash := newSUT(t, withDB(newFlakyDB(db, failAfter)))
+			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
 			remainingBlocks := blocks
 			for i, b := range blocks {
 				if err := preCrash.Apply(b.height, b.txs); err != nil {
-					require.ErrorIsf(t, err, errInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
+					require.ErrorIsf(t, err, saetest.ErrInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
 					break
 				}
 				remainingBlocks = blocks[i+1:]
@@ -597,63 +599,3 @@ func TestCrash(t *testing.T) {
 		})
 	}
 }
-
-var errInjected = errors.New("injected fault")
-
-// flakyDB wraps a database and fails after a configured number of mutating
-// operations. Each [flakyDB.Put], [flakyDB.Delete], and [flakyBatch.Write]
-// counts as an op; reads and iteration are not counted and never fail.
-type flakyDB struct {
-	database.Database
-	failAfter int
-	calls     int
-}
-
-func newFlakyDB(db database.Database, failAfter int) *flakyDB {
-	return &flakyDB{
-		Database:  db,
-		failAfter: failAfter,
-	}
-}
-
-func (f *flakyDB) shouldFail() error {
-	if f.calls >= f.failAfter {
-		return errInjected
-	}
-	f.calls++
-	return nil
-}
-
-func (f *flakyDB) Put(key, value []byte) error {
-	if err := f.shouldFail(); err != nil {
-		return err
-	}
-	return f.Database.Put(key, value)
-}
-
-func (f *flakyDB) Delete(key []byte) error {
-	if err := f.shouldFail(); err != nil {
-		return err
-	}
-	return f.Database.Delete(key)
-}
-
-func (f *flakyDB) NewBatch() database.Batch {
-	return &flakyBatch{Batch: f.Database.NewBatch(), db: f}
-}
-
-type flakyBatch struct {
-	database.Batch
-	db *flakyDB
-}
-
-func (b *flakyBatch) Write() error {
-	if err := b.db.shouldFail(); err != nil {
-		return err
-	}
-	return b.Batch.Write()
-}
-
-// Inner returns the wrapper so that [chainsatomic.WriteAll] calls
-// [flakyBatch.Write].
-func (b *flakyBatch) Inner() database.Batch { return b }

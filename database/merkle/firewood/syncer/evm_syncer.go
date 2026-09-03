@@ -19,7 +19,7 @@ import (
 var _ sync.DB[*RangeProof, struct{}] = (*evmDB)(nil)
 
 type CodeQueue interface {
-	AddCode(context.Context, []common.Hash) error
+	AddCode([]common.Hash) error
 }
 
 type evmDB struct {
@@ -56,7 +56,7 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 		}
 		codeHashes = append(codeHashes, common.Hash(h))
 	}
-	if err := e.codeQueue.AddCode(ctx, codeHashes); err != nil {
+	if err := e.codeQueue.AddCode(codeHashes); err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 	nextKey, err := e.db.CommitRangeProof(ctx, start, end, proof)

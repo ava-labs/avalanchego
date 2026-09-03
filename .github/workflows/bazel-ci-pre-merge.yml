@@ -1,0 +1,44 @@
+name: Bazel
+
+# Top-level Bazel CI entrypoint for pre-merge checks. Full Ubuntu tests and
+# macOS smoke tests use separate reusable workflows so this workflow has no
+# irrelevant skipped jobs.
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-e2e:
+    name: linux-amd64
+    uses: ./.github/workflows/bazel-ci.yml
+    with:
+      platform_name: linux-amd64
+      runner: ubuntu-24.04
+      run_race_shuffle_unit_tests: false
+    secrets: inherit
+
+  smoke:
+    name: darwin-arm64
+    uses: ./.github/workflows/bazel-ci-smoke.yml
+    with:
+      platform_name: darwin-arm64
+      runner: macos-26
+    secrets: inherit

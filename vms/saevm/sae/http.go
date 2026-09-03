@@ -15,6 +15,9 @@ const (
 	wsHTTPExtensionPath  = "/ws"
 )
 
+// HandlerPaths is the keys that will be used in [VM.CreateHandlers].
+var HandlerPaths = []string{rpcHTTPExtensionPath, wsHTTPExtensionPath}
+
 // CreateHandlers returns all VM-specific HTTP handlers to be exposed by the
 // node, keyed by extension.
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {

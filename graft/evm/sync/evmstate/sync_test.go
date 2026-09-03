@@ -30,9 +30,15 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
+	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 )
 
 const testRequestSize = 1024
@@ -75,12 +81,11 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 
 	// Create the state syncer.
 	stateSyncer, err := NewSyncer(
-		mockClient,
+		client.NewLeafFetcher(mockClient, leafReqType, message.StateTrieNode),
 		clientEthDB,
 		root,
 		fetcher,
 		testRequestSize,
-		leafReqType,
 		WithBatchSize(1000), // Use a lower batch size in order to get test coverage of batches being written early.
 	)
 	require.NoError(t, err, "failed to create state syncer")
@@ -602,4 +607,39 @@ func assertDBConsistency(t testing.TB, root common.Hash, clientDB, serverDB stat
 
 	// Check that the number of accounts in the snapshot matches the number of leaves in the accounts trie
 	require.Equal(t, trieAccountLeaves, numSnapshotAccounts)
+}
+
+// The syncer reconstructs the same state over the proto leaf protocol as it does
+// over the message protocol, which is what makes the driver transport neutral.
+func TestSyncOverProtoLeafProtocol(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	r := rand.New(rand.NewSource(1))
+	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+	root, _ := synctest.FillAccountsWithOverlappingStorage(t, r, serverDB, common.Hash{}, 250, 3)
+
+	clientDB := state.NewDatabase(rawdb.NewMemoryDatabase())
+	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
+	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
+
+	log := loggingtest.New(t, logging.Debug)
+	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	require.NoError(t, leafproto.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, serverDB.TrieDB(), common.HashLength))
+
+	codeQueue, err := code.NewQueue(clientEthDB)
+	require.NoError(t, err)
+
+	stateSyncer, err := NewSyncer(
+		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
+		clientEthDB,
+		root,
+		codeQueue,
+		testRequestSize,
+		WithBatchSize(1000),
+	)
+	require.NoError(t, err)
+	require.NoError(t, stateSyncer.Sync(ctx))
+
+	assertDBConsistency(t, root, clientDB, serverDB)
 }

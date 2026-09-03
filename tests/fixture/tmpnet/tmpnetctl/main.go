@@ -26,7 +26,7 @@ import (
 const (
 	cliVersion = "0.0.1"
 
-	// Need a longer timeout to account for time required to deploy nginx ingress controller and chaos mesh
+	// Allow time to deploy Traefik and Chaos Mesh.
 	startKindClusterTimeout = 5 * time.Minute
 )
 

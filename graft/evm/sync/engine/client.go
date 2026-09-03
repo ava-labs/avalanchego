@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -121,9 +122,9 @@ type ClientConfig struct {
 	Enabled            bool
 	SkipResume         bool
 
-	// LeafsRequestType specifies the wire format for leafs requests.
-	// Must be set explicitly by the caller.
-	LeafsRequestType message.LeafsRequestType
+	// LeafFetcher is the transport the state syncer reads leaves over. Required,
+	// so the caller names its wire protocol rather than inheriting a default.
+	LeafFetcher leaf.Fetcher
 }
 
 type client struct {
@@ -427,10 +428,9 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		}
 	} else {
 		stateSyncer, err = evmstate.NewSyncer(
-			c.config.Client, c.config.ChainDB,
+			c.config.LeafFetcher, c.config.ChainDB,
 			summary.GetBlockRoot(),
 			codeQueue, c.config.RequestSize,
-			c.config.LeafsRequestType,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)

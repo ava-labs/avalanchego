@@ -6,11 +6,13 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"math"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -73,6 +75,7 @@ import (
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -89,13 +92,16 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
+	ethclient  *ethclient.Client
+	clientOnce func()
 
+	ctx       *snow.Context
 	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
-	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
+	logger    *loggingtest.Logger
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -103,15 +109,16 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		clock      *saetest.Clock
-		vmConfig   config
-		db         database.Database
-		state      snow.State
-		upgrades   upgrade.Config
+		genesis      core.Genesis
+		nodeID       ids.NodeID
+		networkID    uint32
+		validators   *warptest.Validators
+		clock        *saetest.Clock
+		vmConfig     config
+		db           database.Database
+		chainDataDir string
+		state        snow.State
+		upgrades     upgrade.Config
 
 		skipRPCTransport bool
 	}
@@ -122,6 +129,8 @@ type (
 // initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
 // model a node that is still catching up and has not yet entered normal
 // operation (e.g. verifying blocks received from peers during bootstrap).
+// Use [snow.StateSyncing] to test state-sync specific behavior.
+// Note that any RPCs will not be available until the node is bootstrapping.
 func withState(state snow.State) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
@@ -150,6 +159,14 @@ func withoutRPCTransport() sutOption {
 func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
+	})
+}
+
+// withChainDataDir overrides the SUT's chain data directory, useful for
+// re-using the execution results DB.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
 	})
 }
 
@@ -271,6 +288,16 @@ var chainDBPrefix = []byte("chain")
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	sut, err := tryNewSUT(tb, opts...)
+	require.NoError(tb, err, "tryNewSUT()")
+	return sut.logger.CancelOnError(tb.Context()), sut
+}
+
+// tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
+// [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
+	tb.Helper()
+
 	// Run under the latest network upgrade rules by default.
 	chainConfig := cparams.Copy(saetest.ChainConfig())
 	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
@@ -284,14 +311,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb),
-			clock:      saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:       ids.GenerateTestNodeID(),
+			networkID:    constants.UnitTestID,
+			validators:   warptest.NewValidators(tb),
+			clock:        saetest.NewClock(testStartTime, time.Millisecond),
+			vmConfig:     defaultConfig(),
+			db:           memdb.New(),
+			chainDataDir: tb.TempDir(),
+			state:        snow.NormalOp,
+			upgrades:     upgradetest.GetConfig(upgradetest.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -305,6 +333,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	snowCtx.ChainDataDir = cfg.chainDataDir
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
@@ -325,7 +354,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -334,7 +363,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		configBytes,
 		nil, // fxs
 		appSender,
-	), "%T.Initialize()", vm)
+	); err != nil {
+		return nil, fmt.Errorf("%T.Initialize(): %w", vm, err)
+	}
 	tb.Cleanup(func() {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
@@ -342,14 +373,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
 
-	// The engine sets the preference to the last accepted block when entering
-	// normal operation.
-	if cfg.state == snow.NormalOp {
-		lastAccepted, err := vm.LastAccepted(ctx)
-		require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
-		require.NoErrorf(tb, vm.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", vm)
-	}
-	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+	// This is called immediately after initialization by avalanchego, so we
+	// should test this behavior specifically.
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
@@ -358,15 +385,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:        vm,
 		db:        db,
+		ctx:       snowCtx,
 		memory:    memory,
 		sender:    appSender,
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 		clock:     cfg.clock,
+		logger:    log,
 	}
 
-	if !cfg.skipRPCTransport {
-		handlers, err := vm.CreateHandlers(ctx)
-		require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+	// Called from [SUT.SetState].
+	sut.clientOnce = sync.OnceFunc(func() {
+		if cfg.skipRPCTransport {
+			return
+		}
 
 		mux := http.NewServeMux()
 		for path, h := range handlers {
@@ -383,10 +414,35 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 		sut.Client = NewClient(server.URL)
 		sut.ethclient = ethclient.NewClient(ethRPCClient)
+	})
+
+	if cfg.state == snow.NormalOp {
+		// The engine sets the preference to the last accepted block when entering
+		// normal operation. The bootstrapper will first set it to bootstrapping.
+		if err := sut.SetState(ctx, snow.Bootstrapping); err != nil {
+			return nil, fmt.Errorf("%T.SetState(%s): %w", vm, snow.Bootstrapping, err)
+		}
+		lastAccepted, err := sut.LastAccepted(ctx)
+		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
+		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
 	}
+	if err := sut.SetState(ctx, cfg.state); err != nil {
+		return nil, fmt.Errorf("%T.SetState(%s): %w", vm, cfg.state, err)
+	}
+
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
-	return ctx, sut
+	return sut, nil
+}
+
+func (s *SUT) SetState(ctx context.Context, state snow.State) error {
+	if err := s.VM.SetState(ctx, state); err != nil {
+		return err
+	}
+	if state >= snow.Bootstrapping {
+		s.clientOnce()
+	}
+	return nil
 }
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
@@ -400,7 +456,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.ctx,
 		s.state,
 		s.chainConfig,
-		s.txpool.Pending,
+		s.pending,
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
@@ -558,7 +614,7 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	// The pool updates the verification state atomically with evicting the
 	// included tx, so observing the eviction guarantees the state has been
 	// updated.
-	for s.txpool.Has(t.ID()) {
+	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
 			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())
@@ -1099,6 +1155,27 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
 }
 
+func TestEstimateGasIgnoresMinimumGasConsumption(t *testing.T) {
+	const (
+		gasLimit    = uint64(100_000_000)
+		minEstimate = ethparams.TxGasContractCreation
+		// The RPC estimator may stop its binary search once it is within 1.5%
+		// of the exact estimate.
+		maxEstimate = minEstimate * 1_015 / 1_000
+	)
+	from := common.Address{'m', 'e'}
+	ctx, sut := newSUT(t, withMaxAllocFor(from))
+
+	got, err := sut.ethclient.EstimateGas(ctx, ethereum.CallMsg{
+		From:      from,
+		Gas:       gasLimit,
+		GasFeeCap: big.NewInt(1),
+	})
+	require.NoError(t, err, "%T.EstimateGas(...)", sut.ethclient)
+	require.GreaterOrEqual(t, got, minEstimate, "%T.EstimateGas(...)", sut.ethclient)
+	require.LessOrEqual(t, got, maxEstimate, "%T.EstimateGas(...)", sut.ethclient)
+}
+
 // TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
 // base fee) is credited to the blackhole address before the next transaction
 // executes.
@@ -1144,9 +1221,11 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
-// TestParseBlock verifies that the cchain ParseBlock override accepts
-// well-formed blocks and rejects blocks with an unsupported (non-zero) version
-// or whose extData does not match the ExtDataHash committed in the header.
+// TestParseBlock verifies that ParseBlock accepts well-formed blocks and
+// rejects blocks with an unsupported (non-zero) version or whose extData does
+// not match the ExtDataHash committed in the header, in every VM mode: both
+// before bootstrapping (via the statesync SummaryHandler) and after (via the
+// embedded SAE VM).
 func TestParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t, withNetworkID(constants.FujiID))
 
@@ -1257,18 +1336,31 @@ func TestParseBlock(t *testing.T) {
 			wantErr: errExtDataHashMismatch,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf, err := rlp.EncodeToBytes(tt.block)
-			require.NoError(t, err, "rlp.EncodeToBytes(block)")
 
-			got, err := sut.ParseBlock(ctx, buf)
-			require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
-			if tt.wantErr != nil {
-				return
+	states := []snow.State{
+		snow.Initializing,
+		snow.StateSyncing,
+		snow.Bootstrapping,
+		snow.NormalOp,
+	}
+
+	for _, mode := range states {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut.mode.Set(mode)
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					buf, err := rlp.EncodeToBytes(tt.block)
+					require.NoError(t, err, "rlp.EncodeToBytes(block)")
+
+					got, err := sut.ParseBlock(ctx, buf)
+					require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
+					if tt.wantErr != nil {
+						return
+					}
+
+					require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
+				})
 			}
-
-			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
 }
@@ -1379,6 +1471,33 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
 		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
 	})
+}
+
+// Restarting with a settled asynchronous block requires the chain data
+// directory (home of the execution-results DB) to be carried over along with
+// the database; startup fails otherwise.
+func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	timeOpt, clock := withVMTime(testStartTime)
+	db := memdb.New()
+	dataDir := t.TempDir()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	w := newWallet(key, node.ctx, node.Client)
+
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.AdvanceToSettle(ctx, t, settled)
+	settler := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settles the first block")
+
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	_, err := tryNewSUT(t, alloc, timeOpt, withDB(db))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "restart without the chain data directory")
+
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
@@ -1847,4 +1966,82 @@ func TestWarpPrecompileActivation(t *testing.T) {
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
 	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
 	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
+}
+
+// TestConsensusGettersAfterRestart verifies that all functions routed through
+// [stateDependent] are consistent and usable on all node states after a
+// restart, which is necessary to allow network recovery.
+func TestConsensusGettersAfterRestart(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+	db := memdb.New()
+
+	ctx, node := newSUT(t, alloc, withDB(db))
+	w := newWallet(key, node.ctx, node.Client)
+
+	genesis, err := node.GetBlock(ctx, node.lastAccepted(ctx, t))
+	require.NoErrorf(t, err, "%T.GetBlock()", node.VM)
+	const numBlocks = 3
+	want := make([]*blocks.Block, 0, numBlocks+1)
+	want = append(want, genesis)
+	for range numBlocks {
+		blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		want = append(want, blk)
+	}
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	for _, state := range []snow.State{
+		snow.StateSyncing,
+		snow.Bootstrapping,
+		snow.NormalOp,
+	} {
+		t.Run(state.String(), func(t *testing.T) {
+			ctx, s := newSUT(t, alloc, withDB(db), withState(state))
+
+			wantLastAccepted := want[len(want)-1].ID()
+			gotLastAccepted, err := s.LastAccepted(ctx)
+			require.NoErrorf(t, err, "%T.LastAccepted()", s)
+			assert.Equalf(t, wantLastAccepted, gotLastAccepted, "%T.LastAccepted()", s)
+
+			for _, b := range want {
+				gotID, err := s.GetBlockIDAtHeight(ctx, b.Height())
+				require.NoErrorf(t, err, "%T.GetBlockIDAtHeight(%d)", s, b.Height())
+				assert.Equalf(t, b.ID(), gotID, "%T.GetBlockIDAtHeight(%d)", s, b.Height())
+
+				gotBlock, err := s.GetBlock(ctx, b.ID())
+				require.NoErrorf(t, err, "%T.GetBlock(%s)", s, b.ID())
+				assert.Equalf(t, b.ID(), gotBlock.ID(), "%T.GetBlock(%s).ID()", s, b.ID())
+				assert.Equalf(t, b.Height(), gotBlock.Height(), "%T.GetBlock(%s).Height()", s, b.ID())
+			}
+		})
+	}
+}
+
+// TestConsensusGettersNoState ensures that an empty VM still can serve the
+// genesis block.
+func TestConsensusGettersNoState(t *testing.T) {
+	ctx, sut := newSUT(t, withState(snow.StateSyncing))
+	hash, err := sut.LastAccepted(ctx)
+	require.NoErrorf(t, err, "%T.LastAccepted()", sut)
+	require.NotZerof(t, hash, "%T.LastAccepted()", sut)
+
+	gotID, err := sut.GetBlockIDAtHeight(ctx, 0)
+	require.NoErrorf(t, err, "%T.GetBlockIDAtHeight(%d)", sut, 0)
+	assert.Equalf(t, hash, gotID, "%T.GetBlockIDAtHeight(%d)", sut, 0)
+
+	gotBlock, err := sut.GetBlock(ctx, hash)
+	require.NoErrorf(t, err, "%T.GetBlock(%s)", sut, hash)
+	assert.Equalf(t, hash, gotBlock.ID(), "%T.GetBlock(%s).ID()", sut, hash)
+	assert.Equalf(t, uint64(0), gotBlock.Height(), "%T.GetBlock(%s).Height()", sut, hash)
+}
+
+// TestWaitForEventInitializing tests that WaitForEvent blocks if the VM isn't
+// bootstrapped or state syncing.
+func TestWaitForEventInitializing(t *testing.T) {
+	ctx, sut := newSUT(t, withState(snow.Initializing))
+
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := sut.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.Canceled)
 }

@@ -5,6 +5,7 @@ go_library(
     name = "client",
     srcs = [
         "client.go",
+        "leaf_fetcher.go",
         "test_client.go",
         "test_network.go",
     ],
@@ -15,8 +16,10 @@ go_library(
         "//graft/evm/message",
         "//graft/evm/sync/client/stats",
         "//graft/evm/sync/handlers",
+        "//graft/evm/sync/types",
         "//ids",
         "//network/p2p",
+        "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
@@ -31,7 +34,10 @@ go_library(
 
 graft_go_test(
     name = "client_test",
-    srcs = ["client_test.go"],
+    srcs = [
+        "client_test.go",
+        "leaf_fetcher_test.go",
+    ],
     embed = [":client"],
     deps = [
         "//codec",
@@ -42,6 +48,7 @@ graft_go_test(
         "//graft/evm/sync/handlers/stats",
         "//graft/evm/sync/synctest",
         "//ids",
+        "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",

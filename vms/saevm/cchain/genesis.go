@@ -171,19 +171,18 @@ var (
 	errNoHeadHeader        = errors.New("no head header")
 )
 
-// setup configures the database with genesis.
+// verifyAndWriteBlock verifies that the genesis is compatible with any
+// previously stored genesis state by checking the genesis block hash along with
+// the rules used to execute the head block.
 //
-// It verifies that the genesis is compatible with any previously setup genesis
-// state by checking the genesis block hash along with the rules used to execute
-// the head block.
-func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+// Once the chain is ready to be initialized, one must call
+// [genesis.setupTrieDB] to ensure the genesis state is available.
+func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	block, err := g.block()
 	if err != nil {
 		return fmt.Errorf("constructing genesis block: %w", err)
 	}
 
-	// We can't exit early here. Even if the genesis block is on disk, the
-	// genesis state might not be.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
@@ -198,39 +197,25 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr er
 
 	// If the rules change for the head block, it may have been executed
 	// incorrectly.
-	{
-		prev := rawdb.ReadChainConfig(db, hash)
-		if prev == nil {
-			return errNoStoredChainConfig
-		}
-		head := rawdb.ReadHeadHeader(db)
-		if head == nil {
-			return errNoHeadHeader
-		}
-		height, timestamp := head.Number.Uint64(), head.Time
-		// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-		// that bypasses this compatibility check; we need to make such a check
-		// unnecessary for the c-chain.
-		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
-			return fmt.Errorf("incompatible chain config: %w", err)
-		}
-		// We will be executing new blocks based on the new chain config, so we
-		// need to keep it up-to-date in the database for the next restart.
-		rawdb.WriteChainConfig(db, hash, g.Config)
+	prev := rawdb.ReadChainConfig(db, hash)
+	if prev == nil {
+		return errNoStoredChainConfig
 	}
-
-	tdb := triedb.NewDatabase(db, trieConfig)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
-
-	// Because some trie implementations prune old state, we need to defer to
-	// the trie to determine if the genesis was previously initialized.
-	if !tdb.Initialized(block.Root()) {
-		if _, err := g.writeState(db, tdb); err != nil {
-			return fmt.Errorf("writing genesis state: %w", err)
-		}
+	head := rawdb.ReadHeadHeader(db)
+	if head == nil {
+		return errNoHeadHeader
 	}
+	height, timestamp := head.Number.Uint64(), head.Time
+	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
+	// that bypasses this compatibility check; we need to make such a check
+	// unnecessary for the c-chain.
+	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
+		return fmt.Errorf("incompatible chain config: %w", err)
+	}
+	// We will be executing new blocks based on the new chain config, so we
+	// need to keep it up-to-date in the database for the next restart.
+	rawdb.WriteChainConfig(db, hash, g.Config)
+
 	return nil
 }
 
@@ -342,6 +327,27 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 func activatePrecompile(statedb *state.StateDB, addr common.Address) {
 	statedb.SetNonce(addr, 1)
 	statedb.SetCode(addr, []byte{0x01})
+}
+
+// setupTrieDB commits the genesis allocation to the state database if
+// it is not already present.
+func (g *genesis) setupTrieDB(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+	root, err := g.root()
+	if err != nil {
+		return fmt.Errorf("computing genesis root: %w", err)
+	}
+
+	tdb := triedb.NewDatabase(db, trieConfig)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
+	if tdb.Initialized(root) {
+		return nil
+	}
+
+	_, err = g.writeState(db, tdb)
+	return err
 }
 
 // writeState commits the genesis allocation to the state database and returns

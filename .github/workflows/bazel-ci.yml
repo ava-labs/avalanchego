@@ -1,7 +1,7 @@
-name: Bazel Jobs
+name: Bazel Full Test Jobs
 
-# Reusable Bazel CI workflow for one platform. This workflow is called by
-# bazel-ci-matrix.yml with a platform name and runner.
+# Reusable Bazel CI workflow. The pre-merge and scheduled callers select the platform
+# and test configuration.
 on:
   workflow_call:
     inputs:
@@ -11,25 +11,34 @@ on:
       runner:
         required: true
         type: string
+      run_race_shuffle_unit_tests:
+        description: 'Run unit tests with race detection and shuffled test order'
+        required: false
+        type: boolean
+        default: false
+      enable_remote_cache:
+        description: 'Enable the remote Bazel cache'
+        required: false
+        type: boolean
+        default: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
+  BAZEL_REMOTE_CACHE_ENABLED: ${{ inputs.enable_remote_cache }}
+  BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
+  BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
 
 permissions:
   contents: read
 
 jobs:
   # Aggregate the per-platform Bazel checks into one stable required job.
-  # GitHub Actions job graphs are static, so Bazel still runs inside each
-  # declared job.
   bazel-required:
     if: ${{ always() }}
     needs:
       - setup
-      - unit-main
-      - unit-coreth
-      - unit-subnet-evm
+      - unit
       - e2e
     runs-on: ${{ inputs.runner }}
     steps:
@@ -64,47 +73,31 @@ jobs:
       - uses: ./.github/actions/setup-bazel
         with:
           initial-setup: true
+      - name: Log Bazel disk diagnostics
+        if: failure()
+        shell: bash
+        run: ./scripts/run_task.sh log-ci-disk-state-bazel
 
-  unit-main:
+  unit:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
       - name: Run unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
-
-  unit-coreth:
-    needs: setup
-    runs-on: ${{ inputs.runner }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
-      - name: Run coreth unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
-
-  unit-subnet-evm:
-    needs: setup
-    runs-on: ${{ inputs.runner }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
-      - name: Run subnet-evm unit tests with Bazel
-        shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        uses: ./.github/actions/run-bazel-with-disk-space
+        with:
+          run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'bazel-test-unit-race-shuffle' || 'bazel-test-unit' }}
 
   e2e:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-bazel
-      - name: Run e2e tests with Bazel-built binary
+      - name: Run E2E smoke test with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh bazel-test-e2e-ci
+          run: ./scripts/run_task.sh bazel-test-e2e-smoke
+          setup_bazel: 'true'
           artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}

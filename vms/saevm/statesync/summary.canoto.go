@@ -27,11 +27,11 @@ var (
 )
 
 const (
-	canoto__Summary__height    = 1
-	canoto__Summary__blockHash = 2
+	canoto__Summary__AcceptedHeight = 1
+	canoto__Summary__AcceptedHash   = 2
 
-	canoto__Summary__height__tag    = "\x08" // canoto.Tag(canoto__Summary__height, canoto.Varint)
-	canoto__Summary__blockHash__tag = "\x12" // canoto.Tag(canoto__Summary__blockHash, canoto.Len)
+	canoto__Summary__AcceptedHeight__tag = "\x08" // canoto.Tag(canoto__Summary__AcceptedHeight, canoto.Varint)
+	canoto__Summary__AcceptedHash__tag   = "\x12" // canoto.Tag(canoto__Summary__AcceptedHash, canoto.Len)
 )
 
 type canotoData_Summary struct {
@@ -45,16 +45,16 @@ func (*Summary) CanotoSpec(...reflect.Type) *canoto.Spec {
 		Name: "Summary",
 		Fields: []canoto.FieldType{
 			{
-				FieldNumber: canoto__Summary__height,
-				Name:        "height",
+				FieldNumber: canoto__Summary__AcceptedHeight,
+				Name:        "AcceptedHeight",
 				OneOf:       "",
-				TypeUint:    canoto.SizeOf(zero.height),
+				TypeUint:    canoto.SizeOf(zero.AcceptedHeight),
 			},
 			{
-				FieldNumber:    canoto__Summary__blockHash,
-				Name:           "blockHash",
+				FieldNumber:    canoto__Summary__AcceptedHash,
+				Name:           "AcceptedHash",
 				OneOf:          "",
-				TypeFixedBytes: uint64(len(zero.blockHash)),
+				TypeFixedBytes: uint64(len(zero.AcceptedHash)),
 			},
 		},
 	}
@@ -94,24 +94,24 @@ func (c *Summary) UnmarshalCanotoFrom(r canoto.Reader) error {
 		}
 
 		switch field {
-		case canoto__Summary__height:
+		case canoto__Summary__AcceptedHeight:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadUint(&r, &c.height); err != nil {
+			if err := canoto.ReadUint(&r, &c.AcceptedHeight); err != nil {
 				return err
 			}
-			if canoto.IsZero(c.height) {
+			if canoto.IsZero(c.AcceptedHeight) {
 				return canoto.ErrZeroValue
 			}
-		case canoto__Summary__blockHash:
+		case canoto__Summary__AcceptedHash:
 			if wireType != canoto.Len {
 				return canoto.ErrUnexpectedWireType
 			}
 
 			const (
-				expectedLength       = len(c.blockHash)
+				expectedLength       = len(c.AcceptedHash)
 				expectedLengthUint64 = uint64(expectedLength)
 			)
 			var length uint64
@@ -125,8 +125,8 @@ func (c *Summary) UnmarshalCanotoFrom(r canoto.Reader) error {
 				return io.ErrUnexpectedEOF
 			}
 
-			copy((&c.blockHash)[:], r.B)
-			if canoto.IsZero(c.blockHash) {
+			copy((&c.AcceptedHash)[:], r.B)
+			if canoto.IsZero(c.AcceptedHash) {
 				return canoto.ErrZeroValue
 			}
 			r.B = r.B[expectedLength:]
@@ -156,11 +156,11 @@ func (c *Summary) ValidCanoto() bool {
 // It is not safe to copy this struct concurrently.
 func (c *Summary) CalculateCanotoCache() {
 	var size uint64
-	if !canoto.IsZero(c.height) {
-		size += uint64(len(canoto__Summary__height__tag)) + canoto.SizeUint(c.height)
+	if !canoto.IsZero(c.AcceptedHeight) {
+		size += uint64(len(canoto__Summary__AcceptedHeight__tag)) + canoto.SizeUint(c.AcceptedHeight)
 	}
-	if !canoto.IsZero(c.blockHash) {
-		size += uint64(len(canoto__Summary__blockHash__tag)) + canoto.SizeBytes((&c.blockHash)[:])
+	if !canoto.IsZero(c.AcceptedHash) {
+		size += uint64(len(canoto__Summary__AcceptedHash__tag)) + canoto.SizeBytes((&c.AcceptedHash)[:])
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -200,13 +200,13 @@ func (c *Summary) MarshalCanoto() []byte {
 //
 // It is not safe to copy this struct concurrently.
 func (c *Summary) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
-	if !canoto.IsZero(c.height) {
-		canoto.Append(&w, canoto__Summary__height__tag)
-		canoto.AppendUint(&w, c.height)
+	if !canoto.IsZero(c.AcceptedHeight) {
+		canoto.Append(&w, canoto__Summary__AcceptedHeight__tag)
+		canoto.AppendUint(&w, c.AcceptedHeight)
 	}
-	if !canoto.IsZero(c.blockHash) {
-		canoto.Append(&w, canoto__Summary__blockHash__tag)
-		canoto.AppendBytes(&w, (&c.blockHash)[:])
+	if !canoto.IsZero(c.AcceptedHash) {
+		canoto.Append(&w, canoto__Summary__AcceptedHash__tag)
+		canoto.AppendBytes(&w, (&c.AcceptedHash)[:])
 	}
 	return w
 }

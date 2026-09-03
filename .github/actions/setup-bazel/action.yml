@@ -10,6 +10,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Ensure runner disk space
+      uses: ./.github/actions/ensure-disk-space
+      with:
+        diagnostic-groups: bazel
+
     - id: cache-paths
       shell: bash
       run: |
@@ -45,15 +50,10 @@ runs:
 
     - name: Configure Bazel to use dependency cache
       shell: bash
-      run: |
-        cat >> "$HOME/.bazelrc" <<EOF
-        # Added by .github/actions/setup-bazel
-        common --repository_cache=${{ steps.cache-paths.outputs.repository_cache }}
-        common --repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1
-        common --repo_env=GOMODCACHE=${{ steps.cache-paths.outputs.go_mod_cache }}
-        EOF
-
-        echo 'RUN_TASK_PREFER_BAZEL=1' >> "$GITHUB_ENV"
+      env:
+        REPOSITORY_CACHE_DIR: ${{ steps.cache-paths.outputs.repository_cache }}
+        GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
+      run: ${{ github.action_path }}/configure-bazelrc.sh
 
     - name: Fetch Bazel task bootstrap dependency
       shell: bash

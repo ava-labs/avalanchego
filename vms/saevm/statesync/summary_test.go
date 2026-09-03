@@ -7,25 +7,16 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 func FuzzSummaryRoundTrip(f *testing.F) {
 	f.Add(uint64(0), []byte{})
 	f.Add(uint64(1), []byte{1, 2, 3})
 
+	handler := new(Handler) // stateless
 	f.Fuzz(func(t *testing.T, height uint64, hashBytes []byte) {
-		handler, err := New(Config{
-			DBConfig: saedb.Config{CommitInterval: 1},
-		}, rawdb.NewMemoryDatabase(), loggingtest.New(t, logging.Debug))
-		require.NoError(t, err, "New()")
-
 		summary := NewSummary(common.BytesToHash(hashBytes), height)
 		summaryBytes := summary.Bytes()
 

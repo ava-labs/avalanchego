@@ -47,7 +47,7 @@ func newFlakyRangeProofHandler(
 ) p2p.Handler {
 	var (
 		c       = counter{m: 2}
-		handler = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler = newTestProofHandler(t, db)
 	)
 
 	return &p2p.TestHandler{
@@ -92,10 +92,8 @@ func newFlakyChangeProofHandler(
 	modifyResponse func(response *ChangeProof),
 ) p2p.Handler {
 	var (
-		c                    = counter{m: 2}
-		rangeProofMarshaler  = rangeProofMarshaler
-		changeProofMarshaler = changeProofMarshaler
-		handler              = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		c       = counter{m: 2}
+		handler = newTestProofHandler(t, db)
 	)
 
 	return &p2p.TestHandler{

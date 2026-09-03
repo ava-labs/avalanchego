@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -77,8 +76,8 @@ func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether the block was marked as synchronous during
-// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
+// Synchronous reports whether the block is a pre-SAE, synchronously executed
+// block, as defined by [hook.Synchronous].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }
@@ -111,7 +110,7 @@ func (b *Block) ParentBlock() *Block {
 // blocks. If the block is synchronous, LastSettled always returns b itself,
 // without logging.
 func (b *Block) LastSettled() *Block {
-	if b.synchronous {
+	if b.Synchronous() {
 		return b
 	}
 	return b.ancestor(getSettledOfSettledErrMsg, func(a *ancestry) *Block {
@@ -129,7 +128,7 @@ func (b *Block) LastSettled() *Block {
 // b or its parent. If the block is synchronous, Settles always returns a
 // single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {
-	if b.synchronous {
+	if b.Synchronous() {
 		return []*Block{b}
 	}
 	return Range(b.ParentBlock().LastSettled(), b.LastSettled())
@@ -176,7 +175,7 @@ var errIncompleteBlockHistory = errors.New("incomplete block history when determ
 //
 // See the Example for [Block.WhenChildSettles] for one usage of the returned
 // block.
-func LastToSettleAt(hooks hook.Points, settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
+func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
 	defer func() {
 		// Avoids having to perform this check at every return.
 		if !ok {
@@ -225,7 +224,7 @@ func LastToSettleAt(hooks hook.Points, settleAt time.Time, parent *Block) (b *Bl
 			return block, known, nil
 		}
 
-		if startsNoEarlierThan := hooks.BlockTime(block.Header()); startsNoEarlierThan.Compare(settleAt) > 0 {
+		if startsNoEarlierThan := block.PreciseTime(); startsNoEarlierThan.Compare(settleAt) > 0 {
 			known = true
 			continue
 		}

@@ -48,8 +48,12 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
+      has-aws-role: ${{ steps.check-aws-role.outputs.available }}
     steps:
       - uses: actions/checkout@v5
+      - name: Check AWS Role Availability
+        id: check-aws-role
+        run: echo "available=${{ secrets.AWS_S3_READ_ONLY_ROLE != '' }}" >> "$GITHUB_OUTPUT"
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -89,7 +93,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes }}
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
+    # Fork PRs and Dependabot PRs are served by secret stores without this role, so
+    # authenticating to S3 would fail before the benchmark starts.
+    if: ${{ needs.define-matrix.outputs.has-aws-role == 'true' }}
     permissions:
       id-token: write
       contents: write

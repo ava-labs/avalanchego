@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -54,7 +53,7 @@ type trieToSync struct {
 	// We keep a pointer to the overall sync operation,
 	// used to add segments to the work queue and to
 	// update the eta.
-	sync *stateSync
+	sync *StateSync
 
 	// task implements the syncTask interface with methods
 	// containing logic specific to the main trie or storage
@@ -64,7 +63,7 @@ type trieToSync struct {
 }
 
 // NewTrieToSync initializes a trieToSync and restores any previously started segments.
-func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
+func NewTrieToSync(sync *StateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
 	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
 	writeFn := func(path []byte, hash common.Hash, blob []byte) {
 		rawdb.WriteTrieNode(batch, account, path, hash, blob, rawdb.HashScheme)
@@ -356,7 +355,6 @@ func (t *trieSegment) String() string {
 func (t *trieSegment) Root() common.Hash                  { return t.trie.root }
 func (t *trieSegment) Account() common.Hash               { return t.trie.account }
 func (t *trieSegment) End() []byte                        { return t.end }
-func (*trieSegment) NodeType() message.NodeType           { return message.StateTrieNode }
 func (t *trieSegment) OnStart() (bool, error)             { return t.trie.task.OnStart() }
 func (t *trieSegment) OnFinish(ctx context.Context) error { return t.trie.segmentFinished(ctx, t.idx) }
 

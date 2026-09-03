@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -60,7 +61,7 @@ type VM struct {
 	consensusState utils.Atomic[snow.State]
 	preferenceSet  utils.Atomic[bool]
 	connections    *connections
-	httpHandlers   *httpHandlers
+	httpHandlers   *api.MutableHTTPHandlers
 	current        *current
 }
 
@@ -107,7 +108,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 
 	vm.connections = newConnections()
-	vm.httpHandlers = newHTTPHandlers()
+	vm.httpHandlers = api.NewMutableHTTPHandlers()
 
 	log := preChainCtx.Log
 	log.Info("checking for transition marker")
@@ -191,10 +192,10 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	// API requests are queued and drained during the transition to prevent APIs
 	// from hitting the pre-transition VM while it is shutting down.
 	log.Info("blocking API requests")
-	vm.httpHandlers.block()
+	vm.httpHandlers.Block()
 	defer func() {
 		log.Info("unblocking API requests")
-		vm.httpHandlers.unblock()
+		vm.httpHandlers.Unblock()
 	}()
 
 	// Draining the in-flight API requests blocks, but does not block forever.
@@ -211,7 +212,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	)
 	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.apiDrainTimeout)
 	defer cancelDrain()
-	if err := vm.httpHandlers.drain(drainCtx); err != nil {
+	if err := vm.httpHandlers.Drain(drainCtx); err != nil {
 		log.Warn("abandoning API requests still in flight after drain timeout",
 			zap.String("stack", utils.GetStacktrace(true)),
 			zap.Error(err),
@@ -266,7 +267,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	if err != nil {
 		return fmt.Errorf("creating http handlers: %w", err)
 	}
-	vm.httpHandlers.set(newHandlers)
+	vm.httpHandlers.Set(newHandlers)
 
 	if vm.preferenceSet.Get() {
 		// The VM is only notified of preference changes, so if the consensus

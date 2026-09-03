@@ -22,13 +22,17 @@ tasks:
     desc: Build avalanchego with Bazel
     cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego'
 
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
+
   bazel-build-race:
     desc: Build avalanchego with Bazel (race detection)
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego'
 
-  bazel-build-opt:
-    desc: Build avalanchego with Bazel (optimized)
-    cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
+  bazel-cache-ci-build-dependencies:
+    desc: Cache the build dependencies expected by the Bazel CI jobs
+    cmd: '{{.NIX_RUN}} ./scripts/cache_bazel_ci_build_dependencies.sh'
 
   bazel-check-metadata:
     desc: Checks Bazel metadata is current (requires clean git tree)
@@ -50,6 +54,10 @@ tasks:
     desc: Format BUILD.bazel files with buildifier
     cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
 
+  bazel-gazelle-generate:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
+
   bazel-generate-metadata:
     desc: Regenerate Bazel metadata for this source tree
     cmds:
@@ -62,31 +70,15 @@ tasks:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
     cmd: '{{.NIX_RUN}} ./scripts/generate_bazel_patches.sh'
 
-  bazel-gazelle-generate:
-    desc: Regenerate BUILD files with Gazelle (all modules)
-    cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
-
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
     cmd: '{{.NIX_RUN}} bazelisk mod tidy'
-
-  bazel-cache-ci-build-dependencies:
-    desc: Cache the build dependencies expected by the Bazel CI jobs
-    cmd: '{{.NIX_RUN}} ./scripts/cache_bazel_ci_build_dependencies.sh'
 
   bazel-sync-module-metadata:
     desc: Refresh Bazel module metadata files (MODULE.bazel and MODULE.bazel.lock)
     cmds:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
-
-  bazel-test:
-    desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //...'
-
-  bazel-test-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -97,7 +89,7 @@ tasks:
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-ci:
-    desc: Run E2E tests with bazel-built binary [serially with race detection]
+    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
     env:
       E2E_SERIAL: 1
     cmds:
@@ -106,17 +98,25 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
-  bazel-test-fast:
-    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
+  bazel-test-e2e-smoke:
+    desc: Run an E2E smoke test with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - task: build-xsvm
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
-  bazel-test-main:
-    desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+  bazel-test-unit:
+    desc: Run cacheable Go unit tests with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
 
-  bazel-test-subnet-evm:
-    desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+  bazel-test-unit-race-shuffle:
+    desc: Run Go unit tests with Bazel (race detection and shuffle)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race-shuffle --nocache_test_results'
+
+  bazel-test-unit-smoke:
+    desc: Run a cacheable Bazel Go unit-test smoke test
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh smoke --test_filter=TestID'
 
   build:
     desc: Builds avalanchego
@@ -132,12 +132,6 @@ tasks:
     desc: Builds docker images for antithesis for the subnet-evm test setup
     env:
       TEST_SETUP: subnet-evm
-    cmd: '{{.NIX_RUN}} bash -x ./scripts/build_antithesis_images.sh'
-
-  build-antithesis-images-xsvm:
-    desc: Builds docker images for antithesis for the xsvm test setup
-    env:
-      TEST_SETUP: xsvm
     cmd: '{{.NIX_RUN}} bash -x ./scripts/build_antithesis_images.sh'
 
   build-bootstrap-monitor:
@@ -183,15 +177,15 @@ tasks:
       - task: bazel-fmt
       - task: check-clean-branch
 
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
   check-bazel-generate-patches:
     desc: Checks that generated patches are up-to-date (requires a clean working tree)
     cmds:
       - task: bazel-generate-patches
       - task: check-clean-branch
-
-  check-bazel-gazelle-generate:
-    desc: Check that generated BUILD files are up-to-date
-    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
 
   check-bazel-module-metadata:
     desc: Checks that Bazel module metadata is up-to-date (requires a clean working tree)
@@ -251,9 +245,27 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/check_require_directives_round_trip.sh'
       - task: check-clean-branch
 
+  check-yaml-fmt:
+    desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
+    cmds:
+      - task: lint-yaml-fix
+      - task: check-clean-branch
+
   collect-kind-diagnostics:
     desc: Collects runner, Docker, kind, and Kubernetes diagnostics. Optional arg is output dir.
     cmd: '{{.NIX_RUN}} ./scripts/collect_kind_diagnostics.sh {{.CLI_ARGS}}'
+
+  log-ci-disk-state-bazel:
+    desc: Logs bounded CI disk diagnostics for Bazel jobs.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic --group bazel'
+
+  log-ci-disk-state-docker:
+    desc: Logs bounded CI disk diagnostics for Docker/image-building jobs.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic --group docker'
+
+  log-ci-disk-state-generic:
+    desc: Logs bounded generic CI root-disk diagnostics.
+    cmd: '{{.NIX_RUN}} ./scripts/log_ci_disk_state.sh --group generic'
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -324,12 +336,6 @@ tasks:
     desc: Runs static analysis tests of golang code
     cmd: '{{.NIX_RUN}} ./scripts/lint.sh'
 
-  check-yaml-fmt:
-    desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
-    cmds:
-      - task: lint-yaml-fix
-      - task: check-clean-branch
-
   lint-action:
     desc: Runs actionlint to check sanity of github action configuration
     cmd: '{{.NIX_RUN}} ./scripts/actionlint.sh'
@@ -350,15 +356,12 @@ tasks:
       - task: check-require-directives-round-trip
       - task: bazel-check-metadata
 
-  lint-saevm:
-    desc: Runs gosec with G115 enabled on vms/saevm
-    cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .gosec-golangci.yml ./vms/saevm/...'
-
   _lint-readonly-parallel:
     internal: true
     deps:
       - lint-action
       - lint-shell
+      - test-ci-disk-space
       - check-go-version
       - check-require-directives
 
@@ -377,6 +380,7 @@ tasks:
       - task: lint-saevm
       - task: lint-action
       - task: lint-shell
+      - task: test-ci-disk-space
       - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -388,13 +392,17 @@ tasks:
     desc: Runs automated fixing for failing static analysis of golang code
     cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .golangci.yml --fix'
 
-  lint-yaml-fix:
-    desc: Formats YAML files with yamlfmt
-    cmd: '{{.NIX_RUN}} yamlfmt .'
+  lint-saevm:
+    desc: Runs gosec with G115 enabled on vms/saevm
+    cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .gosec-golangci.yml ./vms/saevm/...'
 
   lint-shell:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: '{{.NIX_RUN}} ./scripts/shellcheck.sh'
+
+  lint-yaml-fix:
+    desc: Formats YAML files with yamlfmt
+    cmd: '{{.NIX_RUN}} yamlfmt .'
 
   run-polyrepo:
     desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
@@ -410,6 +418,27 @@ tasks:
       - cmd: '{{.NIX_RUN}} go mod download'
       # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  tags-create:
+    desc: Creates tags for avalanchego and submodules
+    cmd: '{{.NIX_RUN}} ./scripts/create_tags.sh {{.CLI_ARGS}}'
+
+  tags-push:
+    desc: Pushes tags for avalanchego and submodules and verifies delivery
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/push_tags.sh {{.CLI_ARGS}}'
+      - cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'
+
+  tags-update-require-directives:
+    desc: Updates require directives for avalanchego modules
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/update_require_directives.sh {{.CLI_ARGS}}'
+      - task: go-mod-tidy
+      - task: check-require-directives
+
+  tags-verify-remote:
+    desc: Verifies tags for avalanchego and submodules exist on the remote
+    cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
@@ -434,16 +463,6 @@ tasks:
       - cmd: "{{.NIX_RUN}} bash -c 'cd graft/subnet-evm && go run ./tests/antithesis --avalanchego-path=../../build/avalanchego --plugin-dir=../../build/plugins --duration=120s'"
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.build_antithesis_images.sh'
 
-  test-build-antithesis-images-xsvm:
-    desc: Tests the build of antithesis images for the xsvm test setup
-    env:
-      TEST_SETUP: xsvm
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s'
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.build_antithesis_images.sh'
-
   test-build-image:
     # On mac, docker/podman/lima should work out-of-the-box.
     # On linux, requires qemu (e.g. apt -y install qemu-user-static).
@@ -454,6 +473,12 @@ tasks:
     desc: Runs C-Chain re-execution test. Run without args to see available tests.
     cmd: '{{.NIX_RUN}} ./scripts/benchmark_cchain_range.sh {{.CLI_ARGS}}'
 
+  test-ci-disk-space:
+    desc: Tests CI disk-space check and diagnostics scripts
+    cmds:
+      - cmd: '{{.NIX_RUN}} ./scripts/test_check_ci_disk_space.sh'
+      - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
+
   test-e2e:
     desc: Runs e2e tests
     cmds:
@@ -462,27 +487,21 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
   test-e2e-ci:
-    desc: Runs e2e tests [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled
     cmds:
       - task: build-race
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
   test-e2e-ci-post-latest:
-    desc: Runs e2e tests [serially with race detection enabled] and posts latest activation immediately
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled and posts latest activation immediately
     cmds:
       - task: build-race
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
 
   test-e2e-ci-schedule-latest:
-    desc: Runs e2e tests [serially with race detection enabled] and schedules latest activation after 4 minutes
-    env:
-      E2E_SERIAL: 1
+    desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
     cmds:
       - task: build-race
       - task: build-xsvm
@@ -511,21 +530,22 @@ tasks:
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}'
 
   # test-fuzz targets a single package as a smoke test for fuzz infrastructure.
-  # For comprehensive fuzzing, use test-fuzz-long FUZZTIME=[value in seconds].
-  # A value of `-1` will run until it encounters a failing output.
+  # For comprehensive fuzzing, use test-fuzz-long FUZZEXECS=[value].
+  #
+  # To fuzz until a failure: FUZZEXECS=0 FUZZ_TIMEOUT=0 task test-fuzz-long
 
   test-fuzz:
     desc: Smoke tests fuzz infrastructure with a quick package
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "10"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58'
+      FUZZEXECS: '{{.FUZZEXECS| default "1000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} ./utils/cb58'
 
   # To run only selected directories, pass them after --.
   test-fuzz-long:
-    desc: Runs each fuzz test for 180 seconds
+    desc: Runs each fuzz test for 10,000 executions
     vars:
-      FUZZTIME: '{{.FUZZTIME| default "180"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
+      FUZZEXECS: '{{.FUZZEXECS| default "10000"}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} {{.CLI_ARGS}}'
 
   test-load:
     desc: Runs load tests
@@ -541,17 +561,17 @@ tasks:
       - task: build
       - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego --load-timeout=30s'
 
+  test-load-exclusive:
+    desc: Runs load tests against kube with exclusive scheduling
+    cmds:
+      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}'
+
   test-load-firewood-ci:
     desc: Runs firewood load tests with the scheduled CI timeout
     cmds:
       - task: generate-load-contract-bindings
       - task: build
       - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego --load-timeout=30m --firewood'
-
-  test-load-exclusive:
-    desc: Runs load tests against kube with exclusive scheduling
-    cmds:
-      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}'
 
   test-load-kube:
     desc: Runs load tests against a kubernetes cluster
@@ -591,27 +611,6 @@ tasks:
       NO_SHUFFLE: TRUE # Allows caching
       NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
-
-  tags-create:
-    desc: Creates tags for avalanchego and submodules
-    cmd: '{{.NIX_RUN}} ./scripts/create_tags.sh {{.CLI_ARGS}}'
-
-  tags-push:
-    desc: Pushes tags for avalanchego and submodules and verifies delivery
-    cmds:
-      - cmd: '{{.NIX_RUN}} ./scripts/push_tags.sh {{.CLI_ARGS}}'
-      - cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'
-
-  tags-update-require-directives:
-    desc: Updates require directives for avalanchego modules
-    cmds:
-      - cmd: '{{.NIX_RUN}} ./scripts/update_require_directives.sh {{.CLI_ARGS}}'
-      - task: go-mod-tidy
-      - task: check-require-directives
-
-  tags-verify-remote:
-    desc: Verifies tags for avalanchego and submodules exist on the remote
-    cmd: '{{.NIX_RUN}} ./scripts/verify_tags_remote.sh {{.CLI_ARGS}}'
 
   test-upgrade:
     desc: Runs upgrade tests
