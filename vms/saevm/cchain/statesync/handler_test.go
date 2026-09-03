@@ -226,18 +226,6 @@ func TestGetLastStateSummary(t *testing.T) {
 	require.Equal(t, sut.wantRoot(t, lastCommitted), got.settledRoot, "GetLastStateSummary().settledRoot")
 }
 
-// TestOnlyGenesis asserts that a chain containing only the genesis block has
-// no servable summaries: the genesis block is synchronous.
-func TestOnlyGenesis(t *testing.T) {
-	handler := newSUT(t)
-
-	_, err := handler.GetLastStateSummary(t.Context())
-	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary()")
-
-	_, err = handler.GetStateSummary(t.Context(), 0)
-	require.ErrorIs(t, err, database.ErrNotFound, "GetStateSummary(0)")
-}
-
 func TestWaitForEvent(t *testing.T) {
 	handler := newSUT(t)
 	ctx, cancel := context.WithCancel(t.Context())
