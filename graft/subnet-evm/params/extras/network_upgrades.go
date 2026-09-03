@@ -193,6 +193,16 @@ func (n *NetworkUpgrades) IsHelicon(time uint64) bool {
 	return isTimestampForked(n.HeliconTimestamp, time)
 }
 
+// ScheduledHeliconTimestamp returns the Helicon activation timestamp
+// when the chain has actually scheduled it (treats both nil and the
+// `unscheduledActivation` sentinel as "not scheduled").
+func (n *NetworkUpgrades) ScheduledHeliconTimestamp() (uint64, bool) {
+	if n.HeliconTimestamp == nil || *n.HeliconTimestamp >= unscheduledActivation {
+		return 0, false
+	}
+	return *n.HeliconTimestamp, true
+}
+
 func (n *NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))

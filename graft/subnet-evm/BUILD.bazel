@@ -11,5 +11,6 @@ package_group(
     name = "external_consumers",
     packages = [
         "//vms/evm/emulate",
+        "//vms/saevm/...",
     ],
 )

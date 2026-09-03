@@ -15,6 +15,7 @@ package_group(
         "//tests/antithesis/avalanchego",
         "//tests/e2e",
         "//tests/e2e/c",
+        "//tests/e2e/warp",
         "//tests/fixture/e2e",
         "//tests/reexecute",
         "//tests/reexecute/c",

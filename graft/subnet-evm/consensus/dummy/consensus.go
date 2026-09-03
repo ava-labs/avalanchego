@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 )
 
 var (
@@ -63,18 +63,18 @@ type (
 	}
 
 	DummyEngine struct {
-		consensusMode      Mode
-		desiredDelayExcess *acp226.DelayExcess
+		consensusMode        Mode
+		desiredDelayExponent *dynamic.DelayExponent
 	}
 )
 
 func NewDummyEngine(
 	mode Mode,
-	desiredDelayExcess *acp226.DelayExcess, // Guides the min delay excess (ACP-226) toward the desired value
+	desiredDelayExponent *dynamic.DelayExponent, // Guides the min delay exponent (ACP-226) toward the desired value
 ) *DummyEngine {
 	return &DummyEngine{
-		consensusMode:      mode,
-		desiredDelayExcess: desiredDelayExcess,
+		consensusMode:        mode,
+		desiredDelayExponent: desiredDelayExponent,
 	}
 }
 
@@ -177,6 +177,9 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
+	}
+	if err := customheader.VerifyNoSAEHeaderFields(header); err != nil {
+		return err
 	}
 
 	// Verify the extra data is well-formed.
@@ -315,17 +318,17 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	}
 	header.Extra = append(extraPrefix, header.Extra...)
 
-	// Set the min delay excess
-	minDelayExcess, err := customheader.MinDelayExcess(
+	// Set the min delay exponent
+	minDelayExponent, err := customheader.MinDelayExponent(
 		configExtra,
 		parent,
 		header.Time,
-		eng.desiredDelayExcess,
+		eng.desiredDelayExponent,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate min delay excess: %w", err)
+		return nil, fmt.Errorf("failed to calculate min delay exponent: %w", err)
 	}
-	headerExtra.MinDelayExcess = minDelayExcess
+	headerExtra.MinDelayExponent = minDelayExponent
 
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

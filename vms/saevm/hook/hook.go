@@ -81,8 +81,25 @@ type Points interface {
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can use a single concrete type for both SAE and libevm hooks.
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// so that consumers can share the same check between SAE admission paths
+	// and the libevm hook fired during actual EVM execution.
+	//
+	// Unlike the libevm hook (which is keyed by [params.Rules] via its
+	// receiver), [Points] is one long-lived value per VM, so the rules for the
+	// state being checked MUST be passed explicitly. Implementations MUST
+	// treat the rules and state as a consistent pair, e.g. when gating with
+	// `rules.IsPrecompileEnabled(...)` against contract storage reads. SAE
+	// worst-case calls this with rules computed from the LAST-SETTLED block,
+	// trading strict-as-of-parent enforcement for
+	// strict-as-of-last-settled (a few seconds of leakage after a role
+	// removal).
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	// RequiresTransactionAdmissionCheck reports whether
+	// [Points.CanExecuteTransaction] could reject any tx under `rules`. It
+	// MUST be a cheap, rules-only check, used to skip sender recovery and
+	// state opening when no admission-relevant precompile is active.
+	// Over-reporting (returning true) is safe; under-reporting is not.
+	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
 	// runs during canonical and historical execution. It MUST NOT change data
@@ -110,6 +127,18 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
+	// FinalizeHeader populates header fields on `hdr` that depend on the
+	// settled block. SAE calls this after the last block to settle has been
+	// determined and BEFORE the worst-case projection consumes the header, so
+	// anything [Points.GasConfigAfter] reads from the header MUST be stamped
+	// here (or in [BlockBuilder.BuildHeader]) rather than in
+	// [BlockBuilder.BuildBlock].
+	//
+	// `settledState` is a read-only [libevm.StateReader] rooted at `settled`'s
+	// post-execution state. Implementations SHOULD only read contract storage
+	// from it: account balances and nonces MAY differ from the settled state
+	// due to worst-case projections.
+	FinalizeHeader(hdr, settled *types.Header, settledState libevm.StateReader) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//
@@ -227,6 +256,44 @@ type Settled struct {
 	GasUnix      uint64
 	GasNumerator gas.Gas
 	Excess       gas.Gas
+}
+
+// NewSettled returns the settlement marker encoded by the given header-extra
+// pointers, or the zero value (indicating synchronous, pre-SAE execution)
+// when any pointer is nil. It is the inverse of [Settled.AsPointers], letting
+// chains with different header-extra types share one [Points.SettledBy]
+// implementation.
+func NewSettled(height, gasUnix, gasNumerator, excess *uint64) Settled {
+	if height == nil || gasUnix == nil || gasNumerator == nil || excess == nil {
+		return Settled{}
+	}
+	return Settled{
+		Height:       *height,
+		GasUnix:      *gasUnix,
+		GasNumerator: gas.Gas(*gasNumerator),
+		Excess:       gas.Gas(*excess),
+	}
+}
+
+// AsPointers returns pointers to copies of s's fields, for stamping into
+// chain-specific header extras in [BlockBuilder.BuildBlock]. It is the
+// inverse of [NewSettled].
+func (s Settled) AsPointers() (height, gasUnix, gasNumerator, excess *uint64) {
+	return &s.Height, &s.GasUnix, (*uint64)(&s.GasNumerator), (*uint64)(&s.Excess)
+}
+
+// BlockTimeFrom combines a header's whole-second timestamp with its optional
+// millisecond refinement, implementing the [Points.BlockTime] contract: the
+// whole-second value is authoritative and the millisecond field only refines
+// it below the second, so the two can never disagree on which second a block
+// belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
+func BlockTimeFrom(seconds uint64, milliseconds *uint64) time.Time {
+	var subSecondNanos int64
+	if milliseconds != nil {
+		subSecondNanos = int64(*milliseconds%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
+	}
+	return time.Unix(int64(seconds), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 // Synchronous reports whether the header is that of a synchronously executed

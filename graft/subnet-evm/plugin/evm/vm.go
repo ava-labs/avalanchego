@@ -63,6 +63,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
@@ -77,7 +78,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 
@@ -558,6 +559,16 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 		configExtra.Override(overrides)
 	}
 
+	// Apply parse-time `feeManager` retirement at Helicon: reject
+	// post-Helicon upgrades, normalize a stale genesis activation,
+	// and inject the synthetic disable that wipes pre-existing
+	// storage at the Helicon block.
+	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
+		if err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := g.Verify(); err != nil {
 		return nil, fmt.Errorf("%w: %w", errVerifyGenesis, err)
 	}
@@ -599,10 +610,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		return err
 	}
 
-	var desiredDelayExcess *acp226.DelayExcess
+	var desiredDelayExponent *dynamic.DelayExponent
 	if vm.config.MinDelayTarget != nil {
-		desiredDelayExcess = new(acp226.DelayExcess)
-		*desiredDelayExcess = acp226.DesiredDelayExcess(*vm.config.MinDelayTarget)
+		desiredDelayExponent = new(dynamic.DelayExponent)
+		*desiredDelayExponent = dynamic.DesiredDelayExponent(*vm.config.MinDelayTarget)
 	}
 
 	vm.eth, err = eth.New(
@@ -614,7 +625,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		lastAcceptedHash,
 		dummy.NewDummyEngine(
 			dummy.Mode{},
-			desiredDelayExcess,
+			desiredDelayExponent,
 		),
 		vm.clock,
 	)

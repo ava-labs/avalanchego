@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -109,7 +109,11 @@ type ChainConfig struct {
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
-	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
+	// FeeConfig configures the legacy pre-Helicon dynamic fee algorithm.
+	//
+	// Deprecated: ACP-176 and ACP-224 own post-Helicon gas pricing. This field
+	// remains required for pre-Helicon compatibility and JSON round trips.
+	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
@@ -337,7 +341,7 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	if maxDelayMS := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > maxDelayMS {
+	if maxDelayMS := dynamic.InitialDelayExponent.Delay(); c.InitialMinDelayMS > maxDelayMS {
 		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, maxDelayMS)
 	}
 

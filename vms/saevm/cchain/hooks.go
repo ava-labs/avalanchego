@@ -35,19 +35,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/x/blockdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
@@ -55,8 +56,8 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 type hooks struct {
 	builder
 	state       *cchainstate.State
-	warpStorage *warp.Storage
-	metrics     *metrics
+	warpStorage *saewarp.Storage
+	metrics     *sae.MinBlockDelayMetric
 }
 
 func newHooks(
@@ -64,10 +65,10 @@ func newHooks(
 	state *cchainstate.State,
 	chainConfig *params.ChainConfig,
 	pool *txpool.Pending,
-	warpStorage *warp.Storage,
+	warpStorage *saewarp.Storage,
 	now func() time.Time,
 	desired desiredParams,
-	metrics *metrics,
+	metrics *sae.MinBlockDelayMetric,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -126,22 +127,13 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+			delayExponent:  asDelayExponent(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	db, err := blockdb.New(
-		blockdb.DefaultConfig().WithDir(dataDir),
-		h.ctx.Log,
-	)
-	if err != nil {
-		return saetypes.ExecutionResults{}, fmt.Errorf("creating execution results db: %w", err)
-	}
-	return saetypes.ExecutionResults{
-		HeightIndex: db,
-	}, nil
+	return hook.NewBlockDBExecutionResults(dataDir, h.ctx.Log)
 }
 
 // priceExponent returns h's ACP-283 price exponent, defaulting to
@@ -160,6 +152,14 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 		return dynamic.DelayExponent(*de)
 	}
 	return dynamic.InitialDelayExponent
+}
+
+func asDelayExponent(d *acp226.DelayExcess) *dynamic.DelayExponent {
+	if d == nil {
+		return nil
+	}
+	exponent := dynamic.DelayExponent(*d)
+	return &exponent
 }
 
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
@@ -200,18 +200,7 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	if he.SettledHeight == nil ||
-		he.SettledGasUnix == nil ||
-		he.SettledGasNumerator == nil ||
-		he.SettledExcess == nil {
-		return hook.Settled{}
-	}
-	return hook.Settled{
-		Height:       *he.SettledHeight,
-		GasUnix:      *he.SettledGasUnix,
-		GasNumerator: gas.Gas(*he.SettledGasNumerator),
-		Excess:       gas.Gas(*he.SettledExcess),
-	}
+	return hook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
 }
 
 // BlockTime returns the canonical wall-clock time of a block.
@@ -225,9 +214,7 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 }
 
 func blockTime(h *types.Header) time.Time {
-	ms := customtypes.HeaderTimeMilliseconds(h)
-	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
-	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
+	return hook.BlockTimeFrom(h.Time, customtypes.GetHeaderExtra(h).TimeMilliseconds)
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -247,8 +234,14 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+func (*hooks) CanExecuteTransaction(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
 	return nil
+}
+
+// RequiresTransactionAdmissionCheck returns false: [hooks.CanExecuteTransaction]
+// never rejects a transaction, so admission paths can skip it entirely.
+func (*hooks) RequiresTransactionAdmissionCheck(params.Rules) bool {
+	return false
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
@@ -275,7 +268,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+	h.metrics.Set(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
@@ -400,7 +393,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
-	minDelayExcess := acp226.DelayExcess(de)
+	legacyDE := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -420,11 +413,17 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &minDelayExcess,
+			MinDelayExcess:   &legacyDE,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},
 	), nil
+}
+
+// FinalizeHeader is a no-op: every header field the C-Chain's hooks read is
+// stamped by [builder.BuildHeader] or [builder.BuildBlock].
+func (*builder) FinalizeHeader(*types.Header, *types.Header, libevm.StateReader) error {
+	return nil
 }
 
 // PotentialEndOfBlockOps returns the cross-chain transactions that should be
@@ -570,10 +569,7 @@ func (b *builder) BuildBlock(
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
-	he.SettledHeight = &settled.Height
-	he.SettledGasUnix = &settled.GasUnix
-	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
-	he.SettledExcess = (*uint64)(&settled.Excess)
+	he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess = settled.AsPointers()
 
 	return customtypes.NewBlockWithExtData(
 		header,

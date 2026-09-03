@@ -3,18 +3,23 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "hook",
-    srcs = ["hook.go"],
+    srcs = [
+        "executionresults.go",
+        "hook.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/hook",
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
         "//snow/engine/snowman/block",
+        "//utils/logging",
         "//utils/math/intmath",
         "//vms/components/gas",
         "//vms/saevm/gastime",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/types",
+        "//x/blockdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/state",

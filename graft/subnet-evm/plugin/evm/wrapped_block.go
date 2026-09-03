@@ -297,8 +297,8 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
-	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
-	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+	// Ensure MinDelayExponent is consistent with rules and minimum block delay is enforced.
+	if err := customheader.VerifyMinDelayExponent(extraConfig, parent, header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
@@ -337,6 +337,9 @@ func (b *wrappedBlock) syntacticVerify() error {
 	}
 
 	ethHeader := b.ethBlock.Header()
+	if err := customheader.VerifyNoSAEHeaderFields(ethHeader); err != nil {
+		return err
+	}
 	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
 	rulesExtra := params.GetRulesExtra(rules)
 	// Perform block and header sanity checks

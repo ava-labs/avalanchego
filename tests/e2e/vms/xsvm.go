@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -70,7 +69,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), ginkgo.Serial, func() {
 		sourceChain := sourceSubnet.Chains[0]
 		destinationChain := destinationSubnet.Chains[0]
 
-		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
+		sourceValidators := tmpnet.GetNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
 		sourceAPINodeURI := sourceAPINode.GetAccessibleURI()
@@ -80,7 +79,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), ginkgo.Serial, func() {
 			zap.String("nodeURI", sourceAPINodeURI),
 		)
 
-		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
+		destinationValidators := tmpnet.GetNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
 		destinationAPINodeURI := destinationAPINode.GetAccessibleURI()
@@ -265,16 +264,3 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), ginkgo.Serial, func() {
 		require.NoError(eg.Wait())
 	})
 })
-
-// Retrieve the nodes corresponding to the provided IDs
-func getNodesForIDs(nodes []*tmpnet.Node, nodeIDs []ids.NodeID) []*tmpnet.Node {
-	desiredNodes := make([]*tmpnet.Node, 0, len(nodeIDs))
-	for _, node := range nodes {
-		for _, nodeID := range nodeIDs {
-			if node.NodeID == nodeID {
-				desiredNodes = append(desiredNodes, node)
-			}
-		}
-	}
-	return desiredNodes
-}

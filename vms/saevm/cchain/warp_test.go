@@ -27,14 +27,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // signAndVerifyWarpMessage requests the SUT to sign msg, verifies the
@@ -150,8 +150,8 @@ func TestSendWarpMessage(t *testing.T) {
 	sentMsg := sut.newAddressedCallMessage(t, sender.Bytes(), payload)
 	hashMsg := sut.newHashMessage(t, built.ID())
 
-	sut.assertWarpSigningRefusal(ctx, t, sentMsg, warp.UnknownMessageErrCode)
-	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
+	sut.assertWarpSigningRefusal(ctx, t, sentMsg, saewarp.UnknownMessageErrCode)
+	sut.assertWarpSigningRefusal(ctx, t, hashMsg, saewarp.NotAcceptedErrCode)
 
 	sut.acceptAndExecute(ctx, t, built)
 	sut.signAndVerifyWarpMessage(ctx, t, sentMsg)

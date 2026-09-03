@@ -64,8 +64,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -165,6 +166,15 @@ type testVM struct {
 }
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
+	tvm, err := tryNewVM(t, config)
+	require.NoError(t, err, "error initializing vm")
+	return tvm
+}
+
+// tryNewVM mirrors [newVM] but returns the [VM.Initialize] error
+// instead of asserting `NoError`. Use from tests that want to assert
+// a specific Initialize failure.
+func tryNewVM(t *testing.T, config testVMConfig) (*testVM, error) {
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	fork := upgradetest.Latest
 	if config.fork != nil {
@@ -193,7 +203,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		t.Context(),
 		ctx,
 		prefixedDB,
@@ -202,8 +212,9 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		[]byte(config.configJSON),
 		[]*commonEng.Fx{},
 		appSender,
-	)
-	require.NoError(t, err, "error initializing vm")
+	); err != nil {
+		return nil, err
+	}
 
 	if !config.isSyncing {
 		require.NoError(t, vm.SetState(t.Context(), snow.Bootstrapping))
@@ -216,7 +227,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		atomicMemory: atomicMemory,
 		appSender:    appSender,
 		config:       config,
-	}
+	}, nil
 }
 
 // Firewood cannot yet be run with an empty config.
@@ -1318,6 +1329,46 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	require.ErrorIs(t, verifyErr, errEmptyBlock)
 }
 
+func TestParseBlockRejectsSAEHeaderFields(t *testing.T) {
+	tvm := newVM(t, testVMConfig{genesisJSON: genesisJSONSubnetEVM})
+	t.Cleanup(func() {
+		require.NoError(t, tvm.vm.Shutdown(t.Context()), "VM.Shutdown()")
+	})
+
+	tx := types.NewTransaction(0, testEthAddrs[1], firstTxAmount, 21_000, big.NewInt(testMinGasPrice), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+	require.NoError(t, err, "types.SignTx()")
+	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})[0], "TxPool.AddRemotesSync()")
+
+	_, err = tvm.vm.WaitForEvent(t.Context())
+	require.NoError(t, err, "VM.WaitForEvent()")
+	blk, err := tvm.vm.BuildBlock(t.Context())
+	require.NoError(t, err, "VM.BuildBlock()")
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
+
+	tests := []struct {
+		name string
+		set  func(*customtypes.HeaderExtra)
+	}{
+		{name: "target", set: func(extra *customtypes.HeaderExtra) { extra.TargetExcess = avalancheutils.PointerTo(gas.Gas(1)) }},
+		{name: "settled", set: func(extra *customtypes.HeaderExtra) { extra.SettledHeight = avalancheutils.PointerTo[uint64](1) }},
+		{name: "gas_config", set: func(extra *customtypes.HeaderExtra) { extra.GasConfigMinGasPrice = avalancheutils.PointerTo[uint64](1) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			header := types.CopyHeader(ethBlock.Header())
+			extra := *customtypes.GetHeaderExtra(header)
+			test.set(&extra)
+			customtypes.SetHeaderExtra(header, &extra)
+			wrapped, err := wrapBlock(ethBlock.WithSeal(header), tvm.vm)
+			require.NoError(t, err, "wrapBlock()")
+
+			_, err = tvm.vm.ParseBlock(t.Context(), wrapped.Bytes())
+			require.ErrorIs(t, err, customheader.ErrSAEHeaderFieldsUnsupported, "VM.ParseBlock()")
+		})
+	}
+}
+
 // Regression test to ensure that a VM that verifies block B, C, then
 // D (preferring block B) reorgs when C and then D are accepted.
 //
@@ -1950,9 +2001,11 @@ func TestVerifyManagerConfig(t *testing.T) {
 // Test that the tx allow list allows whitelisted transactions and blocks non-whitelisted addresses
 // and the allowlist is removed after the precompile is disabled.
 func TestTxAllowListDisablePrecompile(t *testing.T) {
+	latestFork := upgradetest.Latest
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[latestFork]))))
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initially active time
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
@@ -1977,6 +2030,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	`, disableAllowListTimestamp.Unix())
 
 	tvm := newVM(t, testVMConfig{
+		fork:        &latestFork,
 		genesisJSON: string(genesisJSON),
 		upgradeJSON: upgradeConfig,
 	})
@@ -2044,9 +2098,11 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[graniteFork]))))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
@@ -2070,6 +2126,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2742,6 +2799,10 @@ func TestStandaloneDB(t *testing.T) {
 }
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
+	// The legacy feeManager precompile is rejected when scheduled at
+	// or after Helicon (see feemanager.Config.Verify)
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
@@ -2769,6 +2830,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2792,6 +2854,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// restart vm and try again
 	restartedTVM, err := restartVM(tvm, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err)
@@ -3531,42 +3594,42 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 	}
 }
 
-func TestMinDelayExcessInHeader(t *testing.T) {
+func TestMinDelayExponentInHeader(t *testing.T) {
 	tests := []struct {
-		name                   string
-		fork                   upgradetest.Fork
-		desiredMinDelay        *uint64
-		expectedMinDelayExcess *acp226.DelayExcess
+		name                     string
+		fork                     upgradetest.Fork
+		desiredMinDelay          *uint64
+		expectedMinDelayExponent *dynamic.DelayExponent
 	}{
 		{
-			name:                   "pre_granite_no_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        nil,
-			expectedMinDelayExcess: nil,
+			name:                     "pre_granite_no_min_delay_exponent",
+			fork:                     upgradetest.Fortuna,
+			desiredMinDelay:          nil,
+			expectedMinDelayExponent: nil,
 		},
 		{
-			name:                   "pre_granite_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](1000),
-			expectedMinDelayExcess: nil,
+			name:                     "pre_granite_min_delay_exponent",
+			fork:                     upgradetest.Fortuna,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](1000),
+			expectedMinDelayExponent: nil,
 		},
 		{
-			name:                   "granite_first_block_initial_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        nil,
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess),
+			name:                     "granite_first_block_initial_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          nil,
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent),
 		},
 		{
-			name:                   "granite_with_excessive_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			name:                     "granite_with_excessive_desired_min_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](4000),
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent + 200),
 		},
 		{
-			name:                   "granite_with_zero_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](0),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			name:                     "granite_with_zero_desired_min_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](0),
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent - 200),
 		},
 	}
 
@@ -3598,11 +3661,11 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			blk, err := vm.vm.BuildBlock(ctx)
 			require.NoError(err)
 
-			// Check the min delay excess in the header
+			// Check the min delay exponent in the header
 			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 			headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
 
-			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
+			require.Equal(test.expectedMinDelayExponent, headerExtra.MinDelayExponent, "expected %s, got %s", test.expectedMinDelayExponent, headerExtra.MinDelayExponent)
 		})
 	}
 }

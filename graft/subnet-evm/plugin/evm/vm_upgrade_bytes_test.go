@@ -36,6 +36,8 @@ import (
 )
 
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
+	latestFork := upgradetest.Latest
+
 	// Make a TxAllowListConfig upgrade at genesis and convert it to JSON to apply as upgradeBytes.
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initial time
 	upgradeConfig := &extras.UpgradeConfig{
@@ -50,6 +52,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 
 	// initialize the VM with these upgrade bytes
 	tvm := newVM(t, testVMConfig{
+		fork:        &latestFork,
 		genesisJSON: genesisJSONSubnetEVM,
 		upgradeJSON: string(upgradeBytesJSON),
 	})

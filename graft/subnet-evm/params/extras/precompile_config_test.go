@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -191,9 +192,14 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			c := *TestChainConfig
+			// Use TestGraniteChainConfig + a snowCtx pinned to the
+			// Granite upgrade-config so Helicon is unscheduled both in
+			// the chain config and in the network upgrades. Otherwise
+			// the feeManager-keyed cases below would fail.
+			c := *TestGraniteChainConfig
 			config := &c
 			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Granite)
 			config.PrecompileUpgrades = tt.upgrades
 
 			err := config.Verify()
@@ -232,9 +238,12 @@ func TestVerifyPrecompiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			c := *TestChainConfig
+			// See the matching loop in TestVerifyPrecompileUpgrades for
+			// why we pin the snowCtx upgrade-config to Granite.
+			c := *TestGraniteChainConfig
 			config := &c
 			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Granite)
 			config.GenesisPrecompiles = tt.precompiles
 
 			err := config.Verify()

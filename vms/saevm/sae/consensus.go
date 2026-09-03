@@ -157,6 +157,27 @@ func (vm *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 	return nil
 }
 
+var errConflictingBlockAccepted = errors.New("conflicting block accepted at height")
+
+// IsAcceptedBlock returns nil iff the block with the given ID is accepted.
+// [VM.GetBlock] can return processing, non-canonical, blocks, so the block
+// MUST additionally be verified as canonical for its height.
+func (vm *VM) IsAcceptedBlock(ctx context.Context, blkID ids.ID) error {
+	b, err := vm.GetBlock(ctx, blkID)
+	if err != nil {
+		return fmt.Errorf("getting block: %w", err)
+	}
+	height := b.Height()
+	acceptedID, err := vm.GetBlockIDAtHeight(ctx, height)
+	if err != nil {
+		return fmt.Errorf("getting block ID at height %d: %w", height, err)
+	}
+	if acceptedID != blkID {
+		return fmt.Errorf("%w: %s at %d", errConflictingBlockAccepted, acceptedID, height)
+	}
+	return nil
+}
+
 // SubscribeAcceptedBlocks returns a new subscription for each [*blocks.Block]
 // emitted after consensus acceptance via [VM.AcceptBlock].
 func (vm *VM) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
