@@ -65,6 +65,7 @@ import (
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
@@ -157,6 +158,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
 			},
+			RPCConfig: saerpc.Config{StateReplayConcurrency: saerpc.DefaultStateReplayConcurrency},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{

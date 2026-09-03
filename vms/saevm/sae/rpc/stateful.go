@@ -29,8 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
-var noopRelease tracers.StateReleaseFunc = func() {}
-
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
 }
@@ -86,7 +84,9 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	}
 
 	hdr := executedHeader(bl)
-	sdb, err := b.StateDB(hdr.Root)
+	// The ethapi backend cannot return a release function. The reconstructed
+	// state releases its native view when it becomes unreachable.
+	sdb, _, err := b.reconstructState(ctx, bl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,39 +95,19 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 
 // StateAtBlock returns the state database after executing the given block.
 //
-// The reexec, base, readOnly, and preferDisk parameters are ignored because SAE
-// does not implement geth's re-execution-from-archive strategy.
-//
-// Like geth, SAE only stores historical state roots, not full historical state.
-// The underlying trie data must still be present in the state cache/DB for
-// [state.New] to succeed. This means tracing is limited to recent blocks whose
-// trie data has not been pruned (or requires an archival node for older blocks).
-//
-// Reference: https://geth.ethereum.org/docs/developers/evm-tracing#state-availability
-//
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	sdb, _, err := b.stateAtBlock(ctx, block.NumberU64())
-	if err != nil {
-		return nil, nil, err
-	}
-	return sdb, noopRelease, nil
-}
-
-// stateAtBlock returns the state after executing block num, along with the
-// stored block it was restored from.
-func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
-	n := rpc.BlockNumber(num) // #nosec G115 -- won't overflow for a while.
+func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, _ uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+	n := rpc.BlockNumber(block.NumberU64()) // #nosec G115 -- won't overflow for a while.
 	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(n))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
+	sdb, release, err := b.reconstructState(ctx, bl)
 	if err != nil {
 		return nil, nil, err
 	}
-	return sdb, bl, nil
+	return sdb, release, nil
 }
 
 // StateAtTransaction returns the execution environment of a particular
@@ -135,9 +115,7 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing. Replay does not apply end-of-block
 // operations, record block progress, or publish receipts.
-//
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, _ uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
 	if ethB.NumberU64() == 0 {
 		return nil, bCtx, nil, nil, errors.New("no transactions in genesis")
@@ -155,7 +133,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
 	}
-	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
+	stateDB, release, err := b.reconstructState(ctx, parent)
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
@@ -173,14 +151,16 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
+		release()
 		return nil, bCtx, nil, nil, err
 	}
 
 	msg, err := core.TransactionToMessage(txs[txIndex], result.Signer, result.BaseFee.ToBig())
 	if err != nil {
+		release()
 		return nil, bCtx, nil, nil, err
 	}
-	return msg, result.BlockCtx, stateDB, noopRelease, nil
+	return msg, result.BlockCtx, stateDB, release, nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
@@ -271,7 +251,7 @@ type tracerBackend struct {
 // transactions ran on.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, _ uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	num := rpc.BlockNumber(block.NumberU64() + 1) // #nosec G115 -- won't overflow for a while.
 	child, err := b.backend.BlockByNumber(ctx, num)
 	if err != nil {
@@ -286,9 +266,11 @@ func (b *tracerBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 }
 
 // stateAtBlockWithChild returns the parent's post-execution state with the
-// child block's pre-transaction state changes applied.
+// child block's pre-transaction state changes applied. It does not record
+// block progress or mark the child as executed.
 func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, child *types.Block) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	sdb, parentBlock, err := b.backend.stateAtBlock(ctx, n)
+	num := rpc.BlockNumber(n) // #nosec G115 -- won't overflow for a while.
+	parentBlock, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(num))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -300,6 +282,10 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 	// TODO(JonathanOppenheimer): once libevm's tracer APIs apply the EIP-4788
 	// beacon root (already fixed upstream in geth), it will be applied twice,
 	// so we should drop it here.
+	sdb, release, err := b.reconstructState(ctx, parentBlock)
+	if err != nil {
+		return nil, nil, err
+	}
 	_, err = saexec.Execute(
 		block,
 		sdb,
@@ -311,9 +297,10 @@ func (b *tracerBackend) stateAtBlockWithChild(ctx context.Context, n uint64, chi
 		saexec.SkipEndOfBlockOps(),
 	)
 	if err != nil {
+		release()
 		return nil, nil, err
 	}
-	return sdb, noopRelease, nil
+	return sdb, release, nil
 }
 
 // StateAtTransaction returns the state served by [backend.StateAtTransaction]
@@ -401,7 +388,7 @@ func (b *suppliedHashBackend) BlockHash(block *types.Block) common.Hash {
 // tracing it by number.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *suppliedHashBackend) StateAtBlock(ctx context.Context, parent *types.Block, _ uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	return b.stateAtBlockWithChild(ctx, parent.NumberU64(), b.supplied)
 }
 

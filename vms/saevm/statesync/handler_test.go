@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -105,6 +106,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	mempoolConf.Journal = "" // no on-disk journal in tests
 	saeCfg := sae.Config{
 		MempoolConfig: mempoolConf,
+		RPCConfig:     rpc.Config{StateReplayConcurrency: rpc.DefaultStateReplayConcurrency},
 	}
 	saeCfg.DBConfig.CommitInterval = cfg.commitInterval
 

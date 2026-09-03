@@ -6,7 +6,6 @@ package firewood
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie/trienode"
 
 	_ "github.com/ava-labs/firewood-go-ethhash/ffi" // comment resolution
@@ -43,16 +42,7 @@ func (*storageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 // Hash returns an empty hash, as the storage roots are managed internally to
 // Firewood. See [baseTrie.UpdateAccount] - this isn't used during hashing.
 //
-// This does affect [state.StateDB.GetStorageRoot], but this is unused outside
-// debug APIs that SAE doesn't support.
+// This means [state.StateDB.GetStorageRoot] is unsupported for Firewood.
 func (*storageTrie) Hash() common.Hash {
 	return common.Hash{}
-}
-
-// Prove writes the inclusion or exclusion proof for the already hashed key to
-// the provided writer.
-//
-// TODO(alarso16): Implement.
-func (*storageTrie) Prove([]byte, ethdb.KeyValueWriter) error {
-	return errProveNotImplemented
 }

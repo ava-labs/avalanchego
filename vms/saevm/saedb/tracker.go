@@ -9,11 +9,13 @@ import (
 	"math"
 	"path/filepath"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
@@ -103,10 +105,6 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 		if c.TrieCacheMiB == 0 {
 			// Firewood doesn't allow memory-only operation
 			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
-		}
-		if c.Archival {
-			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
-			c.CommitInterval = 1
 		}
 		return &triedb.Config{
 			DBOverride: firewood.Config{
@@ -310,7 +308,47 @@ func (t *Tracker) Untrack(root common.Hash) {
 // for canonical blocks, as any other use could result in a memory
 // leak or state corruption.
 func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
-	return state.New(root, t.cache, t.snaps)
+	sdb, err := state.New(root, t.cache, t.snaps)
+	var missingNode *trie.MissingNodeError
+	if errors.As(err, &missingNode) {
+		return nil, fmt.Errorf("%w: opening state at %#x: %w", ErrStateUnavailable, root, err)
+	}
+	return sdb, err
+}
+
+// CanReconstruct reports whether the tracker uses Firewood.
+func (t *Tracker) CanReconstruct() bool {
+	_, ok := t.cache.TrieDB().Backend().(*firewood.TrieDB)
+	return ok
+}
+
+// Reconstructing returns an isolated [state.StateDB] at root and a release
+// function. root MUST identify an available committed Firewood revision.
+//
+// The caller MUST call release after the state and its copies are no longer in
+// use. Each state MUST be used by one goroutine and MUST NOT be committed.
+// Supported replay and RPC operations do not persist changes.
+func (t *Tracker) Reconstructing(root common.Hash) (*state.StateDB, func(), error) {
+	fw, ok := t.cache.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok {
+		return nil, nil, fmt.Errorf("state reconstruction requires firewood, got %T", t.cache.TrieDB().Backend())
+	}
+
+	recon, err := fw.NewReconstructed(root)
+	if errors.Is(err, ffi.ErrRevisionNotFound) {
+		return nil, nil, fmt.Errorf("%w: reconstructing state at %#x: %w", ErrStateUnavailable, root, err)
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("reconstructing state at %#x: %w", root, err)
+	}
+
+	cache, release := firewood.NewReconstructedDatabase(t.cache, fw, recon, root)
+	sdb, err := state.New(root, cache, nil /* snapshots */)
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+	return sdb, release, nil
 }
 
 // Close releases all resources associated with the `[triedb.Database]`

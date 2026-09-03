@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 )
@@ -39,6 +40,7 @@ type trieReader interface {
 var (
 	_ trieReader = (*ffi.Revision)(nil)
 	_ trieReader = (*ffi.Proposal)(nil)
+	_ trieReader = (*ffi.Reconstructed)(nil)
 )
 
 // baseTrie contains the shared state and methods for all Firewood
@@ -139,9 +141,17 @@ var (
 
 // NodeIterator returns an error.
 //
-// Node iteration is only used for debug APIs, snapshot generation, and offline
-// pruning. SAE does not support the debug APIs and Firewood does not require
-// snapshots or offline pruning.
+// Node iteration is used for APIs that inspect trie nodes, snapshot generation,
+// and offline pruning. SAE does not expose trie-node inspection, and Firewood
+// does not require snapshots or offline pruning.
 func (*baseTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errNodeIteratorNotImplemented
+}
+
+// Prove writes the inclusion or exclusion proof for the already hashed key to
+// the provided writer.
+//
+// TODO(alarso16): Implement.
+func (*baseTrie) Prove([]byte, ethdb.KeyValueWriter) error {
+	return errProveNotImplemented
 }

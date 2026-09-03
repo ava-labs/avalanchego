@@ -5,8 +5,11 @@ package firewood
 
 import (
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -512,6 +515,11 @@ func TestMultipleProposals(t *testing.T) {
 		lastRoot = root
 	}
 
+	tdb, ok := db.TrieDB().Backend().(*TrieDB)
+	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
+	_, err := tdb.NewReconstructed(lastRoot)
+	require.ErrorIsf(t, err, ffi.ErrRevisionNotFound, "%T.NewReconstructed(%s)", tdb, lastRoot)
+
 	require.NoErrorf(t, db.TrieDB().Commit(lastRoot, false), "triedb.Commit(%s)", lastRoot)
 
 	// Firewood loses all uncommitted proposals on close, to test that it was
@@ -525,7 +533,7 @@ func TestMultipleProposals(t *testing.T) {
 	}()
 
 	// Would fail if an [ffi.Revision] cannot be found
-	_, err := db.OpenTrie(lastRoot)
+	_, err = db.OpenTrie(lastRoot)
 	require.NoErrorf(t, err, "%T.OpenTrie(%s)", db, lastRoot)
 }
 
@@ -584,6 +592,58 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 	require.Panicsf(t, func() {
 		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
 	}, "%T.BackendConstructor()", cfg)
+}
+
+// TestConcurrentProposalListAccess checks concurrent reconstruction and block
+// execution.
+//
+// Run this test with the race detector to verify that proposalsLock synchronizes
+// reconstruction with proposal creation and commit.
+func TestConcurrentProposalListAccess(t *testing.T) {
+	const (
+		numBlocks      = 20
+		readsPerReader = 100
+	)
+
+	db := newDB(t)
+
+	// Commit a first block so the readers always have a root to open.
+	sdb := newStateDB(t, db, types.EmptyRootHash)
+	applyBlock(sdb, 1)
+	first, err := sdb.Commit(1, true /* EIP-158 */)
+	require.NoError(t, err, "state.StateDB.Commit()")
+
+	var latest atomic.Pointer[common.Hash]
+	latest.Store(&first)
+	tdb, ok := db.TrieDB().Backend().(*TrieDB)
+	require.Truef(t, ok, "triedb.Database.Backend() is %T, not %T", db.TrieDB().Backend(), tdb)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for range readsPerReader {
+			// Errors are expected whenever the writer commits the root out
+			// from under the reader, and are not what this test pins.
+			root := *latest.Load()
+			recon, err := tdb.NewReconstructed(root)
+			if err == nil {
+				_ = recon.Drop()
+			}
+		}
+	})
+
+	last := first
+	for i := uint64(2); i <= numBlocks; i++ {
+		sdb := newStateDB(t, db, last)
+		applyBlock(sdb, i)
+		last, err = sdb.Commit(i, true /* EIP-158 */)
+		require.NoErrorf(t, err, "state.StateDB.Commit() for block %d", i)
+
+		root := last // MUST be a fresh variable; readers dereference the pointer
+		latest.Store(&root)
+		require.NoErrorf(t, db.TrieDB().Commit(last, false), "triedb.Commit(%s)", last)
+	}
+
+	wg.Wait()
 }
 
 // TestUnknownCommitNoError verifies that committing a root that is not known to
