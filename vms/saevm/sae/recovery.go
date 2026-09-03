@@ -125,7 +125,6 @@ func recoverExecutor(
 	reg prometheus.Registerer,
 ) (
 	_ *saexec.Executor,
-	_ *saedb.Tracker,
 	_ *syncMap[common.Hash, *blocks.Block],
 	retErr error,
 ) {
@@ -136,7 +135,7 @@ func recoverExecutor(
 
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("finding last committed state: %w", err)
+		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
 	}
 	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
 
@@ -148,7 +147,7 @@ func recoverExecutor(
 		rec.snowCtx.Log,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
 	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
 
@@ -179,17 +178,17 @@ func recoverExecutor(
 		reg,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
 	closers.Push(exec)
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
-		return nil, nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 	}
 	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
-		return nil, nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
+		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
-	return exec, tracker, consensusCritical, nil
+	return exec, consensusCritical, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
