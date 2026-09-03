@@ -18,12 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ ValidatorTx     = (*AddValidatorTx)(nil)
-	_ ScheduledStaker = (*AddValidatorTx)(nil)
-
-	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
-)
+var errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 
 // AddValidatorTx is an unsigned addValidatorTx
 type AddValidatorTx struct {
@@ -40,6 +35,15 @@ type AddValidatorTx struct {
 	// take 30% of rewards from delegators
 	DelegationShares uint32 `serialize:"true" json:"shares"`
 }
+
+var (
+	_ ValidatorTx             = (*AddValidatorTx)(nil)
+	_ ValidatorStaker         = (*AddValidatorTx)(nil)
+	_ PermissionlessValidator = (*AddValidatorTx)(nil)
+	_ ScheduledStaker         = (*AddValidatorTx)(nil)
+)
+
+func (*AddValidatorTx) validatorStaker() {}
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [AddValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
@@ -61,7 +65,7 @@ func (tx *AddValidatorTx) NodeID() ids.NodeID {
 	return tx.Validator.NodeID
 }
 
-// PublicKey always returns no key: AddValidatorTx predates BLS registration.
+// PublicKey always returns no key because AddValidatorTx predates BLS registration.
 func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return nil, false, nil
 }
@@ -73,8 +77,6 @@ func (*AddValidatorTx) PendingPriority() Priority {
 func (*AddValidatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkValidatorCurrentPriority
 }
-
-func (*AddValidatorTx) validatorStaker() {}
 
 func (tx *AddValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts

@@ -23,7 +23,7 @@ Mutable auto-renewed validator state is stored separately from the core `Staker`
 - `AutoCompoundRewardShares` - percentage of current cycle rewards to restake at cycle end, expressed in millionths.
 - `NextPeriod` - next validation cycle duration in seconds. A value of 0 means the validator stops at the end of the current cycle.
 
-The validator's effective weight is the original stake plus `AccruedValidationRewards` and `AccruedDelegateeRewards`; the implementation persists this weight on the renewed `Staker`. The current cycle's `StartTime`, `EndTime`, `PotentialReward`, and weight remain on the `Staker` record itself.
+The validator's effective weight is the original stake plus `AccruedValidationRewards` and `AccruedDelegateeRewards`; the implementation persists this weight on the renewed `Staker`. The current cycle's `Start`, `End`, `PotentialReward`, and weight remain on the `Staker` record itself.
 
 `StakingInfo` is initialized from `AddAutoRenewedValidatorTx`, updated by `SetAutoRenewedValidatorConfigTx`, and updated again at cycle end when rewards are restaked or withdrawn.
 
@@ -94,7 +94,7 @@ Taken when the validator has sufficient uptime and is eligible for rewards.
 
 3. Withdrawn rewards are paid as reward UTXOs on the commit path. Withdrawn validation rewards and withdrawn delegatee rewards are each paid as a separate reward UTXO when non-zero. Each amount includes both the configured withdrawal from `AutoCompoundRewardShares` and any additional overflow from the `MaxValidatorStake` cap.
 
-4. A new cycle begins immediately with `StartTime` set to the previous `EndTime`, `EndTime = StartTime + NextPeriod`, a new `PotentialReward` calculated from the new weight and current supply, and `DelegateeReward` reset. Current supply is increased by the new `PotentialReward`.
+4. A new cycle begins immediately with `Start` set to the previous `End`, `EndTime = StartTime + NextPeriod`, a new `PotentialReward` calculated from the new weight and current supply, and `DelegateeReward` reset. Current supply is increased by the new `PotentialReward`.
 
 **If `NextPeriod == 0` (graceful exit):**
 

@@ -18,9 +18,6 @@ import (
 )
 
 var (
-	_ DelegatorTx     = (*AddDelegatorTx)(nil)
-	_ ScheduledStaker = (*AddDelegatorTx)(nil)
-
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 	errStakeMustBeAVAX         = errors.New("stake must be AVAX")
 )
@@ -36,6 +33,14 @@ type AddDelegatorTx struct {
 	// Where to send staking rewards when done validating
 	DelegationRewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
+
+var (
+	_ DelegatorTx     = (*AddDelegatorTx)(nil)
+	_ Delegator       = (*AddDelegatorTx)(nil)
+	_ ScheduledStaker = (*AddDelegatorTx)(nil)
+)
+
+func (*AddDelegatorTx) delegator() {}
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedAddDelegatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
@@ -64,8 +69,6 @@ func (*AddDelegatorTx) PendingPriority() Priority {
 func (*AddDelegatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkDelegatorCurrentPriority
 }
-
-func (*AddDelegatorTx) delegatorStaker() {}
 
 func (tx *AddDelegatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts

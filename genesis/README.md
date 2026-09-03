@@ -6,7 +6,7 @@ The genesis JSON file contains the following properties:
 
 - `networkID`: A unique identifier for the blockchain, must be a number in the range [0, 2^32).
 - `allocations`: The list of initial addresses, their initial balances and the unlock schedule for each.
-- `startTime`: The time of the beginning of the blockchain, it must be a Unix
+- `start`: The time of the beginning of the blockchain, it must be a Unix
   timestamp and it can't be a time in the future.
 - `initialStakeDuration`: The stake duration, in seconds, of the validators that exist at network genesis.
 - `initialStakeDurationOffset`: The offset, in seconds, between the end times

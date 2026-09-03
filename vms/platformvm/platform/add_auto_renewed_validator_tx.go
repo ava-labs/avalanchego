@@ -22,11 +22,6 @@ import (
 )
 
 var (
-	_ UnsignedTx  = (*AddAutoRenewedValidatorTx)(nil)
-	_ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
-)
-
-var (
 	errMissingSigner                   = errors.New("missing signer")
 	errMissingPeriod                   = errors.New("missing period")
 	errTooManyAutoCompoundRewardShares = fmt.Errorf("a staker can only restake at most %d shares from rewards", reward.PercentDenominator)
@@ -71,6 +66,15 @@ type AddAutoRenewedValidatorTx struct {
 	Period uint64 `serialize:"true" json:"period"`
 }
 
+var (
+	_ UnsignedTx              = (*AddAutoRenewedValidatorTx)(nil)
+	_ ValidatorTx             = (*AddAutoRenewedValidatorTx)(nil)
+	_ ValidatorStaker         = (*AddAutoRenewedValidatorTx)(nil)
+	_ PermissionlessValidator = (*AddAutoRenewedValidatorTx)(nil)
+)
+
+func (*AddAutoRenewedValidatorTx) validatorStaker() {}
+
 func (*AddAutoRenewedValidatorTx) SubnetID() ids.ID {
 	return constants.PrimaryNetworkID
 }
@@ -107,8 +111,6 @@ func (tx *AddAutoRenewedValidatorTx) Weight() uint64 {
 func (*AddAutoRenewedValidatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkValidatorCurrentPriority
 }
-
-func (*AddAutoRenewedValidatorTx) validatorStaker() {}
 
 func (tx *AddAutoRenewedValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts

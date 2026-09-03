@@ -46,33 +46,28 @@ type Staker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
 	Weight() uint64
+	// TODO deprecate
 	CurrentPriority() Priority
 }
 
 // ValidatorStaker is the sealed set of staker transactions that register a
 // validator.
+// TODO rename to Validator
 type ValidatorStaker interface {
 	Staker
 	validatorStaker()
 }
 
-// DelegatorStaker is the sealed set of staker transactions that register a
+// Delegator is the sealed set of staker transactions that register a
 // delegator.
-type DelegatorStaker interface {
+type Delegator interface {
 	Staker
-	delegatorStaker()
+	delegator()
 }
 
-// KeyedStaker is a staker whose transaction can register a BLS key. Only
-// Primary Network validators can, so a caller that needs the key must
-// type-assert to this interface rather than accepting any [Staker].
-//
-// Satisfying KeyedStaker does not by itself mean the transaction is on the
-// Primary Network: AddPermissionlessValidatorTx serves both networks and
-// carries the network in a field. SyntacticVerify is what rejects a key on a
-// non-Primary-Network transaction.
-type KeyedStaker interface {
-	Staker
+// PermissionlessValidator is the set of transaction that register a permissionless validator.
+type PermissionlessValidator interface {
+	ValidatorStaker
 	// PublicKey returns the BLS public key registered by this transaction. If
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)

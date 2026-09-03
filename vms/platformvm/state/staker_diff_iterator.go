@@ -26,8 +26,6 @@ var (
 //     current staker set, then removed.
 //   - Further ties are broken by *Staker.Less(), returning the lesser staker
 //     first.
-//
-// Deprecated: use [NewDelegatorDiffIterator].
 type StakerDiffIterator interface {
 	Next() bool
 	// Returns:
@@ -50,8 +48,6 @@ type stakerDiffIterator struct {
 }
 
 // NewStakerDiffIterator returns a native staker-diff iterator.
-//
-// Deprecated: use [NewDelegatorDiffIterator].
 func NewStakerDiffIterator(currentIterator, pendingIterator iterator.Iterator[*Staker]) StakerDiffIterator {
 	mutableCurrentIterator := newMutableStakerIterator(currentIterator)
 	return &stakerDiffIterator{

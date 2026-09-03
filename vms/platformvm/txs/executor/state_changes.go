@@ -99,6 +99,43 @@ func AdvanceTimeTo(
 	return changed, diff.Apply(parentState)
 }
 
+// mintPotentialReward calculates the potential reward for a staker over its
+// period and optimistically adds it to the current supply on changes.
+func mintPotentialReward(
+	backend *Backend,
+	parentState state.Chain,
+	changes *state.Diff,
+	period state.StakingPeriod,
+) (uint64, error) {
+	supply, err := changes.GetCurrentSupply(period.SubnetID())
+	if err != nil {
+		return 0, err
+	}
+
+	rewards, err := GetRewardsCalculator(
+		backend.Config.RewardConfig,
+		backend.Config.UpgradeConfig,
+		parentState,
+		period.SubnetID(),
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	potentialReward := rewards.Calculate(
+		period.Start(),
+		period.End().Sub(period.Start()),
+		period.Weight(),
+		supply,
+	)
+
+	// Invariant: reward.Calculator.Calculate can never return a
+	// potentialReward such that supply + potentialReward > maximumSupply.
+	changes.SetCurrentSupply(period.SubnetID(), supply+potentialReward)
+
+	return potentialReward, nil
+}
+
 // advanceTimeTo returns the state diff on top of parentState resulting from
 // advancing the chain time to newChainTime. It also returns a boolean
 // indicating if the validator set changed.
@@ -164,56 +201,36 @@ func advanceTimeTo(
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		period := stakerToRemove.Period()
-		if period.StartTime.After(newChainTime) {
+
+		if period.Start().After(newChainTime) {
 			break
 		}
-		permissioned := false
-		switch stakerToRemove.(type) {
-		case state.PendingValidator:
-			permissioned = period.IsPermissionedValidator()
-		case state.PendingDelegator:
-		default:
-			return nil, false, fmt.Errorf("unexpected pending staker type %T", stakerToRemove)
-		}
 
-		// Only permissionless networks (including the primary network) are eligible for rewards
-		var potentialReward uint64
-		if !permissioned {
-			supply, err := changes.GetCurrentSupply(period.SubnetID())
-			if err != nil {
-				return nil, false, err
-			}
-
-			rewards, err := GetRewardsCalculator(
-				backend.Config.RewardConfig,
-				backend.Config.UpgradeConfig,
-				parentState,
-				period.SubnetID(),
-			)
-			if err != nil {
-				return nil, false, err
-			}
-
-			potentialReward = rewards.Calculate(
-				period.StartTime,
-				period.EndTime.Sub(period.StartTime),
-				period.Weight,
-				supply,
-			)
-			// Invariant: reward.Calculator.Calculate can never return a potentialReward
-			//            such that supply + potentialReward > maximumSupply.
-			changes.SetCurrentSupply(period.SubnetID(), supply+potentialReward)
-		}
-
-		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
-		// expected order of operations.
+		// Buffer state changes so that we can perform validator updates before
+		// delegator updates to respect state's expected order of operations.
 		switch stakerToRemove := stakerToRemove.(type) {
 		case state.PendingValidator:
+			// Only permissionless stakers (including the primary network) are
+			// eligible for rewards.
+			var potentialReward uint64
+			if !period.IsPermissionedValidator() {
+				var err error
+				potentialReward, err = mintPotentialReward(backend, parentState, changes, period)
+				if err != nil {
+					return nil, false, err
+				}
+			}
+
 			validatorPromotions = append(validatorPromotions, validatorPromotion{
 				pending: stakerToRemove,
 				current: stakerToRemove.Promote(potentialReward),
 			})
 		case state.PendingDelegator:
+			potentialReward, err := mintPotentialReward(backend, parentState, changes, period)
+			if err != nil {
+				return nil, false, err
+			}
+
 			delegatorPromotions = append(delegatorPromotions, delegatorPromotion{
 				pending: stakerToRemove,
 				current: stakerToRemove.Promote(potentialReward),
@@ -227,6 +244,7 @@ func advanceTimeTo(
 		if err := changesStakingState.PutCurrentValidator(p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current validator: %w", err)
 		}
+
 		if err := changesStakingState.DeletePendingValidator(
 			p.pending.SubnetID(),
 			p.pending.NodeID(),
@@ -239,9 +257,8 @@ func advanceTimeTo(
 		if err := changesStakingState.PutCurrentDelegator(p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current delegator: %w", err)
 		}
-		if err := changesStakingState.DeletePendingDelegator(p.pending.TxID); err != nil {
-			return nil, false, err
-		}
+
+		changesStakingState.DeletePendingDelegator(p.pending)
 	}
 
 	changed := len(validatorPromotions) > 0 || len(delegatorPromotions) > 0
@@ -260,7 +277,8 @@ func advanceTimeTo(
 	for currentStakerIterator.Next() {
 		stakerToRemove := currentStakerIterator.Value()
 		period := stakerToRemove.Period()
-		if period.EndTime.After(newChainTime) {
+
+		if period.End().After(newChainTime) {
 			break
 		}
 

@@ -61,6 +61,7 @@ go_test(
         "import_test.go",
         "proposal_tx_executor_test.go",
         "reward_validator_test.go",
+        "staker_tx_verification_helpers_test.go",
         "staker_tx_verification_test.go",
         "standard_tx_executor_test.go",
         "state_changes_test.go",

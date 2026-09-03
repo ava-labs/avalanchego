@@ -1412,7 +1412,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 
 	endTime := stakeStartTime.Add(duration)
 
-	validator, err := state.NewCurrentAutoRenewedValidator(
+	validator, err := state.NewCurrentValidator(
 		e.tx.ID(),
 		tx,
 		stakeStartTime,
@@ -1424,8 +1424,23 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("creating staker: %w", err)
 	}
 
-	if err := state.NewAdapter(e.state).PutAutoRenewedValidator(validator); err != nil {
+	// The restake config must be written with the insertion: a restaking
+	// validator with a zero config gracefully exits instead of renewing.
+	stakingState := state.NewAdapter(e.state)
+
+	if err := stakingState.PutCurrentValidator(validator); err != nil {
 		return fmt.Errorf("putting current validator: %w", err)
+	}
+
+	if err := stakingState.SetRestakeConfig(
+		constants.PrimaryNetworkID,
+		tx.NodeID(),
+		state.RestakeConfig{
+			AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
+			NextPeriod:               tx.Period,
+		},
+	); err != nil {
+		return fmt.Errorf("setting restake config: %w", err)
 	}
 
 	avax.Consume(e.state, tx.Ins)
@@ -1450,18 +1465,15 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 		return err
 	}
 
-	stakingState := state.NewAdapter(e.state)
-	autoRenewedValidator, err := stakingState.GetCurrentAutoRenewedValidator(validator.NodeID())
-	if err != nil {
-		return fmt.Errorf("getting auto-renewed validator: %w", err)
-	}
-
-	metadata := autoRenewedValidator.AutoRenewedStakingPeriod
-	metadata.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
-	metadata.NextPeriod = tx.Period
-
-	if err := stakingState.SetCurrentAutoRenewedValidatorMetadata(autoRenewedValidator.NodeID(), metadata); err != nil {
-		return fmt.Errorf("setting auto-renewed validator metadata: %w", err)
+	if err := state.NewAdapter(e.state).SetRestakeConfig(
+		constants.PrimaryNetworkID,
+		validator.NodeID(),
+		state.RestakeConfig{
+			AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
+			NextPeriod:               tx.Period,
+		},
+	); err != nil {
+		return fmt.Errorf("setting restake config: %w", err)
 	}
 
 	avax.Consume(e.state, tx.Ins)
@@ -1494,6 +1506,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		if !ok {
 			return fmt.Errorf("%w: %T", errMissingStartTimePreDurango, stakerTx)
 		}
+
 		pending = true
 		stakeStartTime = scheduledStaker.StartTime()
 	} else {
@@ -1504,7 +1517,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		// Only calculate the potentialReward for permissionless stakers.
 		// Recall that we only need to check if this is a permissioned
 		// validator as there are no permissioned delegators
-		if _, permissioned := stakerTx.(*platform.AddSubnetValidatorTx); !permissioned {
+		if !stakerTx.CurrentPriority().IsPermissionedValidator() {
 			subnetID := stakerTx.SubnetID()
 			currentSupply, err := e.state.GetCurrentSupply(subnetID)
 			if err != nil {
@@ -1535,7 +1548,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 
 	if pending {
 		switch stakerTx.(type) {
-		case platform.DelegatorStaker:
+		case platform.Delegator:
 			return state.NewAdapter(e.state).PutPendingDelegator(e.tx)
 		case platform.ValidatorStaker:
 			return state.NewAdapter(e.state).PutPendingValidator(e.tx)
@@ -1547,8 +1560,8 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	endTime := stakerTx.EndTime()
 	weight := stakerTx.Weight()
 	switch stakerTx := stakerTx.(type) {
-	case platform.DelegatorStaker:
-		delegator, err := state.NewCurrentDelegator(
+	case platform.Delegator:
+		delegator := state.NewCurrentDelegator(
 			txID,
 			stakerTx,
 			stakeStartTime,
@@ -1556,14 +1569,9 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 			weight,
 			potentialReward,
 		)
-		if err != nil {
-			return err
-		}
-		if err := state.NewAdapter(e.state).PutCurrentDelegator(delegator); err != nil {
-			return fmt.Errorf("putting delegator: %w", err)
-		}
-		return nil
-	case state.ValidatorWithEndTime:
+
+		return state.NewAdapter(e.state).PutCurrentDelegator(delegator)
+	case platform.ValidatorStaker:
 		validator, err := state.NewCurrentValidator(
 			txID,
 			stakerTx,
@@ -1575,6 +1583,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		if err != nil {
 			return err
 		}
+
 		return state.NewAdapter(e.state).PutCurrentValidator(validator)
 	default:
 		return fmt.Errorf("staker %s, unexpected type %T", txID, stakerTx)

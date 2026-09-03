@@ -19,8 +19,9 @@ var _ btree.LessFunc[*Staker] = (*Staker).Less
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
 // Invariant: Staker's size is bounded to prevent OOM DoS attacks.
-// Deprecated: this is an implementation detail and callers should use the typed set of apis
-// exposed through Adapter
+//
+// Deprecated: Staker is a storage detail. Use the typed records exposed
+// through [Adapter].
 type Staker struct {
 	TxID            ids.ID
 	NodeID          ids.NodeID
@@ -152,7 +153,7 @@ func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, er
 // optionalPublicKey returns the BLS key staker registers, or nil if its
 // transaction kind cannot register one.
 func optionalPublicKey(staker platform.Staker) (*bls.PublicKey, error) {
-	keyed, ok := staker.(platform.KeyedStaker)
+	keyed, ok := staker.(platform.PermissionlessValidator)
 	if !ok {
 		return nil, nil
 	}

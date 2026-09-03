@@ -21,9 +21,6 @@ import (
 )
 
 var (
-	_ ValidatorTx     = (*AddPermissionlessValidatorTx)(nil)
-	_ ScheduledStaker = (*AddPermissionlessDelegatorTx)(nil)
-
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
 	errInvalidSigner           = errors.New("invalid signer")
@@ -57,6 +54,15 @@ type AddPermissionlessValidatorTx struct {
 	// take 30% of rewards from delegators
 	DelegationShares uint32 `serialize:"true" json:"shares"`
 }
+
+var (
+	_ ValidatorTx             = (*AddPermissionlessValidatorTx)(nil)
+	_ ValidatorStaker         = (*AddPermissionlessValidatorTx)(nil)
+	_ PermissionlessValidator = (*AddPermissionlessValidatorTx)(nil)
+	_ ScheduledStaker         = (*AddPermissionlessValidatorTx)(nil)
+)
+
+func (*AddPermissionlessValidatorTx) validatorStaker() {}
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [AddPermissionlessValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so
@@ -100,8 +106,6 @@ func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
 	}
 	return SubnetPermissionlessValidatorCurrentPriority
 }
-
-func (*AddPermissionlessValidatorTx) validatorStaker() {}
 
 func (tx *AddPermissionlessValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts

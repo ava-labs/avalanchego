@@ -12,12 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	_ StakerTx        = (*AddSubnetValidatorTx)(nil)
-	_ ScheduledStaker = (*AddSubnetValidatorTx)(nil)
-
-	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
-)
+var errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 
 // AddSubnetValidatorTx is an unsigned addSubnetValidatorTx
 type AddSubnetValidatorTx struct {
@@ -28,6 +23,14 @@ type AddSubnetValidatorTx struct {
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
+
+var (
+	_ StakerTx        = (*AddSubnetValidatorTx)(nil)
+	_ ValidatorStaker = (*AddSubnetValidatorTx)(nil)
+	_ ScheduledStaker = (*AddSubnetValidatorTx)(nil)
+)
+
+func (*AddSubnetValidatorTx) validatorStaker() {}
 
 func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID {
 	return tx.SubnetValidator.NodeID
@@ -40,8 +43,6 @@ func (*AddSubnetValidatorTx) PendingPriority() Priority {
 func (*AddSubnetValidatorTx) CurrentPriority() Priority {
 	return SubnetPermissionedValidatorCurrentPriority
 }
-
-func (*AddSubnetValidatorTx) validatorStaker() {}
 
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {

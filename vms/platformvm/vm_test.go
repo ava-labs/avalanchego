@@ -1617,53 +1617,6 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(secondAdvanceTimeBlk.Verify(t.Context()))
 }
 
-func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
-	nodeID := genesistest.DefaultNodeIDs[0]
-
-	tests := []struct {
-		description string
-		startTime   time.Time
-		endTime     time.Time
-	}{
-		{
-			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   genesistest.DefaultValidatorStartTime,
-			endTime:     genesistest.DefaultValidatorEndTime,
-		},
-		{
-			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   genesistest.DefaultValidatorStartTime.Add(time.Minute),
-			endTime:     genesistest.DefaultValidatorEndTime,
-		},
-		{
-			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   genesistest.DefaultValidatorStartTime,
-			endTime:     genesistest.DefaultValidatorEndTime.Add(-time.Minute),
-		},
-		{
-			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   genesistest.DefaultValidatorStartTime.Add(time.Minute),
-			endTime:     genesistest.DefaultValidatorEndTime.Add(-time.Minute),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
-			require.NoError(err)
-
-			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
-			require.NoError(err)
-			require.Equal(genesistest.DefaultValidatorWeight, amount)
-		})
-	}
-}
-
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)

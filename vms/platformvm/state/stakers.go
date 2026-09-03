@@ -18,10 +18,7 @@ import (
 
 var (
 	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
-	// ErrNotAutoRenewedValidator is returned when a bounded validator is used
-	// where an auto-renewed validator is needed.
-	ErrNotAutoRenewedValidator = errors.New("not an auto-renewed validator")
-	errUnexpectedStaker        = errors.New("unexpected staker")
+	errUnexpectedStaker          = errors.New("unexpected staker")
 )
 
 // StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.
@@ -63,13 +60,15 @@ type CurrentStakers interface {
 	// SetStakingInfo updates the mutable staking info for nodeID on subnetID.
 	//
 	// This returns an error if the validator is not in the validator set.
-	// Deprecated: use typed functions exposed from [Adapter].
+	//
+	// Deprecated: use the typed staking-metadata methods on [Adapter].
 	SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error
 
 	// GetStakingInfo returns the mutable staking info for nodeID on subnetID.
 	//
 	// This returns an error if the validator is not in the validator set.
-	// Deprecated: use typed functions exposed from [Adapter].
+	//
+	// Deprecated: use the typed staking-metadata methods on [Adapter].
 	GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the

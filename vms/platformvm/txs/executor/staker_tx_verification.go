@@ -47,21 +47,25 @@ var (
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
 )
 
-func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) (state.StakingPeriod, error) {
+// getValidatorPeriod returns the staking period of the validator on subnetID
+// with nodeID, and whether the validator is current rather than pending.
+func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) (state.StakingPeriod, bool, error) {
 	stakingState := state.NewAdapter(chainState)
-	validator, err := stakingState.GetCurrentValidator(subnetID, nodeID)
+
+	v, err := stakingState.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
-		return validator.Period(), nil
+		return v.Period(), true, nil
 	}
-	if err != database.ErrNotFound {
-		return state.StakingPeriod{}, err
+
+	if !errors.Is(err, database.ErrNotFound) {
+		return state.StakingPeriod{}, false, err
 	}
 
 	pendingValidator, err := stakingState.GetPendingValidator(subnetID, nodeID)
 	if err != nil {
-		return state.StakingPeriod{}, err
+		return state.StakingPeriod{}, false, err
 	}
-	return pendingValidator.Period(), nil
+	return pendingValidator.Period(), false, nil
 }
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -72,8 +76,8 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	chainState state.Chain,
 	subnetValidator platform.Validator,
 ) error {
-	primaryNetworkValidator, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
-	if err == database.ErrNotFound {
+	primaryNetworkValidator, _, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
+	if errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf(
 			"%s %w of the primary network",
 			subnetValidator.NodeID,
@@ -97,8 +101,8 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	if !platform.BoundedBy(
 		startTime,
 		subnetValidator.EndTime(),
-		primaryNetworkValidator.StartTime,
-		primaryNetworkValidator.EndTime,
+		primaryNetworkValidator.Start(),
+		primaryNetworkValidator.End(),
 	) {
 		return ErrPeriodMismatch
 	}
@@ -170,7 +174,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	_, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, _, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
@@ -178,7 +182,7 @@ func verifyAddValidatorTx(
 			ErrAlreadyValidator,
 		)
 	}
-	if err != database.ErrNotFound {
+	if !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf(
 			"failed to find whether %s is a primary network validator: %w",
 			tx.Validator.NodeID,
@@ -259,7 +263,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	_, err := getValidatorPeriod(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	_, _, err := getValidatorPeriod(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
@@ -268,7 +272,7 @@ func verifyAddSubnetValidatorTx(
 			tx.SubnetValidator.Subnet,
 		)
 	}
-	if err != database.ErrNotFound {
+	if !errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf(
 			"failed to find whether %s is a subnet validator: %w",
 			tx.Validator.NodeID,
@@ -345,20 +349,7 @@ func verifyRemoveSubnetValidatorTx(
 		return state.StakingPeriod{}, false, err
 	}
 
-	isCurrentValidator := true
-	stakingState := state.NewAdapter(chainState)
-	currentValidator, err := stakingState.GetCurrentValidator(tx.Subnet, tx.NodeID)
-	var validator state.StakingPeriod
-	if err == nil {
-		validator = currentValidator.Period()
-	} else if err == database.ErrNotFound {
-		pendingValidator, pendingErr := stakingState.GetPendingValidator(tx.Subnet, tx.NodeID)
-		if pendingErr == nil {
-			validator = pendingValidator.Period()
-		}
-		err = pendingErr
-		isCurrentValidator = false
-	}
+	validator, isCurrentValidator, err := getValidatorPeriod(chainState, tx.Subnet, tx.NodeID)
 	if err != nil {
 		// It isn't a current or pending validator.
 		return state.StakingPeriod{}, false, fmt.Errorf(
@@ -474,7 +465,7 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	primaryNetworkValidator, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, _, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -483,7 +474,7 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	maximumWeight, err := safemath.Mul(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
+	maximumWeight, err := safemath.Mul(MaxValidatorWeightFactor, primaryNetworkValidator.Weight())
 	if err != nil {
 		return nil, ErrStakeOverflow
 	}
@@ -495,8 +486,8 @@ func verifyAddDelegatorTx(
 	if !platform.BoundedBy(
 		startTime,
 		endTime,
-		primaryNetworkValidator.StartTime,
-		primaryNetworkValidator.EndTime,
+		primaryNetworkValidator.Start(),
+		primaryNetworkValidator.End(),
 	) {
 		return nil, ErrPeriodMismatch
 	}
@@ -615,7 +606,7 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 
-	_, err = getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
+	_, _, err = getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"%w: %s on %s",
@@ -624,7 +615,7 @@ func verifyAddPermissionlessValidatorTx(
 			tx.Subnet,
 		)
 	}
-	if err != database.ErrNotFound {
+	if !errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			tx.Validator.NodeID,
@@ -739,7 +730,7 @@ func verifyAddPermissionlessDelegatorTx(
 		)
 	}
 
-	validator, err := getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
+	validator, _, err := getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",
@@ -751,7 +742,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	maximumWeight, err := safemath.Mul(
 		uint64(delegatorRules.maxValidatorWeightFactor),
-		validator.Weight,
+		validator.Weight(),
 	)
 	if err != nil {
 		maximumWeight = math.MaxUint64
@@ -761,8 +752,8 @@ func verifyAddPermissionlessDelegatorTx(
 	if !platform.BoundedBy(
 		startTime,
 		endTime,
-		validator.StartTime,
-		validator.EndTime,
+		validator.Start(),
+		validator.End(),
 	) {
 		return ErrPeriodMismatch
 	}
@@ -947,15 +938,15 @@ func verifyAddAutoRenewedValidatorTx(
 		return ErrStakeTooLong
 	}
 
-	_, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.NodeID())
-	switch err {
-	case nil:
+	_, _, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.NodeID())
+	switch {
+	case err == nil:
 		return fmt.Errorf(
 			"%w: %s",
 			ErrDuplicateValidator,
 			tx.NodeID(),
 		)
-	case database.ErrNotFound:
+	case errors.Is(err, database.ErrNotFound):
 		// OK: validator not found
 
 	default:
@@ -1014,7 +1005,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return state.CurrentValidator{}, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
-	if tx.TxID != validator.TxID {
+	if tx.TxID != validator.TxID() {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
 		return state.CurrentValidator{}, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)

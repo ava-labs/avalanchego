@@ -76,7 +76,7 @@ func TestStakingState(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []CurrentDelegator{currentDelegatorFromStaker(delegator)}, iterator.ToSlice(delegatorIt))
 
-	require.NoError(t, typedState.DeleteCurrentDelegator(delegator.TxID))
+	require.NoError(t, typedState.DeleteCurrentDelegator(currentDelegatorFromStaker(delegator)))
 	require.NoError(t, typedState.DeleteCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID))
 
 	_, err = typedState.GetCurrentValidator(subnetValidator.SubnetID, subnetValidator.NodeID)
@@ -119,13 +119,8 @@ func TestStakingStatePreservesPendingPriority(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []*Staker{delegator}, iterator.ToSlice(gotNativeDelegatorIt))
 
-	require.NoError(t, typedState.DeletePendingDelegator(delegator.TxID))
+	typedState.DeletePendingDelegator(pendingDelegatorFromStaker(delegator))
 }
-
-// Embedding promotes currentStaker, so AutoRenewedValidator also inhabits the
-// CurrentStaker sum. Type switches over it must not assume newCurrentStaker
-// produces its only inhabitants.
-var _ CurrentStaker = AutoRenewedValidator{}
 
 // The tx-taking APIs must reject a transaction of the wrong staking role.
 // Cross-role construction is a compile error, so only these paths need
@@ -150,12 +145,6 @@ func TestStakingStateRejectsCrossRoleTx(t *testing.T) {
 	require.ErrorIs(t, err, errUnexpectedStaker)
 
 	err = typedState.PutPendingDelegator(validatorTx)
-	require.ErrorIs(t, err, errUnexpectedStaker)
-
-	err = typedState.DeleteCurrentDelegator(validatorTx.ID())
-	require.ErrorIs(t, err, errUnexpectedStaker)
-
-	err = typedState.DeletePendingDelegator(validatorTx.ID())
 	require.ErrorIs(t, err, errUnexpectedStaker)
 }
 
