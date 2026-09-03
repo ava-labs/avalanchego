@@ -23,6 +23,7 @@ go_library(
     srcs = [
         "api.go",
         "config.go",
+        "deprecated.go",
         "factory.go",
         "genesis.go",
         "gossip.go",
@@ -115,6 +116,7 @@ go_test(
     srcs = [
         "api_test.go",
         "config_test.go",
+        "deprecated_test.go",
         "genesis_test.go",
         "gossip_test.go",
         "hooks_test.go",
