@@ -1,0 +1,12 @@
+[Unit]
+Description=evmwallet demo: page + node API proxy on 127.0.0.1:8080
+After=network-online.target
+
+[Service]
+User=evmwallet
+ExecStart=/usr/bin/python3 /opt/evmwallet/deploy/proxy.py /opt/evmwallet/www /var/lib/evmwallet/network.json 8080
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

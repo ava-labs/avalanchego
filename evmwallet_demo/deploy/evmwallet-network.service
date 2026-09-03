@@ -1,0 +1,16 @@
+[Unit]
+Description=evmwallet demo: private avalanche network (fresh on every start)
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=evmwallet
+WorkingDirectory=/var/lib/evmwallet
+ExecStartPre=/bin/rm -f /var/lib/evmwallet/network.json
+ExecStart=/bin/sh -c '/opt/evmwallet/bin/bootstrap /opt/evmwallet/bin/avalanchego /var/lib/evmwallet/network.json >/var/lib/evmwallet/bootstrap.log 2>&1'
+ExecStop=/usr/bin/pkill -u evmwallet -f evmwallet-demo
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

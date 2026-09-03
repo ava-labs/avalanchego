@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "evmwallet_demo_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/evmwallet_demo",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//config",
+        "//genesis",
+        "//graft/coreth/ethclient",
+        "//tests",
+        "//tests/exporthelper",
+        "//tests/fixture/tmpnet",
+        "//upgrade/upgradetest",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/formatting/address",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+    ],
+)
+
+go_binary(
+    name = "evmwallet_demo",
+    embed = [":evmwallet_demo_lib"],
+    visibility = ["//visibility:public"],
+)

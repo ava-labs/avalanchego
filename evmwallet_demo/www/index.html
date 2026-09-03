@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C-chain with any EVM wallet</title>
+<script src="ethers.umd.min.js"></script>
+<style>
+  :root { --fg:#1b1f24; --dim:#6a737d; --line:#d8dee4; --bg:#fff; --card:#f6f8fa; --blue:#0b5fff; --green:#1a7f37; --red:#c0392b; }
+  * { box-sizing:border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color:var(--fg); background:var(--bg); max-width:960px; margin:0 auto; padding:32px 20px 60px; line-height:1.45; }
+  h1 { font-size:26px; margin:0 0 6px; }
+  h2 { font-size:17px; margin:0 0 10px; }
+  p { margin:6px 0; }
+  .sub { color:var(--dim); margin-bottom:28px; }
+  section { border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin-bottom:18px; }
+  .step { display:inline-block; background:var(--fg); color:#fff; border-radius:50%; width:24px; height:24px; text-align:center; line-height:24px; font-size:13px; margin-right:8px; }
+  code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; }
+  .kv { display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:14px; margin:10px 0; word-break:break-all; }
+  .kv b { color:var(--dim); font-weight:500; }
+  .key { display:flex; gap:8px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .key code { flex:1; word-break:break-all; }
+  button { background:var(--blue); color:#fff; border:none; border-radius:6px; padding:9px 14px; font:inherit; font-size:14px; cursor:pointer; }
+  button:hover { filter:brightness(1.1); } button:disabled { background:#b6bcc4; cursor:wait; }
+  button.alt { background:#fff; color:var(--fg); border:1px solid var(--line); }
+  input { font:inherit; font-size:14px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; }
+  input.addr { width:100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+  .group { margin-top:14px; }
+  .group h3 { font-size:14px; margin:0 0 4px; }
+  section img { display:block; width:100%; margin:0 0 12px; }
+  .flow { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:10px; margin:12px 0 4px; }
+  @media (max-width:700px) { .flow { grid-auto-flow:row; } }
+  .stat { background:var(--card); border-radius:8px; padding:10px 12px; min-width:0; }
+  .stat .l { color:var(--dim); font-size:12px; } .stat .v { font-size:18px; font-weight:600; margin-top:2px; overflow-wrap:anywhere; }
+  .stat .s { color:var(--dim); font-size:12px; margin-top:2px; overflow-wrap:anywhere; }
+  .wallet { border-left:3px solid var(--blue); }
+  .wallet.p { border-left-color:var(--green); }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  th, td { text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:500; }
+  td.mono { word-break:break-all; }
+  .mine { color:var(--blue); font-weight:600; }
+  .fb { background:var(--card); border-left:3px solid var(--line); border-radius:6px; padding:10px 12px; margin-top:12px; font-size:13px; white-space:pre-wrap; word-break:break-all; }
+  .fb[hidden] { display:none; }
+  .fb .row { margin:8px 0 4px; }
+  .steps { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:10px; margin:4px 0 8px; }
+  @media (max-width:700px) { .steps { grid-auto-flow:row; } }
+  .st { background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
+  .st.done { border-color:var(--green); } .st.active { border-color:var(--blue); box-shadow:0 0 0 2px #0b5fff22; } .st.todo { opacity:.45; }
+  .st .n { display:inline-block; width:20px; height:20px; border-radius:50%; background:var(--fg); color:#fff; font-size:12px; text-align:center; line-height:20px; margin-right:6px; }
+  .st.done .n { background:var(--green); } .st.active .n { background:var(--blue); }
+  .st .t { font-weight:600; font-size:14px; }
+  .st .d { color:var(--dim); font-size:12px; margin-top:6px; overflow-wrap:anywhere; white-space:pre-wrap; }
+  .st button { margin-top:8px; }
+  .ok { color:var(--green); } .err { color:var(--red); } .dimlog { color:var(--dim); }
+  .note { color:var(--dim); font-size:13px; }
+  .empty { color:var(--dim); font-size:13px; padding:6px 0; }
+  .tag { display:inline-block; font-size:11px; border-radius:4px; padding:1px 6px; background:#e6f4ea; color:var(--green); }
+  .tag.legacy { background:#fdecea; color:var(--red); }
+  a { color:var(--blue); }
+</style>
+</head>
+<body>
+<h1>C-chain with any EVM wallet</h1>
+<p class="sub">Two wallets, one per chain. MetaMask holds the C-chain side and never signs anything Avalanche-specific: exporting to the P-chain is one ordinary contract call, and importing from the P-chain needs no signature at all. The P-chain side stays a normal P-chain wallet (Core, Ledger, an exchange) and signs its own transactions exactly as today. Here the page plays the P-chain wallet with the same test key.
+<a href="https://github.com/ava-labs/avalanchego/tree/containerman17/cchain-evm-wallet" target="_blank">avalanchego branch</a></p>
+
+<section>
+  <h2><span class="step">1</span>Set up MetaMask</h2>
+  <p>Add the demo network, then import the shared test account. Import it by hand so you see the real MetaMask flow: account menu &rarr; <i>Add account or hardware wallet</i> &rarr; <i>Import account</i> &rarr; paste the key.</p>
+  <div class="kv">
+    <b>Network name</b><span>C-chain EVM wallet demo</span>
+    <b>RPC URL</b><span class="mono" id="rpcurl"></span>
+    <b>Chain ID</b><span id="chainid"></span>
+    <b>Currency</b><span>AVAX</span>
+  </div>
+  <div class="row"><button class="alt" onclick="addNetwork()">Add network to MetaMask</button></div>
+  <p style="margin-top:14px"><b>Private key to import</b> (the public ewoq test key, everyone on this page shares this account)</p>
+  <div class="key"><code id="pk"></code><button class="alt" onclick="copy('pk')">Copy</button></div>
+  <div class="row"><button onclick="connect()">Connect MetaMask</button><span class="note" id="connected"></span></div>
+  <div class="fb" id="fb-setup" hidden></div>
+</section>
+
+<section class="gated" hidden>
+  <h2>Your two wallets</h2>
+  <div class="flow">
+    <div class="stat wallet"><div class="l">MetaMask, C-chain</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div>
+    <div class="stat wallet p"><div class="l">P-chain wallet (Core stand-in, this page signs with the same test key)</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div>
+  </div>
+  <p class="note">The P-chain address is <code>ripemd160(sha256(pubkey))</code>, 20 bytes like an EVM address but a different one. Nothing on the C-chain side knows or needs the P-chain key.</p>
+  <div class="row"><label>Amount per action <input id="amt" type="number" value="50" min="1" style="width:90px"> AVAX</label></div>
+</section>
+
+<section class="gated" hidden>
+  <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
+  <h2>C &rarr; P: MetaMask exports with one contract call</h2>
+  <p>You call <code>exportToP(to)</code> with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the SAE hook reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The P-chain wallet then imports it exactly as it does today.</p>
+  <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div></div>
+  <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
+  <div class="row"><button onclick="run(exportToP)">Export to the P-chain</button><button class="alt" onclick="run(importOnP)">Import waiting UTXOs on P</button></div>
+  <div class="fb" id="fb-export" hidden></div>
+</section>
+
+<section class="gated" hidden>
+  <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
+  <h2>P &rarr; C: nobody signs the import</h2>
+  <p>The P-chain wallet exports to your 0x address as today, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". Then anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain accepts it only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
+  <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
+  <div class="row"><button onclick="run(exportFromP)">Export from the P-chain to MetaMask</button><button class="alt" onclick="run(importOnC)">Import waiting UTXOs on C, no signature</button></div>
+  <div class="fb" id="fb-import" hidden></div>
+  <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
+</section>
+
+<section class="gated" hidden>
+  <h2>Exports emitted by the contract</h2>
+  <p class="note">Every C &rarr; P export is one warp log from the helper: owner and amount, 28 bytes. Decoded from the C-chain logs of the warp precompile, the last 2,000 blocks. Yours are highlighted.</p>
+  <div id="activity" class="empty">&ndash;</div>
+</section>
+
+<script>
+const qs = new URLSearchParams(location.search);
+const RPCBASE = qs.get('rpc') || location.origin;
+const PK = '0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027';
+const WARP_PRECOMPILE = '0x0200000000000000000000000000000000000005';
+const NAVAX = 1000000000n;
+const PFEE = 10000000n;    // 0.01 AVAX burned on P-chain txs
+const CFEE = 1000000n;     // 0.001 AVAX burned by the unsigned C-chain import (cap is 0.01)
+const EVM_OWNER_LOCKTIME = 1n;
+const P_TYPE_IMPORT = 17, P_TYPE_EXPORT = 18, TYPE_TRANSFER_INPUT = 5, TYPE_TRANSFER_OUTPUT = 7, TYPE_CREDENTIAL = 9;
+const C_TYPE_IMPORT = 0;   // vms/saevm/cchain/tx codec
+let NET = null;            // /network.json
+let me = null;             // connected MetaMask address
+const pKey = new ethers.SigningKey(PK);
+const pAddrBytes = hexBytes(ethers.ripemd160(ethers.sha256(pKey.compressedPublicKey)));
+
+document.getElementById('pk').textContent = PK;
+document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
+
+const iface = new ethers.Interface(['function exportToP(address to) payable returns (bytes32)']);
+
+// ---- bech32 (BIP-173) ----
+const B32C = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+function b32polymod(v) {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let chk = 1;
+  for (const x of v) {
+    const b = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ x;
+    for (let i = 0; i < 5; i++) if ((b >> i) & 1) chk ^= GEN[i];
+  }
+  return chk;
+}
+const hrpExpand = hrp => [...hrp].map(c => c.charCodeAt(0) >> 5).concat([0], [...hrp].map(c => c.charCodeAt(0) & 31));
+function bech32(hrp, data8) {
+  const d = []; let acc = 0, bits = 0;
+  for (const b of data8) { acc = (acc << 8) | b; bits += 8; while (bits >= 5) { bits -= 5; d.push((acc >> bits) & 31); } }
+  if (bits > 0) d.push((acc << (5 - bits)) & 31);
+  const pm = b32polymod(hrpExpand(hrp).concat(d, [0,0,0,0,0,0])) ^ 1;
+  const chk = []; for (let i = 0; i < 6; i++) chk.push((pm >> (5 * (5 - i))) & 31);
+  return hrp + '1' + d.concat(chk).map(x => B32C[x]).join('');
+}
+// "P-custom1..." or "custom1..." -> 20 bytes; throws on a bad checksum
+function bech32Decode(s) {
+  s = s.trim().replace(/^[PXC]-/, '').toLowerCase();
+  const i = s.lastIndexOf('1');
+  const hrp = s.slice(0, i), d = [...s.slice(i + 1)].map(c => B32C.indexOf(c));
+  if (i < 1 || d.includes(-1) || b32polymod(hrpExpand(hrp).concat(d)) !== 1) throw new Error('not a valid bech32 address');
+  const out = []; let acc = 0, bits = 0;
+  for (const v of d.slice(0, -6)) { acc = (acc << 5) | v; bits += 5; if (bits >= 8) { bits -= 8; out.push((acc >> bits) & 255); } }
+  if (out.length !== 20) throw new Error('address is not 20 bytes');
+  return Uint8Array.from(out);
+}
+function hexBytes(h) { return Uint8Array.from(h.replace(/^0x/, '').match(/../g) || [], x => parseInt(x, 16)); }
+const toHex = b => '0x' + [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+const pAddr = bytes20 => 'P-' + bech32(NET.hrp, bytes20);
+const cAddr = hex20 => 'C-' + bech32(NET.hrp, hexBytes(hex20));
+const avax = n => (Number(n) / 1e9).toLocaleString(undefined, { maximumFractionDigits: 4 });
+const short = h => h.slice(0, 10) + '…' + h.slice(-6);
+
+// ---- logging ----
+let logEl = document.getElementById('fb-setup');
+function useLog(id) { logEl = document.getElementById(id); logEl.innerHTML = ''; logEl.hidden = false; }
+function log(msg, cls) {
+  const s = document.createElement('span');
+  if (cls) s.className = cls;
+  s.textContent = msg + '\n';
+  logEl.hidden = false; logEl.appendChild(s);
+}
+function copy(id) { navigator.clipboard.writeText(document.getElementById(id).textContent); }
+
+// ---- RPC ----
+async function rpc(path, method, params) {
+  const r = await fetch(RPCBASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const j = await r.json();
+  if (j.error) throw new Error(method + ': ' + j.error.message);
+  return j.result;
+}
+
+// UTXO bytes: codec(2) txID(32) index(4) assetID(32) typeID(4) amount(8) locktime(8) threshold(4) nAddrs(4) addrs, plus a 4-byte checksum
+function parseUTXO(hex) {
+  const b = hexBytes(hex).slice(0, -4);
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (dv.getUint32(70) !== TYPE_TRANSFER_OUTPUT) return null;
+  return { txID: toHex(b.slice(2, 34)), outputIndex: dv.getUint32(34), amount: dv.getBigUint64(74), locktime: dv.getBigUint64(82), threshold: dv.getUint32(90) };
+}
+const spendable = u => u && u.locktime <= BigInt(Math.floor(Date.now() / 1000));
+const sortUTXOs = us => us.sort((a, b) => a.txID < b.txID ? -1 : a.txID > b.txID ? 1 : a.outputIndex - b.outputIndex);
+const sum = us => us.reduce((t, u) => t + u.amount, 0n);
+
+async function getPUTXOs(sourceChain) {
+  const params = { addresses: [pAddr(pAddrBytes)], limit: 1024, encoding: 'hex' };
+  if (sourceChain) params.sourceChain = sourceChain;
+  const r = await rpc('/ext/bc/P', 'platform.getUTXOs', params);
+  return sortUTXOs(r.utxos.map(parseUTXO).filter(spendable));
+}
+async function getCUTXOs() {
+  const r = await rpc('/ext/bc/C/avax', 'avax.getUTXOs', { addresses: [cAddr(me)], sourceChain: 'P', limit: 1024, encoding: 'hex' });
+  return sortUTXOs(r.utxos.map(parseUTXO).filter(spendable));
+}
+const cBalance = async () => BigInt(await rpc('/ext/bc/C/rpc', 'eth_getBalance', [me, 'latest']));
+
+// ---- explorer panel ----
+const $ = id => document.getElementById(id);
+const setK = (k, text) => { for (const el of document.querySelectorAll('[data-k="' + k + '"]')) el.textContent = text; };
+function table(headers, rows) {
+  if (!rows.length) return null;
+  const t = document.createElement('table');
+  t.innerHTML = '<tr>' + headers.map(h => '<th>' + h + '</th>').join('') + '</tr>';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    if (r.mine) tr.className = 'mine';
+    for (const c of r.cells) { const td = document.createElement('td'); td.className = 'mono'; if (typeof c === 'object') td.appendChild(c); else td.textContent = c; tr.appendChild(td); }
+    t.appendChild(tr);
+  }
+  return t;
+}
+function fill(id, node, emptyText) {
+  const el = $(id); el.innerHTML = '';
+  if (node) { el.className = ''; el.appendChild(node); } else { el.className = 'empty'; el.textContent = emptyText; }
+}
+function marker(u) {
+  const s = document.createElement('span');
+  const evm = u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1;
+  s.className = evm ? 'tag' : 'tag legacy'; s.textContent = evm ? 'EVM-owned, importable without a signature' : 'legacy, needs a signature';
+  return s;
+}
+
+async function refresh() {
+  if (!me) return;
+  const [cbal, p, c2p, p2c] = await Promise.all([cBalance(), getPUTXOs(), getPUTXOs('C'), getCUTXOs()]);
+  setK('cbal', (Number(cbal) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 4 }) + ' AVAX');
+  setK('pbal', avax(sum(p)) + ' AVAX');
+  setK('c2p', avax(sum(c2p)) + ' AVAX'); setK('c2pn', c2p.length + ' UTXO waiting to be imported on P');
+  setK('p2c', avax(sum(p2c)) + ' AVAX'); setK('p2cn', p2c.length + ' UTXO waiting to be imported on C');
+  fill('p2c-utxos', table(['UTXO', 'amount', 'locktime', 'marker'], p2c.map(u => ({ cells: [short(u.txID) + ':' + u.outputIndex, avax(u.amount) + ' AVAX', u.locktime.toString(), marker(u)] }))), 'none waiting');
+}
+
+// ---- export log decoding (SendWarpMessage logs from the precompile, helper as sender) ----
+function decodeExport(dataHex) {
+  const [msg] = ethers.AbiCoder.defaultAbiCoder().decode(['bytes'], dataHex);
+  const b = hexBytes(msg);
+  // unsigned warp message: codec(2) networkID(4) sourceChainID(32) payloadLen(4) | addressed call: codec(2) typeID(4) addrLen(4) addr payloadLen(4) payload
+  let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
+  const inner = b.slice(p);
+  return { owner: inner.slice(0, 20), amount: new DataView(inner.buffer, inner.byteOffset).getBigUint64(20) };
+}
+async function refreshActivity() {
+  if (!NET) return;
+  const latest = parseInt(await rpc('/ext/bc/C/rpc', 'eth_blockNumber', []), 16);
+  const logs = await rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ address: WARP_PRECOMPILE, fromBlock: '0x' + Math.max(0, latest - 2000).toString(16), toBlock: 'latest',
+    topics: [ethers.id('SendWarpMessage(address,bytes32,bytes)'), ethers.zeroPadValue(NET.helper, 32)] }]);
+  const rows = logs.slice(-25).reverse().map(l => {
+    let d; try { d = decodeExport(l.data); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', short(l.topics[2])] }; }
+    const owner = pAddr(d.owner);
+    return { mine: owner === NET.pAddress, cells: [parseInt(l.blockNumber, 16), avax(d.amount) + ' AVAX', owner, short(l.transactionHash)] };
+  });
+  fill('activity', table(['C block', 'exported', 'P-chain owner', 'C-chain tx'], rows), 'no exports in the last 2,000 blocks');
+}
+
+// ---- MetaMask ----
+async function addNetwork() {
+  await ethereum.request({ method: 'wallet_addEthereumChain', params: [{
+    chainId: '0x' + Number(NET.ethChainID).toString(16), chainName: 'C-chain EVM wallet demo', rpcUrls: [RPCBASE + '/ext/bc/C/rpc'],
+    nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 } }] });
+  useLog('fb-setup'); log('network added in MetaMask', 'ok');
+}
+async function connect() {
+  useLog('fb-setup');
+  if (typeof ethereum === 'undefined') { log('MetaMask not detected', 'err'); return; }
+  [me] = await ethereum.request({ method: 'eth_requestAccounts' });
+  const isEwoq = me.toLowerCase() === NET.ethAddress.toLowerCase();
+  $('connected').innerHTML = isEwoq ? '<span style="color:var(--green)">&#10004;</span> ' + me
+    : '<span style="color:var(--red)">&#10008; ' + me + ' is not the ewoq address. Import the key above and switch to that account.</span>';
+  setK('caddr', me); setK('paddr', NET.pAddress);
+  if (!$('to').value) $('to').value = NET.pAddress;
+  for (const sec of document.querySelectorAll('.gated')) sec.hidden = !isEwoq;
+  log(isEwoq ? 'connected ' + me : 'connected ' + me + ', not the ewoq account, it has no funds here', isEwoq ? 'ok' : 'err');
+  await Promise.all([refresh(), refreshActivity()]);
+}
+
+async function ensureChain() {
+  const want = '0x' + Number(NET.ethChainID).toString(16);
+  const have = await ethereum.request({ method: 'eth_chainId' });
+  if (have === want) return;
+  log('MetaMask is on chain ' + parseInt(have, 16) + ', asking it to switch to ' + NET.ethChainID, 'dimlog');
+  try { await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: want }] }); }
+  catch (e) { if (e.code === 4902) await addNetwork(); else throw e; }
+}
+async function sendTx(data, valueWei) {
+  await ensureChain();
+  const tx = { from: me, to: NET.helper, data, gas: '0x30d40' };
+  if (valueWei) tx.value = '0x' + valueWei.toString(16);
+  const hash = await ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+  const receipt = await poll(async () => { const r = await rpc('/ext/bc/C/rpc', 'eth_getTransactionReceipt', [hash]); return r && r.blockNumber ? r : null; }, 'receipt');
+  if (receipt.status !== '0x1') throw new Error('C-chain tx reverted');
+  return receipt;
+}
+async function poll(fn, what, timeoutMs = 180000) {
+  const t0 = Date.now();
+  for (;;) {
+    const v = await fn(); if (v) return v;
+    if (Date.now() - t0 > timeoutMs) throw new Error('timed out waiting for ' + what);
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+let busy = false;
+async function run(action) {
+  if (!me) { log('connect MetaMask first', 'err'); return; }
+  if (busy) { log('still waiting for the previous action, check MetaMask', 'err'); return; }
+  busy = true;
+  useLog(action === exportToP || action === importOnP ? 'fb-export' : 'fb-import');
+  for (const b of document.querySelectorAll('button')) b.disabled = true;
+  try { await action(); } catch (e) { log(String(e.message || e), 'err'); }
+  finally {
+    busy = false;
+    for (const b of document.querySelectorAll('button')) b.disabled = false;
+  }
+  try { await Promise.all([refresh(), refreshActivity()]); } catch (e) {}
+}
+
+// ---- Avalanche tx encoding (the P-chain wallet's job; the C-chain unsigned import is the one new format) ----
+const u16 = n => { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, n); return b; };
+const u32 = n => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n); return b; };
+const u64 = n => { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, BigInt(n)); return b; };
+const concat = (...parts) => { const out = new Uint8Array(parts.reduce((t, p) => t + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+// avalanchego "hex" encoding: bytes plus a 4-byte sha256 checksum
+const hexChecksum = b => toHex(concat(b, hexBytes(ethers.sha256(b)).slice(-4)));
+const ZERO32 = new Uint8Array(32);
+const assetID = () => hexBytes(NET.avaxAssetIDHex);
+const cChainID = () => hexBytes(NET.cChainIDHex);
+// TransferableOutput: assetID || typeID 7 || amount || locktime || threshold 1 || 1 address
+const transferOut = (amt, locktime, addr20) => concat(assetID(), u32(TYPE_TRANSFER_OUTPUT), u64(amt), u64(locktime), u32(1), u32(1), addr20);
+// TransferableInput: txID || outputIndex || assetID || typeID 5 || amount || sigIndices
+const transferIn = (u, sigIndices) => concat(hexBytes(u.txID), u32(u.outputIndex), assetID(), u32(TYPE_TRANSFER_INPUT), u64(u.amount), u32(sigIndices.length), ...sigIndices.map(u32));
+const list = items => concat(u32(items.length), ...items);
+const pHeader = typeID => concat(u16(0), u32(typeID), u32(NET.networkID), ZERO32);
+// One secp256k1 credential per input, each a single signature over sha256(unsigned bytes). The P-chain wallet does this today.
+function pSign(unsigned, numInputs) {
+  const sig = pKey.sign(ethers.sha256(unsigned));
+  const bytes65 = concat(hexBytes(sig.r), hexBytes(sig.s), Uint8Array.of(sig.v - 27));
+  return concat(unsigned, list(Array(numInputs).fill(concat(u32(TYPE_CREDENTIAL), list([bytes65])))));
+}
+// P-chain ImportTx: consume the C -> P UTXOs, one output back to the P-chain wallet minus the fee.
+function pImportTx(utxos) {
+  return concat(pHeader(P_TYPE_IMPORT), list([transferOut(sum(utxos) - PFEE, 0n, pAddrBytes)]), list([]), u32(0), cChainID(), list(utxos.map(u => transferIn(u, [0]))));
+}
+// P-chain ExportTx to the C-chain: the exported output is owned by the 0x address and carries the EVM-owner marker.
+function pExportTx(utxos, amt, evmAddr20) {
+  const change = sum(utxos) - amt - PFEE;
+  return concat(pHeader(P_TYPE_EXPORT), list(change > 0n ? [transferOut(change, 0n, pAddrBytes)] : []), list(utxos.map(u => transferIn(u, [0]))), u32(0),
+    cChainID(), list([transferOut(amt, EVM_OWNER_LOCKTIME, evmAddr20)]));
+}
+// C-chain ImportTx with no credentials: inputs name no signature index, one output to the owner, empty credential list.
+function cUnsignedImportTx(utxos, evmAddr20) {
+  return concat(u16(0), u32(C_TYPE_IMPORT), u32(NET.networkID), cChainID(), ZERO32, list(utxos.map(u => transferIn(u, []))),
+    list([concat(evmAddr20, u64(sum(utxos) - CFEE), assetID())]), u32(0));
+}
+function pickInputs(utxos, need) {
+  const picked = []; let total = 0n;
+  for (const u of utxos) { if (total >= need) break; picked.push(u); total += u.amount; }
+  if (total < need) throw new Error('need ' + avax(need) + ' AVAX on the P-chain, have ' + avax(total));
+  return sortUTXOs(picked);
+}
+
+// Left-to-right stepper inside the current feedback panel. Each step is done, active or todo;
+// the active step can carry one button whose handler advances the flow.
+function stepper(titles) {
+  const box = document.createElement('div'); box.className = 'steps';
+  const steps = titles.map((t, i) => {
+    const st = document.createElement('div'); st.className = 'st todo';
+    st.innerHTML = '<div><span class="n">' + (i + 1) + '</span><span class="t"></span></div><div class="d"></div>';
+    st.querySelector('.t').textContent = t;
+    box.appendChild(st); return st;
+  });
+  logEl.appendChild(box);
+  const desc = (i, text) => { steps[i].querySelector('.d').textContent = text; };
+  return {
+    active(i, text, button) {
+      steps[i].className = 'st active'; desc(i, text);
+      if (button) {
+        const [label, fn] = button;
+        const b = document.createElement('button'); b.textContent = label;
+        b.onclick = () => runStage(fn, b); steps[i].appendChild(b);
+      }
+    },
+    done(i, text) { steps[i].className = 'st done'; desc(i, text); },
+    append(i, text) { steps[i].querySelector('.d').textContent += '\n' + text; },
+  };
+}
+async function runStage(fn, button) {
+  if (busy) return;
+  busy = true;
+  for (const b of document.querySelectorAll('button')) b.disabled = true;
+  try { await fn(); if (button) button.remove(); } catch (e) { log(String(e.message || e), 'err'); }
+  finally { busy = false; for (const b of document.querySelectorAll('button')) b.disabled = false; }
+  try { await Promise.all([refresh(), refreshActivity()]); } catch (e) {}
+}
+
+// ---- the flows ----
+const amountNAVAX = () => BigInt(Math.max(1, Math.floor(Number($('amt').value) || 50))) * NAVAX;
+
+// Stage 2 of the export: the P-chain wallet imports what it was sent, signing as it does today.
+async function stageImportOnP(st, i) {
+  const utxos = await getPUTXOs('C');
+  if (!utxos.length) throw new Error('nothing waiting in shared memory for the P-chain wallet');
+  const before = sum(await getPUTXOs());
+  const bytes = pSign(pImportTx(utxos), utxos.length);
+  const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+  st.done(i, 'P-chain wallet signed and issued ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, ' + utxos.length + ' secp256k1 signature(s)). This side did not change.');
+  await poll(async () => sum(await getPUTXOs()) > before ? 1 : null, 'P-chain balance to rise');
+  st.append(i, 'P-chain balance ' + avax(sum(await getPUTXOs())) + ' AVAX');
+}
+async function exportToP() {
+  const amt = amountNAVAX();
+  const to = bech32Decode($('to').value);
+  const toIsMine = toHex(to) === toHex(pAddrBytes);
+  const st = stepper(['MetaMask sends one contract call', 'The hook writes the UTXO', 'The P-chain wallet imports it']);
+  st.active(0, 'exportToP(' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. MetaMask shows a normal contract call. No Avalanche signature anywhere.');
+  const before = toIsMine ? (await getPUTXOs('C')).length : 0;
+  const receipt = await sendTx(iface.encodeFunctionData('exportToP', [toHex(to)]), amt * NAVAX);
+  const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE);
+  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + '. The contract emitted one warp log, 28 bytes of payload: owner and amount.' + (l ? ' Message ' + short(l.topics[2]) + '.' : ''));
+  st.active(1, 'After the block executes, FinishExecutingBlock debits the contract and AfterExecutingBlock writes the UTXO into shared memory, indexed by owner.');
+  if (!toIsMine) { st.done(1, 'UTXO written for ' + pAddr(to) + '. Only that wallet can see and import it, so this page stops here.'); st.done(2, 'not this wallet'); return; }
+  const utxos = await poll(async () => { const u = await getPUTXOs('C'); return u.length > before ? u : null; }, 'UTXO in shared memory');
+  st.done(1, avax(sum(utxos)) + ' AVAX now waiting in shared memory, owned by the P-chain wallet. Same UTXO a C-chain ExportTx would have produced.');
+  st.active(2, 'From here on nothing is new: the P-chain wallet issues its usual ImportTx with its usual signature.', ['Import on P (P-chain wallet signs)', () => stageImportOnP(st, 2)]);
+}
+async function importOnP() {
+  const st = stepper(['The P-chain wallet imports what is waiting']);
+  st.active(0, 'ImportTx signed by the P-chain wallet, as today.');
+  await stageImportOnP(st, 0);
+}
+
+// Stage 2 of the return trip: anyone issues the ImportTx, with zero credentials.
+async function stageImportOnC(st, i) {
+  const utxos = await getCUTXOs().then(us => us.filter(u => u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1));
+  if (!utxos.length) throw new Error('no EVM-owned UTXOs waiting in shared memory for ' + me);
+  const before = await cBalance();
+  const bytes = cUnsignedImportTx(utxos, hexBytes(me));
+  const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+  st.done(i, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials, ' + avax(CFEE) + ' AVAX burned from the UTXO itself). Nobody signed it.');
+  const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
+  st.append(i, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
+}
+async function exportFromP() {
+  const amt = amountNAVAX();
+  const st = stepper(['The P-chain wallet exports to your 0x address', 'Anyone issues the ImportTx, nobody signs']);
+  st.active(0, 'ExportTx signed by the P-chain wallet, as today. The exported output is owned by ' + me + ' and marked EVM-owned (locktime 1).');
+  const inputs = pickInputs(await getPUTXOs(), amt + PFEE);
+  const before = (await getCUTXOs()).length;
+  const bytes = pSign(pExportTx(inputs, amt, hexBytes(me)), inputs.length);
+  const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+  const cu = await poll(async () => { const u = await getCUTXOs(); return u.length > before ? u : null; }, 'UTXO in shared memory');
+  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX waits in shared memory for ' + me + ', marked EVM-owned.');
+  st.active(1, 'The ImportTx names the UTXOs, one output to the owner, and an empty credential list. Verifiers check the marker, the owner and the fee cap against shared memory.', ['Issue the unsigned ImportTx', () => stageImportOnC(st, 1)]);
+}
+async function importOnC() {
+  const st = stepper(['Anyone issues the ImportTx, nobody signs']);
+  st.active(0, 'ImportTx with zero credentials for every EVM-owned UTXO waiting for you.');
+  await stageImportOnC(st, 0);
+}
+
+// ---- boot ----
+(async () => {
+  try {
+    NET = await (await fetch(RPCBASE + '/network.json', { cache: 'no-store' })).json();
+  } catch (e) { useLog('fb-setup'); log('network.json not available, the network may still be starting', 'err'); return; }
+  $('chainid').textContent = NET.ethChainID;
+  $('to').value = NET.pAddress;
+  if (pAddr(pAddrBytes) !== NET.pAddress) { useLog('fb-setup'); log('page key does not match the network\'s P-chain wallet: ' + pAddr(pAddrBytes) + ' vs ' + NET.pAddress, 'err'); }
+  if (typeof ethereum !== 'undefined') ethereum.on('accountsChanged', () => { if (me) connect(); });
+  refreshActivity().catch(e => log(String(e.message), 'err'));
+  setInterval(() => { refresh().catch(() => {}); refreshActivity().catch(() => {}); }, 8000);
+})();
+</script>
+</body>
+</html>
