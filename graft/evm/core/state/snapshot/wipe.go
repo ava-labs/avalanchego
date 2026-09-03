@@ -63,11 +63,8 @@ func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 // WipeSnapshotSync wipes the snapshot data from the database synchronously.
 func WipeSnapshotSync(db ethdb.KeyValueStore) error {
 	batch := db.NewBatch()
-	customrawdb.DeleteSnapshotBlockHash(batch)
 	rawdb.DeleteSnapshotRoot(batch)
-	rawdb.DeleteSnapshotJournal(batch)
 	rawdb.DeleteSnapshotGenerator(batch)
-	rawdb.DeleteSnapshotRecoveryNumber(batch)
 	if err := batch.Write(); err != nil {
 		return err
 	}

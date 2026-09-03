@@ -61,7 +61,6 @@ go_test(
     deps = [
         "//database",
         "//database/memdb",
-        "//graft/coreth/params",
         "//ids",
         "//snow",
         "//snow/snowtest",
