@@ -16,10 +16,14 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -43,7 +47,7 @@ func TestParseConfig(t *testing.T) {
 		json         string
 		networkID    uint32
 		want         config
-		wantWarnings []string
+		wantWarnings []*loggingtest.Record
 		wantErr      testerr.Want
 	}{
 		// Defaults and errors
@@ -231,10 +235,14 @@ func TestParseConfig(t *testing.T) {
 
 		// Unrecognized options
 		{
-			name:         "unrecognized/options",
-			json:         `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
-			want:         with(func(c *config) { c.TrieCleanCache = 256 }),
-			wantWarnings: []string{`ignoring unrecognized options: ["hello austin larson","rpc-gas-cap"]`},
+			name: "unrecognized/options",
+			json: `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
+			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+			wantWarnings: []*loggingtest.Record{{
+				Level:  logging.Warn,
+				Msg:    "ignoring unrecognized C-Chain config options",
+				Fields: []zap.Field{zap.Strings("options", []string{"hello austin larson", "rpc-gas-cap"})},
+			}},
 		},
 
 		// All active fields
@@ -291,12 +299,14 @@ func TestParseConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
-			got, gotWarnings, err := parseConfig([]byte(test.json), test.networkID)
+			log := loggingtest.NewRecorder(logging.Warn)
+			snowCtx := &snow.Context{NetworkID: test.networkID, Log: log}
+			got, err := parseConfig(snowCtx, []byte(test.json))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
-			require.Equal(t, test.wantWarnings, gotWarnings, "parseConfig(...) warnings")
+			require.Equal(t, test.wantWarnings, log.Records, "parseConfig(...) logs")
 		})
 	}
 }

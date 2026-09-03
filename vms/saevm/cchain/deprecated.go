@@ -13,7 +13,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
@@ -42,25 +46,22 @@ var legacyEthAPIs = map[string]set.Set[rpc.API]{
 	"web3":                 set.Of(rpc.APIWeb3),
 }
 
-// applyDeprecated maps the deprecated options in keys onto their [config]
-// equivalents and deletes them from keys. It returns warnings to log for the
-// operator.
-func (c *config) applyDeprecated(keys map[string]json.RawMessage) ([]string, error) {
-	rawNames, ok := keys["eth-apis"]
-	if !ok {
-		return nil, nil
-	}
-	delete(keys, "eth-apis")
+// applyDeprecatedAPINames sets c.APIs from rawNames, the JSON value of the
+// deprecated "eth-apis" option. It logs the equivalent "apis" value for the
+// operator to migrate to. If apisSet, it ignores rawNames because "apis" takes
+// precedence.
+func (c *config) applyDeprecatedAPINames(log logging.Logger, rawNames json.RawMessage, apisSet bool) error {
 	// A config that sets both options is the expected migration path: coreth
 	// reads "eth-apis" before the SAE transition and this VM reads "apis"
 	// after it.
-	if _, ok := keys["apis"]; ok {
-		return []string{`ignoring deprecated "eth-apis" because "apis" is set; "eth-apis" will be removed in the next release`}, nil
+	if apisSet {
+		log.Warn(`ignoring deprecated "eth-apis" because "apis" is set; "eth-apis" will be removed in the next release`)
+		return nil
 	}
 
 	var names []string
 	if err := json.Unmarshal(rawNames, &names); err != nil {
-		return nil, fmt.Errorf(`json.Unmarshal(%T) "eth-apis": %w`, names, err)
+		return fmt.Errorf(`json.Unmarshal(%T) "eth-apis": %w`, names, err)
 	}
 
 	apis := set.NewSet[rpc.API](len(names))
@@ -68,7 +69,7 @@ func (c *config) applyDeprecated(keys map[string]json.RawMessage) ([]string, err
 	for _, name := range names {
 		mapped, ok := legacyEthAPIs[name]
 		if !ok {
-			return nil, fmt.Errorf("%w: %q", errUnknownLegacyEthAPI, name)
+			return fmt.Errorf("%w: %q", errUnknownLegacyEthAPI, name)
 		}
 		if mapped.Len() == 0 {
 			removed = append(removed, name)
@@ -78,9 +79,18 @@ func (c *config) applyDeprecated(keys map[string]json.RawMessage) ([]string, err
 	}
 	c.APIs = apis
 
-	msg := fmt.Sprintf(`"eth-apis" is deprecated and will be removed in the next release; use "apis": %s instead`, quotedList(apis.List()))
-	if len(removed) > 0 {
-		msg += "; ignoring names whose methods no longer exist: " + quotedList(removed)
+	names = make([]string, 0, apis.Len())
+	for api := range apis {
+		names = append(names, string(api))
 	}
-	return []string{msg}, nil
+	slices.Sort(names)
+	log.Warn(`"eth-apis" is deprecated and will be removed in the next release; set "apis" instead`,
+		zap.Strings("apis", names),
+	)
+	if len(removed) > 0 {
+		log.Warn(`ignoring "eth-apis" names whose methods no longer exist`,
+			zap.Strings("names", removed),
+		)
+	}
+	return nil
 }

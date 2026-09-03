@@ -104,14 +104,9 @@ func (vm *VM) Initialize(
 		return errAlreadyClosed
 	}
 
-	userConfig, warnings, err := parseConfig(configBytes, snowCtx.NetworkID)
+	userConfig, err := parseConfig(snowCtx, configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
-	}
-	if len(warnings) > 0 {
-		snowCtx.Log.Warn("C-Chain config warnings",
-			zap.Strings("warnings", warnings),
-		)
 	}
 	snowCtx.Log.Info("initializing C-Chain",
 		zap.Reflect("config", userConfig),

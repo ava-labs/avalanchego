@@ -61,7 +61,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `apis` | array of strings | The JSON-RPC APIs this node serves, see [Available APIs](#available-apis). Methods of an API that is not listed are not served, and calling one returns a `the method ... does not exist/is not available` error. An unrecognised name is a fatal configuration error. | every API marked *enabled* in [Available APIs](#available-apis) |
+| `apis` | array of strings | The JSON-RPC APIs this node serves, see [Available APIs](#available-apis). Methods of an API that is not listed, including APIs added in later releases, are not served, and calling one returns a `the method ... does not exist/is not available` error. An unrecognised name is a fatal configuration error. | every API marked *enabled* in [Available APIs](#available-apis) |
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
@@ -84,36 +84,17 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `db` | disabled | Raw database access: `debug_chaindbCompact`, `debug_chaindbProperty`, `debug_dbAncient`, `debug_dbAncients`, `debug_dbGet`, `debug_getRawBlock`, `debug_getRawHeader`, `debug_getRawReceipts`, `debug_getRawTransaction`, `debug_printBlock`, `debug_setHead` |
 | `profile` | disabled | Process introspection and profiling: `debug_blockProfile`, `debug_cpuProfile`, `debug_freeOSMemory`, `debug_gcStats`, `debug_goTrace`, `debug_memStats`, `debug_mutexProfile`, `debug_setBlockProfileRate`, `debug_setGCPercent`, `debug_setMutexProfileFraction`, `debug_stacks`, `debug_start{CPUProfile,GoTrace}`, `debug_stop{CPUProfile,GoTrace}`, `debug_verbosity`, `debug_vmodule`, `debug_write{Block,Mem,Mutex}Profile` |
 
-Note that `eth_subscribe` is only available over the websocket endpoint
-(`/ext/bc/C/ws`); the HTTP endpoint (`/ext/bc/C/rpc`) cannot deliver
-notifications. Both endpoints are served by the same node and therefore serve
-the same `apis`; to expose different method sets on each, run separately
-configured node fleets behind each path.
+`eth_subscribe` is only available over the websocket endpoint (`/ext/bc/C/ws`).
 
 ### Deprecated: `eth-apis`
 
-`eth-apis` is the API allowlist of the pre-SAE C-Chain. It is deprecated and
-**WILL BE REMOVED in the next release**; migrate to `apis`. Until then,
-`eth-apis` continues to work. The node maps each name to the `apis` values that
-serve the same methods (see the table below). The node also logs a warning that
-contains the equivalent `apis` value; copy that value to migrate. If a config
-sets both options, `apis` wins and the node ignores `eth-apis` with a warning.
-An unrecognised `eth-apis` name is a fatal configuration error, as it was
-pre-SAE.
-
-| `eth-apis` name | `apis` equivalent |
-|-----------------|-------------------|
-| `web3` | `web3` |
-| `net` | `net` |
-| `eth-filter` | `subscriptions` |
-| `internal-eth` | `gas`, `avalanche` |
-| `internal-blockchain` | `chain`, `avalanche` |
-| `internal-transaction` | `transactions` |
-| `internal-tx-pool` | `txpool` |
-| `internal-debug` | `db` |
-| `debug-tracer`, `debug-file-tracer` | `trace` |
-| `debug-handler` | `profile` |
-| `eth`, `admin`, `debug`, `internal-account`, `internal-personal` | none: their methods (e.g. `eth_etherbase`, the `admin` and `personal` namespaces) no longer exist and the name is ignored with a warning |
+`eth-apis`, the pre-SAE C-Chain's API allowlist, is deprecated and **WILL BE
+REMOVED in the next release**; migrate to `apis`. Until then, the node maps
+each `eth-apis` name onto the `apis` values that serve the same methods and
+logs the resulting `apis` value to copy into the config. Names whose methods no
+longer exist (e.g. `admin`, `internal-personal`) are ignored with a warning, and
+an unrecognised name remains a fatal configuration error. If a config sets both
+options, `apis` wins and `eth-apis` is ignored.
 
 ## State Sync
 

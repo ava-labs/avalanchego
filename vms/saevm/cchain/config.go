@@ -14,8 +14,10 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -138,25 +140,29 @@ func defaultConfig() config {
 var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
-// over [json.Unmarshal] because it correctly populates default values.
-//
-// The returned strings are warnings to log for the operator.
-func parseConfig(b []byte, networkID uint32) (config, []string, error) {
+// over [json.Unmarshal] because it correctly populates default values. Options
+// that need the operator's attention are logged as warnings.
+func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	c := defaultConfig()
 	if len(b) == 0 {
-		return c, nil, nil
+		return c, nil
 	}
 
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(b, &keys); err != nil {
-		return config{}, nil, fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
+		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
-		return config{}, nil, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
-	warnings, err := c.applyDeprecated(keys)
-	if err != nil {
-		return config{}, nil, err
+
+	// TODO(JonathanOppenheimer): delete together with deprecated.go.
+	if rawNames, ok := keys["eth-apis"]; ok {
+		delete(keys, "eth-apis")
+		_, apisSet := keys["apis"]
+		if err := c.applyDeprecatedAPINames(snowCtx.Log, rawNames, apisSet); err != nil {
+			return config{}, err
+		}
 	}
 
 	var unrecognized []string
@@ -166,21 +172,24 @@ func parseConfig(b []byte, networkID uint32) (config, []string, error) {
 		}
 	}
 	if len(unrecognized) > 0 {
-		warnings = append(warnings, "ignoring unrecognized options: "+quotedList(unrecognized))
+		slices.Sort(unrecognized)
+		snowCtx.Log.Warn("ignoring unrecognized C-Chain config options",
+			zap.Strings("options", unrecognized),
+		)
 	}
 
 	saeCfg := c.saeConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return config{}, nil, err
+		return config{}, err
 	}
 	if err := saeCfg.DBConfig.Verify(); err != nil {
-		return config{}, nil, err
+		return config{}, err
 	}
 	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
-		constants.ProductionNetworkIDs.Contains(networkID) {
-		return config{}, nil, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
+		constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
-	return c, warnings, nil
+	return c, nil
 }
 
 // configKeys are the JSON keys that unmarshal into a [config] field.
@@ -203,13 +212,6 @@ func jsonKeys(t reflect.Type) set.Set[string] {
 		keys.Add(name)
 	}
 	return keys
-}
-
-// quotedList returns elems, sorted, as a JSON array of strings.
-func quotedList[T ~string](elems []T) string {
-	slices.Sort(elems)
-	b, _ := json.Marshal(elems) // marshalling strings cannot fail
-	return string(b)
 }
 
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
