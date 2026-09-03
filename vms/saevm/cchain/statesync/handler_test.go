@@ -77,7 +77,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	st := newState(t)
 	var build exportBuilder
 	for h := uint64(1); h <= cfg.lastExecuted; h++ {
-		require.NoErrorf(t, st.Apply(h, []*tx.Tx{build.newExport()}), "Apply(%d)", h)
+		require.NoErrorf(t, st.Apply(h, []*tx.Tx{build.newExport()}, nil), "Apply(%d)", h)
 	}
 
 	// Write every executed block to the ethdb and mark the tip as last-accepted.

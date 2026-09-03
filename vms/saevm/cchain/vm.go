@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -151,6 +152,7 @@ func (vm *VM) Initialize(
 		vm.now,
 		userConfig.desired(),
 		vm.metrics,
+		set.Of(userConfig.ExportHelperAddresses...),
 	)
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
 	if err != nil {

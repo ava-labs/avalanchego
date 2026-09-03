@@ -32,6 +32,7 @@ go_library(
         "//utils/logging",
         "//utils/math",
         "//utils/set",
+        "//utils/units",
         "//utils/timer/mockable",
         "//utils/wrappers",
         "//vms/components/avax",
@@ -48,6 +49,7 @@ go_test(
     srcs = [
         "codec_test.go",
         "identifiers_test.go",
+        "import_unsigned_test.go",
         "tx_test.go",
     ],
     data = glob(["testdata/**"]),

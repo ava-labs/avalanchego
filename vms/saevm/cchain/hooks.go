@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	_ "embed"
@@ -32,17 +34,21 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -57,7 +63,13 @@ type hooks struct {
 	state       *cchainstate.State
 	warpStorage *warp.Storage
 	metrics     *metrics
+	// exportHelpers are the contracts whose warp messages export AVAX to the
+	// P-chain on behalf of the caller.
+	exportHelpers set.Set[common.Address]
 }
+
+// exportPayloadLen is owner (20 bytes) || amount in nAVAX (8 bytes).
+const exportPayloadLen = ids.ShortIDLen + 8
 
 func newHooks(
 	ctx *snow.Context,
@@ -68,6 +80,7 @@ func newHooks(
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,
+	exportHelpers set.Set[common.Address],
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -95,6 +108,7 @@ func newHooks(
 		state,
 		warpStorage,
 		metrics,
+		exportHelpers,
 	}
 }
 
@@ -259,7 +273,7 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 	return nil
 }
 
-func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
+func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -271,7 +285,90 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
 		}
 	}
+
+	// The helper holds the caller's value until its message executes here,
+	// so the debit always succeeds; a shortfall means the helper is broken
+	// and the export must not mint.
+	exports, err := h.exports(receipts)
+	if err != nil {
+		return err
+	}
+	for _, e := range exports {
+		wei := new(uint256.Int).Mul(uint256.NewInt(e.amount), uint256.NewInt(params.GWei))
+		if statedb.GetBalance(e.helper).Lt(wei) {
+			return fmt.Errorf("%w: %s owes %d nAVAX", errHelperCannotCoverExport, e.helper, e.amount)
+		}
+		statedb.SubBalance(e.helper, wei)
+	}
 	return nil
+}
+
+var errHelperCannotCoverExport = errors.New("helper cannot cover export")
+
+type export struct {
+	helper common.Address
+	owner  ids.ShortID
+	amount uint64
+	utxoID avax.UTXOID
+}
+
+// exports returns the exports a trusted helper emitted in the block: warp
+// messages whose payload is owner || amount. P-chain tx payloads are longer.
+func (h *hooks) exports(receipts types.Receipts) ([]export, error) {
+	var exports []export
+	for _, r := range receipts {
+		for _, log := range r.Logs {
+			if log.Address != corethwarp.ContractAddress || len(log.Topics) < 2 || !h.exportHelpers.Contains(common.BytesToAddress(log.Topics[1][:])) {
+				continue
+			}
+			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
+			if err != nil {
+				return nil, fmt.Errorf("parsing warp message (tx %s, log %d): %w", log.TxHash, log.Index, err)
+			}
+			call, err := payload.ParseAddressedCall(m.Payload)
+			if err != nil || len(call.Payload) != exportPayloadLen {
+				continue
+			}
+			exports = append(exports, export{
+				helper: common.BytesToAddress(call.SourceAddress),
+				owner:  ids.ShortID(call.Payload[:ids.ShortIDLen]),
+				amount: binary.BigEndian.Uint64(call.Payload[ids.ShortIDLen:]),
+				utxoID: avax.UTXOID{TxID: ids.ID(log.TxHash), OutputIndex: uint32(log.Index)}, //#nosec G115 -- Won't overflow
+			})
+		}
+	}
+	return exports, nil
+}
+
+// exportElements turns the exports of a block into the P-chain UTXOs written
+// to shared memory, indexed by owner like a P-chain ExportTx would.
+func (h *hooks) exportElements(receipts types.Receipts) ([]*chainsatomic.Element, error) {
+	exports, err := h.exports(receipts)
+	if err != nil {
+		return nil, err
+	}
+	elements := make([]*chainsatomic.Element, len(exports))
+	for i, e := range exports {
+		utxo := &avax.UTXO{
+			UTXOID: e.utxoID,
+			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          e.amount,
+				OutputOwners: secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{e.owner}},
+			},
+		}
+		utxoBytes, err := tx.MarshalUTXO(utxo)
+		if err != nil {
+			return nil, err
+		}
+		utxoID := utxo.InputID()
+		elements[i] = &chainsatomic.Element{
+			Key:    utxoID[:],
+			Value:  utxoBytes,
+			Traits: [][]byte{e.owner[:]},
+		}
+	}
+	return elements, nil
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
@@ -282,7 +379,11 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 		return fmt.Errorf("parsing txs: %w", err)
 	}
 
-	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
+	exports, err := h.exportElements(receipts)
+	if err != nil {
+		return fmt.Errorf("collecting exports: %w", err)
+	}
+	if err := h.state.Apply(b.NumberU64(), txs, exports); err != nil {
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 

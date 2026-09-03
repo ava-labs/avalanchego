@@ -461,6 +461,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.now,
 		desiredParams{},
 		m,
+		nil,
 	)
 }
 

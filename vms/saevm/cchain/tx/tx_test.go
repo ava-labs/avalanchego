@@ -1834,9 +1834,10 @@ func TestVerifyCredentials(t *testing.T) {
 			utxos: validUTXOs,
 		},
 		{
-			name:    "import_not_enough_credentials",
+			// No credentials means an unsigned import, which has its own rules.
+			name:    "import_no_credentials_is_unsigned",
 			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
-			wantErr: ErrIncorrectNumCredentials,
+			wantErr: ErrUnsignedNotOneOutput,
 		},
 		{
 			name:    "import_too_many_credentials",

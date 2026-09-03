@@ -83,7 +83,7 @@ type (
 	// stateImpl is the surface common to [State] and [oldState]. It's used by the
 	// [SUT] so the same test helpers can drive either backend.
 	stateImpl interface {
-		Apply(height uint64, txs []*tx.Tx) error
+		Apply(height uint64, txs []*tx.Tx, exports []*chainsatomic.Element) error
 		GetTx(txID ids.ID) (*tx.Tx, uint64, error)
 		GetRoot(height uint64) (common.Hash, error)
 		CurrentHeight() uint64
@@ -163,7 +163,7 @@ func newOldState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMem
 	}
 }
 
-func (o *oldState) Apply(height uint64, txs []*tx.Tx) error {
+func (o *oldState) Apply(height uint64, txs []*tx.Tx, _ []*chainsatomic.Element) error {
 	var blockHash common.Hash
 	binary.BigEndian.PutUint64(blockHash[:], height)
 
@@ -214,7 +214,7 @@ func (s *SUT) apply(tb testing.TB, blocks ...block) {
 	tb.Helper()
 
 	for _, b := range blocks {
-		require.NoErrorf(tb, s.Apply(b.height, b.txs), "%T.Apply(%d)", s.stateImpl, b.height)
+		require.NoErrorf(tb, s.Apply(b.height, b.txs, nil), "%T.Apply(%d)", s.stateImpl, b.height)
 	}
 }
 
@@ -536,7 +536,7 @@ func TestApply_SortInvariant(t *testing.T) {
 		s := newSUT(t)
 
 		const height = 1
-		require.NoErrorf(t, s.Apply(height, txs), "%T.Apply(%d)", s.stateImpl, height)
+		require.NoErrorf(t, s.Apply(height, txs, nil), "%T.Apply(%d)", s.stateImpl, height)
 
 		root, err := s.GetRoot(height)
 		require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, height)
@@ -584,7 +584,7 @@ func TestCrash(t *testing.T) {
 			preCrash := newSUT(t, withDB(saetest.NewFlakyDB(db, failAfter)))
 			remainingBlocks := blocks
 			for i, b := range blocks {
-				if err := preCrash.Apply(b.height, b.txs); err != nil {
+				if err := preCrash.Apply(b.height, b.txs, nil); err != nil {
 					require.ErrorIsf(t, err, saetest.ErrInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
 					break
 				}

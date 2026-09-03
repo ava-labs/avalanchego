@@ -23,6 +23,7 @@ var (
 	ErrInputsNotSortedUnique   = errInputsNotSortedUnique
 	ErrOverflow                = errOverflow
 	ErrIncorrectNumCredentials = errIncorrectNumCredentials
+	ErrUnsignedNotOneOutput    = errUnsignedNotOneOutput
 	ErrConvertingToFxTx        = errConvertingToFxTx
 
 	// codec errors:
