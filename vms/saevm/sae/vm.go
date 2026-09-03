@@ -151,7 +151,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
 	closers.Push(unwind.CloserFunc(func() error {
-		return tracker.Close(exec.LastExecuted().PostExecutionStateRoot())
+		return tracker.Close(exec.LastExecuted().SettledStateRoot())
 	}))
 	closers.Push(exec)
 
