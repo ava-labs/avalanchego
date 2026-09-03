@@ -1113,6 +1113,9 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 			switch {
 			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
 				// on disk
+			case root == e.Snapshot().DiskRoot():
+				// The Tracker pins the snapshot disk root's trie so snapshot
+				// generation can always resolve it, even once untracked.
 			case expectReferenced(b.NumberU64()):
 				// still referenced
 			default:
@@ -1141,6 +1144,104 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 			return height >= numToDrop
 		})
 	})
+}
+
+// TestSnapshotDepthCapAndDiskRootPin is a regression test for the two lines
+// wired into [Executor.afterExecution]: passing
+// [saedb.Tracker.StateDBCommitOptions] to every [state.StateDB.Commit], and
+// calling [saedb.Tracker.PinSnapshotDiskRoot] immediately after
+// [saedb.Tracker.Track]. Without them, nothing else in this package fails:
+// [newSUT] always enables snapshots, but no other test asserts on the shape
+// of the snapshot diff tree or on the disk root's trie surviving Untrack.
+//
+// The snapshot tree only cascades a diff layer down to disk once its
+// in-memory accumulator crosses a size threshold (4MiB) or a background
+// generation is still running (neither of which this small test state
+// reaches on its own), so a plain run of a handful of blocks would leave the
+// disk root pinned at the genesis root for the whole test. That root is
+// already durably committed to disk by [blockstest.NewGenesis] (which closes
+// the trie DB after seeding it), so it would resolve via [e.TrieDB()]
+// regardless of whether [saedb.Tracker.PinSnapshotDiskRoot] is wired up at
+// all -- not a discriminating check. To get a disk root whose trie survives
+// only because of the pin, the test forces one real flush with an explicit
+// [snapshot.Tree.Cap] call at block 1's root before continuing; from then on,
+// depth-1 capping (or its absence, under mutation) governs the tree exactly
+// as it would in production.
+func TestSnapshotDepthCapAndDiskRootPin(t *testing.T) {
+	const (
+		numBlocks      = 4
+		commitInterval = 2 * numBlocks // guarantee no trie commits interfere
+	)
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.commitInterval = commitInterval
+	}))
+	e, chain := sut.Executor, sut.chain
+
+	produce := func() *blocks.Block {
+		b := chain.NewBlock(t, types.Transactions{
+			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+				To:       &common.Address{},
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			}),
+		})
+		require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		return b
+	}
+
+	b1 := produce()
+	root1 := b1.PostExecutionStateRoot()
+
+	// Force a genuine, non-genesis disk flush (see the doc comment above for
+	// why this is necessary for a deterministic pin check). block 1's trie
+	// was committed to the HashDB's in-memory dirty set by its
+	// [state.StateDB.Commit] and referenced once by the ensuing
+	// [saedb.Tracker.Track] call, but never to real, on-disk storage --
+	// commitInterval above is far larger than numBlocks.
+	require.NoErrorf(t, e.Snapshot().Cap(root1, 0), "%T.Cap([root of block 1], 0)", e.Snapshot())
+
+	for range numBlocks - 1 {
+		produce()
+	}
+
+	allBlocks := chain.AllBlocks() // [genesis, block 1, ..., block numBlocks]
+	roots := make([]common.Hash, len(allBlocks))
+	for i, b := range allBlocks {
+		roots[i] = b.PostExecutionStateRoot()
+	}
+	head, headMinus1 := roots[len(roots)-1], roots[len(roots)-2]
+
+	snaps := e.Snapshot()
+	require.NotNilf(t, snaps.Snapshot(head), "%T.Snapshot() of the head block's root %#x", snaps, head)
+	require.NotNilf(t, snaps.Snapshot(headMinus1), "%T.Snapshot() of the head-1 block's root %#x: depth-1 capping must retain exactly one layer behind head", snaps, headMinus1)
+
+	// Every other root, other than whichever one is currently the disk
+	// layer's own root, must have been flattened away by depth-1 capping.
+	// Without it (mutation), libevm's default of 128 layers would retain all
+	// of them.
+	diskRoot := snaps.DiskRoot()
+	for i, root := range roots[:len(roots)-2] {
+		if root == diskRoot {
+			continue
+		}
+		require.Nilf(t, snaps.Snapshot(root), "%T.Snapshot() of block %d's root %#x", snaps, i, root)
+	}
+
+	// The pin: the disk layer's own trie stays resolvable via [e.TrieDB()]
+	// even after every other tracked root -- including the one that is now
+	// the disk root -- has been untracked, mirroring what settlement-based
+	// pruning does once a block's state is no longer needed. Without
+	// [saedb.Tracker.PinSnapshotDiskRoot], the disk root's only reference is
+	// the one added by its own block's [saedb.Tracker.Track] call, and the
+	// Untrack below removes exactly that reference, dropping it to zero.
+	for _, b := range allBlocks[:len(allBlocks)-1] {
+		e.Untrack(b.PostExecutionStateRoot())
+	}
+
+	diskRoot = snaps.DiskRoot()
+	_, err := trie.New(trie.TrieID(diskRoot), e.TrieDB())
+	require.NoErrorf(t, err, "trie.New() at snapshot disk root %#x after untracking every other root", diskRoot)
 }
 
 // TestRecoveryStateAvailability checks that each configuration of the TrieDB
@@ -1195,6 +1296,11 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				switch {
 				case saedb.ShouldCommitTrieDB(height+1, commitInterval):
 					// in this test, each block settles the previous
+					return true
+				case height == numBlocks:
+					// [saedb.Tracker.Close] commits the last-executed state at
+					// shutdown while the snapshot (enabled by [newSUT]) is on,
+					// keeping snapshot generation resumable across restarts.
 					return true
 				case height == 0:
 					// genesis state

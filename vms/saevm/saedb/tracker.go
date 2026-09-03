@@ -4,16 +4,20 @@
 package saedb
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
+	"sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
@@ -145,6 +149,18 @@ func (c Config) snapConfig() *snapshot.Config {
 	return &snapshot.Config{
 		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 -- checked in [Config.Verify]
 		AsyncBuild: true,
+		// Recovery loads a persisted disk layer whose root is AHEAD of the
+		// root requested at [snapshot.New] instead of discarding it. That is
+		// SAE's normal restart shape: [NewTracker] opens at the last committed
+		// (settled) root while the snapshot — flattened in lockstep with
+		// execution ([SnapshotCapLayers]) — sits at the last-executed root.
+		// Recovery's re-execution replays the chain through the disk root,
+		// rebuilding diff layers on top of it, so the snapshot "recovers when
+		// the chain head beyonds the disk layer" exactly as libevm assumes.
+		// Without this, every restart discarded the snapshot and regenerated
+		// it from scratch. A missing or unreadable snapshot still falls back
+		// to a rebuild inside [snapshot.New].
+		Recovery: true,
 	}
 }
 
@@ -175,6 +191,12 @@ type Tracker struct {
 
 	config Config
 	log    logging.Logger
+
+	// pinMu guards pinnedDiskRoot: the snapshot disk layer root whose trie
+	// the Tracker keeps referenced so snapshot generation can always resolve
+	// it. See [Tracker.PinSnapshotDiskRoot].
+	pinMu          sync.Mutex
+	pinnedDiskRoot common.Hash
 }
 
 // NewTracker provides a new [Tracker] on the underlying database.
@@ -196,6 +218,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		if err != nil {
 			return nil, err
 		}
+		logSnapshotState(log, db, snaps, lastExecuted)
 	}
 	return &Tracker{
 		snaps:  snaps,
@@ -203,6 +226,148 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		config: c,
 		log:    log,
 	}, nil
+}
+
+// generatorState mirrors the RLP encoding of libevm's unexported
+// core/state/snapshot journalGenerator, persisted under
+// [rawdb.ReadSnapshotGenerator]. The format is stable: it is the on-disk
+// journal of generation progress, resumed across restarts.
+type generatorState struct {
+	Wiping   bool // deprecated upstream, kept for RLP compatibility
+	Done     bool
+	Marker   []byte
+	Accounts uint64
+	Slots    uint64
+	Storage  uint64
+}
+
+// logSnapshotState logs one line describing the snapshot's post-load health:
+// the disk layer root, whether generation is complete, and if not, where the
+// generation marker sits. A marker that never advances between restarts (or
+// between two reads of this line's inputs) means generation is failing
+// silently — e.g. because the trie at the disk root has been pruned.
+//
+// Failures to decode are logged rather than returned: this is diagnostics and
+// must never fail tracker construction.
+func logSnapshotState(log logging.Logger, db ethdb.Database, snaps *snapshot.Tree, requestedRoot common.Hash) {
+	fields := []zap.Field{
+		zap.Stringer("requestedRoot", requestedRoot),
+		zap.Stringer("diskRoot", snaps.DiskRoot()),
+	}
+
+	blob := rawdb.ReadSnapshotGenerator(db)
+	if len(blob) == 0 {
+		log.Info("snapshot loaded", append(fields, zap.Bool("generatorFound", false))...)
+		return
+	}
+	var gen generatorState
+	if err := rlp.DecodeBytes(blob, &gen); err != nil {
+		log.Warn("snapshot loaded; undecodable generator state", append(fields, zap.Error(err))...)
+		return
+	}
+
+	fields = append(fields,
+		zap.Bool("generationDone", gen.Done),
+		zap.Uint64("generatedAccounts", gen.Accounts),
+		zap.Uint64("generatedSlots", gen.Slots),
+	)
+	if !gen.Done {
+		// The marker is a position in the 32-byte account-hash keyspace, so
+		// its leading bytes give the fraction of the keyspace generated.
+		var pct float64
+		if len(gen.Marker) >= 4 {
+			pct = 100 * float64(binary.BigEndian.Uint32(gen.Marker)) / float64(math.MaxUint32)
+		}
+		fields = append(fields,
+			zap.String("generationMarker", common.Bytes2Hex(gen.Marker)),
+			zap.Float64("generationPct", pct),
+		)
+	}
+	log.Info("snapshot loaded", fields...)
+}
+
+// TrieDB returns the trie database used by [Tracker.StateDB].
+func (t *Tracker) TrieDB() *triedb.Database {
+	return t.cache.TrieDB()
+}
+
+// Snapshot returns any snapshot that is used by a [state.StateDB] returned
+// by [Tracker.StateDB]. This MAY be nil.
+func (t *Tracker) Snapshot() *snapshot.Tree {
+	return t.snaps
+}
+
+// SnapshotCapLayers is the number of in-memory snapshot diff layers retained
+// when [state.StateDB.Commit] caps the snapshot tree, as configured by
+// [Tracker.StateDBCommitOptions]. SAE has no reorgs, so deep diff layers
+// serve no purpose. A depth of 1 flattens block N-1's diff while committing
+// block N, when N-1's trie is still referenced (settlement-based pruning only
+// dereferences it ~Tau later); the snapshot generator, which proves each
+// account/storage range against the trie at the disk layer's root, therefore
+// always has a resolvable target and can complete. libevm's default of 128
+// would pin the disk root deep inside the range SAE has already pruned,
+// wedging generation forever.
+const SnapshotCapLayers = 1
+
+// StateDBCommitOptions returns options that MUST be passed to every
+// [state.StateDB.Commit] of a StateDB opened via [Tracker.StateDB].
+func (t *Tracker) StateDBCommitOptions() []stateconf.StateDBCommitOption {
+	if t.snaps == nil {
+		return nil
+	}
+	return []stateconf.StateDBCommitOption{
+		stateconf.WithSnapshotCapLayers(SnapshotCapLayers),
+	}
+}
+
+// PinSnapshotDiskRoot references the trie at the snapshot disk layer's
+// current root, releasing the reference held for the previous disk root. If
+// the disk root is unset (its zero value) it returns without releasing that
+// previous pin, so callers MUST NOT rely on it as an unconditional release.
+//
+// Snapshot generation proves each account/storage range against the trie at
+// the disk layer's root, so that trie MUST remain resolvable for as long as
+// the root is the disk layer's; settlement-based pruning would otherwise
+// dereference it. The Reference call relies on the disk root's node already
+// being in the HashDB's dirty set, put there by [Tracker.Track] of that same
+// root one block ago (depth-1 capping means today's disk root was
+// yesterday's execution head). hashdb's Reference silently no-ops for a root
+// that ISN'T in the dirty set (e.g. a boot root already flushed to disk);
+// that's safe, since such a root is already durably persisted and needs no
+// in-memory pin, but it means the call-site ordering —
+// [state.StateDB.Commit], then [Tracker.Track], then PinSnapshotDiskRoot — is
+// load-bearing, not stylistic. Call after each block's [state.StateDB.Commit]
+// and [Tracker.Track].
+func (t *Tracker) PinSnapshotDiskRoot() {
+	if t.snaps == nil {
+		return
+	}
+
+	t.pinMu.Lock()
+	defer t.pinMu.Unlock()
+	diskRoot := t.snaps.DiskRoot()
+	if diskRoot == t.pinnedDiskRoot || diskRoot == (common.Hash{}) {
+		return
+	}
+	// Never returns an error because it is a [triedb.HashDB].
+	if err := t.cache.TrieDB().Reference(diskRoot, common.Hash{}); err != nil {
+		t.log.Error("*triedb.Database.Reference() of snapshot disk root", zap.Error(err))
+	}
+	t.unpinLocked()
+	t.pinnedDiskRoot = diskRoot
+}
+
+// unpinLocked dereferences the currently pinned disk root, if any. t.pinMu
+// MUST be held.
+func (t *Tracker) unpinLocked() {
+	if t.pinnedDiskRoot == (common.Hash{}) {
+		return
+	}
+	// Never returns an error because it is a [triedb.HashDB].
+	if err := t.cache.TrieDB().Dereference(t.pinnedDiskRoot); err != nil {
+		t.log.Error("*triedb.Database.Dereference() of pinned snapshot disk root", zap.Error(err))
+	}
+	t.pinnedDiskRoot = common.Hash{}
 }
 
 // CommitInterval returns the number of blocks between guaranteed commits of the
@@ -313,11 +478,26 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 	return state.New(root, t.cache, t.snaps)
 }
 
-// Close releases all resources associated with the `[triedb.Database]`
-// and cancel any snapshot generation.
+// Close releases all resources associated with the [triedb.Database] and
+// cancels any snapshot generation. With the snapshot enabled it first
+// flattens all snapshot layers onto lastRoot and commits the trie there: an
+// in-progress generation resumes after a restart by range-proving against the
+// trie at the snapshot disk root, which after Close is lastRoot.
 func (t *Tracker) Close(lastRoot common.Hash) error {
 	var errs []error
+
+	tdb := t.cache.TrieDB()
 	if t.snaps != nil {
+		// The trie commit serves only the snapshot, so it is gated on one
+		// being enabled. In particular, Firewood (which never runs with a
+		// snapshot; see [Config.snapConfig]) MUST NOT be committed here: an
+		// out-of-order commit breaks its proposal ordering and, non-archival,
+		// evicts the settled revision that recovery boots from. Committing a
+		// hashdb root whose nodes are already on disk is a no-op.
+		if err := tdb.Commit(lastRoot, false /* report */); err != nil {
+			errs = append(errs, fmt.Errorf("%T.Commit(%#x): %v", tdb, lastRoot, err))
+		}
+
 		// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
 		// SAE so we don't mind flattening all snapshot layers to disk. Note that
 		// calling `Cap([disk root], 0)` returns an error when it's actually a
@@ -334,8 +514,12 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 		t.snaps.Release()
 	}
 
-	if err := t.cache.TrieDB().Close(); err != nil {
-		errs = append(errs, fmt.Errorf("triedb.Database.Close(): %v", err))
+	t.pinMu.Lock()
+	t.unpinLocked()
+	t.pinMu.Unlock()
+
+	if err := tdb.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("%T.Close(): %v", tdb, err))
 	}
 
 	return errors.Join(errs...)

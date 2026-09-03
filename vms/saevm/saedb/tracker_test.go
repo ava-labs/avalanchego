@@ -11,8 +11,11 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,7 +141,7 @@ func TestProtectTrieIndex(t *testing.T) {
 //
 // Each call adds roughly 100 KiB of dirty trie nodes to the [Tracker]'s
 // in-memory cache.
-func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64) common.Hash {
+func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64, opts ...stateconf.StateDBCommitOption) common.Hash {
 	tb.Helper()
 
 	sdb, err := tr.StateDB(prevRoot)
@@ -162,9 +165,70 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 		}
 	}
 
-	root, err := sdb.Commit(height, true /*EIP-158*/)
+	root, err := sdb.Commit(height, true /*EIP-158*/, opts...)
 	require.NoErrorf(tb, err, "%T.Commit(%d)", sdb, height)
 	return root
+}
+
+// TestTrackerCloseCommitsTrie verifies that, with the snapshot enabled,
+// [Tracker.Close] persists the trie at the root it is closed with. A restart
+// resumes any in-progress snapshot generation against the persisted snapshot
+// disk root — which Close flattens to that same root — so the trie there MUST
+// be resolvable from disk, not lost with the in-memory dirty cache.
+func TestTrackerCloseCommitsTrie(t *testing.T) {
+	cfg := Config{CommitInterval: DefaultCommitInterval, SnapshotCacheMiB: 1}
+	db := rawdb.NewMemoryDatabase()
+	tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), loggingtest.New(t, logging.Info))
+	require.NoError(t, err, "NewTracker()")
+
+	root := writeBlock(t, tr, types.EmptyRootHash, 1)
+	tr.Track(root)
+	require.NoErrorf(t, tr.Close(root), "%T.Close()", tr)
+
+	cache := state.NewDatabase(db)
+	t.Cleanup(func() { assert.NoErrorf(t, cache.TrieDB().Close(), "%T.Close()", cache.TrieDB()) })
+	_, err = state.New(root, cache, nil)
+	require.NoErrorf(t, err, "state.New() from disk at the root passed to %T.Close()", tr)
+}
+
+// TestTrackerReopenLoadsPersistedSnapshot restarts a Tracker at an older root
+// than it was closed with, as [sae] recovery does when it boots from the last
+// committed (settled) root while the persisted snapshot disk layer sits at the
+// last-executed root. The persisted snapshot MUST be loaded as-is — recovery's
+// re-execution catches the chain head up to the disk layer — rather than
+// discarded and regenerated, which may take hours on a mainnet-sized state.
+func TestTrackerReopenLoadsPersistedSnapshot(t *testing.T) {
+	cfg := Config{CommitInterval: DefaultCommitInterval, SnapshotCacheMiB: 1}
+	db := rawdb.NewMemoryDatabase()
+	log := loggingtest.New(t, logging.Info)
+	tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker()")
+
+	// Wait for genesis generation so the persisted generator is marked Done;
+	// a loaded-but-regenerating snapshot would be indistinguishable from a
+	// discarded one below.
+	require.EventuallyWithT(t,
+		func(c *assert.CollectT) {
+			assert.NoErrorf(c, tr.snaps.Verify(types.EmptyRootHash), "%T.Verify([genesis root])", tr.snaps)
+		},
+		10*time.Second,      // timeout
+		10*time.Millisecond, // polling interval
+		"genesis snapshot generation",
+	)
+
+	root1 := writeBlock(t, tr, types.EmptyRootHash, 1, tr.StateDBCommitOptions()...)
+	tr.Track(root1)
+	root2 := writeBlock(t, tr, root1, 2, tr.StateDBCommitOptions()...)
+	tr.Track(root2)
+	require.NoErrorf(t, tr.Close(root2), "%T.Close()", tr)
+	require.Equal(t, root2, rawdb.ReadSnapshotRoot(db), "rawdb.ReadSnapshotRoot() after Close: sanity-check the persisted disk root")
+
+	tr2, err := NewTracker(db, cfg, root1, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker() reopening at an older root")
+	t.Cleanup(func() { assert.NoErrorf(t, tr2.Close(root2), "%T.Close()", tr2) })
+
+	require.Equalf(t, root2, tr2.Snapshot().DiskRoot(), "%T.DiskRoot() after reopening at an older root: the persisted snapshot MUST be loaded, not rebuilt at the requested root", tr2.Snapshot())
+	require.NoErrorf(t, tr2.Snapshot().Verify(root2), "%T.Verify([persisted disk root]) after reopening", tr2.Snapshot())
 }
 
 // TestTrackerMaybeCap checks that [Tracker.MaybeCommit] decreases memory
@@ -330,4 +394,91 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 			})
 		}
 	}
+}
+
+func TestTrackerStateDBCommitOptions(t *testing.T) {
+	log := loggingtest.New(t, logging.Info)
+
+	tests := []struct {
+		name       string
+		cfg        Config
+		wantLayers int
+	}{
+		{
+			name:       "snapshots enabled",
+			cfg:        Config{CommitInterval: 4096, SnapshotCacheMiB: 16},
+			wantLayers: SnapshotCapLayers,
+		},
+		{
+			name: "snapshots disabled",
+			cfg:  Config{CommitInterval: 4096},
+			// Without snapshots there are no options, so extraction falls
+			// back to libevm's default.
+			wantLayers: stateconf.DefaultSnapshotCapLayers,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr, err := NewTracker(rawdb.NewMemoryDatabase(), tt.cfg, types.EmptyRootHash, t.TempDir(), log)
+			require.NoError(t, err, "NewTracker()")
+			t.Cleanup(func() { assert.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr) })
+
+			opts := tr.StateDBCommitOptions()
+			if tt.cfg.SnapshotCacheMiB == 0 {
+				require.Empty(t, opts, "Tracker.StateDBCommitOptions() with snapshots disabled")
+			}
+			require.Equal(t, tt.wantLayers, stateconf.ExtractSnapshotCapLayers(opts...), "cap layers extracted from Tracker.StateDBCommitOptions()")
+		})
+	}
+}
+
+// TestTrackerPinSnapshotDiskRoot drives the flatten + settle + pin cycle
+// directly: the pinned disk root's trie MUST stay resolvable after the VM
+// untracks it (settlement-based pruning), and the pin MUST transfer — and
+// release the previous root — when the disk layer advances.
+func TestTrackerPinSnapshotDiskRoot(t *testing.T) {
+	cfg := Config{CommitInterval: 4096, SnapshotCacheMiB: 16}
+	log := loggingtest.New(t, logging.Info)
+	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker()")
+
+	root1 := writeBlock(t, tr, types.EmptyRootHash, 1, tr.StateDBCommitOptions()...)
+	tr.Track(root1)
+
+	// Force the flatten that [state.StateDB.Commit] performs whenever
+	// generation is in progress: root1 becomes the disk layer's root.
+	require.NoErrorf(t, tr.snaps.Cap(root1, 0), "%T.Cap(root1, 0)", tr.snaps)
+	require.Equal(t, root1, tr.Snapshot().DiskRoot(), "snapshot disk root after flattening block 1")
+	tr.PinSnapshotDiskRoot()
+
+	root2 := writeBlock(t, tr, root1, 2, tr.StateDBCommitOptions()...)
+	tr.Track(root2)
+
+	// Settlement-based pruning: the VM untracks root1 once settled. The pin
+	// MUST keep the disk root's trie resolvable regardless.
+	tr.Untrack(root1)
+	_, err = trie.New(trie.TrieID(root1), tr.TrieDB())
+	require.NoError(t, err, "trie.New() at the pinned snapshot disk root after Untrack()")
+
+	// The disk layer advances to root2; the pin transfers, releasing root1,
+	// whose (already untracked) trie is now pruned.
+	require.NoErrorf(t, tr.snaps.Cap(root2, 0), "%T.Cap(root2, 0)", tr.snaps)
+	tr.PinSnapshotDiskRoot()
+	_, err = trie.New(trie.TrieID(root1), tr.TrieDB())
+	require.ErrorAs(t, err, new(*trie.MissingNodeError), "trie.New() at the released previous disk root: the transferred pin must drop its reference")
+	_, err = trie.New(trie.TrieID(root2), tr.TrieDB())
+	require.NoError(t, err, "trie.New() at the newly pinned snapshot disk root")
+
+	// Close releases the pin without error.
+	require.NoErrorf(t, tr.Close(root2), "%T.Close()", tr)
+}
+
+func TestTrackerPinSnapshotDiskRootWithoutSnapshots(t *testing.T) {
+	cfg := Config{CommitInterval: 4096} // snapshots disabled
+	log := loggingtest.New(t, logging.Info)
+	tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker()")
+	t.Cleanup(func() { assert.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr) })
+
+	tr.PinSnapshotDiskRoot() // MUST NOT panic
 }

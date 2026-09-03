@@ -439,7 +439,7 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
-	root, err := stateDB.Commit(b.NumberU64(), true)
+	root, err := stateDB.Commit(b.NumberU64(), true, e.Tracker.StateDBCommitOptions()...)
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
@@ -450,6 +450,11 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	// Responsibility for untracking lies with the VM once it deems this block's
 	// post-execution state to no longer be consensus-critical.
 	e.Tracker.Track(root)
+
+	// The commit above may have flattened a snapshot diff layer to disk
+	// ([saedb.SnapshotCapLayers]); keep the new disk root's trie referenced
+	// for the snapshot generator.
+	e.Tracker.PinSnapshotDiskRoot()
 
 	// The strict ordering of the next 3 calls guarantees invariants that MUST
 	// NOT be broken:
