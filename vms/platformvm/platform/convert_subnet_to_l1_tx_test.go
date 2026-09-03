@@ -29,9 +29,9 @@ import (
 )
 
 var (
-	//go:embed tx_convert_subnet_to_l1_test_simple.json
+	//go:embed convert_subnet_to_l1_tx_test_simple.json
 	convertSubnetToL1TxSimpleJSON []byte
-	//go:embed tx_convert_subnet_to_l1_test_complex.json
+	//go:embed convert_subnet_to_l1_tx_test_complex.json
 	convertSubnetToL1TxComplexJSON []byte
 )
 

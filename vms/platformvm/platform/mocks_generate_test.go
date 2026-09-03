@@ -3,4 +3,4 @@
 
 package platform
 
-//go:generate go tool mockgen -package=${GOPACKAGE} -destination=block_mock.go . Block
+//go:generate go tool mockgen -package=${GOPACKAGE} -destination=mock_block.go . Block

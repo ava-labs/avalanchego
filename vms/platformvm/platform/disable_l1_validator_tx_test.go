@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-//go:embed tx_disable_l1_validator_test.json
+//go:embed disable_l1_validator_tx_test.json
 var disableL1ValidatorTxJSON []byte
 
 func TestDisableL1ValidatorTxSerialization(t *testing.T) {

@@ -4,7 +4,6 @@
 package platform
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"testing"
 
@@ -15,29 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-//go:embed tx_register_l1_validator_test.json
-var registerL1ValidatorTxJSON []byte
+//go:embed set_l1_validator_weight_tx_test.json
+var setL1ValidatorWeightTxJSON []byte
 
-func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
+func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 	require := require.New(t)
-
-	const balance = units.Avax
-
-	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
-	require.NoError(err)
-	sk, err := localsigner.FromBytes(skBytes)
-	require.NoError(err)
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
 
 	var (
 		message = []byte("message")
@@ -66,7 +54,7 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 		}
 	)
 
-	var unsignedTx UnsignedTx = &RegisterL1ValidatorTx{
+	var unsignedTx UnsignedTx = &SetL1ValidatorWeightTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
@@ -160,9 +148,7 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 				Memo: types.JSONByteSlice("😅\nwell that's\x01\x23\x45!"),
 			},
 		},
-		Balance:           balance,
-		ProofOfPossession: pop.ProofOfPossession,
-		Message:           message,
+		Message: message,
 	}
 	txBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
 	require.NoError(err)
@@ -170,8 +156,8 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 	expectedBytes := []byte{
 		// Codec version
 		0x00, 0x00,
-		// RegisterL1ValidatorTx Type ID
-		0x00, 0x00, 0x00, 0x24,
+		// SetL1ValidatorWeightTx Type ID
+		0x00, 0x00, 0x00, 0x25,
 		// Network ID
 		0x00, 0x00, 0x00, 0x0a,
 		// P-chain blockchain ID
@@ -300,21 +286,6 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 		0xf0, 0x9f, 0x98, 0x85, 0x0a, 0x77, 0x65, 0x6c,
 		0x6c, 0x20, 0x74, 0x68, 0x61, 0x74, 0x27, 0x73,
 		0x01, 0x23, 0x45, 0x21,
-		// balance
-		0x00, 0x00, 0x00, 0x00, 0x3b, 0x9a, 0xca, 0x00,
-		// proof of possession
-		0x8c, 0xfd, 0x79, 0x09, 0xd1, 0x53, 0xb9, 0x60,
-		0x4b, 0x62, 0xb1, 0x43, 0xba, 0x36, 0x20, 0x7b,
-		0xb7, 0xe6, 0x48, 0x67, 0x42, 0x44, 0x80, 0x20,
-		0x2a, 0x67, 0xdc, 0x68, 0x76, 0x83, 0x46, 0xd9,
-		0x5c, 0x90, 0x98, 0x3c, 0x2d, 0x27, 0x9c, 0x64,
-		0xc4, 0x3c, 0x51, 0x13, 0x6b, 0x2a, 0x05, 0xe0,
-		0x16, 0x02, 0xd5, 0x2a, 0xa6, 0x37, 0x6f, 0xda,
-		0x17, 0xfa, 0x6e, 0x2a, 0x18, 0xa0, 0x83, 0xe4,
-		0x9d, 0x9c, 0x45, 0x0e, 0xab, 0x7b, 0x89, 0xb1,
-		0xd5, 0x55, 0x5d, 0xa5, 0xc4, 0x89, 0x87, 0x2e,
-		0x02, 0xb7, 0xe5, 0x22, 0x7b, 0x77, 0x55, 0x0a,
-		0xf1, 0x33, 0x0e, 0x5a, 0x71, 0xf8, 0xc3, 0x68,
 		// length of message
 		0x00, 0x00, 0x00, 0x07,
 		// message
@@ -327,14 +298,14 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.JSONEq(string(registerL1ValidatorTxJSON), string(txJSON))
+	require.JSONEq(string(setL1ValidatorWeightTxJSON), string(txJSON))
 }
 
-func TestRegisterL1ValidatorTxSyntacticVerify(t *testing.T) {
+func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
 	ctx := snowtest.Context(t, ids.GenerateTestID())
 	tests := []struct {
 		name        string
-		tx          *RegisterL1ValidatorTx
+		tx          *SetL1ValidatorWeightTx
 		expectedErr error
 	}{
 		{
@@ -346,7 +317,7 @@ func TestRegisterL1ValidatorTxSyntacticVerify(t *testing.T) {
 			name: "already verified",
 			// The tx includes invalid data to verify that a cached result is
 			// returned.
-			tx: &RegisterL1ValidatorTx{
+			tx: &SetL1ValidatorWeightTx{
 				BaseTx: BaseTx{
 					SyntacticallyVerified: true,
 				},
@@ -355,14 +326,14 @@ func TestRegisterL1ValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "invalid BaseTx",
-			tx: &RegisterL1ValidatorTx{
+			tx: &SetL1ValidatorWeightTx{
 				BaseTx: BaseTx{},
 			},
 			expectedErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "passes verification",
-			tx: &RegisterL1ValidatorTx{
+			tx: &SetL1ValidatorWeightTx{
 				BaseTx: BaseTx{
 					BaseTx: avax.BaseTx{
 						NetworkID:    ctx.NetworkID,

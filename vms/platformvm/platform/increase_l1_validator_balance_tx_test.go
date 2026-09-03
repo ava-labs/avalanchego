@@ -21,15 +21,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-//go:embed tx_set_l1_validator_weight_test.json
-var setL1ValidatorWeightTxJSON []byte
+//go:embed increase_l1_validator_balance_tx_test.json
+var increaseL1ValidatorBalanceTxJSON []byte
 
-func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
+func TestIncreaseL1ValidatorBalanceTxSerialization(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		message = []byte("message")
-		addr    = ids.ShortID{
+		validationID = ids.ID{
+			0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+			0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+			0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+			0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		}
+		balance uint64 = 0xfedcba9876543210
+		addr           = ids.ShortID{
 			0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
 			0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
 			0x44, 0x55, 0x66, 0x77,
@@ -54,7 +60,7 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 		}
 	)
 
-	var unsignedTx UnsignedTx = &SetL1ValidatorWeightTx{
+	var unsignedTx UnsignedTx = &IncreaseL1ValidatorBalanceTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
@@ -148,7 +154,8 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 				Memo: types.JSONByteSlice("😅\nwell that's\x01\x23\x45!"),
 			},
 		},
-		Message: message,
+		ValidationID: validationID,
+		Balance:      balance,
 	}
 	txBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
 	require.NoError(err)
@@ -156,8 +163,8 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 	expectedBytes := []byte{
 		// Codec version
 		0x00, 0x00,
-		// SetL1ValidatorWeightTx Type ID
-		0x00, 0x00, 0x00, 0x25,
+		// IncreaseL1ValidatorBalanceTx Type ID
+		0x00, 0x00, 0x00, 0x26,
 		// Network ID
 		0x00, 0x00, 0x00, 0x0a,
 		// P-chain blockchain ID
@@ -286,10 +293,13 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 		0xf0, 0x9f, 0x98, 0x85, 0x0a, 0x77, 0x65, 0x6c,
 		0x6c, 0x20, 0x74, 0x68, 0x61, 0x74, 0x27, 0x73,
 		0x01, 0x23, 0x45, 0x21,
-		// length of message
-		0x00, 0x00, 0x00, 0x07,
-		// message
-		0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+		// validation ID
+		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		// balance
+		0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
 	}
 	require.Equal(expectedBytes, txBytes)
 
@@ -298,14 +308,22 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.JSONEq(string(setL1ValidatorWeightTxJSON), string(txJSON))
+	require.JSONEq(string(increaseL1ValidatorBalanceTxJSON), string(txJSON))
 }
 
-func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
-	ctx := snowtest.Context(t, ids.GenerateTestID())
+func TestIncreaseL1ValidatorBalanceTxSyntacticVerify(t *testing.T) {
+	var (
+		ctx         = snowtest.Context(t, ids.GenerateTestID())
+		validBaseTx = BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+			},
+		}
+	)
 	tests := []struct {
 		name        string
-		tx          *SetL1ValidatorWeightTx
+		tx          *IncreaseL1ValidatorBalanceTx
 		expectedErr error
 	}{
 		{
@@ -317,29 +335,35 @@ func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
 			name: "already verified",
 			// The tx includes invalid data to verify that a cached result is
 			// returned.
-			tx: &SetL1ValidatorWeightTx{
+			tx: &IncreaseL1ValidatorBalanceTx{
 				BaseTx: BaseTx{
 					SyntacticallyVerified: true,
 				},
+				Balance: 0,
 			},
 			expectedErr: nil,
 		},
 		{
+			name: "zero balance",
+			tx: &IncreaseL1ValidatorBalanceTx{
+				BaseTx:  validBaseTx,
+				Balance: 0,
+			},
+			expectedErr: ErrZeroBalance,
+		},
+		{
 			name: "invalid BaseTx",
-			tx: &SetL1ValidatorWeightTx{
-				BaseTx: BaseTx{},
+			tx: &IncreaseL1ValidatorBalanceTx{
+				BaseTx:  BaseTx{},
+				Balance: 1,
 			},
 			expectedErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "passes verification",
-			tx: &SetL1ValidatorWeightTx{
-				BaseTx: BaseTx{
-					BaseTx: avax.BaseTx{
-						NetworkID:    ctx.NetworkID,
-						BlockchainID: ctx.ChainID,
-					},
-				},
+			tx: &IncreaseL1ValidatorBalanceTx{
+				BaseTx:  validBaseTx,
+				Balance: 1,
 			},
 			expectedErr: nil,
 		},
