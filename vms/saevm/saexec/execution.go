@@ -72,8 +72,6 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
-
 func (e *Executor) processQueue() {
 	defer close(e.done)
 
@@ -91,13 +89,11 @@ func (e *Executor) processQueue() {
 		case errors.Is(err, errFatal):
 			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
 				"Block execution failed",
-				zap.String("playbook", emergencyPlaybookLink),
 				zap.Error(err),
 			)
 		case err != nil:
 			log.Error(
 				"Error of unknown severity in block execution",
-				zap.String("if_escalation_required", emergencyPlaybookLink),
 				zap.Error(err),
 			)
 		}
