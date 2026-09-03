@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"sync/atomic"
 	"testing"
@@ -193,6 +194,17 @@ func errAll(wants ...testerr.Want) testerr.Want {
 	})
 }
 
+// errIsNot requires that the error does NOT wrap `target`; a nil error
+// trivially satisfies this.
+func errIsNot(target error) testerr.Want {
+	return testerr.Func(func(got error) string {
+		if errors.Is(got, target) {
+			return testerr.DiffMessage(got, "error that is not %v", target)
+		}
+		return ""
+	})
+}
+
 func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
 	asynchronous := hook.Settled{Height: height - 1}
@@ -200,6 +212,11 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 	putCorruptResults := func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, ethB *types.Block) {
 		t.Helper()
 		require.NoErrorf(t, xdb.Put(ethB.NumberU64(), []byte("not canoto")), "%T.Put()", xdb)
+	}
+
+	validGasTime := func(hdr *types.Header, hooks hook.Points) *gastime.Time {
+		target, cfg := hooks.GasConfigAfter(hdr)
+		return mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
 	}
 
 	tests := []struct {
@@ -240,11 +257,26 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 			txs:     []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
 			setupDBs: func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
 				t.Helper()
-				hdr := ethB.Header()
-				target, cfg := hooks.GasConfigAfter(hdr)
-				tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
+				tm := validGasTime(ethB.Header(), hooks)
 				newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
 			},
+		},
+		{
+			name:    "missing_receiptis",
+			settled: asynchronous,
+			txs:     []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
+			setupDBs: func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
+				t.Helper()
+				tm := validGasTime(ethB.Header(), hooks)
+				b := newBlock(t, ethB, nil, nil)
+				receipts := types.Receipts{&types.Receipt{Status: 8}}
+				require.NoErrorf(t, b.MarkExecuted(db, xdb, tm, time.Time{}, new(big.Int), receipts, common.Hash{}, new(atomic.Pointer[Block])), "%T.MarkExecuted()", b)
+				rawdb.DeleteReceipts(db, ethB.Hash(), ethB.NumberU64())
+			},
+			wantErr: errAll(
+				errIsNot(ErrMissingExecutionResults),
+				testerr.Contains("deriving receipt fields"),
+			),
 		},
 		{
 			name:             "synchronous_ignores_execution_results",
