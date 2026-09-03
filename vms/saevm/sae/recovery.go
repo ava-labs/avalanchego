@@ -111,9 +111,11 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 }
 
 // recoverExecutor returns an [saexec.Executor] that is ready to execute any
-// child of the last-known accepted block and a map of all consensus-critical
-// blocks. The [saedb.Tracker] contained within the [saexec.Executor] MUST be
-// closed after the executor.
+// child of the last-known accepted block, and a map of all consensus-critical
+// blocks.
+//
+// The [saedb.Tracker] contained within the [saexec.Executor] MUST be closed
+// after the executor.
 func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
