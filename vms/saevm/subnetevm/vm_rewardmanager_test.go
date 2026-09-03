@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -93,7 +94,8 @@ func balanceOf(t *testing.T, sut *SUT, addr common.Address) *big.Int {
 func settleRewardManagerMutation(t *testing.T, sut *SUT, fromIdx int) {
 	t.Helper()
 	sut.advanceTime(t, settleAdvance)
-	sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
+	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
+	txgossiptest.WaitUntilPending(t, sut.ctx, sut.vm.GethRPCBackends(), tx)
 	_ = sut.buildAcceptExecuteBlock(t)
 }
 

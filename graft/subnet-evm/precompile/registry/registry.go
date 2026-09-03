@@ -8,8 +8,8 @@ package registry
 // with the registry.
 import (
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
