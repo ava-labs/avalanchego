@@ -10,7 +10,6 @@ go_library(
     name = "extstate",
     srcs = [
         "database.go",
-        "options.go",
         "statedb.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/extstate",
@@ -18,7 +17,6 @@ go_library(
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/evm/firewood",
-        "//graft/evm/utils",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
