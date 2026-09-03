@@ -70,14 +70,6 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 
 ### Available APIs
 
-`apis` is an exhaustive list, not an addition to the default: a node configured
-with `"apis": ["chain"]` serves the `chain` methods and nothing else. A pinned
-list also does not silently acquire APIs introduced by later releases.
-
-APIs are finer-grained than JSON-RPC namespaces because several of them
-contribute methods to the `eth` namespace. This is what makes it possible to
-serve, say, `eth_getLogs` without also serving `eth_call`.
-
 | Name | Default | Methods |
 |------|---------|---------|
 | `web3` | enabled | `web3_clientVersion`, `web3_sha3` |
