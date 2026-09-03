@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -103,10 +104,19 @@ func TestParseConfig(t *testing.T) {
 			want:      with(func(c *config) { c.CommitInterval = 256 }),
 		},
 		{
-			name:      "state/commit_interval_production_network",
+			name:      "state/hash_commit_interval_production_network",
 			json:      `{"commit-interval":256}`,
 			networkID: constants.MainnetID,
 			wantErr:   testerr.Is(errProductionCommitInterval),
+		},
+		{
+			name:      "state/production_firewood",
+			json:      `{"state-scheme":"firewood","commit-interval":256}`,
+			networkID: constants.MainnetID,
+			want: with(func(c *config) {
+				c.StateScheme = customrawdb.FirewoodScheme
+				c.CommitInterval = 256
+			}),
 		},
 		{
 			name: "state/trie_clean_cache",
@@ -268,6 +278,44 @@ func TestParseConfig(t *testing.T) {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
+		})
+	}
+}
+
+func TestConfigStateSyncInterval(t *testing.T) {
+	tests := []struct {
+		name           string
+		networkID      uint32
+		commitInterval uint64
+		want           uint64
+	}{
+		{
+			name:           "custom_network",
+			networkID:      constants.UnitTestID,
+			commitInterval: 256,
+			want:           256,
+		},
+		{
+			name:           "mainnet",
+			networkID:      constants.MainnetID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+		{
+			name:           "fuji",
+			networkID:      constants.FujiID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := defaultConfig()
+			c.StateScheme = customrawdb.FirewoodScheme
+			c.CommitInterval = tt.commitInterval
+
+			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
+			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
 		})
 	}
 }
