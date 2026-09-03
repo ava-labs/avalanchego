@@ -51,7 +51,7 @@ func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe everything else asynchronously
 	wiper := make(chan struct{}, 1)
 	go func() {
-		if err := WipeSnapshotSync(db, false); err != nil {
+		if err := wipeContent(db); err != nil {
 			log.Error("Failed to wipe state snapshot", "err", err) // Database close will trigger this
 			return
 		}
@@ -61,17 +61,15 @@ func WipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 }
 
 // WipeSnapshotSync wipes the snapshot data from the database synchronously.
-func WipeSnapshotSync(db ethdb.KeyValueStore, full bool) error {
-	if full {
-		batch := db.NewBatch()
-		customrawdb.DeleteSnapshotBlockHash(batch)
-		rawdb.DeleteSnapshotRoot(batch)
-		rawdb.DeleteSnapshotJournal(batch)
-		rawdb.DeleteSnapshotGenerator(batch)
-		rawdb.DeleteSnapshotRecoveryNumber(batch)
-		if err := batch.Write(); err != nil {
-			return err
-		}
+func WipeSnapshotSync(db ethdb.KeyValueStore) error {
+	batch := db.NewBatch()
+	customrawdb.DeleteSnapshotBlockHash(batch)
+	rawdb.DeleteSnapshotRoot(batch)
+	rawdb.DeleteSnapshotJournal(batch)
+	rawdb.DeleteSnapshotGenerator(batch)
+	rawdb.DeleteSnapshotRecoveryNumber(batch)
+	if err := batch.Write(); err != nil {
+		return err
 	}
 	return wipeContent(db)
 }

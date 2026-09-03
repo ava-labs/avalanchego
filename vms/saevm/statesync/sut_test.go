@@ -63,11 +63,10 @@ type (
 	}
 
 	sutConfig struct {
-		enabled        bool
-		commitInterval uint64
-		avaDB          database.Database
-		xdb            saetypes.ExecutionResults
-		startTime      time.Time
+		syncConfig Config
+		avaDB      database.Database
+		xdb        saetypes.ExecutionResults
+		startTime  time.Time
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -76,7 +75,7 @@ var _ saetest.Peer = (*sut)(nil)
 
 func withEnabled(e bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.enabled = e
+		c.syncConfig.Enabled = e
 	})
 }
 
@@ -124,11 +123,15 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		enabled:        true,
-		commitInterval: defaultCommitInterval,
-		avaDB:          memdb.New(),
-		xdb:            saetest.NewExecutionResultsDB(),
-		startTime:      time.Unix(genesisTimestamp, 0),
+		syncConfig: Config{
+			Enabled: true,
+			DBConfig: saedb.Config{
+				CommitInterval: defaultCommitInterval,
+			},
+		},
+		avaDB:     memdb.New(),
+		xdb:       saetest.NewExecutionResultsDB(),
+		startTime: time.Unix(genesisTimestamp, 0),
 	}, opts...)
 
 	snowCtx := snowtest.Context(t, chainID)
@@ -175,12 +178,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 	require.NoError(t, err, "network.New()")
 
 	handler, err := New(
-		Config{
-			DBConfig: saedb.Config{
-				CommitInterval: cfg.commitInterval,
-			},
-			Enabled: cfg.enabled,
-		},
+		cfg.syncConfig,
 		ethDB,
 		snowCtx,
 		net,
@@ -208,20 +206,28 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 func (s *sut) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
 func (s *sut) Sender() *saetest.Sender { return s.sender }
 
+func (s *sut) syncer() *Syncer {
+	return NewSyncer(
+		s.cfg.syncConfig,
+		s.hooks,
+		s.snowCtx,
+		s.Network,
+		s.db,
+	)
+}
+
 // syncTo emulates the behavior any user would follow, by checking the summary,
 // state syncing, and marking as done. Any error in the latter two steps will be
 // returned.
 func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error {
 	t.Helper()
 
-	syncer := s.Handler.Syncer()
+	syncer := s.syncer()
 
 	require.True(t, syncer.ShouldAcceptSummary(summary), "ShouldAcceptSummary()")
-
 	if err := syncer.Sync(ctx, summary); err != nil {
 		return err
 	}
-
 	return syncer.WriteSynced(summary)
 }
 
@@ -252,10 +258,8 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	mempoolConf.Journal = ""                // no on-disk journal in tests
 	vm := sae.NewSinceGenesis(s.hooks, sae.Config{
 		MempoolConfig: mempoolConf,
-		DBConfig: saedb.Config{
-			CommitInterval: s.cfg.commitInterval,
-		},
-		Now: s.clock.Now,
+		DBConfig:      s.cfg.syncConfig.DBConfig,
+		Now:           s.clock.Now,
 	})
 	require.NoError(t, vm.Initialize(
 		ctx,

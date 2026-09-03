@@ -197,15 +197,6 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
 	asynchronous := hook.Settled{Height: height - 1}
 
-	markExecuted := func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
-		t.Helper()
-
-		hdr := ethB.Header()
-		target, cfg := hooks.GasConfigAfter(hdr)
-		tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
-		newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
-	}
-
 	putCorruptResults := func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, ethB *types.Block) {
 		t.Helper()
 		require.NoErrorf(t, xdb.Put(ethB.NumberU64(), []byte("not canoto")), "%T.Put()", xdb)
@@ -244,10 +235,16 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 			),
 		},
 		{
-			name:     "state_sync_missing_receipts",
-			settled:  asynchronous,
-			txs:      []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
-			setupDBs: markExecuted,
+			name:    "empty_receipts_no_error",
+			settled: asynchronous,
+			txs:     []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
+			setupDBs: func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
+				t.Helper()
+				hdr := ethB.Header()
+				target, cfg := hooks.GasConfigAfter(hdr)
+				tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
+				newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
+			},
 		},
 		{
 			name:             "synchronous_ignores_execution_results",

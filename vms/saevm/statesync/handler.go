@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+
+	syncblocks "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 )
 
 // Config provides all user-configurable information for the [Handler].
@@ -33,11 +35,12 @@ type Config struct {
 // Handler implements provides server-side [Summary] handling and parsing, as
 // well as providing critical block getters for a ChainVM.
 type Handler struct {
-	cfg     Config
-	db      ethdb.Database
-	hooks   hook.Points
-	snowCtx *snow.Context
-	network *network.Network
+	cfg         Config
+	db          ethdb.Database
+	hooks       hook.Points
+	snowCtx     *snow.Context
+	network     *network.Network
+	blockParser syncblocks.Parser
 }
 
 // New constructs a new [Handler] with the given configuration and
@@ -53,12 +56,20 @@ func New(
 		return nil, err
 	}
 	return &Handler{
-		cfg:     cfg,
-		db:      db,
-		snowCtx: snowCtx,
-		network: network,
-		hooks:   hooks,
+		cfg:         cfg,
+		db:          db,
+		snowCtx:     snowCtx,
+		network:     network,
+		hooks:       hooks,
+		blockParser: parser(hooks),
 	}, nil
+}
+
+// parser returns a [syncblocks.Parser] that uses the given hooks to parse blocks.
+func parser(hooks hook.Points) syncblocks.Parser {
+	return func(blkBytes []byte) (*types.Block, error) {
+		return blocks.ParseEth(blkBytes, hooks)
+	}
 }
 
 // GetLastStateSummary returns the summary of the last accepted block at
@@ -102,15 +113,11 @@ func (h *Handler) GetStateSummary(ctx context.Context, height uint64) (*Summary,
 // if it is well-formed. Any returned block is safe to be used after state sync
 // finishes.
 func (h *Handler) ParseBlock(_ context.Context, blkBytes []byte) (*blocks.Block, error) {
-	ethB, err := h.parseBlock(blkBytes)
+	ethB, err := h.blockParser(blkBytes)
 	if err != nil {
 		return nil, err
 	}
 	return blocks.New(ethB, nil, nil, h.hooks, h.snowCtx.Log)
-}
-
-func (h *Handler) parseBlock(bytes []byte) (*types.Block, error) {
-	return blocks.ParseEth(bytes, h.hooks)
 }
 
 // GetBlock returns the block with the given ID. If the block is not found, it

@@ -9,14 +9,20 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -26,39 +32,38 @@ import (
 // [Handler.ShouldAcceptSummary] refuses to state sync.
 func TestShouldAcceptSummary(t *testing.T) {
 	tests := []struct {
-		name       string
-		newHandler func(t *testing.T) *Handler
-		summary    *Summary
-		want       bool
+		name    string
+		newSUT  func(t *testing.T) *sut
+		summary *Summary
+		want    bool
 	}{
 		{
 			name: "summary_at_genesis_height",
-			newHandler: func(t *testing.T) *Handler {
-				return newSUT(t).Handler
+			newSUT: func(t *testing.T) *sut {
+				return newSUT(t)
 			},
 			summary: &Summary{},
 		},
 		{
 			name: "blocks_already_accepted",
-			newHandler: func(t *testing.T) *Handler {
+			newSUT: func(t *testing.T) *sut {
 				vm := newVM(t)
 				vm.acceptBlocks(t, defaultCommitInterval)
-				return vm.Handler
+				return vm.sut
 			},
 			summary: &Summary{AcceptedHeight: 1},
 		},
 		{
 			name: "not_enabled",
-			newHandler: func(t *testing.T) *Handler {
-				sut := newSUT(t, withEnabled(false))
-				return sut.Handler
+			newSUT: func(t *testing.T) *sut {
+				return newSUT(t, withEnabled(false))
 			},
 			summary: &Summary{AcceptedHeight: 1},
 		},
 		{
 			name: "valid_summary",
-			newHandler: func(t *testing.T) *Handler {
-				return newSUT(t).Handler
+			newSUT: func(t *testing.T) *sut {
+				return newSUT(t)
 			},
 			summary: &Summary{AcceptedHeight: 1},
 			want:    true,
@@ -67,9 +72,8 @@ func TestShouldAcceptSummary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			sh := tt.newHandler(t)
-			syncer := sh.Syncer()
-			require.Equalf(t, tt.want, syncer.ShouldAcceptSummary(tt.summary), "%T.ShouldAcceptSummary()", sh)
+			syncer := tt.newSUT(t).syncer()
+			require.Equalf(t, tt.want, syncer.ShouldAcceptSummary(tt.summary), "%T.ShouldAcceptSummary()", syncer)
 		})
 	}
 }
@@ -188,7 +192,7 @@ func TestCancelSync(t *testing.T) {
 	t.Parallel()
 
 	sut := newSUT(t)
-	syncer := sut.Handler.Syncer()
+	syncer := sut.syncer()
 
 	// No peers are connected, so the sync stalls until canceled.
 	ctx, cancel := context.WithCancel(t.Context())
@@ -209,19 +213,21 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 		source := newVM(t)
 		source.acceptBlocks(t, defaultCommitInterval+2)
 
+		summary, err := source.GetLastStateSummary(ctx)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
+		expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
+
 		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
 		client := newSUT(t, withDatabase(fdb))
 		saetest.ConnectTo[saetest.Peer](t, client, source)
-
-		summary, err := source.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
-
-		// Setup (e.g. the genesis commit) is done.
-		fdb.SetFailAfter(failAfter)
+		fdb.SetFailAfter(failAfter) // Setup (e.g. the genesis commit) is done.
 
 		err = client.syncTo(ctx, t, summary)
 		if !fdb.Failed() {
 			require.NoErrorf(t, err, "%T.syncTo", client)
+			// Opening the snapshot also reads through the flaky database.
+			fdb.SetFailAfter(math.MaxInt)
+			requireSnapshotOnDisk(t, client.db, expectedRoot)
 			return
 		}
 		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
@@ -232,8 +238,23 @@ func FuzzSyncErrorSurfacedViaError(f *testing.F) {
 			client := newSUT(t, withDatabase(fdb))
 			saetest.ConnectTo[saetest.Peer](t, client, source)
 			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
+			requireSnapshotOnDisk(t, client.db, expectedRoot)
 		})
 	})
+}
+
+// requireSnapshotOnDisk checks that a completed sync left a snapshot that can
+// be loaded from disk without rebuilding.
+func requireSnapshotOnDisk(t *testing.T, db ethdb.Database, root common.Hash) {
+	t.Helper()
+
+	conf := snapshot.Config{
+		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
+		NoBuild:   true, // i.e. MUST be loaded from disk
+	}
+	snap, err := snapshot.New(conf, db, triedb.NewDatabase(db, nil), root)
+	require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
+	snap.Release()
 }
 
 // TestStateSyncLong ensures that the VM can startup with blocks missing, which
@@ -334,7 +355,7 @@ func TestSyncAfterAbandonedSync(t *testing.T) {
 
 	abandoned, err := sourceVM.GetLastStateSummary(ctx)
 	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-	syncer := client.Handler.Syncer()
+	syncer := client.syncer()
 	require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
 	// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
 

@@ -39,21 +39,21 @@ type Syncer struct {
 	cfg   Config
 	hooks hook.Points
 
-	snowCtx    *snow.Context
-	network    *network.Network
-	db         ethdb.Database
-	parseBlock syncblock.Parser
+	snowCtx     *snow.Context
+	network     *network.Network
+	db          ethdb.Database
+	blockParser syncblock.Parser
 }
 
 // Syncer returns a [Syncer] using the same data as the [Handler].
-func (h *Handler) Syncer() *Syncer {
+func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database) *Syncer {
 	return &Syncer{
-		cfg:        h.cfg,
-		hooks:      h.hooks,
-		snowCtx:    h.snowCtx,
-		network:    h.network,
-		db:         h.db,
-		parseBlock: h.parseBlock,
+		cfg:         cfg,
+		hooks:       hooks,
+		snowCtx:     snowCtx,
+		network:     network,
+		db:          db,
+		blockParser: parser(hooks),
 	}
 }
 
@@ -101,7 +101,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		s.snowCtx.Log,
 		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
 		s.db,
-		s.parseBlock,
+		s.blockParser,
 		summary.AcceptedHash,
 		summary.AcceptedHeight,
 		numBlocksToFetch,
@@ -128,7 +128,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
-	if err := graftsnap.WipeSnapshotSync(s.db, true); err != nil {
+	if err := graftsnap.WipeSnapshotSync(s.db); err != nil {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
 
@@ -193,7 +193,7 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 	}
 
 	// MUST be called last since rawdb markers signal success.
-	if err := writeAcceptedMarkers(s.db, lastSettled.Hash(), lastAccepted.Hash()); err != nil {
+	if err := writeAcceptedMarkers(s.db, lastSettled.Hash(), lastAccepted); err != nil {
 		return fmt.Errorf("writing rawdb invariants: %w", err)
 	}
 
@@ -254,11 +254,17 @@ func writeBloomIndex(db ethdb.Database, settler *types.Header) error {
 
 // writeAcceptedMarkers persists the database markers to complete the state sync,
 // allowing the [sae.VM] to start up from accepted by executing from settled.
-func writeAcceptedMarkers(db ethdb.Database, settled, accepted common.Hash) error {
+func writeAcceptedMarkers(db ethdb.Database, settled common.Hash, accepted *types.Header) error {
 	batch := db.NewBatch()
-	rawdb.WriteHeadFastBlockHash(batch, accepted)
+
+	rawdb.WriteHeadFastBlockHash(batch, accepted.Hash())
 	rawdb.WriteHeadHeaderHash(batch, settled)
 	rawdb.WriteHeadBlockHash(batch, settled)
 	rawdb.WriteFinalizedBlockHash(batch, settled)
+
+	// TODO(powerslider): Move to statesync code.
+	rawdb.WriteSnapshotRoot(batch, accepted.Root)
+	rawdb.WriteSnapshotGenerator(batch, graftsnap.GenerationDoneBlob)
+
 	return batch.Write()
 }
