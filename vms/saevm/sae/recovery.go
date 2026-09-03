@@ -111,7 +111,9 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 }
 
 // recoverExecutor returns an [sae.Executor] that is ready to execute any child
-// of the last-known accepted block, and a map of all consensus-critical blocks.
+// of the last-known accepted block, the [saedb.Tracker] it executes against,
+// and a map of all consensus-critical blocks. The tracker MUST be closed after
+// the executor.
 func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
@@ -123,6 +125,7 @@ func recoverExecutor(
 	reg prometheus.Registerer,
 ) (
 	_ *saexec.Executor,
+	_ *saedb.Tracker,
 	_ *syncMap[common.Hash, *blocks.Block],
 	retErr error,
 ) {
@@ -133,7 +136,7 @@ func recoverExecutor(
 
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
-		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
+		return nil, nil, nil, fmt.Errorf("finding last committed state: %w", err)
 	}
 	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
 
@@ -145,7 +148,7 @@ func recoverExecutor(
 		rec.snowCtx.Log,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
+		return nil, nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
 	}
 	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
 
@@ -176,17 +179,17 @@ func recoverExecutor(
 		reg,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
+		return nil, nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
 	closers.Push(exec)
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
-		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
+		return nil, nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
 	}
 	if err := rec.populateConsensusCriticalBlocks(exec, consensusCritical); err != nil {
-		return nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
+		return nil, nil, nil, fmt.Errorf("finding consensus-critical blocks: %w", err)
 	}
-	return exec, consensusCritical, nil
+	return exec, tracker, consensusCritical, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {

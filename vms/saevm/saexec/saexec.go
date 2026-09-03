@@ -54,8 +54,7 @@ type Executor struct {
 	metrics      *metrics
 }
 
-// New constructs and starts a new [Executor]. Call [Executor.Close] to release
-// resources created by this constructor.
+// New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
 // The last-executed block MAY be the genesis block for an always-SAE chain, the
 // last pre-SAE synchronous block during transition, or the last asynchronously
@@ -105,13 +104,12 @@ func New(
 
 var _ io.Closer = (*Executor)(nil)
 
-// Close shuts down the [Executor], waits for the currently executing block
-// to complete, and then releases all resources.
+// Close shuts down the [Executor] and waits for the currently executing block
+// to complete.
 func (e *Executor) Close() error {
 	close(e.quit)
 	<-e.done
-
-	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
+	return nil
 }
 
 // ChainConfig returns the config originally passed to [New].

@@ -6,6 +6,7 @@ package saexec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -59,10 +60,10 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(
 		m,
 		goleak.IgnoreCurrent(),
-		// Despite the call to [snapshot.Tree.Disable] in [Executor.Close], this
-		// still leaks at shutdown. This is acceptable as we only ever have one
-		// [Executor], which we expect to be running for the entire life of the
-		// process.
+		// Despite the call to [snapshot.Tree.Release] in [saedb.Tracker.Close],
+		// this still leaks at shutdown. This is acceptable as we only ever have
+		// one [Executor], which we expect to be running for the entire life of
+		// the process.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
 	)
 }
@@ -143,7 +144,12 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
-	closeOnce := sync.OnceValue(e.Close)
+	closeOnce := sync.OnceValue(func() error {
+		return errors.Join(
+			e.Close(),
+			tr.Close(e.LastExecuted().PostExecutionStateRoot()),
+		)
+	})
 	tb.Cleanup(func() {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
@@ -1041,11 +1047,7 @@ func TestSnapshotPersistence(t *testing.T) {
 	last := chain.Last()
 	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
 
-	require.NoErrorf(t, e.Close(), "%T.Close()", e)
-	// [newSUT] creates a cleanup that also calls [Executor.Close], which isn't
-	// valid usage. The simplest workaround is to just replace the quit channel
-	// so it can be closed again.
-	e.quit = make(chan struct{})
+	require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
 
 	// The crux of the test is whether we can recover the EOA nonce using only a
 	// new set of snapshots, recovered from the databases.
@@ -1243,6 +1245,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+					require.NoErrorf(t, tr.Close(chain.Last().PostExecutionStateRoot()), "%T.Close()", tr)
 				})
 
 				for _, b := range chain.AllBlocks() {

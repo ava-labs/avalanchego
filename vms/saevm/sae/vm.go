@@ -146,10 +146,13 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
+	exec, tracker, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
+	closers.Push(unwind.CloserFunc(func() error {
+		return tracker.Close(exec.LastExecuted().PostExecutionStateRoot())
+	}))
 	closers.Push(exec)
 
 	// ==========  Mempool & P2P Gossip  ==========
