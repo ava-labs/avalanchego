@@ -401,7 +401,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 //
 // The abort branch is the same regardless of configuration: the validator is
 // removed, its principal is returned, the optimistically-minted potential reward
-// is removed from the supply, and only its accrued validation rewards and
+// is removed from the supply, and only its restaked validation rewards and
 // delegatee rewards are paid out (the current cycle's potential reward is
 // forfeited).
 //
@@ -411,7 +411,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 //     withdrawing any excess) and the next cycle begins immediately.
 //   - NextPeriod == 0: the validator gracefully exits. It is removed, its
 //     principal is returned, and it receives all rewards for the cycle (current
-//     potential reward + accrued validation rewards + all delegatee rewards).
+//     potential reward + restaked validation rewards + all delegatee rewards).
 func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAutoRenewedValidatorTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -450,9 +450,9 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		return fmt.Errorf("failed to get restake config: %w", err)
 	}
 
-	accruedRewards, err := commitState.GetAccruedRewards(constants.PrimaryNetworkID, validator.NodeID())
+	restakedRewards, err := commitState.GetRestakedRewards(constants.PrimaryNetworkID, validator.NodeID())
 	if err != nil {
-		return fmt.Errorf("failed to get accrued rewards: %w", err)
+		return fmt.Errorf("failed to get restaked rewards: %w", err)
 	}
 
 	delegateeReward, err := commitState.GetDelegateeReward(validator.SubnetID(), validator.NodeID())
@@ -473,9 +473,9 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		return err
 	}
 
-	// Abort: pay accrued validation + all delegatee rewards (the current
+	// Abort: pay restaked validation + all delegatee rewards (the current
 	// cycle's potential reward is forfeited).
-	if err = e.mintRewardOnAbort(uStakerTx, accruedRewards, delegateeReward); err != nil {
+	if err = e.mintRewardOnAbort(uStakerTx, restakedRewards, delegateeReward); err != nil {
 		return fmt.Errorf("minting reward on abort: %w", err)
 	}
 
@@ -485,7 +485,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		// Commit: restake rewards per AutoCompoundRewardShares and start the
 		// next cycle. The validator stays in the set, so its stake is not
 		// returned here.
-		return e.restakeAutoRenewedValidatorOnCommit(uStakerTx, validator, restakeConfig, accruedRewards, delegateeReward)
+		return e.restakeAutoRenewedValidatorOnCommit(uStakerTx, validator, restakeConfig, restakedRewards, delegateeReward)
 	}
 
 	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
@@ -498,16 +498,16 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	unstakeUTXOs(uStakerTx, validator.TxID(), e.onCommitState)
 
 	// Commit: pay all rewards for the cycle — the current potential reward plus
-	// any accrued validation rewards.
-	totalValidationRewards, err := safemath.Add(validator.Reward(), accruedRewards.AccruedValidationRewards)
+	// any restaked validation rewards.
+	totalValidationRewards, err := safemath.Add(validator.Reward(), restakedRewards.Validation)
 	if err != nil {
 		return err
 	}
 
 	// On graceful exit the validator receives all delegatee rewards: the pending
 	// commission from this cycle's completed delegations (DelegateeReward) plus the
-	// commission accrued and restaked in prior cycles (AccruedDelegateeRewards).
-	totalDelegateeRewards, err := safemath.Add(delegateeReward, accruedRewards.AccruedDelegateeRewards)
+	// commission restaked in prior cycles (RestakedRewards.Delegatee).
+	totalDelegateeRewards, err := safemath.Add(delegateeReward, restakedRewards.Delegatee)
 	if err != nil {
 		return err
 	}
@@ -739,24 +739,24 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 }
 
 // mintRewardOnAbort creates reward UTXOs on the abort state for an
-// auto-renewed validator. This includes accrued validation rewards and
-// all delegatee rewards (accrued + pending).
+// auto-renewed validator. This includes restaked validation rewards and
+// all delegatee rewards (restaked + pending).
 func (e *proposalTxExecutor) mintRewardOnAbort(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
-	accrued state.AccruedRewards,
+	restaked state.RestakedRewards,
 	delegateeReward uint64,
 ) error {
 	// DelegateeReward tracks pending commission from completed delegator periods.
-	// It is paid on the abort path along with accrued delegatee rewards, while the
+	// It is paid on the abort path along with restaked delegatee rewards, while the
 	// validator forfeits its own potential reward for this cycle.
-	totalDelegateeRewards, err := safemath.Add(delegateeReward, accrued.AccruedDelegateeRewards)
+	totalDelegateeRewards, err := safemath.Add(delegateeReward, restaked.Delegatee)
 	if err != nil {
 		return err
 	}
 
 	return e.mintRewards(
 		addAutoRenewedValidatorTx,
-		accrued.AccruedValidationRewards,
+		restaked.Validation,
 		totalDelegateeRewards,
 		e.onAbortState,
 	)
@@ -811,13 +811,13 @@ func (e *proposalTxExecutor) mintRewards(
 //  2. Caps the restaking portion so the validator's weight stays within
 //     MaxValidatorStake, withdrawing anything that doesn't fit
 //  3. Creates UTXOs for the withdrawn portion
-//  4. Increases validator weight and accrued rewards by the restaking portion
+//  4. Increases validator weight and restaked rewards by the restaking portion
 //  5. Updates the validator state
 func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
 	validator state.CurrentValidator,
 	config state.RestakeConfig,
-	accrued state.AccruedRewards,
+	restaked state.RestakedRewards,
 	delegateeReward uint64,
 ) error {
 	commitState := state.NewAdapter(e.onCommitState)
@@ -899,7 +899,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	// Compound the restaked rewards into the validator's weight and accrued
+	// Compound the restaked rewards into the validator's weight and restaked
 	// reward totals.
 	newWeight, err := safemath.Add(validator.Weight(), restakingValidationRewards)
 	if err != nil {
@@ -911,12 +911,12 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	newAccruedRewards, err := safemath.Add(accrued.AccruedValidationRewards, restakingValidationRewards)
+	newRestakedValidationRewards, err := safemath.Add(restaked.Validation, restakingValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	newAccruedDelegateeRewards, err := safemath.Add(accrued.AccruedDelegateeRewards, restakingDelegateeRewards)
+	newRestakedDelegateeRewards, err := safemath.Add(restaked.Delegatee, restakingDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -966,15 +966,15 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return fmt.Errorf("putting renewed validator: %w", err)
 	}
 
-	if err := commitState.SetAccruedRewards(
+	if err := commitState.SetRestakedRewards(
 		constants.PrimaryNetworkID,
 		validator.NodeID(),
-		state.AccruedRewards{
-			AccruedValidationRewards: newAccruedRewards,
-			AccruedDelegateeRewards:  newAccruedDelegateeRewards,
+		state.RestakedRewards{
+			Validation: newRestakedValidationRewards,
+			Delegatee:  newRestakedDelegateeRewards,
 		},
 	); err != nil {
-		return fmt.Errorf("setting accrued rewards: %w", err)
+		return fmt.Errorf("setting restaked rewards: %w", err)
 	}
 
 	// The new period starts with no pending commission: this cycle's
