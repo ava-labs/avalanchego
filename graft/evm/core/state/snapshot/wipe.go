@@ -109,6 +109,7 @@ func wipeKeyRange(ctx context.Context, db ethdb.KeyValueStore, kind string, pref
 	}
 	for it.Next() {
 		if ctx.Err() != nil {
+			it.Release()
 			return context.Cause(ctx)
 		}
 
