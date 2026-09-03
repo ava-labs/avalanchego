@@ -154,9 +154,9 @@ tasks:
     desc: Builds subnet-evm plugin
     cmd: '{{.NIX_RUN}} ./graft/subnet-evm/scripts/build.sh'
 
-  build-subnet-evm-sae:
-    desc: Builds subnet-evm SAE plugin (vms/saevm/subnetevm) and symlinks it to the SubnetEVMID plugin path (replaces the legacy graft/subnet-evm plugin)
-    cmd: '{{.NIX_RUN}} ./scripts/build_subnet_evm_sae.sh'
+  build-l1:
+    desc: Builds L1 VM plugin (vms/saevm/l1) and symlinks it to the SubnetEVMID plugin path (replaces the legacy graft/subnet-evm plugin)
+    cmd: '{{.NIX_RUN}} ./scripts/build_l1.sh'
 
   build-subnet-evm-image:
     desc: Builds docker image for subnet-evm
@@ -497,23 +497,23 @@ tasks:
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
-  test-e2e-warp-sae:
-    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin (vms/saevm/subnetevm)
+  test-e2e-warp-l1:
+    desc: Runs warp e2e tests against the SAE-based L1 VM (vms/saevm/l1)
     env:
       E2E_TARGET: ./tests/e2e/warp
     cmds:
       - task: build
-      - task: build-subnet-evm-sae
+      - task: build-l1
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
-  test-e2e-warp-sae-ci:
-    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin [serially with race detection enabled]
+  test-e2e-warp-l1-ci:
+    desc: Runs warp e2e tests against the SAE-based L1 VM [serially with race detection enabled]
     env:
       E2E_SERIAL: 1
       E2E_TARGET: ./tests/e2e/warp
     cmds:
       - task: build-race
-      - task: build-subnet-evm-sae
+      - task: build-l1
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-ci-post-latest:

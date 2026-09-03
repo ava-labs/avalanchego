@@ -64,10 +64,11 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 //
 // In the SAE port (post-Helicon), an invalid block at execution time is a
 // fatal halt of the executor, but worst-case admission cannot reliably predict
-// state-dependent precompile checks. To avoid the halt, we short-circuit this hook post-Helicon and let
-// the SAE worst-case path enforce the same check via [EnforceTxAllowList]
+// state-dependent precompile checks. To avoid the halt, we short-circuit this
+// hook post-Helicon and let the SAE worst-case path enforce the same check via
+// [EnforceTxAllowList]
 // against the last-settled rules+state pair (see
-// [vms/saevm/subnetevm/hook.Points.CanExecuteTransaction]).
+// `vms/saevm/l1.(*hooks).CanExecuteTransaction`).
 //
 // Pre-Helicon (synchronous chain), this stays strict because there is no
 // admission/execution gap.

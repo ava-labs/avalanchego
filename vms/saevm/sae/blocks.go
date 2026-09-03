@@ -110,7 +110,7 @@ var (
 
 // verifyWhenBootstrapping skips verification in its entirety. It is expected
 // for blocks to be verified by hash in the bootstrapping engine. This supports
-// hooks, such as Coreth and Subnet-EVM, that are unable to fully verify blocks
+// hooks, such as Coreth and the L1 VM, that are unable to fully verify blocks
 // during bootstrapping.
 func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	header := b.Header()
