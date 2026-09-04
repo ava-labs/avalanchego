@@ -356,7 +356,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		onCommitState,
 		onAbortState,
 	)
-	require.ErrorIs(err, ErrRemoveStakerTooEarly)
+	require.ErrorIs(err, errRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -378,7 +378,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 		onCommitState,
 		onAbortState,
 	)
-	require.ErrorIs(err, ErrRemoveWrongStaker)
+	require.ErrorIs(err, errRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
@@ -457,7 +457,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		onCommitState,
 		onAbortState,
 	)
-	require.ErrorIs(err, ErrRemoveStakerTooEarly)
+	require.ErrorIs(err, errRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
@@ -473,7 +473,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 		onCommitState,
 		onAbortState,
 	)
-	require.ErrorIs(err, ErrRemoveWrongStaker)
+	require.ErrorIs(err, errRemoveWrongStaker)
 
 	// Case 3: Happy path
 	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
@@ -1294,7 +1294,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 			tx: func(t testing.TB, _ ids.ID, endTime time.Time) *txs.Tx {
 				return newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), endTime)
 			},
-			wantErr: ErrRemoveWrongStaker,
+			wantErr: errRemoveWrongStaker,
 		},
 		{
 			name: "invalid_timestamp",
