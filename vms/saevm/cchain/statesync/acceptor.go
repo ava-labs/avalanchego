@@ -32,8 +32,11 @@ func (h *Handler) SyncError() error {
 	return h.err.Get()
 }
 
-// AcceptSummary delegates to the embedded handler and, once its sync
-// completes, syncs the atomic trie state.
+// AcceptSummary ensures the summary should be accepted. If it shouldn't, it
+// returns [block.StateSyncSkipped]. Otherwise, it asynchronouosly begins the
+// state sync. [Handler.WaitForEvent] will return [common.StateSyncDone] once
+// the sync is complete. Any error from during the state sync can be read via
+// [Handler.SyncError].
 //
 // AcceptSummary MUST only be called once.
 func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyncMode, error) {

@@ -9,10 +9,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-
-	assert "github.com/stretchr/testify/require"
 )
 
 // ErrInjected is returned by [FlakyDB] once its op budget is spent.
@@ -27,9 +28,9 @@ func CopyDB(tb testing.TB, src database.Database) database.Database {
 	it := src.NewIterator()
 	defer it.Release()
 	for it.Next() {
-		assert.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
+		require.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
 	}
-	assert.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
+	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
 	return dst
 }
 
@@ -60,7 +61,7 @@ func dbEntries(tb testing.TB, db database.Database) []dbEntry {
 			Value: slices.Clone(it.Value()),
 		})
 	}
-	assert.NoErrorf(tb, it.Error(), "%T.Error()", it)
+	require.NoErrorf(tb, it.Error(), "%T.Error()", it)
 	return out
 }
 
