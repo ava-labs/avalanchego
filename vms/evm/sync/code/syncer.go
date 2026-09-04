@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -280,34 +281,22 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 // response. It retries until a peer returns valid code or ctx is cancelled.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetCodeResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored any peer it reached, re-request.
-			log.Debug("code request failed, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		codes := resp.GetData()
-		if err := verifyCode(hashes, codes); err != nil {
-			outcome.Failure()
-			log.Debug("invalid code response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return codes, nil
+	resp, err := c.Send(ctx, req,
+		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) error {
+			if err := verifyCode(hashes, resp.GetData()); err != nil {
+				log.Debug("invalid code response, re-requesting",
+					zap.Stringer("nodeID", nodeID),
+					zap.Error(err),
+				)
+				return err
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
+	return resp.GetData(), nil
 }
 
 var (
