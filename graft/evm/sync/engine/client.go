@@ -428,6 +428,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		}
 	} else {
 		stateSyncer, err = evmstate.NewSyncer(
+			c.config.SnowCtx.Log,
 			c.config.LeafFetcher, c.config.ChainDB,
 			summary.GetBlockRoot(),
 			codeQueue, c.config.RequestSize,
