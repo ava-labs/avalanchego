@@ -124,15 +124,21 @@ func (v *FlagVars) ActivateLatestAfter() time.Duration {
 	return v.activateLatestAfter
 }
 
+// Leave the latest upgrade unscheduled unless a suite opts into activating it.
+const defaultActivateLatestAfter = -1
+
 type DefaultOption func(*DefaultOptions)
 
 type DefaultOptions struct {
-	owner     string
-	nodeCount int
+	owner               string
+	nodeCount           int
+	activateLatestAfter time.Duration
 }
 
 func newDefaultOptions(ops []DefaultOption) *DefaultOptions {
-	o := &DefaultOptions{}
+	o := &DefaultOptions{
+		activateLatestAfter: defaultActivateLatestAfter,
+	}
 	for _, op := range ops {
 		op(o)
 	}
@@ -151,6 +157,10 @@ func (d *DefaultOptions) NodeCount() int {
 	return d.nodeCount
 }
 
+func (d *DefaultOptions) ActivateLatestAfter() time.Duration {
+	return d.activateLatestAfter
+}
+
 func WithDefaultOwner(owner string) DefaultOption {
 	return func(d *DefaultOptions) {
 		d.owner = owner
@@ -160,6 +170,15 @@ func WithDefaultOwner(owner string) DefaultOption {
 func WithDefaultNodeCount(nodeCount int) DefaultOption {
 	return func(d *DefaultOptions) {
 		d.nodeCount = nodeCount
+	}
+}
+
+// WithDefaultActivateLatestAfter sets the default for --activate-latest-after,
+// which remains overridable on the command line. See tmpnet.UpgradeConfig for
+// the interpretation of the duration.
+func WithDefaultActivateLatestAfter(activateLatestAfter time.Duration) DefaultOption {
+	return func(d *DefaultOptions) {
+		d.activateLatestAfter = activateLatestAfter
 	}
 }
 
@@ -217,7 +236,7 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	flag.DurationVar(
 		&vars.activateLatestAfter,
 		"activate-latest-after",
-		-1,
+		options.ActivateLatestAfter(),
 		"[optional] controls activation of the latest upgrade: <0 leaves it unscheduled, 0 activates it from genesis, >0 schedules it that duration after network start",
 	)
 

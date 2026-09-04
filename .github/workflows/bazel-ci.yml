@@ -108,7 +108,9 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e-merkle-sync:
+  # The merkle sync harness runs one job per state scheme so a regression in
+  # either sync path is attributable on its own.
+  e2e-merkle-sync-hash:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
@@ -118,8 +120,29 @@ jobs:
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh tests:merkle-sync:e2e-ci
-          artifact_prefix: e2e-merkle-sync
-          filter_by_owner: avalanchego-e2e-merkle-sync
+          artifact_prefix: e2e-merkle-sync-hash-${{ inputs.platform_name }}
+          filter_by_owner: avalanchego-msync-e2e
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+
+  e2e-merkle-sync-firewood:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+      - name: Run merkle sync e2e tests for the firewood state scheme with Bazel-built binary
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh tests:merkle-sync:e2e-ci-firewood
+          artifact_prefix: e2e-merkle-sync-firewood-${{ inputs.platform_name }}
+          filter_by_owner: avalanchego-msync-e2e
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
