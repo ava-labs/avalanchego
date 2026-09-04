@@ -42,7 +42,7 @@ func (tx *SetAutoRenewedValidatorConfigTx) SyntacticVerify(ctx *snow.Context) er
 		// already passed syntactic verification
 		return nil
 	case tx.TxID == ids.Empty:
-		return errMissingTxID
+		return errMissingStakerTxID
 	case tx.AutoCompoundRewardShares > reward.PercentDenominator:
 		return errTooManyAutoCompoundRewardShares
 	}
