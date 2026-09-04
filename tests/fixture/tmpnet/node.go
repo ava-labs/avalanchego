@@ -435,7 +435,6 @@ func (n *Node) WaitForHealthy(ctx context.Context) error {
 				zap.Stringer("nodeID", n.NodeID),
 				zap.Error(err),
 			)
-			continue
 		case healthy:
 			return nil
 		}
