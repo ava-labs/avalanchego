@@ -33,7 +33,21 @@ if [[ "${RUN_TASK_PREFER_BAZEL-}" == "1" ]] && command -v bazelisk >/dev/null 2>
 fi
 
 if command -v go >/dev/null 2>&1; then
-  exec "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@}"
+  # run_tool.sh sets GOWORK=off when it runs `go tool`. Without `-n`, `go tool`
+  # passes this setting to Task. Task then passes it to each task command.
+  # This setting disables the Go workspace. Workspace-wide tests then use the
+  # root go.sum. That file does not contain transitive checksums for graft
+  # modules.
+  #
+  # `go tool -n` builds Task if necessary. It prints the binary path without
+  # running Task. Thus, GOWORK=off affects only the build. Task inherits the
+  # caller's environment.
+  task_bin="$("${AVALANCHE_PATH}"/scripts/run_tool.sh -n task)"
+  if [[ -z "${task_bin}" ]]; then
+    echo "Unable to resolve the task binary from tools/external." >&2
+    exit 127
+  fi
+  exec "${task_bin}" "${@}"
 fi
 
 cat >&2 <<'EOF'

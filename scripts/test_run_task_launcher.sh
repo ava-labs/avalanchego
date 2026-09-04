@@ -12,6 +12,7 @@ set -euo pipefail
 # - otherwise we fall back to `go`
 # - Bazel is used only when RUN_TASK_PREFER_BAZEL=1
 # - non-PATH backends preserve the caller's working directory
+# - the go backend does not leak GOWORK=off into task
 # - missing tools fail clearly
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -50,6 +51,10 @@ assert_called() {
   local expected_name="$1"
   local expected_args="$2"
   local actual_name actual_args
+  if [[ ! -f "${workdir}/called" || ! -f "${workdir}/args" ]]; then
+    echo "expected ${expected_name} to run, but no backend recorded a call" >&2
+    exit 1
+  fi
   actual_name="$(<"${workdir}/called")"
   actual_args="$(<"${workdir}/args")"
   if [[ "${actual_name}" != "${expected_name}" ]]; then
@@ -74,11 +79,29 @@ assert_pwd() {
   fi
 }
 
+assert_file() {
+  local path="$1"
+  local expected="$2"
+  local actual
+  if [[ ! -f "${path}" ]]; then
+    echo "expected ${path##*/} to exist with: ${expected}" >&2
+    exit 1
+  fi
+  actual="$(<"${path}")"
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "expected ${path##*/}: ${expected}" >&2
+    echo "actual ${path##*/}:   ${actual}" >&2
+    exit 1
+  fi
+}
+
 reset_observations() {
   rm -f \
     "${workdir}/called" \
     "${workdir}/args" \
-    "${workdir}/pwd"
+    "${workdir}/pwd" \
+    "${workdir}/gowork" \
+    "${workdir}/go-args"
 }
 
 run_case() {
@@ -117,10 +140,29 @@ cat >"${stub_dir}/go" <<EOF
 #!${bash_bin}
 set -euo pipefail
 printf '%s\n' 'go' >"${workdir}/called"
-printf '%s\n' "\$*" >"${workdir}/args"
+printf '%s\n' "\$*" >"${workdir}/go-args"
 printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
+# Mimic \`go tool -n\`: build nothing, print where the tool binary lives.
+for arg in "\$@"; do
+  if [[ "\${arg}" == "-n" ]]; then
+    printf '%s\n' "${stub_dir}/tool-task"
+    exit 0
+  fi
+done
 EOF
 chmod +x "${stub_dir}/go"
+
+# Stands in for the task binary that \`go tool -n\` resolves. It records GOWORK
+# so the test can prove run_tool.sh's GOWORK=off does not reach task.
+cat >"${stub_dir}/tool-task" <<EOF
+#!${bash_bin}
+set -euo pipefail
+printf '%s\n' 'tool-task' >"${workdir}/called"
+printf '%s\n' "\$*" >"${workdir}/args"
+printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
+printf '%s\n' "\${GOWORK-<unset>}" >"${workdir}/gowork"
+EOF
+chmod +x "${stub_dir}/tool-task"
 
 cat >"${stub_dir}/bazelisk" <<EOF
 #!${bash_bin}
@@ -146,8 +188,13 @@ rm "${stub_dir}/task"
 caller_dir="${workdir}/caller"
 mkdir -p "${caller_dir}"
 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called go "tool -modfile=${repo_root}/tools/external/go.mod task hello world"
+assert_called tool-task "hello world"
 assert_pwd "${caller_dir}"
+assert_file "${workdir}/go-args" \
+  "tool -modfile=${repo_root}/tools/external/go.mod -n task"
+# run_tool.sh sets GOWORK=off for the build. Leaking it into task would disable
+# the workspace for every command task runs.
+assert_file "${workdir}/gowork" "<unset>"
 
 # Bazel should only be used when CI explicitly asks for it.
 RUN_TASK_PREFER_BAZEL=1 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
