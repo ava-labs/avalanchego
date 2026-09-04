@@ -26,6 +26,7 @@ go_library(
         "//graft/evm/utils",
         "//ids",
         "//network/p2p",
+        "//utils/logging",
         "//utils/math",
         "//utils/timer",
         "//utils/wrappers",
@@ -36,12 +37,12 @@ go_library(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm/options",
-        "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//metrics",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
         "@org_golang_x_sync//errgroup",
+        "@org_uber_go_zap//:zap",
     ],
 )
 

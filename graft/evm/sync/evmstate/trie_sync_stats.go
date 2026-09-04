@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -26,6 +27,7 @@ const (
 // trieSyncStats keeps track of the total number of leafs and tries
 // completed during a sync.
 type trieSyncStats struct {
+	log  logging.Logger
 	lock sync.Mutex
 
 	lastUpdated time.Time
@@ -44,9 +46,10 @@ type trieSyncStats struct {
 	leafsRateGauge metrics.Gauge
 }
 
-func newTrieSyncStats() *trieSyncStats {
+func newTrieSyncStats(log logging.Logger) *trieSyncStats {
 	now := time.Now()
 	return &trieSyncStats{
+		log:            log,
 		remainingLeafs: make(map[*trieSegment]uint64),
 		lastUpdated:    now,
 
@@ -130,16 +133,15 @@ func (t *trieSyncStats) updateETA(sinceUpdate time.Duration, now time.Time) time
 	if t.triesSynced == 0 {
 		// provide a separate ETA for the account trie syncing step since we
 		// don't know the total number of storage tries yet.
-		log.Info("state sync: syncing account trie", "ETA", roundETA(leafsTime))
+		t.log.Info("state sync: syncing account trie", zap.String("ETA", roundETA(leafsTime)))
 		return leafsTime
 	}
 
 	triesTime := timer.EstimateETA(t.triesStartTime, uint64(t.triesSynced), uint64(t.triesSynced+t.triesRemaining))
 	eta := max(leafsTime, triesTime)
-	log.Info(
-		"state sync: syncing storage tries",
-		"triesRemaining", t.triesRemaining,
-		"ETA", roundETA(eta),
+	t.log.Info("state sync: syncing storage tries",
+		zap.Int("triesRemaining", t.triesRemaining),
+		zap.String("ETA", roundETA(eta)),
 	)
 	return eta
 }

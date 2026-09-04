@@ -13,13 +13,13 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -37,6 +37,7 @@ var (
 
 // StateSync keeps the state of the entire state sync operation.
 type StateSync struct {
+	log       logging.Logger
 	db        ethdb.Database            // database we are syncing
 	root      common.Hash               // root of the EVM state we are syncing to
 	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
@@ -84,18 +85,19 @@ type CodeQueue interface {
 	DoneAdding()
 }
 
-func NewSyncer(fetcher leaf.Fetcher, db ethdb.Database, root common.Hash, codeQueue CodeQueue, leafsRequestSize uint16, opts ...SyncerOption) (*StateSync, error) {
+func NewSyncer(log logging.Logger, fetcher leaf.Fetcher, db ethdb.Database, root common.Hash, codeQueue CodeQueue, leafsRequestSize uint16, opts ...SyncerOption) (*StateSync, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}
 
 	// Construct with defaults, then apply options directly to stateSync.
 	ss := &StateSync{
+		log:             log,
 		db:              db,
 		root:            root,
 		trieDB:          triedb.NewDatabase(db, nil),
 		snapshot:        snapshot.NewDiskLayer(db),
-		stats:           newTrieSyncStats(),
+		stats:           newTrieSyncStats(log),
 		triesInProgress: make(map[common.Hash]*trieToSync),
 
 		// [triesInProgressSem] is used to keep the number of tries syncing
@@ -326,8 +328,7 @@ func (t *StateSync) Finalize() error {
 	for _, trie := range t.triesInProgress {
 		for _, segment := range trie.segments {
 			if err := segment.batch.Write(); err != nil {
-				log.Error("failed to write segment batch on finalize", "err", err)
-				return err
+				return fmt.Errorf("writing segment batch on finalize: %w", err)
 			}
 		}
 	}
