@@ -194,11 +194,12 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 
 // configKeys are the JSON keys that unmarshal into a [config] field.
 // [parseConfig] warns about, and ignores, all other keys.
-var configKeys = jsonKeys(reflect.TypeFor[config]())
+var configKeys = jsonKeys[config]()
 
-// jsonKeys returns the JSON keys that unmarshal into t's fields, including the
-// fields of embedded structs.
-func jsonKeys(t reflect.Type) set.Set[string] {
+// jsonKeys returns the key under which [encoding/json] decodes each field of
+// struct T, including fields promoted from embedded structs.
+func jsonKeys[T any]() set.Set[string] {
+	t := reflect.TypeFor[T]()
 	fields := reflect.VisibleFields(t)
 	keys := set.NewSet[string](len(fields))
 	for _, f := range fields {
