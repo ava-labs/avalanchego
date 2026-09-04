@@ -96,7 +96,7 @@
 <section class="gated" hidden>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
   <h2>C &rarr; P: MetaMask exports with one contract call</h2>
-  <p>You call <code>exportToP(to)</code> with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the SAE hook reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
+  <p>You call <code>exportToP(to)</code> on <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/exporthelper/ExportHelper.sol" target="_blank">ExportHelper.sol</a> (deployed at <span class="mono" data-k="helper"></span>) with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
   <div class="row"><button onclick="run(exportToP)">Export 1 AVAX to the P-chain</button></div>
@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: nobody signs the import</h2>
-  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain accepts it only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
+  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/import.go" target="_blank">accepts it</a> only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C, no signature</button></div>
@@ -504,6 +504,7 @@ async function importOnC() {
     NET = await (await fetch(RPCBASE + '/network.json', { cache: 'no-store' })).json();
   } catch (e) { useLog('fb-setup'); log('network.json not available, the network may still be starting', 'err'); return; }
   $('chainid').textContent = NET.ethChainID;
+  setK('helper', NET.helper);
   $('to').value = NET.pAddress;
   if (pAddr(pAddrBytes) !== NET.pAddress) { useLog('fb-setup'); log('page key does not match the network\'s P-chain wallet: ' + pAddr(pAddrBytes) + ' vs ' + NET.pAddress, 'err'); }
   if (typeof ethereum !== 'undefined') ethereum.on('accountsChanged', () => { if (me) connect(); });
