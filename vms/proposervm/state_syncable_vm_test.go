@@ -734,3 +734,274 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	require.NoError(err)
 	require.Equal(proBlk2.ID(), lastAcceptedID)
 }
+
+// buildMismatchedStateSummary returns state summary bytes carrying the given
+// fork height and an embedded proposervm block at [blockHeight], while the inner
+// summary reports [innerHeight]. buildStateSummary never produces an
+// inconsistent summary, but a malicious or buggy state-sync beacon can hand one
+// to a syncing node.
+func buildMismatchedStateSummary(
+	t *testing.T,
+	vm *VM,
+	innerVM *fullVM,
+	forkHeight uint64,
+	blockHeight uint64,
+	innerHeight uint64,
+) []byte {
+	t.Helper()
+	require := require.New(t)
+
+	innerSummary := &blocktest.StateSummary{
+		IDV:     ids.GenerateTestID(),
+		HeightV: innerHeight,
+		BytesV:  []byte("inner-summary"),
+	}
+	innerBlk := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte("inner-block"),
+		ParentV: ids.GenerateTestID(),
+		HeightV: blockHeight,
+	}
+
+	innerVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
+		require.Equal(innerSummary.BytesV, b)
+		return innerSummary, nil
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		require.Equal(innerBlk.BytesV, b)
+		return innerBlk, nil
+	}
+
+	slb, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk.Timestamp(),
+		100, // pChainHeight
+		statelessblock.Epoch{},
+		vm.StakingCertLeaf,
+		innerBlk.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+
+	statelessSummary, err := summary.Build(forkHeight, slb.Bytes(), innerSummary.Bytes())
+	require.NoError(err)
+	return statelessSummary.Bytes()
+}
+
+// TestParseStateSummaryRejectsBlockHeightMismatch is the regression test for the
+// hardening: ParseStateSummary must reject a summary whose embedded proposervm
+// block height disagrees with the inner summary height.
+func TestParseStateSummaryRejectsBlockHeightMismatch(t *testing.T) {
+	require := require.New(t)
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(t.Context()))
+	}()
+
+	require.NoError(vm.SetForkHeight(1))
+	summaryBytes := buildMismatchedStateSummary(t, vm, innerVM, 1, 5, 1969)
+
+	_, err := vm.ParseStateSummary(t.Context(), summaryBytes)
+	require.ErrorIs(err, errStateSummaryHeightMismatch)
+}
+
+// TestParseStateSummaryRejectsForkHeightAboveSummary is the regression test for
+// the second invariant: a summary whose fork height sits above the inner summary
+// height would underflow height - forkHeight in updateHeightIndex.
+func TestParseStateSummaryRejectsForkHeightAboveSummary(t *testing.T) {
+	require := require.New(t)
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(t.Context()))
+	}()
+
+	require.NoError(vm.SetForkHeight(1))
+	// block height matches the inner summary, so only the fork-height check can fire.
+	summaryBytes := buildMismatchedStateSummary(t, vm, innerVM, 2000, 1969, 1969)
+
+	_, err := vm.ParseStateSummary(t.Context(), summaryBytes)
+	require.ErrorIs(err, errStateSummaryForkHeight)
+}
+
+// TestStateSummaryMismatchedBlockHeightBricksSync documents the downstream
+// failure the hardening prevents: if such a summary is accepted, the transition
+// out of state sync fails permanently because repairAcceptedChainByHeight
+// refuses to run with the proposervm behind the inner VM. The stateSummary is
+// assembled directly here to model a build that skipped the ParseStateSummary
+// guard.
+func TestStateSummaryMismatchedBlockHeightBricksSync(t *testing.T) {
+	require := require.New(t)
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(t.Context()))
+	}()
+
+	const (
+		forkHeight  = uint64(1)
+		blockHeight = uint64(5)
+		innerHeight = uint64(1969)
+	)
+	require.NoError(vm.SetForkHeight(forkHeight))
+
+	innerSummary := &blocktest.StateSummary{
+		IDV:     ids.GenerateTestID(),
+		HeightV: innerHeight,
+		BytesV:  []byte("inner-summary"),
+	}
+	// The block embedded in the summary sits at blockHeight ...
+	embeddedInnerBlk := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte("embedded-inner-block"),
+		ParentV: ids.GenerateTestID(),
+		HeightV: blockHeight,
+	}
+	// ... but a successful inner state sync lands the inner VM at innerHeight.
+	syncedInnerBlk := &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV: ids.GenerateTestID(),
+		},
+		BytesV:  []byte("synced-inner-block"),
+		ParentV: ids.GenerateTestID(),
+		HeightV: innerHeight,
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		require.Equal(embeddedInnerBlk.BytesV, b)
+		return embeddedInnerBlk, nil
+	}
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		// After a successful inner sync the inner VM reports the synced height.
+		innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+			return syncedInnerBlk.ID(), nil
+		}
+		innerVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+			require.Equal(syncedInnerBlk.ID(), id)
+			return syncedInnerBlk, nil
+		}
+		return block.StateSyncStatic, nil
+	}
+
+	slb, err := statelessblock.Build(
+		vm.preferred,
+		embeddedInnerBlk.Timestamp(),
+		100, // pChainHeight
+		statelessblock.Epoch{},
+		vm.StakingCertLeaf,
+		embeddedInnerBlk.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	statelessSummary, err := summary.Build(forkHeight, slb.Bytes(), innerSummary.Bytes())
+	require.NoError(err)
+	proBlk, err := vm.parsePostForkBlock(t.Context(), slb.Bytes(), true)
+	require.NoError(err)
+
+	s := &stateSummary{
+		StateSummary: statelessSummary,
+		innerSummary: innerSummary,
+		block:        proBlk,
+		vm:           vm,
+	}
+
+	status, err := s.Accept(t.Context())
+	require.NoError(err)
+	require.Equal(block.StateSyncStatic, status)
+
+	// proposervm now believes its last accepted height is blockHeight (5) while
+	// the inner VM synced to innerHeight (1969). Leaving state sync trips the
+	// invariant and the node can never finish starting up.
+	err = vm.SetState(t.Context(), snow.Bootstrapping)
+	require.ErrorContains(err, "should never be lower than the inner height index")
+}
+
+// TestStateSummaryForkHeightAboveSummaryCorruptsForkHeight documents the
+// downstream damage the fork-height check prevents: accepting a summary whose
+// fork height is above the proposervm's own last accepted height persists that
+// fork height, which breaks the forkHeight <= acceptedHeight invariant relied on
+// by updateHeightIndex (height - forkHeight) and GetBlockIDAtHeight (height <
+// forkHeight routing). The stateSummary is assembled directly to model a build
+// that skipped the ParseStateSummary guard.
+func TestStateSummaryForkHeightAboveSummaryCorruptsForkHeight(t *testing.T) {
+	require := require.New(t)
+	innerVM, vm := helperBuildStateSyncTestObjects(t)
+	defer func() {
+		require.NoError(vm.Shutdown(t.Context()))
+	}()
+
+	const (
+		realForkHeight = uint64(1)
+		height         = uint64(1969)
+		bogusForkHt    = uint64(2000)
+	)
+	require.NoError(vm.SetForkHeight(realForkHeight))
+
+	innerSummary := &blocktest.StateSummary{
+		IDV:     ids.GenerateTestID(),
+		HeightV: height,
+		BytesV:  []byte("inner-summary"),
+	}
+	innerBlk := &snowmantest.Block{
+		Decidable: snowtest.Decidable{IDV: ids.GenerateTestID()},
+		BytesV:    []byte("inner-block"),
+		ParentV:   ids.GenerateTestID(),
+		HeightV:   height,
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		require.Equal(innerBlk.BytesV, b)
+		return innerBlk, nil
+	}
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
+	}
+
+	slb, err := statelessblock.Build(
+		vm.preferred,
+		innerBlk.Timestamp(),
+		100, // pChainHeight
+		statelessblock.Epoch{},
+		vm.StakingCertLeaf,
+		innerBlk.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+	statelessSummary, err := summary.Build(bogusForkHt, slb.Bytes(), innerSummary.Bytes())
+	require.NoError(err)
+	proBlk, err := vm.parsePostForkBlock(t.Context(), slb.Bytes(), true)
+	require.NoError(err)
+
+	s := &stateSummary{
+		StateSummary: statelessSummary,
+		innerSummary: innerSummary,
+		block:        proBlk,
+		vm:           vm,
+	}
+
+	status, err := s.Accept(t.Context())
+	require.NoError(err)
+	require.Equal(block.StateSyncStatic, status)
+
+	// The bogus fork height was persisted, above the block we just accepted.
+	storedForkHeight, err := vm.State.GetForkHeight()
+	require.NoError(err)
+	require.Equal(bogusForkHt, storedForkHeight)
+	require.Greater(storedForkHeight, vm.lastAcceptedHeight)
+
+	// GetBlockIDAtHeight now misroutes the proposervm block we just accepted at
+	// [height] to the inner VM, because height < forkHeight.
+	innerReached := false
+	innerVM.GetBlockIDAtHeightF = func(_ context.Context, h uint64) (ids.ID, error) {
+		require.Equal(height, h)
+		innerReached = true
+		return ids.GenerateTestID(), nil
+	}
+	got, err := vm.GetBlockIDAtHeight(t.Context(), height)
+	require.NoError(err)
+	require.True(innerReached)
+	require.NotEqual(proBlk.ID(), got)
+}

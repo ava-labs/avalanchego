@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -12,6 +13,24 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
+)
+
+// buildStateSummary only produces a post-fork summary (one carrying a proposervm
+// block) on the path where forkHeight <= innerSummary.Height(), and it always
+// embeds the block accepted at innerSummary.Height(). ParseStateSummary enforces
+// both, so that a malformed summary from a state-sync beacon is discarded rather
+// than accepted and later relied on:
+//   - a block below the inner summary height leaves the proposervm behind the
+//     inner VM, which repairAcceptedChainByHeight treats as fatal with no
+//     automatic recovery;
+//   - a fork height above the inner summary height is persisted above the
+//     proposervm's own last accepted height, breaking the forkHeight <=
+//     acceptedHeight invariant that GetBlockIDAtHeight routing and
+//     updateHeightIndex (height - forkHeight, which then underflows on pruning
+//     nodes) rely on.
+var (
+	errStateSummaryHeightMismatch = errors.New("state summary block height doesn't match inner summary height")
+	errStateSummaryForkHeight     = errors.New("state summary fork height above inner summary height")
 )
 
 func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -69,6 +88,22 @@ func (vm *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block
 	block, err := vm.parsePostForkBlock(ctx, statelessSummary.BlockBytes(), true)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse proposervm block bytes from summary due to: %w", err)
+	}
+
+	if block.Height() != innerSummary.Height() {
+		return nil, fmt.Errorf("%w: block height %d, inner summary height %d",
+			errStateSummaryHeightMismatch,
+			block.Height(),
+			innerSummary.Height(),
+		)
+	}
+
+	if statelessSummary.ForkHeight() > innerSummary.Height() {
+		return nil, fmt.Errorf("%w: fork height %d, inner summary height %d",
+			errStateSummaryForkHeight,
+			statelessSummary.ForkHeight(),
+			innerSummary.Height(),
+		)
 	}
 
 	return &stateSummary{

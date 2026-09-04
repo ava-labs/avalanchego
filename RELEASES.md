@@ -41,6 +41,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 - Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
+- Fixed `proposervm` accepting malformed state sync summaries with inconsistent heights (embedded block height not matching the inner summary, or fork height above it), which could leave a state-syncing node unable to complete startup or corrupt its block height index and fork height.
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
