@@ -67,7 +67,7 @@ func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, st
 			NodeType: nodeType,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported leafs request type: %q", leafReqType)
+		return nil, fmt.Errorf("unsupported leafs request type: %d", leafReqType)
 	}
 }
 

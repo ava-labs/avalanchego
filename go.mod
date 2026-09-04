@@ -15,7 +15,7 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.25.x -> 1.26.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.25.10
+go 1.26.8
 
 require (
 	connectrpc.com/connect v1.18.1

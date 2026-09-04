@@ -105,25 +105,28 @@ func (tc *SimpleTestContext) RecoverAndExit() {
 // Recover is intended to be deferred in a function executing a test whose
 // assertions may result in panics. Such a panic is intended to be recovered to
 // allow cleanup functions to be called before execution continues.
+//
+// This method MUST call recover() directly. The Go specification stops a panic
+// only if the deferred function itself calls recover(). A call from a deeper
+// frame returns nil.
 func (tc *SimpleTestContext) Recover() {
-	tc.recover(false /* rethrow */)
+	tc.handleRecovered(recover(), false /* rethrow */)
 }
 
 // RecoverAndRethrow is intended to be deferred in a function executing a test
 // whose assertions may result in panics.  Such a panic is intended to be recovered
 // to allow cleanup functions to be called before the panic is rethrown.
+//
+// This method MUST call recover() directly. See [SimpleTestContext.Recover].
 func (tc *SimpleTestContext) RecoverAndRethrow() {
-	tc.recover(true /* rethrow */)
+	tc.handleRecovered(recover(), true /* rethrow */)
 }
 
-// Recover is intended to be deferred in a function executing a test
-// whose assertions may result in panics. Such a panic is intended to
-// be recovered to allow cleanup functions to be called. A panic can
-// be optionally rethrown by setting `rethrow` to true.
-func (tc *SimpleTestContext) recover(rethrow bool) {
-	// Recover from test failure
-	var panicData any
-	if panicData = recover(); panicData != nil {
+// handleRecovered reports the recovered panic and calls the cleanup functions.
+// panicData is the result of recover(), and is nil if no panic occurred. Set
+// rethrow to true to raise the panic again after cleanup.
+func (tc *SimpleTestContext) handleRecovered(panicData any, rethrow bool) {
+	if panicData != nil {
 		errorString, ok := panicData.(string)
 		if !ok || errorString != failNowMessage {
 			tc.log.Error("unexpected panic",
