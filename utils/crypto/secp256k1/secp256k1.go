@@ -58,7 +58,10 @@ var (
 
 func NewPrivateKey() (*PrivateKey, error) {
 	k, err := secp256k1.GeneratePrivateKey()
-	return &PrivateKey{sk: k}, err
+	if err != nil {
+		return nil, err
+	}
+	return newPrivateKey(k), nil
 }
 
 func ToPublicKey(b []byte) (*PublicKey, error) {
@@ -67,20 +70,17 @@ func ToPublicKey(b []byte) (*PublicKey, error) {
 	}
 
 	key, err := secp256k1.ParsePubKey(b)
-	return &PublicKey{
-		pk:    key,
-		bytes: b,
-	}, err
+	if err != nil {
+		return nil, err
+	}
+	return newPublicKey(key), nil
 }
 
 func ToPrivateKey(b []byte) (*PrivateKey, error) {
 	if len(b) != PrivateKeyLen {
 		return nil, errInvalidPrivateKeyLength
 	}
-	return &PrivateKey{
-		sk:    secp256k1.PrivKeyFromBytes(b),
-		bytes: b,
-	}, nil
+	return newPrivateKey(secp256k1.PrivKeyFromBytes(b)), nil
 }
 
 func RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
@@ -106,7 +106,7 @@ func RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
 		return nil, errCompressed
 	}
 
-	return &PublicKey{pk: rawPubkey}, nil
+	return newPublicKey(rawPubkey), nil
 }
 
 type RecoverCache struct {
@@ -146,10 +146,23 @@ func (r *RecoverCache) RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, e
 	return pubKey, nil
 }
 
+// A PublicKey is an immutable secp256k1 public key. It is safe for concurrent
+// use, which allows a single instance to be shared, e.g. via [RecoverCache].
 type PublicKey struct {
 	pk    *secp256k1.PublicKey
 	addr  ids.ShortID
 	bytes []byte
+}
+
+// newPublicKey computes the compressed serialization and address eagerly so
+// that the returned key is never mutated after construction.
+func newPublicKey(pk *secp256k1.PublicKey) *PublicKey {
+	bytes := pk.SerializeCompressed()
+	return &PublicKey{
+		pk:    pk,
+		addr:  ids.ShortID(hashing.ComputeHash160Array(hashing.ComputeHash256(bytes))),
+		bytes: bytes,
+	}
 }
 
 func (k *PublicKey) Verify(msg, sig []byte) bool {
@@ -170,13 +183,6 @@ func (k *PublicKey) ToECDSA() *stdecdsa.PublicKey {
 }
 
 func (k *PublicKey) Address() ids.ShortID {
-	if k.addr == ids.ShortEmpty {
-		addr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(k.Bytes()))
-		if err != nil {
-			panic(err)
-		}
-		k.addr = addr
-	}
 	return k.addr
 }
 
@@ -184,23 +190,31 @@ func (k *PublicKey) EthAddress() common.Address {
 	return crypto.PubkeyToAddress(*(k.ToECDSA()))
 }
 
+// Bytes returns the compressed serialization of the key. The returned slice
+// is shared and MUST NOT be modified.
 func (k *PublicKey) Bytes() []byte {
-	if k.bytes == nil {
-		k.bytes = k.pk.SerializeCompressed()
-	}
 	return k.bytes
 }
 
+// A PrivateKey is a secp256k1 private key. Its public key and serialization
+// are computed at construction, so its accessors are safe for concurrent use.
 type PrivateKey struct {
 	sk    *secp256k1.PrivateKey
 	pk    *PublicKey
 	bytes []byte
 }
 
-func (k *PrivateKey) PublicKey() *PublicKey {
-	if k.pk == nil {
-		k.pk = &PublicKey{pk: k.sk.PubKey()}
+// newPrivateKey computes the public key and serialization eagerly so that
+// the returned key is never mutated after construction.
+func newPrivateKey(sk *secp256k1.PrivateKey) *PrivateKey {
+	return &PrivateKey{
+		sk:    sk,
+		pk:    newPublicKey(sk.PubKey()),
+		bytes: sk.Serialize(),
 	}
+}
+
+func (k *PrivateKey) PublicKey() *PublicKey {
 	return k.pk
 }
 
@@ -226,10 +240,9 @@ func (k *PrivateKey) ToECDSA() *stdecdsa.PrivateKey {
 	return k.sk.ToECDSA()
 }
 
+// Bytes returns the serialized private key. The returned slice is shared and
+// MUST NOT be modified.
 func (k *PrivateKey) Bytes() []byte {
-	if k.bytes == nil {
-		k.bytes = k.sk.Serialize()
-	}
 	return k.bytes
 }
 
@@ -283,10 +296,7 @@ func (k *PrivateKey) unmarshalText(text string) error {
 		return errInvalidPrivateKeyLength
 	}
 
-	*k = PrivateKey{
-		sk:    secp256k1.PrivKeyFromBytes(keyBytes),
-		bytes: keyBytes,
-	}
+	*k = *newPrivateKey(secp256k1.PrivKeyFromBytes(keyBytes))
 	return nil
 }
 
