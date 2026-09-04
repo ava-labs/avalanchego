@@ -40,6 +40,11 @@ jobs:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
       run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests }}
+      # Scheduled jobs run broader tests without the remote action cache.
+      setup_timeout_minutes: 20
+      unit_timeout_minutes: 60
+      e2e_timeout_minutes: 60
+      required_timeout_minutes: 10
       # Run this daily validation without remote action or test results.
       enable_remote_cache: false
     secrets: inherit
