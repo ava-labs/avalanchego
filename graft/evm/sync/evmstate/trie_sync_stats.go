@@ -133,13 +133,15 @@ func (t *trieSyncStats) updateETA(sinceUpdate time.Duration, now time.Time) time
 	if t.triesSynced == 0 {
 		// provide a separate ETA for the account trie syncing step since we
 		// don't know the total number of storage tries yet.
-		t.log.Info("state sync: syncing account trie", zap.String("ETA", roundETA(leafsTime)))
+		t.log.Info("syncing account trie",
+			zap.String("ETA", roundETA(leafsTime)),
+		)
 		return leafsTime
 	}
 
 	triesTime := timer.EstimateETA(t.triesStartTime, uint64(t.triesSynced), uint64(t.triesSynced+t.triesRemaining))
 	eta := max(leafsTime, triesTime)
-	t.log.Info("state sync: syncing storage tries",
+	t.log.Info("syncing storage tries",
 		zap.Int("triesRemaining", t.triesRemaining),
 		zap.String("ETA", roundETA(eta)),
 	)

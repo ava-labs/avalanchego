@@ -133,7 +133,9 @@ func (t *trieToSync) loadSegments() error {
 			utils.IncrOne(lastKey)
 			segment.pos = lastKey // syncing will start from this key
 		}
-		t.sync.log.Debug("evmstate: loading segment", zap.Stringer("segment", segment))
+		t.sync.log.Debug("loading segment",
+			zap.Stringer("segment", segment),
+		)
 	}
 	return it.Error()
 }
@@ -172,7 +174,9 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.sync.log.Debug("evmstate: segment finished", zap.Stringer("segment", t.segments[idx]))
+	t.sync.log.Debug("segment finished",
+		zap.Stringer("segment", t.segments[idx]),
+	)
 	t.segmentsDone[idx] = struct{}{}
 	for {
 		if _, ok := t.segmentsDone[t.segmentToHashNext]; !ok {
@@ -323,7 +327,7 @@ func (t *trieToSync) createSegments(ctx context.Context, numSegments int) error 
 		}
 	}
 	t.sync.stats.incTriesSegmented()
-	t.sync.log.Debug("evmstate: trie segmented for parallel sync",
+	t.sync.log.Debug("trie segmented for parallel sync",
 		zap.Stringer("root", t.root),
 		zap.Stringer("account", t.account),
 		zap.Int("segments", len(t.segments)),

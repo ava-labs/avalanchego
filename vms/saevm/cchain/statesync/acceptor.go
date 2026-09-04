@@ -6,11 +6,12 @@ package statesync
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
-	"go.uber.org/zap"
 )
 
 // StateSyncEnabled checks whether the node should query for state summaries.
