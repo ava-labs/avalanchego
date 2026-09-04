@@ -208,7 +208,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentEpoch block.Epoch,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
-	newTimestamp := p.vm.Time().Truncate(time.Second)
+	newTimestamp := p.vm.Time().Truncate(p.vm.timestampGranularity())
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}
@@ -282,6 +282,7 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.StakingLeafSigner,
+			p.vm.MillisecondTimestamps,
 		)
 	} else {
 		statelessChild, err = block.BuildUnsigned(
@@ -290,6 +291,7 @@ func (p *postForkCommonComponents) buildChild(
 			pChainHeight,
 			epoch,
 			innerBlock.Bytes(),
+			p.vm.MillisecondTimestamps,
 		)
 	}
 	if err != nil {

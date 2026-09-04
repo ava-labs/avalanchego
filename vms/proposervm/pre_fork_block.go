@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -194,7 +193,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	// The chain is currently forking
 
 	parentID := b.ID()
-	newTimestamp := b.vm.Time().Truncate(time.Second)
+	newTimestamp := b.vm.Time().Truncate(b.vm.timestampGranularity())
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}
@@ -222,6 +221,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		pChainHeight,
 		block.Epoch{},
 		innerBlock.Bytes(),
+		b.vm.MillisecondTimestamps,
 	)
 	if err != nil {
 		return nil, err

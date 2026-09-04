@@ -28,6 +28,12 @@ type Config struct {
 	// Zero signals all blocks are indexed.
 	NumHistoricalBlocks uint64
 
+	// MillisecondTimestamps interprets the wrapper block's int64 timestamp as
+	// unix-milliseconds instead of unix-seconds, letting sub-second proposer
+	// windows actually advance. Consensus-critical and fixed from genesis; see
+	// subnets.Config.ProposerMillisecondTimestamps. Defaults to false (seconds).
+	MillisecondTimestamps bool
+
 	// Block signer
 	StakingLeafSigner crypto.Signer
 
