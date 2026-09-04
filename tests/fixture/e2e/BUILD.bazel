@@ -28,6 +28,7 @@ go_library(
         "//wallet/subnet/primary",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_spf13_cast//:cast",

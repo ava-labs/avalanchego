@@ -55,8 +55,8 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 				signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 				require.NoError(err)
 
-				// Send the transaction and wait for receipt
-				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+				// Send the transaction and wait for its block state
+				receipt := e2e.SendEthTransactionAndWait(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 			}
 		})
