@@ -96,7 +96,7 @@ the node intends to state sync. The marker is written before the sync runs, so
 the commitment is **one-way**.
 
 Only production networks get the eager path. The real requirement is that the
-network sequenced more than one commit interval of blocks before the
+network sequenced at least one commit interval of blocks after the
 transition, so peers have a post-transition summary to serve; production
 networks are known to satisfy it, while a custom network may transition right
 at its genesis and strand an eagerly-committed node.

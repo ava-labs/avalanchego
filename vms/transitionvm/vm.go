@@ -147,8 +147,8 @@ func (vm *VM) Initialize(
 		if vm.now().Before(vm.transitionTime) {
 			return nil
 		}
-		// Transitioning is only safe once the network has sequenced more than
-		// one commit interval of blocks before the transition, so peers have a
+		// Transitioning is only safe once the network has sequenced at least
+		// one commit interval of blocks after the transition, so peers have a
 		// post-transition summary to serve. The production networks are known
 		// to satisfy this; a custom network may not, so it waits for the
 		// transition block instead.
