@@ -65,29 +65,29 @@
 </head>
 <body>
 <h1>C-chain with any EVM wallet</h1>
-<p class="sub">Two wallets, one per chain. MetaMask holds the C-chain side and never signs anything Avalanche-specific: exporting to the P-chain is one ordinary contract call, and importing from the P-chain needs no signature at all. The P-chain side stays a normal P-chain wallet (Core, Ledger, an exchange) and signs its own transactions exactly as today. Here the page plays the P-chain wallet with the same test key.
+<p class="sub">Two wallets, one per chain. Any EVM wallet holds the C-chain side and never signs anything Avalanche-specific: exporting to the P-chain is one ordinary contract call, and importing from the P-chain needs no signature at all. The P-chain side stays a normal P-chain wallet (Core, Ledger, an exchange) and signs its own transactions exactly as today. Here the page plays the P-chain wallet with the same test key.
 <a href="https://github.com/ava-labs/avalanchego/tree/containerman17/cchain-evm-wallet" target="_blank">avalanchego branch</a></p>
 
 <section>
-  <h2><span class="step">1</span>Set up MetaMask</h2>
-  <p>Add the demo network, then import the shared test account. Import it by hand so you see the real MetaMask flow: account menu &rarr; <i>Add account or hardware wallet</i> &rarr; <i>Import account</i> &rarr; paste the key.</p>
+  <h2><span class="step">1</span>Set up your EVM wallet</h2>
+  <p>Add the demo network, then import the shared test account. Import it by hand so you see the real wallet flow (MetaMask shown): account menu &rarr; <i>Add account or hardware wallet</i> &rarr; <i>Import account</i> &rarr; paste the key.</p>
   <div class="kv">
     <b>Network name</b><span>C-chain EVM wallet demo</span>
     <b>RPC URL</b><span class="mono" id="rpcurl"></span>
     <b>Chain ID</b><span id="chainid"></span>
     <b>Currency</b><span>AVAX</span>
   </div>
-  <div class="row"><button class="alt" onclick="addNetwork()">Add network to MetaMask</button></div>
+  <div class="row"><button class="alt" onclick="addNetwork()">Add network to your wallet</button></div>
   <p style="margin-top:14px"><b>Private key to import</b> (the public ewoq test key, everyone on this page shares this account)</p>
   <div class="key"><code id="pk"></code><button class="alt" onclick="copy('pk')">Copy</button></div>
-  <div class="row"><button onclick="connect()">Connect MetaMask</button><span class="note" id="connected"></span></div>
+  <div class="row"><button onclick="connect()">Connect EVM wallet</button><span class="note" id="connected"></span></div>
   <div class="fb" id="fb-setup" hidden></div>
 </section>
 
 <section class="gated" hidden>
   <h2>Your two wallets</h2>
   <div class="flow">
-    <div class="stat wallet"><div class="l">MetaMask, C-chain</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div>
+    <div class="stat wallet"><div class="l">Any EVM wallet, C-chain</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div>
     <div class="stat wallet p"><div class="l">P-chain wallet (Core stand-in, this page signs with the same test key)</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div>
   </div>
   <p class="note">The P-chain address is <code>ripemd160(sha256(pubkey))</code>, 20 bytes like an EVM address but a different one. Nothing on the C-chain side knows or needs the P-chain key.</p>
@@ -95,7 +95,7 @@
 
 <section class="gated" hidden>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
-  <h2>C &rarr; P: MetaMask exports with one contract call</h2>
+  <h2>C &rarr; P: any EVM wallet exports with one contract call</h2>
   <p>You call <code>exportToP(to)</code> on <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/exporthelper/ExportHelper.sol" target="_blank">ExportHelper.sol</a> (deployed at <span class="mono" data-k="helper"></span>) with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
@@ -115,7 +115,7 @@
   <h2>P-chain wallet exports to your 0x address, as today</h2>
   <p>A normal ExportTx signed by the P-chain wallet, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div></div>
-  <div class="row"><button onclick="run(exportFromP)">Export 1 AVAX from the P-chain to MetaMask</button></div>
+  <div class="row"><button onclick="run(exportFromP)">Export 1 AVAX from the P-chain to your EVM wallet</button></div>
   <div class="fb" id="fb-exportp" hidden></div>
 </section>
 
@@ -310,11 +310,11 @@ async function addNetwork() {
   await ethereum.request({ method: 'wallet_addEthereumChain', params: [{
     chainId: '0x' + Number(NET.ethChainID).toString(16), chainName: 'C-chain EVM wallet demo', rpcUrls: [RPCBASE + '/ext/bc/C/rpc'],
     nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 } }] });
-  useLog('fb-setup'); log('network added in MetaMask', 'ok');
+  useLog('fb-setup'); log('network added in your wallet', 'ok');
 }
 async function connect() {
   useLog('fb-setup');
-  if (typeof ethereum === 'undefined') { log('MetaMask not detected', 'err'); return; }
+  if (typeof ethereum === 'undefined') { log('no EVM wallet detected', 'err'); return; }
   [me] = await ethereum.request({ method: 'eth_requestAccounts' });
   const isEwoq = me.toLowerCase() === NET.ethAddress.toLowerCase();
   $('connected').innerHTML = isEwoq ? '<span style="color:var(--green)">&#10004;</span> ' + me
@@ -330,7 +330,7 @@ async function ensureChain() {
   const want = '0x' + Number(NET.ethChainID).toString(16);
   const have = await ethereum.request({ method: 'eth_chainId' });
   if (have === want) return;
-  log('MetaMask is on chain ' + parseInt(have, 16) + ', asking it to switch to ' + NET.ethChainID, 'dimlog');
+  log('the wallet is on chain ' + parseInt(have, 16) + ', asking it to switch to ' + NET.ethChainID, 'dimlog');
   try { await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: want }] }); }
   catch (e) { if (e.code === 4902) await addNetwork(); else throw e; }
 }
@@ -353,8 +353,8 @@ async function poll(fn, what, timeoutMs = 180000) {
 }
 let busy = false;
 async function run(action) {
-  if (!me) { log('connect MetaMask first', 'err'); return; }
-  if (busy) { log('still waiting for the previous action, check MetaMask', 'err'); return; }
+  if (!me) { log('connect your EVM wallet first', 'err'); return; }
+  if (busy) { log('still waiting for the previous action, check your wallet', 'err'); return; }
   busy = true;
   useLog({ exportToP: 'fb-export', importOnP: 'fb-importp', exportFromP: 'fb-exportp', importOnC: 'fb-import' }[action.name]);
   for (const b of document.querySelectorAll('button')) b.disabled = true;
@@ -451,8 +451,8 @@ async function exportToP() {
   const amt = AMOUNT;
   const to = bech32Decode($('to').value);
   const toIsMine = toHex(to) === toHex(pAddrBytes);
-  const st = stepper(['MetaMask sends one contract call', 'The hook writes the UTXO']);
-  st.active(0, 'exportToP(' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. MetaMask shows a normal contract call. No Avalanche signature anywhere.');
+  const st = stepper(['Your EVM wallet sends one contract call', 'The hook writes the UTXO']);
+  st.active(0, 'exportToP(' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. The wallet shows a normal contract call. No Avalanche signature anywhere.');
   const before = toIsMine ? (await getPUTXOs('C')).length : 0;
   const receipt = await sendTx(iface.encodeFunctionData('exportToP', [toHex(to)]), amt * NAVAX);
   const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE);
