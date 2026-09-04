@@ -296,18 +296,9 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 	t.Parallel()
 
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	// Block 2 commits block 1's state, the only trie on disk beyond genesis.
-	// Block 3 settles block 2 without committing it, so at shutdown the last
-	// settled state has no trie on disk. The snapshot MUST be persisted at a
-	// root that does, or the restart regenerates it.
-	const (
-		commitInterval = 2
-		numBlocks      = commitInterval + 1
-	)
 	sharedOpts := []options.Option[sutConfig]{
 		timeOpt,
 		withSnapshot(),
-		withCommitInterval(commitInterval),
 	}
 	db := memdb.New()
 	xdb := saetest.NewHeightIndexDB()
@@ -318,7 +309,8 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 	// the blocks below from interrupting generation.
 	requireSnapshotEventuallyVerified(t, sut)
 
-	for range numBlocks {
+	newBlock := func(t *testing.T) *blocks.Block {
+		t.Helper()
 		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas,
@@ -326,14 +318,21 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 		}))
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		vmTime.AdvanceToSettle(ctx, t, b)
+		return b
 	}
+
+	settled := newBlock(t)
+	settler := newBlock(t)
+	require.Equal(t, settled.PostExecutionStateRoot(), settler.SettledStateRoot(), "the settled root should have advanced")
+
 	sut.verifySnapshot(t)
 	snaps := sut.rawVM.exec.Snapshot()
 	sut.close()
 
 	// Closing flattens every diff layer into the disk layer before persisting
 	// it, so the root MUST be read afterwards.
-	diskRoot := snaps.DiskRoot()
+	want := snaps.DiskRoot()
+	require.Equal(t, settler.SettledStateRoot(), want, "shutting down should flush the last settled state to disk")
 
 	_, sut = newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb.Clone()), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = saetest.CopyDB(t, db)
@@ -341,7 +340,7 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 
 	snaps = sut.rawVM.exec.Snapshot()
 	require.NotNilf(t, snaps, "%T.Snapshot()", sut.rawVM.exec)
-	require.Equalf(t, diskRoot, snaps.DiskRoot(), "%T.DiskRoot() after restart MUST be the root persisted at shutdown", snaps)
+	require.Equalf(t, want, snaps.DiskRoot(), "%T.DiskRoot() after restart MUST be the root persisted at shutdown", snaps)
 	sut.verifySnapshot(t)
 }
 

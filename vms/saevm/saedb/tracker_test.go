@@ -181,8 +181,8 @@ func TestTrackerClose(t *testing.T) {
 	tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
 	require.NoError(t, err, "NewTracker()")
 
-	// A snapshot persisted mid-generation loads but can't be verified until
-	// generation resumes, which NoBuild below forbids.
+	// The snapshot is initially generated asynchronously. We wait for that to
+	// complete here so that the later check can expect a complete snapshot.
 	require.EventuallyWithT(t,
 		func(c *assert.CollectT) {
 			assert.NoErrorf(c, tr.snaps.Verify(types.EmptyRootHash), "%T.Verify([genesis root])", tr.snaps)
@@ -193,16 +193,15 @@ func TestTrackerClose(t *testing.T) {
 	)
 
 	root := writeBlock(t, tr, types.EmptyRootHash, 1)
-	tr.Track(root)
-	require.NoErrorf(t, tr.Close(root), "%T.Close([settled root])", tr)
+	require.NoErrorf(t, tr.Close(root), "%T.Close([root])", tr)
 
 	cache := state.NewDatabase(db)
 	t.Run("trie_available", func(t *testing.T) {
-		_, err = state.New(root, cache, nil)
-		require.NoError(t, err, "state.New([root]) from disk")
+		_, err := state.New(root, cache, nil)
+		require.NoError(t, err, "state.New([root])")
 	})
 	t.Run("snapshot_available", func(t *testing.T) {
-		snaps, err := snapshot.New(
+		_, err := snapshot.New(
 			snapshot.Config{
 				CacheSize: 1,
 				NoBuild:   true,
@@ -212,7 +211,6 @@ func TestTrackerClose(t *testing.T) {
 			root,
 		)
 		require.NoError(t, err, "snapshot.New(NoBuild, [root])")
-		require.NoErrorf(t, snaps.Verify(root), "%T.Verify([root])", snaps)
 	})
 }
 

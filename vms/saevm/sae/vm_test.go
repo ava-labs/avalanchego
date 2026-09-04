@@ -1282,14 +1282,14 @@ func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
 	}))
 
 	// While generating, the snapshot keeps only 8 diff layers, so the 9th
-	// block moves the disk layer onto block 1's state. Since each block settles
+	// block moves the disk layer to block 1's state. Since each block settles
 	// the prior block, SAE no longer needs block 1's state. But it MUST still
 	// be held to support snapshot generation.
 	//
 	// Unfortunely, libevm doesn't expose 8 as a constant. It is hard-coded in
 	// the snapshot implementation here:
 	// https://github.com/ava-labs/libevm/blob/80edd419ae21fa745accad9f528a190b1f81c7c7/core/state/snapshot/snapshot.go#L396-L398
-	const numBlocks = 9
+	const numBlocks = 8 + 1
 	for range numBlocks {
 		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
@@ -1308,8 +1308,9 @@ func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
 func storageTrieRoot(tb testing.TB, slot, value common.Hash) common.Hash {
 	tb.Helper()
 
-	encoded, err := rlp.EncodeToBytes(common.TrimLeftZeroes(value[:]))
-	require.NoError(tb, err, "rlp.EncodeToBytes(storage value)")
+	raw := common.TrimLeftZeroes(value[:])
+	encoded, err := rlp.EncodeToBytes(raw)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%#x)", raw)
 	st := trie.NewStackTrie(nil)
 	require.NoErrorf(tb, st.Update(crypto.Keccak256(slot[:]), encoded), "%T.Update()", st)
 	return st.Hash()
