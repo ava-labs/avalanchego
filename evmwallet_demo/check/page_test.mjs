@@ -39,7 +39,6 @@ const origWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = s => { if (/timed out|reverted|Error|error/.test(s)) failed = true; return origWrite(s); };
 
 await new Promise(r => setTimeout(r, 1500)); // let the boot IIFE fetch network.json
-document.getElementById('amt').value = '30';
 await api.connect();
 const dump = box => { for (const st of box.children) console.log('   [' + st.className + '] ' + st.t.textContent + (st.d.textContent ? ' :: ' + st.d.textContent.replace(/\n/g, ' | ') : '')); };
 for (const f of ['exportToP', 'importOnP', 'exportFromP', 'importOnC']) {

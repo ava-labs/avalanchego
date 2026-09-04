@@ -92,7 +92,6 @@
     <div class="stat wallet p"><div class="l">P-chain wallet (Core stand-in, this page signs with the same test key)</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div>
   </div>
   <p class="note">The P-chain address is <code>ripemd160(sha256(pubkey))</code>, 20 bytes like an EVM address but a different one. Nothing on the C-chain side knows or needs the P-chain key.</p>
-  <div class="row"><label>Amount per action <input id="amt" type="number" value="50" min="1" style="width:90px"> AVAX</label></div>
 </section>
 
 <section class="gated" hidden>
@@ -101,7 +100,7 @@
   <p>You call <code>exportToP(to)</code> with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the SAE hook reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
-  <div class="row"><button onclick="run(exportToP)">Export to the P-chain</button></div>
+  <div class="row"><button onclick="run(exportToP)">Export 1 AVAX to the P-chain</button></div>
   <div class="fb" id="fb-export" hidden></div>
 </section>
 
@@ -117,7 +116,7 @@
   <h2>P-chain wallet exports to your 0x address, as today</h2>
   <p>A normal ExportTx signed by the P-chain wallet, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div></div>
-  <div class="row"><button onclick="run(exportFromP)">Export from the P-chain to MetaMask</button></div>
+  <div class="row"><button onclick="run(exportFromP)">Export 1 AVAX from the P-chain to MetaMask</button></div>
   <div class="fb" id="fb-exportp" hidden></div>
 </section>
 
@@ -447,10 +446,10 @@ async function runStage(fn, button) {
 }
 
 // ---- the flows ----
-const amountNAVAX = () => BigInt(Math.max(1, Math.floor(Number($('amt').value) || 50))) * NAVAX;
+const AMOUNT = 1n * NAVAX;   // every action moves 1 AVAX
 
 async function exportToP() {
-  const amt = amountNAVAX();
+  const amt = AMOUNT;
   const to = bech32Decode($('to').value);
   const toIsMine = toHex(to) === toHex(pAddrBytes);
   const st = stepper(['MetaMask sends one contract call', 'The hook writes the UTXO']);
@@ -477,7 +476,7 @@ async function importOnP() {
   st.append(0, 'P-chain balance ' + avax(sum(await getPUTXOs())) + ' AVAX');
 }
 async function exportFromP() {
-  const amt = amountNAVAX();
+  const amt = AMOUNT;
   const st = stepper(['The P-chain wallet exports to your 0x address']);
   st.active(0, 'ExportTx signed by the P-chain wallet, as today. The exported output is owned by ' + me + ' and marked EVM-owned (locktime 1).');
   const inputs = pickInputs(await getPUTXOs(), amt + PFEE);
