@@ -188,11 +188,7 @@ After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `c
 - Fixed `callTracer` failing with `incorrect number of top-level calls` on transactions where a precompile makes an outbound call ([ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303)).
 - Fixed the code syncer leaving stale code-to-fetch markers on disk after state sync.
 - ProposerVM `ERROR` logs caused by the P-Chain database closing during shutdown are now `WARN`.
-- `eth_estimateGas` no longer includes the ACP-194 minimum gas floor. The floor caused large overestimates after Helicon activation.
-- Fixed a C-Chain crash loop for nodes that upgrade after Helicon activation and accept no blocks before the SAE transition.
 - Fixed Subnet-EVM nodes failing to restart after a state upgrade activates when the upgrade config contains `"storage": {}`, `"code": "0x"`, or `"balanceChange": "0"`.
-- Fixed P-Chain bootstrapping failing on historical blocks that promote a pending delegator and its validator at the same time.
-- Fixed the C-Chain state snapshot regenerating on every restart after Helicon.
 - Removed the block acceptance time health check that `v1.14.2` added. The check could only recover after the node accepted new blocks. Some deployments send traffic only to healthy nodes, so a failed check could never recover.
 - Fixed `SizedCache` undercounting size when overwriting a key, which let caches exceed their configured limits.
 
