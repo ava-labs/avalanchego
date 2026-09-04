@@ -4,8 +4,10 @@
 package saetest
 
 import (
+	"bytes"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -124,3 +126,28 @@ func (b *flakyBatch) Write() error {
 // Inner returns the wrapper itself, so callers that unwrap batches still commit
 // through the fault counter.
 func (b *flakyBatch) Inner() database.Batch { return b }
+
+// UnreadableOnceDB fails the first read of one key with [ErrInjected] and
+// serves every other read from the wrapped database. Safe for concurrent use.
+type UnreadableOnceDB struct {
+	database.Database
+
+	key    []byte
+	failed atomic.Bool
+}
+
+// NewUnreadableOnceDB returns an [UnreadableOnceDB] whose first read of key
+// fails.
+func NewUnreadableOnceDB(db database.Database, key []byte) *UnreadableOnceDB {
+	return &UnreadableOnceDB{
+		Database: db,
+		key:      key,
+	}
+}
+
+func (u *UnreadableOnceDB) Get(key []byte) ([]byte, error) {
+	if bytes.Equal(key, u.key) && u.failed.CompareAndSwap(false, true) {
+		return nil, ErrInjected
+	}
+	return u.Database.Get(key)
+}
