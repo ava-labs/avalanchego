@@ -45,7 +45,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID := ids.GenerateTestNodeID()
 	addPendingValidatorTx := addPendingValidator(
 		t,
@@ -59,10 +59,10 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -107,10 +107,10 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp().Add(-time.Second))
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -135,7 +135,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID := ids.GenerateTestNodeID()
 	addPendingValidator(t, env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]})
 
@@ -143,10 +143,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime.Add(1*time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -173,10 +173,10 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		tx, err := newAdvanceTimeTx(t, genesistest.DefaultValidatorEndTime.Add(1*time.Second))
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -383,9 +383,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
+				wallet := newWallet(t, env, walletConfig{})
 
 				tx, err := wallet.IssueAddSubnetValidatorTx(
 					&platform.SubnetValidator{
@@ -417,10 +415,10 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				tx, err := newAdvanceTimeTx(t, newTime)
 				require.NoError(err)
 
-				onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+				onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 				require.NoError(err)
 
-				onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+				onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 				require.NoError(err)
 
 				feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -479,14 +477,12 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
 
-	wallet := newWallet(t, env, walletConfig{
-		subnetIDs: []ids.ID{subnetID},
-	})
+	wallet := newWallet(t, env, walletConfig{})
 
 	dummyHeight := uint64(1)
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
-	subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
+	subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(env.config.MinStakeDuration)
 
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&platform.SubnetValidator{
@@ -526,7 +522,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 			Validator: platform.Validator{
 				NodeID: subnetVdr2NodeID,
 				Start:  uint64(subnetVdr1EndTime.Add(time.Second).Unix()),
-				End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()),
+				End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(env.config.MinStakeDuration).Unix()),
 				Wght:   1,
 			},
 			Subnet: subnetID,
@@ -552,10 +548,10 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, subnetVdr1EndTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -595,15 +591,13 @@ func TestTrackedSubnet(t *testing.T) {
 				env.config.TrackedSubnets.Add(subnetID)
 			}
 
-			wallet := newWallet(t, env, walletConfig{
-				subnetIDs: []ids.ID{subnetID},
-			})
+			wallet := newWallet(t, env, walletConfig{})
 
 			// Add a subnet validator to the staker set
 			subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
 
 			subnetVdr1StartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(10 * env.config.MinStakeDuration).Add(1 * time.Minute)
 			tx, err := wallet.IssueAddSubnetValidatorTx(
 				&platform.SubnetValidator{
 					Validator: platform.Validator{
@@ -633,10 +627,10 @@ func TestTrackedSubnet(t *testing.T) {
 			tx, err = newAdvanceTimeTx(t, subnetVdr1StartTime)
 			require.NoError(err)
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -668,7 +662,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(env.config.MaxStakeDuration)
 	nodeID := ids.GenerateTestNodeID()
 	addPendingValidator(
 		t,
@@ -682,10 +676,10 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -741,10 +735,10 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -775,17 +769,17 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
 	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
-	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
+	pendingValidatorEndTime := pendingValidatorStartTime.Add(env.config.MinStakeDuration)
 	nodeID := ids.GenerateTestNodeID()
 	addPendingValidator(t, env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]})
 
 	tx, err := newAdvanceTimeTx(t, pendingValidatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -810,7 +804,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
-	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
+	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(env.config.MinStakeDuration)
 	addDelegatorTx, err := wallet.IssueAddDelegatorTx(
 		&platform.Validator{
 			NodeID: nodeID,
@@ -840,10 +834,10 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err = newAdvanceTimeTx(t, pendingDelegatorStartTime)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -879,10 +873,10 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	tx, err := newAdvanceTimeTx(t, upgradeTime)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
