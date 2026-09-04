@@ -95,21 +95,37 @@
 <section class="gated" hidden>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
   <h2>C &rarr; P: MetaMask exports with one contract call</h2>
-  <p>You call <code>exportToP(to)</code> with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the SAE hook reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The P-chain wallet then imports it exactly as it does today.</p>
-  <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div></div>
+  <p>You call <code>exportToP(to)</code> with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the SAE hook reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
+  <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
-  <div class="row"><button onclick="run(exportToP)">Export to the P-chain</button><button class="alt" onclick="run(importOnP)">Import waiting UTXOs on P</button></div>
+  <div class="row"><button onclick="run(exportToP)">Export to the P-chain</button></div>
   <div class="fb" id="fb-export" hidden></div>
+</section>
+
+<section class="gated" hidden>
+  <h2>P-chain wallet imports, as today</h2>
+  <p>Nothing new here. The P-chain wallet (Core, Ledger, an exchange) sees the UTXO in shared memory and issues its usual ImportTx with its usual secp256k1 signature. Here the page does it with the same test key.</p>
+  <div class="flow"><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div></div>
+  <div class="row"><button onclick="run(importOnP)">Import on P (P-chain wallet signs)</button></div>
+  <div class="fb" id="fb-importp" hidden></div>
+</section>
+
+<section class="gated" hidden>
+  <h2>P-chain wallet exports to your 0x address, as today</h2>
+  <p>A normal ExportTx signed by the P-chain wallet, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". The export is done when the UTXO sits in shared memory.</p>
+  <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div></div>
+  <div class="row"><button onclick="run(exportFromP)">Export from the P-chain to MetaMask</button></div>
+  <div class="fb" id="fb-exportp" hidden></div>
 </section>
 
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: nobody signs the import</h2>
-  <p>The P-chain wallet exports to your 0x address as today, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". Then anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain accepts it only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
-  <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
-  <div class="row"><button onclick="run(exportFromP)">Export from the P-chain to MetaMask</button><button class="alt" onclick="run(importOnC)">Import waiting UTXOs on C, no signature</button></div>
-  <div class="fb" id="fb-import" hidden></div>
+  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain accepts it only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
+  <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
+  <div class="row"><button onclick="run(importOnC)">Import on C, no signature</button></div>
+  <div class="fb" id="fb-import" hidden></div>
 </section>
 
 <section class="gated" hidden>
@@ -330,7 +346,7 @@ async function run(action) {
   if (!me) { log('connect MetaMask first', 'err'); return; }
   if (busy) { log('still waiting for the previous action, check MetaMask', 'err'); return; }
   busy = true;
-  useLog(action === exportToP || action === importOnP ? 'fb-export' : 'fb-import');
+  useLog({ exportToP: 'fb-export', importOnP: 'fb-importp', exportFromP: 'fb-exportp', importOnC: 'fb-import' }[action.name]);
   for (const b of document.querySelectorAll('button')) b.disabled = true;
   try { await action(); } catch (e) { log(String(e.message || e), 'err'); }
   finally {
@@ -421,66 +437,55 @@ async function runStage(fn, button) {
 // ---- the flows ----
 const amountNAVAX = () => BigInt(Math.max(1, Math.floor(Number($('amt').value) || 50))) * NAVAX;
 
-// Stage 2 of the export: the P-chain wallet imports what it was sent, signing as it does today.
-async function stageImportOnP(st, i) {
-  const utxos = await getPUTXOs('C');
-  if (!utxos.length) throw new Error('nothing waiting in shared memory for the P-chain wallet');
-  const before = sum(await getPUTXOs());
-  const bytes = pSign(pImportTx(utxos), utxos.length);
-  const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-  st.done(i, 'P-chain wallet signed and issued ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, ' + utxos.length + ' secp256k1 signature(s)). This side did not change.');
-  await poll(async () => sum(await getPUTXOs()) > before ? 1 : null, 'P-chain balance to rise');
-  st.append(i, 'P-chain balance ' + avax(sum(await getPUTXOs())) + ' AVAX');
-}
 async function exportToP() {
   const amt = amountNAVAX();
   const to = bech32Decode($('to').value);
   const toIsMine = toHex(to) === toHex(pAddrBytes);
-  const st = stepper(['MetaMask sends one contract call', 'The hook writes the UTXO', 'The P-chain wallet imports it']);
+  const st = stepper(['MetaMask sends one contract call', 'The hook writes the UTXO']);
   st.active(0, 'exportToP(' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. MetaMask shows a normal contract call. No Avalanche signature anywhere.');
   const before = toIsMine ? (await getPUTXOs('C')).length : 0;
   const receipt = await sendTx(iface.encodeFunctionData('exportToP', [toHex(to)]), amt * NAVAX);
   const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE);
   st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + '. The contract emitted one warp log, 28 bytes of payload: owner and amount.' + (l ? ' Message ' + short(l.topics[2]) + '.' : ''));
   st.active(1, 'After the block executes, FinishExecutingBlock debits the contract and AfterExecutingBlock writes the UTXO into shared memory, indexed by owner.');
-  if (!toIsMine) { st.done(1, 'UTXO written for ' + pAddr(to) + '. Only that wallet can see and import it, so this page stops here.'); st.done(2, 'not this wallet'); return; }
+  if (!toIsMine) { st.done(1, 'UTXO written for ' + pAddr(to) + '. Only that wallet can see and import it.'); return; }
   const utxos = await poll(async () => { const u = await getPUTXOs('C'); return u.length > before ? u : null; }, 'UTXO in shared memory');
-  st.done(1, avax(sum(utxos)) + ' AVAX now waiting in shared memory, owned by the P-chain wallet. Same UTXO a C-chain ExportTx would have produced.');
-  st.active(2, 'From here on nothing is new: the P-chain wallet issues its usual ImportTx with its usual signature.', ['Import on P (P-chain wallet signs)', () => stageImportOnP(st, 2)]);
+  st.done(1, avax(sum(utxos)) + ' AVAX now in shared memory, owned by the P-chain wallet. Same UTXO a C-chain ExportTx would have produced. Export done.');
 }
 async function importOnP() {
   const st = stepper(['The P-chain wallet imports what is waiting']);
   st.active(0, 'ImportTx signed by the P-chain wallet, as today.');
-  await stageImportOnP(st, 0);
-}
-
-// Stage 2 of the return trip: anyone issues the ImportTx, with zero credentials.
-async function stageImportOnC(st, i) {
-  const utxos = await getCUTXOs().then(us => us.filter(u => u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1));
-  if (!utxos.length) throw new Error('no EVM-owned UTXOs waiting in shared memory for ' + me);
-  const before = await cBalance();
-  const bytes = cUnsignedImportTx(utxos, hexBytes(me));
-  const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-  st.done(i, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials, ' + avax(CFEE) + ' AVAX burned from the UTXO itself). Nobody signed it.');
-  const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-  st.append(i, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
+  const utxos = await getPUTXOs('C');
+  if (!utxos.length) throw new Error('nothing waiting in shared memory for the P-chain wallet');
+  const before = sum(await getPUTXOs());
+  const bytes = pSign(pImportTx(utxos), utxos.length);
+  const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+  st.done(0, 'P-chain wallet signed and issued ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, ' + utxos.length + ' secp256k1 signature(s)).');
+  await poll(async () => sum(await getPUTXOs()) > before ? 1 : null, 'P-chain balance to rise');
+  st.append(0, 'P-chain balance ' + avax(sum(await getPUTXOs())) + ' AVAX');
 }
 async function exportFromP() {
   const amt = amountNAVAX();
-  const st = stepper(['The P-chain wallet exports to your 0x address', 'Anyone issues the ImportTx, nobody signs']);
+  const st = stepper(['The P-chain wallet exports to your 0x address']);
   st.active(0, 'ExportTx signed by the P-chain wallet, as today. The exported output is owned by ' + me + ' and marked EVM-owned (locktime 1).');
   const inputs = pickInputs(await getPUTXOs(), amt + PFEE);
   const before = (await getCUTXOs()).length;
   const bytes = pSign(pExportTx(inputs, amt, hexBytes(me)), inputs.length);
   const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-  const cu = await poll(async () => { const u = await getCUTXOs(); return u.length > before ? u : null; }, 'UTXO in shared memory');
-  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX waits in shared memory for ' + me + ', marked EVM-owned.');
-  st.active(1, 'The ImportTx names the UTXOs, one output to the owner, and an empty credential list. Verifiers check the marker, the owner and the fee cap against shared memory.', ['Issue the unsigned ImportTx', () => stageImportOnC(st, 1)]);
+  await poll(async () => { const u = await getCUTXOs(); return u.length > before ? u : null; }, 'UTXO in shared memory');
+  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX now in shared memory for ' + me + ', marked EVM-owned. Export done.');
 }
 async function importOnC() {
   const st = stepper(['Anyone issues the ImportTx, nobody signs']);
-  st.active(0, 'ImportTx with zero credentials for every EVM-owned UTXO waiting for you.');
-  await stageImportOnC(st, 0);
+  st.active(0, 'The ImportTx names the UTXOs, one output to the owner, and an empty credential list. Verifiers check the marker, the owner and the fee cap against shared memory.');
+  const utxos = await getCUTXOs().then(us => us.filter(u => u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1));
+  if (!utxos.length) throw new Error('no EVM-owned UTXOs waiting in shared memory for ' + me);
+  const before = await cBalance();
+  const bytes = cUnsignedImportTx(utxos, hexBytes(me));
+  const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+  st.done(0, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials, ' + avax(CFEE) + ' AVAX burned from the UTXO itself). Nobody signed it.');
+  const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
+  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
 }
 
 // ---- boot ----

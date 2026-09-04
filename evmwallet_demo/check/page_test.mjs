@@ -30,7 +30,7 @@ const shims = { ethers, document, ethereum, location: { origin: BASE, search: ''
   fetch, alert: m => { throw new Error(m); } };
 const api = new Function(...Object.keys(shims), script + '\nreturn { run, connect, exportToP, importOnP, exportFromP, importOnC, refresh, refreshActivity };')(...Object.values(shims));
 // mirror what the page prints: log() spans and stepper descriptions
-const panels = ['fb-setup', 'fb-export', 'fb-import'];
+const panels = ['fb-setup', 'fb-export', 'fb-importp', 'fb-exportp', 'fb-import'];
 for (const id of panels) document.getElementById(id).appendChild = c => { if (c.className === 'steps') els[id].steps = c; else process.stdout.write(c.textContent); };
 const stepEl = () => ({ className: '', children: [], d: el(), t: el(), appendChild(c) { this.children.push(c); }, querySelector(q) { return q === '.d' ? this.d : this.t; } });
 document.createElement = tag => tag === 'div' ? stepEl() : el();
@@ -42,9 +42,9 @@ await new Promise(r => setTimeout(r, 1500)); // let the boot IIFE fetch network.
 document.getElementById('amt').value = '30';
 await api.connect();
 const dump = box => { for (const st of box.children) console.log('   [' + st.className + '] ' + st.t.textContent + (st.d.textContent ? ' :: ' + st.d.textContent.replace(/\n/g, ' | ') : '')); };
-for (const f of ['exportToP', 'exportFromP', 'exportToP', 'importOnP', 'importOnC']) {
+for (const f of ['exportToP', 'importOnP', 'exportFromP', 'importOnC']) {
   const t0 = Date.now();
-  const panel = f === 'exportToP' || f === 'importOnP' ? 'fb-export' : 'fb-import';
+  const panel = { exportToP: 'fb-export', importOnP: 'fb-importp', exportFromP: 'fb-exportp', importOnC: 'fb-import' }[f];
   console.log('== ' + f);
   await api.run(api[f]);
   const box = els[panel].steps;
