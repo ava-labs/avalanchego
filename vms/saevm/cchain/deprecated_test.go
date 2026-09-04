@@ -60,19 +60,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 			name: "eth_apis_all_mapped_names",
 			json: `{"eth-apis":["internal-eth","internal-blockchain","internal-transaction","internal-tx-pool","internal-debug","debug-tracer","debug-file-tracer","debug-handler","eth-filter","net","web3"]}`,
 			want: with(func(c *config) {
-				c.APIs = set.Of(
-					rpc.APIAvalanche,
-					rpc.APIChain,
-					rpc.APIDB,
-					rpc.APIGas,
-					rpc.APINet,
-					rpc.APIProfile,
-					rpc.APISubscriptions,
-					rpc.APITrace,
-					rpc.APITransactions,
-					rpc.APITxPool,
-					rpc.APIWeb3,
-				)
+				c.APIs = rpc.AllAPIs()
 			}),
 			wantWarnings: []*loggingtest.Record{
 				deprecated("avalanche", "chain", "db", "gas", "net", "profile", "subscriptions", "trace", "transactions", "txpool", "web3"),
