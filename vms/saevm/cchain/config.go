@@ -112,6 +112,7 @@ type config struct {
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 
 	internalConfig
+	deprecatedConfig
 }
 
 // internalConfig holds undocumented, test-only options, kept out of config.md.
@@ -157,10 +158,9 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 
 	// TODO(JonathanOppenheimer): delete together with deprecated.go.
-	if rawNames, ok := keys["eth-apis"]; ok {
-		delete(keys, "eth-apis")
+	if c.EthAPIs != nil {
 		_, apisSet := keys["apis"]
-		if err := c.applyDeprecatedAPINames(snowCtx.Log, rawNames, apisSet); err != nil {
+		if err := c.applyDeprecatedAPINames(snowCtx.Log, apisSet); err != nil {
 			return config{}, err
 		}
 	}

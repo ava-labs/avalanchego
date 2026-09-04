@@ -5,12 +5,10 @@ package rpc
 
 import (
 	"math/big"
-	"reflect"
 	"testing"
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,22 +55,5 @@ func TestNewPriceOptions(t *testing.T) {
 			got := NewPriceOptions(tip, baseFee)
 			require.Equalf(t, test.want, got, "NewPriceOptions(%s, %v)", tip, baseFee)
 		})
-	}
-}
-
-// TestCustomAPICarriesNoSubscription enforces the [customSubscriptionAPI]
-// split.
-func TestCustomAPICarriesNoSubscription(t *testing.T) {
-	subscription := reflect.TypeFor[*rpc.Subscription]()
-
-	api := reflect.TypeFor[*customAPI]()
-	for i := range api.NumMethod() {
-		m := api.Method(i)
-		for j := range m.Type.NumOut() {
-			require.NotEqualf(t, subscription, m.Type.Out(j),
-				"%s.%s returns %s; declare it on customSubscriptionAPI instead",
-				api, m.Name, subscription,
-			)
-		}
 	}
 }

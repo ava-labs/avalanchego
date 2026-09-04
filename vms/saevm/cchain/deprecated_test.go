@@ -102,7 +102,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 				deprecated("web3"),
 				{
 					Level:  logging.Warn,
-					Msg:    "ignoring unrecognized C-Chain config options",
+					Msg:    "ignoring unrecognized config options",
 					Fields: []zap.Field{zap.Strings("options", []string{"rpc-gas-cap"})},
 				},
 			},

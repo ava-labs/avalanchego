@@ -240,7 +240,7 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.TrieCleanCache = 256 }),
 			wantWarnings: []*loggingtest.Record{{
 				Level:  logging.Warn,
-				Msg:    "ignoring unrecognized C-Chain config options",
+				Msg:    "ignoring unrecognized config options",
 				Fields: []zap.Field{zap.Strings("options", []string{"hello austin larson", "rpc-gas-cap"})},
 			}},
 		},

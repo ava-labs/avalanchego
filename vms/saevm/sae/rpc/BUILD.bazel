@@ -72,7 +72,6 @@ go_test(
     deps = [
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//params",
-        "@com_github_ava_labs_libevm//rpc",
         "@com_github_stretchr_testify//require",
     ],
 )

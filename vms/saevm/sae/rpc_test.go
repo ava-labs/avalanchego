@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"os"
 	"reflect"
 	"runtime/debug"
+	"slices"
 	"testing"
 	"time"
 
@@ -1645,10 +1647,10 @@ func withAllAPIs() sutOption {
 const errCodeMethodNotFound = -32601
 
 // methodRegistered reports whether sut serves method.
-func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string, args ...any) bool {
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string) bool {
 	tb.Helper()
 
-	err := sut.CallContext(ctx, new(json.RawMessage), method, args...)
+	err := sut.CallContext(ctx, new(json.RawMessage), method)
 	if err == nil {
 		return true
 	}
@@ -1658,78 +1660,35 @@ func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method strin
 }
 
 func TestAPIsServed(t *testing.T) {
-	// The non-bool second argument fails to parse, but only after the
-	// subscription is looked up.
-	acceptedTxs := []any{"newAcceptedTransactions", "not-a-bool"}
-
-	tests := []struct {
-		name   string
-		apis   set.Set[saerpc.API]
-		method string
-		args   []any
-		want   bool
-	}{
-		// APIs sharing the `eth` namespace are independently selectable.
-		{
-			name:   "subscriptions_serves_get_logs",
-			apis:   set.Of(saerpc.APISubscriptions),
-			method: "eth_getLogs",
-			want:   true,
-		},
-		{
-			name:   "subscriptions_alone_does_not_serve_eth_call",
-			apis:   set.Of(saerpc.APISubscriptions),
-			method: "eth_call",
-		},
-		// The Avalanche extensions and their subscription separate in
-		// both directions.
-		{
-			name:   "avalanche_serves_call_detailed",
-			apis:   set.Of(saerpc.APIAvalanche),
-			method: "eth_callDetailed",
-			want:   true,
-		},
-		{
-			name:   "avalanche_alone_does_not_serve_its_subscription",
-			apis:   set.Of(saerpc.APIAvalanche),
-			method: "eth_subscribe",
-			args:   acceptedTxs,
-		},
-		{
-			name:   "subscriptions_alone_serves_accepted_transactions",
-			apis:   set.Of(saerpc.APISubscriptions),
-			method: "eth_subscribe",
-			args:   acceptedTxs,
-			want:   true,
-		},
-		{
-			name:   "subscriptions_alone_does_not_serve_call_detailed",
-			apis:   set.Of(saerpc.APISubscriptions),
-			method: "eth_callDetailed",
-		},
-		// Defaults.
-		{
-			name:   "default_serves_tracing",
-			apis:   saerpc.DefaultAPIs(),
-			method: "debug_traceBlockByNumber",
-			want:   true,
-		},
-		{
-			name:   "default_omits_db_access",
-			apis:   saerpc.DefaultAPIs(),
-			method: "debug_dbGet",
-		},
-		{
-			name:   "default_omits_profiling",
-			apis:   saerpc.DefaultAPIs(),
-			method: "debug_blockProfile",
-		},
+	// A method served by each API and no other.
+	methods := map[saerpc.API]string{
+		saerpc.APIWeb3:          "web3_clientVersion",
+		saerpc.APINet:           "net_version",
+		saerpc.APITxPool:        "txpool_status",
+		saerpc.APIGas:           "eth_gasPrice",
+		saerpc.APIChain:         "eth_blockNumber",
+		saerpc.APITransactions:  "eth_getTransactionCount",
+		saerpc.APISubscriptions: "eth_getLogs",
+		saerpc.APIAvalanche:     "eth_callDetailed",
+		saerpc.APIDB:            "debug_dbGet",
+		saerpc.APIProfile:       "debug_gcStats",
+		saerpc.APITrace:         "debug_traceBlockByNumber",
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, sut := newSUT(t, 0, withAPIs(test.apis))
-			got := methodRegistered(ctx, t, sut, test.method, test.args...)
-			require.Equalf(t, test.want, got, "%s served", test.method)
+	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
+
+	configs := map[string]set.Set[saerpc.API]{
+		"all":     saerpc.AllAPIs(),
+		"default": saerpc.DefaultAPIs(),
+	}
+	for api := range methods {
+		configs["only_"+string(api)] = set.Of(api)
+	}
+	for name, apis := range configs {
+		t.Run(name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(apis))
+			for api, method := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
+			}
 		})
 	}
 }

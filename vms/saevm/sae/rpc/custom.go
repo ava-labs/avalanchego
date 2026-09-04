@@ -151,9 +151,6 @@ func (c *customAPI) SuggestPriceOptions(ctx context.Context) (*PriceOptions, err
 }
 
 // customSubscriptionAPI provides the Avalanche-custom `eth_subscribe` methods.
-// It is separate from [customAPI] so that [APISubscriptions] can be served
-// without [APIAvalanche]'s state-executing methods. Any new `eth`
-// subscription MUST be added here rather than to [customAPI].
 type customSubscriptionAPI struct {
 	b *backend
 }

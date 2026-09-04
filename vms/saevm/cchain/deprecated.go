@@ -10,7 +10,6 @@ package cchain
 // SAE transition!
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -23,6 +22,11 @@ import (
 )
 
 var errUnknownLegacyEthAPI = errors.New(`unknown "eth-apis" name`)
+
+// deprecatedConfig holds the coreth options that [config] still accepts.
+type deprecatedConfig struct {
+	EthAPIs []string `json:"eth-apis"`
+}
 
 // legacyEthAPIs maps each name that coreth's `eth-apis` option accepted to the
 // [rpc.API]s that serve the same methods. A nil set means that the methods no
@@ -46,22 +50,19 @@ var legacyEthAPIs = map[string]set.Set[rpc.API]{
 	"web3":                 set.Of(rpc.APIWeb3),
 }
 
-// applyDeprecatedAPINames sets c.APIs from rawNames, the JSON value of the
-// deprecated "eth-apis" option. It logs the equivalent "apis" value for the
-// operator to migrate to. If apisSet, it ignores rawNames because "apis" takes
-// precedence.
-func (c *config) applyDeprecatedAPINames(log logging.Logger, rawNames json.RawMessage, apisSet bool) error {
+// applyDeprecatedAPINames sets c.APIs from the deprecated c.EthAPIs, then
+// clears c.EthAPIs. It logs the equivalent "apis" value so the operator can
+// migrate. If apisSet, "apis" takes precedence and it only clears c.EthAPIs.
+func (c *config) applyDeprecatedAPINames(log logging.Logger, apisSet bool) error {
+	names := c.EthAPIs
+	c.EthAPIs = nil
+
 	// A config that sets both options is the expected migration path: coreth
 	// reads "eth-apis" before the SAE transition and this VM reads "apis"
 	// after it.
 	if apisSet {
 		log.Warn(`ignoring deprecated "eth-apis" because "apis" is set; "eth-apis" will be removed in the next release`)
 		return nil
-	}
-
-	var names []string
-	if err := json.Unmarshal(rawNames, &names); err != nil {
-		return fmt.Errorf(`json.Unmarshal(%T) "eth-apis": %w`, names, err)
 	}
 
 	apis := set.NewSet[rpc.API](len(names))

@@ -23,9 +23,9 @@ import (
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
 // An API is a named group of JSON-RPC methods that a node MAY serve, see
-// [Config.APIs]. Groups are finer-grained than namespaces because
-// several contribute to the `eth` namespace yet must be selectable
-// independently and the namespaces are locked in :(.
+// [Config.APIs]. Groups do not align with JSON-RPC namespaces: for security
+// and compatibility reasons, methods within a single namespace must be
+// selectable independently, and the namespaces themselves are locked in.
 type API string
 
 // Every available [API]. The methods each one carries are listed alongside its
@@ -73,9 +73,8 @@ type apiService struct {
 	receiver  func(b *backend, filter *filters.FilterAPI) any
 }
 
-// apiServices is every registerable service, in registration order. An [API]
-// MAY have more than one service, in which case they are all registered
-// together.
+// apiServices is every registerable service. Enabling an [API] registers every
+// service with that name.
 //
 // Standard Ethereum APIs are documented at: https://ethereum.org/developers/docs/apis/json-rpc
 // geth-specific APIs are documented at: https://geth.ethereum.org/docs/interacting-with-geth/rpc
