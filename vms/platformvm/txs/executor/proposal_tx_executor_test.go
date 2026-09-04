@@ -265,10 +265,10 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.setup(env)
 			}
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -296,9 +296,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator currently validating primary network
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -312,10 +310,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -334,9 +332,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// and proposed subnet validation period is subset of
 		// primary network validation period
 		// (note that keys[0] is a genesis validator)
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -350,10 +346,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -370,7 +366,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	// Starts validating primary network 10 seconds after genesis
 	pendingDSValidatorID := ids.GenerateTestNodeID()
 	dsStartTime := genesistest.DefaultValidatorStartTime.Add(10 * time.Second)
-	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
+	dsEndTime := dsStartTime.Add(5 * env.config.MinStakeDuration)
 
 	wallet := newWallet(t, env, walletConfig{
 		keys: genesistest.DefaultFundedKeys[:1],
@@ -392,9 +388,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -408,10 +402,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -447,9 +441,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network
 		// but starts validating subnet before primary network
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -463,10 +455,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -483,9 +475,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network
 		// but stops validating subnet after primary network
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -499,10 +489,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -519,9 +509,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator is pending validator of primary network and
 		// period validating subnet is subset of time validating primary network
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -535,10 +523,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -557,15 +545,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env.state.SetTimestamp(newTimestamp)
 
 	{
-		wallet := newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(newTimestamp.Unix()),
-					End:    uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()),
+					End:    uint64(newTimestamp.Add(env.config.MinStakeDuration).Unix()),
 					Wght:   genesistest.DefaultValidatorWeight,
 				},
 				Subnet: subnetID,
@@ -573,10 +559,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -595,9 +581,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
-	wallet = newWallet(t, env, walletConfig{
-		subnetIDs: []ids.ID{subnetID},
-	})
+	wallet = newWallet(t, env, walletConfig{})
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
 		&platform.SubnetValidator{
 			Validator: platform.Validator{
@@ -629,9 +613,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		// Node with ID nodeIDKey.Address() now validating subnet with ID testSubnet1.ID
-		wallet = newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet = newWallet(t, env, walletConfig{})
 		duplicateSubnetTx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
@@ -645,10 +627,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -668,15 +650,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		// Case: Too few signatures
-		wallet = newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet = newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
 					NodeID: nodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
-					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					End:    uint64(genesistest.DefaultValidatorStartTime.Add(env.config.MinStakeDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
 				},
 				Subnet: subnetID,
@@ -691,10 +671,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -710,15 +690,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
-		wallet = newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet = newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
 					NodeID: nodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
-					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					End:    uint64(genesistest.DefaultValidatorStartTime.Add(env.config.MinStakeDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
 				},
 				Subnet: subnetID,
@@ -731,10 +709,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -751,15 +729,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
-		wallet = newWallet(t, env, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
+		wallet = newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&platform.SubnetValidator{
 				Validator: platform.Validator{
 					NodeID: nodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
-					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
+					End:    uint64(genesistest.DefaultValidatorStartTime.Add(env.config.MinStakeDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
 				},
 				Subnet: subnetID,
@@ -783,10 +759,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -829,10 +805,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -863,10 +839,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -888,7 +864,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			&platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
-				End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()),
+				End:    uint64(startTime.Add(env.config.MinStakeDuration).Unix()),
 				Wght:   env.config.MinValidatorStake,
 			},
 			rewardsOwner,
@@ -913,10 +889,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -955,10 +931,10 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
