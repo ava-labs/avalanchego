@@ -170,7 +170,6 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
 - Added `transitionvm`, a VM that swaps between two implementations at a configured time. The C-Chain uses it to switch from Coreth to the SAE VM at Helicon.
 - The Primary Network minimum validator staking duration decreases from 2 weeks to 48 hours at Helicon activation (ACP-273).
-- Updated Firewood from `v0.3.1` to `v0.8.0`.
 - Changed the Firewood state sync protocol. A `v1.15.0` node cannot state sync with Firewood from a `v1.14.x` node. This does not affect the default `hash` state scheme.
 
 ### C-Chain State Sync
