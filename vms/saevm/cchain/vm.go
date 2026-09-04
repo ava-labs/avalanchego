@@ -106,7 +106,7 @@ func (vm *VM) Initialize(
 		return errAlreadyClosed
 	}
 
-	userConfig, err := parseConfig(configBytes, snowCtx.NetworkID)
+	userConfig, err := parseConfig(snowCtx, configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
