@@ -495,7 +495,7 @@ async function importOnC() {
   const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
   st.done(0, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials). Nobody signed it. The builder reprices the fee to the base fee before including it.');
   const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(6) + ' AVAX, fee actually burned: ' + avax(sum(utxos) - (after - before) / NAVAX) + ' AVAX');
+  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(6) + ' AVAX, fee actually burned: ' + (sum(utxos) - (after - before) / NAVAX) + ' nAVAX');
 }
 
 // ---- boot ----
