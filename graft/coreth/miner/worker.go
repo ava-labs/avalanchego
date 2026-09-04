@@ -39,7 +39,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -51,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/state"
@@ -309,7 +309,7 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 		}
 	}
 	numPrefetchers := w.chain.CacheConfig().TriePrefetcherParallelism
-	currentState.StartPrefetcher("miner", extstate.WithConcurrentWorkers(numPrefetchers))
+	currentState.StartPrefetcher("miner", prefetch.WithConcurrentWorkers(numPrefetchers))
 	return &environment{
 		signer:           types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:            currentState,

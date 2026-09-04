@@ -13,20 +13,24 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
 var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 
-// SummaryHandler wraps the SAE [statesync.SummaryHandler] with the C-Chain
+// SummaryHandler wraps the SAE [statesync.Handler] with the C-Chain
 // atomic trie state at the settled height.
 type SummaryHandler struct {
-	*statesync.SummaryHandler
+	*statesync.Handler
 
+	cfg   statesync.Config
 	hooks hook.Points
 	state *state.State
 	ethDB ethdb.Database
@@ -38,44 +42,49 @@ type SummaryHandler struct {
 func New(
 	cfg statesync.Config,
 	db ethdb.Database,
+	snowCtx *snow.Context,
+	network *network.Network,
 	hooks hook.Points,
 	state *state.State,
-	log logging.Logger,
 ) (*SummaryHandler, error) {
 	inner, err := statesync.New(
 		cfg,
 		db,
-		log,
+		snowCtx,
+		network,
 		hooks,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)
 	}
 	return &SummaryHandler{
-		SummaryHandler: inner,
-		state:          state,
-		hooks:          hooks,
-		ethDB:          db,
-		log:            log,
+		Handler: inner,
+		cfg:     cfg,
+		state:   state,
+		hooks:   hooks,
+		ethDB:   db,
+		log:     snowCtx.Log,
 	}, nil
 }
 
-// GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
+// GetStateSummary is the same as [statesync.Handler.GetStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetStateSummary(ctx, height))
+	return h.wrap(h.Handler.GetStateSummary(ctx, height))
 }
 
-// GetLastStateSummary is the same as [statesync.SummaryHandler.GetLastStateSummary],
+// GetLastStateSummary is the same as [statesync.Handler.GetLastStateSummary],
 // but the returned summary contains the settled C-Chain state root.
 func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetLastStateSummary(ctx))
+	return h.wrap(h.Handler.GetLastStateSummary(ctx))
 }
 
-// GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
-// but the returned summary contains the settled C-Chain state root.
-func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetOngoingSyncStateSummary(ctx))
+// GetOngoingSyncStateSummary is not implemented. It always returns
+// [database.ErrNotFound].
+//
+// TODO(alarso16): Allow resuming state sync.
+func (*SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
+	return nil, database.ErrNotFound
 }
 
 // wrap pairs an SAE summary with the C-Chain atomic trie root at the
