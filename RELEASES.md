@@ -185,7 +185,6 @@ After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `c
 
 - Updated the minimum Go version from `1.25.8` to `1.25.10`.
 - Fixed `callTracer` failing with `incorrect number of top-level calls` on transactions where a precompile makes an outbound call ([ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303)).
-- Fixed the code syncer leaving stale code-to-fetch markers on disk after state sync.
 - ProposerVM `ERROR` logs caused by the P-Chain database closing during shutdown are now `WARN`.
 - Fixed Subnet-EVM nodes failing to restart after a state upgrade activates when the upgrade config contains `"storage": {}`, `"code": "0x"`, or `"balanceChange": "0"`.
 - Removed the block acceptance time health check that `v1.14.2` added. The check could only recover after the node accepted new blocks. Some deployments send traffic only to healthy nodes, so a failed check could never recover.
