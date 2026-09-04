@@ -15,11 +15,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -46,6 +48,10 @@ import (
 
 // directory that stores execution results database under the chain data directory
 const executionResultsDir = "sae_execution_results"
+
+func ExecutionResultsPath(chainDataDir string) string {
+	return filepath.Join(chainDataDir, executionResultsDir)
+}
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
@@ -137,8 +143,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	// ==========  Execution Results DB  ==========
-	xdbDir := filepath.Join(snowCtx.ChainDataDir, executionResultsDir)
-
+	xdbDir := ExecutionResultsPath(snowCtx.ChainDataDir)
 	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
@@ -354,6 +359,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 func (vm *VM) numPendingTxs() int {
 	p, _ := vm.mempool.Pool.Stats()
 	return p
+}
+
+// EVMState returns direct access to the databases that control the EVM state.
+func (vm *VM) EVMState() (*triedb.Database, *snapshot.Tree) {
+	return vm.exec.TrieDB(), vm.exec.Snapshot()
 }
 
 // SetState notifies the VM of a transition in the state lifecycle.

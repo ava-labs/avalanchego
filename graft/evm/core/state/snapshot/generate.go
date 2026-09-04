@@ -49,6 +49,16 @@ const (
 	snapshotCacheStatsUpdateFrequency = 1000                             // update stats from the snapshot fastcache once per 1000 ops
 )
 
+var GenerationDoneBlob = mustRLPEncode(journalGenerator{Done: true})
+
+func mustRLPEncode(x interface{}) []byte {
+	b, err := rlp.EncodeToBytes(x)
+	if err != nil {
+		panic(fmt.Errorf("failed to RLP encode: %w", err))
+	}
+	return b
+}
+
 // generateSnapshot regenerates a brand new snapshot based on an existing state
 // database and head block asynchronously. The snapshot is returned immediately
 // and generation is continued in the background until done.

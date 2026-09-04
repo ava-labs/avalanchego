@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -73,8 +74,6 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
-
 func (e *Executor) processQueue() {
 	defer close(e.done)
 
@@ -97,13 +96,11 @@ func (e *Executor) processQueue() {
 			case errors.Is(err, errFatal):
 				log.Fatal( //nolint:gocritic // False positive, will not terminate the process
 					"Block execution failed",
-					zap.String("playbook", emergencyPlaybookLink),
 					zap.Error(err),
 				)
 			case err != nil:
 				log.Error(
 					"Error of unknown severity in block execution",
-					zap.String("if_escalation_required", emergencyPlaybookLink),
 					zap.Error(err),
 				)
 			}
@@ -116,6 +113,17 @@ func (e *Executor) processQueue() {
 }
 
 var errFatal = errors.New("fatal execution error")
+
+const (
+	// triePrefetcherNamespace names the prefetcher's metrics. libevm records
+	// them as `trie/prefetch/sae/*` on its global registry.
+	//
+	// TODO(JonathanOppenheimer): We need to register this namespace within
+	// SAE.
+	triePrefetcherNamespace = "sae"
+	// triePrefetcherParallelism limits the prefetcher to 16 goroutines.
+	triePrefetcherParallelism = 16
+)
 
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
@@ -133,6 +141,16 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+
+	// The prefetcher loads trie nodes during execution which removes the loads
+	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
+	// from 99.76ms to 44.84ms:
+	// https://github.com/ava-labs/avalanchego/issues/5665#issuecomment-5372800462
+	//
+	// TODO(JonathanOppenheimer): measure this again after SAE is live!
+	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
+	defer stateDB.StopPrefetcher()
+
 	result, err := Execute(
 		b,
 		stateDB,

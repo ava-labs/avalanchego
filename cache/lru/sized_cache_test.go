@@ -50,6 +50,27 @@ func TestSizedCacheWrongKeyEvictionRegression(t *testing.T) {
 	require.True(ok)
 }
 
+// Overwriting the oldest key with a larger value must not subtract the old
+// size twice.
+func TestSizedCacheOverwriteOldestRegression(t *testing.T) {
+	require := require.New(t)
+
+	cache := NewSizedCache(
+		100,
+		func(_ string, v int) int {
+			return v
+		},
+	)
+
+	cache.Put("a", 60)
+	cache.Put("b", 40)
+	cache.Put("a", 61)
+
+	_, ok := cache.Get("b")
+	require.False(ok, "Get(b)")
+	require.Equal(0.61, cache.PortionFilled(), "PortionFilled()")
+}
+
 func TestSizedLRUSizeAlteringRegression(t *testing.T) {
 	require := require.New(t)
 
