@@ -47,25 +47,26 @@ var (
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
 )
 
-// getValidatorPeriod returns the staking period of the validator on subnetID
-// with nodeID, and whether the validator is current rather than pending.
-func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) (state.StakingPeriod, bool, error) {
+// getValidatorStakingPeriod returns the staking period of the validator on subnetID
+// with nodeID, whether the validator is permissioned, and whether it is
+// current rather than pending.
+func getValidatorStakingPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) (stakingPeriod state.StakingPeriod, permissioned bool, isCurrent bool, err error) {
 	stakingState := state.NewAdapter(chainState)
 
 	v, err := stakingState.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
-		return v.StakingPeriod(), true, nil
+		return v.StakingPeriod(), v.IsPermissioned(), true, nil
 	}
 
 	if !errors.Is(err, database.ErrNotFound) {
-		return state.StakingPeriod{}, false, err
+		return state.StakingPeriod{}, false, false, err
 	}
 
 	pendingValidator, err := stakingState.GetPendingValidator(subnetID, nodeID)
 	if err != nil {
-		return state.StakingPeriod{}, false, err
+		return state.StakingPeriod{}, false, false, err
 	}
-	return pendingValidator.StakingPeriod(), false, nil
+	return pendingValidator.StakingPeriod(), pendingValidator.IsPermissioned(), false, nil
 }
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -76,7 +77,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	chainState state.Chain,
 	subnetValidator platform.Validator,
 ) error {
-	primaryNetworkValidator, _, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
+	primaryNetworkValidator, _, _, err := getValidatorStakingPeriod(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf(
 			"%s %w of the primary network",
@@ -174,7 +175,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	_, _, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, _, _, err = getValidatorStakingPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
@@ -263,7 +264,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	_, _, err := getValidatorPeriod(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	_, _, _, err := getValidatorStakingPeriod(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
@@ -349,7 +350,7 @@ func verifyRemoveSubnetValidatorTx(
 		return state.StakingPeriod{}, false, err
 	}
 
-	validator, isCurrentValidator, err := getValidatorPeriod(chainState, tx.Subnet, tx.NodeID)
+	validator, permissioned, isCurrentValidator, err := getValidatorStakingPeriod(chainState, tx.Subnet, tx.NodeID)
 	if err != nil {
 		// It isn't a current or pending validator.
 		return state.StakingPeriod{}, false, fmt.Errorf(
@@ -361,7 +362,7 @@ func verifyRemoveSubnetValidatorTx(
 		)
 	}
 
-	if !validator.IsPermissionedValidator() {
+	if !permissioned {
 		return state.StakingPeriod{}, false, ErrRemovePermissionlessValidator
 	}
 
@@ -465,7 +466,7 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	primaryNetworkValidator, _, err := getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, _, _, err := getValidatorStakingPeriod(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -606,7 +607,7 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 
-	_, _, err = getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
+	_, _, _, err = getValidatorStakingPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"%w: %s on %s",
@@ -730,7 +731,7 @@ func verifyAddPermissionlessDelegatorTx(
 		)
 	}
 
-	validator, _, err := getValidatorPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
+	validator, permissioned, _, err := getValidatorStakingPeriod(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",
@@ -772,7 +773,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return ErrOverDelegated
 	}
 
-	if validator.IsPermissionedValidator() {
+	if permissioned {
 		// Invariant: Delegators must only be able to reference validator
 		//            transactions that implement [platform.ValidatorTx]. All
 		//            validator transactions implement this interface except the
@@ -938,7 +939,7 @@ func verifyAddAutoRenewedValidatorTx(
 		return ErrStakeTooLong
 	}
 
-	_, _, err = getValidatorPeriod(chainState, constants.PrimaryNetworkID, tx.NodeID())
+	_, _, _, err = getValidatorStakingPeriod(chainState, constants.PrimaryNetworkID, tx.NodeID())
 	switch {
 	case err == nil:
 		return fmt.Errorf(

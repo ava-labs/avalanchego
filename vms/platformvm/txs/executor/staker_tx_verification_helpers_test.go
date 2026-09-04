@@ -48,7 +48,7 @@ func TestGetMaxWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			validator, _, err := getValidatorPeriod(s, constants.PrimaryNetworkID, nodeID)
+			validator, _, _, err := getValidatorStakingPeriod(s, constants.PrimaryNetworkID, nodeID)
 			require.NoError(err)
 
 			amount, err := getMaxWeight(

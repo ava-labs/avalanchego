@@ -45,7 +45,7 @@ func (a Adapter) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (Curren
 // is self-contained: its TxID and BLS key were captured from the adding
 // transaction at construction, so re-insertion (e.g. auto-renewal) needs no tx.
 func (a Adapter) PutCurrentValidator(v CurrentValidator) error {
-	return a.legacy.PutCurrentValidator(currentStaker(v.period, v.PotentialReward()))
+	return a.legacy.PutCurrentValidator(currentStaker(v.stakingPeriod, v.PotentialReward()))
 }
 
 // DeleteCurrentValidator removes the specified validator from the current validator set.
@@ -213,14 +213,14 @@ func (a Adapter) GetCurrentDelegators(subnetID ids.ID, nodeID ids.NodeID) (iter.
 // PutCurrentDelegator adds delegator to the current delegator set. As with
 // [Adapter.PutCurrentValidator], the record carries its own TxID.
 func (a Adapter) PutCurrentDelegator(delegator CurrentDelegator) error {
-	return a.legacy.PutCurrentDelegator(currentStaker(delegator.period, delegator.PotentialReward()))
+	return a.legacy.PutCurrentDelegator(currentStaker(delegator.stakingPeriod, delegator.PotentialReward()))
 }
 
 // DeleteCurrentDelegator removes delegator from the current delegator set. As
 // with puts, the record is self-contained: the native record is reconstructed
 // from it without a transaction lookup.
 func (a Adapter) DeleteCurrentDelegator(delegator CurrentDelegator) error {
-	return a.legacy.DeleteCurrentDelegator(currentStaker(delegator.period, delegator.PotentialReward()))
+	return a.legacy.DeleteCurrentDelegator(currentStaker(delegator.stakingPeriod, delegator.PotentialReward()))
 }
 
 // GetPendingValidator returns the pending validator on subnetID with nodeID.
@@ -249,13 +249,13 @@ func (a Adapter) PutPendingValidator(tx *platform.Tx) error {
 		return fmt.Errorf("%w: %T does not register a validator", errUnexpectedStaker, s)
 	}
 
-	period := newPendingStakingPeriod(tx.ID(), s)
-	period.publicKey, err = getPublicKey(v)
+	stakingPeriod := newPendingStakingPeriod(tx.ID(), s)
+	stakingPeriod.publicKey, err = getPublicKey(v)
 	if err != nil {
 		return err
 	}
 
-	return a.legacy.PutPendingValidator(pendingStaker(period))
+	return a.legacy.PutPendingValidator(pendingStaker(stakingPeriod))
 }
 
 // DeletePendingValidator removes the pending validator on subnetID with
@@ -302,7 +302,7 @@ func (a Adapter) PutPendingDelegator(tx *platform.Tx) error {
 // DeletePendingDelegator removes delegator from the pending delegator set, as
 // in [Adapter.DeleteCurrentDelegator].
 func (a Adapter) DeletePendingDelegator(delegator PendingDelegator) {
-	a.legacy.DeletePendingDelegator(pendingStaker(delegator.period))
+	a.legacy.DeletePendingDelegator(pendingStaker(delegator.stakingPeriod))
 }
 
 // GetCurrentStakers returns all current stakers, ordered by their removal
@@ -331,8 +331,8 @@ func (a Adapter) GetPendingStakers() (iter.Seq[PendingStaker], error) {
 
 // DelegatorDiff is one scheduled change to a validator's delegator set.
 type DelegatorDiff struct {
-	// Period is the staking period of the delegation that is changing.
-	Period StakingPeriod
+	// StakingPeriod is the staking period of the delegation that is changing.
+	StakingPeriod StakingPeriod
 	// Added is whether the delegation is being added to the current
 	// delegator set; otherwise it is being removed.
 	Added bool
@@ -362,9 +362,9 @@ func (a Adapter) GetDelegatorDiffs(subnetID ids.ID, nodeID ids.NodeID) (iter.Seq
 		for it.Next() {
 			s, added := it.Value()
 			diff := DelegatorDiff{
-				Period: stakingPeriodFromStaker(s),
-				Added:  added,
-				Time:   s.NextTime,
+				StakingPeriod: stakingPeriodFromStaker(s),
+				Added:         added,
+				Time:          s.NextTime,
 			}
 			if !yield(diff) {
 				return

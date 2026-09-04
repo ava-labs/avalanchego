@@ -105,9 +105,9 @@ func mintPotentialReward(
 	backend *Backend,
 	parentState state.Chain,
 	changes *state.Diff,
-	period state.StakingPeriod,
+	stakingPeriod state.StakingPeriod,
 ) (uint64, error) {
-	supply, err := changes.GetCurrentSupply(period.SubnetID())
+	supply, err := changes.GetCurrentSupply(stakingPeriod.SubnetID())
 	if err != nil {
 		return 0, err
 	}
@@ -116,22 +116,22 @@ func mintPotentialReward(
 		backend.Config.RewardConfig,
 		backend.Config.UpgradeConfig,
 		parentState,
-		period.SubnetID(),
+		stakingPeriod.SubnetID(),
 	)
 	if err != nil {
 		return 0, err
 	}
 
 	potentialReward := rewards.Calculate(
-		period.Start(),
-		period.End().Sub(period.Start()),
-		period.Weight(),
+		stakingPeriod.Start(),
+		stakingPeriod.End().Sub(stakingPeriod.Start()),
+		stakingPeriod.Weight(),
 		supply,
 	)
 
 	// Invariant: reward.Calculator.Calculate can never return a
 	// potentialReward such that supply + potentialReward > maximumSupply.
-	changes.SetCurrentSupply(period.SubnetID(), supply+potentialReward)
+	changes.SetCurrentSupply(stakingPeriod.SubnetID(), supply+potentialReward)
 
 	return potentialReward, nil
 }
@@ -211,7 +211,7 @@ func advanceTimeTo(
 			// Only permissionless stakers (including the primary network) are
 			// eligible for rewards.
 			var potentialReward uint64
-			if !stakingPeriod.IsPermissionedValidator() {
+			if !stakerToRemove.IsPermissioned() {
 				var err error
 				potentialReward, err = mintPotentialReward(backend, parentState, changes, stakingPeriod)
 				if err != nil {
@@ -272,24 +272,24 @@ func advanceTimeTo(
 	}
 
 	for stakerToRemove := range currentStakers {
-		period := stakerToRemove.StakingPeriod()
+		stakingPeriod := stakerToRemove.StakingPeriod()
 
-		if period.End().After(newChainTime) {
+		if stakingPeriod.End().After(newChainTime) {
 			break
 		}
 
 		// Invariant: Permissioned validators are encountered first for a given
 		// timestamp because their internal priority is the smallest.
-		_, ok := stakerToRemove.(state.CurrentValidator)
-		if !ok || !period.IsPermissionedValidator() {
+		validator, ok := stakerToRemove.(state.CurrentValidator)
+		if !ok || !validator.IsPermissioned() {
 			// Permissionless stakers are removed by the RewardValidatorTx (or a
 			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
 			// AdvanceTimeTx.
 			break
 		}
 		if err := changesStakingState.DeleteCurrentValidator(
-			period.SubnetID(),
-			period.NodeID(),
+			stakingPeriod.SubnetID(),
+			stakingPeriod.NodeID(),
 		); err != nil {
 			return nil, false, fmt.Errorf("deleting current validator: %w", err)
 		}

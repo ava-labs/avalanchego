@@ -197,7 +197,7 @@ func getMaxWeight(
 		} else {
 			op = math.Sub
 		}
-		currentWeight, err = op(currentWeight, diff.Period.Weight())
+		currentWeight, err = op(currentWeight, diff.StakingPeriod.Weight())
 		if err != nil {
 			return 0, err
 		}
