@@ -1,13 +1,51 @@
 # Release Notes
 
-## Pending (v1.14.3)
+## Pending (v1.15.1)
 
-### Config
+- None (delete and fill in as you work)
 
-- Added `api-resolve-pending-to-last-executed` for SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
+## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
-### Metrics
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md) C-Chain Async Execution
+- [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
+- [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
+- [ACP-273](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md) Reduce Minimum Validator Staking Duration
+- [ACP-283](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md) Dynamic Minimum C-Chain Gas Price
+- [ACP-285](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md) Reduce Minimum Consumption Rate
 
+The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
+
+**All Mainnet nodes must upgrade before 11 AM ET, September 22nd 2026.**
+
+The plugin version is updated to `46`; all plugins must update to be compatible.
+
+### APIs
+
+The wallet now supports the transaction types:
+- `NewAddAutoRenewedValidatorTx`
+- `NewSetAutoRenewedValidatorConfigTx`
+
+#### C-Chain RPCs
+
+- All RPCs that rely on state, if called after a block is accepted, will return after the block is executed.
+- The `admin` API namespace is deprecated.
+- The `warp` API namespace is deprecated.
+- The `avax.getAtomicTxStatus` RPC is deprecated.
+- All APIs that rely on state of pending blocks are deprecated.
+- In the `debug` namespace, the following APIs are deprecated:
+  - `debug_dumpBlock`
+  - `debug_preimage`
+  - `debug_getBadBlocks`
+  - `debug_accountRange`
+  - `debug_storageRangeAt`
+  - `debug_getModifiedAccountsByNumber`
+  - `debug_getModifiedAccountsByHash`
+  - `debug_getAccessibleState`
+
+#### Metrics
+
+- Histogram `avalanche_snowman_consensus_latencies` creates 8 buckets instead of 4, each a second wide.
 - Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
 - Added SAE execution-pressure metrics:
   - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
@@ -38,9 +76,113 @@
 
 NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
+### Configs
+
+#### New
+
+- `helicon-min-stake-duration` (only on local/custom networks)
+- `min-price-target` for C-Chain
+- `api-resolve-pending-to-last-executed` for C-Chain SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
+
+#### Changed
+
+- `state-sync-ids` in Coreth and Subnet-EVM configs is now a JSON array of node IDs (`["NodeID-..."]`) instead of a comma-separated string.
+- `api-max-duration` for C-Chain is now a duration string (e.g. `"30s"`) instead of a number; `0` means no limit.
+- `commit-interval` for C-Chain MUST be left at its default (`4096`) on Mainnet and Fuji; other values are rejected at startup.
+- `state-sync-enabled` for C-Chain now defaults to `true`.
+
+#### Removed from C-Chain
+
+After Helicon activates, the C-Chain ignores the following options. The node does not log a warning or fail to start.
+
+- `skip-upgrade-check`
+- `admin-api-enabled`
+- `admin-api-dir`
+- `warp-api-enabled`
+- `continuous-profiler-dir`
+- `continuous-profiler-frequency`
+- `continuous-profiler-max-files`
+- `rpc-gas-cap` (fixed at 50,000,000)
+- `rpc-tx-fee-cap` (fixed at 100 AVAX)
+- `trie-dirty-cache`
+- `trie-dirty-commit-target`
+- `trie-prefetcher-parallelism`
+- `preimages-enabled`
+- `snapshot-wait`
+- `snapshot-verification-enabled`
+- `accepted-queue-limit`
+- `populate-missing-tries-parallelism`
+- `prune-warp-db-enabled`
+- `historical-proof-query-window`
+- `metrics-expensive-enabled`
+- `price-options-slow-fee-percentage`
+- `price-options-fast-fee-percentage`
+- `price-options-max-tip`
+- `tx-pool-price-limit`
+- `tx-pool-price-bump`
+- `tx-pool-lifetime`
+- `ws-cpu-refill-rate`
+- `ws-cpu-max-stored`
+- `allow-unfinalized-queries`
+- `allow-unprotected-tx-hashes`
+- `keystore-directory`
+- `keystore-external-signer`
+- `keystore-insecure-unlock-allowed`
+- `push-gossip-percent-stake`
+- `push-gossip-num-validators`
+- `push-gossip-num-peers`
+- `push-regossip-num-validators`
+- `push-regossip-num-peers`
+- `push-gossip-frequency`
+- `pull-gossip-frequency`
+- `regossip-frequency`
+- `log-level`
+- `log-json-format`
+- `offline-pruning-bloom-filter-size`
+- `max-outbound-active-requests`
+- `state-sync-skip-resume`
+- `state-sync-server-trie-cache`
+- `state-sync-commit-interval`
+- `state-sync-min-blocks`
+- `state-sync-request-size`
+- `inspect-database`
+- `accepted-cache-size`
+- `state-history`
+- `skip-tx-indexing`
+- `http-body-limit`
+- `batch-response-max-size`
+- `eth-apis`
+- `offline-pruning-enabled`
+- `offline-pruning-data-directory`
+- `populate-missing-tries`
+- `transaction-history`
+- `tx-pool-account-queue`
+- `tx-pool-global-queue`
+- `api-max-blocks-per-request`
+
+### Features
+
+- Subnet-EVM allows providing the initial block delay at genesis via `InitialMinDelayMS` in the chain config.
+- Added `transitionvm` as a type of VM that can swap between two different implementations at a specific fork.
+- The Primary Network minimum staking duration is reduced from 2 weeks to 48 hours at Helicon activation (ACP-273).
+- C-Chain nodes serve ACP-194 state-sync summaries to peers, but state-syncing a C-Chain node is not yet supported; new nodes bootstrap by executing all blocks.
+- Updated Firewood from `v0.3.1` to `v0.8.0`.
+- Changed the Firewood state sync protocol. A `v1.15.0` node cannot state sync with Firewood from a `v1.14.x` node. This does not affect the default `hash` state scheme.
+
 ### Fixes
+
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 - Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
+- Archival nodes with re-execution will correctly skip atomic transaction application.
+- Fixed bug where code syncer could finish with improper disk artifacts.
+- P-Chain `ERROR` logs during close are downgraded to `WARN`.
+- `eth_estimateGas` no longer includes the ACP-194 minimum gas floor, which caused large overestimates after Helicon activation.
+- Fixed a C-Chain crash loop for nodes upgrading after Helicon activation.
+- Fixed Subnet-EVM nodes failing to restart after a state upgrade activates when the upgrade config contains `"storage": {}`, `"code": "0x"`, or a decimal `balanceChange`.
+- Removed the block acceptance time health check that `v1.14.2` added. The check could only recover after the node accepted new blocks. Some deployments send traffic only to healthy nodes, so a failed check could never recover.
+- Fixed `SizedCache` undercounting size when overwriting a key, which let caches exceed their configured limits.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.2...v1.15.0
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
