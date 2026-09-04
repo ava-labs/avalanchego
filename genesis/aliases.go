@@ -15,14 +15,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	pChainAlias = "platform"
+	xChainAlias = "avm"
+	cChainAlias = "evm"
+)
+
 var (
-	PChainAliases = []string{"P", "platform"}
-	XChainAliases = []string{"X", "avm"}
-	CChainAliases = []string{"C", "evm"}
+	PChainAliases = []string{"P", pChainAlias}
+	XChainAliases = []string{"X", xChainAlias}
+	CChainAliases = []string{"C", cChainAlias}
 	VMAliases     = map[ids.ID][]string{
-		constants.PlatformVMID: {"platform"},
-		constants.AVMID:        {"avm"},
-		constants.EVMID:        {"evm"},
+		constants.PlatformVMID: {pChainAlias},
+		constants.AVMID:        {xChainAlias},
+		constants.EVMID:        {cChainAlias},
 		secp256k1fx.ID:         {"secp256k1fx"},
 		nftfx.ID:               {"nftfx"},
 		propertyfx.ID:          {"propertyfx"},
@@ -34,9 +40,9 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	apiAliases := map[string][]string{
 		path.Join(constants.ChainAliasPrefix, constants.PlatformChainID.String()): {
 			"P",
-			"platform",
+			pChainAlias,
 			path.Join(constants.ChainAliasPrefix, "P"),
-			path.Join(constants.ChainAliasPrefix, "platform"),
+			path.Join(constants.ChainAliasPrefix, pChainAlias),
 		},
 	}
 	chainAliases := map[ids.ID][]string{
@@ -55,17 +61,17 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 		case constants.AVMID:
 			apiAliases[endpoint] = []string{
 				"X",
-				"avm",
+				xChainAlias,
 				path.Join(constants.ChainAliasPrefix, "X"),
-				path.Join(constants.ChainAliasPrefix, "avm"),
+				path.Join(constants.ChainAliasPrefix, xChainAlias),
 			}
 			chainAliases[chainID] = XChainAliases
 		case constants.EVMID:
 			apiAliases[endpoint] = []string{
 				"C",
-				"evm",
+				cChainAlias,
 				path.Join(constants.ChainAliasPrefix, "C"),
-				path.Join(constants.ChainAliasPrefix, "evm"),
+				path.Join(constants.ChainAliasPrefix, cChainAlias),
 			}
 			chainAliases[chainID] = CChainAliases
 		}

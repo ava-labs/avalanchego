@@ -23,7 +23,7 @@ func flip(b uint8) uint8 {
 func BitString(id ID) string {
 	sb := strings.Builder{}
 	for _, b := range id {
-		sb.WriteString(fmt.Sprintf("%08b", flip(b)))
+		fmt.Fprintf(&sb, "%08b", flip(b))
 	}
 	return sb.String()
 }

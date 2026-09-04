@@ -28,7 +28,7 @@ func Push(tb testing.TB, data []byte) []byte {
 	tb.Helper()
 	require.NotEmpty(tb, data, "Push() data is empty; PUSH0 pushes a 0, not zero-length data")
 	require.LessOrEqualf(tb, len(data), 32, "Push() data length exceeds the EVM's push limit")
-	return append(Ops(vm.PUSH0+vm.OpCode(len(data))), data...)
+	return append(Ops(vm.PUSH0+vm.OpCode(len(data))), data...) //#nosec G115 -- the require above limits len(data) to 32.
 }
 
 // LogTopOfStackAfter returns runtime bytecode that executes the concatenated

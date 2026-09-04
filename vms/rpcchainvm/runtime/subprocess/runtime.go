@@ -99,7 +99,7 @@ func Bootstrap(
 	stopper := NewStopper(log, cmd)
 
 	// start stdout collector
-	go func() {
+	go func() { //#nosec G118 -- this collector outlives Bootstrap, and a done ctx skips the graceful SIGTERM.
 		_, err := io.Copy(config.Stdout, stdoutPipe)
 		if err != nil {
 			log.Error("stdout collector failed",
@@ -112,7 +112,7 @@ func Bootstrap(
 	}()
 
 	// start stderr collector
-	go func() {
+	go func() { //#nosec G118 -- this collector outlives Bootstrap, and a done ctx skips the graceful SIGTERM.
 		_, err := io.Copy(config.Stderr, stderrPipe)
 		if err != nil {
 			log.Error("stderr collector failed",
