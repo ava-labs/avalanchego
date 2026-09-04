@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: nobody signs the import</h2>
-  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/import.go" target="_blank">accepts it</a> only if every UTXO is marked, the single output pays exactly the owner, and the burned fee stays under a cap. Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
+  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/import.go" target="_blank">accepts it</a> only if every UTXO is marked and the single output pays exactly the owner. The block builder sets the fee itself, to exactly what the tx's gas costs at the block's base fee, so whoever posts it cannot inflate the fee (mainnet imports burn about 0.00001 AVAX). Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C, no signature</button></div>
@@ -142,7 +142,7 @@ const PK = '0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027';
 const WARP_PRECOMPILE = '0x0200000000000000000000000000000000000005';
 const NAVAX = 1000000000n;
 const PFEE = 10000000n;    // 0.01 AVAX burned on P-chain txs
-const CFEE = 1000000n;     // 0.001 AVAX burned by the unsigned C-chain import (cap is 0.01)
+const CFEE = 1000000n;     // fee hint for the unsigned import; the block builder reprices it to the base fee
 const EVM_OWNER_LOCKTIME = 1n;
 const P_TYPE_IMPORT = 17, P_TYPE_EXPORT = 18, TYPE_TRANSFER_INPUT = 5, TYPE_TRANSFER_OUTPUT = 7, TYPE_CREDENTIAL = 9;
 const C_TYPE_IMPORT = 0;   // vms/saevm/cchain/tx codec
@@ -493,9 +493,9 @@ async function importOnC() {
   const before = await cBalance();
   const bytes = cUnsignedImportTx(utxos, hexBytes(me));
   const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-  st.done(0, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials, ' + avax(CFEE) + ' AVAX burned from the UTXO itself). Nobody signed it.');
+  st.done(0, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials). Nobody signed it. The builder reprices the fee to the base fee before including it.');
   const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
+  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(6) + ' AVAX, fee actually burned: ' + avax(sum(utxos) - (after - before) / NAVAX) + ' AVAX');
 }
 
 // ---- boot ----

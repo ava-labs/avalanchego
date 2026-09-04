@@ -71,6 +71,7 @@ go_test(
         "//utils/crypto/secp256k1",
         "//utils/math",
         "//utils/set",
+        "//utils/units",
         "//vms/components/avax",
         "//vms/components/gas",
         "//vms/components/verify",

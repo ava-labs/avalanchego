@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -78,4 +80,55 @@ func TestImportUnsigned(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
+}
+
+func TestRepriceUnsigned(t *testing.T) {
+	var (
+		avaxAssetID = ids.GenerateTestID()
+		owner       = common.Address{1}
+		amount      = uint64(units.Avax)
+	)
+	imp := func(out uint64) *Tx {
+		return &Tx{Unsigned: &Import{
+			SourceChain: constants.PlatformChainID,
+			ImportedInputs: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+				Asset:  avax.Asset{ID: avaxAssetID},
+				In:     &secp256k1fx.TransferInput{Amt: amount},
+			}},
+			Outs: []Output{{Address: owner, Amount: out, AssetID: avaxAssetID}},
+		}}
+	}
+	baseFee := uint256.NewInt(1_500_000_000) // 1.5 nAVAX per gas
+
+	posted := imp(amount - MaxUnsignedImportBurn) // poster asked for the maximum fee
+	canonical, err := posted.RepriceUnsigned(baseFee)
+	require.NoError(t, err)
+	gas, err := gasUsed(canonical.Unsigned)
+	require.NoError(t, err)
+	wantBurn := (uint64(gas)*baseFee.Uint64() + _x2cRate - 1) / _x2cRate
+	require.Equal(t, amount-wantBurn, canonical.Unsigned.(*Import).Outs[0].Amount)
+	require.Less(t, wantBurn, MaxUnsignedImportBurn/100, "base-fee pricing is far below the posted cap")
+
+	// Repricing the canonical tx again is a no-op, which is what lets verifiers
+	// rebuild a block byte for byte.
+	again, err := canonical.RepriceUnsigned(baseFee)
+	require.NoError(t, err)
+	require.Equal(t, canonical.ID(), again.ID())
+
+	// Signed txs pass through untouched.
+	signed := imp(amount - 1)
+	signed.Creds = []Credential{&secp256k1fx.Credential{}}
+	same, err := signed.RepriceUnsigned(baseFee)
+	require.NoError(t, err)
+	require.Same(t, signed, same)
+
+	// A UTXO that cannot cover the fee is rejected.
+	dust := &Tx{Unsigned: &Import{
+		SourceChain:    constants.PlatformChainID,
+		ImportedInputs: []*avax.TransferableInput{{UTXOID: avax.UTXOID{}, Asset: avax.Asset{ID: avaxAssetID}, In: &secp256k1fx.TransferInput{Amt: 10}}},
+		Outs:           []Output{{Address: owner, Amount: 1, AssetID: avaxAssetID}},
+	}}
+	_, err = dust.RepriceUnsigned(baseFee)
+	require.ErrorIs(t, err, errUnsignedDust)
 }

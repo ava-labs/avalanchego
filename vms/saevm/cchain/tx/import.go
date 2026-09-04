@@ -40,7 +40,8 @@ const (
 	// the cleanup once the P-chain wallets ship it.
 	EVMOwnerLocktime uint64 = 1
 	// MaxUnsignedImportBurn caps the fee an [Import] with no credentials may
-	// burn, because anyone can issue one on the owner's behalf.
+	// burn as posted. The block builder reprices it to the base fee anyway
+	// ([Tx.RepriceUnsigned]); this only bounds what the mempool admits.
 	MaxUnsignedImportBurn nAVAX = 10 * units.MilliAvax
 )
 
@@ -266,6 +267,38 @@ func (i *Import) verifyUnsigned(sm chainsatomic.SharedMemory) error {
 		}
 	}
 	return nil
+}
+
+var errUnsignedDust = errors.New("unsigned import does not cover its fee")
+
+// repriceUnsigned returns a copy of i whose single output leaves exactly the
+// fee that gas at baseFee costs, rounded up. Because the tx bytes have fixed
+// width, the gas does not depend on the amounts, so every builder and
+// verifier derives the same tx from the same inputs and header. Whoever
+// posted the tx cannot inflate the fee.
+func (i *Import) repriceUnsigned(baseFee *uint256.Int) (*Import, error) {
+	gas, err := gasUsed(i)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		fee   = new(uint256.Int).Mul(uint256.NewInt(uint64(gas)), baseFee)
+		burn  = new(uint256.Int)
+		total nAVAX
+	)
+	burn.Add(fee, x2cRate).SubUint64(burn, 1).Div(burn, x2cRate) // ceil(fee / x2cRate)
+	for _, in := range i.ImportedInputs {
+		total, err = math.Add(total, in.In.Amount())
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !burn.IsUint64() || burn.Uint64() >= total {
+		return nil, fmt.Errorf("%w: %d nAVAX in, %s nAVAX fee", errUnsignedDust, total, burn)
+	}
+	repriced := *i
+	repriced.Outs = []Output{{Address: i.Outs[0].Address, Amount: total - burn.Uint64(), AssetID: i.Outs[0].AssetID}}
+	return &repriced, nil
 }
 
 var errUnexpectedInputType = errors.New("unexpected input type")

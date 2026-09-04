@@ -556,6 +556,16 @@ func (b *builder) PotentialEndOfBlockOps(
 			return
 		}
 
+		if building.BaseFee == nil {
+			b.ctx.Log.Error("building header has no base fee")
+			return
+		}
+		baseFee, overflow := uint256.FromBig(building.BaseFee)
+		if overflow {
+			b.ctx.Log.Error("building header base fee overflows uint256")
+			return
+		}
+
 		for t := range b.potentialTxs {
 			if inputs.Overlaps(t.inputs) {
 				b.ctx.Log.Debug("tx consumes previously consumed inputs",
@@ -585,6 +595,29 @@ func (b *builder) PotentialEndOfBlockOps(
 					zap.Error(err),
 				)
 				continue
+			}
+
+			// An unsigned import pays exactly the base fee, whatever its
+			// poster asked for. Verifiers rebuild the block through this same
+			// path, so a block carrying any other fee does not match.
+			repriced, err := t.tx.RepriceUnsigned(baseFee)
+			if err != nil {
+				b.ctx.Log.Debug("tx cannot be repriced",
+					zap.Stringer("txID", t.id),
+					zap.Error(err),
+				)
+				continue
+			}
+			if repriced != t.tx {
+				ht, err := newHookTx(repriced, b.ctx.AVAXAssetID)
+				if err != nil {
+					b.ctx.Log.Debug("repriced tx cannot be converted",
+						zap.Stringer("txID", t.id),
+						zap.Error(err),
+					)
+					continue
+				}
+				t = ht
 			}
 
 			if !yield(t) {

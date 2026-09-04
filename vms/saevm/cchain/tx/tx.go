@@ -247,6 +247,22 @@ func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
 	return t.Unsigned.verifyCredentials(sm, t.Creds)
 }
 
+// RepriceUnsigned returns the canonical form of an [Import] with no
+// credentials for a block with baseFee: same inputs and recipient, fee set to
+// exactly what its gas costs. Signed transactions are returned unchanged. It
+// MUST run after [Tx.VerifyCredentials].
+func (t *Tx) RepriceUnsigned(baseFee *uint256.Int) (*Tx, error) {
+	imp, ok := t.Unsigned.(*Import)
+	if !ok || len(t.Creds) != 0 {
+		return t, nil
+	}
+	repriced, err := imp.repriceUnsigned(baseFee)
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{Unsigned: repriced, Creds: t.Creds}, nil
+}
+
 // AtomicRequests returns shared-memory modifications that this transaction
 // should perform on the peer chainID during execution.
 func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err error) {
