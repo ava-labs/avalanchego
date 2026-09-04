@@ -156,9 +156,9 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
 	closers.Push(unwind.CloserFunc(func() error {
+		exec.Close()
 		return exec.Tracker.Close(exec.LastExecuted().SettledStateRoot())
 	}))
-	closers.Push(exec)
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)

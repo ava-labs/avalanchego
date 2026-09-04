@@ -9,7 +9,6 @@ package saexec
 
 import (
 	"fmt"
-	"io"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -102,14 +101,11 @@ func New(
 	return e, nil
 }
 
-var _ io.Closer = (*Executor)(nil)
-
 // Close shuts down the [Executor] and waits for all queued blocks to finish
 // executing.
-func (e *Executor) Close() error {
+func (e *Executor) Close() {
 	close(e.queue)
 	<-e.done
-	return nil
 }
 
 // ChainConfig returns the config originally passed to [New].

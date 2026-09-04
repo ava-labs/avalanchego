@@ -47,7 +47,7 @@ type queuedBlock struct {
 
 // Enqueue pushes a new block to the FIFO queue. Every enqueued block is
 // executed before [Executor.Close] returns, unless an earlier block fails to
-// execute. Enqueue MUST NOT be called after [Executor.Close].
+// execute. Enqueue MUST NOT be called after [Executor.Close] or it will panic.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 

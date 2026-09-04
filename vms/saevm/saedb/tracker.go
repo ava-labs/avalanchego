@@ -290,10 +290,10 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 	return nil
 }
 
-// retain holds a reference to root until [core.TriesInMemory] later roots have
-// been retained. The snapshot's disk layer never falls further behind the
-// last-executed state, and generation resumes at its root, so that trie MUST
-// still be in memory.
+// retain holds a reference to `root` until [core.TriesInMemory] later roots
+// have been retained. This is necessary because snapshot generation resumes at
+// the root of its disk layer, which is never more than [core.TriesInMemory]
+// blocks behind. If [Tracker.snaps] is nil then retain is a no-op.
 func (t *Tracker) retain(root common.Hash) {
 	if t.snaps == nil {
 		return

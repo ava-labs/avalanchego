@@ -6,7 +6,6 @@ package saexec
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -143,10 +142,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(func() error {
-		return errors.Join(
-			e.Close(),
-			tr.Close(e.LastExecuted().PostExecutionStateRoot()),
-		)
+		e.Close()
+		return tr.Close(e.LastExecuted().PostExecutionStateRoot())
 	})
 	tb.Cleanup(func() {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
@@ -1209,7 +1206,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
-					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+					e.Close()
 					require.NoErrorf(t, tr.Close(chain.Last().PostExecutionStateRoot()), "%T.Close()", tr)
 				})
 
