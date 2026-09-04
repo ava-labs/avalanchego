@@ -149,8 +149,8 @@ func pendingStaker(period StakingPeriod) *Staker {
 // Validator and delegator stay distinct because their legal operations differ;
 // the Primary Network and subnets do not.
 type CurrentStaker interface {
-	Period() StakingPeriod
-	Reward() uint64
+	StakingPeriod() StakingPeriod
+	PotentialReward() uint64
 	currentStaker()
 }
 
@@ -171,9 +171,16 @@ func newCurrentStaker(s *Staker) CurrentStaker {
 	}
 }
 
+func currentDelegatorFromStaker(s *Staker) CurrentDelegator {
+	return CurrentDelegator{
+		period:          stakingPeriodFromStaker(s),
+		potentialReward: s.PotentialReward,
+	}
+}
+
 // PendingStaker is the sealed sum of [PendingValidator] and [PendingDelegator].
 type PendingStaker interface {
-	Period() StakingPeriod
+	StakingPeriod() StakingPeriod
 	pendingStaker()
 }
 
@@ -197,7 +204,7 @@ func newPendingStaker(s *Staker) PendingStaker {
 // CurrentValidator is an active validator. The network it validates comes from
 // its staking period.
 type CurrentValidator struct {
-	StakingPeriod
+	period          StakingPeriod
 	potentialReward uint64
 }
 
@@ -219,7 +226,7 @@ func NewCurrentValidator(
 	}
 
 	return CurrentValidator{
-		StakingPeriod:   period,
+		period:          period,
 		potentialReward: potentialReward,
 	}, nil
 }
@@ -245,28 +252,27 @@ func newCurrentValidatorStakingPeriod(
 // validator's identity, transaction, and BLS key carry over; the caller
 // provides the new period bounds, weight, and potential reward it calculated.
 func (v CurrentValidator) Restake(start, end time.Time, weight, potentialReward uint64) CurrentValidator {
-	period := v.StakingPeriod
+	period := v.period
 	period.start = start
 	period.end = end
 	period.weight = weight
 
 	return CurrentValidator{
-		StakingPeriod:   period,
+		period:          period,
 		potentialReward: potentialReward,
 	}
 }
 
-// Period returns the validator's staking period.
-func (v CurrentValidator) Period() StakingPeriod { return v.StakingPeriod }
+func (v CurrentValidator) StakingPeriod() StakingPeriod { return v.period }
 
 // Reward returns the validator's potential reward.
-func (v CurrentValidator) Reward() uint64 { return v.potentialReward }
+func (v CurrentValidator) PotentialReward() uint64 { return v.potentialReward }
 
 func (CurrentValidator) currentStaker() {}
 
 func currentValidatorFromStaker(s *Staker) CurrentValidator {
 	return CurrentValidator{
-		StakingPeriod:   stakingPeriodFromStaker(s),
+		period:          stakingPeriodFromStaker(s),
 		potentialReward: s.PotentialReward,
 	}
 }
@@ -275,36 +281,36 @@ func currentValidatorFromStaker(s *Staker) CurrentValidator {
 // validates comes from its staking period; the Primary Network and subnets
 // have no distinct pending representation.
 type PendingValidator struct {
-	StakingPeriod
+	period StakingPeriod
 }
 
 var _ PendingStaker = PendingValidator{}
 
 // Promote returns the current validator corresponding to v.
 func (v PendingValidator) Promote(potentialReward uint64) CurrentValidator {
-	period := v.StakingPeriod
+	period := v.period
 	period.priority = platform.PendingToCurrentPriorities[period.priority]
 
 	return CurrentValidator{
-		StakingPeriod:   period,
+		period:          period,
 		potentialReward: potentialReward,
 	}
 }
 
 // Period returns the validator's staking period.
-func (v PendingValidator) Period() StakingPeriod { return v.StakingPeriod }
+func (v PendingValidator) StakingPeriod() StakingPeriod { return v.period }
 
 func (PendingValidator) pendingStaker() {}
 
 func pendingValidatorFromStaker(s *Staker) PendingValidator {
 	return PendingValidator{
-		StakingPeriod: stakingPeriodFromStaker(s),
+		period: stakingPeriodFromStaker(s),
 	}
 }
 
 // CurrentDelegator is an active delegation.
 type CurrentDelegator struct {
-	StakingPeriod
+	period          StakingPeriod
 	potentialReward uint64
 }
 
@@ -318,51 +324,44 @@ func NewCurrentDelegator(
 	weight, potentialReward uint64,
 ) CurrentDelegator {
 	return CurrentDelegator{
-		StakingPeriod:   newCurrentStakingPeriod(txID, staker, startTime, endTime, weight),
+		period:          newCurrentStakingPeriod(txID, staker, startTime, endTime, weight),
 		potentialReward: potentialReward,
 	}
 }
 
-// Period returns the delegator's staking period.
-func (d CurrentDelegator) Period() StakingPeriod { return d.StakingPeriod }
+// StakingPeriod returns the delegator's staking period.
+func (d CurrentDelegator) StakingPeriod() StakingPeriod { return d.period }
 
-// Reward returns the delegator's potential reward.
-func (d CurrentDelegator) Reward() uint64 { return d.potentialReward }
+// PotentialReward returns the delegator's potential reward.
+func (d CurrentDelegator) PotentialReward() uint64 { return d.potentialReward }
 
 func (CurrentDelegator) currentStaker() {}
 
-func currentDelegatorFromStaker(s *Staker) CurrentDelegator {
-	return CurrentDelegator{
-		StakingPeriod:   stakingPeriodFromStaker(s),
-		potentialReward: s.PotentialReward,
-	}
-}
-
 // PendingDelegator is a delegation waiting to become current.
 type PendingDelegator struct {
-	StakingPeriod
+	period StakingPeriod
 }
 
 var _ PendingStaker = PendingDelegator{}
 
 // Promote returns the current delegator corresponding to d.
 func (d PendingDelegator) Promote(potentialReward uint64) CurrentDelegator {
-	period := d.StakingPeriod
+	period := d.period
 	period.priority = platform.PendingToCurrentPriorities[period.priority]
 
 	return CurrentDelegator{
-		StakingPeriod:   period,
+		period:          period,
 		potentialReward: potentialReward,
 	}
 }
 
 // Period returns the delegator's staking period.
-func (d PendingDelegator) Period() StakingPeriod { return d.StakingPeriod }
+func (d PendingDelegator) StakingPeriod() StakingPeriod { return d.period }
 
 func (PendingDelegator) pendingStaker() {}
 
 func pendingDelegatorFromStaker(s *Staker) PendingDelegator {
 	return PendingDelegator{
-		StakingPeriod: stakingPeriodFromStaker(s),
+		period: stakingPeriodFromStaker(s),
 	}
 }

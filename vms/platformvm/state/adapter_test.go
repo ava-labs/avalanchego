@@ -26,7 +26,7 @@ func TestStakingState(t *testing.T) {
 
 	primaryValidator, err := typedState.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(t, err)
-	require.Equal(t, constants.PrimaryNetworkID, primaryValidator.SubnetID())
+	require.Equal(t, constants.PrimaryNetworkID, primaryValidator.StakingPeriod().SubnetID())
 
 	now := time.Now().Truncate(time.Second)
 	subnetValidator := &Staker{

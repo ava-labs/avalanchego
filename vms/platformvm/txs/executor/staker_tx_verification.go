@@ -54,7 +54,7 @@ func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.Node
 
 	v, err := stakingState.GetCurrentValidator(subnetID, nodeID)
 	if err == nil {
-		return v.Period(), true, nil
+		return v.StakingPeriod(), true, nil
 	}
 
 	if !errors.Is(err, database.ErrNotFound) {
@@ -65,7 +65,7 @@ func getValidatorPeriod(chainState state.Chain, subnetID ids.ID, nodeID ids.Node
 	if err != nil {
 		return state.StakingPeriod{}, false, err
 	}
-	return pendingValidator.Period(), false, nil
+	return pendingValidator.StakingPeriod(), false, nil
 }
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -1005,7 +1005,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return state.CurrentValidator{}, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
-	if tx.TxID != validator.TxID() {
+	if tx.TxID != validator.StakingPeriod().TxID() {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
 		return state.CurrentValidator{}, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)

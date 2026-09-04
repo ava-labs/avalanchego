@@ -160,7 +160,7 @@ func getMaxWeight(
 	// currently active delegators.
 	currentWeight := validatorWeight
 	for delegator := range currentDelegators {
-		currentWeight, err = math.Add(currentWeight, delegator.Weight())
+		currentWeight, err = math.Add(currentWeight, delegator.StakingPeriod().Weight())
 		if err != nil {
 			return 0, err
 		}

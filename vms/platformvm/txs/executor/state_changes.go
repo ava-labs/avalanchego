@@ -198,9 +198,9 @@ func advanceTimeTo(
 	}
 
 	for stakerToRemove := range pendingStakers {
-		period := stakerToRemove.Period()
+		stakingPeriod := stakerToRemove.StakingPeriod()
 
-		if period.Start().After(newChainTime) {
+		if stakingPeriod.Start().After(newChainTime) {
 			break
 		}
 
@@ -211,9 +211,9 @@ func advanceTimeTo(
 			// Only permissionless stakers (including the primary network) are
 			// eligible for rewards.
 			var potentialReward uint64
-			if !period.IsPermissionedValidator() {
+			if !stakingPeriod.IsPermissionedValidator() {
 				var err error
-				potentialReward, err = mintPotentialReward(backend, parentState, changes, period)
+				potentialReward, err = mintPotentialReward(backend, parentState, changes, stakingPeriod)
 				if err != nil {
 					return nil, false, err
 				}
@@ -224,7 +224,7 @@ func advanceTimeTo(
 				current: stakerToRemove.Promote(potentialReward),
 			})
 		case state.PendingDelegator:
-			potentialReward, err := mintPotentialReward(backend, parentState, changes, period)
+			potentialReward, err := mintPotentialReward(backend, parentState, changes, stakingPeriod)
 			if err != nil {
 				return nil, false, err
 			}
@@ -244,8 +244,8 @@ func advanceTimeTo(
 		}
 
 		if err := changesStakingState.DeletePendingValidator(
-			p.pending.SubnetID(),
-			p.pending.NodeID(),
+			p.pending.StakingPeriod().SubnetID(),
+			p.pending.StakingPeriod().NodeID(),
 		); err != nil {
 			return nil, false, err
 		}
@@ -272,7 +272,7 @@ func advanceTimeTo(
 	}
 
 	for stakerToRemove := range currentStakers {
-		period := stakerToRemove.Period()
+		period := stakerToRemove.StakingPeriod()
 
 		if period.End().After(newChainTime) {
 			break
@@ -280,7 +280,7 @@ func advanceTimeTo(
 
 		// Invariant: Permissioned validators are encountered first for a given
 		// timestamp because their internal priority is the smallest.
-		validator, ok := stakerToRemove.(state.CurrentValidator)
+		_, ok := stakerToRemove.(state.CurrentValidator)
 		if !ok || !period.IsPermissionedValidator() {
 			// Permissionless stakers are removed by the RewardValidatorTx (or a
 			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
@@ -288,8 +288,8 @@ func advanceTimeTo(
 			break
 		}
 		if err := changesStakingState.DeleteCurrentValidator(
-			validator.SubnetID(),
-			validator.NodeID(),
+			period.SubnetID(),
+			period.NodeID(),
 		); err != nil {
 			return nil, false, fmt.Errorf("deleting current validator: %w", err)
 		}

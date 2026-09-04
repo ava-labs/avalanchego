@@ -45,64 +45,17 @@ func (a Adapter) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (Curren
 // is self-contained: its TxID and BLS key were captured from the adding
 // transaction at construction, so re-insertion (e.g. auto-renewal) needs no tx.
 func (a Adapter) PutCurrentValidator(v CurrentValidator) error {
-	return a.legacy.PutCurrentValidator(currentStaker(v.StakingPeriod, v.Reward()))
+	return a.legacy.PutCurrentValidator(currentStaker(v.period, v.PotentialReward()))
 }
 
-// DeleteCurrentValidator removes the current validator on subnetID with
-// nodeID from the current validator set.
+// DeleteCurrentValidator removes the specified validator from the current validator set.
 func (a Adapter) DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) error {
 	v, err := a.legacy.GetCurrentValidator(subnetID, nodeID)
 	if err != nil {
 		return err
 	}
+
 	return a.legacy.DeleteCurrentValidator(v)
-}
-
-// RestakedRewards is the reward state a restaking validator carries across
-// cycles: amounts earned in previous cycles and restaked rather than paid.
-// Execution rewrites it only at a cycle boundary, alongside the staking
-// period it restakes. It is the zero value for a validator that has never
-// restaked.
-type RestakedRewards struct {
-	// Validation is the sum of validation rewards restaked from previous
-	// cycles.
-	Validation uint64
-	// Delegatee is the sum of delegatee rewards restaked from previous
-	// cycles.
-	Delegatee uint64
-}
-
-// GetRestakedRewards returns the rewards restaked in previous cycles by the
-// validator on subnetID with nodeID, or an error wrapping
-// [database.ErrNotFound] if the validator is not in the current validator
-// set. Rewards that were never set read as the zero value, indistinguishable
-// from rewards explicitly set to zero: the validator has never restaked.
-func (a Adapter) GetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID) (RestakedRewards, error) {
-	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
-	if err != nil {
-		return RestakedRewards{}, err
-	}
-
-	return RestakedRewards{
-		Validation: si.AccruedValidationRewards,
-		Delegatee:  si.AccruedDelegateeRewards,
-	}, nil
-}
-
-// SetRestakedRewards sets the rewards restaked in previous cycles by the
-// validator on subnetID with nodeID. It returns an error wrapping
-// [database.ErrNotFound] if the validator is not in the current validator
-// set.
-func (a Adapter) SetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID, restaked RestakedRewards) error {
-	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
-	if err != nil {
-		return err
-	}
-
-	si.AccruedValidationRewards = restaked.Validation
-	si.AccruedDelegateeRewards = restaked.Delegatee
-
-	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
 }
 
 // GetDelegateeReward returns the delegatee reward accrued during the current
@@ -183,12 +136,60 @@ func (a Adapter) SetRestakeConfig(subnetID ids.ID, nodeID ids.NodeID, config Res
 	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
 }
 
-// stakerSeq adapts a native staker iterator into a single-use sequence of
+// RestakedRewards is the reward state a restaking validator carries across
+// cycles: amounts earned in previous cycles and restaked rather than paid.
+// Execution rewrites it only at a cycle boundary, alongside the staking
+// period it restakes. It is the zero value for a validator that has never
+// restaked.
+type RestakedRewards struct {
+	// Validation is the sum of validation rewards restaked from previous
+	// cycles.
+	Validation uint64
+	// Delegatee is the sum of delegatee rewards restaked from previous
+	// cycles.
+	Delegatee uint64
+}
+
+// GetRestakedRewards returns the rewards restaked in previous cycles by the
+// validator on subnetID with nodeID, or an error wrapping
+// [database.ErrNotFound] if the validator is not in the current validator
+// set. Rewards that were never set read as the zero value, indistinguishable
+// from rewards explicitly set to zero: the validator has never restaked.
+func (a Adapter) GetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID) (RestakedRewards, error) {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return RestakedRewards{}, err
+	}
+
+	return RestakedRewards{
+		Validation: si.AccruedValidationRewards,
+		Delegatee:  si.AccruedDelegateeRewards,
+	}, nil
+}
+
+// SetRestakedRewards sets the rewards restaked in previous cycles by the
+// validator on subnetID with nodeID. It returns an error wrapping
+// [database.ErrNotFound] if the validator is not in the current validator
+// set.
+func (a Adapter) SetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID, restaked RestakedRewards) error {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return err
+	}
+
+	si.AccruedValidationRewards = restaked.Validation
+	si.AccruedDelegateeRewards = restaked.Delegatee
+
+	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
+}
+
+// seqFromStakerIterator adapts a native staker iterator into a single-use sequence of
 // typed records. The native iterator is released when iteration stops, so
 // the sequence must be ranged, even if the loop exits early.
-func stakerSeq[T any](it iterator.Iterator[*Staker], convert func(*Staker) T) iter.Seq[T] {
+func seqFromStakerIterator[T any](it iterator.Iterator[*Staker], convert func(*Staker) T) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		defer it.Release()
+
 		for it.Next() {
 			if !yield(convert(it.Value())) {
 				return
@@ -206,20 +207,20 @@ func (a Adapter) GetCurrentDelegators(subnetID ids.ID, nodeID ids.NodeID) (iter.
 		return nil, err
 	}
 
-	return stakerSeq(it, currentDelegatorFromStaker), nil
+	return seqFromStakerIterator(it, currentDelegatorFromStaker), nil
 }
 
 // PutCurrentDelegator adds delegator to the current delegator set. As with
 // [Adapter.PutCurrentValidator], the record carries its own TxID.
 func (a Adapter) PutCurrentDelegator(delegator CurrentDelegator) error {
-	return a.legacy.PutCurrentDelegator(currentStaker(delegator.StakingPeriod, delegator.Reward()))
+	return a.legacy.PutCurrentDelegator(currentStaker(delegator.period, delegator.PotentialReward()))
 }
 
 // DeleteCurrentDelegator removes delegator from the current delegator set. As
 // with puts, the record is self-contained: the native record is reconstructed
 // from it without a transaction lookup.
 func (a Adapter) DeleteCurrentDelegator(delegator CurrentDelegator) error {
-	return a.legacy.DeleteCurrentDelegator(currentStaker(delegator.StakingPeriod, delegator.Reward()))
+	return a.legacy.DeleteCurrentDelegator(currentStaker(delegator.period, delegator.PotentialReward()))
 }
 
 // GetPendingValidator returns the pending validator on subnetID with nodeID.
@@ -278,7 +279,7 @@ func (a Adapter) GetPendingDelegators(subnetID ids.ID, nodeID ids.NodeID) (iter.
 		return nil, err
 	}
 
-	return stakerSeq(it, pendingDelegatorFromStaker), nil
+	return seqFromStakerIterator(it, pendingDelegatorFromStaker), nil
 }
 
 // PutPendingDelegator adds the delegation that tx registers to the pending set.
@@ -301,7 +302,7 @@ func (a Adapter) PutPendingDelegator(tx *platform.Tx) error {
 // DeletePendingDelegator removes delegator from the pending delegator set, as
 // in [Adapter.DeleteCurrentDelegator].
 func (a Adapter) DeletePendingDelegator(delegator PendingDelegator) {
-	a.legacy.DeletePendingDelegator(pendingStaker(delegator.StakingPeriod))
+	a.legacy.DeletePendingDelegator(pendingStaker(delegator.period))
 }
 
 // GetCurrentStakers returns all current stakers, ordered by their removal
@@ -313,7 +314,7 @@ func (a Adapter) GetCurrentStakers() (iter.Seq[CurrentStaker], error) {
 		return nil, err
 	}
 
-	return stakerSeq(it, newCurrentStaker), nil
+	return seqFromStakerIterator(it, newCurrentStaker), nil
 }
 
 // GetPendingStakers returns all pending stakers, ordered by their removal
@@ -325,7 +326,7 @@ func (a Adapter) GetPendingStakers() (iter.Seq[PendingStaker], error) {
 		return nil, err
 	}
 
-	return stakerSeq(it, newPendingStaker), nil
+	return seqFromStakerIterator(it, newPendingStaker), nil
 }
 
 // DelegatorDiff is one scheduled change to a validator's delegator set.

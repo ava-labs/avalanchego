@@ -1467,7 +1467,7 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 
 	if err := state.NewAdapter(e.state).SetRestakeConfig(
 		constants.PrimaryNetworkID,
-		validator.NodeID(),
+		validator.StakingPeriod().NodeID(),
 		state.RestakeConfig{
 			AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
 			NextPeriod:               tx.Period,
