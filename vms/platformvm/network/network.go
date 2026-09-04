@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -32,7 +32,7 @@ type Network struct {
 	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
 
-	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
+	txPushGossiper        *gossip.PushGossiper[*platform.Tx]
 	txPushGossipFrequency time.Duration
 	txPullGossiper        gossip.Gossiper
 	txPullGossipFrequency time.Duration
@@ -169,7 +169,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 	return n.Network.AppGossip(ctx, nodeID, msgBytes)
 }
 
-func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
+func (n *Network) IssueTxFromRPC(tx *platform.Tx) error {
 	if err := n.mempool.Add(tx); err != nil {
 		return err
 	}

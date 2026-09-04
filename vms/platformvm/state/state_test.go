@@ -36,15 +36,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 
@@ -184,17 +183,17 @@ func TestState_writeStakers(t *testing.T) {
 		subnetValidatorEndTime     = subnetValidatorStartTime.Add(subnetValidatorDuration)
 		subnetValidatorEndTimeUnix = uint64(subnetValidatorEndTime.Unix())
 
-		primaryValidatorData = txs.Validator{
+		primaryValidatorData = platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			End:    primaryValidatorEndTimeUnix,
 			Wght:   1234,
 		}
-		primaryDelegatorData = txs.Validator{
+		primaryDelegatorData = platform.Validator{
 			NodeID: primaryValidatorData.NodeID,
 			End:    primaryDelegatorEndTimeUnix,
 			Wght:   6789,
 		}
-		subnetValidatorData = txs.Validator{
+		subnetValidatorData = platform.Validator{
 			NodeID: primaryValidatorData.NodeID,
 			End:    subnetValidatorEndTimeUnix,
 			Wght:   9876,
@@ -204,8 +203,8 @@ func TestState_writeStakers(t *testing.T) {
 	)
 
 	unsignedAddPrimaryNetworkValidator := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, primaryValidatorData)
-	addPrimaryNetworkValidator := &txs.Tx{Unsigned: unsignedAddPrimaryNetworkValidator}
-	require.NoError(t, addPrimaryNetworkValidator.Initialize(txs.Codec))
+	addPrimaryNetworkValidator := &platform.Tx{Unsigned: unsignedAddPrimaryNetworkValidator}
+	require.NoError(t, addPrimaryNetworkValidator.Initialize(platform.Codec))
 
 	primaryNetworkPendingValidatorStaker, err := NewPendingStaker(
 		addPrimaryNetworkValidator.ID(),
@@ -224,8 +223,8 @@ func TestState_writeStakers(t *testing.T) {
 	require.NoError(t, err)
 
 	unsignedAddPrimaryNetworkDelegator := createPermissionlessDelegatorTx(constants.PrimaryNetworkID, primaryDelegatorData)
-	addPrimaryNetworkDelegator := &txs.Tx{Unsigned: unsignedAddPrimaryNetworkDelegator}
-	require.NoError(t, addPrimaryNetworkDelegator.Initialize(txs.Codec))
+	addPrimaryNetworkDelegator := &platform.Tx{Unsigned: unsignedAddPrimaryNetworkDelegator}
+	require.NoError(t, addPrimaryNetworkDelegator.Initialize(platform.Codec))
 
 	primaryNetworkPendingDelegatorStaker, err := NewPendingStaker(
 		addPrimaryNetworkDelegator.ID(),
@@ -244,8 +243,8 @@ func TestState_writeStakers(t *testing.T) {
 	require.NoError(t, err)
 
 	unsignedAddSubnetValidator := createPermissionlessValidatorTx(t, subnetID, subnetValidatorData)
-	addSubnetValidator := &txs.Tx{Unsigned: unsignedAddSubnetValidator}
-	require.NoError(t, addSubnetValidator.Initialize(txs.Codec))
+	addSubnetValidator := &platform.Tx{Unsigned: unsignedAddSubnetValidator}
+	require.NoError(t, addSubnetValidator.Initialize(platform.Codec))
 
 	subnetCurrentValidatorStaker, err := NewCurrentStaker(
 		addSubnetValidator.ID(),
@@ -259,11 +258,11 @@ func TestState_writeStakers(t *testing.T) {
 
 	tests := map[string]struct {
 		initialStakers []*Staker
-		initialTxs     []*txs.Tx
+		initialTxs     []*platform.Tx
 
 		// Staker to insert or remove
 		staker      *Staker
-		addStakerTx *txs.Tx // If tx is nil, the staker is being removed
+		addStakerTx *platform.Tx // If tx is nil, the staker is being removed
 
 		// Check that the staker is duly stored/removed in P-chain state
 		expectedCurrentValidator  *Staker
@@ -303,7 +302,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"add current primary network delegator": {
 			initialStakers:            []*Staker{primaryNetworkCurrentValidatorStaker},
-			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
+			initialTxs:                []*platform.Tx{addPrimaryNetworkValidator},
 			staker:                    primaryNetworkCurrentDelegatorStaker,
 			addStakerTx:               addPrimaryNetworkDelegator,
 			expectedCurrentValidator:  primaryNetworkCurrentValidatorStaker,
@@ -335,7 +334,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"add pending primary network delegator": {
 			initialStakers:            []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
+			initialTxs:                []*platform.Tx{addPrimaryNetworkValidator},
 			staker:                    primaryNetworkPendingDelegatorStaker,
 			addStakerTx:               addPrimaryNetworkDelegator,
 			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
@@ -344,7 +343,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"add current subnet validator": {
 			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
-			initialTxs:               []*txs.Tx{addPrimaryNetworkValidator},
+			initialTxs:               []*platform.Tx{addPrimaryNetworkValidator},
 			staker:                   subnetCurrentValidatorStaker,
 			addStakerTx:              addSubnetValidator,
 			expectedCurrentValidator: subnetCurrentValidatorStaker,
@@ -369,7 +368,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"delete current primary network validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
+			initialTxs:     []*platform.Tx{addPrimaryNetworkValidator},
 			staker:         primaryNetworkCurrentValidatorStaker,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
@@ -390,7 +389,7 @@ func TestState_writeStakers(t *testing.T) {
 				primaryNetworkCurrentValidatorStaker,
 				primaryNetworkCurrentDelegatorStaker,
 			},
-			initialTxs: []*txs.Tx{
+			initialTxs: []*platform.Tx{
 				addPrimaryNetworkValidator,
 				addPrimaryNetworkDelegator,
 			},
@@ -417,7 +416,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"delete pending primary network validator": {
 			initialStakers:         []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:             []*txs.Tx{addPrimaryNetworkValidator},
+			initialTxs:             []*platform.Tx{addPrimaryNetworkValidator},
 			staker:                 primaryNetworkPendingValidatorStaker,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{},
 		},
@@ -426,7 +425,7 @@ func TestState_writeStakers(t *testing.T) {
 				primaryNetworkPendingValidatorStaker,
 				primaryNetworkPendingDelegatorStaker,
 			},
-			initialTxs: []*txs.Tx{
+			initialTxs: []*platform.Tx{
 				addPrimaryNetworkValidator,
 				addPrimaryNetworkDelegator,
 			},
@@ -436,7 +435,7 @@ func TestState_writeStakers(t *testing.T) {
 		},
 		"delete current subnet validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
+			initialTxs:     []*platform.Tx{addPrimaryNetworkValidator, addSubnetValidator},
 			staker:         subnetCurrentValidatorStaker,
 			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
 				{
@@ -610,7 +609,7 @@ func TestState_writeStakers(t *testing.T) {
 	}
 }
 
-func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
+func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsData platform.Validator) *platform.AddPermissionlessValidatorTx {
 	var sig signer.Signer = &signer.Empty{}
 	if subnetID == constants.PrimaryNetworkID {
 		sk, err := localsigner.New()
@@ -619,8 +618,8 @@ func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsDa
 		require.NoError(t, err)
 	}
 
-	return &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{
+	return &platform.AddPermissionlessValidatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
 				BlockchainID: constants.PlatformChainID,
@@ -684,9 +683,9 @@ func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsDa
 	}
 }
 
-func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validator) *txs.AddPermissionlessDelegatorTx {
-	return &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{
+func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData platform.Validator) *platform.AddPermissionlessDelegatorTx {
+	return &platform.AddPermissionlessDelegatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
 				BlockchainID: constants.PlatformChainID,
@@ -749,14 +748,14 @@ func createStakerAndTx(
 	endTime time.Time,
 	weight uint64,
 	potentialReward uint64,
-) (*Staker, *txs.Tx) {
-	unsignedTx := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+) (*Staker, *platform.Tx) {
+	unsignedTx := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime.Unix()),
 		Wght:   weight,
 	})
-	tx := &txs.Tx{Unsigned: unsignedTx}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	tx := &platform.Tx{Unsigned: unsignedTx}
+	require.NoError(t, tx.Initialize(platform.Codec))
 
 	staker, err := NewCurrentStaker(tx.ID(), unsignedTx, startTime, unsignedTx.EndTime(), unsignedTx.Weight(), potentialReward)
 	require.NoError(t, err)
@@ -770,14 +769,14 @@ func createAutoRenewedValidatorTx(
 	weight uint64,
 	period uint64,
 	autoCompoundRewardShares uint32,
-) *txs.AddAutoRenewedValidatorTx {
+) *platform.AddAutoRenewedValidatorTx {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	sig, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
-	return &txs.AddAutoRenewedValidatorTx{
-		BaseTx: txs.BaseTx{
+	return &platform.AddAutoRenewedValidatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
 				BlockchainID: constants.PlatformChainID,
@@ -1308,7 +1307,7 @@ func TestParsedStateBlock(t *testing.T) {
 			Status: choices.Accepted,
 		}
 
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		stBlkBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, &stBlk)
 		require.NoError(err)
 
 		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
@@ -1336,7 +1335,7 @@ func TestReindexBlocks(t *testing.T) {
 			Bytes:  blk.Bytes(),
 			Status: choices.Accepted,
 		}
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		stBlkBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, &stBlk)
 		require.NoError(err)
 
 		blkID := blk.ID()
@@ -1352,7 +1351,7 @@ func TestReindexBlocks(t *testing.T) {
 		blkBytes, err := s.blockDB.Get(blkID[:])
 		require.NoError(err)
 
-		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
+		parsedBlk, err := platform.ParseBlock(platform.GenesisCodec, blkBytes)
 		require.NoError(err)
 		require.Equal(blkID, parsedBlk.ID())
 	}
@@ -1374,9 +1373,9 @@ func TestStateSubnetOwner(t *testing.T) {
 		owner1 = fxmock.NewOwner(ctrl)
 		owner2 = fxmock.NewOwner(ctrl)
 
-		createSubnetTx = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{},
+		createSubnetTx = &platform.Tx{
+			Unsigned: &platform.CreateSubnetTx{
+				BaseTx: platform.BaseTx{},
 				Owner:  owner1,
 			},
 		}
@@ -1445,17 +1444,17 @@ func TestStateSubnetToL1Conversion(t *testing.T) {
 	}
 }
 
-func makeBlocks(require *require.Assertions) []block.Block {
-	var blks []block.Block
+func makeBlocks(require *require.Assertions) []platform.Block {
+	var blks []platform.Block
 	{
-		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
+		blk, err := platform.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := block.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{
+		blk, err := platform.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &platform.Tx{
+			Unsigned: &platform.AdvanceTimeTx{
 				Time: 1000,
 			},
 		})
@@ -1464,69 +1463,69 @@ func makeBlocks(require *require.Assertions) []block.Block {
 	}
 
 	{
-		blk, err := block.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
+		blk, err := platform.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
+		tx := &platform.Tx{
+			Unsigned: &platform.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
 		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
+		require.NoError(tx.Initialize(platform.Codec))
+		blk, err := platform.NewApricotProposalBlock(ids.GenerateTestID(), 1000, tx)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
+		tx := &platform.Tx{
+			Unsigned: &platform.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
 		}
-		require.NoError(tx.Initialize(txs.Codec))
-		blk, err := block.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{tx})
+		require.NoError(tx.Initialize(platform.Codec))
+		blk, err := platform.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*platform.Tx{tx})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := block.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
+		blk, err := platform.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		blk, err := block.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
+		blk, err := platform.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
+		tx := &platform.Tx{
+			Unsigned: &platform.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
 		}
-		require.NoError(tx.Initialize(txs.Codec))
+		require.NoError(tx.Initialize(platform.Codec))
 
-		blk, err := block.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*txs.Tx{})
+		blk, err := platform.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, tx, []*platform.Tx{})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
 
 	{
-		tx := &txs.Tx{
-			Unsigned: &txs.RewardValidatorTx{
+		tx := &platform.Tx{
+			Unsigned: &platform.RewardValidatorTx{
 				TxID: ids.GenerateTestID(),
 			},
 		}
-		require.NoError(tx.Initialize(txs.Codec))
+		require.NoError(tx.Initialize(platform.Codec))
 
-		blk, err := block.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{tx})
+		blk, err := platform.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*platform.Tx{tx})
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
@@ -2213,14 +2212,14 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	unsignedAddSubnetValidator := createPermissionlessValidatorTx(
 		t,
 		subnetID,
-		txs.Validator{
+		platform.Validator{
 			NodeID: defaultValidatorNodeID,
 			End:    genesistest.DefaultValidatorEndTimeUnix,
 			Wght:   weight,
 		},
 	)
-	addSubnetValidator := &txs.Tx{Unsigned: unsignedAddSubnetValidator}
-	require.NoError(addSubnetValidator.Initialize(txs.Codec))
+	addSubnetValidator := &platform.Tx{Unsigned: unsignedAddSubnetValidator}
+	require.NoError(addSubnetValidator.Initialize(platform.Codec))
 	state.AddTx(addSubnetValidator, status.Committed)
 
 	legacyStaker := &Staker{
@@ -2797,7 +2796,7 @@ func TestDiffValidatorReplacement(t *testing.T) {
 				StartTime: startTime,
 				EndTime:   endTime,
 				NextTime:  endTime,
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 			}
 
 			// Block 0: Add the original validator.
@@ -2818,7 +2817,7 @@ func TestDiffValidatorReplacement(t *testing.T) {
 				StartTime: startTime,
 				EndTime:   endTime.Add(24 * time.Hour),
 				NextTime:  endTime.Add(24 * time.Hour),
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 			}
 
 			d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
@@ -2886,7 +2885,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  endTime,
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 	stakerB := Staker{
 		TxID:      ids.GenerateTestID(),
@@ -2897,7 +2896,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		StartTime: startTime.Add(time.Second),
 		EndTime:   endTime.Add(time.Second),
 		NextTime:  endTime.Add(time.Second),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 
 	// Block 0: Add validators A and B.
@@ -2919,7 +2918,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		StartTime: startTime.Add(time.Second),
 		EndTime:   endTime.Add(48 * time.Hour),
 		NextTime:  endTime.Add(48 * time.Hour),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 	stakerC := Staker{
 		TxID:      ids.GenerateTestID(),
@@ -2930,7 +2929,7 @@ func TestDiffMultipleValidatorsSameBlock(t *testing.T) {
 		StartTime: startTime.Add(2 * time.Second),
 		EndTime:   endTime.Add(2 * time.Second),
 		NextTime:  endTime.Add(2 * time.Second),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
@@ -2988,7 +2987,7 @@ func TestDiffRemoveValidatorNoPriorState(t *testing.T) {
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  endTime,
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 
 	// Block 0: Add the validator.
@@ -3040,37 +3039,37 @@ func TestDiffMultipleBlocksRollback(t *testing.T) {
 	)
 
 	// Create three validators with different keys and weights.
-	unsignedTx1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	unsignedTx1 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime1.Unix()),
 		Wght:   10,
 	})
-	tx1 := &txs.Tx{Unsigned: unsignedTx1}
-	require.NoError(tx1.Initialize(txs.Codec))
+	tx1 := &platform.Tx{Unsigned: unsignedTx1}
+	require.NoError(tx1.Initialize(platform.Codec))
 	staker1, err := NewCurrentStaker(tx1.ID(), unsignedTx1, startTime, unsignedTx1.EndTime(), unsignedTx1.Weight(), 0)
 	require.NoError(err)
 	pk1 := staker1.PublicKey
 	require.NotNil(pk1)
 
-	unsignedTx2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	unsignedTx2 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime2.Unix()),
 		Wght:   20,
 	})
-	tx2 := &txs.Tx{Unsigned: unsignedTx2}
-	require.NoError(tx2.Initialize(txs.Codec))
+	tx2 := &platform.Tx{Unsigned: unsignedTx2}
+	require.NoError(tx2.Initialize(platform.Codec))
 	staker2, err := NewCurrentStaker(tx2.ID(), unsignedTx2, startTime, unsignedTx2.EndTime(), unsignedTx2.Weight(), 0)
 	require.NoError(err)
 	pk2 := staker2.PublicKey
 	require.NotNil(pk2)
 
-	unsignedTx3 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	unsignedTx3 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime3.Unix()),
 		Wght:   30,
 	})
-	tx3 := &txs.Tx{Unsigned: unsignedTx3}
-	require.NoError(tx3.Initialize(txs.Codec))
+	tx3 := &platform.Tx{Unsigned: unsignedTx3}
+	require.NoError(tx3.Initialize(platform.Codec))
 	staker3, err := NewCurrentStaker(tx3.ID(), unsignedTx3, startTime, unsignedTx3.EndTime(), unsignedTx3.Weight(), 0)
 	require.NoError(err)
 
@@ -3146,38 +3145,38 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	)
 
 	// Create primary network validator 1 (PK1).
-	primaryUnsigned1 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+	primaryUnsigned1 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime1.Unix()),
 		Wght:   10,
 	})
-	primaryTx1 := &txs.Tx{Unsigned: primaryUnsigned1}
-	require.NoError(primaryTx1.Initialize(txs.Codec))
+	primaryTx1 := &platform.Tx{Unsigned: primaryUnsigned1}
+	require.NoError(primaryTx1.Initialize(platform.Codec))
 	primaryStaker1, err := NewCurrentStaker(primaryTx1.ID(), primaryUnsigned1, startTime, primaryUnsigned1.EndTime(), primaryUnsigned1.Weight(), 0)
 	require.NoError(err)
 	pk1 := primaryStaker1.PublicKey
 	require.NotNil(pk1)
 
 	// Create subnet validator 1 (inherits PK1, PublicKey field is nil).
-	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime1.Unix()),
 		Wght:   5,
 	})
-	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
-	require.NoError(subnetTx1.Initialize(txs.Codec))
+	subnetTx1 := &platform.Tx{Unsigned: subnetUnsigned1}
+	require.NoError(subnetTx1.Initialize(platform.Codec))
 	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, subnetUnsigned1.EndTime(), subnetUnsigned1.Weight(), 0)
 	require.NoError(err)
 	require.Nil(subnetStaker1.PublicKey, "subnet validators must not carry their own BLS key")
 
 	// Create primary network validator 2 (PK2).
-	primaryUnsigned2 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+	primaryUnsigned2 := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime2.Unix()),
 		Wght:   10,
 	})
-	primaryTx2 := &txs.Tx{Unsigned: primaryUnsigned2}
-	require.NoError(primaryTx2.Initialize(txs.Codec))
+	primaryTx2 := &platform.Tx{Unsigned: primaryUnsigned2}
+	require.NoError(primaryTx2.Initialize(platform.Codec))
 	primaryStaker2, err := NewCurrentStaker(primaryTx2.ID(), primaryUnsigned2, startTime, primaryUnsigned2.EndTime(), primaryUnsigned2.Weight(), 0)
 	require.NoError(err)
 	pk2 := primaryStaker2.PublicKey
@@ -3188,13 +3187,13 @@ func TestSubnetValidatorPublicKeyDiffOnPrimaryAndSubnetReplacement(t *testing.T)
 	)
 
 	// Create subnet validator 2 (inherits PK2).
-	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime2.Unix()),
 		Wght:   5,
 	})
-	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
-	require.NoError(subnetTx2.Initialize(txs.Codec))
+	subnetTx2 := &platform.Tx{Unsigned: subnetUnsigned2}
+	require.NoError(subnetTx2.Initialize(platform.Codec))
 	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, subnetUnsigned2.EndTime(), subnetUnsigned2.Weight(), 0)
 	require.NoError(err)
 
@@ -3267,37 +3266,37 @@ func TestSubnetValidatorReplacementWithUnchangedPrimaryKey(t *testing.T) {
 	)
 
 	// Create primary network validator (PK1) — will NOT be replaced.
-	primaryUnsigned := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, txs.Validator{
+	primaryUnsigned := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime2.Unix()),
 		Wght:   10,
 	})
-	primaryTx := &txs.Tx{Unsigned: primaryUnsigned}
-	require.NoError(primaryTx.Initialize(txs.Codec))
+	primaryTx := &platform.Tx{Unsigned: primaryUnsigned}
+	require.NoError(primaryTx.Initialize(platform.Codec))
 	primaryStaker, err := NewCurrentStaker(primaryTx.ID(), primaryUnsigned, startTime, primaryUnsigned.EndTime(), primaryUnsigned.Weight(), 0)
 	require.NoError(err)
 	pk1 := primaryStaker.PublicKey
 	require.NotNil(pk1)
 
 	// Create subnet validator 1.
-	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	subnetUnsigned1 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime1.Unix()),
 		Wght:   5,
 	})
-	subnetTx1 := &txs.Tx{Unsigned: subnetUnsigned1}
-	require.NoError(subnetTx1.Initialize(txs.Codec))
+	subnetTx1 := &platform.Tx{Unsigned: subnetUnsigned1}
+	require.NoError(subnetTx1.Initialize(platform.Codec))
 	subnetStaker1, err := NewCurrentStaker(subnetTx1.ID(), subnetUnsigned1, startTime, subnetUnsigned1.EndTime(), subnetUnsigned1.Weight(), 0)
 	require.NoError(err)
 
 	// Create subnet validator 2 (replacement).
-	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+	subnetUnsigned2 := createPermissionlessValidatorTx(t, subnetID, platform.Validator{
 		NodeID: nodeID,
 		End:    uint64(endTime2.Unix()),
 		Wght:   8,
 	})
-	subnetTx2 := &txs.Tx{Unsigned: subnetUnsigned2}
-	require.NoError(subnetTx2.Initialize(txs.Codec))
+	subnetTx2 := &platform.Tx{Unsigned: subnetUnsigned2}
+	require.NoError(subnetTx2.Initialize(platform.Codec))
 	subnetStaker2, err := NewCurrentStaker(subnetTx2.ID(), subnetUnsigned2, startTime, subnetUnsigned2.EndTime(), subnetUnsigned2.Weight(), 0)
 	require.NoError(err)
 
@@ -3950,19 +3949,19 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 	require.NoError(t, err)
 
 	currentPrimaryValidator := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
-	currentPrimaryValidator.Priority = txs.PrimaryNetworkValidatorCurrentPriority
+	currentPrimaryValidator.Priority = platform.PrimaryNetworkValidatorCurrentPriority
 
 	currentPrimaryDelegator := newTestStaker(currentPrimaryValidator.SubnetID, currentPrimaryValidator.NodeID)
-	currentPrimaryDelegator.Priority = txs.PrimaryNetworkDelegatorCurrentPriority
+	currentPrimaryDelegator.Priority = platform.PrimaryNetworkDelegatorCurrentPriority
 
 	permissionedSubnetValidator := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
-	permissionedSubnetValidator.Priority = txs.SubnetPermissionedValidatorCurrentPriority
+	permissionedSubnetValidator.Priority = platform.SubnetPermissionedValidatorCurrentPriority
 
 	permissionlessSubnetValidator := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
-	permissionlessSubnetValidator.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
+	permissionlessSubnetValidator.Priority = platform.SubnetPermissionlessValidatorCurrentPriority
 
 	permissionlessSubnetDelegator := newTestStaker(permissionlessSubnetValidator.SubnetID, permissionlessSubnetValidator.NodeID)
-	permissionlessSubnetDelegator.Priority = txs.SubnetPermissionlessDelegatorCurrentPriority
+	permissionlessSubnetDelegator.Priority = platform.SubnetPermissionlessDelegatorCurrentPriority
 
 	tests := []struct {
 		name             string
@@ -4428,8 +4427,8 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 
 	// Create and add the auto-renewed validator with initial times
 	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
-	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
-	require.NoError(autoRenewedTx.Initialize(txs.Codec))
+	autoRenewedTx := &platform.Tx{Unsigned: autoRenewedUnsigned}
+	require.NoError(autoRenewedTx.Initialize(platform.Codec))
 
 	autoRenewedStaker, err := NewCurrentStaker(
 		autoRenewedTx.ID(),

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestBaseStakersPruning(t *testing.T) {
@@ -429,7 +429,7 @@ func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {
 		PotentialReward: 1,
 
 		NextTime: endTime,
-		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+		Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 	}
 }
 
@@ -464,7 +464,7 @@ func TestStakerEquals(t *testing.T) {
 		EndTime:         now.Add(time.Hour),
 		PotentialReward: 50,
 		NextTime:        now.Add(time.Hour),
-		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 
 	// Test nil handling

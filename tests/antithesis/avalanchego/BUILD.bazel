@@ -28,7 +28,7 @@ go_library(
         "//vms/components/avax",
         "//vms/components/verify",
         "//vms/platformvm",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
         "//vms/propertyfx",
         "//vms/secp256k1fx",
         "//wallet/chain/x/builder",

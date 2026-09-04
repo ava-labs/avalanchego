@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
@@ -29,7 +29,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require := require.New(t)
 
 	txID := ids.GenerateTestID()
-	tx := &txs.Tx{
+	tx := &platform.Tx{
 		TxID: txID,
 	}
 
@@ -74,8 +74,8 @@ func TestMempoolDuplicate(t *testing.T) {
 	txVerifier := testTxVerifier{}
 
 	txID := ids.GenerateTestID()
-	tx := &txs.Tx{
-		Unsigned: &txs.BaseTx{
+	tx := &platform.Tx{
+		Unsigned: &platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				Ins: []*avax.TransferableInput{
 					{
@@ -117,8 +117,8 @@ func TestGossipAddBloomFilter(t *testing.T) {
 	require := require.New(t)
 
 	txID := ids.GenerateTestID()
-	tx := &txs.Tx{
-		Unsigned: &txs.BaseTx{
+	tx := &platform.Tx{
+		Unsigned: &platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				Ins: []*avax.TransferableInput{
 					{

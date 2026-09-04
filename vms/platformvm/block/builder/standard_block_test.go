@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -48,7 +48,7 @@ func TestAtomicTxImports(t *testing.T) {
 			OutputOwners: *owner,
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+	utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()

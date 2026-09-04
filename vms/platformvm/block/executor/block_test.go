@@ -16,14 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
@@ -32,7 +31,7 @@ func TestBlockOptions(t *testing.T) {
 	type test struct {
 		name                   string
 		blkF                   func(t testing.TB) *Block
-		expectedPreferenceType block.Block
+		expectedPreferenceType platform.Block
 	}
 
 	tests := []test{
@@ -56,11 +55,11 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block:   &block.ApricotProposalBlock{},
+					Block:   &platform.ApricotProposalBlock{},
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.ApricotCommitBlock{},
+			expectedPreferenceType: &platform.ApricotCommitBlock{},
 		},
 		{
 			name: "banff proposal block; invalid proposal tx",
@@ -82,17 +81,17 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.CreateChainTx{},
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.CreateChainTx{},
 							},
 						},
 					},
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; missing tx",
@@ -116,10 +115,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -128,7 +127,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; error fetching staker tx; db closed",
@@ -157,10 +156,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -169,15 +168,15 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; unexpected staker tx type",
 			blkF: func(t testing.TB) *Block {
 				stakerTxID := ids.GenerateTestID()
-				stakerTx := &txs.Tx{
+				stakerTx := &platform.Tx{
 					TxID:     stakerTxID,
-					Unsigned: &txs.CreateChainTx{},
+					Unsigned: &platform.CreateChainTx{},
 				}
 
 				state := statetest.New(t, statetest.Config{})
@@ -198,10 +197,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -210,7 +209,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; missing primary network validator",
@@ -219,9 +218,9 @@ func TestBlockOptions(t *testing.T) {
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = ids.GenerateTestID()
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddPermissionlessValidatorTx{
-							Validator: txs.Validator{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddPermissionlessValidatorTx{
+							Validator: platform.Validator{
 								NodeID: nodeID,
 							},
 							Subnet: subnetID,
@@ -248,10 +247,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -260,7 +259,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; failed calculating primary network uptime",
@@ -269,9 +268,9 @@ func TestBlockOptions(t *testing.T) {
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = constants.PrimaryNetworkID
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddPermissionlessValidatorTx{
-							Validator: txs.Validator{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddPermissionlessValidatorTx{
+							Validator: platform.Validator{
 								NodeID: nodeID,
 							},
 							Subnet: subnetID,
@@ -305,10 +304,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -317,7 +316,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; failed fetching subnet transformation",
@@ -326,9 +325,9 @@ func TestBlockOptions(t *testing.T) {
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = ids.GenerateTestID()
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddPermissionlessValidatorTx{
-							Validator: txs.Validator{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddPermissionlessValidatorTx{
+							Validator: platform.Validator{
 								NodeID: nodeID,
 							},
 							Subnet: subnetID,
@@ -362,10 +361,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -374,7 +373,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; prefers commit",
@@ -383,9 +382,9 @@ func TestBlockOptions(t *testing.T) {
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = ids.GenerateTestID()
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddPermissionlessValidatorTx{
-							Validator: txs.Validator{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddPermissionlessValidatorTx{
+							Validator: platform.Validator{
 								NodeID: nodeID,
 							},
 							Subnet: subnetID,
@@ -397,8 +396,8 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
 					}
-					transformSubnetTx = &txs.Tx{
-						Unsigned: &txs.TransformSubnetTx{
+					transformSubnetTx = &platform.Tx{
+						Unsigned: &platform.TransformSubnetTx{
 							UptimeRequirement: .2 * reward.PercentDenominator,
 							Subnet:            subnetID,
 						},
@@ -427,10 +426,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -439,7 +438,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; prefers abort",
@@ -448,9 +447,9 @@ func TestBlockOptions(t *testing.T) {
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
 					subnetID   = constants.PrimaryNetworkID
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddPermissionlessValidatorTx{
-							Validator: txs.Validator{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddPermissionlessValidatorTx{
+							Validator: platform.Validator{
 								NodeID: nodeID,
 							},
 							Subnet: subnetID,
@@ -463,8 +462,8 @@ func TestBlockOptions(t *testing.T) {
 						NodeID:    nodeID,
 						SubnetID:  subnetID,
 					}
-					transformSubnetTx = &txs.Tx{
-						Unsigned: &txs.TransformSubnetTx{
+					transformSubnetTx = &platform.Tx{
+						Unsigned: &platform.TransformSubnetTx{
 							UptimeRequirement: .6 * reward.PercentDenominator,
 						},
 					}
@@ -490,10 +489,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -502,7 +501,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffAbortBlock{},
+			expectedPreferenceType: &platform.BanffAbortBlock{},
 		},
 		{
 			name: "banff proposal block; reward auto-renewed validator; sufficient uptime; prefer commit",
@@ -510,8 +509,8 @@ func TestBlockOptions(t *testing.T) {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddAutoRenewedValidatorTx{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddAutoRenewedValidatorTx{
 							ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
 						},
 						TxID: stakerTxID,
@@ -541,10 +540,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardAutoRenewedValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardAutoRenewedValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -553,7 +552,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffCommitBlock{},
+			expectedPreferenceType: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "banff proposal block; reward auto-renewed validator; insufficient uptime; prefer abort",
@@ -561,8 +560,8 @@ func TestBlockOptions(t *testing.T) {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
-					stakerTx   = &txs.Tx{
-						Unsigned: &txs.AddAutoRenewedValidatorTx{
+					stakerTx   = &platform.Tx{
+						Unsigned: &platform.AddAutoRenewedValidatorTx{
 							ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
 						},
 						TxID: stakerTxID,
@@ -594,10 +593,10 @@ func TestBlockOptions(t *testing.T) {
 				}
 
 				return &Block{
-					Block: &block.BanffProposalBlock{
-						ApricotProposalBlock: block.ApricotProposalBlock{
-							Tx: &txs.Tx{
-								Unsigned: &txs.RewardAutoRenewedValidatorTx{
+					Block: &platform.BanffProposalBlock{
+						ApricotProposalBlock: platform.ApricotProposalBlock{
+							Tx: &platform.Tx{
+								Unsigned: &platform.RewardAutoRenewedValidatorTx{
 									TxID: stakerTxID,
 								},
 							},
@@ -606,7 +605,7 @@ func TestBlockOptions(t *testing.T) {
 					manager: manager,
 				}
 			},
-			expectedPreferenceType: &block.BanffAbortBlock{},
+			expectedPreferenceType: &platform.BanffAbortBlock{},
 		},
 	}
 
@@ -642,9 +641,9 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 		var (
 			nodeID     = ids.GenerateTestNodeID()
 			stakerTxID = ids.GenerateTestID()
-			stakerTx   = &txs.Tx{
-				Unsigned: &txs.AddPermissionlessValidatorTx{
-					Validator: txs.Validator{NodeID: nodeID},
+			stakerTx   = &platform.Tx{
+				Unsigned: &platform.AddPermissionlessValidatorTx{
+					Validator: platform.Validator{NodeID: nodeID},
 					Subnet:    constants.PrimaryNetworkID,
 				},
 				TxID: stakerTxID,
@@ -660,7 +659,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 		rewardValidatorTx, err := newRewardValidatorTx(t, stakerTxID)
 		require.NoError(t, err)
 
-		proposalBlock, err := block.NewBanffProposalBlock(
+		proposalBlock, err := platform.NewBanffProposalBlock(
 			proposalTimestamp,
 			ids.GenerateTestID(),
 			1,
@@ -737,22 +736,22 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 			options, err := blk.Options(t.Context())
 			require.NoError(t, err)
 
-			proposalBlock := blk.Block.(*block.BanffProposalBlock)
-			commitBlock, err := block.NewBanffCommitBlock(
+			proposalBlock := blk.Block.(*platform.BanffProposalBlock)
+			commitBlock, err := platform.NewBanffCommitBlock(
 				proposalBlock.Timestamp(),
 				proposalBlock.ID(),
 				proposalBlock.Height()+1,
 			)
 			require.NoError(t, err)
 
-			abortBlock, err := block.NewBanffAbortBlock(
+			abortBlock, err := platform.NewBanffAbortBlock(
 				proposalBlock.Timestamp(),
 				proposalBlock.ID(),
 				proposalBlock.Height()+1,
 			)
 			require.NoError(t, err)
 
-			var wantPreferred, wantAlternate block.Block = abortBlock, commitBlock
+			var wantPreferred, wantAlternate platform.Block = abortBlock, commitBlock
 			if tt.wantPrefersCommit {
 				wantPreferred, wantAlternate = commitBlock, abortBlock
 			}

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 var _ btree.LessFunc[*Staker] = (*Staker).Less
@@ -40,7 +40,7 @@ type Staker struct {
 	// are grouped together. The ordering of these groups is documented in
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
-	Priority txs.Priority
+	Priority platform.Priority
 }
 
 // Equals returns true if this staker is equal to the provided staker.
@@ -94,11 +94,11 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-// NewCurrentStaker returns a current-priority Staker built from [txs.Staker] with
-// the provided start time, end time, weight, and potential reward.
+// NewCurrentStaker returns a current-priority Staker built from [platform.Staker]
+// with the provided start time, end time, weight, and potential reward.
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.Staker,
+	staker platform.Staker,
 	startTime time.Time,
 	endTime time.Time,
 	weight uint64,
@@ -122,9 +122,9 @@ func NewCurrentStaker(
 	}, nil
 }
 
-// NewPendingStaker returns a pending Staker built from a [txs.ScheduledStaker]
+// NewPendingStaker returns a pending Staker built from a [platform.ScheduledStaker]
 // transaction.
-func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

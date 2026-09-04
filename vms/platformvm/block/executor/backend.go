@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -67,7 +67,7 @@ func (b *backend) getOnCommitState(blkID ids.ID) (*state.Diff, bool) {
 	return state.onCommitState, true
 }
 
-func (b *backend) GetBlock(blkID ids.ID) (block.Block, error) {
+func (b *backend) GetBlock(blkID ids.ID) (platform.Block, error) {
 	// See if the block is in memory.
 	if blk, ok := b.blkIDToState[blkID]; ok {
 		return blk.statelessBlock, nil

@@ -13,9 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var errCustom = errors.New("custom")
@@ -32,12 +32,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(1, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: true,
 		},
@@ -46,12 +46,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(1, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: false,
 		},
@@ -60,12 +60,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkDelegatorApricotPendingPriority,
+				Priority: platform.PrimaryNetworkDelegatorApricotPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			less: true,
 		},
@@ -74,12 +74,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkDelegatorApricotPendingPriority,
+				Priority: platform.PrimaryNetworkDelegatorApricotPendingPriority,
 			},
 			less: false,
 		},
@@ -88,12 +88,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{0}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{1}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			less: true,
 		},
@@ -102,12 +102,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{1}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{0}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorPendingPriority,
+				Priority: platform.PrimaryNetworkValidatorPendingPriority,
 			},
 			less: false,
 		},
@@ -116,12 +116,12 @@ func TestStakerLess(t *testing.T) {
 			left: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			right: &Staker{
 				TxID:     ids.ID([32]byte{}),
 				NextTime: time.Unix(0, 0),
-				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+				Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 			},
 			less: false,
 		},
@@ -200,7 +200,7 @@ func TestNewPendingStaker(t *testing.T) {
 	require.ErrorIs(err, errCustom)
 }
 
-func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidatorTx {
+func generateStakerTx(require *require.Assertions) *platform.AddPermissionlessValidatorTx {
 	nodeID := ids.GenerateTestNodeID()
 	sk, err := localsigner.New()
 	require.NoError(err)
@@ -211,8 +211,8 @@ func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidat
 	startTime := time.Now().Truncate(time.Second)
 	endTime := startTime.Add(time.Hour)
 
-	return &txs.AddPermissionlessValidatorTx{
-		Validator: txs.Validator{
+	return &platform.AddPermissionlessValidatorTx{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(endTime.Unix()),

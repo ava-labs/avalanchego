@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -24,7 +24,7 @@ type proposalBlockState struct {
 // Note that not all fields will be set for a given block.
 type blockState struct {
 	proposalBlockState
-	statelessBlock block.Block
+	statelessBlock platform.Block
 
 	onAcceptState *state.Diff
 	onAcceptFunc  func()

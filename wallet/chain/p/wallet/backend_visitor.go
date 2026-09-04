@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = (*backendVisitor)(nil)
+	_ platform.TxVisitor = (*backendVisitor)(nil)
 
 	ErrUnsupportedTxType = errors.New("unsupported tx type")
 )
@@ -30,31 +30,31 @@ type backendVisitor struct {
 	txID ids.ID
 }
 
-func (*backendVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*backendVisitor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (*backendVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*backendVisitor) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (b *backendVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (b *backendVisitor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (b *backendVisitor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (b *backendVisitor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
+func (b *backendVisitor) CreateChainTx(tx *platform.CreateChainTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (b *backendVisitor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 	b.b.setOwner(
 		b.txID,
 		tx.Owner,
@@ -62,7 +62,7 @@ func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
+func (b *backendVisitor) ImportTx(tx *platform.ImportTx) error {
 	err := b.b.removeUTXOs(
 		b.ctx,
 		tx.SourceChain,
@@ -74,7 +74,7 @@ func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
+func (b *backendVisitor) ExportTx(tx *platform.ExportTx) error {
 	for i, out := range tx.ExportedOutputs {
 		err := b.b.AddUTXO(
 			b.ctx,
@@ -95,23 +95,23 @@ func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (b *backendVisitor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (b *backendVisitor) TransformSubnetTx(tx *platform.TransformSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (b *backendVisitor) AddPermissionlessValidatorTx(tx *platform.AddPermissionlessValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *platform.AddPermissionlessDelegatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (b *backendVisitor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
 	b.b.setOwner(
 		tx.Subnet,
 		tx.Owner,
@@ -119,11 +119,11 @@ func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
+func (b *backendVisitor) BaseTx(tx *platform.BaseTx) error {
 	return b.baseTx(tx)
 }
 
-func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+func (b *backendVisitor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
 	for i, vdr := range tx.Validators {
 		b.b.setOwner(
 			tx.Subnet.Append(uint32(i)),
@@ -136,7 +136,7 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+func (b *backendVisitor) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
 		return err
@@ -160,19 +160,19 @@ func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) er
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+func (b *backendVisitor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+func (b *backendVisitor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+func (b *backendVisitor) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+func (b *backendVisitor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenewedValidatorTx) error {
 	b.b.setOwner(
 		b.txID,
 		tx.ValidatorAuthority,
@@ -180,15 +180,15 @@ func (b *backendVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidat
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+func (b *backendVisitor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (*backendVisitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*backendVisitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {
+func (b *backendVisitor) baseTx(tx *platform.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,
 		constants.PlatformChainID,

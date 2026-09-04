@@ -15,13 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ txs.Visitor = (*visitor)(nil)
+	_ platform.TxVisitor = (*visitor)(nil)
 
 	ErrUnsupportedTxType     = errors.New("unsupported tx type")
 	ErrUnknownInputType      = errors.New("unknown input type")
@@ -39,18 +39,18 @@ type visitor struct {
 	kc      keychain.Keychain
 	backend Backend
 	ctx     context.Context
-	tx      *txs.Tx
+	tx      *platform.Tx
 }
 
-func (*visitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*visitor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (*visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*visitor) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (s *visitor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (s *visitor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (s *visitor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (s *visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) CreateChainTx(tx *txs.CreateChainTx) error {
+func (s *visitor) CreateChainTx(tx *platform.CreateChainTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func (s *visitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (s *visitor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (s *visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) ImportTx(tx *txs.ImportTx) error {
+func (s *visitor) ImportTx(tx *platform.ImportTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func (s *visitor) ImportTx(tx *txs.ImportTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) ExportTx(tx *txs.ExportTx) error {
+func (s *visitor) ExportTx(tx *platform.ExportTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -121,20 +121,7 @@ func (s *visitor) ExportTx(tx *txs.ExportTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, txSigners)
-}
-
-func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (s *visitor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -147,23 +134,7 @@ func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	return sign(s.tx, txSigners)
-}
-
-func (s *visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	return sign(s.tx, txSigners)
-}
-
-func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (s *visitor) TransformSubnetTx(tx *platform.TransformSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -176,7 +147,7 @@ func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) e
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) BaseTx(tx *txs.BaseTx) error {
+func (s *visitor) AddPermissionlessValidatorTx(tx *platform.AddPermissionlessValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -184,7 +155,15 @@ func (s *visitor) BaseTx(tx *txs.BaseTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+func (s *visitor) AddPermissionlessDelegatorTx(tx *platform.AddPermissionlessDelegatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
+func (s *visitor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -197,7 +176,7 @@ func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+func (s *visitor) BaseTx(tx *platform.BaseTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -205,7 +184,20 @@ func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+func (s *visitor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, txSigners)
+}
+
+func (s *visitor) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -213,7 +205,7 @@ func (s *visitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+func (s *visitor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -221,7 +213,15 @@ func (s *visitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanc
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+func (s *visitor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
+func (s *visitor) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+func (s *visitor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenewedValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -242,7 +242,7 @@ func (s *visitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) e
 	return sign(s.tx, txSigners)
 }
 
-func (s *visitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+func (s *visitor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func (s *visitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidato
 	return sign(s.tx, txSigners)
 }
 
-func (*visitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*visitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
@@ -351,8 +351,8 @@ func (s *visitor) getAuthSigners(ownerID ids.ID, auth verify.Verifiable) ([]keyc
 	return authSigners, nil
 }
 
-func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
-	unsignedBytes, err := txs.Codec.Marshal(txs.CodecVersion, &tx.Unsigned)
+func sign(tx *platform.Tx, txSigners [][]keychain.Signer) error {
+	unsignedBytes, err := platform.Codec.Marshal(platform.CodecVersion, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
@@ -407,7 +407,7 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 		}
 	}
 
-	signedBytes, err := txs.Codec.Marshal(txs.CodecVersion, tx)
+	signedBytes, err := platform.Codec.Marshal(platform.CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}

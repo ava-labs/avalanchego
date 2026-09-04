@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -27,7 +27,7 @@ var (
 func verifyPoASubnetAuthorization(
 	fx fx.Fx,
 	chainState state.Chain,
-	sTx *txs.Tx,
+	sTx *platform.Tx,
 	subnetID ids.ID,
 	subnetAuth verify.Verifiable,
 ) ([]verify.Verifiable, error) {
@@ -62,7 +62,7 @@ func verifyPoASubnetAuthorization(
 func verifySubnetAuthorization(
 	fx fx.Fx,
 	chainState state.Chain,
-	tx *txs.Tx,
+	tx *platform.Tx,
 	subnetID ids.ID,
 	subnetAuth verify.Verifiable,
 ) ([]verify.Verifiable, error) {
@@ -80,7 +80,7 @@ func verifySubnetAuthorization(
 // other operations in the tx.
 func verifyAuthorization(
 	fx fx.Fx,
-	tx *txs.Tx,
+	tx *platform.Tx,
 	owner fx.Owner,
 	auth verify.Verifiable,
 ) ([]verify.Verifiable, error) {

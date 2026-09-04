@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -124,7 +124,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
+	tx.Unsigned.(*platform.CreateChainTx).SubnetID = ids.GenerateTestID()
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)

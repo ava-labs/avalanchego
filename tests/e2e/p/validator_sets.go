@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -57,8 +57,8 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 
 			for i := 0; i < delegatorCount; i++ {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-					&txs.SubnetValidator{
-						Validator: txs.Validator{
+					&platform.SubnetValidator{
+						Validator: platform.Validator{
 							NodeID: nodeURI.NodeID,
 							End:    uint64(endTime.Unix()),
 							Wght:   weight,

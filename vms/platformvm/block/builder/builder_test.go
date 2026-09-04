@@ -20,14 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -127,8 +126,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	// Create a valid [AddPermissionlessValidatorTx]
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -156,8 +155,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	// Build and accept a block with the tx
 	blk, err := env.Builder.BuildBlock(t.Context())
 	require.NoError(err)
-	require.IsType(&block.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
-	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
+	require.IsType(&platform.BanffStandardBlock{}, blk.(*blockexecutor.Block).Block)
+	require.Equal([]*platform.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
 	require.NoError(blk.Verify(t.Context()))
 	require.NoError(blk.Accept(t.Context()))
 	env.blkManager.SetPreference(blk.ID(), nil)
@@ -181,11 +180,11 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		blk, err := env.Builder.BuildBlock(t.Context())
 		require.NoError(err)
 		require.NoError(blk.Verify(t.Context()))
-		require.IsType(&block.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
+		require.IsType(&platform.BanffProposalBlock{}, blk.(*blockexecutor.Block).Block)
 
 		expectedTx, err := NewRewardValidatorTx(env.ctx, staker.TxID)
 		require.NoError(err)
-		require.Equal([]*txs.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
+		require.Equal([]*platform.Tx{expectedTx}, blk.(*blockexecutor.Block).Block.Txs())
 
 		// Commit the [ProposalBlock] with a [CommitBlock]
 		proposalBlk, ok := blk.(snowman.OracleBlock)
@@ -194,7 +193,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(err)
 
 		commit := options[0].(*blockexecutor.Block)
-		require.IsType(&block.BanffCommitBlock{}, commit.Block)
+		require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 		require.NoError(blk.Accept(t.Context()))
 		require.NoError(commit.Verify(t.Context()))
@@ -227,7 +226,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 
 	addTx := newAddAutoRenewedValidatorTx(t)
 	txID := addTx.ID()
-	validatorTx := addTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	validatorTx := addTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 
 	startTime := genesistest.DefaultValidatorStartTime
 	endTime := startTime.Add(time.Duration(validatorTx.Period) * time.Second)
@@ -256,7 +255,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	proposalBlk := blk.(*blockexecutor.Block).Block
-	require.IsType(&block.BanffProposalBlock{}, proposalBlk)
+	require.IsType(&platform.BanffProposalBlock{}, proposalBlk)
 
 	proposalTxs := proposalBlk.Txs()
 	require.Len(proposalTxs, 1)
@@ -281,7 +280,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	// Add a staker to [env.state]
 	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		NextTime: nextTime,
-		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 	}))
 
 	// Advance wall clock to [nextTime]
@@ -294,8 +293,8 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	require.IsType(&blockexecutor.Block{}, blkIntf)
 	blk := blkIntf.(*blockexecutor.Block)
 	require.Empty(blk.Txs())
-	require.IsType(&block.BanffStandardBlock{}, blk.Block)
-	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.IsType(&platform.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*platform.BanffStandardBlock)
 	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
 }
 
@@ -338,7 +337,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	// Add a staker to [env.state]
 	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		NextTime: nextTime,
-		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 	}))
 
 	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
@@ -351,9 +350,9 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 
 	require.IsType(&blockexecutor.Block{}, blkIntf)
 	blk := blkIntf.(*blockexecutor.Block)
-	require.Equal([]*txs.Tx{tx}, blk.Txs())
-	require.IsType(&block.BanffStandardBlock{}, blk.Block)
-	standardBlk := blk.Block.(*block.BanffStandardBlock)
+	require.Equal([]*platform.Tx{tx}, blk.Txs())
+	require.IsType(&platform.BanffStandardBlock{}, blk.Block)
+	standardBlk := blk.Block.(*platform.BanffStandardBlock)
 	require.Equal(nextTime.Unix(), standardBlk.Timestamp().Unix())
 }
 
@@ -388,8 +387,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 	tx1, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  uint64(now.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -419,8 +418,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require.NoError(err)
 
 	tx2, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  uint64(now.Unix()),
 				End:    uint64(validator2EndTime.Unix()),
@@ -561,13 +560,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
 				staker2 := &state.Staker{
 					TxID:     txID,
-					Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
+					Priority: platform.SubnetPermissionlessDelegatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   staker1.NodeID,
 				}
@@ -584,13 +583,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
 				staker2 := &state.Staker{
 					TxID:     txID,
-					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+					Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
@@ -607,13 +606,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
 				staker1 := &state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   ids.GenerateTestNodeID(),
 				}
 				staker2 := &state.Staker{
 					TxID:     txID,
-					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+					Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now,
 					NodeID:   staker1.NodeID,
 				}
@@ -633,7 +632,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 					TxID:     txID,
 					NodeID:   genesistest.DefaultNodeIDs[0],
 					SubnetID: constants.PrimaryNetworkID,
-					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+					Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 				}))
 				return s
@@ -648,7 +647,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				s := statetest.New(t, statetest.Config{})
 				require.NoError(t, s.PutCurrentValidator(&state.Staker{
 					TxID:     txID,
-					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+					Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 					NodeID:   ids.GenerateTestNodeID(),
 				}))
@@ -677,35 +676,35 @@ func TestGetNextStakerToReward(t *testing.T) {
 func TestNewRewardTxForStaker(t *testing.T) {
 	tests := []struct {
 		name         string
-		stakerTxFunc func(t testing.TB) *txs.Tx
+		stakerTxFunc func(t testing.TB) *platform.Tx
 		wantTxType   any
 		wantErr      error
 	}{
 		{
 			name:         "add_auto_renewed_validator_tx_returns_reward_auto_renewed_validator_tx",
 			stakerTxFunc: newAddAutoRenewedValidatorTx,
-			wantTxType:   &txs.RewardAutoRenewedValidatorTx{},
+			wantTxType:   &platform.RewardAutoRenewedValidatorTx{},
 		},
 		{
 			name:         "add_permissionless_validator_tx_returns_reward_validator_tx",
 			stakerTxFunc: newAddPermissionlessValidatorTx,
-			wantTxType:   &txs.RewardValidatorTx{},
+			wantTxType:   &platform.RewardValidatorTx{},
 		},
 		{
 			name:         "add_validator_tx_returns_reward_validator_tx",
 			stakerTxFunc: newAddValidatorTx,
-			wantTxType:   &txs.RewardValidatorTx{},
+			wantTxType:   &platform.RewardValidatorTx{},
 		},
 		{
 			name:         "add_delegator_tx_returns_reward_validator_tx",
 			stakerTxFunc: newAddDelegatorTx,
-			wantTxType:   &txs.RewardValidatorTx{},
+			wantTxType:   &platform.RewardValidatorTx{},
 		},
 		{
 			name: "create_subnet_tx_returns_error",
-			stakerTxFunc: func(t testing.TB) *txs.Tx {
-				utx := &txs.CreateSubnetTx{
-					BaseTx: txs.BaseTx{
+			stakerTxFunc: func(t testing.TB) *platform.Tx {
+				utx := &platform.CreateSubnetTx{
+					BaseTx: platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							NetworkID:    constants.UnitTestID,
 							BlockchainID: ids.GenerateTestID(),
@@ -714,7 +713,7 @@ func TestNewRewardTxForStaker(t *testing.T) {
 					Owner: &secp256k1fx.OutputOwners{},
 				}
 
-				tx, err := txs.NewSigned(utx, txs.Codec, nil)
+				tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 				require.NoError(t, err)
 				return tx
 			},
@@ -733,9 +732,9 @@ func TestNewRewardTxForStaker(t *testing.T) {
 
 			if tt.wantErr == nil {
 				require.IsType(t, tt.wantTxType, rewardTx.Unsigned)
-				require.Equal(t, stakerTx.ID(), rewardTx.Unsigned.(txs.RewardTx).StakerTxID())
+				require.Equal(t, stakerTx.ID(), rewardTx.Unsigned.(platform.RewardTx).StakerTxID())
 
-				if utx, ok := rewardTx.Unsigned.(*txs.RewardAutoRenewedValidatorTx); ok {
+				if utx, ok := rewardTx.Unsigned.(*platform.RewardAutoRenewedValidatorTx); ok {
 					require.Equal(t, uint64(timestamp.Unix()), utx.Timestamp)
 				}
 			}
@@ -743,17 +742,17 @@ func TestNewRewardTxForStaker(t *testing.T) {
 	}
 }
 
-func newAddPermissionlessValidatorTx(t testing.TB) *txs.Tx {
+func newAddPermissionlessValidatorTx(t testing.TB) *platform.Tx {
 	t.Helper()
 
-	utx := &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{
+	utx := &platform.AddPermissionlessValidatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
 				BlockchainID: ids.GenerateTestID(),
 			},
 		},
-		Validator: txs.Validator{
+		Validator: platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
 			Wght:   2,
@@ -766,22 +765,22 @@ func newAddPermissionlessValidatorTx(t testing.TB) *txs.Tx {
 		DelegationShares:      reward.PercentDenominator,
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 	require.NoError(t, err)
 	return tx
 }
 
-func newAddValidatorTx(t testing.TB) *txs.Tx {
+func newAddValidatorTx(t testing.TB) *platform.Tx {
 	t.Helper()
 
-	utx := &txs.AddValidatorTx{
-		BaseTx: txs.BaseTx{
+	utx := &platform.AddValidatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
 				BlockchainID: ids.GenerateTestID(),
 			},
 		},
-		Validator: txs.Validator{
+		Validator: platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
 			Wght:   2,
@@ -791,22 +790,22 @@ func newAddValidatorTx(t testing.TB) *txs.Tx {
 		DelegationShares: reward.PercentDenominator,
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 	require.NoError(t, err)
 	return tx
 }
 
-func newAddDelegatorTx(t testing.TB) *txs.Tx {
+func newAddDelegatorTx(t testing.TB) *platform.Tx {
 	t.Helper()
 
-	utx := &txs.AddDelegatorTx{
-		BaseTx: txs.BaseTx{
+	utx := &platform.AddDelegatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
 				BlockchainID: ids.GenerateTestID(),
 			},
 		},
-		Validator: txs.Validator{
+		Validator: platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
 			Wght:   2,
@@ -815,16 +814,16 @@ func newAddDelegatorTx(t testing.TB) *txs.Tx {
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 	require.NoError(t, err)
 	return tx
 }
 
-func newAddAutoRenewedValidatorTx(t testing.TB) *txs.Tx {
+func newAddAutoRenewedValidatorTx(t testing.TB) *platform.Tx {
 	t.Helper()
 
-	utx := &txs.AddAutoRenewedValidatorTx{
-		BaseTx: txs.BaseTx{
+	utx := &platform.AddAutoRenewedValidatorTx{
+		BaseTx: platform.BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.UnitTestID,
 				BlockchainID: ids.GenerateTestID(),
@@ -847,7 +846,7 @@ func newAddAutoRenewedValidatorTx(t testing.TB) *txs.Tx {
 		ValidatorAuthority:    &secp256k1fx.OutputOwners{},
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 	require.NoError(t, err)
 	return tx
 }
