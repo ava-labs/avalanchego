@@ -41,12 +41,10 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. When enabled, trie roots are only persisted every `commit-interval` blocks. | `true` |
-| `commit-interval` | uint64 | Interval at which to persist the state trie (blocks). A value of `0` uses the default. | `4096` |
+| `commit-interval` | uint64 | Interval at which to persist the state trie (blocks). The node rejects `0`. Mainnet and Fuji MUST use the default. | `4096` |
 | `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
-| `populate-missing-tries` | uint64 | Starting block for re-populating missing tries. Re-generation is disabled if null. | `null` |
-| `offline-pruning-enabled` | bool | Enable offline pruning. | `false` |
 | `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
 
 ## Transaction Pool
@@ -62,7 +60,6 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `apis` | array of strings | The JSON-RPC APIs this node serves, see [Available APIs](#available-apis). Methods of an API that is not listed, including APIs added in later releases, are not served, and calling one returns a `the method ... does not exist/is not available` error. An unrecognised name is a fatal configuration error. | every API marked *enabled* in [Available APIs](#available-apis) |
-| `api-max-blocks-per-request` | int64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 | `api-max-duration` | duration | Maximum duration of an `eth_call` (or `eth_callDetailed`) execution. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration) (e.g. `"30s"`, `"2h45m"`); valid units are `ns`, `us`, `ms`, `s`, `m` and `h`. Non-positive values result in no limit. | `0` |
