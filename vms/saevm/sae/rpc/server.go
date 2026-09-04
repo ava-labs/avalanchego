@@ -15,47 +15,105 @@ import (
 	// (e.g. "callTracer") tracers available to debug_trace* APIs.
 	_ "github.com/ava-labs/libevm/eth/tracers/js"
 	_ "github.com/ava-labs/libevm/eth/tracers/native"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
-// Server returns the Provider's [rpc.Server], with all configured JSON-RPC
-// namespace handlers registered.
-func (p *Provider) Server() *rpc.Server {
-	return p.server
+// An API is a named group of JSON-RPC methods that a node MAY serve, see
+// [Config.APIs]. Groups can't align with the JSON-RPC namespaces for security
+// and compatibility reasons with existing APIs :(.
+type API string
+
+// Every available [API]. The methods each one carries are listed alongside its
+// registration in [apiServices].
+const (
+	APIWeb3         API = "web3"
+	APINet          API = "net"
+	APITxPool       API = "txpool"
+	APIPrice        API = "price"
+	APIChain        API = "chain"
+	APITx           API = "tx"
+	APISubscription API = "subscription"
+	APIAvalanche    API = "avalanche"
+	APIDB           API = "db"
+	APIProfile      API = "profile"
+	APITrace        API = "trace"
+)
+
+// AllAPIs returns every [API].
+func AllAPIs() set.Set[API] {
+	all := set.NewSet[API](len(apiServices))
+	for _, s := range apiServices {
+		all.Add(s.name)
+	}
+	return all
 }
 
-func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
-	type api struct {
-		namespace string
-		api       any
+// DefaultAPIs returns the [API]s served when an operator doesn't configure
+// [Config.APIs] (those with [apiService.defaultOn])).
+func DefaultAPIs() set.Set[API] {
+	d := set.NewSet[API](len(apiServices))
+	for _, s := range apiServices {
+		if s.defaultOn {
+			d.Add(s.name)
+		}
 	}
+	return d
+}
 
-	// Standard Ethereum APIs are documented at: https://ethereum.org/developers/docs/apis/json-rpc
-	// geth-specific APIs are documented at: https://geth.ethereum.org/docs/interacting-with-geth/rpc
-	apis := []api{
+// An apiService constructs the receiver registered for a single [API].
+type apiService struct {
+	name      API
+	namespace string
+	defaultOn bool
+	receiver  func(b *backend, filter *filters.FilterAPI) any
+}
+
+// apiServices is every registerable service. Enabling an [API] registers every
+// service with that name.
+//
+// Standard Ethereum APIs are documented at: https://ethereum.org/developers/docs/apis/json-rpc
+// geth-specific APIs are documented at: https://geth.ethereum.org/docs/interacting-with-geth/rpc
+var apiServices = []apiService{
+	{
 		// Standard Ethereum node APIs:
 		// - web3_clientVersion
 		// - web3_sha3
-		{"web3", newWeb3API()},
+		name: APIWeb3, namespace: "web3", defaultOn: true,
+		receiver: func(*backend, *filters.FilterAPI) any { return newWeb3API() },
+	},
+	{
 		// Standard Ethereum node APIs:
 		// - net_listening
 		// - net_peerCount
 		// - net_version
-		{"net", newNetAPI(b.Peers(), b.ChainConfig().ChainID.Uint64())},
+		name: APINet, namespace: "net", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any {
+			return newNetAPI(b.Peers(), b.ChainConfig().ChainID.Uint64())
+		},
+	},
+	{
 		// geth-specific APIs:
 		// - txpool_content
 		// - txpool_contentFrom
 		// - txpool_inspect
 		// - txpool_status
-		{"txpool", ethapi.NewTxPoolAPI(b)},
+		name: APITxPool, namespace: "txpool", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return ethapi.NewTxPoolAPI(b) },
+	},
+	{
 		// Standard Ethereum node APIs:
 		// - eth_gasPrice
 		// - eth_maxPriorityFeePerGas
 		// - eth_feeHistory
 		// - eth_syncing
-		{"eth", ethapi.NewEthereumAPI(b)},
+		name: APIPrice, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return ethapi.NewEthereumAPI(b) },
+	},
+	{
 		// Standard Ethereum node APIs:
 		// - eth_blockNumber
 		// - eth_call
@@ -79,7 +137,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//
 		// Undocumented APIs:
 		// - eth_getBlockReceipts
-		{"eth", &blockChainAPI{ethapi.NewBlockChainAPI(b), b}},
+		name: APIChain, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any {
+			return &blockChainAPI{ethapi.NewBlockChainAPI(b), b}
+		},
+	},
+	{
 		// Standard Ethereum node APIs:
 		// - eth_getBlockTransactionCountByHash
 		// - eth_getBlockTransactionCountByNumber
@@ -100,13 +163,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_getRawTransactionByHash
 		// - eth_pendingTransactions
 		// - eth_resend
-		{
-			"eth",
-			immediateReceipts{
-				b.RecentReceipt,
-				ethapi.NewTransactionAPI(b, new(ethapi.AddrLocker)),
-			},
+		name: APITx, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any {
+			return immediateReceipts{b.RecentReceipt, ethapi.NewTransactionAPI(b, new(ethapi.AddrLocker))}
 		},
+	},
+	{
 		// Standard Ethereum node APIS:
 		// - eth_getFilterChanges
 		// - eth_getFilterLogs
@@ -121,85 +183,101 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
-		{"eth", filter},
+		name: APISubscription, namespace: "eth", defaultOn: true,
+		receiver: func(_ *backend, filter *filters.FilterAPI) any { return filter },
+	},
+	{
+		// Avalanche-custom eth extensions:
+		// - eth_subscribe
+		//  - newAcceptedTransactions
+		name: APISubscription, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customSubscriptionAPI{b} },
+	},
+	{
 		// Avalanche-custom eth extensions:
 		// - eth_baseFee
 		// - eth_callDetailed
 		// - eth_getChainConfig
 		// - eth_suggestPriceOptions
-		// - eth_subscribe
-		//  - newAcceptedTransactions
-		{"eth", &customAPI{b}},
-	}
+		name: APIAvalanche, namespace: "eth", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customAPI{b} },
+	},
+	{
+		// geth-specific APIs:
+		// - debug_chaindbCompact
+		// - debug_chaindbProperty
+		// - debug_dbAncient
+		// - debug_dbAncients
+		// - debug_dbGet
+		// - debug_getRawBlock
+		// - debug_getRawHeader
+		// - debug_getRawReceipts
+		// - debug_getRawTransaction
+		// - debug_printBlock
+		// - debug_setHead          (no-op, logs info)
+		name: APIDB, namespace: "debug", // raw database access
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return ethapi.NewDebugAPI(b) },
+	},
+	{
+		// geth-specific APIs:
+		// - debug_blockProfile
+		// - debug_cpuProfile
+		// - debug_freeOSMemory
+		// - debug_gcStats
+		// - debug_goTrace
+		// - debug_memStats
+		// - debug_mutexProfile
+		// - debug_setBlockProfileRate
+		// - debug_setGCPercent
+		// - debug_setMutexProfileFraction
+		// - debug_stacks
+		// - debug_startCPUProfile
+		// - debug_startGoTrace
+		// - debug_stopCPUProfile
+		// - debug_stopGoTrace
+		// - debug_verbosity
+		// - debug_vmodule
+		// - debug_writeBlockProfile
+		// - debug_writeMemProfile
+		// - debug_writeMutexProfile
+		name: APIProfile, namespace: "debug", // process introspection
+		receiver: func(*backend, *filters.FilterAPI) any { return debug.Handler },
+	},
+	{
+		// geth-specific APIs:
+		// - debug_intermediateRoots
+		// - debug_standardTraceBadBlockToFile
+		// - debug_standardTraceBlockToFile
+		// - debug_traceBadBlock
+		// - debug_traceBlock
+		// - debug_traceBlockByHash
+		// - debug_traceBlockByNumber
+		// - debug_traceBlockFromFile
+		// - debug_traceCall
+		// - debug_subscribe
+		//  - traceChain // TODO(JonathanOppenheimer): test this RPC
+		// - debug_traceTransaction
+		name: APITrace, namespace: "debug", defaultOn: true,
+		receiver: func(b *backend, _ *filters.FilterAPI) any { return newTracerAPI(b) },
+	},
+}
 
-	if b.config.EnableDBInspecting {
-		apis = append(apis, api{
-			// geth-specific APIs:
-			// - debug_chaindbCompact
-			// - debug_chaindbProperty
-			// - debug_dbAncient
-			// - debug_dbAncients
-			// - debug_dbGet
-			// - debug_getRawBlock
-			// - debug_getRawHeader
-			// - debug_getRawReceipts
-			// - debug_getRawTransaction
-			// - debug_printBlock
-			// - debug_setHead          (no-op, logs info)
-			"debug", ethapi.NewDebugAPI(b),
-		})
-	}
+// Server returns the Provider's [rpc.Server], with the JSON-RPC namespace
+// handlers for every enabled [API] registered.
+func (p *Provider) Server() *rpc.Server {
+	return p.server
+}
 
-	if b.config.EnableProfiling {
-		apis = append(apis, api{
-			// geth-specific APIs:
-			// - debug_blockProfile
-			// - debug_cpuProfile
-			// - debug_freeOSMemory
-			// - debug_gcStats
-			// - debug_goTrace
-			// - debug_memStats
-			// - debug_mutexProfile
-			// - debug_setBlockProfileRate
-			// - debug_setGCPercent
-			// - debug_setMutexProfileFraction
-			// - debug_stacks
-			// - debug_startCPUProfile
-			// - debug_startGoTrace
-			// - debug_stopCPUProfile
-			// - debug_stopGoTrace
-			// - debug_verbosity
-			// - debug_vmodule
-			// - debug_writeBlockProfile
-			// - debug_writeMemProfile
-			// - debug_writeMutexProfile
-			"debug", debug.Handler,
-		})
-	}
-
-	if !b.config.DisableTracing {
-		apis = append(apis, api{
-			// geth-specific APIs:
-			// - debug_intermediateRoots
-			// - debug_standardTraceBadBlockToFile
-			// - debug_standardTraceBlockToFile
-			// - debug_traceBadBlock
-			// - debug_traceBlock
-			// - debug_traceBlockByHash
-			// - debug_traceBlockByNumber
-			// - debug_traceBlockFromFile
-			// - debug_traceCall
-			// - debug_traceChain // TODO(JonathanOppenheimer): test this RPC
-			// - debug_traceTransaction
-			"debug", newTracerAPI(b),
-		})
-	}
-
+func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	s := rpc.NewServer()
 	s.SetBatchLimits(int(b.config.BatchRequestLimit), batchResponseMaxSize) // #nosec G115 -- [Config.Verify], bounds-checks against math.MaxInt
-	for _, api := range apis {
-		if err := s.RegisterName(api.namespace, api.api); err != nil {
-			return nil, fmt.Errorf("%T.RegisterName(%q, %T): %v", s, api.namespace, api.api, err)
+	for _, svc := range apiServices {
+		if !b.config.APIs.Contains(svc.name) {
+			continue
+		}
+		r := svc.receiver(b, filter)
+		if err := s.RegisterName(svc.namespace, r); err != nil {
+			return nil, fmt.Errorf("%T.RegisterName(%q, %T): %v", s, svc.namespace, r, err)
 		}
 	}
 	return s, nil
