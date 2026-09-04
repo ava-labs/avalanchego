@@ -173,7 +173,7 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 	if len(unrecognized) > 0 {
 		slices.Sort(unrecognized)
-		snowCtx.Log.Warn("ignoring unrecognized C-Chain config options",
+		snowCtx.Log.Warn("ignoring unrecognized config options",
 			zap.Strings("options", unrecognized),
 		)
 	}
