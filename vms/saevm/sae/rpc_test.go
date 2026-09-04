@@ -1662,17 +1662,17 @@ func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method strin
 func TestAPIsServed(t *testing.T) {
 	// A method served by each API and no other.
 	methods := map[saerpc.API]string{
-		saerpc.APIWeb3:          "web3_clientVersion",
-		saerpc.APINet:           "net_version",
-		saerpc.APITxPool:        "txpool_status",
-		saerpc.APIGas:           "eth_gasPrice",
-		saerpc.APIChain:         "eth_blockNumber",
-		saerpc.APITransactions:  "eth_getTransactionCount",
-		saerpc.APISubscriptions: "eth_getLogs",
-		saerpc.APIAvalanche:     "eth_callDetailed",
-		saerpc.APIDB:            "debug_dbGet",
-		saerpc.APIProfile:       "debug_gcStats",
-		saerpc.APITrace:         "debug_traceBlockByNumber",
+		saerpc.APIWeb3:         "web3_clientVersion",
+		saerpc.APINet:          "net_version",
+		saerpc.APITxPool:       "txpool_status",
+		saerpc.APIPrice:        "eth_gasPrice",
+		saerpc.APIChain:        "eth_blockNumber",
+		saerpc.APITx:           "eth_getTransactionCount",
+		saerpc.APISubscription: "eth_getLogs",
+		saerpc.APIAvalanche:    "eth_callDetailed",
+		saerpc.APIDB:           "debug_dbGet",
+		saerpc.APIProfile:      "debug_gcStats",
+		saerpc.APITrace:        "debug_traceBlockByNumber",
 	}
 	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
 

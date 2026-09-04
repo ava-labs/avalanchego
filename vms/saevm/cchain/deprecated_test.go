@@ -63,7 +63,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 				c.APIs = rpc.AllAPIs()
 			}),
 			wantWarnings: []*loggingtest.Record{
-				deprecated("avalanche", "chain", "db", "gas", "net", "profile", "subscriptions", "trace", "transactions", "txpool", "web3"),
+				deprecated("avalanche", "chain", "db", "net", "price", "profile", "subscription", "trace", "tx", "txpool", "web3"),
 			},
 		},
 		{
@@ -73,15 +73,15 @@ func TestParseConfigDeprecated(t *testing.T) {
 				c.APIs = set.Of(
 					rpc.APIAvalanche,
 					rpc.APIChain,
-					rpc.APIGas,
 					rpc.APINet,
-					rpc.APISubscriptions,
-					rpc.APITransactions,
+					rpc.APIPrice,
+					rpc.APISubscription,
+					rpc.APITx,
 					rpc.APIWeb3,
 				)
 			}),
 			wantWarnings: []*loggingtest.Record{
-				deprecated("avalanche", "chain", "gas", "net", "subscriptions", "transactions", "web3"),
+				deprecated("avalanche", "chain", "net", "price", "subscription", "tx", "web3"),
 				removed("eth"),
 			},
 		},

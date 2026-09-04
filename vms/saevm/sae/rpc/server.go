@@ -31,17 +31,17 @@ type API string
 // Every available [API]. The methods each one carries are listed alongside its
 // registration in [apiServices].
 const (
-	APIWeb3          API = "web3"
-	APINet           API = "net"
-	APITxPool        API = "txpool"
-	APIGas           API = "gas"
-	APIChain         API = "chain"
-	APITransactions  API = "transactions"
-	APISubscriptions API = "subscriptions"
-	APIAvalanche     API = "avalanche"
-	APIDB            API = "db"
-	APIProfile       API = "profile"
-	APITrace         API = "trace"
+	APIWeb3         API = "web3"
+	APINet          API = "net"
+	APITxPool       API = "txpool"
+	APIPrice        API = "price"
+	APIChain        API = "chain"
+	APITx           API = "tx"
+	APISubscription API = "subscription"
+	APIAvalanche    API = "avalanche"
+	APIDB           API = "db"
+	APIProfile      API = "profile"
+	APITrace        API = "trace"
 )
 
 // AllAPIs returns every [API].
@@ -111,7 +111,7 @@ var apiServices = []apiService{
 		// - eth_maxPriorityFeePerGas
 		// - eth_feeHistory
 		// - eth_syncing
-		name: APIGas, namespace: "eth", defaultOn: true,
+		name: APIPrice, namespace: "eth", defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return ethapi.NewEthereumAPI(b) },
 	},
 	{
@@ -164,7 +164,7 @@ var apiServices = []apiService{
 		// - eth_getRawTransactionByHash
 		// - eth_pendingTransactions
 		// - eth_resend
-		name: APITransactions, namespace: "eth", defaultOn: true,
+		name: APITx, namespace: "eth", defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any {
 			return immediateReceipts{b.RecentReceipt, ethapi.NewTransactionAPI(b, new(ethapi.AddrLocker))}
 		},
@@ -184,14 +184,14 @@ var apiServices = []apiService{
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
-		name: APISubscriptions, namespace: "eth", defaultOn: true,
+		name: APISubscription, namespace: "eth", defaultOn: true,
 		receiver: func(_ *backend, filter *filters.FilterAPI) any { return filter },
 	},
 	{
 		// Avalanche-custom eth extensions:
 		// - eth_subscribe
 		//  - newAcceptedTransactions
-		name: APISubscriptions, namespace: "eth", defaultOn: true,
+		name: APISubscription, namespace: "eth", defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customSubscriptionAPI{b} },
 	},
 	{

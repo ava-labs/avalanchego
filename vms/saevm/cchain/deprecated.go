@@ -38,13 +38,13 @@ var legacyEthAPIs = map[string]set.Set[rpc.API]{
 	"debug-handler":        set.Of(rpc.APIProfile),
 	"debug-tracer":         set.Of(rpc.APITrace),
 	"eth":                  nil, // eth_etherbase and eth_coinbase no longer exist
-	"eth-filter":           set.Of(rpc.APISubscriptions),
+	"eth-filter":           set.Of(rpc.APISubscription),
 	"internal-account":     nil, // eth_accounts no longer exists
 	"internal-blockchain":  set.Of(rpc.APIChain, rpc.APIAvalanche),
 	"internal-debug":       set.Of(rpc.APIDB),
-	"internal-eth":         set.Of(rpc.APIGas, rpc.APIAvalanche),
+	"internal-eth":         set.Of(rpc.APIPrice, rpc.APIAvalanche),
 	"internal-personal":    nil, // the personal namespace no longer exists
-	"internal-transaction": set.Of(rpc.APITransactions),
+	"internal-transaction": set.Of(rpc.APITx),
 	"internal-tx-pool":     set.Of(rpc.APITxPool),
 	"net":                  set.Of(rpc.APINet),
 	"web3":                 set.Of(rpc.APIWeb3),
