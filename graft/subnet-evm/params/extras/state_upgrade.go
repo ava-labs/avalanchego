@@ -4,13 +4,17 @@
 package extras
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
+	"maps"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -38,8 +42,22 @@ type StateUpgradeAccount struct {
 	BalanceChange *math.HexOrDecimal256       `json:"balanceChange,omitempty"`
 }
 
+// Equal reports whether s and other describe the same state modifications.
+// It must treat a config as equal to its own JSON round-trip, since the copy
+// persisted by WriteChainConfig is compared against a fresh parse of the
+// upgrade bytes on every startup.
 func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
-	return reflect.DeepEqual(s, other)
+	if s == nil || other == nil {
+		return s == other
+	}
+	return utils.Uint64PtrEqual(s.BlockTimestamp, other.BlockTimestamp) &&
+		maps.EqualFunc(s.StateUpgradeAccounts, other.StateUpgradeAccounts, StateUpgradeAccount.equal)
+}
+
+func (s StateUpgradeAccount) equal(other StateUpgradeAccount) bool {
+	return bytes.Equal(s.Code, other.Code) &&
+		maps.Equal(s.Storage, other.Storage) &&
+		utils.BigEqual((*big.Int)(s.BalanceChange), (*big.Int)(other.BalanceChange))
 }
 
 // verifyStateUpgrades checks [c.StateUpgrades] is well formed:

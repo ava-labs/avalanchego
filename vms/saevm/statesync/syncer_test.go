@@ -369,3 +369,21 @@ func TestSyncAfterAbandonedSync(t *testing.T) {
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
 }
+
+func TestSyncToSynchronousBlock(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, defaultCommitInterval)
+
+	summary, err := sourceVM.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+
+	client := newSUT(t, withLastSynchronous(summary.AcceptedHeight))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	syncer := client.syncer()
+	err = syncer.Sync(ctx, summary)
+	require.ErrorIsf(t, err, errSynchronousBlock, "%T.Sync(%v)", syncer, summary)
+}

@@ -46,6 +46,7 @@ go_test(
     embed = [":statesync"],
     deps = [
         "//chains/atomic",
+        "//database",
         "//database/memdb",
         "//database/prefixdb",
         "//snow/engine/enginetest",
