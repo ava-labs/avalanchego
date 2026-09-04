@@ -23,9 +23,8 @@ import (
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
 // An API is a named group of JSON-RPC methods that a node MAY serve, see
-// [Config.APIs]. Groups do not align with JSON-RPC namespaces: for security
-// and compatibility reasons, methods within a single namespace must be
-// selectable independently, and the namespaces themselves are locked in.
+// [Config.APIs]. Groups can't align with the JSON-RPC namespaces for security
+// and compatibility reasons with existing APIs :(.
 type API string
 
 // Every available [API]. The methods each one carries are listed alongside its
