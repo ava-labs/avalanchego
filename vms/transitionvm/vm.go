@@ -147,13 +147,7 @@ func (vm *VM) Initialize(
 			return nil
 		}
 		// The network is past the transition time, so peers only serve the
-		// post-transition chain's state summaries: a fresh node must
-		// transition before the engine starts the sync. A node with accepted
-		// blocks instead bootstraps to the transition block, since the
-		// post-transition chain refuses to sync over accepted blocks.
-		//
-		// This commits to state syncing before any summary has been seen;
-		// see the README's "Eager transition for state sync" section.
+		// post-transition chain's state summaries.
 		if lastAccepted.Height() > 0 {
 			log.Info("past transition time with accepted pre-transition blocks; waiting for the transition block")
 			return nil
