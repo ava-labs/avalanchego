@@ -34,6 +34,9 @@
   .stat { background:var(--card); border-radius:8px; padding:10px 12px; min-width:0; }
   .stat .l { color:var(--dim); font-size:12px; } .stat .v { font-size:18px; font-weight:600; margin-top:2px; overflow-wrap:anywhere; }
   .stat .s { color:var(--dim); font-size:12px; margin-top:2px; overflow-wrap:anywhere; }
+  @keyframes bump { 0% { background:#0b5fff; color:#fff; transform:scale(1.04); } 30% { background:#cfe0ff; color:var(--fg); transform:scale(1.04); } 100% { background:var(--card); transform:none; } }
+  .stat.bump { animation: bump 1.6s ease-out; }
+  .stat.bump .l, .stat.bump .s { color:inherit; }
   .wallet { border-left:3px solid var(--blue); }
   .wallet.p { border-left-color:var(--green); }
   table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
@@ -239,7 +242,16 @@ const cBalance = async () => BigInt(await rpc('/ext/bc/C/rpc', 'eth_getBalance',
 
 // ---- explorer panel ----
 const $ = id => document.getElementById(id);
-const setK = (k, text) => { for (const el of document.querySelectorAll('[data-k="' + k + '"]')) el.textContent = text; };
+// Flash the card when a value changes so the eye lands on the balance that moved.
+function setK(k, text) {
+  for (const el of document.querySelectorAll('[data-k="' + k + '"]')) {
+    const old = el.textContent;
+    el.textContent = text;
+    const card = el.closest && el.closest('.stat');
+    if (!card || old === text || old === '\u2013' || !old.trim()) continue;
+    card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump');
+  }
+}
 function table(headers, rows) {
   if (!rows.length) return null;
   const t = document.createElement('table');
