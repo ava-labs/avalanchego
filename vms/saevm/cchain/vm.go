@@ -179,6 +179,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}
+	vm.onClose = append(vm.onClose, vm.Handler.Shutdown)
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
 	// [VM.finishInitialize] adds the [sae.VM] after all necessary state is available.
