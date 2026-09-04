@@ -20,6 +20,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_ava_labs_libevm//triedb/hashdb",
         "@org_uber_go_zap//:zap",
@@ -30,6 +31,7 @@ go_test(
     name = "saedb_test",
     srcs = [
         "saedb_test.go",
+        "snapshot_state_test.go",
         "tracker_test.go",
     ],
     data = glob(["testdata/**"]),
@@ -47,8 +49,11 @@ go_test(
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//triedb",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//zapcore",
     ],
 )

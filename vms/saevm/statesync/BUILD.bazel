@@ -23,7 +23,6 @@ go_library(
         "//network/p2p",
         "//snow",
         "//snow/engine/snowman/block",
-        "//utils/logging",
         "//vms/evm/sync/block",
         "//vms/evm/sync/code",
         "//vms/evm/sync/customrawdb",
@@ -57,6 +56,7 @@ go_test(
     name = "statesync_test",
     srcs = [
         "handler_test.go",
+        "metrics_test.go",
         "summary_test.go",
         "sut_test.go",
         "syncer_test.go",

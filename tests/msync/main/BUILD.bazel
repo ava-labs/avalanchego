@@ -6,7 +6,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/tests/msync/main",
     visibility = ["//visibility:private"],
     deps = [
-        "//api/health",
         "//chains",
         "//config",
         "//ids",

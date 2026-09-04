@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "libevmlog",
+    srcs = ["libevmlog.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/libevmlog",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "@com_github_ava_labs_libevm//log",
+        "@org_golang_x_exp//slog",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "libevmlog_test",
+    srcs = ["libevmlog_test.go"],
+    embed = [":libevmlog"],
+    deps = [
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_exp//slog",
+    ],
+)
