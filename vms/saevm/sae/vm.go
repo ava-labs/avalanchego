@@ -155,6 +155,9 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
+	closers.Push(unwind.CloserFunc(func() error {
+		return exec.Tracker.Close(exec.LastExecuted().SettledStateRoot())
+	}))
 	closers.Push(exec)
 
 	// ==========  Mempool & P2P Gossip  ==========

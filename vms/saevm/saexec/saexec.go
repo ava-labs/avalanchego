@@ -35,9 +35,9 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
 	*saedb.Tracker
-	quit, done chan struct{}
-	log        logging.Logger
-	hooks      hook.Points
+	done  chan struct{}
+	log   logging.Logger
+	hooks hook.Points
 
 	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
@@ -54,8 +54,7 @@ type Executor struct {
 	metrics      *metrics
 }
 
-// New constructs and starts a new [Executor]. Call [Executor.Close] to release
-// resources created by this constructor.
+// New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
 // The last-executed block MAY be the genesis block for an always-SAE chain, the
 // last pre-SAE synchronous block during transition, or the last asynchronously
@@ -78,13 +77,13 @@ func New(
 
 	e := &Executor{
 		Tracker: tracker,
-		quit:    make(chan struct{}), // closed by [Executor.Close]
-		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
+		done:    make(chan struct{}), // closed by [Executor.processQueue] once `queue` is closed and drained
 		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
+		// queue is closed by [Executor.Close].
 		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
@@ -105,13 +104,12 @@ func New(
 
 var _ io.Closer = (*Executor)(nil)
 
-// Close shuts down the [Executor], waits for the currently executing block
-// to complete, and then releases all resources.
+// Close shuts down the [Executor] and waits for all queued blocks to finish
+// executing.
 func (e *Executor) Close() error {
-	close(e.quit)
+	close(e.queue)
 	<-e.done
-
-	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
+	return nil
 }
 
 // ChainConfig returns the config originally passed to [New].
