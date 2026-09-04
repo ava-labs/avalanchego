@@ -22,8 +22,8 @@ import (
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
 const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB
 
-// An API is a named group of JSON-RPC methods that a node either serves or
-// doesn't, see [Config.APIs]. Groups are finer-grained than namespaces because
+// An API is a named group of JSON-RPC methods that a node MAY serve, see
+// [Config.APIs]. Groups are finer-grained than namespaces because
 // several contribute to the `eth` namespace yet must be selectable
 // independently and the namespaces are locked in :(.
 type API string
