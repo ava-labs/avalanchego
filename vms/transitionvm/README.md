@@ -90,9 +90,16 @@ flowchart TD
 The engine runs state sync once, at startup, against the active VM — but a
 node starting after the transition faces peers that serve only the
 post-transition VM's summaries. So a node transitions *eagerly* during
-initialization when the wall clock is past the transition time, the chain is
-still at the genesis, and the node intends to state sync. The marker is
-written before the sync runs, so the commitment is **one-way**.
+initialization when the wall clock is past the transition time, the network is
+a production network (Mainnet or Fuji), the chain is still at the genesis, and
+the node intends to state sync. The marker is written before the sync runs, so
+the commitment is **one-way**.
+
+Only production networks get the eager path. The real requirement is that the
+network sequenced more than one commit interval of blocks before the
+transition, so peers have a post-transition summary to serve; production
+networks are known to satisfy it, while a custom network may transition right
+at its genesis and strand an eagerly-committed node.
 
 The eager path requires of the VMs:
 

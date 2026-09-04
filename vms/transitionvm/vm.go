@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -144,6 +145,15 @@ func (vm *VM) Initialize(
 	}
 	if lastAccepted.Timestamp().Before(vm.transitionTime) {
 		if vm.now().Before(vm.transitionTime) {
+			return nil
+		}
+		// Transitioning is only safe once the network has sequenced more than
+		// one commit interval of blocks before the transition, so peers have a
+		// post-transition summary to serve. The production networks are known
+		// to satisfy this; a custom network may not, so it waits for the
+		// transition block instead.
+		if !constants.ProductionNetworkIDs.Contains(preChainCtx.NetworkID) {
+			log.Info("past transition time on a non-production network; waiting for the transition block")
 			return nil
 		}
 		// The network is past the transition time, so peers only serve the

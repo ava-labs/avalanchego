@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -100,6 +101,7 @@ func setPreference(t *testing.T, ctx context.Context, vm *VM, blkID ids.ID, mode
 type sutConfig struct {
 	db                  database.Database
 	state               *fakeState
+	networkID           uint32
 	preStateSyncEnabled bool
 	preStateSyncErr     error
 	now                 time.Time
@@ -114,6 +116,13 @@ type sutOption = options.Option[sutConfig]
 func withPreStateSync(enabled bool) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.preStateSyncEnabled = enabled
+	})
+}
+
+// withNetworkID sets the network the VM believes it is running on.
+func withNetworkID(networkID uint32) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.networkID = networkID
 	})
 }
 
@@ -144,6 +153,9 @@ func tryNewSUT(t *testing.T, blocksUntilTransition int, opts ...sutOption) (*SUT
 	cfg := options.ApplyTo(&sutConfig{
 		db:    memdb.New(),
 		state: newFakeState(),
+		// Eager transitions only happen on production networks, so default to
+		// one to keep that path reachable.
+		networkID: constants.MainnetID,
 		// The clock sits at the genesis, before any positive transition time,
 		// so tests opt in to the eager-transition path with [withClockAt].
 		now:            snowmantest.GenesisTimestamp,
@@ -169,6 +181,7 @@ func (cfg *sutConfig) newSUT(t *testing.T) (*SUT, error) {
 		APIDrainTimeout: 100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
+	ctx.NetworkID = cfg.networkID
 	intf, err := factory.New(ctx.Log)
 	require.NoErrorf(t, err, "%T.New()", factory)
 	vm := intf.(*VM)
@@ -540,14 +553,16 @@ func TestRestart(t *testing.T) {
 }
 
 // TestEagerTransition verifies Initialize transitions without a transition
-// block iff the wall clock is past the transition time, the local chain is
-// still at the genesis, and the pre-transition chain will state sync.
+// block iff the wall clock is past the transition time, the network is a
+// production network, the local chain is still at the genesis, and the
+// pre-transition chain will state sync.
 func TestEagerTransition(t *testing.T) {
 	const blocksUntilTransition = 10
 
 	tests := []struct {
 		name           string
 		clockOffset    time.Duration // from the transition time
+		networkID      uint32        // 0 keeps the production-network default
 		blocksAccepted int
 		preStateSync   bool
 		wantVersion    string
@@ -556,6 +571,21 @@ func TestEagerTransition(t *testing.T) {
 			name:         "fresh_node_syncing",
 			preStateSync: true,
 			wantVersion:  "post",
+		},
+		{
+			name:         "fresh_node_syncing_fuji",
+			networkID:    constants.FujiID,
+			preStateSync: true,
+			wantVersion:  "post",
+		},
+		{
+			// A custom network may not have sequenced more than one commit
+			// interval of blocks before the transition, so a past wall clock
+			// isn't trusted there.
+			name:         "fresh_node_syncing_non_production_waits",
+			networkID:    constants.UnitTestID,
+			preStateSync: true,
+			wantVersion:  "pre",
 		},
 		{
 			name:        "fresh_node_not_syncing",
@@ -586,10 +616,14 @@ func TestEagerTransition(t *testing.T) {
 				sut.BuildVerifyAccept(t, t.Context(), noContext)
 			}
 
-			sut.restart(t,
+			opts := []sutOption{
 				withClockAt(tt.clockOffset),
 				withPreStateSync(tt.preStateSync),
-			).requireVersion(t, tt.wantVersion)
+			}
+			if tt.networkID != 0 {
+				opts = append(opts, withNetworkID(tt.networkID))
+			}
+			sut.restart(t, opts...).requireVersion(t, tt.wantVersion)
 		})
 	}
 }
