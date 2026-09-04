@@ -11,9 +11,6 @@ on:
   merge_group:
     types: [checks_requested]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 permissions:
   contents: read
 
@@ -55,10 +52,8 @@ jobs:
       # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
       # - load_kube_kind
       - robustness
-      - unit-avalanchego
-      - unit-coreth
-      - unit-evm
-      - unit-subnet-evm
+      - smoke
+      - unit
       - upgrade
     runs-on: ubuntu-24.04
     steps:
@@ -504,69 +499,24 @@ jobs:
         with:
           artifact_name: robustness-kind-diagnostics
 
-  unit-avalanchego:
-    name: unit-avalanchego (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - name: test-unit
-        shell: bash
-        run: ./scripts/run_task.sh test-unit
-        env:
-          TIMEOUT: ${{ env.TIMEOUT }}
+  # macOS runners are slower and less reliable than Linux runners.
+  # Pre-merge CI runs only a smoke test on macOS. The scheduled Go workflow
+  # runs the full suite on macOS.
+  smoke:
+    name: darwin-arm64
+    uses: ./.github/workflows/go-ci-smoke.yml
+    with:
+      platform_name: darwin-arm64
+      runner: macos-26
+    secrets: inherit
 
-  unit-coreth:
-    name: unit-coreth (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: ./graft/coreth
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - run: ./scripts/run_task.sh build-test
-      - run: ./scripts/run_task.sh coverage
-
-  unit-evm:
-    name: unit-evm (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: ./graft/evm
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - run: ../../scripts/run_task.sh build-test
-      - run: ../../scripts/run_task.sh coverage
-
-  unit-subnet-evm:
-    name: unit-subnet-evm (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - run: ./scripts/run_task.sh build-test
-      - run: ./scripts/run_task.sh coverage
+  unit:
+    name: linux-amd64
+    uses: ./.github/workflows/go-ci.yml
+    with:
+      platform_name: linux-amd64
+      runner: ubuntu-24.04
+    secrets: inherit
 
   upgrade:
     runs-on: ubuntu-24.04
