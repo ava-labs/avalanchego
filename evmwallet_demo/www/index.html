@@ -34,9 +34,8 @@
   .stat { background:var(--card); border-radius:8px; padding:10px 12px; min-width:0; }
   .stat .l { color:var(--dim); font-size:12px; } .stat .v { font-size:18px; font-weight:600; margin-top:2px; overflow-wrap:anywhere; }
   .stat .s { color:var(--dim); font-size:12px; margin-top:2px; overflow-wrap:anywhere; }
-  @keyframes bump { 0% { background:#0b5fff; color:#fff; transform:scale(1.04); } 30% { background:#cfe0ff; color:var(--fg); transform:scale(1.04); } 100% { background:var(--card); transform:none; } }
-  .stat.bump { animation: bump 1.6s ease-out; }
-  .stat.bump .l, .stat.bump .s { color:inherit; }
+  @keyframes bump { 0% { background:#dfeaff; box-shadow:0 0 0 2px #0b5fff55; } 100% { background:var(--card); box-shadow:none; } }
+  .stat.bump { animation: bump 2.4s ease-out; }
   .wallet { border-left:3px solid var(--blue); }
   .wallet.p { border-left-color:var(--green); }
   table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
