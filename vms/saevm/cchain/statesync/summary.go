@@ -31,7 +31,7 @@ type summary struct {
 }
 
 // ParseStateSummary unmarshals a canoto-encoded [summary].
-func (*SummaryHandler) ParseStateSummary(_ context.Context, summaryBytes []byte) (*summary, error) {
+func (*Handler) ParseStateSummary(_ context.Context, summaryBytes []byte) (*summary, error) {
 	var s summary
 	if err := s.UnmarshalCanoto(summaryBytes); err != nil {
 		return nil, fmt.Errorf("parsing state summary: %w", err)
