@@ -105,7 +105,7 @@ func (n *Network) Round() error {
 	sampledColors := bag.Bag[ids.ID]{}
 	for _, index := range indices {
 		peer := n.nodes[int(index)]
-		sampledColors.Add(peer.Preference())
+		sampledColors.Add(preferenceID(peer))
 	}
 
 	if err := running.RecordPoll(context.Background(), sampledColors); err != nil {
@@ -126,9 +126,9 @@ func (n *Network) Agreement() bool {
 	if len(n.nodes) == 0 {
 		return true
 	}
-	pref := n.nodes[0].Preference()
+	pref := preferenceID(n.nodes[0])
 	for _, node := range n.nodes {
-		if pref != node.Preference() {
+		if pref != preferenceID(node) {
 			return false
 		}
 	}
