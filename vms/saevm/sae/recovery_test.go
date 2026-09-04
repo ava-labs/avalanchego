@@ -331,8 +331,8 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 
 	// Closing flattens every diff layer into the disk layer before persisting
 	// it, so the root MUST be read afterwards.
-	want := snaps.DiskRoot()
-	require.Equal(t, settler.SettledStateRoot(), want, "shutting down should flush the last settled state to disk")
+	want := settler.SettledStateRoot()
+	require.Equal(t, want, snaps.DiskRoot(), "shutting down should flush the last settled state to disk")
 
 	_, sut = newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb.Clone()), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = saetest.CopyDB(t, db)
