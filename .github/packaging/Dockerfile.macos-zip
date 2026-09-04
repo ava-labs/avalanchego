@@ -1,0 +1,68 @@
+# Build container for local validation of the macOS zip packaging pipeline.
+#
+# Mirrors the toolchain of the workflow's sign-publish job (ubuntu-24.04 in
+# CI), so build-zip-pkg.sh runs in the same Linux/GNU userland here as in
+# production. Source tree is bind-mounted at runtime, not COPY'd.
+#
+# Usage (via build-builder-image.sh, which fetches GO_CHECKSUM and
+# APPLE_CODESIGN_CHECKSUM automatically):
+#   .github/packaging/scripts/build-builder-image.sh
+#   docker run --rm -v .:/build -v ./build/macos:/output avalanchego-macos-zip-builder ...
+
+FROM debian:stable-slim
+
+ARG GO_VERSION=INVALID
+ARG GO_CHECKSUM=INVALID
+ARG APPLE_CODESIGN_VERSION=INVALID
+ARG APPLE_CODESIGN_CHECKSUM=INVALID
+ARG TARGETARCH
+
+# Install build dependencies
+# - p7zip-full: 7z, matches the workflow's "Install rcodesign and 7zip" step
+# - gnupg: GPG signing + verification of zip archives
+# - openssl: ECDSA P8 key generation for the encode-app-store-connect-api-key path
+# - curl + ca-certificates: tool downloads
+# - gettext-base: envsubst, harmless to keep parity with the RPM image
+# - git: needed by lib-build-common.sh::init_build_env (safe.directory + status)
+# - file: used by validate to confirm Mach-O format on extracted binaries
+# - jq: parse-check rcodesign encode-app-store-connect-api-key output
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        p7zip-full \
+        gnupg \
+        openssl \
+        curl \
+        ca-certificates \
+        gettext-base \
+        git \
+        file \
+        jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go (SHA256-verified, cross-compiles the stub Mach-O binaries)
+RUN curl -fsSL -o /tmp/go.tar.gz \
+        "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" \
+    && echo "${GO_CHECKSUM}  /tmp/go.tar.gz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Install rcodesign (SHA256-verified, matches the action's vendored binary).
+# The release uses unusual asset arch names: x86_64-unknown-linux-musl /
+# aarch64-unknown-linux-musl. Note that the URL path-encodes the slash in
+# the apple-codesign/<ver> tag as %2F.
+RUN case "${TARGETARCH}" in \
+        amd64) RCODESIGN_ARCH="x86_64-unknown-linux-musl" ;; \
+        arm64) RCODESIGN_ARCH="aarch64-unknown-linux-musl" ;; \
+        *) echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    RCODESIGN_BASE="apple-codesign-${APPLE_CODESIGN_VERSION}-${RCODESIGN_ARCH}" && \
+    curl -fsSL -o /tmp/rcodesign.tar.gz \
+        "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_VERSION}/${RCODESIGN_BASE}.tar.gz" && \
+    echo "${APPLE_CODESIGN_CHECKSUM}  /tmp/rcodesign.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/rcodesign.tar.gz -C /tmp/ && \
+    install "/tmp/${RCODESIGN_BASE}/rcodesign" /usr/local/bin/rcodesign && \
+    rm -rf "/tmp/${RCODESIGN_BASE}" /tmp/rcodesign.tar.gz && \
+    rcodesign --version
+
+WORKDIR /build
