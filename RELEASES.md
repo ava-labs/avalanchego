@@ -91,7 +91,6 @@ NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` a
 - `api-max-duration` for C-Chain accepts only a duration string (for example `"30s"`) after Helicon. The node rejects a number. `0` means no limit.
 - `state-sync-enabled` for C-Chain defaults to `true` after Helicon.
 - `commit-interval` for C-Chain with `state-scheme` `firewood`: Coreth now accepts any value on Mainnet and Fuji, but the C-Chain rejects values other than `4096` after Helicon.
-- `allow-missing-tries` for C-Chain: after Helicon, a node that switches from archival to pruning mode refuses to start unless this option is `true`.
 
 #### Deprecated in C-Chain
 
@@ -173,6 +172,8 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - Changed the Firewood state sync protocol. A `v1.15.0` node cannot state sync with Firewood from a `v1.14.x` node. This does not affect the default `hash` state scheme.
 
 ### C-Chain State Sync
+
+C-Chain state sync does not work during and immediately after the Helicon transition. A node that is state syncing when Helicon activates stalls. Restart the node about an hour after activation to state sync again.
 
 After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `commit-interval` height. State sync has these limits:
 
