@@ -27,9 +27,8 @@ func (h *Handler) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}
 }
 
-// Error blocks until the entire state sync (the embedded handler's and the
-// atomic trie's) has finished, then returns the error that terminated it.
-func (h *Handler) Error() error {
+// SyncError returns any error that has occurred thusfar during state sync.
+func (h *Handler) SyncError() error {
 	return h.err.Get()
 }
 
@@ -37,7 +36,7 @@ func (h *Handler) Error() error {
 // completes, syncs the atomic trie state.
 //
 // AcceptSummary MUST only be called once.
-func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.StateSyncMode, error) {
+func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyncMode, error) {
 	evmSyncer := statesync.NewSyncer(
 		h.cfg,
 		h.hooks,
@@ -45,7 +44,7 @@ func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.St
 		h.network,
 		h.ethDB,
 	)
-	shouldSync := evmSyncer.ShouldAcceptSummary(&summary.summary)
+	shouldSync := evmSyncer.ShouldAcceptSummary(&s.summary)
 	if !shouldSync {
 		return block.StateSyncSkipped, nil
 	}
@@ -56,30 +55,37 @@ func (h *Handler) AcceptSummary(ctx context.Context, summary *summary) (block.St
 		return block.StateSyncSkipped, nil
 	}
 
-	ctx, h.cancel = context.WithCancel(context.Background())
+	// The sync runs in a goroutine that outlives this call, but callers
+	// idiomatically cancel ctx on return. Drop that cancellation while
+	// keeping ctx's values, so the sync stays in the caller's trace.
+	ctx, h.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	go func() {
 		defer h.cancel()
 		defer close(h.done) // result barrier: h.err is now readable
 
-		if err := evmSyncer.Sync(ctx, &summary.summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		if err := h.syncCChainState(ctx, summary); err != nil {
-			h.err.Set(err)
-			return
-		}
-		h.err.Set(evmSyncer.WriteSynced(&summary.summary))
+		h.err.Set(h.sync(ctx, evmSyncer, s))
 	}()
 	return block.StateSyncStatic, nil
 }
 
-func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
+// sync performs the full state sync, including the EVM sync and the cross-chain
+// state sync.
+func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, s *summary) error {
+	if err := evmSyncer.Sync(ctx, &s.summary); err != nil {
+		return err
+	}
+
+	// We can only determine the settled height after we have fetched the last
+	// accepted block, which is fetched during the EVM sync.
 	settledHeight, err := h.settledHeight(s.summary.AcceptedHash, s.summary.AcceptedHeight)
 	if err != nil {
 		return err
 	}
 
-	syncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
-	return syncer.Sync(ctx)
+	crossChainSyncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
+	if err := crossChainSyncer.Sync(ctx); err != nil {
+		return err
+	}
+
+	return evmSyncer.WriteSynced(&s.summary)
 }

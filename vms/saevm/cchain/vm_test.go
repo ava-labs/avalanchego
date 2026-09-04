@@ -1075,6 +1075,8 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 }
 
 func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transactions, stxs []*tx.Tx) {
+	tb.Helper()
+
 	if diff := cmp.Diff(ethTxs, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		tb.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
 	}

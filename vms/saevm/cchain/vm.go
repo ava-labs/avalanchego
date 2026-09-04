@@ -154,7 +154,6 @@ func (vm *VM) Initialize(
 		userConfig.desired(),
 		vm.metrics,
 	)
-
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
@@ -177,8 +176,10 @@ func (vm *VM) Initialize(
 		vm.state,
 	)
 	if err != nil {
-		return fmt.Errorf("creating summary handler: %w", err)
+		return fmt.Errorf("creating statesync handler: %w", err)
 	}
+	vm.onClose = append(vm.onClose, vm.Handler.Shutdown)
+
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
 	// [VM.finishInitialize] adds the [sae.VM] after all necessary state is available.
@@ -297,8 +298,11 @@ func (vm *VM) Initialize(
 			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
 				// The triedb shouldn't share a cache with execution.
 				tdb := triedb.NewDatabase(ethDB, tdbConfig)
+				vm.onClose = append(vm.onClose, func(context.Context) error {
+					return tdb.Close()
+				})
 				_, snaps := vm.VM.EVMState()
-				if err := statesync.RegisterServer(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
+				if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
 					return fmt.Errorf("registering state sync server: %w", err)
 				}
 			}
@@ -330,7 +334,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.finishInitializeOnce.Do(func() {
-			if err = vm.Handler.Error(); err != nil {
+			if err = vm.Handler.SyncError(); err != nil {
 				return
 			}
 			err = vm.finishInitialize(ctx)

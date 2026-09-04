@@ -233,7 +233,7 @@ func (s *SUT) assertEqual(tb testing.TB, want *SUT) {
 		assert.Equalf(tb, wantRoot, gotRoot, "%T.GetRoot(%d)", s.stateImpl, h)
 	}
 
-	saetest.RequireEqualDBs(tb, want.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
+	saetest.AssertEqualDBs(tb, want.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
 }
 
 func (s *SUT) assertHasTxs(tb testing.TB, blocks []block) {

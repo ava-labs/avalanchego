@@ -27,8 +27,11 @@ import (
 
 var _ adaptor.SyncableVM[*summary] = (*Handler)(nil)
 
-// Handler wraps the SAE [statesync.Handler] with the C-Chain
-// atomic trie state at the settled height.
+// Handler wraps the SAE [statesync.Handler] with the cross-chain state at the
+// settled height. It provides a full implementation of [adaptor.SyncableVM] to
+// be used with a VM to provide state sync functionality.
+//
+// TODO(StephenButtolph): Investigate better abstracting syncing in the handler.
 type Handler struct {
 	*statesync.Handler
 
@@ -79,10 +82,9 @@ func New(
 	}, nil
 }
 
-// Shutdown cancels any ongoing state sync (both the embedded handler's and
-// the atomic trie's) and waits for the sync goroutine to exit, returning early
-// with the context's error if ctx expires first. After Shutdown, no new sync
-// can be started.
+// Shutdown cancels any ongoing state sync and waits for the sync goroutine to
+// exit, returning early with the context's error if ctx expires first. After
+// Shutdown, no new sync can be started.
 func (h *Handler) Shutdown(ctx context.Context) error {
 	h.mu.Lock()
 	h.stopped = true
@@ -124,8 +126,6 @@ func (*Handler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error
 
 // wrap pairs an SAE summary with the C-Chain atomic trie root at the
 // corresponding block's settled height.
-//
-// Any database errors are logged at [logging.Error] and returned to the caller.
 func (h *Handler) wrap(base *statesync.Summary, err error) (*summary, error) {
 	if err != nil {
 		return nil, err

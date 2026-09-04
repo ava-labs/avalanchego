@@ -17,9 +17,9 @@ import (
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 )
 
-// RegisterServer registers the SAE state sync handler with the given EVM trie
-// database, allowing this node to server others' state sync requests.
-func RegisterServer(
+// RegisterHandlers registers the SAE state sync handler with the given EVM trie
+// database, allowing this node to serve others' state sync requests.
+func RegisterHandlers(
 	log logging.Logger,
 	network *p2p.Network,
 	db ethdb.Database,

@@ -56,8 +56,7 @@ func newEthTx(tb testing.TB, ethW *saetest.Wallet) *types.Transaction {
 }
 
 // produceBlocks accepts n blocks on s, each containing a minimal export tx
-// from w and a minimal eth transfer from ethW, and returns the last block and
-// its cross-chain tx.
+// from w and a minimal eth transfer from ethW, and returns the last block.
 func (s *SUT) produceBlocks(ctx context.Context, t *testing.T, w *wallet, ethW *saetest.Wallet, n int) *blocks.Block {
 	t.Helper()
 
@@ -69,35 +68,35 @@ func (s *SUT) produceBlocks(ctx context.Context, t *testing.T, w *wallet, ethW *
 }
 
 // startStateSync fetches src's last state summary and parses and accepts it
-// on dst, as the engine would, returning the accepted summary's height. The
+// on the SUT, as the engine would, returning the accepted summary's height. The
 // sync then proceeds in the background until [awaitStateSync] observes its
 // completion.
-func startStateSync(ctx context.Context, t *testing.T, src, dst *SUT) uint64 {
+func (s *SUT) startStateSyncFrom(ctx context.Context, t *testing.T, src *SUT) uint64 {
 	t.Helper()
 
 	// The engine fetches summaries from peers; parsing happens locally.
 	summary, err := src.GetLastStateSummary(ctx)
 	require.NoErrorf(t, err, "%T.GetLastStateSummary()", src.VM)
 
-	parsed, err := dst.ParseStateSummary(ctx, summary.Bytes())
-	require.NoErrorf(t, err, "%T.ParseStateSummary()", dst.VM)
-	require.Equalf(t, summary.ID(), parsed.ID(), "%T.ParseStateSummary() round trip", dst.VM)
+	parsed, err := s.ParseStateSummary(ctx, summary.Bytes())
+	require.NoErrorf(t, err, "%T.ParseStateSummary()", s.VM)
+	require.Equalf(t, summary.ID(), parsed.ID(), "%T.ParseStateSummary() round trip", s.VM)
 
-	mode, err := dst.AcceptSummary(ctx, parsed)
-	require.NoErrorf(t, err, "%T.AcceptSummary()", dst.VM)
-	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary() mode", dst.VM)
+	mode, err := s.AcceptSummary(ctx, parsed)
+	require.NoErrorf(t, err, "%T.AcceptSummary()", s.VM)
+	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary() mode", s.VM)
 	return parsed.Height()
 }
 
 // awaitStateSync blocks until dst announces completion of a sync started by
 // [startStateSync] and asserts that it succeeded.
-func awaitStateSync(ctx context.Context, t *testing.T, dst *SUT) {
+func (s *SUT) awaitStateSync(ctx context.Context, t *testing.T) {
 	t.Helper()
 
-	msg, err := dst.WaitForEvent(ctx)
-	require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
-	require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
-	require.NoErrorf(t, dst.Handler.Error(), "%T.Error()", dst.Handler)
+	msg, err := s.WaitForEvent(ctx)
+	require.NoErrorf(t, err, "%T.WaitForEvent()", s.VM)
+	require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", s.VM)
+	require.NoErrorf(t, s.Handler.SyncError(), "%T.Error()", s.Handler)
 }
 
 // bootstrapFrom transitions s to [snow.Bootstrapping], replays src's accepted
@@ -138,13 +137,13 @@ func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 	require.NoErrorf(t, err, "%T.GetRoot(%d)", s.state, head)
 	require.Equalf(t, wantRoot, gotRoot, "%T.GetRoot(%d)", s.state, head)
 
-	saetest.RequireEqualDBs(t, other.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
+	saetest.AssertEqualDBs(t, other.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
 }
 
 // TestStateSyncNewNodeJoins is the happy path: a fresh node state syncs from a
 // running source VM, bootstraps the remaining blocks, and then participates in
 // the network, both accepting the source's blocks and building its own.
-func TestStateSyncNewNodeJoins(t *testing.T) {
+func TestStateSyncNewNode(t *testing.T) {
 	const commitInterval = 8
 
 	key := txtest.NewKey(t)
@@ -201,9 +200,9 @@ func TestStateSyncNewNodeJoins(t *testing.T) {
 
 	dst.addUTXOs(t, dst.ctx.ChainID, snowtest.XChainID, seededUTXO, replayUTXO)
 
-	summaryHeight := startStateSync(ctx, t, src, dst)
+	summaryHeight := dst.startStateSyncFrom(ctx, t, src)
 	require.Equal(t, uint64(commitInterval), summaryHeight, "summary at last commit boundary")
-	awaitStateSync(ctx, t, dst)
+	dst.awaitStateSync(ctx, t)
 
 	dst.bootstrapFrom(ctx, t, src, summaryHeight)
 	dst.assertChainsMatch(ctx, t, src)
@@ -243,11 +242,11 @@ func TestStateSyncWhileNetworkAdvances(t *testing.T) {
 	ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing))...)
 	saetest.ConnectTo(t, dst, src)
 
-	summaryHeight := startStateSync(ctx, t, src, dst)
+	summaryHeight := dst.startStateSyncFrom(ctx, t, src)
 	require.Equal(t, uint64(commitInterval), summaryHeight, "summary at last commit boundary")
 
 	src.produceBlocks(srcCtx, t, w, ethW, commitInterval)
-	awaitStateSync(ctx, t, dst)
+	dst.awaitStateSync(ctx, t)
 
 	// The network keeps advancing, past another commit boundary, before dst
 	// starts bootstrapping.
@@ -315,7 +314,7 @@ func TestStateSyncDBFailure(t *testing.T) {
 
 		flaky.SetFailAfter(numOps)
 
-		startStateSync(ctx, t, src, dst)
+		dst.startStateSyncFrom(ctx, t, src)
 		msg, err := dst.WaitForEvent(ctx)
 		require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
 		require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
@@ -327,7 +326,7 @@ func TestStateSyncDBFailure(t *testing.T) {
 		// We MUST restore the db to allow a graceful transition, we're not testing DB failures there.
 		flaky.SetFailAfter(math.MaxInt)
 
-		err = dst.SetState(t.Context(), snow.Bootstrapping)
+		err = dst.SetState(ctx, snow.Bootstrapping)
 		require.ErrorIsf(t, err, wantErr, "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
 		if wantErr == nil {
 			return
@@ -336,8 +335,8 @@ func TestStateSyncDBFailure(t *testing.T) {
 		t.Run("second_try", func(t *testing.T) {
 			ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
 			saetest.ConnectTo(t, dst, src)
-			summaryHeight := startStateSync(ctx, t, src, dst)
-			awaitStateSync(ctx, t, dst)
+			summaryHeight := dst.startStateSyncFrom(ctx, t, src)
+			dst.awaitStateSync(ctx, t)
 			dst.bootstrapFrom(ctx, t, src, summaryHeight)
 			dst.assertChainsMatch(ctx, t, src)
 		})

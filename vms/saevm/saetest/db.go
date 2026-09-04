@@ -9,10 +9,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+
+	assert "github.com/stretchr/testify/require"
 )
 
 // ErrInjected is returned by [FlakyDB] once its op budget is spent.
@@ -27,18 +27,18 @@ func CopyDB(tb testing.TB, src database.Database) database.Database {
 	it := src.NewIterator()
 	defer it.Release()
 	for it.Next() {
-		require.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
+		assert.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
 	}
-	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
+	assert.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
 	return dst
 }
 
-// RequireEqualDBs asserts that got holds exactly the same key/value pairs as
+// AssertEqualDBs asserts that got holds exactly the same key/value pairs as
 // want.
-func RequireEqualDBs(tb testing.TB, want, got database.Database, msgAndArgs ...any) {
+func AssertEqualDBs(tb testing.TB, want, got database.Database, msgAndArgs ...any) {
 	tb.Helper()
 
-	require.Equal(tb, dbEntries(tb, want), dbEntries(tb, got), msgAndArgs...)
+	assert.Equal(tb, dbEntries(tb, want), dbEntries(tb, got), msgAndArgs...)
 }
 
 type dbEntry struct {
@@ -60,7 +60,7 @@ func dbEntries(tb testing.TB, db database.Database) []dbEntry {
 			Value: slices.Clone(it.Value()),
 		})
 	}
-	require.NoErrorf(tb, it.Error(), "%T.Error()", it)
+	assert.NoErrorf(tb, it.Error(), "%T.Error()", it)
 	return out
 }
 

@@ -16,10 +16,6 @@ import (
 	saestatesync "github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
-// TestShutdownCancelsMidSync checks that shutting down while a sync is in
-// flight cancels it: Shutdown returns without error, WaitForEvent reports
-// [enginecommon.StateSyncDone], and the cancellation is surfaced by
-// [Handler.Error].
 func TestShutdownCancelsMidSync(t *testing.T) {
 	sut := newSUT(t, withEnabled(true))
 
@@ -36,5 +32,5 @@ func TestShutdownCancelsMidSync(t *testing.T) {
 	msg, err := sut.WaitForEvent(t.Context())
 	require.NoErrorf(t, err, "%T.WaitForEvent()", sut.Handler)
 	require.Equal(t, enginecommon.StateSyncDone, msg, "WaitForEvent()")
-	require.ErrorIsf(t, sut.Error(), context.Canceled, "%T.Error()", sut.Handler)
+	require.ErrorIsf(t, sut.SyncError(), context.Canceled, "%T.Error()", sut.Handler)
 }

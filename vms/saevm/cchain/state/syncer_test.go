@@ -37,7 +37,7 @@ func checkStatesMatch(t *testing.T, wantSUT, gotSUT *SUT, blocks ...block) {
 	)
 
 	require.Equal(t, want.CurrentHeight(), got.CurrentHeight(), "CurrentHeight()")
-	saetest.RequireEqualDBs(t, wantSUT.sharedMemoryDB, gotSUT.sharedMemoryDB, "shared memory")
+	saetest.AssertEqualDBs(t, wantSUT.sharedMemoryDB, gotSUT.sharedMemoryDB, "shared memory")
 	require.Equal(t, want.currentRoot, got.currentRoot, "current merkle root")
 
 	for _, b := range blocks {
