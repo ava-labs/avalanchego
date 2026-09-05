@@ -1,0 +1,14 @@
+{
+  "_comment": "Sample sidecar config. This same file is read by (a) the sidecar binary at startup to register verifiers, (b) each validator whose oracle.sidecar-config-path points at it to derive the allowed source-type set, and (c) optionally by icm-services/solana-observer via its sidecar_config_path field to derive which programs to watch. Top-level `verifiers` keys must be registered in network/p2p/oracle KnownSourceTypes.",
+
+  "bind_addr": ":9900",
+
+  "verifiers": {
+    "solana": {
+      "rpc_url": "https://api.devnet.solana.com",
+      "allowed_programs": [
+        "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+      ]
+    }
+  }
+}
