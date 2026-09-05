@@ -705,16 +705,13 @@ This value is an estimate, not a wall-clock limit for the Bazel command. A
 command can make multiple RPCs. Retry delays and other build work also add time.
 Use command and job timeouts to set a limit for the complete CI operation.
 
-Pre-merge jobs use these job-level limits:
-
-- setup: 10 minutes
-- unit tests: 30 minutes
-- E2E tests: 30 minutes
-- aggregate required job: 5 minutes
-
-Scheduled jobs use twice these limits. They run broader tests without the remote
-cache. Bazel's test timeouts still limit each test process. The job-level limits
-also cover loading, analysis, builds, downloads, retries, and test setup.
+CI job timeouts bound the complete operation. The timeout values are configured
+in `.github/workflows/bazel-ci.yml` and
+`.github/workflows/bazel-ci-smoke.yml`. Scheduled jobs configure their longer
+limits in `.github/workflows/bazel-ci-scheduled.yml`. They run broader tests
+without the remote cache. Bazel's test timeouts still limit each test process.
+The job-level limits also cover loading, analysis, builds, downloads, retries,
+and test setup.
 
 Tests with Bazel 8.8.0 confirmed the expected behavior. An HTTP cache download
 continued beyond 120 seconds when a proxy limited traffic to 1 KiB/s. The test
@@ -852,7 +849,8 @@ preserve these invariants:
   by the Bazel CI reusable workflows
 - cache-prefetch behavior stays focused on external repositories and does not
   start depending on developer-specific workspace state
-- remote caching requires the cache URL and the authorization header
+- when enabled, remote caching requires a `grpcs://` cache URL and the
+  authorization header
 - the daily scheduled workflow disables remote caching
 - setup does not print the remote-cache authorization header
 

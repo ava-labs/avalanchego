@@ -13,6 +13,10 @@ BAZEL_REMOTE_CACHE_ENABLED="${BAZEL_REMOTE_CACHE_ENABLED:-true}"
 BAZEL_REMOTE_CACHE_URL="${BAZEL_REMOTE_CACHE_URL:-}"
 BAZEL_REMOTE_CACHE_AUTH_HEADER="${BAZEL_REMOTE_CACHE_AUTH_HEADER:-}"
 
+if [[ "$BAZEL_REMOTE_CACHE_ENABLED" == "true" && -z "$BAZEL_REMOTE_CACHE_AUTH_HEADER" ]]; then
+  echo "::warning::Bazel remote cache is enabled but BAZEL_REMOTE_CACHE_AUTH_HEADER is empty; continuing without the remote cache."
+fi
+
 if [[ "$BAZEL_REMOTE_CACHE_ENABLED" == "true" && -n "$BAZEL_REMOTE_CACHE_URL" && -n "$BAZEL_REMOTE_CACHE_AUTH_HEADER" ]]; then
   case "$BAZEL_REMOTE_CACHE_URL" in
     grpcs://*) ;;
