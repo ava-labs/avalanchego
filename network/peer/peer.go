@@ -54,6 +54,8 @@ var errClosed = errors.New("closed")
 type Peer struct {
 	*Config
 
+	stack MessageStack
+
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
@@ -138,9 +140,10 @@ type Peer struct {
 // Start a new peer instance.
 //
 // Invariant: There must only be one peer running at a time with a reference to
-// the same [config.InboundMsgThrottler].
+// the same [stack.InboundMsgThrottler].
 func Start(
 	config *Config,
+	stack MessageStack,
 	conn net.Conn,
 	cert *staking.Certificate,
 	id ids.NodeID,
@@ -151,6 +154,7 @@ func Start(
 	p := &Peer{
 		isIngress:          isIngress,
 		Config:             config,
+		stack:              stack,
 		conn:               conn,
 		cert:               cert,
 		id:                 id,
@@ -341,9 +345,9 @@ func (p *Peer) close() {
 // When this method returns, the connection is closed.
 func (p *Peer) readMessages() {
 	// Track this node with the inbound message throttler.
-	p.InboundMsgThrottler.AddNode(p.id)
+	p.stack.InboundMsgThrottler.AddNode(p.id)
 	defer func() {
-		p.InboundMsgThrottler.RemoveNode(p.id)
+		p.stack.InboundMsgThrottler.RemoveNode(p.id)
 		p.StartClose()
 		p.close()
 	}()
@@ -372,7 +376,7 @@ func (p *Peer) readMessages() {
 		}
 
 		// Parse the message length
-		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
+		msgLen, err := readMsgLen(msgLenBytes, p.stack.MaxFrameSize)
 		if err != nil {
 			p.Log.Verbo("error parsing message length",
 				zap.Stringer("nodeID", p.id),
@@ -394,7 +398,7 @@ func (p *Peer) readMessages() {
 		// exited before calling [Network.Disconnected] to guarantee that there
 		// can't be multiple instances of this goroutine running over different
 		// peer instances.
-		onFinishedHandling := p.InboundMsgThrottler.Acquire(
+		onFinishedHandling := p.stack.InboundMsgThrottler.Acquire(
 			p.onClosingCtx,
 			uint64(msgLen),
 			p.id,
@@ -442,7 +446,7 @@ func (p *Peer) readMessages() {
 		)
 
 		// Parse the message
-		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		msg, err := p.stack.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
@@ -499,7 +503,7 @@ func (p *Peer) writeMessages() {
 
 	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
 	requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
-	msg, err := p.MessageCreator.Handshake(
+	msg, err := p.stack.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
 		mySignedIP.AddrPort,
@@ -574,7 +578,7 @@ func (p *Peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
 	}
 
 	msgLen := uint32(len(msgBytes))
-	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
+	msgLenBytes, err := writeMsgLen(msgLen, p.stack.MaxFrameSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -617,7 +621,7 @@ func (p *Peer) sendNetworkMessages() {
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
 			requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
-			msg, err := p.Config.MessageCreator.GetPeerList(
+			msg, err := p.stack.MessageCreator.GetPeerList(
 				knownPeersFilter,
 				knownPeersSalt,
 				requestAllSubnetIPs,
@@ -649,7 +653,7 @@ func (p *Peer) sendNetworkMessages() {
 			}
 
 			primaryUptime := p.getUptime()
-			pingMessage, err := p.MessageCreator.Ping(primaryUptime)
+			pingMessage, err := p.stack.MessageCreator.Ping(primaryUptime)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
 					zap.Stringer("nodeID", p.id),
@@ -762,7 +766,7 @@ func (p *Peer) handlePing(msg *p2p.Ping) {
 	}
 	p.observedUptime.Set(msg.Uptime)
 
-	pongMessage, err := p.MessageCreator.Pong()
+	pongMessage, err := p.stack.MessageCreator.Pong()
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1042,7 +1046,7 @@ func (p *Peer) handleHandshake(msg *p2p.Handshake) {
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	peerListMsg, err := p.stack.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1110,7 +1114,7 @@ func (p *Peer) handleGetPeerList(msg *p2p.GetPeerList) {
 
 	// Bypass throttling is disabled here to follow the non-handshake message
 	// sending pattern.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+	peerListMsg, err := p.stack.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
 			zap.Stringer("nodeID", p.id),

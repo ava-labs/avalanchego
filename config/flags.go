@@ -182,6 +182,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
 	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
+	fs.Uint(NetworkMaxMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, fmt.Sprintf("Maximum P2P message size in KiB for peers listed in %s. Must be >= %d KiB (2 MiB)", NetworkLargeMessagePeerIDsKey, constants.DefaultMaxMessageSize/units.KiB))
+	fs.StringSlice(NetworkLargeMessagePeerIDsKey, []string{}, fmt.Sprintf("Comma-separated list of peer node IDs allowed to send and receive messages up to %s (KiB)", NetworkMaxMessageSizeKey))
 
 	fs.Bool(NetworkTCPProxyEnabledKey, constants.DefaultNetworkTCPProxyEnabled, "Require all P2P connections to be initiated with a TCP proxy header")
 	// The PROXY protocol specification recommends setting this value to be at

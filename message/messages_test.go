@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestMessage(t *testing.T) {
@@ -25,6 +26,7 @@ func TestMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(t, err)
 
@@ -681,6 +683,7 @@ func TestInboundMessageToString(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -710,6 +713,7 @@ func TestEmptyInboundMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -729,6 +733,7 @@ func TestNilInboundMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 

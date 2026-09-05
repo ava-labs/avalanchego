@@ -182,6 +182,7 @@ func newNetworkConfigsWithKeyReuse(t *testing.T, numNodes uint64, reuseKeys keyR
 			prometheus.NewRegistry(),
 			constants.DefaultNetworkCompressionType,
 			10*time.Second,
+			int64(constants.DefaultMaxMessageSize),
 		)
 		require.NoError(t, err)
 		config := &Config{
