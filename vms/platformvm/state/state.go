@@ -2270,13 +2270,7 @@ func (s *State) initValidatorSets() error {
 		}
 	}
 
-	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
-	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
-	if err != nil {
-		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
-	}
-	s.metrics.SetTotalStake(totalWeight)
-	return nil
+	return s.updateStakeMetrics()
 }
 
 func (s *State) write(updateValidators bool, height uint64) error {
@@ -2725,12 +2719,40 @@ func (s *State) updateValidatorManager(updateValidators bool) error {
 	}
 
 	// Update the stake metrics
+	return s.updateStakeMetrics()
+}
+
+// updateStakeMetrics must run after updates to the validator manager and
+// current staker state.
+func (s *State) updateStakeMetrics() error {
+	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
+	s.metrics.SetLocalStake(localStake)
+
+	var delegatedStake uint64
+	if localStake != 0 {
+		vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
+		if err != nil {
+			return fmt.Errorf("failed to get local validator: %w", err)
+		}
+
+		// The manager's weight includes the validator's own stake. Underflow
+		// means the manager is inconsistent with the current staker state.
+		delegatedStake, err = safemath.Sub(localStake, vdr.Weight)
+		if err != nil {
+			return fmt.Errorf(
+				"local validator weight %d exceeds validator manager weight %d: %w",
+				vdr.Weight,
+				localStake,
+				err,
+			)
+		}
+	}
+	s.metrics.SetLocalDelegatedStake(delegatedStake)
+
 	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
-		return fmt.Errorf("failed to get total weight of primary network: %w", err)
+		return fmt.Errorf("failed to get total weight of primary network validators: %w", err)
 	}
-
-	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }
