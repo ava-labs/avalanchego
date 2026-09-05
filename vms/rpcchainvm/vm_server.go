@@ -273,12 +273,17 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	parentID := blk.Parent()
+	retainsAcceptedBlocks := false
+	if r, ok := vm.vm.(block.RetainsAcceptedBlocksVM); ok {
+		retainsAcceptedBlocks = r.RetainsAcceptedBlocks()
+	}
 	return &vmpb.InitializeResponse{
-		LastAcceptedId:       lastAccepted[:],
-		LastAcceptedParentId: parentID[:],
-		Height:               blk.Height(),
-		Bytes:                blk.Bytes(),
-		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
+		LastAcceptedId:        lastAccepted[:],
+		LastAcceptedParentId:  parentID[:],
+		Height:                blk.Height(),
+		Bytes:                 blk.Bytes(),
+		Timestamp:             grpcutils.TimestampFromTime(blk.Timestamp()),
+		RetainsAcceptedBlocks: retainsAcceptedBlocks,
 	}, nil
 }
 
