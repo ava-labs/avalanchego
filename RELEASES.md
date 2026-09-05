@@ -1,46 +1,197 @@
 # Release Notes
 
-## Pending (v1.14.3)
+## Pending (v1.15.1)
 
-### Config
+- None (delete and fill in as you work)
 
-- Added `api-resolve-pending-to-last-executed` for SAE named-block resolution, optionally mapping "pending" to the last-executed instead of last-accepted block.
+## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
-### Metrics
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md) C-Chain Async Execution
+- [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
+- [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
+- [ACP-273](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md) Reduce Minimum Validator Staking Duration
+- [ACP-283](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md) Dynamic Minimum C-Chain Gas Price
+- [ACP-285](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md) Reduce Minimum Consumption Rate
 
-- Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
+
+**All Mainnet nodes must upgrade before 11 AM ET, September 22nd 2026.**
+
+This release updates the plugin version to `46`. All plugins must update to remain compatible.
+
+### APIs
+
+The P-Chain wallet adds builders for the ACP-236 transactions:
+- `NewAddAutoRenewedValidatorTx`
+- `NewSetAutoRenewedValidatorConfigTx`
+
+#### C-Chain RPCs
+
+- State-dependent RPCs for an accepted block wait until that block executes. The `latest` tag always refers to the last executed block.
+- The C-Chain has no pending state. `pending` resolves to the last executed block by default. With `api-resolve-pending-to-last-executed` set to `false`, `pending` resolves to the last accepted block, and state queries on it return an error.
+- The `avax.getAtomicTxStatus` RPC is deprecated. Use `avax.getAtomicTx`.
+- The `admin`, `warp`, and `personal` API namespaces are removed.
+- The `eth_accounts`, `eth_coinbase`, and `eth_etherbase` RPCs are removed.
+- The following `debug` RPCs are removed:
+  - `debug_dumpBlock`
+  - `debug_preimage`
+  - `debug_getBadBlocks`
+  - `debug_accountRange`
+  - `debug_storageRangeAt`
+  - `debug_getModifiedAccountsByNumber`
+  - `debug_getModifiedAccountsByHash`
+  - `debug_getAccessibleState`
+
+#### Metrics
+
+- Histogram `avalanche_snowman_consensus_latencies` has 8 buckets instead of 4, each a second wide.
+- Added `avalanche_evm_transition_sae_last_executed_height` and `avalanche_evm_transition_sae_last_settled_height` gauges, exposing SAE execution and settlement heights.
 - Added SAE execution-pressure metrics:
-  - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
-  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including the state commit and post-execution work.
-  - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
-  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet completed execution, being their transaction gas limits plus end-of-block operation gas.
-  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks, transaction gas used plus end-of-block operation gas.
-  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative worst-case gas of executed blocks.
-- Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
-- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative worst-case gas of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+  - `avalanche_evm_transition_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
+  - `avalanche_evm_transition_sae_execute_block_duration_seconds` (histogram): wall time to execute a single block, including the state commit and post-execution work.
+  - `avalanche_evm_transition_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
+  - `avalanche_evm_transition_sae_execution_queue_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet completed execution. Worst-case gas is the sum of transaction gas limits and end-of-block operation gas.
+  - `avalanche_evm_transition_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks. Charged gas is the sum of transaction gas used and end-of-block operation gas.
+  - `avalanche_evm_transition_sae_executed_gas_limit_total` (counter): cumulative worst-case gas of executed blocks.
+- Added `avalanche_evm_transition_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
+- Added `avalanche_evm_transition_sae_accepted_gas_limit_total` (counter): cumulative worst-case gas of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
 - Added SAE gas-time and pricing metrics:
-  - `avalanche_{vmName}_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
-  - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
-  - `avalanche_{vmName}_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest executed block.
-  - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_worst_case_gas_excess` (gauge): worst-case gas excess simulated for the latest executed block.
-  - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
-  - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest executed block.
-- Added `avalanche_{vmName}_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
+  - `avalanche_evm_transition_sae_last_executed_gas_time_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
+  - `avalanche_evm_transition_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time when the latest block finished executing. A negative value means gas time lags wall time.
+  - `avalanche_evm_transition_sae_worst_case_base_fee` (gauge): worst-case base fee admitted by consensus for the latest executed block.
+  - `avalanche_evm_transition_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
+  - `avalanche_evm_transition_sae_worst_case_gas_excess` (gauge): worst-case gas excess simulated for the latest executed block.
+  - `avalanche_evm_transition_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
+  - `avalanche_evm_transition_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest executed block.
+- Added `avalanche_evm_transition_cchain_min_block_delay_seconds` (gauge): ACP-226 minimum block delay currently in force, taken from the most recently executed block.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
   - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
-- Added Firewood state-sync proof metrics, labeled by `proof_type="range|change"`; the duration histograms are additionally labeled by `result="success|failure"`:
+- Added Firewood state-sync proof metrics. All carry the label `proof_type="range|change"`. The duration histograms also carry the label `result="success|failure"`.
   - Server-side histograms: `avalanche_{vmName}_sync_server_sync_proof_generation_seconds`, `avalanche_{vmName}_sync_server_sync_generated_proof_size_bytes`, and `avalanche_{vmName}_sync_server_sync_proof_shrink_new_key_limit`
   - Client-side histograms: `avalanche_{vmName}_sync_firewood_sync_proof_verification_seconds`, `avalanche_{vmName}_sync_firewood_sync_proof_commit_seconds`, and `avalanche_{vmName}_sync_firewood_sync_received_proof_size_bytes`
   - Client-side gauge: `avalanche_{vmName}_sync_firewood_sync_request_key_limit`
 
-NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
+NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` and `cchain` metrics exist only on the C-Chain. Their `transition_` segment comes from the `transitionvm` wrapper.
+
+### Configs
+
+#### New
+
+- `helicon-min-stake-duration` (only on local/custom networks)
+- `min-price-target` for C-Chain
+- `apis` for C-Chain. Lists the JSON-RPC APIs that the node serves. See the [C-Chain config reference](https://github.com/ava-labs/avalanchego/blob/v1.15.0/vms/saevm/cchain/config.md#available-apis) for the names and defaults.
+- `api-resolve-pending-to-last-executed` for C-Chain. Defaults to `true`, which resolves `pending` to the last executed block. Set it to `false` to resolve `pending` to the last accepted block.
+
+#### Changed
+
+- `state-sync-ids` in Coreth and Subnet-EVM configs is now a JSON array of node IDs (`["NodeID-..."]`) instead of a comma-separated string.
+- `api-max-duration` for C-Chain accepts only a duration string (for example `"30s"`) after Helicon. The node rejects a number. `0` means no limit.
+- `state-sync-enabled` for C-Chain defaults to `true` after Helicon.
+- `commit-interval` for C-Chain with `state-scheme` `firewood`: Coreth now accepts any value on Mainnet and Fuji, but the C-Chain rejects values other than `4096` after Helicon.
+
+#### Deprecated in C-Chain
+
+- `eth-apis` is deprecated. The node maps it onto `apis` and logs a warning. If the config also sets `apis`, the node ignores `eth-apis`. Names whose methods no longer exist, such as `admin` and `debug`, log a warning. Any other unknown name is a fatal error. The next release removes `eth-apis`.
+
+#### Removed from C-Chain
+
+After Helicon activates, the C-Chain ignores the following options. The node logs a warning for each unrecognized option and starts.
+
+- `skip-upgrade-check`
+- `admin-api-enabled`
+- `admin-api-dir`
+- `warp-api-enabled`
+- `continuous-profiler-dir`
+- `continuous-profiler-frequency`
+- `continuous-profiler-max-files`
+- `rpc-gas-cap` (fixed at 50,000,000)
+- `rpc-tx-fee-cap` (fixed at 100 AVAX)
+- `trie-dirty-cache`
+- `trie-dirty-commit-target`
+- `trie-prefetcher-parallelism`
+- `preimages-enabled`
+- `snapshot-wait`
+- `snapshot-verification-enabled`
+- `accepted-queue-limit`
+- `populate-missing-tries-parallelism`
+- `prune-warp-db-enabled`
+- `historical-proof-query-window`
+- `metrics-expensive-enabled`
+- `price-options-slow-fee-percentage`
+- `price-options-fast-fee-percentage`
+- `price-options-max-tip`
+- `tx-pool-price-limit`
+- `tx-pool-price-bump`
+- `tx-pool-lifetime`
+- `ws-cpu-refill-rate`
+- `ws-cpu-max-stored`
+- `allow-unfinalized-queries`
+- `allow-unprotected-tx-hashes`
+- `keystore-directory`
+- `keystore-external-signer`
+- `keystore-insecure-unlock-allowed`
+- `push-gossip-percent-stake`
+- `push-gossip-num-validators`
+- `push-gossip-num-peers`
+- `push-regossip-num-validators`
+- `push-regossip-num-peers`
+- `push-gossip-frequency`
+- `pull-gossip-frequency`
+- `regossip-frequency`
+- `log-level`
+- `log-json-format`
+- `offline-pruning-bloom-filter-size`
+- `max-outbound-active-requests`
+- `state-sync-skip-resume`
+- `state-sync-server-trie-cache`
+- `state-sync-commit-interval`
+- `state-sync-min-blocks`
+- `state-sync-request-size`
+- `inspect-database`
+- `accepted-cache-size`
+- `state-history`
+- `skip-tx-indexing`
+- `http-body-limit`
+- `batch-response-max-size`
+- `offline-pruning-enabled`
+- `offline-pruning-data-directory`
+- `populate-missing-tries`
+- `transaction-history`
+- `tx-pool-account-queue`
+- `tx-pool-global-queue`
+- `api-max-blocks-per-request`
+
+### Features
+
+- Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
+- Added `transitionvm`, a VM that swaps between two implementations at a configured time. The C-Chain uses it to switch from Coreth to the SAE VM at Helicon.
+- The Primary Network minimum validator staking duration decreases from 2 weeks to 48 hours at Helicon activation (ACP-273).
+- Changed the Firewood state sync protocol. A `v1.15.0` node cannot state sync with Firewood from a `v1.14.x` node. This does not affect the default `hash` state scheme.
+
+### C-Chain State Sync
+
+C-Chain state sync does not work during and immediately after the Helicon transition. A node that is state syncing when Helicon activates stalls. Restart the node about an hour after activation to state sync again.
+
+After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `commit-interval` height. State sync has these limits:
+
+- A node with an empty database starts on Coreth, which cannot parse the new summaries. The node bootstraps by executing all blocks.
+- `state-scheme` is `firewood`. The node logs a warning and does not state sync.
+- A node that has accepted any block does not state sync.
+- The node cannot resume an interrupted state sync. It restarts from a new summary.
 
 ### Fixes
-- Updated minimum Go version from `v1.25.8` to `v1.25.10`.
-- Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
+
+- Updated the minimum Go version from `1.25.8` to `1.25.10`.
+- Fixed `callTracer` failing with `incorrect number of top-level calls` on transactions where a precompile makes an outbound call ([ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303)).
+- ProposerVM `ERROR` logs caused by the P-Chain database closing during shutdown are now `WARN`.
+- Fixed Subnet-EVM nodes failing to restart after a state upgrade activates when the upgrade config contains `"storage": {}`, `"code": "0x"`, or `"balanceChange": "0"`.
+- Removed the block acceptance time health check that `v1.14.2` added. The check could only recover after the node accepted new blocks. Some deployments send traffic only to healthy nodes, so a failed check could never recover.
+- Fixed `SizedCache` undercounting size when overwriting a key, which let caches exceed their configured limits.
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.2...v1.15.0
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
