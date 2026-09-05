@@ -306,7 +306,7 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 	})
 }
 
-func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
+func withCommitInterval(interval uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.CommitInterval = interval
 	})
