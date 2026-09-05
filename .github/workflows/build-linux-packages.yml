@@ -19,9 +19,6 @@ on:
       - ".github/packaging/**"
       - ".github/workflows/build-linux-packages.yml"
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     strategy:
