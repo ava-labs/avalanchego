@@ -39,6 +39,7 @@
 NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
 ### Fixes
+- Fixed `saexec.Executor` silently and permanently stopping asynchronous execution on any block execution error, not just ones classified as fatal: the error was logged at `Error` instead of `Fatal` regardless, and a subsequent `Enqueue` could non-deterministically report success while the block was never going to execute. `Executor.processQueue` now always logs at `Fatal`, `Enqueue` always fails once execution has stopped, and the failure is exposed via `TerminalError` so `HealthCheck` reports unhealthy immediately instead of only once another block happens to be accepted.
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 - Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
 

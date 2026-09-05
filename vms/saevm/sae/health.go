@@ -3,9 +3,19 @@
 
 package sae
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
-// HealthCheck returns the current health status of the VM.
-func (*VM) HealthCheck(context.Context) (any, error) {
+// HealthCheck returns the current health status of the VM. It reports
+// unhealthy if [saexec.Executor] has permanently stopped executing blocks, so
+// that the failure is detected by health-based monitoring (e.g. liveness
+// probes) even if no new block is accepted for a while to otherwise surface it
+// via [VM.Accept].
+func (vm *VM) HealthCheck(context.Context) (any, error) {
+	if err := vm.exec.TerminalError(); err != nil {
+		return nil, fmt.Errorf("asynchronous execution permanently stopped: %w", err)
+	}
 	return nil, nil
 }

@@ -9,7 +9,6 @@ package saexec
 
 import (
 	"fmt"
-	"io"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -35,12 +34,16 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
 	*saedb.Tracker
-	quit, done chan struct{}
-	log        logging.Logger
-	hooks      hook.Points
+	done  chan struct{}
+	log   logging.Logger
+	hooks hook.Points
 
 	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
+	// terminalErr is set, exactly once, immediately before [Executor.processQueue]
+	// permanently exits due to an execute() error, strictly before [Executor.done]
+	// is closed. See [Executor.TerminalError].
+	terminalErr atomic.Pointer[error]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
 	chainEvents event.FeedOf[core.ChainEvent]
@@ -54,8 +57,7 @@ type Executor struct {
 	metrics      *metrics
 }
 
-// New constructs and starts a new [Executor]. Call [Executor.Close] to release
-// resources created by this constructor.
+// New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
 // The last-executed block MAY be the genesis block for an always-SAE chain, the
 // last pre-SAE synchronous block during transition, or the last asynchronously
@@ -78,13 +80,13 @@ func New(
 
 	e := &Executor{
 		Tracker: tracker,
-		quit:    make(chan struct{}), // closed by [Executor.Close]
-		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
+		done:    make(chan struct{}), // closed by [Executor.processQueue] once `queue` is closed and drained
 		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
+		// queue is closed by [Executor.Close].
 		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
@@ -103,15 +105,11 @@ func New(
 	return e, nil
 }
 
-var _ io.Closer = (*Executor)(nil)
-
-// Close shuts down the [Executor], waits for the currently executing block
-// to complete, and then releases all resources.
-func (e *Executor) Close() error {
-	close(e.quit)
+// Close shuts down the [Executor] and waits for all queued blocks to finish
+// executing.
+func (e *Executor) Close() {
+	close(e.queue)
 	<-e.done
-
-	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
 }
 
 // ChainConfig returns the config originally passed to [New].
@@ -128,4 +126,20 @@ func (e *Executor) ChainContext() core.ChainContext {
 // LastExecuted returns the last-executed block in a threadsafe manner.
 func (e *Executor) LastExecuted() *blocks.Block {
 	return e.lastExecuted.Load()
+}
+
+// TerminalError returns the error that caused [Executor.processQueue] to
+// permanently stop, if any. A non-nil return means the [Executor] will never
+// execute another block; callers SHOULD treat this as equivalent to the
+// [Executor] being closed. Unlike waiting for a subsequent [Executor.Enqueue]
+// to fail, this can be polled independently of block production (e.g. from a
+// health check), so that the failure is detected even if no new block is
+// accepted for a while.
+//
+// A graceful [Executor.Close] is deliberately NOT reported here.
+func (e *Executor) TerminalError() error {
+	if p := e.terminalErr.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
