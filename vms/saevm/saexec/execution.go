@@ -48,7 +48,19 @@ type queuedBlock struct {
 // Enqueue pushes a new block to the FIFO queue. Every enqueued block is
 // executed before [Executor.Close] returns, unless an earlier block fails to
 // execute. Enqueue MUST NOT be called after [Executor.Close] or it will panic.
+//
+// Enqueue always fails once [Executor.processQueue] has permanently stopped,
+// whether due to [Executor.Close] or an execute() error. Because [Executor.queue]
+// is buffered, a `select` racing a send against `<-e.done` would otherwise let
+// [processQueue]'s death go unreported for as long as the buffer has room (in
+// the worst case, its entire capacity): [Executor.TerminalError] is therefore
+// checked unconditionally, and takes priority, before the block is ever
+// offered to the channel.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
+	if err := e.TerminalError(); err != nil {
+		return fmt.Errorf("%w: %w", errExecutorClosed, err)
+	}
+
 	e.createReceiptBuffers(block)
 
 	select {
@@ -67,7 +79,13 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-e.done:
-		// `e.done` can also close due to [Executor.execute] errors.
+		// `e.done` can also close due to [Executor.execute] errors, in which
+		// case [Executor.TerminalError] is already non-nil (it is set strictly
+		// before `done` is closed), but the check above can theoretically race
+		// with [processQueue] exiting; fall back to the generic error here.
+		if err := e.TerminalError(); err != nil {
+			return fmt.Errorf("%w: %w", errExecutorClosed, err)
+		}
 		return errExecutorClosed
 	}
 }
@@ -85,19 +103,24 @@ func (e *Executor) processQueue() {
 		)
 
 		err := e.execute(block, log)
-		switch {
-		case errors.Is(err, errFatal):
+		if err != nil {
+			// processQueue exits unconditionally below on ANY error, not just
+			// one wrapped in errFatal, permanently stopping asynchronous
+			// execution for the lifetime of the process. That outcome is
+			// exactly as severe regardless of the error's origin, so it MUST
+			// always be logged at Fatal: operators typically page on Fatal but
+			// not on Error, and the generic errExecutorClosed subsequently
+			// returned by Enqueue (surfaced, in turn, as a block Accept()
+			// error) buries the real, actionable cause.
 			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
 				"Block execution failed",
 				zap.Error(err),
 			)
-		case err != nil:
-			log.Error(
-				"Error of unknown severity in block execution",
-				zap.Error(err),
-			)
-		}
-		if err != nil {
+			// MUST be stored before returning (and therefore before `done`
+			// is closed via the deferred call), so that any goroutine that
+			// observes `done` closing is guaranteed to also observe a
+			// non-nil [Executor.TerminalError].
+			e.terminalErr.Store(&err)
 			return
 		}
 		e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))

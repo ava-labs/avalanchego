@@ -6,6 +6,7 @@ package saexec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -50,6 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
@@ -182,6 +185,230 @@ func withExtraAlloc(a types.GenesisAlloc) sutOption {
 
 func TestImmediateShutdownNonBlocking(t *testing.T) {
 	newSUT(t) // calls [Executor.Close] in test cleanup
+}
+
+// TestGracefulCloseIsNotATerminalError verifies that a normal, intentional
+// [Executor.Close] (e.g. during ordinary node shutdown) is NOT reported via
+// [Executor.TerminalError] -- distinguishing it from an execute() failure is
+// exactly what lets a health check surface only genuine, unexpected halts.
+func TestGracefulCloseIsNotATerminalError(t *testing.T) {
+	_, sut := newSUT(t)
+	require.NoError(t, sut.Close(), "Close()")
+	assert.NoErrorf(t, sut.TerminalError(), "%T.TerminalError() after a graceful Close()", sut.Executor)
+}
+
+// recorderSUT is like [SUT] but uses a [loggingtest.Recorder] instead of
+// [loggingtest.New], so that ERROR-level logs (which the latter sends to
+// [testing.TB.Errorf], failing the test) can be asserted upon instead.
+type recorderSUT struct {
+	*Executor
+	chain     *blockstest.ChainBuilder
+	recorder  *loggingtest.Recorder
+	xdb       saetypes.ExecutionResults
+	closeOnce func() error
+}
+
+func newRecorderSUT(t *testing.T, hooks *saehookstest.Stub) (context.Context, *recorderSUT) {
+	t.Helper()
+
+	recorder := loggingtest.NewRecorder(logging.Debug)
+
+	chainDataDir := t.TempDir()
+	config := saetest.ChainConfig()
+	saedbConfig := saedb.Config{
+		CommitInterval:   saedb.DefaultCommitInterval,
+		SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+	}
+	db := rawdb.NewMemoryDatabase()
+	xdb := saetest.NewExecutionResultsDB()
+	tdbCfg := saedbConfig.TrieDBConfig(chainDataDir, recorder)
+
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(config))
+	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
+
+	genOpts := []blockstest.GenesisOption{
+		blockstest.WithTrieDBConfig(tdbCfg),
+		blockstest.WithGasTarget(hooks.Target),
+		blockstest.WithBaseFee(1),
+	}
+	genesis := blockstest.NewGenesis(t, db, config, alloc, genOpts...)
+
+	blockOpts := blockstest.WithBlockOptions(
+		blockstest.WithLogger(recorder),
+		blockstest.WithHooks(hooks),
+	)
+	chain := blockstest.NewChainBuilder(genesis, blockOpts)
+	src := blocks.Source(chain.GetBlock)
+
+	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, recorder)
+	require.NoError(t, err, "saedb.NewTracker()")
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, hooks, recorder, prometheus.NewRegistry())
+	require.NoError(t, err, "New()")
+
+	closeOnce := sync.OnceValue(func() error {
+		e.Close()
+		return tr.Close(e.LastExecuted().PostExecutionStateRoot())
+	})
+	t.Cleanup(func() {
+		require.NoErrorf(t, closeOnce(), "%T.Close()", e)
+	})
+
+	return t.Context(), &recorderSUT{Executor: e, chain: chain, recorder: recorder, xdb: xdb, closeOnce: closeOnce}
+}
+
+func (s *recorderSUT) Close() error {
+	return s.closeOnce()
+}
+
+// assertExecutorDiesLoudly waits for [Executor.processQueue] to exit and asserts that
+// it did so with a [logging.Fatal] log describing the failure (regression
+// coverage for a bug where only errFatal-wrapped errors were logged at Fatal,
+// while every other execute() error -- despite killing processQueue exactly
+// the same way -- was merely logged at Error, so operators who page on Fatal
+// but not on Error were never alerted). It also documents that a subsequent,
+// otherwise-valid block is never executed, regardless of what
+// [Executor.Enqueue] itself returns for it.
+func assertExecutorDiesLoudly(t *testing.T, ctx context.Context, sut *recorderSUT) {
+	t.Helper()
+
+	select {
+	case <-sut.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for processQueue to exit after an execute() error")
+	}
+
+	fatals := sut.recorder.At(logging.Fatal)
+	t.Logf("Fatal logs: %d", len(fatals))
+	assert.NotEmptyf(t, fatals, "expected a Fatal-level log describing the execute() failure that "+
+		"permanently stopped %T.processQueue -- Error-or-below would leave operators unalerted", sut.Executor)
+
+	// [Executor.TerminalError] must be non-nil immediately: it's the mechanism
+	// that lets failure be detected independently of block production (e.g. via
+	// a health check), rather than only via some future Enqueue().
+	require.Errorf(t, sut.TerminalError(), "%T.TerminalError() immediately after processQueue's death", sut.Executor)
+
+	// Every subsequent Enqueue() call MUST now deterministically fail -- not
+	// just eventually, and not racily succeed while the block is silently
+	// dropped. Loop many times, well beyond any single scheduling hiccup, to
+	// rule out the flakiness that a `select` racing a channel send against
+	// `<-e.done` previously exhibited (it could non-deterministically report
+	// success while the block was actually never going to be executed).
+	for i := range 20 {
+		next := sut.chain.NewBlock(t, nil)
+		err := sut.Enqueue(ctx, next)
+		assert.ErrorIsf(t, err, errExecutorClosed, "Enqueue() attempt %d after the executor's death", i)
+	}
+}
+
+// TestSilentExecutorDeathOnParentMismatch is a regression test checking that
+// the non-[errFatal] parent-hash mismatch error at the top of execute() kills
+// [Executor.processQueue] with a [logging.Fatal] log, exactly like an
+// errFatal-wrapped error does.
+func TestSilentExecutorDeathOnParentMismatch(t *testing.T) {
+	ctx, sut := newRecorderSUT(t, defaultHooks())
+
+	// Build two blocks but only enqueue the second one, so the executor is
+	// asked to execute a block whose parent was never itself executed. This is
+	// exactly the condition guarded against at the top of [Executor.execute],
+	// which returns a plain (non-errFatal) error.
+	_ = sut.chain.NewBlock(t, nil)       // deliberately never enqueued
+	orphan := sut.chain.NewBlock(t, nil) // built on top of the skipped block
+
+	require.NoError(t, sut.Enqueue(ctx, orphan), "Enqueue() of the block with an unexecuted parent")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
+}
+
+// TestSilentExecutorDeathOnFinishExecutingBlockHookError is a second, independent
+// regression test triggering the same class of bug via a realistic production
+// failure mode: the [hook.Points.FinishExecutingBlock] hook returning an error
+// (e.g. because of a downstream DB write failure), which [Execute] also
+// returns unwrapped by errFatal.
+func TestSilentExecutorDeathOnFinishExecutingBlockHookError(t *testing.T) {
+	hooks := defaultHooks()
+	wantErr := errors.New("injected finish-executing-block failure")
+	hooks.FinishExecutingBlockFn = func(*state.StateDB, *types.Block, types.Receipts) error {
+		return wantErr
+	}
+
+	ctx, sut := newRecorderSUT(t, hooks)
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
+}
+
+// TestSilentExecutorDeathOnStartExecutingBlockHookError is a third, independent
+// regression test: the [hook.Points.StartExecutingBlock] hook returning an
+// error is surfaced by [stateBeforeTransactions] as a plain error, also
+// unwrapped by errFatal.
+func TestSilentExecutorDeathOnStartExecutingBlockHookError(t *testing.T) {
+	hooks := defaultHooks()
+	wantErr := errors.New("injected start-executing-block failure")
+	hooks.StartExecutingBlockFn = func(params.Rules, *state.StateDB, *types.Header, *types.Block) error {
+		return wantErr
+	}
+
+	ctx, sut := newRecorderSUT(t, hooks)
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
+}
+
+// TestSilentExecutorDeathOnGasClockConfigError is a fourth, independent
+// regression test: an invalid [gastime.GasPriceConfig] (a configuration error,
+// not a malicious or even unusual condition) fails validation inside
+// [gastime.Time.AfterBlock], called at the very end of [Execute], again
+// unwrapped by errFatal.
+func TestSilentExecutorDeathOnGasClockConfigError(t *testing.T) {
+	hooks := defaultHooks()
+	hooks.GasPriceConfig.MinPrice = 0 // invalid: gastime.GasPriceConfig.Validate() requires non-zero
+
+	ctx, sut := newRecorderSUT(t, hooks)
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
+}
+
+// TestSilentExecutorDeathOnAfterExecutingBlockHookError is a fifth, independent
+// regression test: the [hook.Points.AfterExecutingBlock] hook returning an
+// error, at the very start of [Executor.afterExecution], is also unwrapped by
+// errFatal.
+func TestSilentExecutorDeathOnAfterExecutingBlockHookError(t *testing.T) {
+	hooks := defaultHooks()
+	wantErr := errors.New("injected after-executing-block failure")
+	hooks.AfterExecutingBlockFn = func(*types.Block, types.Receipts) error {
+		return wantErr
+	}
+
+	ctx, sut := newRecorderSUT(t, hooks)
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
+}
+
+// TestSilentExecutorDeathOnExecutionResultsDBError is a sixth, independent
+// regression test, using a real (if unusual) infrastructure failure: the
+// execution-results database (holding [saetypes.ExecutionResults]) being
+// unavailable when [Block.MarkExecuted] tries to persist the block's results
+// via [Executor.markExecutedOnDisk], which is also unwrapped by errFatal. A
+// closed or otherwise erroring on-disk database is exactly the kind of
+// transient, non-malicious failure that occurs in production.
+func TestSilentExecutorDeathOnExecutionResultsDBError(t *testing.T) {
+	ctx, sut := newRecorderSUT(t, defaultHooks())
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.xdb.Close(), "xdb.Close() to simulate an execution-results DB failure")
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+
+	assertExecutorDiesLoudly(t, ctx, sut)
 }
 
 func TestExecutionSynchronisation(t *testing.T) {

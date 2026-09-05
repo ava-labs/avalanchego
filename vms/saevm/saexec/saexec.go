@@ -40,6 +40,10 @@ type Executor struct {
 
 	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
+	// terminalErr is set, exactly once, immediately before [Executor.processQueue]
+	// permanently exits due to an execute() error, strictly before [Executor.done]
+	// is closed. See [Executor.TerminalError].
+	terminalErr atomic.Pointer[error]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
 	chainEvents event.FeedOf[core.ChainEvent]
@@ -122,4 +126,20 @@ func (e *Executor) ChainContext() core.ChainContext {
 // LastExecuted returns the last-executed block in a threadsafe manner.
 func (e *Executor) LastExecuted() *blocks.Block {
 	return e.lastExecuted.Load()
+}
+
+// TerminalError returns the error that caused [Executor.processQueue] to
+// permanently stop, if any. A non-nil return means the [Executor] will never
+// execute another block; callers SHOULD treat this as equivalent to the
+// [Executor] being closed. Unlike waiting for a subsequent [Executor.Enqueue]
+// to fail, this can be polled independently of block production (e.g. from a
+// health check), so that the failure is detected even if no new block is
+// accepted for a while.
+//
+// A graceful [Executor.Close] is deliberately NOT reported here.
+func (e *Executor) TerminalError() error {
+	if p := e.terminalErr.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
