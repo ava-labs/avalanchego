@@ -258,6 +258,7 @@ Failing to set these options will result in errors on VM initialization. Additio
 | `use-standalone-database` | bool | Use standalone database instead of shared one | - |
 | `inspect-database` | bool | Inspect database on startup | `false` |
 | `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash` or `firewood` | `hash` |
+| `state-history-enabled` | bool | Records flat state history rows for every block and serves historical state from them. Requires `state-scheme` `firewood`, `pruning-enabled` `true`, `state-sync-enabled` `false`, and a chain synced from genesis with this flag set | `false` |
 
 ## Transaction Indexing
 

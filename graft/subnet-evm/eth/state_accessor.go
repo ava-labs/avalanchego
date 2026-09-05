@@ -193,6 +193,24 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 	return statedb, func() { tdb.Dereference(block.Root()) }, nil
 }
 
+// historicalStateOverlay returns a read-only StateDB serving state as of
+// header from the flat state history store, with ok=false when the store is
+// disabled, empty, the height is above the latest captured block (the live
+// state DB serves those), or header is not canonical (history is keyed by
+// height and only holds the canonical chain). Reads below the first captured
+// block fail loud.
+func (eth *Ethereum) historicalStateOverlay(header *types.Header) (*state.StateDB, bool, error) {
+	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
+	if !ok || fwDB.HistoryStore() == nil {
+		return nil, false, nil
+	}
+	number := header.Number.Uint64()
+	if eth.blockchain.GetCanonicalHash(number) != header.Hash() {
+		return nil, false, nil
+	}
+	return fwDB.HistoryStore().StateAt(eth.blockchain.StateCache(), number, header.Root)
+}
+
 // This is compatible with both PathDB and FirewoodDB schemes.
 func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), error) {
 	// Check if the requested state is available in the live chain.
@@ -214,6 +232,15 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
 		return statedb, noopReleaser, nil
 	}
+
+	// Flat state-history overlay: serve historical heights from flat value
+	// rows (no re-execution) when the store is enabled and covers this height.
+	if sdb, ok, err := eth.historicalStateOverlay(header); err != nil {
+		return nil, nil, err
+	} else if ok {
+		return sdb, noopReleaser, nil
+	}
+
 	return eth.firewoodReconstructedState(ctx, header, reexec)
 }
 
