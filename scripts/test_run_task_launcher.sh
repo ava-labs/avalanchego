@@ -10,7 +10,6 @@ set -euo pipefail
 # Covered cases:
 # - a real `task` on PATH wins
 # - otherwise we fall back to `go`
-# - Bazel is used only when RUN_TASK_PREFER_BAZEL=1
 # - non-PATH backends preserve the caller's working directory
 # - the go backend does not leak GOWORK=off into task
 # - missing tools fail clearly
@@ -127,15 +126,6 @@ run_case_in_dir() {
 # Backend stubs used by the scenarios below.
 make_stub task
 
-cat >"${stub_dir}/fake-task" <<EOF
-#!${bash_bin}
-set -euo pipefail
-printf '%s\n' 'fake-task' >"${workdir}/called"
-printf '%s\n' "\$*" >"${workdir}/args"
-printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
-EOF
-chmod +x "${stub_dir}/fake-task"
-
 cat >"${stub_dir}/go" <<EOF
 #!${bash_bin}
 set -euo pipefail
@@ -164,20 +154,6 @@ printf '%s\n' "\${GOWORK-<unset>}" >"${workdir}/gowork"
 EOF
 chmod +x "${stub_dir}/tool-task"
 
-cat >"${stub_dir}/bazelisk" <<EOF
-#!${bash_bin}
-set -euo pipefail
-if [[ "\$1" == "build" ]]; then
-  exit 0
-fi
-if [[ "\$1" == "cquery" ]]; then
-  printf '%s\n' "${stub_dir}/fake-task"
-  exit 0
-fi
-exit 1
-EOF
-chmod +x "${stub_dir}/bazelisk"
-
 # A real task binary on PATH should win immediately.
 run_case "${stub_dir}" hello world
 assert_called task "hello world"
@@ -196,13 +172,7 @@ assert_file "${workdir}/go-args" \
 # the workspace for every command task runs.
 assert_file "${workdir}/gowork" "<unset>"
 
-# Bazel should only be used when CI explicitly asks for it.
-RUN_TASK_PREFER_BAZEL=1 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called fake-task "hello world"
-assert_pwd "${caller_dir}"
-
-# If go is unavailable and Bazel was not requested, the launcher should fail
-# clearly.
+# If go is unavailable, the launcher should fail clearly.
 rm "${stub_dir}/go"
 if PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
   echo "expected missing-go-without-bazel-preference case to fail" >&2
@@ -210,19 +180,6 @@ if PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${wo
 fi
 if ! grep -q "Unable to launch task" "${workdir}/stderr"; then
   echo "missing-go-without-bazel-preference case did not print expected error" >&2
-  exit 1
-fi
-
-# With neither go nor Bazel available, we should get the generic launcher
-# failure message.
-rm "${stub_dir}/bazelisk"
-if PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
-  echo "expected missing-tools case to fail" >&2
-  exit 1
-fi
-
-if ! grep -q "Unable to launch task" "${workdir}/stderr"; then
-  echo "missing-tools case did not print expected error" >&2
   exit 1
 fi
 

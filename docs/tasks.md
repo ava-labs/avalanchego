@@ -15,6 +15,7 @@ tasks](../CONTRIBUTING.md#running-tasks) in
   - [Why not Make or just?](#why-not-make-or-just)
 - [How tasks should work in this repo](#how-tasks-should-work-in-this-repo)
   - [Keep tasks simple](#keep-tasks-simple)
+  - [Task version](#task-version)
   - [Keep Taskfile entries sorted](#keep-taskfile-entries-sorted)
   - [CI should run named tasks](#ci-should-run-named-tasks)
   - [Some CI-only setup still belongs in workflows](#some-ci-only-setup-still-belongs-in-workflows)
@@ -93,6 +94,21 @@ main exception is code under [`.github/`](../.github/) when it is specific to Gi
 Actions or packaging.
 
 This makes the real behavior easier to check, test, reuse, and review.
+
+### Task version
+
+Nix defines the repository Task version. The Nix development shell provides this
+version through `go-task`. The Go bootstrap dependency in
+[`tools/external/go.mod`](../tools/external/go.mod) must use the same version.
+This keeps the Nix development shell, the local `go tool` fallback, and the CI
+Task release on one version.
+
+Run `task check-task-version` to check the versions. This task does not change
+repository files. The lint tasks run it. Run `task sync-task-version` after a
+Nix update changes the Task version. The sync task changes the Task bootstrap
+dependency and its module sums. A Task update can also change indirect
+requirements shared with other tools. Review every change in the tool module.
+Both tasks run in the Nix development shell.
 
 ### Keep Taskfile entries sorted
 

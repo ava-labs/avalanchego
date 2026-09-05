@@ -80,7 +80,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for avalanchego test setup
         uses: ./.github/actions/run-docker-with-disk-space
         with:
@@ -92,7 +91,6 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for subnet-evm test setup
         uses: ./.github/actions/run-docker-with-disk-space
         with:

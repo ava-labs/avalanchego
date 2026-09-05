@@ -144,21 +144,12 @@ relevant tooling rather than duplicating them in documentation:
 
 When checking or updating a version, use those files as the source of truth.
 
-### Repository tools and external-dependency fetches
+### External-dependency fetches
 
-Bazel CI uses two separate Gazelle `go_deps` extension instances:
+Bazel CI uses the Gazelle `go_deps` extension to read `go.work` for workspace
+modules and the external repositories they import.
 
-- the main `go_deps` instance reads `go.work` for the workspace modules and the
-  external repos they import
-- the isolated `tool_go_deps` instance reads `tools/external/go.mod` for
-  repo-owned helper tools that CI may need to launch before other Bazel tasks
-
-That split is intentional. The CI setup path needs to fetch the Bazel-owned
-`//tools/external:task` bootstrap target and warm external dependency caches
-without also depending on whatever local workspace state happens to exist in a
-particular checkout.
-
-For the same reason, `MODULE.bazel` intentionally omits `use_repo` bindings for
+`MODULE.bazel` intentionally omits `use_repo` bindings for
 workspace modules such as `avalanchego` and `graft/*`. Those modules are built
 from the local source tree, so binding their generated local-path repos is not
 needed for normal builds. Omitting them also keeps broad fetches such as
@@ -598,20 +589,16 @@ the current merge target.
 In GitHub Actions, the Bazel jobs use the local `./.github/actions/setup-bazel`
 composite action. It applies the shared runner disk guard described in
 [CI disk space](./ci-disk-space.md) before Bazel cache restore and setup work. The
-Bazel-specific action then prepares cache state for the dependencies those jobs are
-expected to need and sets `RUN_TASK_PREFER_BAZEL=1`. With that variable set,
-`run_task.sh` uses the Bazel-owned `//tools/external:task` target instead of
-bootstrapping `task` with `go tool` on runners where Go is already on `PATH`. That
-preference is only for CI; local developer use still defaults to the Go-based task
-bootstrap.
+Bazel-specific action then restores the pinned Task binary with the shared
+`setup-task` action and prepares cache state for the dependencies those jobs are
+expected to need. Local developer use still defaults to the Go-based Task bootstrap
+when Task is not already on `PATH`.
 
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,
 cache-key design, checked-in list of Bazel CI target patterns used to
-prepare the build dependency cache, and enforcement model. This keeps
-repo tool bootstrapping and build dependency caching inside Bazel for
-the lighter-weight Bazel CI jobs. The E2E Bazel job uses the same cache
-setup before its heavier test wrapper.
+prepare the build dependency cache, and enforcement model. The E2E Bazel job
+uses the same cache setup before its heavier test wrapper.
 
 That check includes the Bazel module metadata files, so lockfile drift
 is caught in the metadata phase rather than showing up later as a
@@ -798,19 +785,16 @@ This setup is similar in spirit to `actions/setup-go`: before the later Bazel
 CI jobs run, prepare cache state for the build dependencies they are expected
 to need so those jobs do not each discover missing dependencies on their own.
 
-The setup action first restores any previously saved dependency data,
-configures Bazel to use it, and fetches the Bazel-owned
-`//tools/external:task` bootstrap target before the workflow's first
-`./scripts/run_task.sh ...` invocation. In the per-platform `setup` job it is
-run with `initial-setup: true`; in that mode it also checks Bazel metadata and
-runs `./scripts/run_task.sh bazel-cache-ci-build-dependencies`, which
-delegates to `./scripts/cache_bazel_ci_build_dependencies.sh` and uses the
-checked-in list in `./scripts/bazel_ci_dependency_list.sh`.
+The setup action first restores the pinned Task binary and any previously saved
+Bazel dependency data, then configures Bazel to use the dependency cache. In the
+per-platform `setup` job it is run with `initial-setup: true`; in that mode it also
+checks Bazel metadata and runs `./scripts/run_task.sh
+bazel-cache-ci-build-dependencies`, which delegates to
+`./scripts/cache_bazel_ci_build_dependencies.sh` and uses the checked-in list in
+`./scripts/bazel_ci_dependency_list.sh`.
 
-That checked-in list names both:
-- the Bazel bootstrap targets needed before the first CI task launch
-- the Bazel target patterns whose build dependencies the later CI jobs are
-  expected to need
+That checked-in list names the Bazel target patterns whose build dependencies the
+later CI jobs are expected to need.
 
 The list should cover the targets that the Bazel CI reusable workflows run. It
 should not fetch every target that Bazel can reach. This ensures that required
@@ -818,11 +802,9 @@ dependencies are available. It also excludes unrelated repositories and
 toolchains.
 
 A related design constraint is that this setup path must stay focused on
-external dependencies, not local workspace-module discovery. The isolated
-`tool_go_deps` extension and the omission of workspace-module `use_repo`
-bindings in `MODULE.bazel` are part of the same design: they let the setup job
-fetch Bazel-owned repo tools and warm caches for later jobs without making
-`bazel fetch` walk machine-specific workspace state.
+external dependencies, not local workspace-module discovery. The omission of
+workspace-module `use_repo` bindings in `MODULE.bazel` keeps `bazel fetch` from
+walking machine-specific workspace state.
 
 ### Enforcement
 
@@ -856,14 +838,13 @@ preserve these invariants:
 
 Validate changes proportionally:
 
-- run `./scripts/test_run_task_launcher.sh` when changing `run_task.sh` or its
-  Bazel bootstrap path so the launcher policy and working-directory behavior are
-  still covered
+- run `./scripts/test_run_task_launcher.sh` when changing `run_task.sh` so the
+  launcher policy and working-directory behavior are still covered
 - run each affected Bazel task through its normal entrypoint
 - include `task bazel-check-metadata` and `task bazel-cache-ci-build-dependencies`
   when these tasks are relevant
 - run the relevant `task bazel-test-unit-*` and `task bazel-test-e2e-*` targets
-- confirm that the dependency list, bootstrap target, and cache preparation agree
+- confirm that the dependency list and cache preparation agree
 - if you change which Bazel CI commands or target patterns the workflow runs,
   update `scripts/bazel_ci_dependency_list.sh` in the same change rather than
   letting CI discover the mismatch later

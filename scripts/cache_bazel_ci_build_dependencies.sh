@@ -14,11 +14,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/bazel_ci_dependency_list.sh"
 
-while IFS= read -r target; do
-  [[ -n "${target}" ]] || continue
-  bazelisk fetch "${target}"
-done < <(bazel_ci_bootstrap_targets)
-
 while IFS= read -r target_set; do
   [[ -n "${target_set}" ]] || continue
   read -r -a target_args <<<"${target_set}"

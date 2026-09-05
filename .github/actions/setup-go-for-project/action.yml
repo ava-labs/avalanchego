@@ -16,10 +16,12 @@ description: 'Install a go toolchain with project defaults'
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/setup-task
+
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
-        cache-dependency-path: |
+        cache-dependency-path: |-
           go.work.sum
           tools/external/go.sum

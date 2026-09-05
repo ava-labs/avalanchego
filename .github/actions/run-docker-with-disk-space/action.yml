@@ -21,6 +21,8 @@ runs:
       with:
         diagnostic-groups: docker
 
+    - uses: ./.github/actions/setup-task
+
     - name: Set up QEMU (required for cross-platform builds)
       if: ${{ inputs.setup-qemu == 'true' }}
       uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
@@ -30,7 +32,7 @@ runs:
       working-directory: ${{ inputs.working_directory }}
       env:
         RUN_COMMAND: ${{ inputs.run }}
-      run: |
+      run: |-
         repo_root="$(git rev-parse --show-toplevel)"
 
         set +e

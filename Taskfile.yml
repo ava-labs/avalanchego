@@ -245,6 +245,10 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/check_require_directives_round_trip.sh'
       - task: check-clean-branch
 
+  check-task-version:
+    desc: Checks that the Go Task bootstrap matches the Nix Task version
+    cmd: '{{.NIX_RUN}} ./scripts/check_task_version.sh'
+
   check-yaml-fmt:
     desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
     cmds:
@@ -362,9 +366,11 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-setup-task
       - test-unit-script
       - check-go-version
       - check-require-directives
+      - check-task-version
 
   _lint-readonly-serial:
     internal: true
@@ -383,12 +389,14 @@ tasks:
       - task: lint-shell
       - task: test-ci-disk-space
       - task: test-run-task-launcher
+      - task: test-setup-task
       - task: test-unit-script
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+      - task: check-task-version
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -420,6 +428,10 @@ tasks:
       - cmd: '{{.NIX_RUN}} go mod download'
       # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  sync-task-version:
+    desc: Synchronizes the Go Task bootstrap dependency with the Nix Task version
+    cmd: '{{.NIX_RUN}} ./scripts/sync_task_version.sh'
 
   tags-create:
     desc: Creates tags for avalanchego and submodules
@@ -601,6 +613,10 @@ tasks:
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
+
+  test-setup-task:
+    desc: Tests Task setup behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_setup_task.sh'
 
   test-unit:
     desc: Runs cacheable unified unit tests
