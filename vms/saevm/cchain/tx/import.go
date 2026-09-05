@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -29,21 +28,6 @@ import (
 )
 
 var _ Unsigned = (*Import)(nil)
-
-const (
-	// EVMOwnerLocktime marks a UTXO whose owner is an EVM address. Such a
-	// UTXO is imported to that address by an [Import] with no credentials.
-	// Legacy UTXOs (locktime 0) are owned by ripemd160(sha256(pubkey)), an
-	// address nobody holds an EVM key for, so they keep needing a signature.
-	//
-	// ponytail: locktime doubles as the marker; a dedicated output type is
-	// the cleanup once the P-chain wallets ship it.
-	EVMOwnerLocktime uint64 = 1
-	// MaxUnsignedImportBurn caps the fee an [Import] with no credentials may
-	// burn as posted. The block builder reprices it to the base fee anyway
-	// ([Tx.RepriceUnsigned]); this only bounds what the mempool admits.
-	MaxUnsignedImportBurn nAVAX = 10 * units.MilliAvax
-)
 
 // Import is the unsigned component of a transaction that transfers assets from
 // either the P-Chain or the X-Chain to the C-Chain. It consumes UTXOs in the
@@ -170,10 +154,7 @@ var (
 	errVerifyingTransfer  = errors.New("verifying transfer")
 )
 
-func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
-	if len(creds) == 0 {
-		return i.verifyUnsigned(sm)
-	}
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, auth WarpAuth, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
@@ -206,99 +187,22 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		if utxo.Asset.ID != in.Asset.ID {
 			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
 		}
+		if cred, ok := creds[j].(*WarpCredential); ok {
+			input, _ := in.In.(*secp256k1fx.TransferInput)
+			out, _ := utxo.Out.(*secp256k1fx.TransferOutput)
+			if input == nil || out == nil {
+				return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, secp256k1fx.ErrWrongUTXOType)
+			}
+			if err := verifyWarpTransfer(fxTx, input, cred, out, auth); err != nil {
+				return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
+			}
+			continue
+		}
 		if err := fx.VerifyTransfer(fxTx, in.In, creds[j], utxo.Out); err != nil {
 			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
 		}
 	}
 	return nil
-}
-
-var (
-	errUnsignedNotOneOutput = errors.New("unsigned import must have exactly one output")
-	errUnsignedBurnTooHigh  = errors.New("unsigned import burns too much")
-	errNotEVMOwned          = errors.New("UTXO is not marked as EVM-owned")
-	errUnsignedOutputOwner  = errors.New("unsigned import output is not the UTXO owner")
-	errUnsignedAmount       = errors.New("unsigned import input amount does not match UTXO")
-)
-
-// verifyUnsigned authorizes an [Import] with no credentials: every consumed
-// UTXO must be marked with [EVMOwnerLocktime] and owned by exactly the one
-// output address, so whoever issues the tx can only credit the owner.
-func (i *Import) verifyUnsigned(sm chainsatomic.SharedMemory) error {
-	if len(i.Outs) != 1 {
-		return errUnsignedNotOneOutput
-	}
-	out := i.Outs[0]
-	burned, err := i.burned(out.AssetID)
-	if err != nil {
-		return err
-	}
-	if burned > MaxUnsignedImportBurn {
-		return fmt.Errorf("%w: %d > %d", errUnsignedBurnTooHigh, burned, MaxUnsignedImportBurn)
-	}
-
-	utxoIDs := make([][]byte, len(i.ImportedInputs))
-	for j, in := range i.ImportedInputs {
-		inputID := in.InputID()
-		utxoIDs[j] = inputID[:]
-	}
-	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
-	if err != nil {
-		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
-	}
-
-	for j, in := range i.ImportedInputs {
-		utxo, err := ParseUTXO(utxoBytes[j])
-		if err != nil {
-			return fmt.Errorf("%w (%d): %w", errUnmarshallingUTXO, j, err)
-		}
-		if utxo.Asset.ID != in.Asset.ID {
-			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
-		}
-		owner, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok || owner.Locktime != EVMOwnerLocktime || owner.Threshold != 1 || len(owner.Addrs) != 1 {
-			return fmt.Errorf("%w (%d)", errNotEVMOwned, j)
-		}
-		if common.Address(owner.Addrs[0]) != out.Address {
-			return fmt.Errorf("%w (%d): %s", errUnsignedOutputOwner, j, owner.Addrs[0])
-		}
-		if in.In.Amount() != owner.Amt {
-			return fmt.Errorf("%w (%d): %d != %d", errUnsignedAmount, j, in.In.Amount(), owner.Amt)
-		}
-	}
-	return nil
-}
-
-var errUnsignedDust = errors.New("unsigned import does not cover its fee")
-
-// repriceUnsigned returns a copy of i whose single output leaves exactly the
-// fee that gas at baseFee costs, rounded up. Because the tx bytes have fixed
-// width, the gas does not depend on the amounts, so every builder and
-// verifier derives the same tx from the same inputs and header. Whoever
-// posted the tx cannot inflate the fee.
-func (i *Import) repriceUnsigned(baseFee *uint256.Int) (*Import, error) {
-	gas, err := gasUsed(i)
-	if err != nil {
-		return nil, err
-	}
-	var (
-		fee   = new(uint256.Int).Mul(uint256.NewInt(uint64(gas)), baseFee)
-		burn  = new(uint256.Int)
-		total nAVAX
-	)
-	burn.Add(fee, x2cRate).SubUint64(burn, 1).Div(burn, x2cRate) // ceil(fee / x2cRate)
-	for _, in := range i.ImportedInputs {
-		total, err = math.Add(total, in.In.Amount())
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !burn.IsUint64() || burn.Uint64() >= total {
-		return nil, fmt.Errorf("%w: %d nAVAX in, %s nAVAX fee", errUnsignedDust, total, burn)
-	}
-	repriced := *i
-	repriced.Outs = []Output{{Address: i.Outs[0].Address, Amount: total - burn.Uint64(), AssetID: i.Outs[0].AssetID}}
-	return &repriced, nil
 }
 
 var errUnexpectedInputType = errors.New("unexpected input type")

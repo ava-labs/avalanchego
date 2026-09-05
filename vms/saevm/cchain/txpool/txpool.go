@@ -60,6 +60,10 @@ type Txpool struct {
 	executionLock sync.RWMutex
 	stateLock     sync.Mutex
 	state         libevm.StateReader
+
+	// warpAuth is the liveness pre-check for warp credentials; the block
+	// builder enforces the settled height.
+	warpAuth tx.WarpAuth
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -75,6 +79,7 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
+	warpAuth tx.WarpAuth,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
@@ -100,6 +105,8 @@ func New(
 		sub:     sub,
 		maxSize: maxSize,
 		state:   state,
+
+		warpAuth: warpAuth,
 	}
 	p.wg.Go(func() {
 		p.updateState(chainConfig, chain, executed)
@@ -216,7 +223,7 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	p.executionLock.RLock()
 	defer p.executionLock.RUnlock()
 
-	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
+	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory, p.warpAuth); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
 	if err := p.verifyOp(t.op); err != nil {

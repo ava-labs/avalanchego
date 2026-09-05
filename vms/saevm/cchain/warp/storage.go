@@ -65,6 +65,17 @@ func (s *Storage) Add(msgs ...*warp.UnsignedMessage) error {
 	return nil
 }
 
+// Has reports whether this chain emitted the message with the given ID. Unlike
+// [Storage.Get] it never consults the node-local overrides: off-chain messages
+// must not satisfy consensus checks.
+func (s *Storage) Has(id ids.ID) bool {
+	if _, ok := s.cache.Get(id); ok {
+		return true
+	}
+	has, err := s.db.Has(id[:])
+	return err == nil && has
+}
+
 // Get returns the message with the given ID.
 func (s *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
 	if m, ok := s.cache.Get(id); ok {

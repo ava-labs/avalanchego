@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
@@ -169,9 +170,10 @@ var (
 	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
 	errRecoveringPublicKey    = errors.New("recovering public key")
 	errAddressMismatch        = errors.New("signature does not match address")
+	errWrongCredentialType    = errors.New("wrong credential type")
 )
 
-func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, _ WarpAuth, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}
@@ -184,7 +186,10 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		// TODO(StephenButtolph): Parallelize signature verification. This is
 		// non-trivial, because transactions frequently contain duplicate
 		// signatures, which are currently being cached.
-		cred := creds[i].Self()
+		cred, ok := creds[i].(*secp256k1fx.Credential)
+		if !ok {
+			return fmt.Errorf("%w (%d): %T", errWrongCredentialType, i, creds[i])
+		}
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w (%d): want 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
 		}

@@ -6,6 +6,7 @@ package tx_test
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -147,8 +148,18 @@ func FuzzParseCompatibility(f *testing.F) {
 		}
 		oldOk := oldErr == nil
 
-		_, newErr := Parse(data)
+		newTx, newErr := Parse(data)
 		newOk := newErr == nil
+
+		// Credential is now any Verifiable, so SAE parses warp credentials
+		// (new) and misplaced inputs or outputs (rejected at verification)
+		// where coreth failed to parse.
+		if newOk && slices.ContainsFunc(newTx.Creds, func(c Credential) bool {
+			_, ok := c.(*secp256k1fx.Credential)
+			return !ok
+		}) {
+			t.Skip("credential type unknown to coreth")
+		}
 
 		assert.Equal(t, oldOk, newOk, "Parse(b) == txtest.ParseOld(b)")
 	})

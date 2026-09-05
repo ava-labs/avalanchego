@@ -1,5 +1,5 @@
 // Demo bootstrap for the C-chain-with-any-EVM-wallet prototype: starts a
-// persistent tmpnet network with SAE from genesis, deploys ExportHelper.sol
+// persistent tmpnet network with SAE from genesis, deploys CChainHelper.sol
 // from the ewoq key's nonce-0 tx (so its address is known before the network
 // starts and can be trusted in the C-chain config) and writes everything the
 // demo page needs to os.Args[2]. The network keeps running after this exits.
@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/exporthelper"
+	"github.com/ava-labs/avalanchego/tests/cchainhelper"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -72,7 +72,7 @@ func main() {
 	network.DefaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 	network.PreFundedKeys = []*secp256k1.PrivateKey{key}
 	network.PrimaryChainConfigs = map[string]tmpnet.ConfigMap{
-		"C": {"export-helper-addresses": []string{helper.Hex()}},
+		"C": {"helper-addresses": []string{helper.Hex()}},
 	}
 	network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
 		Process: &tmpnet.ProcessRuntimeConfig{AvalancheGoPath: avagoPath},
@@ -107,11 +107,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "FATAL: ewoq nonce is not 0, cannot pin helper address")
 		os.Exit(1)
 	}
-	parsedABI, err := abi.JSON(strings.NewReader(exporthelper.ABI))
+	parsedABI, err := abi.JSON(strings.NewReader(cchainhelper.ABI))
 	check(err)
-	initcode, err := hex.DecodeString(exporthelper.Bin)
+	initcode, err := hex.DecodeString(cchainhelper.Bin)
 	check(err)
-	ctorArgs, err := parsedABI.Pack("")
+	ctorArgs, err := parsedABI.Pack("", networkID, avaxAssetID)
 	check(err)
 	gasPrice, err := ethClient.SuggestGasPrice(ctx)
 	check(err)

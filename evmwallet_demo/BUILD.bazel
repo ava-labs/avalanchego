@@ -11,7 +11,7 @@ go_library(
         "//genesis",
         "//graft/coreth/ethclient",
         "//tests",
-        "//tests/exporthelper",
+        "//tests/cchainhelper",
         "//tests/fixture/tmpnet",
         "//upgrade/upgradetest",
         "//utils/constants",

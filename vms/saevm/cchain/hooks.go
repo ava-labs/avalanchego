@@ -63,9 +63,6 @@ type hooks struct {
 	state       *cchainstate.State
 	warpStorage *warp.Storage
 	metrics     *metrics
-	// exportHelpers are the contracts whose warp messages export AVAX to the
-	// P-chain on behalf of the caller.
-	exportHelpers set.Set[common.Address]
 }
 
 // exportPayloadLen is owner (20 bytes) || amount in nAVAX (8 bytes).
@@ -80,7 +77,7 @@ func newHooks(
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,
-	exportHelpers set.Set[common.Address],
+	helpers set.Set[common.Address],
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -104,11 +101,12 @@ func newHooks(
 			now,
 			poolTxs,
 			desired,
+			warpStorage,
+			helpers,
 		},
 		state,
 		warpStorage,
 		metrics,
-		exportHelpers,
 	}
 }
 
@@ -142,6 +140,8 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			priceExponent:  headerExtra.MinPriceExponent,
 			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
+		h.warpStorage,
+		h.helpers,
 	}, nil
 }
 
@@ -318,7 +318,7 @@ func (h *hooks) exports(receipts types.Receipts) ([]export, error) {
 	var exports []export
 	for _, r := range receipts {
 		for _, log := range r.Logs {
-			if log.Address != corethwarp.ContractAddress || len(log.Topics) < 2 || !h.exportHelpers.Contains(common.BytesToAddress(log.Topics[1][:])) {
+			if log.Address != corethwarp.ContractAddress || len(log.Topics) < 2 || !h.helpers.Contains(common.BytesToAddress(log.Topics[1][:])) {
 				continue
 			}
 			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
@@ -468,6 +468,10 @@ type builder struct {
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
+	warpStorage  *warp.Storage
+	// helpers are the contracts whose warp messages export AVAX to the
+	// P-chain and authorize imports from it on behalf of msg.sender.
+	helpers set.Set[common.Address]
 }
 
 var (
@@ -548,22 +552,18 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, err := ancestorInputIDs(building, settledHash, source)
+		inputs, settledHeight, err := ancestorInputIDs(building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),
 			)
 			return
 		}
-
-		if building.BaseFee == nil {
-			b.ctx.Log.Error("building header has no base fee")
-			return
-		}
-		baseFee, overflow := uint256.FromBig(building.BaseFee)
-		if overflow {
-			b.ctx.Log.Error("building header base fee overflows uint256")
-			return
+		// Every verifier has executed the settled block, so only messages
+		// emitted at or below it are known to all of them. The message ID
+		// hashes the payload, so a stored message vouches for its height.
+		knownWarp := func(id ids.ID, helper common.Address, height uint64) bool {
+			return b.helpers.Contains(helper) && height <= settledHeight && b.warpStorage.Has(id)
 		}
 
 		for t := range b.potentialTxs {
@@ -589,35 +589,12 @@ func (b *builder) PotentialEndOfBlockOps(
 			// verified against out-dated state, we need to ensure that import
 			// txs are consuming UTXOs that still exist so that our in-memory
 			// UTXO conflict checks are sufficient.
-			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
+			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory, knownWarp); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),
 					zap.Error(err),
 				)
 				continue
-			}
-
-			// An unsigned import pays exactly the base fee, whatever its
-			// poster asked for. Verifiers rebuild the block through this same
-			// path, so a block carrying any other fee does not match.
-			repriced, err := t.tx.RepriceUnsigned(baseFee)
-			if err != nil {
-				b.ctx.Log.Debug("tx cannot be repriced",
-					zap.Stringer("txID", t.id),
-					zap.Error(err),
-				)
-				continue
-			}
-			if repriced != t.tx {
-				ht, err := newHookTx(repriced, b.ctx.AVAXAssetID)
-				if err != nil {
-					b.ctx.Log.Debug("repriced tx cannot be converted",
-						zap.Stringer("txID", t.id),
-						zap.Error(err),
-					)
-					continue
-				}
-				t = ht
 			}
 
 			if !yield(t) {
@@ -631,26 +608,26 @@ func (b *builder) PotentialEndOfBlockOps(
 var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
-// in the block range (h, settled), both exclusive.
-func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
+// in the block range (h, settled), both exclusive, and the settled height.
+func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], uint64, error) {
 	var s set.Set[ids.ID]
 	for h.ParentHash != settled {
 		parentNumber := h.Number.Uint64() - 1
 		p, ok := source(h.ParentHash, parentNumber)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
+			return nil, 0, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, 0, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
 		}
 		h = p.Header()
 	}
-	return s, nil
+	return s, h.Number.Uint64() - 1, nil
 }
 
 var errEmptyBlock = errors.New("empty block")

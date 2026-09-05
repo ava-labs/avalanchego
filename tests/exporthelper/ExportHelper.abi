@@ -1,1 +1,0 @@
-[{"inputs":[],"name":"BadAmount","type":"error"},{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"exportToP","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"payable","type":"function"}]

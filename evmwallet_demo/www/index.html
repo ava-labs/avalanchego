@@ -65,7 +65,7 @@
 </head>
 <body>
 <h1>C-chain with any EVM wallet</h1>
-<p class="sub">Two wallets, one per chain. Any EVM wallet holds the C-chain side and never signs anything Avalanche-specific: exporting to the P-chain is one ordinary contract call, and importing from the P-chain needs no signature at all. The P-chain side stays a normal P-chain wallet (Core, Ledger, an exchange) and signs its own transactions exactly as today. Here the page plays the P-chain wallet with the same test key.
+<p class="sub">Two wallets, one per chain. Any EVM wallet holds the C-chain side and never signs anything Avalanche-specific: exporting to the P-chain and importing from it are each one ordinary contract call, signed by the wallet like any other transaction. The P-chain side stays a normal P-chain wallet (Core, Ledger, an exchange) and signs its own transactions exactly as today. Here the page plays the P-chain wallet with the same test key.
 <a href="https://github.com/ava-labs/avalanchego/tree/containerman17/cchain-evm-wallet" target="_blank">avalanchego branch</a></p>
 
 <section>
@@ -96,7 +96,7 @@
 <section class="gated" hidden>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
   <h2>C &rarr; P: any EVM wallet exports with one contract call</h2>
-  <p>You call <code>exportToP(to)</code> on <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/exporthelper/ExportHelper.sol" target="_blank">ExportHelper.sol</a> (deployed at <span class="mono" data-k="helper"></span>) with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
+  <p>You call <code>exportToP(to)</code> on <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">CChainHelper.sol</a> (deployed at <span class="mono" data-k="helper"></span>) with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
   <div class="row"><button onclick="run(exportToP)">Export 1 AVAX to the P-chain</button></div>
@@ -113,7 +113,7 @@
 
 <section class="gated" hidden>
   <h2>P-chain wallet exports to your 0x address, as today</h2>
-  <p>A normal ExportTx signed by the P-chain wallet, with one difference: the output carries a marker (locktime 1) that says "an EVM address owns this". The export is done when the UTXO sits in shared memory.</p>
+  <p>A normal ExportTx signed by the P-chain wallet, exactly as it works now. The destination is the C-chain address of your 0x bytes. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div></div>
   <div class="row"><button onclick="run(exportFromP)">Export 1 AVAX from the P-chain to your EVM wallet</button></div>
   <div class="fb" id="fb-exportp" hidden></div>
@@ -121,17 +121,17 @@
 
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
-  <h2>P &rarr; C: nobody signs the import</h2>
-  <p>Anyone, you, the wallet, a bot, posts an ImportTx with zero credentials. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/import.go" target="_blank">accepts it</a> only if every UTXO is marked and the single output pays exactly the owner. The block builder sets the fee itself, to exactly what the tx's gas costs at the block's base fee, so whoever posts it cannot inflate the fee (mainnet imports burn about 0.00001 AVAX). Unmarked legacy UTXOs, whose 20-byte owner is a P-chain key hash nobody holds an EVM key for, still need a signature, so no funds can be swept to a dead address.</p>
+  <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
+  <p>You call <code>importFromP(utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact C-chain ImportTx bytes inside the EVM and emits them as a warp message prefixed with <code>msg.sender</code>. Then anyone issues that ImportTx with the message as its credential, here you with one button. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/warp_credential.go" target="_blank">accepts</a> it because the message is in its own warp store, was emitted by the trusted contract at or below the settled height, names you as the owner of every UTXO, and carries exactly these tx bytes. Nothing moves unless you signed the call that asked for it, and no P-chain wallet needs to change anything.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
-  <div class="row"><button onclick="run(importOnC)">Import on C, no signature</button></div>
+  <div class="row"><button onclick="run(importOnC)">Import on C with your EVM wallet</button></div>
   <div class="fb" id="fb-import" hidden></div>
 </section>
 
 <section class="gated" hidden>
-  <h2>Exports emitted by the contract</h2>
-  <p class="note">Every C &rarr; P export is one warp log from the helper: owner and amount, 28 bytes. Decoded from the C-chain logs of the warp precompile, the last 2,000 blocks. Yours are highlighted.</p>
+  <h2>Messages emitted by the contract</h2>
+  <p class="note">Every export is one 28-byte warp log (P-chain owner and amount); every import request is one log carrying your address and the full ImportTx bytes. Decoded from the C-chain logs of the warp precompile, the last 2,000 blocks. Yours are highlighted.</p>
   <div id="activity" class="empty">&ndash;</div>
 </section>
 
@@ -142,8 +142,8 @@ const PK = '0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027';
 const WARP_PRECOMPILE = '0x0200000000000000000000000000000000000005';
 const NAVAX = 1000000000n;
 const PFEE = 10000000n;    // 0.01 AVAX burned on P-chain txs
-const CFEE = 1000000n;     // fee hint for the unsigned import; the block builder reprices it to the base fee
-const EVM_OWNER_LOCKTIME = 1n;
+const CFEE = 1000000n;     // 0.001 AVAX burned by the C-chain import, chosen by you in the contract call
+const CRED_TYPE_WARP = 10;  // tx.WarpCredential type ID in the SAE C-chain codec
 const P_TYPE_IMPORT = 17, P_TYPE_EXPORT = 18, TYPE_TRANSFER_INPUT = 5, TYPE_TRANSFER_OUTPUT = 7, TYPE_CREDENTIAL = 9;
 const C_TYPE_IMPORT = 0;   // vms/saevm/cchain/tx codec
 let NET = null;            // /network.json
@@ -154,7 +154,10 @@ const pAddrBytes = hexBytes(ethers.ripemd160(ethers.sha256(pKey.compressedPublic
 document.getElementById('pk').textContent = PK;
 document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
 
-const iface = new ethers.Interface(['function exportToP(address to) payable returns (bytes32)']);
+const iface = new ethers.Interface([
+  'function exportToP(address to) payable returns (bytes32)',
+  'function importFromP((bytes32 txID,uint32 outputIndex,uint64 amount)[] imported, uint64 fee) returns (bytes32)',
+]);
 
 // ---- bech32 (BIP-173) ----
 const B32C = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
@@ -257,7 +260,7 @@ function table(headers, rows) {
   for (const r of rows) {
     const tr = document.createElement('tr');
     if (r.mine) tr.className = 'mine';
-    for (const c of r.cells) { const td = document.createElement('td'); td.className = 'mono'; if (typeof c === 'object') td.appendChild(c); else td.textContent = c; tr.appendChild(td); }
+    for (const c of r.cells) { const td = document.createElement('td'); td.className = 'mono'; td.textContent = c; tr.appendChild(td); }
     t.appendChild(tr);
   }
   return t;
@@ -266,13 +269,6 @@ function fill(id, node, emptyText) {
   const el = $(id); el.innerHTML = '';
   if (node) { el.className = ''; el.appendChild(node); } else { el.className = 'empty'; el.textContent = emptyText; }
 }
-function marker(u) {
-  const s = document.createElement('span');
-  const evm = u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1;
-  s.className = evm ? 'tag' : 'tag legacy'; s.textContent = evm ? 'EVM-owned, importable without a signature' : 'legacy, needs a signature';
-  return s;
-}
-
 async function refresh() {
   if (!me) return;
   const [cbal, p, c2p, p2c] = await Promise.all([cBalance(), getPUTXOs(), getPUTXOs('C'), getCUTXOs()]);
@@ -280,7 +276,7 @@ async function refresh() {
   setK('pbal', avax(sum(p)) + ' AVAX');
   setK('c2p', avax(sum(c2p)) + ' AVAX'); setK('c2pn', c2p.length + ' UTXO waiting to be imported on P');
   setK('p2c', avax(sum(p2c)) + ' AVAX'); setK('p2cn', p2c.length + ' UTXO waiting to be imported on C');
-  fill('p2c-utxos', table(['UTXO', 'amount', 'locktime', 'marker'], p2c.map(u => ({ cells: [short(u.txID) + ':' + u.outputIndex, avax(u.amount) + ' AVAX', u.locktime.toString(), marker(u)] }))), 'none waiting');
+  fill('p2c-utxos', table(['UTXO', 'amount'], p2c.map(u => ({ cells: [short(u.txID) + ':' + u.outputIndex, avax(u.amount) + ' AVAX'] }))), 'none waiting');
 }
 
 // ---- export log decoding (SendWarpMessage logs from the precompile, helper as sender) ----
@@ -290,7 +286,10 @@ function decodeExport(dataHex) {
   // unsigned warp message: codec(2) networkID(4) sourceChainID(32) payloadLen(4) | addressed call: codec(2) typeID(4) addrLen(4) addr payloadLen(4) payload
   let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
   const inner = b.slice(p);
-  return { owner: inner.slice(0, 20), amount: new DataView(inner.buffer, inner.byteOffset).getBigUint64(20) };
+  const dv = new DataView(inner.buffer, inner.byteOffset);
+  if (inner.length === 28) return { kind: 'export to P', owner: pAddr(inner.slice(0, 20)), amount: dv.getBigUint64(20), mine: pAddr(inner.slice(0, 20)) === NET.pAddress };
+  const owner = toHex(inner.slice(0, 20));
+  return { kind: 'import from P (' + (inner.length - 28) + '-byte ImportTx)', owner, amount: null, mine: me && owner.toLowerCase() === me.toLowerCase() };
 }
 async function refreshActivity() {
   if (!NET) return;
@@ -298,11 +297,10 @@ async function refreshActivity() {
   const logs = await rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ address: WARP_PRECOMPILE, fromBlock: '0x' + Math.max(0, latest - 2000).toString(16), toBlock: 'latest',
     topics: [ethers.id('SendWarpMessage(address,bytes32,bytes)'), ethers.zeroPadValue(NET.helper, 32)] }]);
   const rows = logs.slice(-25).reverse().map(l => {
-    let d; try { d = decodeExport(l.data); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', short(l.topics[2])] }; }
-    const owner = pAddr(d.owner);
-    return { mine: owner === NET.pAddress, cells: [parseInt(l.blockNumber, 16), avax(d.amount) + ' AVAX', owner, short(l.transactionHash)] };
+    let d; try { d = decodeExport(l.data); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', '', short(l.topics[2])] }; }
+    return { mine: d.mine, cells: [parseInt(l.blockNumber, 16), d.kind, d.amount === null ? '' : avax(d.amount) + ' AVAX', d.owner, short(l.transactionHash)] };
   });
-  fill('activity', table(['C block', 'exported', 'P-chain owner', 'C-chain tx'], rows), 'no exports in the last 2,000 blocks');
+  fill('activity', table(['C block', 'message', 'amount', 'owner', 'C-chain tx'], rows), 'no messages in the last 2,000 blocks');
 }
 
 // ---- MetaMask ----
@@ -392,16 +390,29 @@ function pSign(unsigned, numInputs) {
 function pImportTx(utxos) {
   return concat(pHeader(P_TYPE_IMPORT), list([transferOut(sum(utxos) - PFEE, 0n, pAddrBytes)]), list([]), u32(0), cChainID(), list(utxos.map(u => transferIn(u, [0]))));
 }
-// P-chain ExportTx to the C-chain: the exported output is owned by the 0x address and carries the EVM-owner marker.
+// P-chain ExportTx to the C-chain: the exported output is owned by the 0x address.
 function pExportTx(utxos, amt, evmAddr20) {
   const change = sum(utxos) - amt - PFEE;
   return concat(pHeader(P_TYPE_EXPORT), list(change > 0n ? [transferOut(change, 0n, pAddrBytes)] : []), list(utxos.map(u => transferIn(u, [0]))), u32(0),
-    cChainID(), list([transferOut(amt, EVM_OWNER_LOCKTIME, evmAddr20)]));
+    cChainID(), list([transferOut(amt, 0n, evmAddr20)]));
 }
-// C-chain ImportTx with no credentials: inputs name no signature index, one output to the owner, empty credential list.
-function cUnsignedImportTx(utxos, evmAddr20) {
-  return concat(u16(0), u32(C_TYPE_IMPORT), u32(NET.networkID), cChainID(), ZERO32, list(utxos.map(u => transferIn(u, []))),
-    list([concat(evmAddr20, u64(sum(utxos) - CFEE), assetID())]), u32(0));
+// Warp message from the receipt: the helper's SendWarpMessage log, decoded to {id, unsigned bytes}.
+function messageFromReceipt(receipt) {
+  const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE && l.topics[1] && l.topics[1].slice(-40).toLowerCase() === NET.helper.slice(2).toLowerCase());
+  if (!l) throw new Error('no warp message in the receipt');
+  const [msg] = ethers.AbiCoder.defaultAbiCoder().decode(['bytes'], l.data);
+  return { id: l.topics[2], unsigned: hexBytes(msg) };
+}
+// The tx bytes ride inside the message payload after owner (20) || height (8):
+// warp: codec(2) networkID(4) sourceChainID(32) payloadLen(4) | addressed call: codec(2) typeID(4) addrLen(4) addr payloadLen(4) payload
+function txBytesFromMessage(b) {
+  let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
+  return b.slice(p + 28);
+}
+// Signed tx = unsigned bytes || numCreds || numCreds x (typeID || len || message)
+function warpSignedTx(txBytes, numCreds, msgBytes) {
+  const cred = concat(u32(CRED_TYPE_WARP), u32(msgBytes.length), msgBytes);
+  return concat(txBytes, u32(numCreds), ...Array(numCreds).fill(cred));
 }
 function pickInputs(utxos, need) {
   const picked = []; let total = 0n;
@@ -477,25 +488,31 @@ async function importOnP() {
 async function exportFromP() {
   const amt = AMOUNT;
   const st = stepper(['The P-chain wallet exports to your 0x address']);
-  st.active(0, 'ExportTx signed by the P-chain wallet, as today. The exported output is owned by ' + me + ' and marked EVM-owned (locktime 1).');
+  st.active(0, 'ExportTx signed by the P-chain wallet, as today. The exported output is owned by ' + me + '.');
   const inputs = pickInputs(await getPUTXOs(), amt + PFEE);
   const before = (await getCUTXOs()).length;
   const bytes = pSign(pExportTx(inputs, amt, hexBytes(me)), inputs.length);
   const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
   await poll(async () => { const u = await getCUTXOs(); return u.length > before ? u : null; }, 'UTXO in shared memory');
-  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX now in shared memory for ' + me + ', marked EVM-owned. Export done.');
+  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX now in shared memory for ' + me + '. Export done.');
 }
 async function importOnC() {
-  const st = stepper(['Anyone issues the ImportTx, nobody signs']);
-  st.active(0, 'The ImportTx names the UTXOs, one output to the owner, and an empty credential list. Verifiers check the marker, the owner and the fee cap against shared memory.');
-  const utxos = await getCUTXOs().then(us => us.filter(u => u.locktime === EVM_OWNER_LOCKTIME && u.threshold === 1));
-  if (!utxos.length) throw new Error('no EVM-owned UTXOs waiting in shared memory for ' + me);
-  const before = await cBalance();
-  const bytes = cUnsignedImportTx(utxos, hexBytes(me));
-  const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-  st.done(0, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, 0 credentials). Nobody signed it. The builder reprices the fee to the base fee before including it.');
-  const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-  st.append(0, 'C-chain balance ' + (Number(after) / 1e18).toFixed(6) + ' AVAX, fee actually burned: ' + (sum(utxos) - (after - before) / NAVAX) + ' nAVAX');
+  const utxos = await getCUTXOs();
+  if (!utxos.length) throw new Error('no UTXOs waiting in shared memory for ' + me);
+  const st = stepper(['Your EVM wallet sends one contract call', 'Issue the ImportTx to the C-chain']);
+  st.active(0, 'importFromP(' + utxos.length + ' UTXO(s), fee ' + avax(CFEE) + ' AVAX). The wallet shows the UTXO references and the fee. The contract builds the exact ImportTx bytes and emits them as a warp message with your address in front.');
+  const receipt = await sendTx(iface.encodeFunctionData('importFromP', [utxos.map(u => [u.txID, u.outputIndex, u.amount]), CFEE]));
+  const m = messageFromReceipt(receipt);
+  const txBytes = txBytesFromMessage(m.unsigned);
+  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + ' emitted warp message ' + short(m.id) + ': owner ' + me + ', ' + txBytes.length + ' bytes of ImportTx. Only your signed call could have produced it.');
+  st.active(1, 'The message goes into every credential slot of the ImportTx (' + utxos.length + '). No BLS, no signature: the chain checks its own warp store for the message.', ['Issue ImportTx to C', async () => {
+    const before = await cBalance();
+    const bytes = warpSignedTx(txBytes, utxos.length, m.unsigned);
+    const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
+    st.done(1, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes). Waiting for the balance...');
+    const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
+    st.append(1, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
+  }]);
 }
 
 // ---- boot ----

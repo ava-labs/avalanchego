@@ -1834,10 +1834,9 @@ func TestVerifyCredentials(t *testing.T) {
 			utxos: validUTXOs,
 		},
 		{
-			// No credentials means an unsigned import, which has its own rules.
-			name:    "import_no_credentials_is_unsigned",
+			name:    "import_not_enough_credentials",
 			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
-			wantErr: ErrUnsignedNotOneOutput,
+			wantErr: ErrIncorrectNumCredentials,
 		},
 		{
 			name:    "import_too_many_credentials",
@@ -1934,7 +1933,7 @@ func TestVerifyCredentials(t *testing.T) {
 			require.NoErrorf(t, err, "%T.Apply()", xMemory)
 
 			cMemory := memory.NewSharedMemory(cChainID)
-			err = test.tx.VerifyCredentials(cMemory)
+			err = test.tx.VerifyCredentials(cMemory, nil)
 			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
 		})
 	}

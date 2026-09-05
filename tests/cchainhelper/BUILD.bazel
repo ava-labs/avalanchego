@@ -1,12 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "exporthelper",
+    name = "cchainhelper",
     srcs = ["generate.go"],
     embedsrcs = [
-        "ExportHelper.abi",
-        "ExportHelper.bin",
+        "CChainHelper.abi",
+        "CChainHelper.bin",
     ],
-    importpath = "github.com/ava-labs/avalanchego/tests/exporthelper",
+    importpath = "github.com/ava-labs/avalanchego/tests/cchainhelper",
     visibility = ["//visibility:public"],
 )
