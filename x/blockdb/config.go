@@ -8,7 +8,7 @@ import "errors"
 // DefaultMaxDataFileSize is the default maximum size of the data block file in bytes (500GB).
 const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
 
-// DefaultMaxDataFiles is the default maximum number of data files descriptors cached.
+// DefaultMaxDataFiles is the default maximum number of data file descriptors cached.
 const DefaultMaxDataFiles = 10
 
 // DefaultBlockCacheSize is the default size of the block cache.
@@ -28,7 +28,9 @@ type DatabaseConfig struct {
 	// MaxDataFileSize sets the maximum size of the data block file in bytes.
 	MaxDataFileSize uint64
 
-	// MaxDataFiles is the maximum number of data files descriptors cached.
+	// MaxDataFiles is the maximum number of data file descriptors cached.
+	// Most callers should use DefaultMaxDataFiles and only increase it if
+	// concurrent access to distinct data files causes descriptor churn.
 	MaxDataFiles int
 
 	// BlockCacheSize is the size of the block cache (default: 256).

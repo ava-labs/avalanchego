@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -214,6 +215,105 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 	checkDatabaseState(t, store, 19)
 }
 
+func TestPutContinuesAfterIndexWriteFailure(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithDir(t.TempDir()))
+	indexPath := db.indexFile.Name()
+	// Fail after the data write, when Put attempts to write the index entry.
+	require.NoError(t, db.indexFile.Close())
+
+	err := db.Put(1, []byte("failed index write"))
+	require.ErrorIs(t, err, os.ErrClosed)
+
+	indexFile, err := os.OpenFile(indexPath, os.O_RDWR, defaultFilePermissions)
+	require.NoError(t, err)
+	db.indexFile = indexFile
+	require.NoError(t, db.Put(2, []byte("successful later write")))
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, db.config)
+	_, err = db.Get(1)
+	require.ErrorIs(t, err, database.ErrNotFound)
+	got, err := db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, []byte("successful later write"), got)
+	require.NoError(t, db.Close())
+}
+
+func TestFailedPutDoesNotAdvanceCheckpoint(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	config := DefaultConfig().
+		WithIndexDir(filepath.Join(dir, "index")).
+		WithDataDir(dataDir)
+	db := newDatabase(t, config)
+	blocks := [][]byte{
+		[]byte("first block"),
+		[]byte("second block"),
+	}
+	for height, block := range blocks {
+		require.NoError(t, db.Put(uint64(height), block))
+	}
+	// Make the next Put reserve an offset, then fail reopening the unavailable data file.
+	db.fileCache.Flush()
+
+	movedDataDir := filepath.Join(dir, "moved-data")
+	require.NoError(t, os.Rename(dataDir, movedDataDir))
+	err := db.Put(uint64(len(blocks)), []byte("failed data write"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(movedDataDir, dataDir))
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, config)
+	for height, block := range blocks {
+		got, err := db.Get(uint64(height))
+		require.NoError(t, err)
+		require.Equal(t, block, got)
+	}
+	_, err = db.Get(uint64(len(blocks)))
+	require.ErrorIs(t, err, database.ErrNotFound)
+	require.NoError(t, db.Close())
+}
+
+func TestPutContinuesAfterDataWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	config := DefaultConfig().
+		WithIndexDir(filepath.Join(dir, "index")).
+		WithDataDir(dataDir).
+		WithMaxDataFileSize(100)
+	db := newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	require.NoError(t, db.Put(0, make([]byte, 40)))
+	wantLaterOffset := db.nextDataReservationOffset.Load()
+
+	// Force the failed Put to reserve in the next data file, then fail opening it.
+	db.fileCache.Flush()
+	movedDataDir := filepath.Join(dir, "moved-data")
+	require.NoError(t, os.Rename(dataDir, movedDataDir))
+	err := db.Put(1, make([]byte, 20))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(movedDataDir, dataDir))
+
+	laterBlock := []byte("later")
+	require.NoError(t, db.Put(2, laterBlock))
+	laterEntry, err := db.readIndexEntry(2)
+	require.NoError(t, err)
+	require.Equal(t, wantLaterOffset, laterEntry.Offset)
+	got, err := db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, laterBlock, got)
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	_, err = db.Get(1)
+	require.ErrorIs(t, err, database.ErrNotFound)
+	got, err = db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, laterBlock, got)
+	require.NoError(t, db.Close())
+}
+
 func TestWriteBlock_Errors(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -263,7 +363,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			config:             DefaultConfig(),
 			setup: func(db *Database) {
 				// Set the next write offset to near max to trigger overflow
-				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
+				db.nextDataReservationOffset.Store(math.MaxUint64 - 50)
 			},
 			wantErr: safemath.ErrOverflow,
 		},
@@ -273,13 +373,13 @@ func TestWriteBlock_Errors(t *testing.T) {
 			block:  make([]byte, 100),
 			setup: func(db *Database) {
 				// Change file permissions to read-only
-				file, err := db.getOrOpenDataFile(0)
+				file, err := db.getDataFile(0, os.O_RDWR|os.O_CREATE)
 				require.NoError(t, err)
 				filePath := file.Name()
 				file.Close()
 				require.NoError(t, os.Chmod(filePath, 0o444))
 			},
-			wantErrMsg: "failed to get data file for writing block",
+			wantErrMsg: "failed to write block to data file at offset",
 		},
 		{
 			name:   "writeIndexEntryAt - index file write failure",
