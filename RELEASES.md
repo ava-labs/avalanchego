@@ -38,6 +38,11 @@
 
 NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
+### Config
+
+- Added:
+  - `--p-chain-follow-only`
+
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 - Tracing of EVM precompile outbound calls as described in [ava-labs/libevm#303](https://github.com/ava-labs/libevm/pull/303).
