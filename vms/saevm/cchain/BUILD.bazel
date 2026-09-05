@@ -23,6 +23,7 @@ go_library(
     srcs = [
         "api.go",
         "config.go",
+        "deprecated.go",
         "factory.go",
         "genesis.go",
         "gossip.go",
@@ -74,6 +75,7 @@ go_library(
         "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
+        "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
@@ -115,10 +117,12 @@ go_test(
     srcs = [
         "api_test.go",
         "config_test.go",
+        "deprecated_test.go",
         "genesis_test.go",
         "gossip_test.go",
         "hooks_test.go",
         "metrics_test.go",
+        "statesync_test.go",
         "vm_test.go",
         "warp_test.go",
     ],
@@ -207,5 +211,6 @@ go_test(
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
     ],
 )

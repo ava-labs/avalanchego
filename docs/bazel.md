@@ -41,6 +41,7 @@ avalanchego monorepo.
 - [Bazel CI External Dependency Caching](#bazel-ci-external-dependency-caching)
   - [Why this exists](#why-this-exists)
   - [Test platforms and cache policy](#test-platforms-and-cache-policy)
+  - [Why the remote cache uses gRPC](#why-the-remote-cache-uses-grpc)
   - [What is cached](#what-is-cached)
   - [Cache key](#cache-key)
   - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
@@ -525,10 +526,8 @@ tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
 excludes them from `bazel test //...` which should only run unit
 tests.
 
-This roughly mirrors the behavior of `scripts/build_test.sh`, which excludes these directories via grep:
-```bash
-grep -v tests/e2e | grep -v tests/upgrade | grep -v tests/fixture/bootstrapmonitor/e2e | ...
-```
+The Go unit-test script excludes equivalent directories during package
+selection. See [`scripts/tests.unit.sh`](../scripts/tests.unit.sh).
 
 **Tests with `manual` tag:**
 
@@ -676,6 +675,71 @@ When you change the CI test set, update
 `./scripts/bazel_ci_dependency_list.sh`. The list must include every target
 pattern that `run_bazel_ci_command.sh` runs in CI.
 
+### Why the remote cache uses gRPC
+
+CI uses Bazel's gRPC remote-cache protocol instead of its HTTP protocol. This
+choice limits the effect of a slow or degraded network path. It is not a claim
+that gRPC is faster than HTTP in normal conditions.
+
+For an HTTP remote cache, Bazel applies
+[`--remote_timeout`](https://bazel.build/reference/command-line-reference#flag--remote_timeout)
+as an inactivity timeout. Each received byte resets the timeout. A large
+download can therefore continue for hours if the cache sends data very slowly.
+[Bazel issue #11782](https://github.com/bazelbuild/bazel/issues/11782) describes
+this difference between the HTTP and gRPC timeout behavior.
+
+For a gRPC remote cache, Bazel applies `--remote_timeout` as a deadline for each
+remote procedure call (RPC). Slow progress does not extend this deadline. Bazel
+then uses
+[`--remote_retries`](https://bazel.build/reference/command-line-reference#flag--remote_retries)
+to limit the retries after the first attempt.
+
+The CI setup currently sets a 60-second deadline and three retries. Thus, one
+failed RPC can use approximately 240 seconds:
+
+```text
+60 seconds × (1 initial attempt + 3 retries) = 240 seconds
+```
+
+This value is an estimate, not a wall-clock limit for the Bazel command. A
+command can make multiple RPCs. Retry delays and other build work also add time.
+Use command and job timeouts to set a limit for the complete CI operation.
+
+CI job timeouts bound the complete operation. The timeout values are configured
+in `.github/workflows/bazel-ci.yml` and
+`.github/workflows/bazel-ci-smoke.yml`. Scheduled jobs configure their longer
+limits in `.github/workflows/bazel-ci-scheduled.yml`. They run broader tests
+without the remote cache. Bazel's test timeouts still limit each test process.
+The job-level limits also cover loading, analysis, builds, downloads, retries,
+and test setup.
+
+Tests with Bazel 8.8.0 confirmed the expected behavior. An HTTP cache download
+continued beyond 120 seconds when a proxy limited traffic to 1 KiB/s. The test
+used `--remote_timeout=60s`, and the download continued to receive data. The
+same limit caused a gRPC cache read to fail after its deadline. Direct TLS did
+not change the gRPC deadline behavior.
+
+This policy accepts a bounded cache failure instead of a CI job that makes very
+slow progress for hours. In the gRPC test, Bazel reported `Missing digest` and
+failed the build. It did not fall back to local execution. Retries can recover
+from a temporary failure, but retry recovery under this throttling scenario has
+not been confirmed.
+
+Preserve these requirements when you change the remote-cache client settings:
+
+- Use the `grpcs://` scheme for the CI cache URL.
+- Set `--remote_timeout` and `--remote_retries` explicitly.
+- Treat the timeout as a limit for each RPC, not for the complete build.
+- Keep a separate timeout for the complete command or CI job.
+
+Reconsider the transport only if Bazel changes the HTTP timeout behavior or if
+the gRPC failure behavior no longer meets CI requirements. Test any change with
+a throttled cache read. Confirm that useful but slow traffic cannot keep the CI
+operation active without a limit.
+
+This repository configures only the Bazel client. Cache-server and proxy
+configuration are outside this repository's scope.
+
 ### What is cached
 
 The Bazel CI cache setup configures three kinds of cached data:
@@ -785,7 +849,8 @@ preserve these invariants:
   by the Bazel CI reusable workflows
 - cache-prefetch behavior stays focused on external repositories and does not
   start depending on developer-specific workspace state
-- remote caching requires the cache URL and the authorization header
+- when enabled, remote caching requires a `grpcs://` cache URL and the
+  authorization header
 - the daily scheduled workflow disables remote caching
 - setup does not print the remote-cache authorization header
 

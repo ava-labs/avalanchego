@@ -150,10 +150,15 @@ func (c *customAPI) SuggestPriceOptions(ctx context.Context) (*PriceOptions, err
 	return NewPriceOptions(tip, doubleBaseFee), nil
 }
 
+// customSubscriptionAPI provides the Avalanche-custom `eth_subscribe` methods.
+type customSubscriptionAPI struct {
+	b *backend
+}
+
 // NewAcceptedTransactions creates a subscription that is notified each time a
 // transaction is accepted by consensus (prior to execution). If fullTx is true
 // the full tx is sent to the client, otherwise only the hash is sent.
-func (c *customAPI) NewAcceptedTransactions(ctx context.Context, fullTx *bool) (*rpc.Subscription, error) {
+func (c *customSubscriptionAPI) NewAcceptedTransactions(ctx context.Context, fullTx *bool) (*rpc.Subscription, error) {
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return nil, rpc.ErrNotificationsUnsupported

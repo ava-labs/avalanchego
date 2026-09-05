@@ -31,7 +31,9 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -65,6 +67,7 @@ import (
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
@@ -157,6 +160,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
 			},
+			RPCConfig: saerpc.Config{APIs: saerpc.DefaultAPIs()},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
@@ -305,6 +309,13 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.CommitInterval = interval
+	})
+}
+
+// withSnapshot enables the state snapshot with a minimal cache.
+func withSnapshot() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.SnapshotCacheMiB = 1
 	})
 }
 
@@ -591,6 +602,30 @@ func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	sdb, err := s.rawVM.exec.StateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.rawVM.exec)
 	return sdb
+}
+
+// verifySnapshot requires the snapshot to be enabled and asserts that it is
+// fully generated and reproduces the last-executed state root.
+func (s *SUT) verifySnapshot(tb require.TestingT) {
+	snaps := s.rawVM.exec.Snapshot()
+	require.NotNil(tb, snaps, "snapshot disabled")
+
+	lastExecutedRoot := s.rawVM.exec.LastExecuted().PostExecutionStateRoot()
+	assert.NoError(tb, snaps.Verify(lastExecutedRoot), "last executed snapshot root verification failed")
+}
+
+// requireSnapshotEventuallyVerified waits for background snapshot generation to
+// finish and requires the snapshot to reproduce the last-executed state root.
+func requireSnapshotEventuallyVerified(tb testing.TB, sut *SUT) {
+	tb.Helper()
+	require.EventuallyWithT(tb,
+		func(c *assert.CollectT) {
+			sut.verifySnapshot(c)
+		},
+		10*time.Second,      // timeout
+		10*time.Millisecond, // polling interval
+		"snapshot verification",
+	)
 }
 
 // lastAcceptedBlock is a convenience wrapper for calling [VM.GetBlock] with
@@ -1214,4 +1249,71 @@ func TestDuplicateVerify(t *testing.T) {
 			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
 		})
 	}
+}
+
+// TestSnapshotGenerationSpansDiskLayerMoves generates the snapshot of a VM
+// while it accepts blocks. The snapshot MUST eventually verify against the
+// executed state, even though blocks are moving the disk layer onto a state
+// that consensus no longer needs.
+func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
+	t.Parallel()
+
+	// An account with storage that no transaction touches, so only the
+	// snapshot generator opens its storage trie.
+	var (
+		storageAddr = common.Address{'s', 't', 'o', 'r', 'a', 'g', 'e'}
+		storageSlot = common.Hash{1}
+		storageVal  = common.Hash{1}
+	)
+	storageRoot := storageTrieRoot(t, storageSlot, storageVal)
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, withSnapshot(), options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[storageAddr] = types.Account{
+			Storage: map[common.Hash]common.Hash{storageSlot: storageVal},
+			Balance: big.NewInt(1),
+		}
+		// This is a gross hack to emulate a slow snapshot generation. By
+		// returning an error when reading the storage root, the snapshot
+		// generation will halt until the disk root moves.
+		//
+		// TODO(StephenButtolph): Figure out a way to simulate slow snapshot
+		// generation without relying on implementation details of the snapshot
+		// or being racy.
+		c.db = saetest.NewUnreadableOnceDB(memdb.New(), storageRoot[:])
+	}))
+
+	// While generating, the snapshot keeps only 8 diff layers, so the 9th
+	// block moves the disk layer to block 1's state. Since each block settles
+	// the prior block, SAE no longer needs block 1's state. But it MUST still
+	// be held to support snapshot generation.
+	//
+	// Unfortunely, libevm doesn't expose 8 as a constant. It is hard-coded in
+	// the snapshot implementation here:
+	// https://github.com/ava-labs/libevm/blob/80edd419ae21fa745accad9f528a190b1f81c7c7/core/state/snapshot/snapshot.go#L396-L398
+	const numBlocks = 8 + 1
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		vmTime.AdvanceToSettle(ctx, t, b)
+	}
+
+	requireSnapshotEventuallyVerified(t, sut)
+}
+
+// storageTrieRoot returns the root of a storage trie holding only the given
+// slot.
+func storageTrieRoot(tb testing.TB, slot, value common.Hash) common.Hash {
+	tb.Helper()
+
+	raw := common.TrimLeftZeroes(value[:])
+	encoded, err := rlp.EncodeToBytes(raw)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%#x)", raw)
+	st := trie.NewStackTrie(nil)
+	require.NoErrorf(tb, st.Update(crypto.Keccak256(slot[:]), encoded), "%T.Update()", st)
+	return st.Hash()
 }

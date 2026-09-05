@@ -4,10 +4,14 @@
 package saetest
 
 import (
+	"bytes"
 	"errors"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -30,6 +34,37 @@ func CopyDB(tb testing.TB, src database.Database) database.Database {
 	}
 	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
 	return dst
+}
+
+// AssertEqualDBs asserts that got holds exactly the same key/value pairs as
+// want.
+func AssertEqualDBs(tb testing.TB, want, got database.Database, msgAndArgs ...any) {
+	tb.Helper()
+
+	assert.Equal(tb, dbEntries(tb, want), dbEntries(tb, got), msgAndArgs...)
+}
+
+type dbEntry struct {
+	Key   []byte
+	Value []byte
+}
+
+// dbEntries returns every key/value pair in db, in iteration order.
+func dbEntries(tb testing.TB, db database.Database) []dbEntry {
+	tb.Helper()
+
+	it := db.NewIterator()
+	defer it.Release()
+
+	var out []dbEntry
+	for it.Next() {
+		out = append(out, dbEntry{
+			Key:   slices.Clone(it.Key()),
+			Value: slices.Clone(it.Value()),
+		})
+	}
+	require.NoErrorf(tb, it.Error(), "%T.Error()", it)
+	return out
 }
 
 // FlakyDB fails every mutating op after a configured number of them. A Put, a
@@ -124,3 +159,28 @@ func (b *flakyBatch) Write() error {
 // Inner returns the wrapper itself, so callers that unwrap batches still commit
 // through the fault counter.
 func (b *flakyBatch) Inner() database.Batch { return b }
+
+// UnreadableOnceDB fails the first read of one key with [ErrInjected] and
+// serves every other read from the wrapped database. Safe for concurrent use.
+type UnreadableOnceDB struct {
+	database.Database
+
+	key    []byte
+	failed atomic.Bool
+}
+
+// NewUnreadableOnceDB returns an [UnreadableOnceDB] whose first read of key
+// fails.
+func NewUnreadableOnceDB(db database.Database, key []byte) *UnreadableOnceDB {
+	return &UnreadableOnceDB{
+		Database: db,
+		key:      key,
+	}
+}
+
+func (u *UnreadableOnceDB) Get(key []byte) ([]byte, error) {
+	if bytes.Equal(key, u.key) && u.failed.CompareAndSwap(false, true) {
+		return nil, ErrInjected
+	}
+	return u.Database.Get(key)
+}
