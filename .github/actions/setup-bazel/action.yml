@@ -3,7 +3,7 @@ description: 'Prepare Bazel CI for this job and, during initial setup, for the l
 
 inputs:
   initial-setup:
-    description: 'Whether this is the initial setup pass that checks metadata, caches dependencies needed by subsequent Bazel CI jobs, and saves the resulting cache state'
+    description: 'Whether this is the initial setup pass that checks metadata and, on master pushes, caches dependencies needed by subsequent Bazel CI jobs'
     required: false
     default: 'false'
 
@@ -28,19 +28,8 @@ runs:
           echo "go_mod_cache=$go_mod_cache_dir"
         } >> "$GITHUB_OUTPUT"
 
-    - name: Perform initial setup of Bazel dependency cache
-      if: ${{ inputs.initial-setup == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ${{ steps.cache-paths.outputs.repository_cache }}
-          ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
-        restore-keys: |
-          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
-
     - name: Restore Bazel dependency cache
-      if: ${{ inputs.initial-setup != 'true' }}
+      id: cache
       uses: actions/cache/restore@v5
       with:
         path: |
@@ -65,6 +54,15 @@ runs:
       run: ./scripts/run_task.sh bazel-check-metadata
 
     - name: Cache Bazel CI build dependencies
-      if: ${{ inputs.initial-setup == 'true' }}
+      if: ${{ inputs.initial-setup == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
+
+    - name: Save Bazel dependency cache
+      if: ${{ inputs.initial-setup == 'true' && steps.cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ${{ steps.cache-paths.outputs.repository_cache }}
+          ${{ steps.cache-paths.outputs.go_mod_cache }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}

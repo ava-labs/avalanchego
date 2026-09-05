@@ -20,13 +20,40 @@ permissions:
   contents: read
 
 jobs:
-  unit:
+  setup:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-go-dependencies
+
+  unit:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: setup-go
+        uses: ./.github/actions/setup-go-for-project
+      - id: unit-cache
+        name: Restore Go unit-test cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: go-unit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+          restore-keys: |
+            go-unit-${{ runner.os }}-${{ runner.arch }}-
+      # actions/cache saves in its post step, after the unit tests complete.
+      # Register that post step only for master pushes.
+      - name: Save Go unit-test cache on master
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: go-unit-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+          restore-keys: |
+            go-unit-${{ runner.os }}-${{ runner.arch }}-
       - name: Run unit tests
         shell: bash
         run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
         env:
+          GOPROXY: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && 'off' || '' }}
           TIMEOUT: 900s

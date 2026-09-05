@@ -13,6 +13,17 @@
 name: 'Install Go toolchain with project defaults'
 description: 'Install a go toolchain with project defaults'
 
+outputs:
+  go-mod-cache-hit:
+    description: 'Whether the Go module cache was restored with an exact key'
+    value: ${{ steps.go-mod-cache.outputs.cache-hit }}
+  go-mod-cache-path:
+    description: 'Path to the Go module cache'
+    value: ${{ steps.cache-paths.outputs.go-mod-cache }}
+  go-build-cache-path:
+    description: 'Path to the Go build and test cache'
+    value: ${{ steps.cache-paths.outputs.go-build-cache }}
+
 runs:
   using: composite
   steps:
@@ -22,6 +33,25 @@ runs:
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
-        cache-dependency-path: |-
-          go.work.sum
-          tools/external/go.sum
+        # setup-go saves its dependency cache in a post step that cannot be
+        # restricted to master pushes. Caching is handled explicitly by actions
+        # that can apply the master-write-only policy.
+        cache: false
+
+    - id: cache-paths
+      name: Read Go cache paths
+      shell: bash
+      run: |
+        {
+          echo "go-mod-cache=$(go env GOMODCACHE)"
+          echo "go-build-cache=$(go env GOCACHE)"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: go-mod-cache
+      name: Restore Go module cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}
+        restore-keys: |
+          go-mod-${{ runner.os }}-

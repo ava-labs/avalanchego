@@ -93,30 +93,27 @@ runs:
         github_access_token: ${{ inputs.github-token }}
     # Mirror the repo install-nix cache here so jobs do not need to fetch the
     # same flake inputs on every run.
-    - name: Restore and save Nix store cache
+    - name: Restore Nix store cache
       if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
       with:
         primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
         restore-prefixes-first-match: |
           nix-${{ runner.os }}-${{ runner.arch }}-
+        save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         gc-max-store-size-linux: 5G
         gc-max-store-size-macos: 5G
     - run: echo "dependencies installed"
       shell: nix develop --command bash {0}
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
+    # Restore the module cache populated by the Go setup job. This action may
+    # download missing modules, but only the setup job saves the shared cache.
+    - uses: actions/cache/restore@v5
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}
+        restore-keys: |
+          go-mod-${{ runner.os }}-
     # Download modules only on cache miss
     - run: go mod download
       if: steps.go-mod-cache.outputs.cache-hit != 'true'

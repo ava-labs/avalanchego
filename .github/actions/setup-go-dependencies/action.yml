@@ -1,0 +1,22 @@
+name: Setup Go dependencies
+description: Restore Go module dependencies and populate their cache on master pushes
+
+runs:
+  using: composite
+  steps:
+    - id: setup-go
+      uses: ./.github/actions/setup-go-for-project
+
+    - name: Download Go module dependencies
+      if: ${{ steps.setup-go.outputs.go-mod-cache-hit != 'true' }}
+      shell: bash
+      run: |
+        go mod download
+        GOWORK=off go mod download -modfile=tools/external/go.mod
+
+    - name: Save Go module cache
+      if: ${{ steps.setup-go.outputs.go-mod-cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.setup-go.outputs.go-mod-cache-path }}
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}

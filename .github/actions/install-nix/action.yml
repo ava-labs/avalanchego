@@ -17,31 +17,28 @@ runs:
     # same flake inputs on every run. Key by OS, arch, and flake.lock so the
     # cache is reused across matching runners and replaced when inputs change.
     # Cap the saved store size to keep cache growth bounded.
-    - name: Restore and save Nix store cache
+    - name: Restore Nix store cache
       if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
       with:
         primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
         restore-prefixes-first-match: |
           nix-${{ runner.os }}-${{ runner.arch }}-
+        save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         gc-max-store-size-linux: 5G
         gc-max-store-size-macos: 5G
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
       shell: bash
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
+    # Restore the module cache populated by the Go setup job. This action may
+    # download missing modules, but only the setup job saves the shared cache.
+    - uses: actions/cache/restore@v5
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}
+        restore-keys: |
+          go-mod-${{ runner.os }}-
     # Download modules only on cache miss
     - run: nix develop --command go mod download
       if: steps.go-mod-cache.outputs.cache-hit != 'true'
