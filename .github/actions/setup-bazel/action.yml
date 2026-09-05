@@ -15,6 +15,8 @@ runs:
       with:
         diagnostic-groups: bazel
 
+    - uses: ./.github/actions/setup-task
+
     - id: cache-paths
       shell: bash
       run: |
@@ -54,15 +56,6 @@ runs:
         REPOSITORY_CACHE_DIR: ${{ steps.cache-paths.outputs.repository_cache }}
         GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
       run: ${{ github.action_path }}/configure-bazelrc.sh
-
-    - name: Fetch Bazel task bootstrap dependency
-      shell: bash
-      run: |
-        source ./scripts/bazel_ci_dependency_list.sh
-        while IFS= read -r target; do
-          [[ -n "${target}" ]] || continue
-          bazelisk fetch "${target}"
-        done < <(bazel_ci_bootstrap_targets)
 
     # Bazel metadata must be consistent before any other bazel operations are
     # performed including build dependency caching.

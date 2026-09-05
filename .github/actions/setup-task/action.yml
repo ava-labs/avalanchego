@@ -1,0 +1,37 @@
+name: Setup Task
+description: Restore the pinned Task binary from cache or download and verify it
+
+runs:
+  using: composite
+  steps:
+    - id: version
+      name: Read pinned Task version
+      shell: bash
+      run: echo "version=$(./scripts/setup_task.sh version)" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      name: Restore Task
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
+        key: task-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+
+    - name: Download Task
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        TASK_VERSION: ${{ steps.version.outputs.version }}
+      run: ./scripts/setup_task.sh download
+
+    - name: Save Task
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
+        key: task-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+
+    - name: Add Task to PATH
+      shell: bash
+      env:
+        TASK_VERSION: ${{ steps.version.outputs.version }}
+      run: ./scripts/setup_task.sh path >> "$GITHUB_PATH"
