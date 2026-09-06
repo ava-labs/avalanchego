@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"os"
 	"reflect"
 	"runtime/debug"
+	"slices"
 	"testing"
 	"time"
 
@@ -40,6 +42,7 @@ import (
 	_ "github.com/ava-labs/libevm/eth/filters"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -47,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -565,7 +569,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withAllAPIs())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -641,7 +645,7 @@ func TestEthGetters(t *testing.T) {
 }
 
 func TestMempoolTxGetters(t *testing.T) {
-	ctx, sut := newSUT(t, 1, withDebugAPI())
+	ctx, sut := newSUT(t, 1, withAllAPIs())
 
 	// These RPC methods use GetPoolTransaction, which returns any transaction
 	// accepted into the pool regardless of pending/queued status. A
@@ -876,7 +880,7 @@ func TestEthPendingTransactions(t *testing.T) {
 
 func TestGetReceipts(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 2, timeOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 2, timeOpt, withAllAPIs())
 
 	var (
 		txs  []*types.Transaction
@@ -1283,7 +1287,7 @@ func TestUnprotectedTxs(t *testing.T) {
 }
 
 func TestDebugRPCs(t *testing.T) {
-	ctx, sut := newSUT(t, 0, withDebugAPI())
+	ctx, sut := newSUT(t, 0, withAllAPIs())
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1625,12 +1629,68 @@ func withTxFeeCap(feeCap float64) sutOption {
 	})
 }
 
-// withDebugAPI returns a sutOption that enables the debug API.
-func withDebugAPI() sutOption {
+// withAPIs returns a sutOption that serves only the APIs in apis.
+func withAPIs(apis set.Set[saerpc.API]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.EnableDBInspecting = true
-		c.vmConfig.RPCConfig.EnableProfiling = true
+		c.vmConfig.RPCConfig.APIs = apis
 	})
+}
+
+// withAllAPIs returns a sutOption that serves every API, including those
+// excluded from [saerpc.DefaultAPIs].
+func withAllAPIs() sutOption {
+	return withAPIs(saerpc.AllAPIs())
+}
+
+// errCodeMethodNotFound is the JSON-RPC 2.0 code returned for a method the
+// server doesn't serve. libevm's rpc package doesn't export it.
+const errCodeMethodNotFound = -32601
+
+// methodRegistered reports whether sut serves method.
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string) bool {
+	tb.Helper()
+
+	err := sut.CallContext(ctx, new(json.RawMessage), method)
+	if err == nil {
+		return true
+	}
+	var rpcErr rpc.Error
+	require.ErrorAsf(tb, err, &rpcErr, "%T.CallContext(%q)", sut, method)
+	return rpcErr.ErrorCode() != errCodeMethodNotFound
+}
+
+func TestAPIsServed(t *testing.T) {
+	// A method served by each API and no other.
+	methods := map[saerpc.API]string{
+		saerpc.APIWeb3:         "web3_clientVersion",
+		saerpc.APINet:          "net_version",
+		saerpc.APITxPool:       "txpool_status",
+		saerpc.APIPrice:        "eth_gasPrice",
+		saerpc.APIChain:        "eth_blockNumber",
+		saerpc.APITx:           "eth_getTransactionCount",
+		saerpc.APISubscription: "eth_getLogs",
+		saerpc.APIAvalanche:    "eth_callDetailed",
+		saerpc.APIDB:           "debug_dbGet",
+		saerpc.APIProfile:      "debug_gcStats",
+		saerpc.APITrace:        "debug_traceBlockByNumber",
+	}
+	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
+
+	configs := map[string]set.Set[saerpc.API]{
+		"all":     saerpc.AllAPIs(),
+		"default": saerpc.DefaultAPIs(),
+	}
+	for api := range methods {
+		configs["only_"+string(api)] = set.Of(api)
+	}
+	for name, apis := range configs {
+		t.Run(name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(apis))
+			for api, method := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
+			}
+		})
+	}
 }
 
 func TestResolveBlockNumberOrHash(t *testing.T) {

@@ -362,6 +362,7 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-unit-script
       - check-go-version
       - check-require-directives
 
@@ -382,6 +383,7 @@ tasks:
       - task: lint-shell
       - task: test-ci-disk-space
       - task: test-run-task-launcher
+      - task: test-unit-script
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -601,16 +603,24 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
   test-unit:
-    desc: Runs unit tests
-    # Invoking with bash ensures compatibility with CI execution on Windows
-    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
-
-  test-unit-fast:
-    desc: Runs unit tests
+    desc: Runs cacheable unified unit tests
     env:
       NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Tests are much faster without race detection
-    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+      NO_RACE: TRUE    # Reduces execution time
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unified unit tests with race detection and shuffle
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-script:
+    desc: Tests unified unit-test script behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
+
+  test-unit-smoke:
+    desc: Runs one unit test package to check that Go unit tests run on a platform
+    # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
+    cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
 
   test-upgrade:
     desc: Runs upgrade tests

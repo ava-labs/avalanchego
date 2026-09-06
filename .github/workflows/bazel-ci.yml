@@ -21,9 +21,28 @@ on:
         required: false
         type: boolean
         default: true
+      setup_timeout_minutes:
+        description: 'Timeout for the setup job'
+        required: false
+        type: number
+        default: 10
+      unit_timeout_minutes:
+        description: 'Timeout for the unit-test job'
+        required: false
+        type: number
+        default: 30
+      e2e_timeout_minutes:
+        description: 'Timeout for the E2E job'
+        required: false
+        type: number
+        default: 30
+      required_timeout_minutes:
+        description: 'Timeout for the aggregate required job'
+        required: false
+        type: number
+        default: 5
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
   BAZEL_REMOTE_CACHE_ENABLED: ${{ inputs.enable_remote_cache }}
   BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
@@ -41,6 +60,7 @@ jobs:
       - unit
       - e2e
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.required_timeout_minutes }}
     steps:
       - name: Fail unless all needed jobs succeeded
         shell: bash
@@ -68,6 +88,7 @@ jobs:
   # missing dependencies on its own.
   setup:
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.setup_timeout_minutes }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-bazel
@@ -81,6 +102,7 @@ jobs:
   unit:
     needs: setup
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.unit_timeout_minutes }}
     steps:
       - uses: actions/checkout@v5
       - name: Run unit tests with Bazel
@@ -91,6 +113,7 @@ jobs:
   e2e:
     needs: setup
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.e2e_timeout_minutes }}
     steps:
       - uses: actions/checkout@v5
       - name: Run E2E smoke test with Bazel-built binary
