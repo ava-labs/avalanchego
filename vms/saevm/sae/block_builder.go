@@ -298,7 +298,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		includedBytes += txBytes
 	}
 	var includedOps []T
-	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {
+	// Keep this view separate from the mutable worst-case balance calculation.
+	settledState, err := b.exec.StateDB(lastSettled.PostExecutionStateRoot())
+	if err != nil {
+		return nil, fmt.Errorf("opening settled state for end-of-block operations: %w", err)
+	}
+	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), settledState, b.source) {
 		// TODO(StephenButtolph): Return additional information from
 		// [hook.PointsG.PotentialEndOfBlockOps] to terminate the loop early
 		// when there is insufficient block space remaining.
@@ -327,6 +332,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		opLog.Trace("Including op")
 		includedOps = append(includedOps, tx)
 		includedBytes += opBytes
+	}
+	if err := settledState.Error(); err != nil {
+		return nil, fmt.Errorf("reading settled state for end-of-block operations: %w", err)
 	}
 	hdr.GasUsed = state.GasUsed()
 

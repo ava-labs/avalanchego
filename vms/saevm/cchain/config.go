@@ -102,11 +102,11 @@ type config struct {
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
-	// HelperAddresses are the contracts whose warp messages export AVAX to the
-	// P-chain and authorize imports from it on behalf of msg.sender.
+	// HelperAddress exports AVAX to P through Warp messages and authorizes
+	// imports through contract storage. Zero disables this prototype.
 	//
 	// ponytail: consensus-critical, hardcode per network before shipping.
-	HelperAddresses []common.Address `json:"helper-addresses"`
+	HelperAddress common.Address `json:"helper-address"`
 
 	internalConfig
 }

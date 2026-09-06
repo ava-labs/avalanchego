@@ -46,7 +46,7 @@ func init() {
 	lc.SkipRegistrations(1)
 	errs.Add(
 		lc.RegisterType(&secp256k1fx.Credential{}),
-		lc.RegisterType(&WarpCredential{}),
+		lc.RegisterType(&ContractCredential{}),
 		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {

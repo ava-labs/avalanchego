@@ -77,7 +77,7 @@ func newHooks(
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,
-	helpers set.Set[common.Address],
+	helper common.Address,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -101,8 +101,7 @@ func newHooks(
 			now,
 			poolTxs,
 			desired,
-			warpStorage,
-			helpers,
+			helper,
 		},
 		state,
 		warpStorage,
@@ -140,8 +139,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			priceExponent:  headerExtra.MinPriceExponent,
 			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
-		h.warpStorage,
-		h.helpers,
+		h.helper,
 	}, nil
 }
 
@@ -317,8 +315,12 @@ type export struct {
 func (h *hooks) exports(receipts types.Receipts) ([]export, error) {
 	var exports []export
 	for _, r := range receipts {
+		if r.Status != types.ReceiptStatusSuccessful {
+			continue
+		}
 		for _, log := range r.Logs {
-			if log.Address != corethwarp.ContractAddress || len(log.Topics) < 2 || !h.helpers.Contains(common.BytesToAddress(log.Topics[1][:])) {
+			if h.helper == (common.Address{}) || log.Address != corethwarp.ContractAddress || len(log.Topics) != 3 ||
+				log.Topics[0] != corethwarp.WarpABI.Events["SendWarpMessage"].ID || log.Topics[1] != common.BytesToHash(h.helper[:]) {
 				continue
 			}
 			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
@@ -326,7 +328,7 @@ func (h *hooks) exports(receipts types.Receipts) ([]export, error) {
 				return nil, fmt.Errorf("parsing warp message (tx %s, log %d): %w", log.TxHash, log.Index, err)
 			}
 			call, err := payload.ParseAddressedCall(m.Payload)
-			if err != nil || len(call.Payload) != exportPayloadLen {
+			if err != nil || len(call.Payload) != exportPayloadLen || len(call.SourceAddress) != common.AddressLength || common.BytesToAddress(call.SourceAddress) != h.helper {
 				continue
 			}
 			exports = append(exports, export{
@@ -468,10 +470,8 @@ type builder struct {
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
-	warpStorage  *warp.Storage
-	// helpers are the contracts whose warp messages export AVAX to the
-	// P-chain and authorize imports from it on behalf of msg.sender.
-	helpers set.Set[common.Address]
+	// helper emits exports and stores approvals for imports on behalf of callers.
+	helper common.Address
 }
 
 var (
@@ -544,6 +544,7 @@ func (b *builder) PotentialEndOfBlockOps(
 	ctx context.Context,
 	building *types.Header,
 	settledHash common.Hash,
+	settledState libevm.StateReader,
 	source saetypes.BlockSource,
 ) iter.Seq[*hookTx] {
 	return func(yield func(*hookTx) bool) {
@@ -552,18 +553,17 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, settledHeight, err := ancestorInputIDs(building, settledHash, source)
+		inputs, err := ancestorInputIDs(building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),
 			)
 			return
 		}
-		// Every verifier has executed the settled block, so only messages
-		// emitted at or below it are known to all of them. The message ID
-		// hashes the payload, so a stored message vouches for its height.
-		knownWarp := func(id ids.ID, helper common.Address, height uint64) bool {
-			return b.helpers.Contains(helper) && height <= settledHeight && b.warpStorage.Has(id)
+		auth := &tx.ImportAuth{
+			State:     settledState,
+			Helper:    b.helper,
+			Timestamp: building.Time,
 		}
 
 		for t := range b.potentialTxs {
@@ -589,7 +589,7 @@ func (b *builder) PotentialEndOfBlockOps(
 			// verified against out-dated state, we need to ensure that import
 			// txs are consuming UTXOs that still exist so that our in-memory
 			// UTXO conflict checks are sufficient.
-			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory, knownWarp); err != nil {
+			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory, auth); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),
 					zap.Error(err),
@@ -608,26 +608,26 @@ func (b *builder) PotentialEndOfBlockOps(
 var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
-// in the block range (h, settled), both exclusive, and the settled height.
-func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], uint64, error) {
+// in the block range (h, settled), both exclusive.
+func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
 	var s set.Set[ids.ID]
 	for h.ParentHash != settled {
 		parentNumber := h.Number.Uint64() - 1
 		p, ok := source(h.ParentHash, parentNumber)
 		if !ok {
-			return nil, 0, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
+			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, 0, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
 		}
 		h = p.Header()
 	}
-	return s, h.Number.Uint64() - 1, nil
+	return s, nil
 }
 
 var errEmptyBlock = errors.New("empty block")

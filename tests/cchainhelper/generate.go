@@ -3,7 +3,7 @@
 
 // Package cchainhelper embeds the compiled CChainHelper contract, the trusted
 // C-chain helper that exports to and imports from the P-chain on behalf of
-// msg.sender (see vms/saevm/cchain/hooks.go and tx/warp_credential.go).
+// msg.sender (see vms/saevm/cchain/hooks.go and tx/contract_credential.go).
 package cchainhelper
 
 import _ "embed"

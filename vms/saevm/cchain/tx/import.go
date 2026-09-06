@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
@@ -154,7 +155,7 @@ var (
 	errVerifyingTransfer  = errors.New("verifying transfer")
 )
 
-func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, auth WarpAuth, creds []Credential) error {
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, auth *ImportAuth, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
@@ -162,6 +163,25 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, auth WarpAuth, 
 	fxTx, err := toFxTx(i)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+	contractImport := slices.ContainsFunc(creds, isContractCredential)
+	if contractImport {
+		if i.SourceChain != constants.PlatformChainID || len(i.Outs) != 1 {
+			return errContractImportShape
+		}
+		for _, cred := range creds {
+			if !isContractCredential(cred) {
+				return errWrongCredentialType
+			}
+			if err := cred.Verify(); err != nil {
+				return err
+			}
+		}
+		// Hash the unsigned transaction and read its approval once, regardless
+		// of the number of inputs. Each input still needs its own UTXO checks.
+		if !auth.authorized(fxTx) {
+			return errUnauthorizedImport
+		}
 	}
 
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
@@ -187,13 +207,13 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, auth WarpAuth, 
 		if utxo.Asset.ID != in.Asset.ID {
 			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
 		}
-		if cred, ok := creds[j].(*WarpCredential); ok {
+		if contractImport {
 			input, _ := in.In.(*secp256k1fx.TransferInput)
 			out, _ := utxo.Out.(*secp256k1fx.TransferOutput)
 			if input == nil || out == nil {
 				return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, secp256k1fx.ErrWrongUTXOType)
 			}
-			if err := verifyWarpTransfer(fxTx, input, cred, out, auth); err != nil {
+			if err := verifyContractTransfer(i.Outs[0].Address, auth.Timestamp, input, creds[j].(*ContractCredential), out); err != nil {
 				return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
 			}
 			continue

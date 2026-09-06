@@ -26,18 +26,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
-	"github.com/ava-labs/libevm/common"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
@@ -65,7 +62,6 @@ type VM struct {
 	state       *state.State
 	metrics     *metrics
 	pending     *txpool.Pending
-	warpAuth    tx.WarpAuth
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
 	gossipSet *gossip.BloomSet[*gossipTx]
@@ -146,10 +142,6 @@ func (vm *VM) Initialize(
 
 	vm.pending = txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
-	helpers := set.Of(userConfig.HelperAddresses...)
-	vm.warpAuth = func(id ids.ID, helper common.Address, _ uint64) bool {
-		return helpers.Contains(helper) && warpStorage.Has(id)
-	}
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
@@ -159,7 +151,7 @@ func (vm *VM) Initialize(
 		vm.now,
 		userConfig.desired(),
 		vm.metrics,
-		helpers,
+		userConfig.HelperAddress,
 	)
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
 	if err != nil {
@@ -208,7 +200,7 @@ func (vm *VM) Initialize(
 		vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 		const maxTxPoolSize = 1024
-		txpool, err := txpool.New(snowCtx, vm.chainConfig, vm.pending, vm.VM, maxTxPoolSize, vm.warpAuth)
+		txpool, err := txpool.New(snowCtx, vm.chainConfig, vm.pending, vm.VM, maxTxPoolSize, userConfig.HelperAddress)
 		if err != nil {
 			return fmt.Errorf("creating txpool: %w", err)
 		}

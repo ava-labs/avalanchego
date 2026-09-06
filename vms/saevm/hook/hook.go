@@ -114,8 +114,9 @@ type BlockBuilder[T Transaction] interface {
 	// would be valid to include into a block.
 	//
 	// The header of the block being built, the hash of the last block to
-	// settle, and a block source are provided to allow end of block ops to be
-	// filtered based on the worst-case queue.
+	// settle, its post-execution state, and a block source are provided to
+	// filter operations. The state excludes all unsettled blocks, regardless
+	// of the node's local execution progress.
 	//
 	// SAE will filter any transactions whose [Op] can not be safely applied to
 	// the state.
@@ -123,6 +124,7 @@ type BlockBuilder[T Transaction] interface {
 		ctx context.Context,
 		header *types.Header,
 		lastSettledBlock common.Hash,
+		settledState libevm.StateReader,
 		source saetypes.BlockSource,
 	) iter.Seq[T]
 	// BuildBlock constructs a block with the given components. The header

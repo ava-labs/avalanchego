@@ -12,7 +12,9 @@ import (
 	"iter"
 	"slices"
 	"sync"
+	"time"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
@@ -61,9 +63,7 @@ type Txpool struct {
 	stateLock     sync.Mutex
 	state         libevm.StateReader
 
-	// warpAuth is the liveness pre-check for warp credentials; the block
-	// builder enforces the settled height.
-	warpAuth tx.WarpAuth
+	helper common.Address
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -79,7 +79,7 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
-	warpAuth tx.WarpAuth,
+	helper common.Address,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
@@ -106,7 +106,7 @@ func New(
 		maxSize: maxSize,
 		state:   state,
 
-		warpAuth: warpAuth,
+		helper: helper,
 	}
 	p.wg.Go(func() {
 		p.updateState(chainConfig, chain, executed)
@@ -223,11 +223,8 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	p.executionLock.RLock()
 	defer p.executionLock.RUnlock()
 
-	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory, p.warpAuth); err != nil {
-		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
-	}
-	if err := p.verifyOp(t.op); err != nil {
-		return fmt.Errorf("%w: %w", errVerifyState, err)
+	if err := p.verifyState(tx, t.op); err != nil {
+		return err
 	}
 
 	p.lock.Lock()
@@ -265,13 +262,24 @@ func (p *Txpool) Close() {
 	p.wg.Wait()
 }
 
-func (p *Txpool) verifyOp(op hook.Op) error {
+func (p *Txpool) verifyState(t *tx.Tx, op hook.Op) error {
 	// [libevm.StateReader] is not thread-safe, we must lock it even for
 	// read-only operations.
 	p.stateLock.Lock()
 	defer p.stateLock.Unlock()
 
-	return verifyOp(p.state, op)
+	auth := &tx.ImportAuth{
+		State:     p.state,
+		Helper:    p.helper,
+		Timestamp: uint64(time.Now().Unix()), //#nosec G115 -- Known non-negative
+	}
+	if err := t.VerifyCredentials(p.snowCtx.SharedMemory, auth); err != nil {
+		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
+	}
+	if err := verifyOp(p.state, op); err != nil {
+		return fmt.Errorf("%w: %w", errVerifyState, err)
+	}
+	return nil
 }
 
 // inputUTXOs returns the union of all UTXO IDs consumed by transactions in b,

@@ -23,6 +23,7 @@ go_library(
         "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
+        "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",

@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -21,11 +22,53 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
+
+func TestHelperExportLogFilter(t *testing.T) {
+	helper, owner := common.Address{1}, ids.ShortID{2}
+	call, err := payload.NewAddressedCall(helper[:], binary.BigEndian.AppendUint64(owner[:], 42))
+	require.NoError(t, err)
+	msg, err := avalanchewarp.NewUnsignedMessage(1, ids.GenerateTestID(), call.Bytes())
+	require.NoError(t, err)
+	topics, data, err := corethwarp.PackSendWarpMessageEvent(helper, common.Hash(msg.ID()), msg.Bytes())
+	require.NoError(t, err)
+	h := &hooks{builder: builder{helper: helper}}
+	for _, tt := range []struct {
+		name   string
+		mutate func(*types.Log, *types.Receipt)
+		want   int
+	}{
+		{name: "valid", want: 1},
+		{name: "wrong precompile", mutate: func(l *types.Log, _ *types.Receipt) { l.Address = helper }},
+		{name: "wrong event", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics[0] = common.Hash{} }},
+		{name: "wrong helper", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics[1] = common.Hash{} }},
+		{name: "missing topic", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics = l.Topics[:2] }},
+		{name: "reverted", mutate: func(_ *types.Log, r *types.Receipt) { r.Status = types.ReceiptStatusFailed }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &types.Log{Address: corethwarp.ContractAddress, Topics: append([]common.Hash{}, topics...), Data: data}
+			r := &types.Receipt{Status: types.ReceiptStatusSuccessful, Logs: []*types.Log{l}}
+			if tt.mutate != nil {
+				tt.mutate(l, r)
+			}
+			exports, err := h.exports(types.Receipts{r})
+			require.NoError(t, err)
+			require.Len(t, exports, tt.want)
+			if tt.want == 1 {
+				require.Equal(t, owner, exports[0].owner)
+				require.Equal(t, uint64(42), exports[0].amount)
+			}
+		})
+	}
+}
 
 func TestDelayExponent(t *testing.T) {
 	tests := []struct {
@@ -152,7 +195,7 @@ func TestAncestorInputIDs(t *testing.T) {
 				return nil, false
 			}
 
-			got, _, err := ancestorInputIDs(tt.header, tt.settled, source)
+			got, err := ancestorInputIDs(tt.header, tt.settled, source)
 			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})

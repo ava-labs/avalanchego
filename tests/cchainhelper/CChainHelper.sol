@@ -7,8 +7,8 @@ interface IWarpMessenger {
 }
 
 /// Moves AVAX between the C-chain and the P-chain for any EVM wallet with
-/// ordinary EVM transactions. The C-chain trusts this contract's address to
-/// name msg.sender in the warp messages it emits; nothing here holds a key.
+/// ordinary EVM transactions. The C-chain trusts this contract to bind import
+/// approvals and export messages to the caller.
 contract CChainHelper {
     IWarpMessenger private constant WARP = IWarpMessenger(0x0200000000000000000000000000000000000005);
 
@@ -19,6 +19,11 @@ contract CChainHelper {
 
     uint32 public immutable networkID;
     bytes32 public immutable avaxAssetID;
+
+    // Consensus reads this mapping directly. Keep it at storage slot 0.
+    mapping(bytes32 => bool) public authorized;
+
+    event ImportAuthorized(bytes32 indexed importHash, bytes unsignedTx);
 
     struct UTXO {
         bytes32 txID;
@@ -39,15 +44,14 @@ contract CChainHelper {
     /// reads the warp log (to || nAVAX), debits this contract and writes the
     /// UTXO into shared memory.
     function exportToP(address to) external payable returns (bytes32) {
-        if (msg.value == 0 || msg.value % 1e9 != 0) revert BadAmount();
+        if (msg.value == 0 || msg.value % 1e9 != 0 || msg.value / 1e9 > type(uint64).max) revert BadAmount();
         return WARP.sendWarpMessage(abi.encodePacked(to, uint64(msg.value / 1e9)));
     }
 
-    /// Imports [imported], UTXOs owned by msg.sender waiting in shared memory
-    /// from the P-chain, into msg.sender's C-chain balance; [fee] nAVAX is
-    /// burned. Emits the exact C-chain ImportTx bytes prefixed with
-    /// msg.sender and the emission height; anyone may then issue that tx with
-    /// this message as its credential. Callers pass [imported] sorted.
+    /// Authorizes an import of [imported] to msg.sender with [fee] nAVAX burned.
+    /// Anyone can submit the emitted ImportTx bytes with empty credentials.
+    /// The atomic verifier checks ownership and availability of the UTXOs.
+    /// Callers pass [imported] sorted. This call does not complete the import.
     function importFromP(UTXO[] calldata imported, uint64 fee) external returns (bytes32) {
         uint64 total;
         bytes memory ins = abi.encodePacked(uint32(imported.length));
@@ -62,7 +66,10 @@ contract CChainHelper {
         bytes memory tx_ = abi.encodePacked(
             CODEC_VERSION, C_TYPE_IMPORT, networkID, WARP.getBlockchainID(), bytes32(0), ins, uint32(1), msg.sender, total - fee, avaxAssetID
         );
-        return WARP.sendWarpMessage(abi.encodePacked(msg.sender, uint64(block.number), tx_));
+        bytes32 importHash = keccak256(tx_);
+        authorized[importHash] = true;
+        emit ImportAuthorized(importHash, tx_);
+        return importHash;
     }
 
     function before(UTXO calldata a, UTXO calldata b) private pure returns (bool) {

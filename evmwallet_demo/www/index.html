@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
-  <p>You call <code>importFromP(utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact C-chain ImportTx bytes inside the EVM and emits them as a warp message prefixed with <code>msg.sender</code>. Then anyone issues that ImportTx with the message as its credential, here you with one button. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/warp_credential.go" target="_blank">accepts</a> it because the message is in its own warp store, was emitted by the trusted contract at or below the settled height, names you as the owner of every UTXO, and carries exactly these tx bytes. Nothing moves unless you signed the call that asked for it, and no P-chain wallet needs to change anything.</p>
+  <p>You call <code>importFromP(utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact ImportTx, fixes you as its recipient, and stores approval of its hash. This page then submits those bytes with an empty marker credential for each input. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/contract_credential.go" target="_blank">verifier</a> checks the approval in settled EVM state and checks the UTXOs. Anyone can relay the same import, but cannot change your inputs, recipient, or fee. The EVM receipt confirms approval. The later atomic transaction completes the import.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C with your EVM wallet</button></div>
@@ -131,7 +131,7 @@
 
 <section class="gated" hidden>
   <h2>Messages emitted by the contract</h2>
-  <p class="note">Every export is one 28-byte warp log (P-chain owner and amount); every import request is one log carrying your address and the full ImportTx bytes. Decoded from the C-chain logs of the warp precompile, the last 2,000 blocks. Yours are highlighted.</p>
+  <p class="note">Exports use Warp logs with the P-chain owner and amount. Import approvals use ordinary helper events with the hash and unsigned ImportTx. These are the last 2,000 blocks. Yours are highlighted.</p>
   <div id="activity" class="empty">&ndash;</div>
 </section>
 
@@ -143,7 +143,7 @@ const WARP_PRECOMPILE = '0x0200000000000000000000000000000000000005';
 const NAVAX = 1000000000n;
 const PFEE = 10000000n;    // 0.01 AVAX burned on P-chain txs
 const CFEE = 1000000n;     // 0.001 AVAX burned by the C-chain import, chosen by you in the contract call
-const CRED_TYPE_WARP = 10;  // tx.WarpCredential type ID in the SAE C-chain codec
+const CRED_TYPE_CONTRACT = 10;  // tx.ContractCredential type ID in the prototype codec
 const P_TYPE_IMPORT = 17, P_TYPE_EXPORT = 18, TYPE_TRANSFER_INPUT = 5, TYPE_TRANSFER_OUTPUT = 7, TYPE_CREDENTIAL = 9;
 const C_TYPE_IMPORT = 0;   // vms/saevm/cchain/tx codec
 let NET = null;            // /network.json
@@ -157,6 +157,7 @@ document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
 const iface = new ethers.Interface([
   'function exportToP(address to) payable returns (bytes32)',
   'function importFromP((bytes32 txID,uint32 outputIndex,uint64 amount)[] imported, uint64 fee) returns (bytes32)',
+  'event ImportAuthorized(bytes32 indexed importHash, bytes unsignedTx)',
 ]);
 
 // ---- bech32 (BIP-173) ----
@@ -287,17 +288,31 @@ function decodeExport(dataHex) {
   let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
   const inner = b.slice(p);
   const dv = new DataView(inner.buffer, inner.byteOffset);
-  if (inner.length === 28) return { kind: 'export to P', owner: pAddr(inner.slice(0, 20)), amount: dv.getBigUint64(20), mine: pAddr(inner.slice(0, 20)) === NET.pAddress };
-  const owner = toHex(inner.slice(0, 20));
-  return { kind: 'import from P (' + (inner.length - 28) + '-byte ImportTx)', owner, amount: null, mine: me && owner.toLowerCase() === me.toLowerCase() };
+  if (inner.length !== 28) throw new Error('not an export message');
+  return { kind: 'export to P', owner: pAddr(inner.slice(0, 20)), amount: dv.getBigUint64(20), mine: pAddr(inner.slice(0, 20)) === NET.pAddress };
+}
+function decodeImport(l) {
+  const e = iface.parseLog(l);
+  const unsigned = hexBytes(e.args.unsignedTx);
+  if (ethers.keccak256(unsigned) !== e.args.importHash) throw new Error('import hash mismatch');
+  // The helper emits one output: address(20), amount(8), assetID(32).
+  const owner = toHex(unsigned.slice(-60, -40));
+  const amount = new DataView(unsigned.buffer, unsigned.byteOffset).getBigUint64(unsigned.length - 40);
+  return { kind: 'import approval', id: e.args.importHash, unsigned, owner, amount, mine: me && owner.toLowerCase() === me.toLowerCase() };
 }
 async function refreshActivity() {
   if (!NET) return;
   const latest = parseInt(await rpc('/ext/bc/C/rpc', 'eth_blockNumber', []), 16);
-  const logs = await rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ address: WARP_PRECOMPILE, fromBlock: '0x' + Math.max(0, latest - 2000).toString(16), toBlock: 'latest',
-    topics: [ethers.id('SendWarpMessage(address,bytes32,bytes)'), ethers.zeroPadValue(NET.helper, 32)] }]);
+  const range = { fromBlock: '0x' + Math.max(0, latest - 2000).toString(16), toBlock: 'latest' };
+  const batches = await Promise.all([
+    rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ ...range, address: WARP_PRECOMPILE,
+      topics: [ethers.id('SendWarpMessage(address,bytes32,bytes)'), ethers.zeroPadValue(NET.helper, 32)] }]),
+    rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ ...range, address: NET.helper,
+      topics: [iface.getEvent('ImportAuthorized').topicHash] }]),
+  ]);
+  const logs = batches.flat().sort((a, b) => parseInt(a.blockNumber, 16) - parseInt(b.blockNumber, 16) || parseInt(a.logIndex, 16) - parseInt(b.logIndex, 16));
   const rows = logs.slice(-25).reverse().map(l => {
-    let d; try { d = decodeExport(l.data); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', '', short(l.topics[2])] }; }
+    let d; try { d = l.address.toLowerCase() === WARP_PRECOMPILE ? decodeExport(l.data) : decodeImport(l); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', '', short(l.transactionHash)] }; }
     return { mine: d.mine, cells: [parseInt(l.blockNumber, 16), d.kind, d.amount === null ? '' : avax(d.amount) + ' AVAX', d.owner, short(l.transactionHash)] };
   });
   fill('activity', table(['C block', 'message', 'amount', 'owner', 'C-chain tx'], rows), 'no messages in the last 2,000 blocks');
@@ -396,22 +411,14 @@ function pExportTx(utxos, amt, evmAddr20) {
   return concat(pHeader(P_TYPE_EXPORT), list(change > 0n ? [transferOut(change, 0n, pAddrBytes)] : []), list(utxos.map(u => transferIn(u, [0]))), u32(0),
     cChainID(), list([transferOut(amt, 0n, evmAddr20)]));
 }
-// Warp message from the receipt: the helper's SendWarpMessage log, decoded to {id, unsigned bytes}.
-function messageFromReceipt(receipt) {
-  const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE && l.topics[1] && l.topics[1].slice(-40).toLowerCase() === NET.helper.slice(2).toLowerCase());
-  if (!l) throw new Error('no warp message in the receipt');
-  const [msg] = ethers.AbiCoder.defaultAbiCoder().decode(['bytes'], l.data);
-  return { id: l.topics[2], unsigned: hexBytes(msg) };
+function importFromReceipt(receipt) {
+  const l = receipt.logs.find(l => l.address.toLowerCase() === NET.helper.toLowerCase() && l.topics[0] === iface.getEvent('ImportAuthorized').topicHash);
+  if (!l) throw new Error('no import approval in the receipt');
+  return decodeImport(l);
 }
-// The tx bytes ride inside the message payload after owner (20) || height (8):
-// warp: codec(2) networkID(4) sourceChainID(32) payloadLen(4) | addressed call: codec(2) typeID(4) addrLen(4) addr payloadLen(4) payload
-function txBytesFromMessage(b) {
-  let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
-  return b.slice(p + 28);
-}
-// Signed tx = unsigned bytes || numCreds || numCreds x (typeID || len || message)
-function warpSignedTx(txBytes, numCreds, msgBytes) {
-  const cred = concat(u32(CRED_TYPE_WARP), u32(msgBytes.length), msgBytes);
+// Atomic tx = unsigned bytes || numCreds || numCreds x typeID. No payload.
+function contractImportTx(txBytes, numCreds) {
+  const cred = u32(CRED_TYPE_CONTRACT);
   return concat(txBytes, u32(numCreds), ...Array(numCreds).fill(cred));
 }
 function pickInputs(utxos, need) {
@@ -500,19 +507,20 @@ async function importOnC() {
   const utxos = await getCUTXOs();
   if (!utxos.length) throw new Error('no UTXOs waiting in shared memory for ' + me);
   const st = stepper(['Your EVM wallet sends one contract call', 'Issue the ImportTx to the C-chain']);
-  st.active(0, 'importFromP(' + utxos.length + ' UTXO(s), fee ' + avax(CFEE) + ' AVAX). The wallet shows the UTXO references and the fee. The contract builds the exact ImportTx bytes and emits them as a warp message with your address in front.');
+  st.active(0, 'importFromP(' + utxos.length + ' UTXO(s), fee ' + avax(CFEE) + ' AVAX). The contract stores approval of the exact ImportTx hash, including your inputs, recipient, and fee.');
   const receipt = await sendTx(iface.encodeFunctionData('importFromP', [utxos.map(u => [u.txID, u.outputIndex, u.amount]), CFEE]));
-  const m = messageFromReceipt(receipt);
-  const txBytes = txBytesFromMessage(m.unsigned);
-  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + ' emitted warp message ' + short(m.id) + ': owner ' + me + ', ' + txBytes.length + ' bytes of ImportTx. Only your signed call could have produced it.');
-  st.active(1, 'The message goes into every credential slot of the ImportTx (' + utxos.length + '). No BLS, no signature: the chain checks its own warp store for the message.', ['Issue ImportTx to C', async () => {
-    const before = await cBalance();
-    const bytes = warpSignedTx(txBytes, utxos.length, m.unsigned);
-    const r = await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
-    st.done(1, 'C-chain accepted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes). Waiting for the balance...');
-    const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-    st.append(1, 'C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
-  }]);
+  const approval = importFromReceipt(receipt);
+  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' approved import hash ' + short(approval.id) + '. This receipt confirms approval, not completion.');
+  st.active(1, 'This page submits the import without another signature. The chain checks the approval in settled EVM state.');
+  const before = await cBalance();
+  const bytes = contractImportTx(approval.unsigned, utxos.length);
+  const r = await poll(async () => {
+    try { return await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' }); }
+    catch (e) { if (e.message.includes('import not authorized in helper storage')) return null; throw e; }
+  }, 'approval to reach the atomic pool');
+  st.append(1, 'Submitted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes). Waiting for execution...');
+  const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
+  st.done(1, 'ImportTx ' + r.txID + ' completed. C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
 }
 
 // ---- boot ----

@@ -72,7 +72,7 @@ func main() {
 	network.DefaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 	network.PreFundedKeys = []*secp256k1.PrivateKey{key}
 	network.PrimaryChainConfigs = map[string]tmpnet.ConfigMap{
-		"C": {"helper-addresses": []string{helper.Hex()}},
+		"C": {"helper-address": helper.Hex()},
 	}
 	network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
 		Process: &tmpnet.ProcessRuntimeConfig{AvalancheGoPath: avagoPath},
