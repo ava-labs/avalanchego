@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -28,7 +27,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -59,10 +57,10 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(
 		m,
 		goleak.IgnoreCurrent(),
-		// Despite the call to [snapshot.Tree.Disable] in [Executor.Close], this
-		// still leaks at shutdown. This is acceptable as we only ever have one
-		// [Executor], which we expect to be running for the entire life of the
-		// process.
+		// Despite the call to [snapshot.Tree.Release] in [saedb.Tracker.Close],
+		// this still leaks at shutdown. This is acceptable as we only ever have
+		// one [Executor], which we expect to be running for the entire life of
+		// the process.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
 	)
 }
@@ -143,7 +141,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
-	closeOnce := sync.OnceValue(e.Close)
+	closeOnce := sync.OnceValue(func() error {
+		e.Close()
+		return tr.Close(e.LastExecuted().PostExecutionStateRoot())
+	})
 	tb.Cleanup(func() {
 		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
@@ -1022,51 +1023,6 @@ func (e *blockNumSaver) store(h *types.Header) {
 	e.num = new(big.Int).Set(h.Number)
 }
 
-func TestSnapshotPersistence(t *testing.T) {
-	ctx, sut := newSUT(t)
-
-	e, chain, wallet := sut.Executor, sut.chain, sut.wallet
-
-	const n = 10
-	for range n {
-		b := chain.NewBlock(t, types.Transactions{
-			wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
-	}
-	last := chain.Last()
-	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
-
-	require.NoErrorf(t, e.Close(), "%T.Close()", e)
-	// [newSUT] creates a cleanup that also calls [Executor.Close], which isn't
-	// valid usage. The simplest workaround is to just replace the quit channel
-	// so it can be closed again.
-	e.quit = make(chan struct{})
-
-	// The crux of the test is whether we can recover the EOA nonce using only a
-	// new set of snapshots, recovered from the databases.
-	conf := snapshot.Config{
-		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
-		NoBuild:   true, // i.e. MUST be loaded from disk
-	}
-	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
-	require.NoError(t, err, "snapshot.New(..., [post-execution state root of last-executed block])")
-	snap := snaps.Snapshot(last.PostExecutionStateRoot())
-	require.NotNilf(t, snap, "%T.Snapshot([post-execution state root of last-executed block])", snaps)
-
-	t.Run("snap.Account(EOA)", func(t *testing.T) {
-		eoa := wallet.Addresses()[0]
-		got, err := snap.Account(crypto.Keccak256Hash(eoa.Bytes()))
-		require.NoError(t, err)
-		require.NotNil(t, got) // yes, this is still possible with nil error
-		require.Equalf(t, uint64(n), got.Nonce, "%T.Nonce", got)
-	})
-}
-
 func missingTrieNodeError(root common.Hash) testerr.Want {
 	return testerr.As(func(got *trie.MissingNodeError) string {
 		if got.NodeHash != root {
@@ -1076,12 +1032,19 @@ func missingTrieNodeError(root common.Hash) testerr.Want {
 	})
 }
 
-// TestHashDBStateRootAvailability ensures the ability to dereference recent
-// states explicitly when no longer needed. This is not needed for Firewood,
-// which does this automatically, and any archival node, which never prunes.
+// TestHashDBStateRootAvailability checks that untracking a state prunes it from
+// memory unless the snapshot still retains it, and that tracked states remain
+// available. This is not needed for Firewood, which prunes automatically, nor
+// any archival node, which never prunes.
 func TestHashDBStateRootAvailability(t *testing.T) {
+	// Blocks form three contiguous sections by height, distinguished by whether
+	// their states are untracked below and whether they fall inside the
+	// snapshot's retention window of the last [core.TriesInMemory] states.
 	const (
-		numBlocks      = 10
+		numPruned      = 10                               // untracked, outside the window
+		numRetained    = 10                               // untracked, inside the window
+		numTracked     = core.TriesInMemory - numRetained // tracked, inside the window
+		numBlocks      = numPruned + numRetained + numTracked
 		commitInterval = 2 * numBlocks // guarantee no states are committed
 	)
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
@@ -1133,12 +1096,11 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 	})
 
 	t.Run("remove in memory state", func(t *testing.T) {
-		const numToDrop = 10
-		for _, b := range chain.AllBlocks()[:numToDrop] {
+		for _, b := range chain.AllExceptGenesis()[:numPruned+numRetained] {
 			e.Untrack(b.PostExecutionStateRoot())
 		}
 		checkStates(t, e, func(height uint64) bool {
-			return height >= numToDrop
+			return height > numPruned
 		})
 	})
 }
@@ -1172,10 +1134,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: true,
 			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available.
-				// The last executed state MUST NOT be available, since
-				// Firewood guarantees recovery from the last committed proposal.
-				return height < numBlocks
+				// All settled states MUST be available, as MUST the state
+				// committed at shutdown.
+				return height <= numBlocks
 			},
 		},
 		{
@@ -1183,8 +1144,8 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: false,
 			expectAvailable: func(height uint64) bool {
-				// Only the last settled state should be available.
-				return height == numBlocks-1
+				// Only the state committed at shutdown should be available.
+				return height == numBlocks
 			},
 		},
 		{
@@ -1195,6 +1156,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				switch {
 				case saedb.ShouldCommitTrieDB(height+1, commitInterval):
 					// in this test, each block settles the previous
+					return true
+				case height == numBlocks:
+					// state committed at shutdown
 					return true
 				case height == 0:
 					// genesis state
@@ -1242,7 +1206,8 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
-					require.NoErrorf(t, e.Close(), "%T.Close()", e)
+					e.Close()
+					require.NoErrorf(t, tr.Close(chain.Last().PostExecutionStateRoot()), "%T.Close()", tr)
 				})
 
 				for _, b := range chain.AllBlocks() {

@@ -9,7 +9,9 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Principles](#principles)
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
-  - [Keep Go CI in one workflow](#keep-go-ci-in-one-workflow)
+  - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
+  - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
@@ -55,31 +57,73 @@ For example, this workflow step runs the unit-test task:
   run: ./scripts/run_task.sh test-unit
 ```
 
-### Keep Go CI in one workflow
+### Keep Go CI unified
 
-The `Go` workflow, defined in [`ci.yml`](../.github/workflows/ci.yml), checks
-the Go modules for avalanchego, Coreth, EVM, and Subnet-EVM. These modules must
-remain available to downstream consumers through Go tooling. Do not add a
-separate pre-merge Go workflow for one of these modules. Add its job to
-`ci.yml`.
+Go CI checks the avalanchego, Coreth, EVM, and Subnet-EVM modules. These modules
+must remain available to downstream consumers through Go tooling.
 
-The `Bazel` workflow checks repository code that does not need this downstream
-Go-module interface. Keep Bazel checks out of `ci.yml`.
+Use one task to run unit tests for all four modules. Do not add a unit-test job
+for one module. Add each tested module to the Go workspace. Update package
+selection in [`scripts/tests.unit.sh`](../scripts/tests.unit.sh) when necessary.
 
-This split keeps the Go-module test policy in one place. A change to runners,
-caches, test selection, race detection, or test shuffling can then apply to
-every Go module. The workflow has one required job. It checks every enabled
-job.
+The pre-merge and scheduled entrypoints select runners and platforms. Keep
+shared unit-test policy in the reusable workflows. This structure applies
+changes to test selection, race detection, and test shuffling across all Go
+modules.
 
-Name a job `<check>-<component>`, such as `unit-avalanchego` or `lint-evm`.
-For a repository-wide check, omit the component. The aggregate job is an
-exception. Include the workflow name: `go-required`. This keeps the required
-check distinct in GitHub output. Matrix job names include `${{ matrix.os }}` so
-each platform check has a distinct name. Put `go-required` first. Sort all
-other job definitions and its `needs` list alphabetically.
+The `Bazel` workflow checks repository code that does not need the downstream
+Go-module interface. Keep Bazel checks out of the Go workflows.
 
-All jobs run for every event that starts the workflow. The `go-required` job
-fails if any job fails.
+Name a component-specific job `<check>-<component>`, such as `lint-evm`. Omit
+the component for a repository-wide check. The aggregate job is an exception.
+Include the workflow name in `go-required`. This name keeps the required check
+distinct in GitHub output.
+
+Put `go-required` first in the pre-merge workflow. Sort the other job
+definitions and its `needs` list alphabetically. The `go-required` job fails if
+an enabled job fails.
+
+### Go and Bazel CI workflow layout
+
+Go and Bazel use the same workflow roles and file-name pattern:
+
+| Role | Bazel | Go |
+| --- | --- | --- |
+| Pre-merge entrypoint | [`bazel-ci-pre-merge.yml`](../.github/workflows/bazel-ci-pre-merge.yml) | [`go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) |
+| Scheduled entrypoint | [`bazel-ci-scheduled.yml`](../.github/workflows/bazel-ci-scheduled.yml) | [`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml) |
+| Primary reusable workflow | [`bazel-ci.yml`](../.github/workflows/bazel-ci.yml) | [`go-ci.yml`](../.github/workflows/go-ci.yml) |
+| Reusable smoke workflow | [`bazel-ci-smoke.yml`](../.github/workflows/bazel-ci-smoke.yml) | [`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml) |
+
+Entrypoints select the reusable workflow that provides the required test policy,
+or define jobs that are specific to that event. The pre-merge and scheduled Go
+entrypoints both use `go-ci.yml`; pre-merge macOS uses `go-ci-smoke.yml`.
+
+Smoke workflows run a minimal macOS test. This test verifies that unit tests
+can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
+suite.
+
+### Go unit test platforms
+
+The `unit` job in `go-ci-pre-merge.yml` calls the reusable
+[`go-ci.yml`](../.github/workflows/go-ci.yml) workflow on Linux AMD64. It runs
+the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
+through the `test-unit` task. That task disables race detection and test
+shuffling so the Go build and test cache can serve repeated runs.
+
+On macOS, the `smoke` job calls
+[`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml). macOS runners are
+slower. They also fail more often because of external runner problems.
+Pre-merge CI therefore runs only a Go unit-test smoke test on macOS. This
+mirrors the macOS smoke job in Bazel CI. See [Test platforms and cache
+policy](./bazel.md#test-platforms-and-cache-policy).
+
+The `Scheduled Go` workflow runs the full unit suite on each platform. The
+workflow is defined in
+[`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml). It calls
+[`go-ci.yml`](../.github/workflows/go-ci.yml) for each platform. Only the Ubuntu
+24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
+and shuffled test order. The other scheduled jobs run `test-unit` to check
+platform compatibility without race detection or shuffled test order.
 
 ### Local composite actions define reusable GitHub Actions behavior
 
@@ -96,7 +140,7 @@ A composite action can:
 - run a command with monitoring
 
 For example, end-to-end jobs in
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) use
+[`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) use
 `run-monitored-tmpnet-cmd` to monitor a named task and collect its artifacts:
 
 ```yaml
