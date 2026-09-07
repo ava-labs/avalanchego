@@ -1,6 +1,8 @@
 # gazelle:ignore
 # Source library for blst - headers and C files for unity build
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "src",
     hdrs = glob(["*.h"]),

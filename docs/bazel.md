@@ -12,7 +12,7 @@ avalanchego monorepo.
   - [Toolchain Strategy](#toolchain-strategy)
   - [Version Pinning](#version-pinning)
   - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
-  - [Why Bazel 8?](#why-bazel-8)
+  - [Why Bazel 9?](#why-bazel-9)
   - [Multi-Module Structure](#multi-module-structure)
   - [Key Configuration Files](#key-configuration-files)
   - [BUILD.bazel Files with Custom Content](#buildbazel-files-with-custom-content)
@@ -172,16 +172,22 @@ important invariant is that Bazel CI can bootstrap repo tools and prefetch the
 external dependencies its jobs need without coupling that setup step to
 machine-specific workspace state.
 
-### Why Bazel 8?
+### Why Bazel 9?
 
-| Factor | Bazel 7 | Bazel 8 |
+| Factor | Bazel 8 | Bazel 9 |
 |--------|---------|---------|
-| bzlmod | Optional | Default |
-| LTS status | Older | Current |
-| WORKSPACE | Default | Deprecated (still works) |
+| bzlmod | Default | Only option |
+| LTS status | Previous | Current |
+| WORKSPACE | Deprecated (still works) | Removed |
+| C++ rules | Built in (autoloaded) | Must be loaded from `rules_cc` |
 
-Bazel 8 is the current LTS with native bzlmod support. bzlmod replaces
-the legacy use of WORKSPACE files.
+Bazel 9 is the current LTS. It removes WORKSPACE support entirely, so
+bzlmod is the only dependency mechanism, which this repo already uses.
+It also removes the native C++ rules and the autoload shim, so any BUILD
+file that uses `cc_library` or `cc_import` (including the patched BUILD
+files under `.bazel/patches/build_files/`) must load them explicitly
+from `@rules_cc//cc:defs.bzl`. `rules_cc` is declared as a `bazel_dep`
+in `MODULE.bazel` for this reason.
 
 ### Multi-Module Structure
 

@@ -1,6 +1,8 @@
 # gazelle:ignore
 # Header library for blst C bindings
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "bindings",
     hdrs = glob(["*.h"]),
