@@ -23,7 +23,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
+	github.com/arr4n/shed v0.0.0-20260907160111-1d80ceaf95df
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
 	github.com/ava-labs/libevm v1.13.15-0.20260903154605-2eaf73af626c

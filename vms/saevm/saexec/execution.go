@@ -62,18 +62,27 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 				zap.Int("queue_capacity", n),
 			)
 		}
+		// As it's concurrent, there's no perfect place to check for a
+		// processing error when enqueueing (nor is it strictly necessary as its
+		// exposed by [Executor.HealthCheck]), but this is the latest possible
+		// time.
+		if err := e.HealthCheck(); err != nil {
+			return err
+		}
 		return nil
 
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-e.done:
-		// `e.done` can also close due to [Executor.execute] errors.
-		return errExecutorClosed
+		return errors.Join(errExecutorClosed, e.HealthCheck())
 	}
 }
 
-func (e *Executor) processQueue() {
-	defer close(e.done)
+func (e *Executor) processQueue() (ret *Unhealthy) {
+	defer func() {
+		e.queueErr.Store(ret)
+		close(e.done)
+	}()
 
 	for qb := range e.queue {
 		block := qb.block
@@ -98,10 +107,14 @@ func (e *Executor) processQueue() {
 			)
 		}
 		if err != nil {
-			return
+			return &Unhealthy{
+				err:   err,
+				cause: block,
+			}
 		}
 		e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 	}
+	return nil
 }
 
 var errFatal = errors.New("fatal execution error")

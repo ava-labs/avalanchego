@@ -91,7 +91,7 @@ type SUT struct {
 	wallet *saetest.Wallet
 	db     ethdb.Database
 	hooks  *hookstest.Stub
-	logger *loggingtest.Logger
+	logger logging.Logger
 	sender *saetest.Sender
 
 	rpcClient *rpc.Client
@@ -105,15 +105,17 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		hooks       *hookstest.Stub
-		vmConfig    Config
-		logLevel    logging.Level
-		genesis     core.Genesis
-		db          database.Database
-		precompiles map[common.Address]libevm.PrecompiledContract
-		nodeID      ids.NodeID
-		validators  set.Set[ids.NodeID]
-		dataDir     string
+		hooks           *hookstest.Stub
+		vmConfig        Config
+		logger          logging.Logger
+		logLevel        logging.Level // ignored if logger is non-nil
+		genesis         core.Genesis
+		db              database.Database
+		precompiles     map[common.Address]libevm.PrecompiledContract
+		nodeID          ids.NodeID
+		validators      set.Set[ids.NodeID]
+		dataDir         string
+		wantShutdownErr testerr.Want
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -178,10 +180,19 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
 
-	logger := loggingtest.New(tb, conf.logLevel)
-	ctx := logger.CancelOnError(tb.Context())
+	ctx := tb.Context()
+	switch l := conf.logger.(type) {
+	case nil:
+		ll := loggingtest.New(tb, conf.logLevel)
+		conf.logger = ll
+		ctx = ll.CancelOnError(ctx)
+
+	case *loggingtest.Logger:
+		ctx = l.CancelOnError(ctx)
+	}
+
 	snowCtx := snowtest.Context(tb, chainID)
-	snowCtx.Log = logger
+	snowCtx.Log = conf.logger
 	snowCtx.ChainDataDir = conf.dataDir
 	snowCtx.NodeID = conf.nodeID
 	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
@@ -212,7 +223,9 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+		if diff := testerr.Diff(snow.Shutdown(ctx), conf.wantShutdownErr); diff != "" {
+			tb.Errorf("%T.Shutdown() %s", snow, diff)
+		}
 	})
 	tb.Cleanup(closeOnce)
 
@@ -231,7 +244,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		),
 		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
-		logger: logger,
+		logger: conf.logger,
 		sender: sender,
 
 		rpcClient: rpcClient,
@@ -360,13 +373,16 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 	h.Register(tb)
 }
 
-// context returns a [context.Context], derived from the [testing.TB], that is
-// cancelled if the SUT's default logger receives a log at [logging.Error] or
-// higher.
+// context returns a [context.Context], derived from the [testing.TB]. If the
+// SUT's default logger is a [loggingtest.Logger], the returned context is
+// cancelled if said logger receives a log at [logging.Error] or higher.
 //
 //nolint:thelper // Not a helper
 func (s *SUT) context(tb testing.TB) context.Context {
-	return s.logger.CancelOnError(tb.Context())
+	if l, ok := s.logger.(*loggingtest.Logger); ok {
+		return l.CancelOnError(tb.Context())
+	}
+	return tb.Context()
 }
 
 // mustSendTx guarantees all transactions are delivered to the mempool, which triggers

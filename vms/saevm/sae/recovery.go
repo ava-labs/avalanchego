@@ -182,10 +182,7 @@ func recoverExecutor(
 	if err != nil {
 		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
-	closers.Push(unwind.CloserFunc(func() error {
-		exec.Close()
-		return nil
-	}))
+	closers.Push(exec)
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
 		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)

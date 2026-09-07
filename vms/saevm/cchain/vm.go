@@ -359,6 +359,7 @@ var (
 )
 
 type stateDependent interface {
+	HealthCheck(context.Context) (any, error)
 	ParseBlock(context.Context, []byte) (*blocks.Block, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
@@ -370,6 +371,11 @@ func (vm *VM) activeHandler() stateDependent {
 		return vm.VM
 	}
 	return vm.Handler
+}
+
+// HealthCheck returns the current health status of the VM.
+func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
+	return vm.activeHandler().HealthCheck(ctx)
 }
 
 // ParseBlock parses a block from bytes.
