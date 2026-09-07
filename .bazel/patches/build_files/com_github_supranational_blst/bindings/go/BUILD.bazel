@@ -4,6 +4,7 @@
 # Compiler flags are derived from the CGO directives in blst.go:13-16.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 COPTS = [
     "-O2",

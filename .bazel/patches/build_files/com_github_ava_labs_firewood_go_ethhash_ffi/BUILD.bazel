@@ -1,5 +1,6 @@
 # gazelle:ignore
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 
 # Pre-built static library for firewood FFI
 cc_import(

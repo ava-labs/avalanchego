@@ -4,6 +4,8 @@
 # assembly.S is #include'd by cgo_assembly.S and in turn
 # #include's platform-specific assembly from elf/, coff/, mach-o/.
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "build_cc",
     hdrs = ["assembly.S"],

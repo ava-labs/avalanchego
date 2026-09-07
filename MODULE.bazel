@@ -8,6 +8,7 @@ bazel_dep(name = "gazelle", version = "0.54.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4")
+bazel_dep(name = "rules_cc", version = "0.2.22")
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
