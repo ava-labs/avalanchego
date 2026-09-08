@@ -13,12 +13,15 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 func TestUnmarshalConfig(t *testing.T) {
+	nodeID := ids.GenerateTestNodeID()
 	tests := []struct {
 		name        string
 		givenJSON   []byte
@@ -72,8 +75,8 @@ func TestUnmarshalConfig(t *testing.T) {
 		},
 		{
 			"state sync sources",
-			[]byte(`{"state-sync-ids": "NodeID-CaBYJ9kzHvrQFiYWowMkJGAQKGMJqZoat"}`),
-			Config{StateSyncIDs: "NodeID-CaBYJ9kzHvrQFiYWowMkJGAQKGMJqZoat"},
+			[]byte(fmt.Sprintf(`{"state-sync-ids": ["%s"]}`, nodeID)),
+			Config{StateSyncIDs: set.Of(nodeID)},
 			false,
 		},
 		{

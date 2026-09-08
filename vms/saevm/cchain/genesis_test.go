@@ -469,7 +469,7 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 	return c
 }
 
-func TestSetupGenesis(t *testing.T) {
+func TestWriteGenesis(t *testing.T) {
 	const emptyGenesis = `{
 		"config":{
 			"chainId":2
@@ -608,15 +608,13 @@ func TestSetupGenesis(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
-			trieConfig := triedb.HashDefaults
-
 			g, err := parseGenesis(
 				&snow.Context{NetworkUpgrades: tt.initial.upgrades},
 				[]byte(tt.initial.genesis),
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.setup(db, trieConfig), "%T.setup(initial)", g)
+			require.NoErrorf(t, g.verifyAndWriteBlock(db), "%T.verifyAndWriteBlock(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
@@ -645,9 +643,9 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.setup(db, trieConfig)
+			err = g.verifyAndWriteBlock(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
+				t.Fatalf("%T.verifyAndWriteBlock(restart) error (-want +got)\n%s", g, diff)
 			}
 			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
 			if tt.wantErr != nil {
@@ -663,4 +661,31 @@ func TestSetupGenesis(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWriteGenesisState ensures that the genesis changes are persisted to the
+// database.
+func TestWriteGenesisState(t *testing.T) {
+	genesis := avalanchegenesis.GetConfig(constants.MainnetID).CChainGenesis
+	ctx := &snow.Context{
+		NetworkUpgrades: upgrade.GetConfig(constants.MainnetID),
+	}
+
+	g, err := parseGenesis(ctx, []byte(genesis))
+	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
+
+	block, err := g.block()
+	require.NoErrorf(t, err, "%T.block()", g)
+	root := block.Root()
+
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	defer func() {
+		require.NoErrorf(t, tdb.Close(), "%T.Close()", tdb)
+	}()
+
+	require.Falsef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
+	_, err = g.writeState(db, tdb)
+	require.NoErrorf(t, err, "%T.writeState()", g)
+	require.Truef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
 }

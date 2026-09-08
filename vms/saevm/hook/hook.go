@@ -71,6 +71,10 @@ type Points interface {
 	// [BlockBuilder.BuildBlock] and MUST be the zero value for synchronously
 	// executed (pre-SAE) headers.
 	SettledBy(*types.Header) Settled
+	// VerifyBlockSyntax checks chain-specific syntactic invariants of a parsed
+	// block, beyond the universal invariants enforced by [blocks.Parse]. It
+	// MUST be stateless.
+	VerifyBlockSyntax(*types.Block) error
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -79,12 +83,18 @@ type Points interface {
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
-	// BeforeExecutingBlock is called immediately prior to executing the block;
-	// rules are those of the block and parent is the header of the block's
-	// parent.
-	BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
-	// AfterExecutingBlock is called immediately after executing the block.
-	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// StartExecutingBlock applies state changes before the block's transactions
+	// run. `rules` are those of the block and `parent` is the parent header. It
+	// runs during canonical and historical execution. It MUST NOT change data
+	// outside of the [state.StateDB].
+	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
+	// FinishExecutingBlock applies state changes after the block's transactions
+	// and end-of-block operations. It runs during canonical and historical
+	// execution. It MUST NOT change data outside of the [state.StateDB].
+	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
+	// AfterExecutingBlock runs only during canonical execution, before the VM
+	// commits the post-execution state.
+	AfterExecutingBlock(*types.Block, types.Receipts) error
 }
 
 // BlockBuilder constructs a block given its components.
@@ -227,8 +237,6 @@ func Synchronous(h Points, hdr *types.Header) bool {
 
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
-//
-// TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
 	s := h.SettledBy(settler)

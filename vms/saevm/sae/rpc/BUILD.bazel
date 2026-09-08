@@ -27,6 +27,7 @@ go_library(
     deps = [
         "//network/p2p",
         "//utils/logging",
+        "//utils/set",
         "//version",
         "//vms/saevm/blocks",
         "//vms/saevm/gasprice",

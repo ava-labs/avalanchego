@@ -140,17 +140,17 @@ func logTopOfStackAfter(tb testing.TB, code []byte) ([]byte, uint64, cmp.Options
 	}
 }
 
-// beforeExecutingBlockResult describes the before-block hook's inputs. The
-// hashes commit to every field of the parent header and block it receives, so a
-// faked or re-sealed one changes them. Balance counts the calls, which the
+// startExecutingBlockResult describes the start-executing-block hook's inputs.
+// The hashes commit to every field of the parent header and block it receives,
+// so a faked or re-sealed one changes them. Balance counts the calls, which the
 // hashes can't, as a hook applied twice records the same ones.
-type beforeExecutingBlockResult struct {
+type startExecutingBlockResult struct {
 	ParentHash common.Hash
 	BlockHash  common.Hash
 	Balance    *uint256.Int
 }
 
-func (r beforeExecutingBlockResult) Bytes() []byte {
+func (r startExecutingBlockResult) Bytes() []byte {
 	balance := r.Balance.Bytes32()
 	return slices.Concat(
 		r.ParentHash[:],
@@ -159,17 +159,17 @@ func (r beforeExecutingBlockResult) Bytes() []byte {
 	)
 }
 
-// Hex is the encoding of [beforeExecutingBlockResult.Bytes] that a caller sees
+// Hex is the encoding of [startExecutingBlockResult.Bytes] that a caller sees
 // in [logger.ExecutionResult.ReturnValue].
-func (r beforeExecutingBlockResult) Hex() string {
+func (r startExecutingBlockResult) Hex() string {
 	return common.Bytes2Hex(r.Bytes())
 }
 
-// withBeforeExecutingBlockPrecompile records each before-block hook call in the
-// precompile's own account, and registers a precompile returning the recorded
-// [beforeExecutingBlockResult]. No debug_trace* endpoint exposes the hook, so
-// returning its inputs as data is what makes them assertable.
-func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
+// withStartExecutingBlockPrecompile records each start-executing-block hook
+// call in the precompile's own account, and registers a precompile returning
+// the recorded [startExecutingBlockResult]. No debug_trace* endpoint exposes
+// the hook, so returning its inputs as data is what makes them assertable.
+func withStartExecutingBlockPrecompile(precompile common.Address) sutOption {
 	var (
 		parentHashSlot = common.Hash{0}
 		blockHashSlot  = common.Hash{1}
@@ -177,7 +177,7 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 	precompileOpt := withPrecompile(precompile, vm.NewStatefulPrecompile(
 		func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
 			sdb := env.ReadOnlyState()
-			result := beforeExecutingBlockResult{
+			result := startExecutingBlockResult{
 				ParentHash: sdb.GetState(precompile, parentHashSlot),
 				BlockHash:  sdb.GetState(precompile, blockHashSlot),
 				Balance:    sdb.GetBalance(precompile),
@@ -188,7 +188,7 @@ func withBeforeExecutingBlockPrecompile(precompile common.Address) sutOption {
 
 	return options.Func[sutConfig](func(c *sutConfig) {
 		precompileOpt.Configure(c)
-		c.hooks.BeforeExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
+		c.hooks.StartExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 			sdb.SetState(precompile, parentHashSlot, parent.Hash())
 			sdb.SetState(precompile, blockHashSlot, b.Hash())
 			// A non-empty account stops EIP-158 deleting the slots above, as
@@ -207,11 +207,11 @@ func TestDebugTrace(t *testing.T) {
 	// A controlled clock keeps the executed base fees reproducible.
 	timeOpt, clock := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompile := common.Address{'p', 'r', 'e', 'c', 'o', 'm', 'p'}
-	ctx, sut := newSUT(t, 1,
+	ctx, sut := newSUT(t, 2,
 		timeOpt,
 		// Using an increased base fee allows the fee to change during the test.
 		withGenesisBaseFee(params.GWei),
-		withBeforeExecutingBlockPrecompile(precompile),
+		withStartExecutingBlockPrecompile(precompile),
 	)
 	var (
 		sender = sut.wallet.Addresses()[0]
@@ -245,11 +245,11 @@ func TestDebugTrace(t *testing.T) {
 	// MUST be fast-forwarded to the traced block's time to reach its base fee.
 	clock.Advance(time.Second)
 
-	// The traced block reports what its before-block hook saw at index 0 and
-	// logs the base fee it replayed with at index 1.
+	// The traced block reports what its start-executing-block hook saw at index
+	// 0 and logs the base fee it replayed with at index 1.
 	precompileTx := callPrecompile()
 	logBaseFeeCode, logBaseFeePC, cmpBaseFeeLOG1 := logTopOfStackAfter(t, saetest.Ops(vm.BASEFEE))
-	baseFeeTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	baseFeeTx := sut.wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
 		GasFeeCap: gasPrice,
 		Gas:       1e6,
 		Data:      logBaseFeeCode,
@@ -279,8 +279,8 @@ func TestDebugTrace(t *testing.T) {
 
 	// precompileResult is what the precompile should return during the provided
 	// block's execution.
-	precompileResult := func(block *types.Block) beforeExecutingBlockResult {
-		return beforeExecutingBlockResult{
+	precompileResult := func(block *types.Block) startExecutingBlockResult {
+		return startExecutingBlockResult{
 			ParentHash: block.ParentHash(),
 			BlockHash:  block.Hash(),
 			Balance:    uint256.NewInt(block.NumberU64()),
@@ -373,8 +373,9 @@ func TestDebugTrace(t *testing.T) {
 					},
 				},
 				{
-					// debug_traceCall applies no before-block changes, so a result
-					// carrying the canonical child's would mean they leaked in.
+					// debug_traceCall applies no start-executing-block changes, so
+					// a result carrying the canonical child's would mean they
+					// leaked in.
 					name:   "call_on_parent",
 					method: "debug_traceCall",
 					args:   []any{callPrecompileArgs, rpc.BlockNumber(parent.NumberU64())}, // #nosec G115 -- block heights are small
@@ -674,7 +675,7 @@ func TestDebugIntermediateRoots(t *testing.T) {
 	require.Len(t, roots, numTxs, "one root per transaction")
 	assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
 	// This holds only because nothing modifies state after the last tx:
-	// hookstest.Stub.AfterExecutingBlock is a no-op and there are no
+	// hookstest.Stub.FinishExecutingBlock is a no-op and there are no
 	// end-of-block ops. Hooks that mutate post-transaction state (e.g.
 	// the C-Chain's) would break this!!
 	assert.Equal(t, block.PostExecutionStateRoot(), roots[numTxs-1], "last root is the block's post-execution root")

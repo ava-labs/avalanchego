@@ -102,18 +102,26 @@ type BlockOption = options.Option[blockProperties]
 func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 
-	props := options.ApplyTo(&blockProperties{}, opts...)
-	if props.logger == nil {
-		props.logger = loggingtest.New(tb, logging.Warn)
-	}
+	props := options.ApplyTo(&blockProperties{
+		logger: loggingtest.New(tb, logging.Warn),
+		hooks:  hookstest.NewStub(0),
+	}, opts...)
 
-	b, err := blocks.New(eth, parent, lastSettled, props.logger)
+	b, err := blocks.New(eth, parent, lastSettled, props.hooks, props.logger)
 	require.NoError(tb, err, "blocks.New()")
 	return b
 }
 
 type blockProperties struct {
+	hooks  hook.Points
 	logger logging.Logger
+}
+
+// WithHooks overrides the hooks passed to [blocks.New] by [NewBlock].
+func WithHooks(h hook.Points) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.hooks = h
+	})
 }
 
 // WithLogger overrides the logger passed to [blocks.New] by [NewBlock].
