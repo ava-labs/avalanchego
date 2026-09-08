@@ -178,6 +178,7 @@ func TestRecoveryLeavesPartialRecordSuffix(t *testing.T) {
 	require.NoError(t, os.Truncate(db.dataFilePath(0), int64(partialBlockEnd)))
 
 	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 0)
 	got, err := db.Get(0)
 	require.NoError(t, err)
 	require.Equal(t, firstBlock, got)
@@ -197,18 +198,19 @@ func TestRecoveryLeavesIndexedDataAfterChecksumMismatch(t *testing.T) {
 	malformedBlock := []byte("malformed block")
 	indexedBlock := []byte("indexed block")
 	db := newDatabase(t, DefaultConfig())
-	require.NoError(t, db.Put(10, checkpointBlock))
+	require.NoError(t, db.Put(2, checkpointBlock))
 	require.NoError(t, db.Put(3, malformedBlock))
 	require.NoError(t, db.Put(5, indexedBlock))
 	malformedEntry, err := db.readIndexEntry(3)
 	require.NoError(t, err)
-	checkpointEntry, err := db.readIndexEntry(10)
+	checkpointEntry, err := db.readIndexEntry(2)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 
 	checkpointOffset := checkpointEntry.Offset + uint64(sizeOfBlockEntryHeader) + uint64(checkpointEntry.Size)
-	// The later index entry remains usable even though recovery stops at height 3.
-	require.NoError(t, writeIndexFileHeader(db, 10, checkpointOffset))
+	// Keep the checkpoint max below height 5 to exercise max-height recovery.
+	require.NoError(t, writeIndexFileHeader(db, 2, checkpointOffset))
+	require.NoError(t, os.Truncate(db.indexFile.Name(), int64(sizeOfIndexFileHeader+7*sizeOfIndexEntry)))
 	require.NoError(t, writeBlockHeader(db, int64(malformedEntry.Offset), blockEntryHeader{
 		Height:   3,
 		Size:     malformedEntry.Size,
@@ -217,11 +219,19 @@ func TestRecoveryLeavesIndexedDataAfterChecksumMismatch(t *testing.T) {
 	}))
 
 	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 5)
 	got, err := db.Get(5)
 	require.NoError(t, err)
 	require.Equal(t, indexedBlock, got)
 	_, err = db.Get(3)
 	require.ErrorIs(t, err, ErrCorrupted)
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 5)
+	got, err = db.Get(5)
+	require.NoError(t, err)
+	require.Equal(t, indexedBlock, got)
 
 	replacement := randomBlock(t)
 	// A later Put must append after the preserved suffix without overwriting height 5.

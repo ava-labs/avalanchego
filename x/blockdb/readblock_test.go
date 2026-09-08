@@ -302,14 +302,16 @@ func TestGetMissingDataFileDoesNotCreate(t *testing.T) {
 	require.NoError(t, db.Put(0, randomBlock(t)))
 
 	dataFilePath := db.dataFilePath(0)
+	missingDataFilePath := dataFilePath + ".missing"
 	// Force Get to reopen the missing file instead of reusing the cached handle.
 	db.fileCache.Flush()
-	require.NoError(t, os.Remove(dataFilePath))
+	require.NoError(t, os.Rename(dataFilePath, missingDataFilePath))
 
 	_, err := db.Get(0)
 	require.ErrorIs(t, err, ErrCorrupted)
 	_, err = os.Stat(dataFilePath)
 	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(missingDataFilePath, dataFilePath))
 	require.NoError(t, db.Close())
 }
 

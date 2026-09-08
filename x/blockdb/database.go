@@ -671,7 +671,12 @@ func (db *Database) persistIndexHeader() error {
 	if err != nil {
 		return err
 	}
-	checkpoint := max(dataEnd, db.header.NextWriteOffset)
+	// Do not checkpoint an index state that references missing data.
+	if dataEnd < db.header.NextWriteOffset {
+		return fmt.Errorf("%w: index checkpoint is ahead of physical data "+
+			"(physical data end: %d bytes, checkpoint: %d bytes)",
+			ErrCorrupted, dataEnd, db.header.NextWriteOffset)
+	}
 
 	// The index file must be fsync'd before the header is written to prevent
 	// a state where the header is persisted but the index entries it refers to
@@ -685,7 +690,7 @@ func (db *Database) persistIndexHeader() error {
 	header := db.header
 
 	// Update the header with the current state of the database.
-	header.NextWriteOffset = checkpoint
+	header.NextWriteOffset = dataEnd
 	header.MaxHeight = db.maxBlockHeight.Load()
 	headerBytes, err := header.MarshalBinary()
 	if err != nil {
@@ -699,7 +704,7 @@ func (db *Database) persistIndexHeader() error {
 			return fmt.Errorf("failed to sync checkpoint header: %w", err)
 		}
 	}
-	db.header.NextWriteOffset = checkpoint
+	db.header.NextWriteOffset = dataEnd
 	return nil
 }
 
@@ -876,6 +881,50 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 	}
 	// Append after recovered data and any malformed suffix left as an orphan.
 	db.nextDataReservationOffset.Store(currentScanOffset)
+	if badErr != nil {
+		// Valid entries past malformed data need a max-height update or Get
+		// short-circuits before reading them.
+		info, err := db.indexFile.Stat()
+		if err != nil {
+			return fmt.Errorf("recovery: failed to get index file stats: %w", err)
+		}
+		indexSize := uint64(info.Size())
+		if indexSize > sizeOfIndexFileHeader {
+			entryCount := (indexSize - sizeOfIndexFileHeader) / sizeOfIndexEntry
+			for entryCount > 0 {
+				entryCount--
+				height, err := safemath.Add(db.header.MinHeight, entryCount)
+				if err != nil {
+					return fmt.Errorf("recovery: %w: calculating max indexed height: %w", ErrCorrupted, err)
+				}
+				entry, err := db.readIndexEntry(height)
+				if errors.Is(err, database.ErrNotFound) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to read index entry at height %d: %w", height, err)
+				}
+				dataEnd, err := db.dataFileEndForOffset(entry.Offset)
+				if errors.Is(err, ErrCorrupted) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to get data end for indexed block %d: %w", height, err)
+				}
+				bh, _, err := db.readBlockAtOffset(entry.Offset, dataEnd, &entry.Size)
+				if errors.Is(err, ErrCorrupted) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to validate indexed block %d: %w", height, err)
+				}
+				if bh.Height == height {
+					db.updateBlockMaxHeight(height)
+					break
+				}
+			}
+		}
+	}
 
 	if err := db.persistIndexHeader(); err != nil {
 		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
