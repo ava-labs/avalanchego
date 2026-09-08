@@ -160,9 +160,8 @@ func (*StateSync) ID() string {
 }
 
 func (t *StateSync) Sync(ctx context.Context) error {
-	t.log.Info("syncing state",
-		zap.Stringer("root", t.root),
-	)
+	log := t.log.With(zap.Stringer("root", t.root))
+	log.Info("syncing state")
 
 	// Start the leaf syncer and storage trie producer.
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -184,7 +183,7 @@ func (t *StateSync) Sync(ctx context.Context) error {
 	if err := eg.Wait(); err != nil {
 		return err
 	}
-	t.log.Info("finished syncing state")
+	log.Info("finished syncing state")
 	return nil
 }
 
