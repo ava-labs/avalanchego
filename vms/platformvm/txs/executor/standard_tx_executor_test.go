@@ -5,13 +5,12 @@ package executor
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"math"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
