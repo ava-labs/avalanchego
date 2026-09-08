@@ -29,8 +29,26 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
-	initialize(bytes []byte) error
+	initialize(bytes []byte, millisecondTimestamps bool) error
 	verify(chainID ids.ID) error
+}
+
+// timestampToUnix encodes the block's int64 Timestamp field: historically
+// whole unix-seconds, unix-millis when the chain is configured for
+// millisecond timestamps; see subnets.Config.ProposerMillisecondTimestamps.
+func timestampToUnix(t time.Time, millisecondTimestamps bool) int64 {
+	if millisecondTimestamps {
+		return t.UnixMilli()
+	}
+	return t.Unix()
+}
+
+// unixToTimestamp decodes what [timestampToUnix] encodes.
+func unixToTimestamp(ts int64, millisecondTimestamps bool) time.Time {
+	if millisecondTimestamps {
+		return time.UnixMilli(ts)
+	}
+	return time.Unix(ts, 0)
 }
 
 type SignedBlock interface {
@@ -76,6 +94,7 @@ func (m *statelessBlockMetadata) initialize(
 	b *statelessUnsignedBlock,
 	sig []byte,
 	bytes []byte,
+	millisecondTimestamps bool,
 ) error {
 	m.bytes = bytes
 
@@ -86,7 +105,7 @@ func (m *statelessBlockMetadata) initialize(
 	unsignedBytes := bytes[:lenUnsignedBytes]
 	m.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	m.timestamp = time.Unix(b.Timestamp, 0)
+	m.timestamp = unixToTimestamp(b.Timestamp, millisecondTimestamps)
 	if len(b.Certificate) == 0 {
 		return nil
 	}
@@ -164,8 +183,8 @@ func (b *statelessBlock) Block() []byte {
 	return b.StatelessBlock.Block
 }
 
-func (b *statelessBlock) initialize(bytes []byte) error {
-	return b.statelessBlockMetadata.initialize(&b.StatelessBlock, b.Signature, bytes)
+func (b *statelessBlock) initialize(bytes []byte, millisecondTimestamps bool) error {
+	return b.statelessBlockMetadata.initialize(&b.StatelessBlock, b.Signature, bytes, millisecondTimestamps)
 }
 
 func (b *statelessBlock) verify(chainID ids.ID) error {
@@ -196,8 +215,8 @@ func (b *statelessGraniteBlock) PChainEpoch() Epoch {
 	return b.StatelessGraniteBlock.Epoch
 }
 
-func (b *statelessGraniteBlock) initialize(bytes []byte) error {
-	return b.statelessBlockMetadata.initialize(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, bytes)
+func (b *statelessGraniteBlock) initialize(bytes []byte, millisecondTimestamps bool) error {
+	return b.statelessBlockMetadata.initialize(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, bytes, millisecondTimestamps)
 }
 
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {

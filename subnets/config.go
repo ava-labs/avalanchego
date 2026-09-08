@@ -15,10 +15,11 @@ import (
 
 const (
 	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
-	// "use the default". The floor is 1000ms because block timestamps are
-	// second-granular, so a sub-second window cannot advance the slot clock. The
+	// "use the default". The floor is 50ms: roughly the smallest window in which
+	// a proposer can build and propagate a block before its slot closes. Windows
+	// below 1s also require ProposerMillisecondTimestamps to have any effect. The
 	// ceiling is the default window, since a larger window only slows failover.
-	MinProposerWindowMilliseconds = 1_000
+	MinProposerWindowMilliseconds = 50
 	MaxProposerWindowMilliseconds = 5_000
 )
 
@@ -74,6 +75,18 @@ type Config struct {
 	// knob. Every validator of the Subnet's chains must use the same value or
 	// the Subnet loses liveness. The primary network (P/C/X) is unaffected.
 	ProposerWindowMilliseconds uint64 `json:"proposerWindowMilliseconds" yaml:"proposerWindowMilliseconds"`
+
+	// ProposerMillisecondTimestamps interprets the proposerVM wrapper block's
+	// timestamp as unix-milliseconds instead of unix-seconds, so that a
+	// sub-second ProposerWindowMilliseconds can actually advance the slot clock.
+	// Only meaningful alongside a sub-second proposer window.
+	//
+	// Invariant: this is a Subnet-wide consensus parameter, not a per-node knob.
+	// Every validator of the Subnet's chains must use the same value, and it must
+	// be fixed from genesis: enabling it on a chain that already has whole-second
+	// history misreads every old block. The primary network (P/C/X) is unaffected
+	// and always uses whole-second timestamps.
+	ProposerMillisecondTimestamps bool `json:"proposerMillisecondTimestamps" yaml:"proposerMillisecondTimestamps"`
 }
 
 func boolToInt(b bool) int {

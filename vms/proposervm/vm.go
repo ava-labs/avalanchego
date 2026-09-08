@@ -46,8 +46,8 @@ const (
 	httpPathEndpoint = "/proposervm"
 	HTTPHeaderRoute  = "proposervm"
 
-	// DefaultMinBlockDelay should be kept as whole seconds because block
-	// timestamps are only specific to the second.
+	// DefaultMinBlockDelay should be kept as whole seconds because the chains
+	// it applies to (P and X) use second-granular block timestamps.
 	DefaultMinBlockDelay = time.Second
 	// DefaultWindowDuration is the default proposer slot length.
 	DefaultWindowDuration = proposer.DefaultWindowDuration
@@ -158,11 +158,14 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer, vm.MillisecondTimestamps)
 	if err != nil {
 		return err
 	}
 	vm.State = baseState
+	if err := baseState.VerifyTimestampUnit(vm.MillisecondTimestamps); err != nil {
+		return err
+	}
 	if vm.WindowDuration <= 0 {
 		vm.WindowDuration = DefaultWindowDuration
 	}
@@ -487,6 +490,15 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}
 }
 
+// timestampGranularity is the truncation unit for locally-built block
+// timestamps.
+func (vm *VM) timestampGranularity() time.Duration {
+	if vm.MillisecondTimestamps {
+		return time.Millisecond
+	}
+	return time.Second
+}
+
 func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
@@ -520,7 +532,7 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 		nextStartTime    time.Time
 	)
 	if vm.Upgrades.IsDurangoActivated(parentTimestamp) {
-		currentTime := vm.Clock.Time().Truncate(time.Second)
+		currentTime := vm.Clock.Time().Truncate(vm.timestampGranularity())
 		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
 			childBlockHeight,
@@ -732,9 +744,9 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte, verifySignature 
 	)
 
 	if verifySignature {
-		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID)
+		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID, vm.MillisecondTimestamps)
 	} else {
-		statelessBlock, err = statelessblock.ParseWithoutVerification(b)
+		statelessBlock, err = statelessblock.ParseWithoutVerification(b, vm.MillisecondTimestamps)
 	}
 	if err != nil {
 		return nil, err

@@ -41,6 +41,10 @@ type blockState struct {
 	blkCache cache.Cacher[ids.ID, *blockWrapper]
 
 	db database.Database
+
+	// millisecondTimestamps determines how stored blocks' int64 timestamps are
+	// decoded; must match the value the blocks were written with.
+	millisecondTimestamps bool
 }
 
 type blockWrapper struct {
@@ -57,14 +61,15 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func NewBlockState(db database.Database) BlockState {
+func NewBlockState(db database.Database, millisecondTimestamps bool) BlockState {
 	return &blockState{
-		blkCache: lru.NewSizedCache(blockCacheSize, cachedBlockSize),
-		db:       db,
+		blkCache:              lru.NewSizedCache(blockCacheSize, cachedBlockSize),
+		db:                    db,
+		millisecondTimestamps: millisecondTimestamps,
 	}
 }
 
-func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer) (BlockState, error) {
+func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer, millisecondTimestamps bool) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
@@ -72,8 +77,9 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	)
 
 	return &blockState{
-		blkCache: blkCache,
-		db:       db,
+		blkCache:              blkCache,
+		db:                    db,
+		millisecondTimestamps: millisecondTimestamps,
 	}, err
 }
 
@@ -104,7 +110,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 	}
 
 	// The key was in the database
-	blk, err := block.ParseWithoutVerification(blkWrapper.Block)
+	blk, err := block.ParseWithoutVerification(blkWrapper.Block, s.millisecondTimestamps)
 	if err != nil {
 		return nil, err
 	}

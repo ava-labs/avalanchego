@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"connectrpc.com/connect"
 	"go.uber.org/zap"
@@ -150,7 +149,7 @@ func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 	}
 
 	timestamp := blk.Timestamp()
-	newTimestamp := vm.Time().Truncate(time.Second)
+	newTimestamp := vm.Time().Truncate(vm.timestampGranularity())
 	if newTimestamp.Before(timestamp) {
 		newTimestamp = timestamp
 	}

@@ -437,6 +437,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		0,
 		block.Epoch{},
 		coreOracleBlk.Bytes(),
+		false,
 	)
 	require.NoError(err)
 

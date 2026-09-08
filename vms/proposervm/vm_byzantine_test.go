@@ -327,6 +327,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		uint64(2000),
 		block.Epoch{},
 		yBlock.Bytes(),
+		false,
 	)
 	require.NoError(err)
 
