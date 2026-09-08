@@ -175,12 +175,15 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 
 C-Chain state sync does not work during and immediately after the Helicon transition. A node that is state syncing when Helicon activates stalls. Restart the node about an hour after activation to state sync again.
 
-After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `commit-interval` height. State sync has these limits:
+After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `commit-interval` height. On Mainnet and Fuji, a new node with state sync enabled starts on the SAE VM and state syncs from these summaries. State sync has these limits:
 
-- A node with an empty database starts on Coreth, which cannot parse the new summaries. The node bootstraps by executing all blocks.
-- `state-scheme` is `firewood`. The node logs a warning and does not state sync.
+- On custom networks, a new node starts on the pre-Helicon Coreth VM and bootstraps by executing all blocks.
+- If `state-scheme` is `firewood`, the node cannot state sync. A new Firewood node on Mainnet or Fuji MUST set `state-sync-enabled` to `false` or will shut down with a `FATAL` error.
 - A node that has accepted any block does not state sync.
-- The node cannot resume an interrupted state sync. It restarts from a new summary.
+- The node cannot resume an interrupted state sync. Instead, it restarts from a new summary.
+- Disabling state sync on a node that already started on the SAE VM shuts down with a `FATAL` error.
+
+A node that starts on the SAE VM never falls back to executing pre-Helicon blocks. To recover from either `FATAL` error, delete the C-Chain database and restart.
 
 ### Fixes
 
