@@ -1,8 +1,9 @@
 [
-  {"type":"function","name":"importUTXOs","stateMutability":"nonpayable","inputs":[{"name":"utxos","type":"tuple[]","internalType":"struct ICrossChainTransfer.UTXOID[]","components":[{"name":"txID","type":"bytes32"},{"name":"outputIndex","type":"uint32"}]}],"outputs":[]},
+  {"type":"function","name":"importUTXOs","stateMutability":"nonpayable","inputs":[{"name":"utxos","type":"tuple[]","internalType":"struct ICrossChainTransfer.UTXOID[]","components":[{"name":"txID","type":"bytes32"},{"name":"outputIndex","type":"uint32"}]},{"name":"to","type":"address"}],"outputs":[]},
+  {"type":"function","name":"importForOwners","stateMutability":"nonpayable","inputs":[{"name":"utxos","type":"tuple[]","internalType":"struct ICrossChainTransfer.UTXOID[]","components":[{"name":"txID","type":"bytes32"},{"name":"outputIndex","type":"uint32"}]}],"outputs":[]},
   {"type":"function","name":"setRemoteImport","stateMutability":"nonpayable","inputs":[{"name":"allowed","type":"bool"}],"outputs":[]},
   {"type":"function","name":"exportAVAX","stateMutability":"payable","inputs":[{"name":"destinationChainID","type":"bytes32"},{"name":"to","type":"address"}],"outputs":[]},
-  {"type":"event","name":"Imported","anonymous":false,"inputs":[{"name":"owner","type":"address","indexed":true},{"name":"txID","type":"bytes32","indexed":false},{"name":"outputIndex","type":"uint32","indexed":false},{"name":"amountNAVAX","type":"uint64","indexed":false}]},
+  {"type":"event","name":"Imported","anonymous":false,"inputs":[{"name":"recipient","type":"address","indexed":true},{"name":"txID","type":"bytes32","indexed":false},{"name":"outputIndex","type":"uint32","indexed":false},{"name":"amountNAVAX","type":"uint64","indexed":false}]},
   {"type":"event","name":"RemoteImportSet","anonymous":false,"inputs":[{"name":"owner","type":"address","indexed":true},{"name":"allowed","type":"bool","indexed":false}]},
   {"type":"event","name":"Exported","anonymous":false,"inputs":[{"name":"from","type":"address","indexed":true},{"name":"destinationChainID","type":"bytes32","indexed":true},{"name":"to","type":"address","indexed":false},{"name":"amountNAVAX","type":"uint64","indexed":false}]}
 ]

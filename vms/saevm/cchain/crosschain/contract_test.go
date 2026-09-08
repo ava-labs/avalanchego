@@ -21,12 +21,22 @@ func TestImportCalldataRoundTrip(t *testing.T) {
 	for i, u := range want {
 		args[i] = UTXOID{TxID: u.TxID, OutputIndex: u.OutputIndex}
 	}
-	data, err := ABI.Pack("importUTXOs", args)
+	data, err := ABI.Pack("importUTXOs", args, common.Address{7})
 	require.NoError(t, err)
 
 	got, ok := ImportCalldata(types.NewTx(&types.DynamicFeeTx{To: &ContractAddress, Data: data}))
 	require.True(t, ok)
 	require.Equal(t, want, got)
+
+	forOwners, err := ABI.Pack("importForOwners", args)
+	require.NoError(t, err)
+	got, ok = ImportCalldata(types.NewTx(&types.DynamicFeeTx{To: &ContractAddress, Data: forOwners}))
+	require.True(t, ok)
+	require.Equal(t, want, got)
+
+	_, to, err := unpackImportArgs(data[4:])
+	require.NoError(t, err)
+	require.Equal(t, common.Address{7}, to)
 
 	other := common.Address{1}
 	_, ok = ImportCalldata(types.NewTx(&types.DynamicFeeTx{To: &other, Data: data}))
@@ -62,5 +72,5 @@ func TestFromReceipts(t *testing.T) {
 		From: from, Destination: constants.PlatformChainID, To: ids.ShortID(to), Amount: 42,
 		UTXOID: avax.UTXOID{TxID: ids.ID(txHash), OutputIndex: 1},
 	}}, exports)
-	require.Equal(t, []Import{{Owner: to, UTXOID: utxoID}}, imports)
+	require.Equal(t, []Import{{Recipient: to, UTXOID: utxoID}}, imports)
 }

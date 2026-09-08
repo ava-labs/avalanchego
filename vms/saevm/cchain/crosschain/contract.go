@@ -45,7 +45,7 @@ var (
 	errNotDirectCall    = errors.New("importUTXOs must be called directly by the transaction sender")
 	errUnverifiedImport = errors.New("UTXO was not verified for this block")
 	errDuplicateUTXO    = errors.New("duplicate UTXO in import")
-	errNotOwner         = errors.New("caller is not the UTXO owner and the owner did not allow remote imports")
+	errNotOwner         = errors.New("caller is not the UTXO owner, or the owner did not allow remote imports")
 	errBadAmount        = errors.New("export value must be a positive whole number of nAVAX below 2^64")
 	errBadDestination   = errors.New("export destination must be the P-Chain or X-Chain")
 )
@@ -80,37 +80,62 @@ var resolver Resolver
 
 func SetResolver(r Resolver) { resolver = r }
 
-// ImportCalldata reports whether t is a direct importUTXOs call and returns
-// the UTXO IDs it names.
+// ImportCalldata reports whether t is a direct import call and returns the
+// UTXO IDs it names.
 func ImportCalldata(t *types.Transaction) ([]avax.UTXOID, bool) {
 	if to := t.To(); to == nil || *to != ContractAddress {
 		return nil, false
 	}
-	ids, err := unpackImport(t.Data())
-	return ids, err == nil
-}
-
-// unpackImport parses full calldata, selector included.
-func unpackImport(calldata []byte) ([]avax.UTXOID, error) {
-	method := ABI.Methods["importUTXOs"]
-	if len(calldata) < contract.SelectorLen || string(calldata[:contract.SelectorLen]) != string(method.ID) {
-		return nil, errors.New("not an importUTXOs call")
+	data := t.Data()
+	if len(data) < contract.SelectorLen {
+		return nil, false
 	}
-	return unpackImportArgs(calldata[contract.SelectorLen:])
+	var (
+		selector = string(data[:contract.SelectorLen])
+		args     = data[contract.SelectorLen:]
+		utxos    []avax.UTXOID
+		err      error
+	)
+	switch selector {
+	case string(ABI.Methods["importUTXOs"].ID):
+		utxos, _, err = unpackImportArgs(args)
+	case string(ABI.Methods["importForOwners"].ID):
+		utxos, err = unpackImportForOwnersArgs(args)
+	default:
+		return nil, false
+	}
+	return utxos, err == nil
 }
 
-// unpackImportArgs parses the arguments that follow the selector, which is
-// what the precompile framework hands to each function.
-func unpackImportArgs(args []byte) ([]avax.UTXOID, error) {
+type importArgs struct {
+	Utxos []UTXOID
+	To    common.Address
+}
+
+// unpackImportArgs parses importUTXOs arguments, selector excluded.
+func unpackImportArgs(args []byte) ([]avax.UTXOID, common.Address, error) {
+	var in importArgs
+	if err := ABI.UnpackInputIntoInterface(&in, "importUTXOs", args); err != nil {
+		return nil, common.Address{}, err
+	}
+	return toUTXOIDs(in.Utxos), in.To, nil
+}
+
+// unpackImportForOwnersArgs parses importForOwners arguments, selector excluded.
+func unpackImportForOwnersArgs(args []byte) ([]avax.UTXOID, error) {
 	var utxos []UTXOID
-	if err := ABI.UnpackInputIntoInterface(&utxos, "importUTXOs", args); err != nil {
+	if err := ABI.UnpackInputIntoInterface(&utxos, "importForOwners", args); err != nil {
 		return nil, err
 	}
+	return toUTXOIDs(utxos), nil
+}
+
+func toUTXOIDs(utxos []UTXOID) []avax.UTXOID {
 	out := make([]avax.UTXOID, len(utxos))
 	for i, u := range utxos {
 		out[i] = avax.UTXOID{TxID: ids.ID(u.TxID), OutputIndex: u.OutputIndex}
 	}
-	return out, nil
+	return out
 }
 
 // RemoteImportKey is the storage slot of owner's remote import flag.
@@ -118,7 +143,37 @@ func RemoteImportKey(owner common.Address) common.Hash {
 	return common.BytesToHash(owner[:])
 }
 
+// importUTXOs credits msg.sender's own UTXOs to `to`.
 func importUTXOs(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return runImport(accessibleState, caller, input, suppliedGas, readOnly, func(args []byte) ([]avax.UTXOID, common.Address, error) {
+		return unpackImportArgs(args)
+	}, func(owner common.Address, _ contract.StateDB) bool {
+		return owner == caller
+	})
+}
+
+// importForOwners credits each UTXO to its owner, if that owner allowed
+// remote imports. The caller only pays gas.
+func importForOwners(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return runImport(accessibleState, caller, input, suppliedGas, readOnly, func(args []byte) ([]avax.UTXOID, common.Address, error) {
+		utxos, err := unpackImportForOwnersArgs(args)
+		return utxos, common.Address{}, err
+	}, func(owner common.Address, statedb contract.StateDB) bool {
+		return statedb.GetState(ContractAddress, RemoteImportKey(owner)) != (common.Hash{})
+	})
+}
+
+// runImport is shared by both import entrypoints. A zero `to` credits each
+// UTXO's owner.
+func runImport(
+	accessibleState contract.AccessibleState,
+	caller common.Address,
+	input []byte,
+	suppliedGas uint64,
+	readOnly bool,
+	unpack func([]byte) ([]avax.UTXOID, common.Address, error),
+	authorized func(owner common.Address, statedb contract.StateDB) bool,
+) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, ImportBaseGas); err != nil {
 		return nil, 0, err
 	}
@@ -126,7 +181,7 @@ func importUTXOs(accessibleState contract.AccessibleState, caller common.Address
 	if addrs := env.Addresses(); env.IncomingCallType() != vm.Call || addrs.EVMSemantic.Caller != addrs.Origin {
 		return nil, remainingGas, errNotDirectCall
 	}
-	utxos, err := unpackImportArgs(input)
+	utxos, to, err := unpack(input)
 	if err != nil {
 		return nil, remainingGas, err
 	}
@@ -157,11 +212,15 @@ func importUTXOs(accessibleState contract.AccessibleState, caller common.Address
 			return nil, remainingGas, fmt.Errorf("%w: %s", errUnverifiedImport, id.InputID())
 		}
 		owner := common.Address(r.Owner)
-		if owner != caller && statedb.GetState(ContractAddress, RemoteImportKey(owner)) == (common.Hash{}) {
+		if !authorized(owner, statedb) {
 			return nil, remainingGas, fmt.Errorf("%w: %s", errNotOwner, id.InputID())
 		}
-		statedb.AddBalance(owner, new(uint256.Int).Mul(uint256.NewInt(r.Amount), uint256.NewInt(ethparams.GWei)))
-		topics, data, err := ABI.PackEvent("Imported", owner, r.UTXOID.TxID, r.UTXOID.OutputIndex, r.Amount)
+		recipient := to
+		if recipient == (common.Address{}) {
+			recipient = owner
+		}
+		statedb.AddBalance(recipient, new(uint256.Int).Mul(uint256.NewInt(r.Amount), uint256.NewInt(ethparams.GWei)))
+		topics, data, err := ABI.PackEvent("Imported", recipient, r.UTXOID.TxID, r.UTXOID.OutputIndex, r.Amount)
 		if err != nil {
 			return nil, remainingGas, err
 		}
@@ -261,8 +320,8 @@ type Export struct {
 
 // Import is one credited UTXO parsed from a receipt log.
 type Import struct {
-	Owner  common.Address
-	UTXOID avax.UTXOID
+	Recipient common.Address
+	UTXOID    avax.UTXOID
 }
 
 // FromReceipts returns the exports and imports the precompile logged in
@@ -314,8 +373,8 @@ func FromReceipts(receipts types.Receipts) ([]Export, []Import, error) {
 					return nil, nil, fmt.Errorf("parsing Imported log %s/%d: %w", l.TxHash, l.Index, err)
 				}
 				imports = append(imports, Import{
-					Owner:  common.BytesToAddress(l.Topics[1][:]),
-					UTXOID: avax.UTXOID{TxID: ids.ID(out.TxID), OutputIndex: out.OutputIndex},
+					Recipient: common.BytesToAddress(l.Topics[1][:]),
+					UTXOID:    avax.UTXOID{TxID: ids.ID(out.TxID), OutputIndex: out.OutputIndex},
 				})
 			}
 		}
@@ -326,6 +385,7 @@ func FromReceipts(receipts types.Receipts) ([]Export, []Import, error) {
 func createPrecompile() contract.StatefulPrecompiledContract {
 	fns := map[string]contract.RunStatefulPrecompileFunc{
 		"importUTXOs":     importUTXOs,
+		"importForOwners": importForOwners,
 		"setRemoteImport": setRemoteImport,
 		"exportAVAX":      exportAVAX,
 	}

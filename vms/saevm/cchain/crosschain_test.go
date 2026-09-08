@@ -29,13 +29,26 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-func importCall(tb testing.TB, utxos ...*avax.UTXO) []byte {
-	tb.Helper()
+func utxoIDs(utxos ...*avax.UTXO) []crosschain.UTXOID {
 	ids := make([]crosschain.UTXOID, len(utxos))
 	for i, u := range utxos {
 		ids[i] = crosschain.UTXOID{TxID: u.TxID, OutputIndex: u.OutputIndex}
 	}
-	data, err := crosschain.ABI.Pack("importUTXOs", ids)
+	return ids
+}
+
+// importCall is the owner's own import, credited to `to`.
+func importCall(tb testing.TB, to common.Address, utxos ...*avax.UTXO) []byte {
+	tb.Helper()
+	data, err := crosschain.ABI.Pack("importUTXOs", utxoIDs(utxos...), to)
+	require.NoError(tb, err)
+	return data
+}
+
+// importForOwnersCall imports on behalf of owners that allowed it.
+func importForOwnersCall(tb testing.TB, utxos ...*avax.UTXO) []byte {
+	tb.Helper()
+	data, err := crosschain.ABI.Pack("importForOwners", utxoIDs(utxos...))
 	require.NoError(tb, err)
 	return data
 }
@@ -109,8 +122,9 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	// An import of a UTXO that is not in shared memory builds no block.
 	const amount = uint64(100_000)
 	utxo := newAVAXUTXO(owner, amount, node.ctx.AVAXAssetID)
+	recipient := common.Address{0xbb}
 	importTx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, utxo),
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, recipient, utxo),
 	})
 	require.NoError(t, node.ethclient.SendTransaction(ctx, importTx))
 	node.waitForPendingEthTxs(ctx, t, importTx)
@@ -118,11 +132,11 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	_, err = node.BuildBlock(ctx, nil)
 	require.ErrorIs(t, err, errEmptyBlock, "an import without its UTXO must not be included")
 
-	// Once the P-Chain data arrives, the same transaction imports. Only the
-	// owner is credited, by the full amount, and the UTXO is consumed.
+	// Once the P-Chain data arrives, the same transaction imports. The owner
+	// chose the recipient, which is credited the full amount, and the UTXO is
+	// consumed.
 	node.addUTXOs(t, node.ctx.ChainID, constants.PlatformChainID, utxo)
 	clock.Set(clock.Now().Add(time.Second))
-	before := node.balance(t, owner)
 	importedBlk := node.runConsensusLoop(ctx, t)
 	require.Equal(t, types.ReceiptStatusSuccessful, importedBlk.Receipts()[0].Status)
 	_, records, err := tx.ParseExtData(customtypes.BlockExtData(importedBlk.EthBlock()))
@@ -132,19 +146,25 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	require.Equal(t, constants.PlatformChainID, records[0].SourceChain)
 	require.Equal(t, ids.ShortID(owner), records[0].Owner)
 	require.Equal(t, amount, records[0].Amount)
-	after := node.balance(t, owner)
-	gasPaid := new(uint256.Int).SetUint64(importedBlk.Receipts()[0].GasUsed) // gas price is 1 wei
-	delta := new(uint256.Int).Sub(&after, &before)
-	delta.Add(delta, gasPaid)
-	require.Equal(t, tx.ScaleAVAX(amount), *delta)
+	require.Equal(t, tx.ScaleAVAX(amount), node.balance(t, recipient))
 	node.assertUTXOsMissing(t, node.ctx.ChainID, constants.PlatformChainID, utxo)
 
-	// A stranger cannot import the owner's UTXO until the owner allows it.
+	// A stranger cannot import the owner's UTXO to itself, and cannot import
+	// for the owner until the owner allows it.
 	utxo2 := newAVAXUTXO(owner, amount, node.ctx.AVAXAssetID)
 	node.addUTXOs(t, node.ctx.ChainID, constants.PlatformChainID, utxo2)
-	strangerImport := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
-		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, utxo2),
+	theft := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, stranger, utxo2),
 	})
+	strangerImport := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importForOwnersCall(t, utxo2),
+	})
+	require.NoError(t, node.ethclient.SendTransaction(ctx, theft))
+	node.waitForPendingEthTxs(ctx, t, theft)
+	theftBlk := node.runConsensusLoop(ctx, t)
+	require.Equal(t, types.ReceiptStatusFailed, theftBlk.Receipts()[0].Status)
+	node.assertUTXOsExist(t, node.ctx.ChainID, constants.PlatformChainID, utxo2)
+	clock.Set(clock.Now().Add(time.Minute))
 	require.NoError(t, node.ethclient.SendTransaction(ctx, strangerImport))
 	node.waitForPendingEthTxs(ctx, t, strangerImport)
 	refusedBlk := node.runConsensusLoop(ctx, t)
@@ -165,21 +185,21 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	// block settles and leaves the processing range.
 	clock.Set(clock.Now().Add(time.Minute))
 	strangerImport2 := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
-		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, utxo2),
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importForOwnersCall(t, utxo2),
 	})
 	require.NoError(t, node.ethclient.SendTransaction(ctx, strangerImport2))
 	node.waitForPendingEthTxs(ctx, t, strangerImport2)
-	before = node.balance(t, owner)
+	before := node.balance(t, owner)
 	remoteBlk := node.runConsensusLoop(ctx, t)
 	require.Equal(t, types.ReceiptStatusSuccessful, remoteBlk.Receipts()[0].Status)
-	after = node.balance(t, owner)
+	after := node.balance(t, owner)
 	require.Equal(t, tx.ScaleAVAX(amount), *new(uint256.Int).Sub(&after, &before), "the owner receives the full amount, the stranger paid gas")
 	node.assertUTXOsMissing(t, node.ctx.ChainID, constants.PlatformChainID, utxo2)
 
 	// Fresh nodes replay the same blocks. A live node needs the UTXOs to
 	// verify; a bootstrapping node executes without them and reaches the
 	// same state roots.
-	all := []*blocks.Block{exportedBlk, badBlk, importedBlk, refusedBlk, allowedBlk, remoteBlk}
+	all := []*blocks.Block{exportedBlk, badBlk, importedBlk, theftBlk, refusedBlk, allowedBlk, remoteBlk}
 	for _, mode := range []snow.State{snow.NormalOp, snow.Bootstrapping} {
 		t.Run(mode.String(), func(t *testing.T) {
 			ctx, replay := newSUT(t, timeOpt, withState(mode), funded)
@@ -191,7 +211,7 @@ func TestPrecompileExportAndImport(t *testing.T) {
 					case importedBlk.ID():
 						require.Error(t, replay.VerifyBlock(ctx, nil, b), "import block must not verify without the UTXO")
 						replay.addUTXOs(t, replay.ctx.ChainID, constants.PlatformChainID, utxo)
-					case refusedBlk.ID():
+					case theftBlk.ID():
 						replay.addUTXOs(t, replay.ctx.ChainID, constants.PlatformChainID, utxo2)
 					}
 				}
@@ -201,6 +221,7 @@ func TestPrecompileExportAndImport(t *testing.T) {
 				require.Equal(t, original.PostExecutionStateRoot(), b.PostExecutionStateRoot())
 			}
 			require.Equal(t, node.balance(t, owner), replay.balance(t, owner))
+			require.Equal(t, node.balance(t, recipient), replay.balance(t, recipient))
 			replay.assertUTXOsMissing(t, replay.ctx.ChainID, constants.PlatformChainID, utxo, utxo2)
 			if mode == snow.Bootstrapping {
 				// A delayed P export clears the removal marker without

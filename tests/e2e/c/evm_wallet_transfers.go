@@ -129,7 +129,7 @@ var _ = e2e.DescribeCChain("[EVM Wallet Transfers]", func() {
 				utxoIDs[i] = crosschain.UTXOID{TxID: u.TxID, OutputIndex: u.OutputIndex}
 				total += u.Out.(*secp256k1fx.TransferOutput).Amt
 			}
-			data, err := crosschain.ABI.Pack("importUTXOs", utxoIDs)
+			data, err := crosschain.ABI.Pack("importUTXOs", utxoIDs, ethAddress)
 			require.NoError(err)
 			receipt := sendToPrecompile(data, nil)
 			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
