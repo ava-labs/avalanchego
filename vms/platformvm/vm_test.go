@@ -2314,7 +2314,7 @@ func TestTxTooBig(t *testing.T) {
 			)
 			require.NoError(err)
 
-			bigTx := &txs.Tx{Unsigned: createChainTx}
+			bigTx := &platform.Tx{Unsigned: createChainTx}
 			require.NoError(wallet.Signer().Sign(t.Context(), bigTx))
 
 			err = vm.manager.VerifyTx(bigTx)
