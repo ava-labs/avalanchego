@@ -179,7 +179,7 @@ After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `c
 - If `state-scheme` is `firewood`, the node cannot state sync. A new Firewood node on Mainnet or Fuji MUST set `state-sync-enabled` to `false` or will shut down with a `FATAL` error.
 - A node that has accepted any block does not state sync.
 - The node cannot resume an interrupted state sync. Instead, it restarts from a new summary.
-- Disabling state sync on a node that already started on the SAE VM shuts down with a `FATAL` error.
+- Disabling state sync after partially state syncing may result in an unrecoverable `FATAL` error.
 
 A node that starts on the SAE VM never falls back to executing pre-Helicon blocks. To recover from either `FATAL` error, delete the C-Chain database and restart.
 
