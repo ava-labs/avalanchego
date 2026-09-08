@@ -79,11 +79,9 @@ These changes prepare the merge commit that will be tagged.
    ./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
    ```
 
-1. If the release schedules a network upgrade, disable the `upgrade` job in
-   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml)
-   by commenting out its `Run e2e tests` step with a `TODO` to re-enable it. The
-   job upgrades from the latest published release, and that binary cannot run the
-   new upgrade. Re-enable it in step 10.
+1. If the release schedules a network upgrade, comment out the `upgrade` job's
+   `Run e2e tests` step in [`go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
+   It upgrades from the latest published release, which cannot run the new upgrade.
 
 ### 4. Commit and Create PR
 
@@ -413,9 +411,7 @@ export NEXT_VERSION=v1.14.2
 
 1. Update all version files (as in step 3) to the next version.
 
-1. If step 3 disabled the `upgrade` job in
-   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
-   re-enable it. The job now upgrades from `$VERSION`.
+1. Re-enable the `upgrade` job's `Run e2e tests` step if step 3 disabled it.
 
 1. Create PR and merge:
 
