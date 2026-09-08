@@ -6,6 +6,8 @@ package statesync
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -85,10 +87,17 @@ func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, s *summ
 		return err
 	}
 
+	h.snowCtx.Log.Info("syncing cross-chain state",
+		zap.Stringer("settledCrossChainRoot", s.settledRoot),
+		zap.Uint64("settledHeight", settledHeight),
+		zap.Stringer("acceptedHash", s.summary.AcceptedHash),
+		zap.Uint64("acceptedHeight", s.summary.AcceptedHeight),
+	)
 	crossChainSyncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
 	if err := crossChainSyncer.Sync(ctx); err != nil {
 		return err
 	}
+	h.snowCtx.Log.Info("finished syncing cross-chain state")
 
 	return evmSyncer.WriteSynced(&s.summary)
 }
