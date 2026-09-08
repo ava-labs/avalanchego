@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/flatfirewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
@@ -100,6 +101,11 @@ func TestParseConfig(t *testing.T) {
 			name: "state_scheme",
 			json: `{"state-scheme":"firewood"}`,
 			want: with(func(c *config) { c.StateScheme = customrawdb.FirewoodScheme }),
+		},
+		{
+			name: "state_scheme/flatfirewood",
+			json: `{"state-scheme":"flatfirewood"}`,
+			want: with(func(c *config) { c.StateScheme = flatfirewood.Scheme }),
 		},
 		{
 			name:      "state/commit_interval",

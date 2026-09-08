@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
+	"github.com/ava-labs/avalanchego/vms/saevm/flatfirewood"
 
 	graftfw "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
@@ -73,6 +74,7 @@ var (
 	errZeroCommitInterval = errors.New("commit interval must be non-zero")
 	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
 	errUnknownScheme      = errors.New("unknown trie database scheme")
+	errFlatArchival       = errors.New("flatfirewood requires pruning: an archival Firewood database already retains every revision")
 )
 
 func (c Config) Verify() error {
@@ -86,12 +88,22 @@ func (c Config) Verify() error {
 		return fmt.Errorf("%w: SnapshotCacheMiB (%d)", errCacheTooLarge, c.SnapshotCacheMiB)
 	}
 	switch c.Scheme {
-	case "", customrawdb.FirewoodScheme, rawdb.HashScheme:
+	case "", customrawdb.FirewoodScheme, flatfirewood.Scheme, rawdb.HashScheme:
 	default:
 		return fmt.Errorf("%w: %q", errUnknownScheme, c.Scheme)
 	}
+	if c.Scheme == flatfirewood.Scheme && c.Archival {
+		return errFlatArchival
+	}
 
 	return nil
+}
+
+// IsFirewood returns whether [Config.Scheme] stores state in Firewood, either
+// directly ([customrawdb.FirewoodScheme]) or wrapped with flat history
+// ([flatfirewood.Scheme]).
+func (c Config) IsFirewood() bool {
+	return c.Scheme == customrawdb.FirewoodScheme || c.Scheme == flatfirewood.Scheme
 }
 
 // TrieDBConfig returns a config that can be used to create a [triedb.Database]
@@ -100,7 +112,7 @@ func (c Config) Verify() error {
 // All [triedb.Database] MUST be closed.
 func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config {
 	switch c.Scheme {
-	case customrawdb.FirewoodScheme:
+	case customrawdb.FirewoodScheme, flatfirewood.Scheme:
 		if c.TrieCacheMiB == 0 {
 			// Firewood doesn't allow memory-only operation
 			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
@@ -109,16 +121,23 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
 			c.CommitInterval = 1
 		}
-		return &triedb.Config{
-			DBOverride: firewood.Config{
-				Path:                   filepath.Join(dataDir, graftfw.Directory),
-				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
-				RevisionsInMemory:      uint(2 * c.CommitInterval),
-				DeferredCommitInterval: c.CommitInterval,
-				Archive:                c.Archival,
-				Log:                    log,
-			}.BackendConstructor,
+		fw := firewood.Config{
+			Path:                   filepath.Join(dataDir, graftfw.Directory),
+			CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+			RevisionsInMemory:      uint(2 * c.CommitInterval),
+			DeferredCommitInterval: c.CommitInterval,
+			Archive:                c.Archival,
+			Log:                    log,
 		}
+		if c.Scheme == flatfirewood.Scheme {
+			return &triedb.Config{
+				DBOverride: flatfirewood.Config{
+					Firewood: fw,
+					Path:     filepath.Join(dataDir, flatfirewood.Directory),
+				}.BackendConstructor,
+			}
+		}
+		return &triedb.Config{DBOverride: fw.BackendConstructor}
 	case rawdb.HashScheme, "":
 		return &triedb.Config{
 			HashDB: &hashdb.Config{
@@ -138,7 +157,7 @@ func (c Config) snapConfig() *snapshot.Config {
 	if c.SnapshotCacheMiB <= 0 {
 		return nil
 	}
-	if c.Scheme == customrawdb.FirewoodScheme {
+	if c.IsFirewood() {
 		// Firewood already has efficient value lookups, so the snapshot
 		// provides unnecessary overhead.
 		return nil
@@ -246,7 +265,7 @@ func (t *Tracker) Track(root common.Hash) {
 // executionRoot, settling the state at settledRoot. It MAY call
 // [triedb.Database.Commit], based on the following priorities:
 //
-// 1. If [Config.Scheme] is [customrawdb.FirewoodScheme], the settled root is committed.
+// 1. If [Config.IsFirewood], the settled root is committed.
 // 2. If [Config.Archival] is true, then `executionRoot` will be committed.
 // 3. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
 // 4. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
@@ -263,7 +282,7 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 		because string
 	)
 	switch {
-	case t.config.Scheme == customrawdb.FirewoodScheme:
+	case t.config.IsFirewood():
 		// Firewood prunes all but the last state on disk after shutdown.
 		// Persisting the execution root would make VM recovery (re-execution
 		// since last settled) impossible, as Firewood can only build off the

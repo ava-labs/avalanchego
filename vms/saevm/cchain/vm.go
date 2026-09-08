@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -295,7 +294,7 @@ func (vm *VM) Initialize(
 		// Register state sync server
 		{
 			// TODO(alarso16): Find a way to wire in Firewood.
-			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
+			if !saeConfig.DBConfig.IsFirewood() {
 				// The triedb shouldn't share a cache with execution.
 				tdb := triedb.NewDatabase(ethDB, tdbConfig)
 				vm.onClose = append(vm.onClose, func(context.Context) error {
