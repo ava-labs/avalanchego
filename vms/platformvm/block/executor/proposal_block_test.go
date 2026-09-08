@@ -53,8 +53,11 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// create a proposal transaction to be included into proposal block
 	utx := &platform.AddValidatorTx{
-		BaseTx:    platform.BaseTx{},
-		Validator: platform.Validator{End: uint64(chainTime.Unix())},
+		BaseTx: platform.BaseTx{},
+		Validator: platform.Validator{
+			End:  uint64(chainTime.Unix()),
+			Wght: 1,
+		},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -82,6 +85,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		TxID:      addValTx.ID(),
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
+		Weight:    utx.Weight(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
 		NextTime:  chainTime,
@@ -144,8 +148,11 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 	unsignedNextStakerTx := &platform.AddValidatorTx{
-		BaseTx:    platform.BaseTx{},
-		Validator: platform.Validator{End: uint64(nextStakerTime.Unix())},
+		BaseTx: platform.BaseTx{},
+		Validator: platform.Validator{
+			End:  uint64(nextStakerTime.Unix()),
+			Wght: 1,
+		},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -169,6 +176,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		NodeID:    unsignedNextStakerTx.NodeID(),
 		SubnetID:  unsignedNextStakerTx.SubnetID(),
 		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
+		Weight:    unsignedNextStakerTx.Weight(),
 		StartTime: nextStakerTime,
 		EndTime:   nextStakerTime,
 		NextTime:  nextStakerTime,
