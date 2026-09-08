@@ -17,9 +17,6 @@ contract CChainHelper {
     /// C-chain atomic tx codec (vms/saevm/cchain/tx).
     uint32 private constant C_TYPE_IMPORT = 0;
 
-    uint32 public immutable networkID;
-    bytes32 public immutable avaxAssetID;
-
     // Consensus reads this mapping directly. Keep it at storage slot 0.
     mapping(bytes32 => bool) public authorized;
 
@@ -34,11 +31,6 @@ contract CChainHelper {
     error BadAmount();
     error InputsNotSorted();
 
-    constructor(uint32 networkID_, bytes32 avaxAssetID_) {
-        networkID = networkID_;
-        avaxAssetID = avaxAssetID_;
-    }
-
     /// Exports msg.value (whole nAVAX) to the P-chain as a UTXO owned by [to],
     /// any 20-byte P-chain address. The AVAX stays here until the SAE hook
     /// reads the warp log (to || nAVAX), debits this contract and writes the
@@ -51,8 +43,13 @@ contract CChainHelper {
     /// Authorizes an import of [imported] to msg.sender with [fee] nAVAX burned.
     /// Anyone can submit the emitted ImportTx bytes with empty credentials.
     /// The atomic verifier checks ownership and availability of the UTXOs.
-    /// Callers pass [imported] sorted. This call does not complete the import.
-    function importFromP(UTXO[] calldata imported, uint64 fee) external returns (bytes32) {
+    /// Callers pass [imported] sorted and the network ID and AVAX asset ID of
+    /// the chain; wrong values fail the atomic verifier. This call does not
+    /// complete the import.
+    function importFromP(uint32 networkID, bytes32 avaxAssetID, UTXO[] calldata imported, uint64 fee)
+        external
+        returns (bytes32)
+    {
         uint64 total;
         bytes memory ins = abi.encodePacked(uint32(imported.length));
         for (uint256 i = 0; i < imported.length; i++) {
@@ -63,9 +60,8 @@ contract CChainHelper {
             );
         }
         if (total <= fee) revert BadAmount();
-        bytes memory tx_ = abi.encodePacked(
-            CODEC_VERSION, C_TYPE_IMPORT, networkID, WARP.getBlockchainID(), bytes32(0), ins, uint32(1), msg.sender, total - fee, avaxAssetID
-        );
+        bytes memory tx_ = abi.encodePacked(CODEC_VERSION, C_TYPE_IMPORT, networkID, WARP.getBlockchainID(), bytes32(0), ins);
+        tx_ = abi.encodePacked(tx_, uint32(1), msg.sender, total - fee, avaxAssetID);
         bytes32 importHash = keccak256(tx_);
         authorized[importHash] = true;
         emit ImportAuthorized(importHash, tx_);

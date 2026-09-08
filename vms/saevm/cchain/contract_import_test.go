@@ -45,10 +45,8 @@ func TestContractImportSettlementAndReplay(t *testing.T) {
 	require.NoError(t, err)
 	bin, err := hex.DecodeString(cchainhelper.Bin)
 	require.NoError(t, err)
-	ctor, err := parsed.Pack("", node.ctx.NetworkID, node.ctx.AVAXAssetID)
-	require.NoError(t, err)
-	deploy := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		Gas: 2_000_000, GasFeeCap: big.NewInt(1), Data: append(bin, ctor...),
+		deploy := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		Gas: 2_000_000, GasFeeCap: big.NewInt(1), Data: bin,
 	})
 	require.NoError(t, node.ethclient.SendTransaction(ctx, deploy))
 	node.waitForPendingEthTxs(ctx, t, deploy)
@@ -68,7 +66,7 @@ func TestContractImportSettlementAndReplay(t *testing.T) {
 		OutputIndex uint32
 		Amount      uint64
 	}{{utxo.TxID, utxo.OutputIndex, amount}}
-	callData, err := parsed.Pack("importFromP", inputs, fee)
+	callData, err := parsed.Pack("importFromP", node.ctx.NetworkID, node.ctx.AVAXAssetID, inputs, fee)
 	require.NoError(t, err)
 	signed := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To: &helper, Gas: 1_000_000, GasFeeCap: big.NewInt(1), Data: callData,

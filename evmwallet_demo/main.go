@@ -13,10 +13,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 
@@ -107,11 +105,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "FATAL: ewoq nonce is not 0, cannot pin helper address")
 		os.Exit(1)
 	}
-	parsedABI, err := abi.JSON(strings.NewReader(cchainhelper.ABI))
-	check(err)
 	initcode, err := hex.DecodeString(cchainhelper.Bin)
-	check(err)
-	ctorArgs, err := parsedABI.Pack("", networkID, avaxAssetID)
 	check(err)
 	gasPrice, err := ethClient.SuggestGasPrice(ctx)
 	check(err)
@@ -123,7 +117,7 @@ func main() {
 		GasTipCap: big.NewInt(0),
 		GasFeeCap: gasPrice,
 		Gas:       2_000_000,
-		Data:      append(initcode, ctorArgs...),
+		Data:      initcode,
 	}), signer, key.ToECDSA())
 	check(err)
 	check(ethClient.SendTransaction(ctx, tx))

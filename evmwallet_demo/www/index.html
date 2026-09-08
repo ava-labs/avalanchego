@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
-  <p>You call <code>importFromP(utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact ImportTx, fixes you as its recipient, and stores approval of its hash. This page then submits those bytes with an empty marker credential for each input. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/contract_credential.go" target="_blank">verifier</a> checks the approval in settled EVM state and checks the UTXOs. Anyone can relay the same import, but cannot change your inputs, recipient, or fee. The EVM receipt confirms approval. The later atomic transaction completes the import.</p>
+  <p>You call <code>importFromP(networkID, avaxAssetID, utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact ImportTx, fixes you as its recipient, and stores approval of its hash. This page then submits those bytes with an empty marker credential for each input. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/contract_credential.go" target="_blank">verifier</a> checks the approval in settled EVM state and checks the UTXOs. Anyone can relay the same import, but cannot change your inputs, recipient, or fee. The EVM receipt confirms approval. The later atomic transaction completes the import.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C with your EVM wallet</button></div>
@@ -156,7 +156,7 @@ document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
 
 const iface = new ethers.Interface([
   'function exportToP(address to) payable returns (bytes32)',
-  'function importFromP((bytes32 txID,uint32 outputIndex,uint64 amount)[] imported, uint64 fee) returns (bytes32)',
+  'function importFromP(uint32 networkID, bytes32 avaxAssetID, (bytes32 txID,uint32 outputIndex,uint64 amount)[] imported, uint64 fee) returns (bytes32)',
   'event ImportAuthorized(bytes32 indexed importHash, bytes unsignedTx)',
 ]);
 
@@ -508,7 +508,7 @@ async function importOnC() {
   if (!utxos.length) throw new Error('no UTXOs waiting in shared memory for ' + me);
   const st = stepper(['Your EVM wallet sends one contract call', 'Issue the ImportTx to the C-chain']);
   st.active(0, 'importFromP(' + utxos.length + ' UTXO(s), fee ' + avax(CFEE) + ' AVAX). The contract stores approval of the exact ImportTx hash, including your inputs, recipient, and fee.');
-  const receipt = await sendTx(iface.encodeFunctionData('importFromP', [utxos.map(u => [u.txID, u.outputIndex, u.amount]), CFEE]));
+  const receipt = await sendTx(iface.encodeFunctionData('importFromP', [NET.networkID, NET.avaxAssetIDHex, utxos.map(u => [u.txID, u.outputIndex, u.amount]), CFEE]));
   const approval = importFromReceipt(receipt);
   st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' approved import hash ' + short(approval.id) + '. This receipt confirms approval, not completion.');
   st.active(1, 'This page submits the import without another signature. The chain checks the approval in settled EVM state.');
