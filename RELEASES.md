@@ -173,7 +173,7 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 
 C-Chain state sync does not work during and immediately after the Helicon transition. A node that is state syncing when Helicon activates stalls. Restart the node about an hour after activation to state sync again.
 
-After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `commit-interval` height. On Mainnet and Fuji, a new node with state sync enabled starts on the SAE VM and state syncs from these summaries. State sync has these limits:
+After Helicon activates, state sync has the following limitations:
 
 - On custom networks, a new node starts on the pre-Helicon Coreth VM and bootstraps by executing all blocks.
 - If `state-scheme` is `firewood`, the node cannot state sync. A new Firewood node on Mainnet or Fuji MUST set `state-sync-enabled` to `false` or will shut down with a `FATAL` error.
