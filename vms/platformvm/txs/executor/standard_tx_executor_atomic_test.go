@@ -4,13 +4,12 @@
 package executor
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"math"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"

@@ -140,7 +140,11 @@ func newAddAutoRenewedValidatorTx(
 ) *platform.Tx {
 	t.Helper()
 
-	wallet := newWallet(t, env, walletConfig{})
+	// Only spend the first funded key so that txs built on top of this one
+	// can use the other keys without conflicting on UTXOs.
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
 	tx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		ids.GenerateTestNodeID(),
 		weight,
@@ -299,7 +303,6 @@ func assertRewardAutoRenewedValidator(
 		assertValidatorRemoved(t, onCommitState, stakerTx, rewardTx.ID(), want.commitReward)
 		require.Equal(t, currentSupply, commitSupply)
 	}
-
 }
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
@@ -1517,9 +1520,12 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	vdr, err := diff.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 
-	// Create a delegator running for the validator's full period.
-
-	wallet := newWallet(t, env, walletConfig{})
+	// Create a delegator running for the validator's full period. The wallet
+	// reads UTXOs from env.state, which does not include the validator tx
+	// staged in diff, so use a key the validator did not spend from.
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[1:2],
+	})
 	delegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
 		&platform.SubnetValidator{
 			Validator: platform.Validator{
