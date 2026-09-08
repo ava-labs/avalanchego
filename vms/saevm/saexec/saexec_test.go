@@ -1134,9 +1134,9 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			scheme:   customrawdb.FirewoodScheme,
 			archival: true,
 			expectAvailable: func(height uint64) bool {
-				// All settled states MUST be available, as MUST the state
-				// committed at shutdown.
-				return height <= numBlocks
+				// Firewood is guaranteed to persist halfway to the commit interval.
+				// It MUST also have the most recent state.
+				return height%(commitInterval/2) == 0 || height == numBlocks
 			},
 		},
 		{

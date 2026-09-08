@@ -5,13 +5,12 @@ package firewood
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"go.uber.org/zap"
 )
@@ -24,8 +23,11 @@ var _ state.Trie = (*accountTrie)(nil)
 //     values, and we thus rely on the shared [baseTrie]. Additionally, no [trienode.NodeSet] is
 //     actually constructed, since Firewood manages nodes internally and the list of changes
 //     is not needed externally.
-//  2. The [accountTrie.Hash] method actually creates the [ffi.Proposal], since Firewood cannot calculate
-//     the hash of the trie without committing it.
+//  2. The [accountTrie.Hash] method actually applies the changes to Firewood, since Firewood cannot
+//     calculate the hash of the trie otherwise. If the parent root can be proposed on (it is the
+//     Firewood tip or a not-yet-committed proposal), an [ffi.Proposal] is created so that the changes
+//     can later be committed. Otherwise, an [ffi.Reconstructed] view over the historical revision is
+//     built, which can be read and hashed but never committed. See [hasher].
 //  3. the [accountTrie.GetAccount] and [accountTrie.GetStorage] methods cannot read from changes since
 //     the most recent call to [accountTrie.Hash], and this is a very difficult problem to solve due
 //     to account deletions on the `SELFDESTRUCT` opcode not manually calling [state.Trie.DeleteStorage].
@@ -35,67 +37,60 @@ var _ state.Trie = (*accountTrie)(nil)
 // Note this is not concurrent safe.
 type accountTrie struct {
 	*baseTrie
-	parentRoot       common.Hash
-	root             common.Hash
-	pending          *ffi.Proposal
-	tdb              *TrieDB
-	lastProposalSize int
+	revision *ffi.Revision
+	hasher   hasher
+	tdb      *TrieDB
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
-	reader, err := db.Firewood.Revision(ffi.Hash(root))
-	switch {
-	case errors.Is(err, ffi.ErrRevisionNotFound):
-		return nil, &trie.MissingNodeError{NodeHash: root}
-	case err != nil:
+	revision, err := db.newRevision(root)
+	if err != nil {
 		return nil, err
 	}
-
-	return &accountTrie{
-		baseTrie:   &baseTrie{reader: reader, updateOps: currentOps},
-		parentRoot: root,
-		root:       root,
-		tdb:        db,
-	}, nil
+	hasher := newProposalHasher(db, root, revision)
+	return newAccountTrieWithHasher(revision, hasher, db, currentOps), nil
 }
 
-// Hash returns the current hash of the state trie.
-// This will create the necessary proposals to guarantee that the changes can
-// later be committed. Any new proposal will be tracked by the accountTrie
-// until a call to [accountTrie.Commit].
+func newAccountTrieWithHasher(revision *ffi.Revision, h hasher, db *TrieDB, currentOps []ffi.BatchOp) *accountTrie {
+	return &accountTrie{
+		baseTrie: &baseTrie{reader: h, updateOps: currentOps},
+		revision: revision,
+		hasher:   h,
+		tdb:      db,
+	}
+}
+
+// Hash returns the current hash of the state trie. This will apply any changes
+// since the last call, which permits future calls to [accountTrie.Commit] if
+// the changes are proposed on top of the tip of state.
 //
-// Any proposals created by this method will be freed once the accountTrie
-// is garbage collected.
+// Any Firewood handles created by this method will be freed once the
+// accountTrie is garbage collected.
 //
 // Hash cannot return an error, so if any error is encountered, it will be
 // logged at error level and the zero hash is returned.
 func (a *accountTrie) Hash() common.Hash {
-	if err := a.updateProposal(); err != nil {
+	root, err := a.hash()
+	if err != nil {
 		a.tdb.log.Error("hashing account trie", zap.Error(err))
 		return common.Hash{}
 	}
-	return a.root
+	return root
 }
 
-// updateProposal checks whether the pending proposal is out of date, and if it
-// is, creates a new proposal with the addiotional changes and updates the
-// internal state.
-func (a *accountTrie) updateProposal() error {
-	if a.lastProposalSize == len(a.updateOps) {
-		return nil
+// hash applies all pending updates via the [hasher] and returns the root. If the
+// previous root was a historical revision,  an [ffi.Reconstruction] will be made.
+func (a *accountTrie) hash() (common.Hash, error) {
+	root, err := a.hasher.hash(a.updateOps)
+	if !errors.Is(err, errNotProposable) {
+		return root, err
 	}
 
-	proposal, err := a.tdb.newProposal(a.parentRoot, a.updateOps)
-	// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
-	if err != nil {
-		return err
-	}
-
-	a.pending = proposal
-	a.reader = proposal
-	a.root = common.Hash(proposal.Root())
-	a.lastProposalSize = len(a.updateOps) // Avoid re-hashing until next update
-	return nil
+	// Reads by the shared [baseTrie] (and so by every [storageTrie]) MUST
+	// follow the new hasher.
+	a.hasher = newReconstructedHasher(a.revision)
+	a.reader = a.hasher
+	return a.hasher.hash(a.updateOps)
 }
 
 // Commit returns the new root hash of the trie and a nil [trienode.NodeSet].
@@ -108,36 +103,24 @@ func (a *accountTrie) updateProposal() error {
 // the values as a leaf in the nodeset (corresponding to whether the caller
 // expects this to be an account trie or not).
 func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
-	if err := a.updateProposal(); err != nil {
+	root, err := a.hash()
+	if err != nil {
 		return common.Hash{}, nil, err
 	}
 
-	// The [state.StateDB] only calls [triedb.Database.Update] when the root
-	// differs from the parent. Also, a.pending is only non-nil when the root
-	// has changed.
-	if a.root != a.parentRoot {
-		a.tdb.trieCommit(a.pending)
+	if err := a.hasher.commit(); err != nil {
+		return common.Hash{}, nil, fmt.Errorf("committing account trie: %w", err)
 	}
-	return a.root, nil, nil
-}
 
-// Prove writes the inclusion or exclusion proof for the already hashed key to
-// the provided writer.
-//
-// TODO(alarso16): Implement.
-func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
-	return errProveNotImplemented
+	return root, nil, nil
 }
 
 // Copy creates a copy of the [accountTrie].
 func (a *accountTrie) Copy() *accountTrie {
-	// This revision MUST be copied because it could refer to a proposal held
-	// by this account trie. If the proposal is committed, the reader will no
-	// no longer be valid. However, an [ffi.Revision] will still be valid.
-	tr, err := newAccountTrie(a.parentRoot, a.tdb, slices.Clone(a.updateOps))
+	h, err := a.hasher.copy()
 	if err != nil {
 		a.tdb.log.Error("copying account trie", zap.Error(err))
 		return nil
 	}
-	return tr
+	return newAccountTrieWithHasher(a.revision, h, a.tdb, slices.Clone(a.updateOps))
 }

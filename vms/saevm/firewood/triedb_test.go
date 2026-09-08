@@ -43,6 +43,9 @@ func newStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateD
 
 	sdb, err := state.New(root, db, nil)
 	require.NoErrorf(t, err, "state.New(%s, %T)", root, db)
+	t.Cleanup(func() {
+		assert.NoErrorf(t, sdb.Error(), "%T.Error()", sdb)
+	})
 
 	return sdb
 }
@@ -592,4 +595,221 @@ func TestUnknownCommitNoError(t *testing.T) {
 	db := newDB(t)
 	root := common.Hash{0x1}
 	require.NoErrorf(t, db.TrieDB().Commit(root, false), "triedb.Commit(%s)", root)
+}
+
+var (
+	addr1 = common.Address{1}
+	addr2 = common.Address{2}
+	addr3 = common.Address{3}
+)
+
+// TestCommitOnlyOneOfTwoProposals verifies that when two StateDBs branch from
+// the same parent, only the first is accepted by the TrieDB.
+func TestCommitOnlyOneOfTwoProposals(t *testing.T) {
+	db := newDB(t)
+	tip := types.EmptyRootHash
+
+	a := newStateDB(t, db, tip)
+	b := newStateDB(t, db, tip)
+	a.SetNonce(addr1, 1)
+	b.SetNonce(addr2, 1)
+	rootA := a.IntermediateRoot(true)
+	rootB := b.IntermediateRoot(true)
+	require.NotEqual(t, rootA, rootB, "different changes yield different roots")
+
+	got, err := a.Commit(1, true)
+	require.NoError(t, err, "a.Commit()")
+	require.Equal(t, rootA, got, "a.Commit() root")
+
+	// b's proposal was valid when hashed, but the TrieDB rejects a second
+	// proposal on the same parent.
+	_, err = b.Commit(1, true)
+	require.ErrorIs(t, err, errParentNotLatest, "b.Commit()")
+
+	tdb := db.TrieDB()
+	require.NoErrorf(t, tdb.Commit(rootA, false), "triedb.Commit(%s)", rootA)
+	require.NoErrorf(t, tdb.Commit(rootB, false), "triedb.Commit(%s) of unknown root", rootB)
+
+	// We CANNOT guarantee that the rootB isn't available, since it depends on the GC.
+	_, err = db.OpenTrie(rootA)
+	require.NoErrorf(t, err, "db.OpenTrie(%s)", rootA)
+}
+
+// TestTrieCommitRejectsLostProposal verifies that a proposal handed to the
+// TrieDB by a failed commit is not silently overwritten by a later one.
+func TestTrieCommitRejectsLostProposal(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+	tip := types.EmptyRootHash
+
+	a := newStateDB(t, db, tip)
+	b := newStateDB(t, db, tip)
+	a.SetNonce(addr1, 1)
+	b.SetNonce(addr2, 1)
+	b.IntermediateRoot(true) // proposal created while the parent is still the tip
+	rootA, err := a.Commit(1, true)
+	require.NoError(t, err, "a.Commit()")
+	require.NoErrorf(t, tdb.Commit(rootA, false), "triedb.Commit(%s)", rootA)
+
+	// b's proposal is handed to the TrieDB before [TrieDB.Update] rejects it,
+	// so it remains pending.
+	_, err = b.Commit(1, true)
+	require.ErrorIs(t, err, errParentNotLatest, "b.Commit()")
+
+	c := newStateDB(t, db, rootA)
+	c.SetNonce(addr3, 1)
+	_, err = c.Commit(2, true)
+	require.ErrorIs(t, err, errProposalPending, "c.Commit() while b's proposal is pending")
+}
+
+// TestProposalToReconstruction creates a proposal that ends up being
+// uncommittable. To allow hashing again, it replaces the proposal with a
+// reconstruction internally.
+func TestProposalToReconstruction(t *testing.T) {
+	db := newDB(t)
+	tip := types.EmptyRootHash
+
+	a := newStateDB(t, db, tip)
+	b := newStateDB(t, db, tip)
+	a.SetNonce(addr1, 1)
+	b.SetNonce(addr2, 1)
+	b.IntermediateRoot(true) // creates proposal
+
+	// Reference for b's eventual state, proposed while tip is still proposable.
+	want := newStateDB(t, db, tip)
+	want.SetNonce(addr2, 1)
+	want.SetNonce(addr3, 1)
+	wantRoot := want.IntermediateRoot(true)
+
+	rootA, err := a.Commit(1, true)
+	require.NoError(t, err, "a.Commit()")
+	require.NoErrorf(t, db.TrieDB().Commit(rootA, false), "triedb.Commit(%s)", rootA)
+
+	// b should now match want
+	// Hashing must now create a reconstruction instead of a proposal.
+	b.SetNonce(addr3, 1)
+	require.Equal(t, wantRoot, b.IntermediateRoot(true), "root via reconstruction")
+	require.Equal(t, uint64(1), b.GetNonce(addr3), "GetNonce() after reconstruction")
+
+	_, err = b.Commit(1, true)
+	require.ErrorIs(t, err, errHistoricalNotCommittable, "b.Commit()")
+}
+
+// TestReconstructionFromHistoricalRevision verifies that a StateDB opened at a
+// historical root can be repeatedly modified and hashed but never committed.
+func TestReconstructionFromHistoricalRevision(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+
+	blk1 := newStateDB(t, db, types.EmptyRootHash)
+	blk1.SetNonce(addr1, 1)
+	root1, err := blk1.Commit(1, true)
+	require.NoError(t, err, "blk1.Commit()")
+	require.NoErrorf(t, tdb.Commit(root1, false), "triedb.Commit(%s)", root1)
+
+	// Reference for the final state, proposed while root1 is still the tip.
+	addrs := []common.Address{{0xa}, {0xb}, {0xc}}
+	want := newStateDB(t, db, root1)
+	for _, addr := range addrs {
+		want.SetNonce(addr, 1)
+	}
+	wantRoot := want.IntermediateRoot(true)
+
+	blk2 := newStateDB(t, db, root1)
+	blk2.SetNonce(addr2, 1)
+	root2, err := blk2.Commit(2, true)
+	require.NoError(t, err, "blk2.Commit()")
+	require.NoErrorf(t, tdb.Commit(root2, false), "triedb.Commit(%s)", root2)
+
+	sdb := newStateDB(t, db, root1)
+	require.Equal(t, root1, sdb.IntermediateRoot(true), "IntermediateRoot() without changes")
+	require.Equal(t, uint64(0), sdb.GetNonce(addr2), "block 2 is not visible at root1")
+
+	prev := root1
+	for i, addr := range addrs {
+		sdb.SetNonce(addr, 1)
+		root := sdb.IntermediateRoot(true)
+		require.NotEqual(t, prev, root, "IntermediateRoot() after change %d", i)
+		prev = root
+	}
+	require.Equal(t, wantRoot, prev, "final root matches the proposal reference")
+	require.Equal(t, prev, sdb.IntermediateRoot(true), "IntermediateRoot() without new changes")
+
+	_, err = sdb.Commit(2, true)
+	require.ErrorIs(t, err, errHistoricalNotCommittable, "Commit()")
+}
+
+// TestCopyDoesNotAliasProposal verifies that a copy of a proposal-backed
+// StateDB hashes independently and survives the original being committed.
+func TestCopyDoesNotAliasProposal(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+
+	base := newStateDB(t, db, types.EmptyRootHash)
+	base.SetNonce(addr1, 1)
+	tip, err := base.Commit(1, true)
+	require.NoError(t, err, "base.Commit()")
+	require.NoErrorf(t, tdb.Commit(tip, false), "triedb.Commit(%s)", tip)
+
+	a := newStateDB(t, db, tip)
+	a.SetNonce(addr1, 2)
+	rootA := a.IntermediateRoot(true)
+
+	cp := a.Copy()
+	require.Equal(t, rootA, cp.IntermediateRoot(true), "copy hashes to the same root")
+
+	_, err = a.Commit(2, true)
+	require.NoError(t, err, "a.Commit()")
+	require.NoErrorf(t, tdb.Commit(rootA, false), "triedb.Commit(%s)", rootA)
+	require.Equal(t, uint64(2), cp.GetNonce(addr1), "GetNonce() on copy after original committed")
+	require.Equal(t, rootA, cp.IntermediateRoot(true), "IntermediateRoot() on copy after original committed")
+
+	// The copy holds its own proposal on tip, which is no longer the latest
+	// root, so it is rejected rather than treated as the original's proposal.
+	_, err = cp.Commit(2, true)
+	require.ErrorIs(t, err, errParentNotLatest, "cp.Commit()")
+}
+
+// TestCopyClonesReconstruction verifies that a copy of a reconstruction-backed
+// StateDB diverges independently of the original.
+func TestCopyClonesReconstruction(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+
+	blk1 := newStateDB(t, db, types.EmptyRootHash)
+	blk1.SetNonce(addr1, 1)
+	root1, err := blk1.Commit(1, true)
+	require.NoError(t, err, "blk1.Commit()")
+	require.NoErrorf(t, tdb.Commit(root1, false), "triedb.Commit(%s)", root1)
+
+	// References for both divergent states, proposed while root1 is the tip.
+	wantX := newStateDB(t, db, root1)
+	wantX.SetNonce(addr1, 2)
+	wantX.SetNonce(addr2, 1)
+	wantRootX := wantX.IntermediateRoot(true)
+	wantY := newStateDB(t, db, root1)
+	wantY.SetNonce(addr1, 2)
+	wantY.SetNonce(addr3, 1)
+	wantRootY := wantY.IntermediateRoot(true)
+
+	blk2 := newStateDB(t, db, root1)
+	blk2.SetNonce(addr2, 5)
+	root2, err := blk2.Commit(2, true)
+	require.NoError(t, err, "blk2.Commit()")
+	require.NoErrorf(t, tdb.Commit(root2, false), "triedb.Commit(%s)", root2)
+
+	sdb := newStateDB(t, db, root1)
+	sdb.SetNonce(addr1, 2)
+	sdb.IntermediateRoot(true) // reconstruction is created here
+
+	cp := sdb.Copy()
+	sdb.SetNonce(addr2, 1)
+	cp.SetNonce(addr3, 1)
+	require.Equal(t, wantRootX, sdb.IntermediateRoot(true), "original root after divergence")
+	require.Equal(t, wantRootY, cp.IntermediateRoot(true), "copy root after divergence")
+
+	_, err = sdb.Commit(2, true)
+	require.ErrorIs(t, err, errHistoricalNotCommittable, "original Commit()")
+	_, err = cp.Commit(2, true)
+	require.ErrorIs(t, err, errHistoricalNotCommittable, "copy Commit()")
 }

@@ -36,9 +36,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
@@ -654,31 +657,86 @@ func TestDebugStandardTraceBlockToFile(t *testing.T) {
 // TestDebugIntermediateRoots verifies that debug_intermediateRoots returns one
 // root per transaction, the last of which is the block's post-execution root.
 func TestDebugIntermediateRoots(t *testing.T) {
-	ctx, sut := newSUT(t, 1)
+	const commitInterval = 4
 
-	const numTxs = 2
-	txs := make([]*types.Transaction, numTxs)
-	for i := range txs {
-		txs[i] = sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-			To:       &common.Address{},
-			Gas:      params.TxGas,
-			GasPrice: big.NewInt(1),
-			Value:    big.NewInt(1),
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb_archival",
+			opts: []sutOption{withArchival()},
+		},
+		{
+			name: "hashdb_pruning",
+			opts: []sutOption{withCommitInterval(commitInterval)},
+		},
+		{
+			name: "firewood_archival_every",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(1)},
+		},
+		{
+			name: "firewood_archival_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const (
+				numBlocks   = 2*commitInterval + 3
+				txsPerBlock = 2
+			)
+
+			srcDB := memdb.New()
+			xdb := saetest.NewHeightIndexDB()
+			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+			dataDir := t.TempDir()
+			opts := append(slices.Clone(tt.opts), options.Func[sutConfig](func(c *sutConfig) {
+				c.dataDir = dataDir
+			}))
+			ctx, src := newSUT(t, 1, append(slices.Clone(opts), withDB(srcDB), withExecResultsDB(xdb), timeOpt)...)
+
+			blks := make([]*blocks.Block, 0, numBlocks)
+			for range numBlocks {
+				vmTime.AdvanceToSettle(ctx, t, src.lastAcceptedBlock(t))
+				txs := make([]*types.Transaction, txsPerBlock)
+				for i := range txs {
+					txs[i] = src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+						To:       &common.Address{},
+						Gas:      params.TxGas,
+						GasPrice: big.NewInt(1),
+						Value:    big.NewInt(1),
+					})
+				}
+				block := src.runConsensusLoop(t, txs...)
+				require.Lenf(t, block.Transactions(), len(txs), "%T.Transactions()", block)
+				blks = append(blks, block)
+			}
+
+			// restarting the VM clears the cache
+			src.close()
+			ctx, sut := newSUT(t, 1, append(slices.Clone(opts),
+				withDB(saetest.CopyDB(t, srcDB)),
+				withExecResultsDB(xdb.Clone()),
+			)...)
+
+			for _, block := range blks {
+				t.Run(fmt.Sprintf("block_%02d", block.NumberU64()), func(t *testing.T) {
+					var roots []common.Hash
+					require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
+
+					require.Len(t, roots, txsPerBlock, "one root per transaction")
+					assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
+					// This holds only because nothing modifies state after the last tx:
+					// hookstest.Stub.FinishExecutingBlock is a no-op and there are no
+					// end-of-block ops. Hooks that mutate post-transaction state (e.g.
+					// the C-Chain's) would break this!!
+					assert.Equal(t, block.PostExecutionStateRoot(), roots[txsPerBlock-1], "last root is the block's post-execution root")
+				})
+			}
 		})
 	}
-	block := sut.runConsensusLoop(t, txs...)
-	require.Lenf(t, block.Transactions(), len(txs), "%T.Transactions()", block)
-
-	var roots []common.Hash
-	require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
-
-	require.Len(t, roots, numTxs, "one root per transaction")
-	assert.NotEqual(t, roots[0], roots[1], "each transfer changes state (nonce and balances)")
-	// This holds only because nothing modifies state after the last tx:
-	// hookstest.Stub.FinishExecutingBlock is a no-op and there are no
-	// end-of-block ops. Hooks that mutate post-transaction state (e.g.
-	// the C-Chain's) would break this!!
-	assert.Equal(t, block.PostExecutionStateRoot(), roots[numTxs-1], "last root is the block's post-execution root")
 }
 
 func TestStatefulRPCs(t *testing.T) {
@@ -769,6 +827,99 @@ func TestStatefulRPCs(t *testing.T) {
 				assert.Equal(t, storageKeyHex, storage.Key, "GetProof().StorageProof[0].Key")
 				assert.Zerof(t, wantStorageValue.Cmp(storage.Value), "GetProof().StorageProof[0].Value: want %d, got %s", wantStorageValue, storage.Value)
 			})
+		})
+	}
+}
+
+// TestStatefulRPCsEveryHeight tests the stateful RPCs are available for all
+// block heights on multiple database configurations.
+func TestStatefulRPCsEveryHeight(t *testing.T) {
+	t.Parallel()
+
+	const (
+		commitInterval = 4
+		// Spans two commit boundaries, heights between them, and a tail of
+		// blocks that are not yet settled.
+		numBlocks = 2*commitInterval + 3
+	)
+
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hash_archival",
+			opts: []sutOption{withArchival(), withCommitInterval(saedb.DefaultCommitInterval)},
+		},
+		{
+			name: "hash_commit_every_block",
+			opts: []sutOption{withCommitInterval(1)},
+		},
+		{
+			name: "firewood_archival",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(saedb.DefaultCommitInterval)},
+		},
+		{
+			name: "firewood_commit_every_block",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(1)},
+		},
+		{
+			name: "firewood_commit_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srcDB := memdb.New()
+			srcHDB := saetest.NewHeightIndexDB()
+			dataDir := t.TempDir()
+			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+			dbOpts := append(slices.Clone(tt.opts),
+				timeOpt,
+				options.Func[sutConfig](func(c *sutConfig) {
+					c.dataDir = dataDir
+					c.logLevel = logging.Warn
+				}),
+			)
+
+			ctx, src := newSUT(t, 1, append(slices.Clone(dbOpts),
+				withExecResultsDB(srcHDB),
+				withDB(srcDB),
+			)...)
+
+			// One transfer per block, so the sender's nonce at height h is h.
+			prev := src.lastAcceptedBlock(t)
+			for h := uint64(1); h <= numBlocks; h++ {
+				// Settling the parent before building the next block evicts all
+				// but the most recent blocks from memory.
+				vmTime.AdvanceToSettle(ctx, t, prev)
+				b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+					To:        &zeroAddr,
+					Gas:       params.TxGas,
+					GasFeeCap: big.NewInt(params.GWei),
+				}))
+				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+				prev = b
+			}
+
+			sender := src.wallet.Addresses()[0]
+
+			// restarting the VM clears all caches
+			src.close()
+			ctx, sut := newSUT(t, 1, append(slices.Clone(dbOpts),
+				withExecResultsDB(srcHDB.Clone()),
+				withDB(saetest.CopyDB(t, srcDB)),
+			)...)
+
+			for height := uint64(1); height <= numBlocks; height++ {
+				t.Run(fmt.Sprintf("block_%02d", height), func(t *testing.T) {
+					got, err := sut.NonceAt(ctx, sender, new(big.Int).SetUint64(height))
+					require.NoError(t, err, "NonceAt()")
+					assert.Equal(t, height, got, "NonceAt(): one transaction per block")
+				})
+			}
 		})
 	}
 }

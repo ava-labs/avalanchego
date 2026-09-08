@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -85,12 +87,12 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, err
 	}
 
-	hdr := executedHeader(bl)
-	sdb, err := b.StateDB(hdr.Root)
+	sdb, _, err := b.stateAtBlock(ctx, bl.NumberU64())
 	if err != nil {
 		return nil, nil, err
 	}
-	return sdb, hdr, nil
+
+	return sdb, executedHeader(bl), nil
 }
 
 // StateAtBlock returns the state database after executing the given block.
@@ -117,17 +119,74 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 // stateAtBlock returns the state after executing block num, along with the
 // stored block it was restored from.
 func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
-	n := rpc.BlockNumber(num) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(n))
+	sdb, parent, toReexec, err := b.lastBlockWithState(ctx, num)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
-	if err != nil {
-		return nil, nil, err
+	for _, stored := range toReexec {
+		// A settled block has no ancestry, which [saexec.Execute] requires,
+		// so it is rebuilt on top of the previous block.
+		bl, err := b.NewBlock(stored.EthBlock(), parent, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("constructing SAE block %d: %w", stored.NumberU64(), err)
+		}
+		_, err = saexec.Execute(
+			bl,
+			sdb,
+			b.Hooks(),
+			b.ChainConfig(),
+			b.ChainContext(),
+			b.Logger(),
+			saexec.SkipEndOfBlockOps(),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("re-executing block %d: %w", stored.NumberU64(), err)
+		}
+
+		// A normal execution would commit this state or store it in the triedb.
+		sdb.Finalise(true /*EIP-151*/)
+		// The stored block carries the executed gas clock that the next block's
+		// execution reads from its parent.
+		parent = stored
 	}
-	return sdb, bl, nil
+
+	return sdb.Copy(), parent, nil
+}
+
+// lastBlockWithState searches backwards from block num for the most recent
+// block with available post-execution state. It returns that state and block,
+// along with the blocks (in ascending order, excluding the found block) that
+// must be re-executed on top of it to reach the state of block num.
+func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, []*blocks.Block, error) {
+	const maxReexec = 8192 // TODO(alarso16): determine using commit interval and settlement height
+
+	var (
+		toReexec     []*blocks.Block
+		notFoundType = new(trie.MissingNodeError)
+	)
+	for i := range uint64(maxReexec) {
+		if num < i {
+			break
+		}
+		rpcNum := rpc.BlockNumber(num - i) // #nosec G115 -- won't overflow for a while.
+		bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(rpcNum))
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		sdb, err := b.StateDB(bl.PostExecutionStateRoot())
+		switch {
+		case errors.As(err, &notFoundType):
+			toReexec = append(toReexec, bl)
+			continue
+		case err != nil:
+			return nil, nil, nil, fmt.Errorf("unexpected error looking for state: %w", err)
+		}
+		slices.Reverse(toReexec)
+		return sdb, bl, toReexec, nil
+	}
+
+	return nil, nil, nil, fmt.Errorf("no parent state of block %d found", num)
 }
 
 // StateAtTransaction returns the execution environment of a particular
@@ -147,17 +206,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	parent, err := b.restoreExecutedParent(ctx, ethB)
+	stateDB, parent, err := b.stateAtBlock(ctx, ethB.NumberU64()-1)
 	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
+		return nil, bCtx, nil, nil, err
 	}
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
-	}
-	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, bCtx, nil, nil, err
 	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
