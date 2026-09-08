@@ -171,7 +171,7 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 
 ### C-Chain State Sync
 
-C-Chain state sync does not work during and immediately after the Helicon transition. A node that is state syncing when Helicon activates stalls. Restart the node about an hour after activation to state sync again.
+C-Chain state sync is not supported immediately around the Helicon activation. A node that is state syncing when Helicon activates may stall.
 
 After Helicon activates, state sync has the following limitations:
 
