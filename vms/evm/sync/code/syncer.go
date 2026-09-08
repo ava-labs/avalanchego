@@ -166,13 +166,18 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		return errSyncAlreadyRun
 	}
 
+	s.log.Info("starting code sync")
 	eg, egCtx := errgroup.WithContext(ctx)
 	const numCodeFetchers = 5
 	// One extra slot for the batcher, so numCodeFetchers can run alongside it.
 	eg.SetLimit(numCodeFetchers + 1)
 
 	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
-	return eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	s.log.Info("finished code sync")
+	return nil
 }
 
 // drainQueue blocks until at least one hash is queued or [Syncer.DoneAdding]
