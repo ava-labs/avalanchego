@@ -94,7 +94,7 @@ NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` a
 
 #### Deprecated in C-Chain
 
-- `eth-apis` is deprecated. The node maps it onto `apis` and logs a warning. If the config also sets `apis`, the node ignores `eth-apis`. Names whose methods no longer exist, such as `admin` and `debug`, log a warning. Any other unknown name is a fatal error. The next release removes `eth-apis`.
+- `eth-apis` is deprecated. The node maps it onto `apis` and logs a warning. If the config also sets `apis`, the node ignores `eth-apis`. Names whose methods no longer exist, such as `admin` and `debug`, log a warning. Any other unknown name is a fatal error. The next release will remove `eth-apis`.
 
 #### Removed from C-Chain
 
