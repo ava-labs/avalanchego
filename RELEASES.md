@@ -20,6 +20,19 @@ The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, Septe
 
 This release updates the plugin version to `46`. All plugins must update to remain compatible.
 
+### C-Chain State Sync
+
+C-Chain state sync is not supported immediately around the Helicon activation. A node that is state syncing when Helicon activates may stall.
+
+After Helicon activates, state sync has the following limitations:
+
+- Restarting a node mid-state sync will restart the sync from the beginning.
+- Disabling state sync after partially state syncing may result in an unrecoverable `FATAL` error.
+- If `state-scheme` is `firewood`, the node cannot state sync. A new Firewood node on Mainnet or Fuji MUST set `state-sync-enabled` to `false` or will shut down with a `FATAL` error.
+- On custom networks, a new node starts on the pre-Helicon Coreth VM and bootstraps by executing all blocks.
+
+If encountering one of these `FATAL` errors, the only way to recover is by deleting the database and restarting.
+
 ### APIs
 
 #### C-Chain RPCs
@@ -168,19 +181,6 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 
 - Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
 - The Primary Network minimum validator staking duration decreases from 2 weeks to 48 hours at Helicon activation (ACP-273).
-
-### C-Chain State Sync
-
-C-Chain state sync is not supported immediately around the Helicon activation. A node that is state syncing when Helicon activates may stall.
-
-After Helicon activates, state sync has the following limitations:
-
-- On custom networks, a new node starts on the pre-Helicon Coreth VM and bootstraps by executing all blocks.
-- If `state-scheme` is `firewood`, the node cannot state sync. A new Firewood node on Mainnet or Fuji MUST set `state-sync-enabled` to `false` or will shut down with a `FATAL` error.
-- Restarting a node mid-state sync will restart the sync from the beginning.
-- Disabling state sync after partially state syncing may result in an unrecoverable `FATAL` error.
-
-If encountering one of these `FATAL` errors, the only way to recover is by deleting the database and restarting.
 
 ### Fixes
 
