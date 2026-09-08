@@ -28,7 +28,7 @@ func TestImportCalldataRoundTrip(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, want, got)
 
-	forOwners, err := ABI.Pack("importForOwners", args)
+	forOwners, err := ABI.Pack("remoteImportUTXOs", args)
 	require.NoError(t, err)
 	got, ok = ImportCalldata(types.NewTx(&types.DynamicFeeTx{To: &ContractAddress, Data: forOwners}))
 	require.True(t, ok)

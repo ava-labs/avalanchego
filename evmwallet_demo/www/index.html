@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
-  <p>You call <code>importUTXOs(utxos, to)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">precompile</a> with nothing but the UTXO IDs. The <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">block builder</a> checks that the UTXOs exist in shared memory before the block is accepted and records owner and amount in the block. Execution credits <code>to</code> with the full amount and consumes the UTXOs. One transaction, one receipt, done. You pay gas only; there is no import fee taken from the funds. Someone else can import for you with <code>importForOwners</code> if you allowed it once with <code>setRemoteImport(true)</code>; those funds always land on you.</p>
+  <p>You call <code>importUTXOs(utxos, to)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">precompile</a> with nothing but the UTXO IDs. The <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">block builder</a> checks that the UTXOs exist in shared memory before the block is accepted and records owner and amount in the block. Execution credits <code>to</code> with the full amount and consumes the UTXOs. One transaction, one receipt, done. You pay gas only; there is no import fee taken from the funds. Someone else can import for you with <code>remoteImportUTXOs</code> if you allowed it once with <code>allowRemoteImport(true)</code>; those funds always land on you.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C with your EVM wallet</button></div>
@@ -153,8 +153,8 @@ document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
 const iface = new ethers.Interface([
   'function exportAVAX(bytes32 destinationChainID, address to) payable',
   'function importUTXOs((bytes32 txID,uint32 outputIndex)[] utxos, address to)',
-  'function importForOwners((bytes32 txID,uint32 outputIndex)[] utxos)',
-  'function setRemoteImport(bool allowed)',
+  'function remoteImportUTXOs((bytes32 txID,uint32 outputIndex)[] utxos)',
+  'function allowRemoteImport(bool allowed)',
   'event Exported(address indexed from, bytes32 indexed destinationChainID, address to, uint64 amountNAVAX)',
   'event Imported(address indexed recipient, bytes32 txID, uint32 outputIndex, uint64 amountNAVAX)',
 ]);

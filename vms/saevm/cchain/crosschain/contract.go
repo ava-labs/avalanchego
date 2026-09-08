@@ -29,10 +29,10 @@ import (
 // Gas charges. Import covers one shared memory read and one consumption write
 // per UTXO. Export covers the UTXO write and the shared memory index update.
 const (
-	ImportBaseGas      uint64 = 20_000
-	ImportUTXOGas      uint64 = 5_000
-	SetRemoteImportGas uint64 = 20_000
-	ExportGas          uint64 = 40_000
+	ImportBaseGas        uint64 = 20_000
+	ImportUTXOGas        uint64 = 5_000
+	AllowRemoteImportGas uint64 = 20_000
+	ExportGas            uint64 = 40_000
 )
 
 //go:embed ICrossChainTransfer.abi
@@ -99,8 +99,8 @@ func ImportCalldata(t *types.Transaction) ([]avax.UTXOID, bool) {
 	switch selector {
 	case string(ABI.Methods["importUTXOs"].ID):
 		utxos, _, err = unpackImportArgs(args)
-	case string(ABI.Methods["importForOwners"].ID):
-		utxos, err = unpackImportForOwnersArgs(args)
+	case string(ABI.Methods["remoteImportUTXOs"].ID):
+		utxos, err = unpackRemoteImportArgs(args)
 	default:
 		return nil, false
 	}
@@ -121,10 +121,10 @@ func unpackImportArgs(args []byte) ([]avax.UTXOID, common.Address, error) {
 	return toUTXOIDs(in.Utxos), in.To, nil
 }
 
-// unpackImportForOwnersArgs parses importForOwners arguments, selector excluded.
-func unpackImportForOwnersArgs(args []byte) ([]avax.UTXOID, error) {
+// unpackRemoteImportArgs parses remoteImportUTXOs arguments, selector excluded.
+func unpackRemoteImportArgs(args []byte) ([]avax.UTXOID, error) {
 	var utxos []UTXOID
-	if err := ABI.UnpackInputIntoInterface(&utxos, "importForOwners", args); err != nil {
+	if err := ABI.UnpackInputIntoInterface(&utxos, "remoteImportUTXOs", args); err != nil {
 		return nil, err
 	}
 	return toUTXOIDs(utxos), nil
@@ -152,11 +152,11 @@ func importUTXOs(accessibleState contract.AccessibleState, caller common.Address
 	})
 }
 
-// importForOwners credits each UTXO to its owner, if that owner allowed
+// remoteImportUTXOs credits each UTXO to its owner, if that owner allowed
 // remote imports. The caller only pays gas.
-func importForOwners(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func remoteImportUTXOs(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return runImport(accessibleState, caller, input, suppliedGas, readOnly, func(args []byte) ([]avax.UTXOID, common.Address, error) {
-		utxos, err := unpackImportForOwnersArgs(args)
+		utxos, err := unpackRemoteImportArgs(args)
 		return utxos, common.Address{}, err
 	}, func(owner common.Address, statedb contract.StateDB) bool {
 		return statedb.GetState(ContractAddress, RemoteImportKey(owner)) != (common.Hash{})
@@ -249,15 +249,15 @@ func verifiedImports(number *big.Int, blockTime uint64, utxos []avax.UTXOID) (ma
 	return m, nil
 }
 
-func setRemoteImport(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, SetRemoteImportGas); err != nil {
+func allowRemoteImport(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	if remainingGas, err = contract.DeductGas(suppliedGas, AllowRemoteImportGas); err != nil {
 		return nil, 0, err
 	}
 	if readOnly {
 		return nil, remainingGas, vm.ErrWriteProtection
 	}
 	var allowed bool
-	if err := ABI.UnpackInputIntoInterface(&allowed, "setRemoteImport", input); err != nil {
+	if err := ABI.UnpackInputIntoInterface(&allowed, "allowRemoteImport", input); err != nil {
 		return nil, remainingGas, err
 	}
 	var value common.Hash
@@ -266,7 +266,7 @@ func setRemoteImport(accessibleState contract.AccessibleState, caller common.Add
 	}
 	statedb := accessibleState.GetStateDB()
 	statedb.SetState(ContractAddress, RemoteImportKey(caller), value)
-	topics, data, err := ABI.PackEvent("RemoteImportSet", caller, allowed)
+	topics, data, err := ABI.PackEvent("RemoteImportAllowed", caller, allowed)
 	if err != nil {
 		return nil, remainingGas, err
 	}
@@ -384,10 +384,10 @@ func FromReceipts(receipts types.Receipts) ([]Export, []Import, error) {
 
 func createPrecompile() contract.StatefulPrecompiledContract {
 	fns := map[string]contract.RunStatefulPrecompileFunc{
-		"importUTXOs":     importUTXOs,
-		"importForOwners": importForOwners,
-		"setRemoteImport": setRemoteImport,
-		"exportAVAX":      exportAVAX,
+		"importUTXOs":       importUTXOs,
+		"remoteImportUTXOs": remoteImportUTXOs,
+		"allowRemoteImport": allowRemoteImport,
+		"exportAVAX":        exportAVAX,
 	}
 	functions := make([]*contract.StatefulPrecompileFunction, 0, len(fns))
 	for name, fn := range fns {

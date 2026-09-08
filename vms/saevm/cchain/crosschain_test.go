@@ -45,10 +45,10 @@ func importCall(tb testing.TB, to common.Address, utxos ...*avax.UTXO) []byte {
 	return data
 }
 
-// importForOwnersCall imports on behalf of owners that allowed it.
-func importForOwnersCall(tb testing.TB, utxos ...*avax.UTXO) []byte {
+// remoteImportCall imports on behalf of owners that allowed it.
+func remoteImportCall(tb testing.TB, utxos ...*avax.UTXO) []byte {
 	tb.Helper()
-	data, err := crosschain.ABI.Pack("importForOwners", utxoIDs(utxos...))
+	data, err := crosschain.ABI.Pack("remoteImportUTXOs", utxoIDs(utxos...))
 	require.NoError(tb, err)
 	return data
 }
@@ -157,7 +157,7 @@ func TestPrecompileExportAndImport(t *testing.T) {
 		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importCall(t, stranger, utxo2),
 	})
 	strangerImport := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
-		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importForOwnersCall(t, utxo2),
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: remoteImportCall(t, utxo2),
 	})
 	require.NoError(t, node.ethclient.SendTransaction(ctx, theft))
 	node.waitForPendingEthTxs(ctx, t, theft)
@@ -171,7 +171,7 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	require.Equal(t, types.ReceiptStatusFailed, refusedBlk.Receipts()[0].Status)
 	node.assertUTXOsExist(t, node.ctx.ChainID, constants.PlatformChainID, utxo2)
 
-	allow, err := crosschain.ABI.Pack("setRemoteImport", true)
+	allow, err := crosschain.ABI.Pack("allowRemoteImport", true)
 	require.NoError(t, err)
 	allowTx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: allow,
@@ -185,7 +185,7 @@ func TestPrecompileExportAndImport(t *testing.T) {
 	// block settles and leaves the processing range.
 	clock.Set(clock.Now().Add(time.Minute))
 	strangerImport2 := wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
-		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: importForOwnersCall(t, utxo2),
+		To: &precompile, Gas: 100_000, GasFeeCap: big.NewInt(1), Data: remoteImportCall(t, utxo2),
 	})
 	require.NoError(t, node.ethclient.SendTransaction(ctx, strangerImport2))
 	node.waitForPendingEthTxs(ctx, t, strangerImport2)
