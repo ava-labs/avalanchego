@@ -16,8 +16,8 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.14.0 is the earliest version that supports Granite.
-DEFAULT_VERSION="1.14.0"
+# v1.15.0 is the earliest version that supports Helicon.
+DEFAULT_VERSION="1.15.0"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
