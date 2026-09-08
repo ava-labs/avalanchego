@@ -6,7 +6,16 @@
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
-This release schedules the activation of the following Avalanche Community Proposals (ACPs):
+This release schedules the activation of the Helicon network upgrade at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
+
+**All Mainnet nodes must upgrade before 11 AM ET, September 22nd 2026.**
+
+This release updates the plugin version to `46`. All plugins must update to remain compatible.
+
+### Features
+
+Helicon activates the following Avalanche Community Proposals (ACPs):
+
 - [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-continuous-execution/README.md) C-Chain Async Execution
 - [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
 - [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
@@ -14,11 +23,9 @@ This release schedules the activation of the following Avalanche Community Propo
 - [ACP-283](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md) Dynamic Minimum C-Chain Gas Price
 - [ACP-285](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/285-reduce-minimum-consumption-rate/README.md) Reduce Minimum Consumption Rate
 
-The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
+Other features:
 
-**All Mainnet nodes must upgrade before 11 AM ET, September 22nd 2026.**
-
-This release updates the plugin version to `46`. All plugins must update to remain compatible.
+- Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
 
 ### C-Chain State Sync
 
@@ -176,11 +183,6 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - `tx-pool-account-queue`
 - `tx-pool-global-queue`
 - `api-max-blocks-per-request`
-
-### Features
-
-- Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
-- The Primary Network minimum validator staking duration decreases from 2 weeks to 48 hours at Helicon activation (ACP-273).
 
 ### Fixes
 
