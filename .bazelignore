@@ -1,3 +1,4 @@
+.agents
 .claude
 .direnv
 .bazel/patches/build_files

@@ -35,7 +35,7 @@ var (
 // ConnectionHandler handles peer connection events
 type ConnectionHandler interface {
 	// Connected is called when we connect to nodeID
-	Connected(nodeID ids.NodeID)
+	Connected(nodeID ids.NodeID, ver *version.Application)
 	// Disconnected is called when we disconnect from nodeID
 	Disconnected(nodeID ids.NodeID)
 }
@@ -107,9 +107,9 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) 
 	return n.router.AppGossip(ctx, nodeID, msg)
 }
 
-func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
+func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, ver *version.Application) error {
 	for _, c := range n.connectionHandlers {
-		c.Connected(nodeID)
+		c.Connected(nodeID, ver)
 	}
 
 	return nil
@@ -146,7 +146,7 @@ type Peers struct {
 	set  set.SampleableSet[ids.NodeID]
 }
 
-func (p *Peers) Connected(nodeID ids.NodeID) {
+func (p *Peers) Connected(nodeID ids.NodeID, _ *version.Application) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

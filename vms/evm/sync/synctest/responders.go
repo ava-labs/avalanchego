@@ -145,8 +145,9 @@ func NewCancelAfter[Req, Resp proto.Message](
 }
 
 func (c *CancelAfter[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+	resp, appErr := c.inner.Respond(ctx, nodeID, req)
 	if int(c.seen.Add(1)) >= c.at {
 		c.cancel()
 	}
-	return c.inner.Respond(ctx, nodeID, req)
+	return resp, appErr
 }

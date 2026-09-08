@@ -4,6 +4,7 @@
 package sae
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -21,13 +23,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // TestRecoverAfterCrash recovers from a copy of a running VM's database,
@@ -279,11 +284,123 @@ func TestRecover(t *testing.T) {
 	}
 }
 
+// TestRecoverSnapshotAfterShutdown cleanly restarts a VM. The snapshot
+// persisted at shutdown MUST be loaded as-is and MUST verify against the
+// recovered state.
+//
+// A snapshot that fails to load is regenerated, which may take hours on a
+// mainnet-sized state. Until that finishes, state reads and state-sync serving
+// fall back to the far slower trie. Clean restarts are routine and should not
+// result in a significant performance reduction.
+func TestRecoverSnapshotAfterShutdown(t *testing.T) {
+	t.Parallel()
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	sharedOpts := []options.Option[sutConfig]{
+		timeOpt,
+		withSnapshot(),
+	}
+	db := memdb.New()
+	xdb := saetest.NewHeightIndexDB()
+	ctx, sut := newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	}))...)
+	// The genesis snapshot generates in the background. Waiting for it keeps
+	// the blocks below from interrupting generation.
+	requireSnapshotEventuallyVerified(t, sut)
+
+	newBlock := func(t *testing.T) *blocks.Block {
+		t.Helper()
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		vmTime.AdvanceToSettle(ctx, t, b)
+		return b
+	}
+
+	settled := newBlock(t)
+	settler := newBlock(t)
+	require.Equal(t, settled.PostExecutionStateRoot(), settler.SettledStateRoot(), "the settled root should have advanced")
+
+	sut.verifySnapshot(t)
+	snaps := sut.rawVM.exec.Snapshot()
+	sut.close()
+
+	// Closing flattens every diff layer into the disk layer before persisting
+	// it, so the root MUST be read afterwards.
+	want := settler.SettledStateRoot()
+	require.Equal(t, want, snaps.DiskRoot(), "shutting down should flush the last settled state to disk")
+
+	_, sut = newSUT(t, 1, append(sharedOpts, withExecResultsDB(xdb.Clone()), options.Func[sutConfig](func(c *sutConfig) {
+		c.db = saetest.CopyDB(t, db)
+	}))...)
+
+	snaps = sut.rawVM.exec.Snapshot()
+	require.NotNilf(t, snaps, "%T.Snapshot()", sut.rawVM.exec)
+	require.Equalf(t, want, snaps.DiskRoot(), "%T.DiskRoot() after restart MUST be the root persisted at shutdown", snaps)
+	sut.verifySnapshot(t)
+}
+
+// A failure to open the execution-results database must abort [VM]
+// initialization with an error that unwraps to the cause.
+func TestNewVMExecutionResultsDBError(t *testing.T) {
+	t.Parallel()
+
+	errInjected := errors.New("injected ExecutionResultsDB failure")
+	_, err := tryNewSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetypes.ExecutionResults{}, errInjected
+		}))
+		c.logLevel = logging.Warn
+	}))
+	require.ErrorIs(t, err, errInjected, "Initialize() with failing ExecutionResultsDB")
+}
+
+func TestNewVMIncompatibleExecutionResults(t *testing.T) {
+	t.Parallel()
+
+	sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
+	var (
+		srcDB      database.Database
+		srcGenesis core.Genesis
+	)
+	ctx, src := newSUT(t, 1, sutOpt, options.Func[sutConfig](func(c *sutConfig) {
+		srcDB = c.db
+		srcGenesis = c.genesis
+		c.logLevel = logging.Warn
+	}))
+
+	b := src.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, b)
+	settler := src.runConsensusLoop(t)
+	require.NoErrorf(t, settler.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settler)
+	require.Equal(t, b.Height(), src.rawVM.last.settled.Load().Height(), "settled height after accepting settler")
+
+	_, err := tryNewSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+			return saetest.NewExecutionResultsDB(), nil
+		}))
+		c.db = saetest.CopyDB(t, srcDB)
+		c.genesis = srcGenesis
+		c.logLevel = logging.Warn
+	}))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "Initialize() with incompatible execution-results DB")
+}
+
 func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 	t.Helper()
 
+	opts := cmp.Options{
+		blocks.CmpOpt(),
+		blocks.IgnoreLastSettledExecutionArtefacts(t),
+	}
+
 	t.Run("consensus_critical", func(t *testing.T) {
-		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, blocks.CmpOpt()); diff != "" {
+		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, opts); diff != "" {
 			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.rawVM, diff)
 		}
 		for _, b := range sut.rawVM.consensusCritical.m {
@@ -302,7 +419,7 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			t.Run(name, func(t *testing.T) {
 				got := fn(sut.rawVM)
 				want := fn(src.rawVM)
-				if diff := cmp.Diff(want, got, blocks.CmpOpt()); diff != "" {
+				if diff := cmp.Diff(want, got, opts); diff != "" {
 					t.Errorf("(-want +got):\n%s", diff)
 				}
 			})

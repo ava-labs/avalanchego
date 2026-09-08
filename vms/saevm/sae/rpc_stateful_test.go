@@ -207,7 +207,7 @@ func TestDebugTrace(t *testing.T) {
 	// A controlled clock keeps the executed base fees reproducible.
 	timeOpt, clock := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompile := common.Address{'p', 'r', 'e', 'c', 'o', 'm', 'p'}
-	ctx, sut := newSUT(t, 1,
+	ctx, sut := newSUT(t, 2,
 		timeOpt,
 		// Using an increased base fee allows the fee to change during the test.
 		withGenesisBaseFee(params.GWei),
@@ -249,7 +249,7 @@ func TestDebugTrace(t *testing.T) {
 	// 0 and logs the base fee it replayed with at index 1.
 	precompileTx := callPrecompile()
 	logBaseFeeCode, logBaseFeePC, cmpBaseFeeLOG1 := logTopOfStackAfter(t, saetest.Ops(vm.BASEFEE))
-	baseFeeTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	baseFeeTx := sut.wallet.SetNonceAndSign(t, 1, &types.DynamicFeeTx{
 		GasFeeCap: gasPrice,
 		Gas:       1e6,
 		Data:      logBaseFeeCode,

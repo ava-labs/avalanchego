@@ -8,97 +8,142 @@ package statesync
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
-var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
+var _ adaptor.SyncableVM[*summary] = (*Handler)(nil)
 
-// SummaryHandler wraps the SAE [statesync.SummaryHandler] with the C-Chain
-// atomic trie state at the settled height.
-type SummaryHandler struct {
-	*statesync.SummaryHandler
+// Handler wraps the SAE [statesync.Handler] with the cross-chain state at the
+// settled height. It provides a full implementation of [adaptor.SyncableVM] to
+// be used with a VM to provide state sync functionality.
+//
+// TODO(StephenButtolph): Investigate better abstracting syncing in the handler.
+type Handler struct {
+	*statesync.Handler
 
-	hooks hook.Points
-	state *state.State
-	ethDB ethdb.Database
-	log   logging.Logger
+	cfg     statesync.Config
+	hooks   hook.Points
+	state   *state.State
+	network *network.Network
+	ethDB   ethdb.Database
+	snowCtx *snow.Context
+
+	// Lifecycle management
+	mu      sync.Mutex
+	stopped bool
+	cancel  context.CancelFunc
+	err     utils.Atomic[error]
+	done    chan struct{}
 }
 
-// New constructs a new [SummaryHandler] with the given configuration and
+// New constructs a new [Handler] with the given configuration and
 // database.
 func New(
 	cfg statesync.Config,
 	db ethdb.Database,
+	snowCtx *snow.Context,
+	network *network.Network,
 	hooks hook.Points,
 	state *state.State,
-	log logging.Logger,
-) (*SummaryHandler, error) {
+) (*Handler, error) {
 	inner, err := statesync.New(
 		cfg,
 		db,
-		log,
+		snowCtx,
+		network,
 		hooks,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)
 	}
-	return &SummaryHandler{
-		SummaryHandler: inner,
-		state:          state,
-		hooks:          hooks,
-		ethDB:          db,
-		log:            log,
+	return &Handler{
+		Handler: inner,
+		cfg:     cfg,
+		state:   state,
+		hooks:   hooks,
+		network: network,
+		ethDB:   db,
+		snowCtx: snowCtx,
+		done:    make(chan struct{}),
 	}, nil
 }
 
-// GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
-// but the returned summary contains the settled C-Chain state root.
-func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetStateSummary(ctx, height))
+// Shutdown cancels any ongoing state sync and waits for the sync goroutine to
+// exit, returning early with the context's error if ctx expires first. After
+// Shutdown, no new sync can be started.
+func (h *Handler) Shutdown(ctx context.Context) error {
+	h.mu.Lock()
+	h.stopped = true
+	cancel := h.cancel
+	h.mu.Unlock()
+
+	if cancel == nil {
+		// no sync was ever started
+		return nil
+	}
+	cancel()
+	select {
+	case <-h.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
-// GetLastStateSummary is the same as [statesync.SummaryHandler.GetLastStateSummary],
+// GetStateSummary is the same as [statesync.Handler.GetStateSummary],
 // but the returned summary contains the settled C-Chain state root.
-func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetLastStateSummary(ctx))
+func (h *Handler) GetStateSummary(ctx context.Context, height uint64) (*summary, error) {
+	return h.wrap(h.Handler.GetStateSummary(ctx, height))
 }
 
-// GetOngoingSyncStateSummary is the same as [statesync.SummaryHandler.GetOngoingSyncStateSummary],
+// GetLastStateSummary is the same as [statesync.Handler.GetLastStateSummary],
 // but the returned summary contains the settled C-Chain state root.
-func (h *SummaryHandler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
-	return h.wrap(h.SummaryHandler.GetOngoingSyncStateSummary(ctx))
+func (h *Handler) GetLastStateSummary(ctx context.Context) (*summary, error) {
+	return h.wrap(h.Handler.GetLastStateSummary(ctx))
+}
+
+// GetOngoingSyncStateSummary is not implemented. It always returns
+// [database.ErrNotFound].
+//
+// TODO(alarso16): Allow resuming state sync.
+func (*Handler) GetOngoingSyncStateSummary(ctx context.Context) (*summary, error) {
+	return nil, database.ErrNotFound
 }
 
 // wrap pairs an SAE summary with the C-Chain atomic trie root at the
 // corresponding block's settled height.
-//
-// Any database errors are logged at [logging.Error] and returned to the caller.
-func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, error) {
+func (h *Handler) wrap(base *statesync.Summary, err error) (*summary, error) {
 	if err != nil {
 		return nil, err
 	}
 
-	hdr := rawdb.ReadHeader(h.ethDB, base.AcceptedHash, base.AcceptedHeight)
-	if hdr == nil {
-		h.log.Error("missing header",
+	settledHeight, err := h.settledHeight(base.AcceptedHash, base.AcceptedHeight)
+	if err != nil {
+		h.snowCtx.Log.Error("getting settled height for summary",
 			zap.Uint64("acceptedHeight", base.AcceptedHeight),
 			zap.Stringer("acceptedHash", base.AcceptedHash),
+			zap.Error(err),
 		)
-		return nil, fmt.Errorf("missing header %d with hash %s", base.AcceptedHeight, base.AcceptedHash)
+		return nil, err
 	}
-	settledHeight := h.hooks.SettledBy(hdr).Height
+
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
-		h.log.Error("getting settled cross-chain state root",
+		h.snowCtx.Log.Error("getting settled cross-chain state root",
 			zap.Uint64("acceptedHeight", base.AcceptedHeight),
 			zap.Stringer("acceptedHash", base.AcceptedHash),
 			zap.Uint64("settledHeight", settledHeight),
@@ -110,4 +155,12 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		summary:     *base,
 		settledRoot: root,
 	}, nil
+}
+
+func (h *Handler) settledHeight(hash common.Hash, height uint64) (uint64, error) {
+	hdr := rawdb.ReadHeader(h.ethDB, hash, height)
+	if hdr == nil {
+		return 0, database.ErrNotFound
+	}
+	return h.hooks.SettledBy(hdr).Height, nil
 }

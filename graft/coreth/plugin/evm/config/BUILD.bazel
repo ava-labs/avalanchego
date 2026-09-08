@@ -16,7 +16,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config",
     deps = [
         "//graft/evm/utils",
+        "//ids",
         "//utils/constants",
+        "//utils/set",
         "//vms/components/gas",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
@@ -30,8 +32,10 @@ graft_go_test(
     srcs = ["config_test.go"],
     embed = [":config"],
     deps = [
+        "//ids",
         "//utils",
         "//utils/constants",
+        "//utils/set",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

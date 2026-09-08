@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"math"
 	"math/big"
@@ -74,6 +75,7 @@ import (
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -93,12 +95,15 @@ type SUT struct {
 	ethclient  *ethclient.Client
 	clientOnce func()
 
-	ctx       *snow.Context
-	db        database.Database
-	memory    *atomic.Memory
+	ctx            *snow.Context
+	db             database.Database
+	memory         *atomic.Memory
+	sharedMemoryDB database.Database
+
 	sender    *saetest.Sender
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
+	logger    *loggingtest.Logger
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -106,15 +111,16 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		clock      *saetest.Clock
-		vmConfig   config
-		db         database.Database
-		state      snow.State
-		upgrades   upgrade.Config
+		genesis      core.Genesis
+		nodeID       ids.NodeID
+		networkID    uint32
+		validators   *warptest.Validators
+		clock        *saetest.Clock
+		vmConfig     config
+		db           database.Database
+		chainDataDir string
+		state        snow.State
+		upgrades     upgrade.Config
 
 		skipRPCTransport bool
 	}
@@ -155,6 +161,14 @@ func withoutRPCTransport() sutOption {
 func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
+	})
+}
+
+// withChainDataDir overrides the SUT's chain data directory, useful for
+// re-using the execution results DB.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
 	})
 }
 
@@ -246,6 +260,21 @@ func withArchival() sutOption {
 	})
 }
 
+// withCommitInterval sets the interval at which trie roots are persisted.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
+// true.
+func withStateSyncDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateSyncEnabled = false
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -276,6 +305,16 @@ var chainDBPrefix = []byte("chain")
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	sut, err := tryNewSUT(tb, opts...)
+	require.NoError(tb, err, "tryNewSUT()")
+	return sut.logger.CancelOnError(tb.Context()), sut
+}
+
+// tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
+// [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
+	tb.Helper()
+
 	// Run under the latest network upgrade rules by default.
 	chainConfig := cparams.Copy(saetest.ChainConfig())
 	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
@@ -289,14 +328,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb),
-			clock:      saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:       ids.GenerateTestNodeID(),
+			networkID:    constants.UnitTestID,
+			validators:   warptest.NewValidators(tb),
+			clock:        saetest.NewClock(testStartTime, time.Millisecond),
+			vmConfig:     defaultConfig(),
+			db:           memdb.New(),
+			chainDataDir: tb.TempDir(),
+			state:        snow.NormalOp,
+			upgrades:     upgradetest.GetConfig(upgradetest.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -308,8 +348,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
-	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
+	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), db)
+	memory := atomic.NewMemory(sharedMemoryDB)
+
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	snowCtx.ChainDataDir = cfg.chainDataDir
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
@@ -330,7 +373,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -339,7 +382,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		configBytes,
 		nil, // fxs
 		appSender,
-	), "%T.Initialize()", vm)
+	); err != nil {
+		return nil, fmt.Errorf("%T.Initialize(): %w", vm, err)
+	}
 	tb.Cleanup(func() {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
@@ -357,13 +402,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
 	sut := &SUT{
-		VM:        vm,
-		db:        db,
-		ctx:       snowCtx,
-		memory:    memory,
-		sender:    appSender,
-		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
-		clock:     cfg.clock,
+		VM:             vm,
+		db:             db,
+		ctx:            snowCtx,
+		memory:         memory,
+		sharedMemoryDB: sharedMemoryDB,
+		sender:         appSender,
+		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:          cfg.clock,
+		logger:         log,
 	}
 
 	// Called from [SUT.SetState].
@@ -392,16 +439,20 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	if cfg.state == snow.NormalOp {
 		// The engine sets the preference to the last accepted block when entering
 		// normal operation. The bootstrapper will first set it to bootstrapping.
-		require.NoErrorf(tb, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", vm, snow.Bootstrapping)
+		if err := sut.SetState(ctx, snow.Bootstrapping); err != nil {
+			return nil, fmt.Errorf("%T.SetState(%s): %w", vm, snow.Bootstrapping, err)
+		}
 		lastAccepted, err := sut.LastAccepted(ctx)
 		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
 		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
 	}
-	require.NoErrorf(tb, sut.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+	if err := sut.SetState(ctx, cfg.state); err != nil {
+		return nil, fmt.Errorf("%T.SetState(%s): %w", vm, cfg.state, err)
+	}
 
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
-	return ctx, sut
+	return sut, nil
 }
 
 func (s *SUT) SetState(ctx context.Context, state snow.State) error {
@@ -626,6 +677,17 @@ func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...bloc
 	return blk
 }
 
+// blockAtHeight returns the accepted block at the given height.
+func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
+	tb.Helper()
+
+	id, err := s.GetBlockIDAtHeight(ctx, height)
+	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.VM, height)
+	blk, err := s.GetBlock(ctx, id)
+	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.VM, id)
+	return blk
+}
+
 // lastAccepted returns the ID of the last-accepted block.
 func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	tb.Helper()
@@ -633,6 +695,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	id, err := s.LastAccepted(ctx)
 	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
 	return id
+}
+
+// lastAcceptedHeight returns the height of the last-accepted block.
+func (s *SUT) lastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
+	tb.Helper()
+
+	blk, err := s.GetBlock(ctx, s.lastAccepted(ctx, tb))
+	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.VM)
+	return blk.Height()
 }
 
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
@@ -689,6 +760,19 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// parseVerifyAccept drives a block produced by another node through
+// this SUT's consensus surface, as the engine would during bootstrapping or
+// normal operation.
+func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.Block) *blocks.Block {
+	tb.Helper()
+
+	parsed, err := s.ParseBlock(ctx, blk.Bytes())
+	require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
+	return parsed
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -810,7 +894,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -852,7 +936,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -939,7 +1023,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -990,6 +1074,17 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	}
 }
 
+func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transactions, stxs []*tx.Tx) {
+	tb.Helper()
+
+	if diff := cmp.Diff(ethTxs, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		tb.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
+	if diff := cmp.Diff(stxs, blockTxs(tb, blk), txtest.CmpOpt()); diff != "" {
+		tb.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
+	}
+}
+
 // blockTxs returns every cross-chain tx encoded in the block.
 func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 	tb.Helper()
@@ -1034,12 +1129,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
 	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
-		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
-	}
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, types.Transactions{tracedTx}, []*tx.Tx{signedExport})
 
 	rpc := sut.GethRPCBackends()
 	// To rebuild the state at a particular tx, the [saexec.Execute] method is
@@ -1122,6 +1212,27 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 
 	wantBalance := new(uint256.Int).Sub(&preBalance, uint256.NewInt(totalCharged))
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
+}
+
+func TestEstimateGasIgnoresMinimumGasConsumption(t *testing.T) {
+	const (
+		gasLimit    = uint64(100_000_000)
+		minEstimate = ethparams.TxGasContractCreation
+		// The RPC estimator may stop its binary search once it is within 1.5%
+		// of the exact estimate.
+		maxEstimate = minEstimate * 1_015 / 1_000
+	)
+	from := common.Address{'m', 'e'}
+	ctx, sut := newSUT(t, withMaxAllocFor(from))
+
+	got, err := sut.ethclient.EstimateGas(ctx, ethereum.CallMsg{
+		From:      from,
+		Gas:       gasLimit,
+		GasFeeCap: big.NewInt(1),
+	})
+	require.NoError(t, err, "%T.EstimateGas(...)", sut.ethclient)
+	require.GreaterOrEqual(t, got, minEstimate, "%T.EstimateGas(...)", sut.ethclient)
+	require.LessOrEqual(t, got, maxEstimate, "%T.EstimateGas(...)", sut.ethclient)
 }
 
 // TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
@@ -1419,6 +1530,33 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
 		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
 	})
+}
+
+// Restarting with a settled asynchronous block requires the chain data
+// directory (home of the execution-results DB) to be carried over along with
+// the database; startup fails otherwise.
+func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	timeOpt, clock := withVMTime(testStartTime)
+	db := memdb.New()
+	dataDir := t.TempDir()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	w := newWallet(key, node.ctx, node.Client)
+
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.AdvanceToSettle(ctx, t, settled)
+	settler := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settles the first block")
+
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	_, err := tryNewSUT(t, alloc, timeOpt, withDB(db))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "restart without the chain data directory")
+
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full

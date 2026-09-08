@@ -233,30 +233,7 @@ func (s *SUT) assertEqual(tb testing.TB, want *SUT) {
 		assert.Equalf(tb, wantRoot, gotRoot, "%T.GetRoot(%d)", s.stateImpl, h)
 	}
 
-	type entry struct {
-		Key   []byte
-		Value []byte
-	}
-	dbEntries := func(db database.Database) []entry {
-		tb.Helper()
-
-		it := db.NewIterator()
-		defer it.Release()
-
-		var out []entry
-		for it.Next() {
-			out = append(out, entry{
-				Key:   slices.Clone(it.Key()),
-				Value: slices.Clone(it.Value()),
-			})
-		}
-		require.NoErrorf(tb, it.Error(), "%T.Error()", it)
-		return out
-	}
-
-	wantEntries := dbEntries(want.sharedMemoryDB)
-	gotEntries := dbEntries(s.sharedMemoryDB)
-	assert.Equalf(tb, wantEntries, gotEntries, "shared memory")
+	saetest.AssertEqualDBs(tb, want.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
 }
 
 func (s *SUT) assertHasTxs(tb testing.TB, blocks []block) {

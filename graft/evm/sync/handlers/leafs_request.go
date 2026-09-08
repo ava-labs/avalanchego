@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/syncutils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
 var _ LeafRequestHandler = (*leafsRequestHandler)(nil)
@@ -421,15 +422,18 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 	defer func() { rb.trieReadTime += time.Since(startTime) }()
 
 	// create iterator to iterate the trie
-	nodeIt, err := rb.t.NodeIterator(rb.nextKey())
-	if err != nil {
-		return false, err
-	}
-	it := trie.NewIterator(nodeIt)
 	more := false
-	for it.Next() {
+	start := rb.nextKey()
+	if len(start) == 0 {
+		start = make([]byte, rb.keyLength)
+	}
+	for pair, err := range hashdb.LeafIterator(rb.t, start) {
+		if err != nil {
+			return false, err
+		}
+
 		// if we're at the end, break this loop
-		if len(end) > 0 && bytes.Compare(it.Key, end) > 0 {
+		if len(end) > 0 && bytes.Compare(pair.Key, end) > 0 {
 			more = true
 			break
 		}
@@ -442,10 +446,10 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 		}
 
 		// append key/vals to the response
-		rb.response.Keys = append(rb.response.Keys, it.Key)
-		rb.response.Vals = append(rb.response.Vals, it.Value)
+		rb.response.Keys = append(rb.response.Keys, pair.Key)
+		rb.response.Vals = append(rb.response.Vals, pair.Value)
 	}
-	return more, it.Err
+	return more, nil
 }
 
 // readLeafsFromSnapshot iterates the storage snapshot of the requested account
