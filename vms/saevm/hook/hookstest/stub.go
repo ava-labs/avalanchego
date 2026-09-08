@@ -127,11 +127,18 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return hdr, nil
 }
 
+// TxFilter accepts every transaction.
+//
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
+func (*Stub) TxFilter(ctx context.Context, header *types.Header, lastSettledBlock common.Hash, settledState libevm.StateReader, source saetypes.BlockSource) func(*types.Transaction) error {
+	return func(*types.Transaction) error { return nil }
+}
+
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
 // sequence.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, lastSettledBlock common.Hash, settledState libevm.StateReader, source saetypes.BlockSource) iter.Seq[Op] {
+func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, lastSettledBlock common.Hash, settledState libevm.StateReader, source saetypes.BlockSource, txs []*types.Transaction) iter.Seq[Op] {
 	return func(yield func(Op) bool) {
 		for _, op := range s.Ops {
 			if s.InvalidOpIDs.Contains(op.ID) {

@@ -173,7 +173,7 @@ var (
 	errWrongCredentialType    = errors.New("wrong credential type")
 )
 
-func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, _ *ImportAuth, creds []Credential) error {
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
 		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}

@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -133,7 +132,9 @@ func rootKey(height uint64) []byte {
 // the EVM at height, written alongside the txs' operations.
 //
 // Apply is a noop when height is not higher than [State.CurrentHeight].
-func (s *State) Apply(height uint64, txs []*tx.Tx, exports []*chainsatomic.Element) error {
+// Apply writes the shared-memory changes of the block at height: the atomic
+// transactions plus extra requests from the cross-chain transfer precompile.
+func (s *State) Apply(height uint64, txs []*tx.Tx, extra map[ids.ID]*chainsatomic.Requests) error {
 	if currentHeight := s.currentHeight.Load(); height <= currentHeight {
 		// During restarts, it is expected for SAE to reprocess already-applied
 		// heights. Shared memory is not safe to apply multiple times for the
@@ -149,11 +150,13 @@ func (s *State) Apply(height uint64, txs []*tx.Tx, exports []*chainsatomic.Eleme
 	if err != nil {
 		return fmt.Errorf("merging atomic ops: %w", err)
 	}
-	if len(exports) > 0 {
-		if ops[constants.PlatformChainID] == nil {
-			ops[constants.PlatformChainID] = &chainsatomic.Requests{}
+	for chainID, req := range extra {
+		if existing, ok := ops[chainID]; ok {
+			existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
+			existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
+		} else {
+			ops[chainID] = req
 		}
-		ops[constants.PlatformChainID].PutRequests = append(ops[constants.PlatformChainID].PutRequests, exports...)
 	}
 
 	var (

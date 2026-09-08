@@ -461,7 +461,6 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.now,
 		desiredParams{},
 		m,
-		common.Address{},
 	)
 }
 
@@ -1026,8 +1025,8 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 	tb.Helper()
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(blk.EthBlock()))
-	require.NoErrorf(tb, err, "tx.ParseSlice()")
+	txs, _, err := tx.ParseExtData(customtypes.BlockExtData(blk.EthBlock()))
+	require.NoErrorf(tb, err, "tx.ParseExtData()")
 	return txs
 }
 

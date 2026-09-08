@@ -248,12 +248,18 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	hdr.GasLimit = state.GasLimit()
 	hdr.BaseFee = state.BaseFee().ToBig()
 
+	// Keep this view separate from the mutable worst-case balance calculation.
+	settledState, err := b.exec.StateDB(lastSettled.PostExecutionStateRoot())
+	if err != nil {
+		return nil, fmt.Errorf("opening settled state for end-of-block operations: %w", err)
+	}
 	var (
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
 		})
 		included      []*types.Transaction
 		includedBytes uint64
+		filter        = builder.TxFilter(ctx, hdr, lastSettled.Hash(), settledState, b.source)
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -286,6 +292,11 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
+		if err := filter(tx); err != nil {
+			txLog.Debug("Transaction excluded by hook filter", zap.Error(err))
+			continue
+		}
+
 		// The [saexec.Executor] checks the worst-case balance before tx
 		// execution so we MUST record it at the equivalent point, before
 		// ApplyTx().
@@ -298,12 +309,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		includedBytes += txBytes
 	}
 	var includedOps []T
-	// Keep this view separate from the mutable worst-case balance calculation.
-	settledState, err := b.exec.StateDB(lastSettled.PostExecutionStateRoot())
-	if err != nil {
-		return nil, fmt.Errorf("opening settled state for end-of-block operations: %w", err)
-	}
-	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), settledState, b.source) {
+	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), settledState, b.source, included) {
 		// TODO(StephenButtolph): Return additional information from
 		// [hook.PointsG.PotentialEndOfBlockOps] to terminate the loop early
 		// when there is insufficient block space remaining.

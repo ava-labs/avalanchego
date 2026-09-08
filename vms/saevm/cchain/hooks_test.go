@@ -4,7 +4,6 @@
 package cchain
 
 import (
-	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -18,56 +17,48 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/crosschain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-func TestHelperExportLogFilter(t *testing.T) {
-	helper, owner := common.Address{1}, ids.ShortID{2}
-	call, err := payload.NewAddressedCall(helper[:], binary.BigEndian.AppendUint64(owner[:], 42))
+func TestSharedMemoryRequests(t *testing.T) {
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	h := &hooks{builder: builder{ctx: snowCtx}}
+	from, owner := common.Address{1}, common.Address{2}
+	exportTopics, exportData, err := crosschain.ABI.PackEvent("Exported", from, [32]byte(constants.PlatformChainID), owner, uint64(42))
 	require.NoError(t, err)
-	msg, err := avalanchewarp.NewUnsignedMessage(1, ids.GenerateTestID(), call.Bytes())
+	imported := tx.ImportRecord{UTXOID: avax.UTXOID{TxID: ids.GenerateTestID(), OutputIndex: 1}, SourceChain: snowCtx.XChainID, Owner: ids.ShortID(owner), Amount: 9}
+	importTopics, importData, err := crosschain.ABI.PackEvent("Imported", owner, [32]byte(imported.UTXOID.TxID), imported.UTXOID.OutputIndex, imported.Amount)
 	require.NoError(t, err)
-	topics, data, err := corethwarp.PackSendWarpMessageEvent(helper, common.Hash(msg.ID()), msg.Bytes())
+	txHash := common.Hash{7}
+	receipts := types.Receipts{{Status: types.ReceiptStatusSuccessful, Logs: []*types.Log{
+		{Address: crosschain.ContractAddress, Topics: exportTopics, Data: exportData, TxHash: txHash, Index: 0},
+		{Address: crosschain.ContractAddress, Topics: importTopics, Data: importData, TxHash: txHash, Index: 1},
+	}}}
+
+	reqs, err := h.sharedMemoryRequests([]tx.ImportRecord{imported}, receipts)
 	require.NoError(t, err)
-	h := &hooks{builder: builder{helper: helper}}
-	for _, tt := range []struct {
-		name   string
-		mutate func(*types.Log, *types.Receipt)
-		want   int
-	}{
-		{name: "valid", want: 1},
-		{name: "wrong precompile", mutate: func(l *types.Log, _ *types.Receipt) { l.Address = helper }},
-		{name: "wrong event", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics[0] = common.Hash{} }},
-		{name: "wrong helper", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics[1] = common.Hash{} }},
-		{name: "missing topic", mutate: func(l *types.Log, _ *types.Receipt) { l.Topics = l.Topics[:2] }},
-		{name: "reverted", mutate: func(_ *types.Log, r *types.Receipt) { r.Status = types.ReceiptStatusFailed }},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &types.Log{Address: corethwarp.ContractAddress, Topics: append([]common.Hash{}, topics...), Data: data}
-			r := &types.Receipt{Status: types.ReceiptStatusSuccessful, Logs: []*types.Log{l}}
-			if tt.mutate != nil {
-				tt.mutate(l, r)
-			}
-			exports, err := h.exports(types.Receipts{r})
-			require.NoError(t, err)
-			require.Len(t, exports, tt.want)
-			if tt.want == 1 {
-				require.Equal(t, owner, exports[0].owner)
-				require.Equal(t, uint64(42), exports[0].amount)
-			}
-		})
-	}
+	require.Len(t, reqs, 2)
+	require.Len(t, reqs[constants.PlatformChainID].PutRequests, 1)
+	exportedUTXO := avax.UTXOID{TxID: ids.ID(txHash), OutputIndex: 0}
+	exportedID := exportedUTXO.InputID()
+	require.Equal(t, exportedID[:], reqs[constants.PlatformChainID].PutRequests[0].Key)
+	require.Equal(t, [][]byte{owner[:]}, reqs[constants.PlatformChainID].PutRequests[0].Traits)
+	importedID := imported.UTXOID.InputID()
+	require.Equal(t, [][]byte{importedID[:]}, reqs[snowCtx.XChainID].RemoveRequests)
+
+	_, err = h.sharedMemoryRequests(nil, receipts)
+	require.ErrorIs(t, err, errUnverifiedImportCredited)
 }
 
 func TestDelayExponent(t *testing.T) {

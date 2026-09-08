@@ -96,7 +96,7 @@
 <section class="gated" hidden>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
   <h2>C &rarr; P: any EVM wallet exports with one contract call</h2>
-  <p>You call <code>exportToP(to)</code> on <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">CChainHelper.sol</a> (deployed at <span class="mono" data-k="helper"></span>) with AVAX attached. The contract emits a warp log with the P-chain owner and the amount. Nobody signs it. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the contract and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
+  <p>You call <code>exportAVAX(destinationChainID, to)</code> on the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">cross-chain transfer precompile</a> at <span class="mono" data-k="precompile"></span> with AVAX attached. The precompile emits one <code>Exported</code> log with the owner and the amount. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the precompile and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
   <div class="flow"><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div></div>
   <div class="group"><h3>To P-chain address</h3><input id="to" class="addr" spellcheck="false"><p class="note">Prefilled with the demo's P-chain wallet. Any P-chain address works; only that wallet can import it.</p></div>
   <div class="row"><button onclick="run(exportToP)">Export 1 AVAX to the P-chain</button></div>
@@ -122,7 +122,7 @@
 <section class="gated" hidden>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
-  <p>You call <code>importFromP(networkID, avaxAssetID, utxos, fee)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/tests/cchainhelper/CChainHelper.sol" target="_blank">contract</a>. It builds the exact ImportTx, fixes you as its recipient, and stores approval of its hash. This page then submits those bytes with an empty marker credential for each input. The C-chain <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/tx/contract_credential.go" target="_blank">verifier</a> checks the approval in settled EVM state and checks the UTXOs. Anyone can relay the same import, but cannot change your inputs, recipient, or fee. The EVM receipt confirms approval. The later atomic transaction completes the import.</p>
+  <p>You call <code>importUTXOs(utxos)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">precompile</a> with nothing but the UTXO IDs. The <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">block builder</a> checks that the UTXOs exist in shared memory before the block is accepted and records owner and amount in the block. Execution credits the owner with the full amount and consumes the UTXOs. One transaction, one receipt, done. You pay gas only; there is no import fee taken from the funds.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div><div class="stat"><div class="l">C-chain balance</div><div class="v" data-k="cbal">&ndash;</div><div class="s" data-k="caddr">&nbsp;</div></div></div>
   <div class="group"><h3>UTXOs waiting in shared memory for your 0x address</h3><div id="p2c-utxos" class="empty">&ndash;</div></div>
   <div class="row"><button onclick="run(importOnC)">Import on C with your EVM wallet</button></div>
@@ -130,8 +130,8 @@
 </section>
 
 <section class="gated" hidden>
-  <h2>Messages emitted by the contract</h2>
-  <p class="note">Exports use Warp logs with the P-chain owner and amount. Import approvals use ordinary helper events with the hash and unsigned ImportTx. These are the last 2,000 blocks. Yours are highlighted.</p>
+  <h2>Events emitted by the precompile</h2>
+  <p class="note"><code>Exported</code> and <code>Imported</code> logs from the last 2,000 blocks. Yours are highlighted.</p>
   <div id="activity" class="empty">&ndash;</div>
 </section>
 
@@ -139,13 +139,9 @@
 const qs = new URLSearchParams(location.search);
 const RPCBASE = qs.get('rpc') || location.origin;
 const PK = '0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027';
-const WARP_PRECOMPILE = '0x0200000000000000000000000000000000000005';
 const NAVAX = 1000000000n;
 const PFEE = 10000000n;    // 0.01 AVAX burned on P-chain txs
-const CFEE = 1000000n;     // 0.001 AVAX burned by the C-chain import, chosen by you in the contract call
-const CRED_TYPE_CONTRACT = 10;  // tx.ContractCredential type ID in the prototype codec
 const P_TYPE_IMPORT = 17, P_TYPE_EXPORT = 18, TYPE_TRANSFER_INPUT = 5, TYPE_TRANSFER_OUTPUT = 7, TYPE_CREDENTIAL = 9;
-const C_TYPE_IMPORT = 0;   // vms/saevm/cchain/tx codec
 let NET = null;            // /network.json
 let me = null;             // connected MetaMask address
 const pKey = new ethers.SigningKey(PK);
@@ -155,10 +151,13 @@ document.getElementById('pk').textContent = PK;
 document.getElementById('rpcurl').textContent = RPCBASE + '/ext/bc/C/rpc';
 
 const iface = new ethers.Interface([
-  'function exportToP(address to) payable returns (bytes32)',
-  'function importFromP(uint32 networkID, bytes32 avaxAssetID, (bytes32 txID,uint32 outputIndex,uint64 amount)[] imported, uint64 fee) returns (bytes32)',
-  'event ImportAuthorized(bytes32 indexed importHash, bytes unsignedTx)',
+  'function exportAVAX(bytes32 destinationChainID, address to) payable',
+  'function importUTXOs((bytes32 txID,uint32 outputIndex)[] utxos)',
+  'function setRemoteImport(bool allowed)',
+  'event Exported(address indexed from, bytes32 indexed destinationChainID, address to, uint64 amountNAVAX)',
+  'event Imported(address indexed owner, bytes32 txID, uint32 outputIndex, uint64 amountNAVAX)',
 ]);
+const P_CHAIN_ID = '0x' + '00'.repeat(32);
 
 // ---- bech32 (BIP-173) ----
 const B32C = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
@@ -280,42 +279,27 @@ async function refresh() {
   fill('p2c-utxos', table(['UTXO', 'amount'], p2c.map(u => ({ cells: [short(u.txID) + ':' + u.outputIndex, avax(u.amount) + ' AVAX'] }))), 'none waiting');
 }
 
-// ---- export log decoding (SendWarpMessage logs from the precompile, helper as sender) ----
-function decodeExport(dataHex) {
-  const [msg] = ethers.AbiCoder.defaultAbiCoder().decode(['bytes'], dataHex);
-  const b = hexBytes(msg);
-  // unsigned warp message: codec(2) networkID(4) sourceChainID(32) payloadLen(4) | addressed call: codec(2) typeID(4) addrLen(4) addr payloadLen(4) payload
-  let p = 2 + 4 + 32 + 4 + 2 + 4; const alen = new DataView(b.buffer, b.byteOffset).getUint32(p); p += 4 + alen; p += 4;
-  const inner = b.slice(p);
-  const dv = new DataView(inner.buffer, inner.byteOffset);
-  if (inner.length !== 28) throw new Error('not an export message');
-  return { kind: 'export to P', owner: pAddr(inner.slice(0, 20)), amount: dv.getBigUint64(20), mine: pAddr(inner.slice(0, 20)) === NET.pAddress };
-}
-function decodeImport(l) {
+// ---- event decoding ----
+function decodeEvent(l) {
   const e = iface.parseLog(l);
-  const unsigned = hexBytes(e.args.unsignedTx);
-  if (ethers.keccak256(unsigned) !== e.args.importHash) throw new Error('import hash mismatch');
-  // The helper emits one output: address(20), amount(8), assetID(32).
-  const owner = toHex(unsigned.slice(-60, -40));
-  const amount = new DataView(unsigned.buffer, unsigned.byteOffset).getBigUint64(unsigned.length - 40);
-  return { kind: 'import approval', id: e.args.importHash, unsigned, owner, amount, mine: me && owner.toLowerCase() === me.toLowerCase() };
+  if (e.name === 'Exported') {
+    const owner = hexBytes(e.args.to);
+    return { kind: 'export to P', owner: pAddr(owner), amount: e.args.amountNAVAX, mine: toHex(owner) === toHex(pAddrBytes) };
+  }
+  return { kind: 'import from P', owner: e.args.owner, amount: e.args.amountNAVAX, mine: me && e.args.owner.toLowerCase() === me.toLowerCase() };
 }
 async function refreshActivity() {
   if (!NET) return;
   const latest = parseInt(await rpc('/ext/bc/C/rpc', 'eth_blockNumber', []), 16);
   const range = { fromBlock: '0x' + Math.max(0, latest - 2000).toString(16), toBlock: 'latest' };
-  const batches = await Promise.all([
-    rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ ...range, address: WARP_PRECOMPILE,
-      topics: [ethers.id('SendWarpMessage(address,bytes32,bytes)'), ethers.zeroPadValue(NET.helper, 32)] }]),
-    rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ ...range, address: NET.helper,
-      topics: [iface.getEvent('ImportAuthorized').topicHash] }]),
-  ]);
-  const logs = batches.flat().sort((a, b) => parseInt(a.blockNumber, 16) - parseInt(b.blockNumber, 16) || parseInt(a.logIndex, 16) - parseInt(b.logIndex, 16));
+  const logs = await rpc('/ext/bc/C/rpc', 'eth_getLogs', [{ ...range, address: NET.precompile,
+    topics: [[iface.getEvent('Exported').topicHash, iface.getEvent('Imported').topicHash]] }]);
+  logs.sort((a, b) => parseInt(a.blockNumber, 16) - parseInt(b.blockNumber, 16) || parseInt(a.logIndex, 16) - parseInt(b.logIndex, 16));
   const rows = logs.slice(-25).reverse().map(l => {
-    let d; try { d = l.address.toLowerCase() === WARP_PRECOMPILE ? decodeExport(l.data) : decodeImport(l); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', '', short(l.transactionHash)] }; }
-    return { mine: d.mine, cells: [parseInt(l.blockNumber, 16), d.kind, d.amount === null ? '' : avax(d.amount) + ' AVAX', d.owner, short(l.transactionHash)] };
+    let d; try { d = decodeEvent(l); } catch (e) { return { cells: [parseInt(l.blockNumber, 16), 'undecodable', '', '', short(l.transactionHash)] }; }
+    return { mine: d.mine, cells: [parseInt(l.blockNumber, 16), d.kind, avax(d.amount) + ' AVAX', d.owner, short(l.transactionHash)] };
   });
-  fill('activity', table(['C block', 'message', 'amount', 'owner', 'C-chain tx'], rows), 'no messages in the last 2,000 blocks');
+  fill('activity', table(['C block', 'event', 'amount', 'owner', 'C-chain tx'], rows), 'no events in the last 2,000 blocks');
 }
 
 // ---- MetaMask ----
@@ -349,7 +333,7 @@ async function ensureChain() {
 }
 async function sendTx(data, valueWei) {
   await ensureChain();
-  const tx = { from: me, to: NET.helper, data, gas: '0x30d40' };
+  const tx = { from: me, to: NET.precompile, data, gas: '0x30d40' };
   if (valueWei) tx.value = '0x' + valueWei.toString(16);
   const hash = await ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
   const receipt = await poll(async () => { const r = await rpc('/ext/bc/C/rpc', 'eth_getTransactionReceipt', [hash]); return r && r.blockNumber ? r : null; }, 'receipt');
@@ -411,16 +395,6 @@ function pExportTx(utxos, amt, evmAddr20) {
   return concat(pHeader(P_TYPE_EXPORT), list(change > 0n ? [transferOut(change, 0n, pAddrBytes)] : []), list(utxos.map(u => transferIn(u, [0]))), u32(0),
     cChainID(), list([transferOut(amt, 0n, evmAddr20)]));
 }
-function importFromReceipt(receipt) {
-  const l = receipt.logs.find(l => l.address.toLowerCase() === NET.helper.toLowerCase() && l.topics[0] === iface.getEvent('ImportAuthorized').topicHash);
-  if (!l) throw new Error('no import approval in the receipt');
-  return decodeImport(l);
-}
-// Atomic tx = unsigned bytes || numCreds || numCreds x typeID. No payload.
-function contractImportTx(txBytes, numCreds) {
-  const cred = u32(CRED_TYPE_CONTRACT);
-  return concat(txBytes, u32(numCreds), ...Array(numCreds).fill(cred));
-}
 function pickInputs(utxos, need) {
   const picked = []; let total = 0n;
   for (const u of utxos) { if (total >= need) break; picked.push(u); total += u.amount; }
@@ -469,13 +443,12 @@ async function exportToP() {
   const amt = AMOUNT;
   const to = bech32Decode($('to').value);
   const toIsMine = toHex(to) === toHex(pAddrBytes);
-  const st = stepper(['Your EVM wallet sends one contract call', 'The hook writes the UTXO']);
-  st.active(0, 'exportToP(' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. The wallet shows a normal contract call. No Avalanche signature anywhere.');
+  const st = stepper(['Your EVM wallet sends one precompile call', 'The hook writes the UTXO']);
+  st.active(0, 'exportAVAX(P-chain, ' + pAddr(to) + ') with ' + avax(amt) + ' AVAX attached. The wallet shows a normal contract call. No Avalanche signature anywhere.');
   const before = toIsMine ? (await getPUTXOs('C')).length : 0;
-  const receipt = await sendTx(iface.encodeFunctionData('exportToP', [toHex(to)]), amt * NAVAX);
-  const l = receipt.logs.find(l => l.address.toLowerCase() === WARP_PRECOMPILE);
-  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + '. The contract emitted one warp log, 28 bytes of payload: owner and amount.' + (l ? ' Message ' + short(l.topics[2]) + '.' : ''));
-  st.active(1, 'After the block executes, FinishExecutingBlock debits the contract and AfterExecutingBlock writes the UTXO into shared memory, indexed by owner.');
+  const receipt = await sendTx(iface.encodeFunctionData('exportAVAX', [P_CHAIN_ID, toHex(to)]), amt * NAVAX);
+  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + '. The precompile emitted one Exported log: owner and amount.');
+  st.active(1, 'After the block executes, FinishExecutingBlock debits the precompile and AfterExecutingBlock writes the UTXO into shared memory, indexed by owner.');
   if (!toIsMine) { st.done(1, 'UTXO written for ' + pAddr(to) + '. Only that wallet can see and import it.'); return; }
   const utxos = await poll(async () => { const u = await getPUTXOs('C'); return u.length > before ? u : null; }, 'UTXO in shared memory');
   st.done(1, avax(sum(utxos)) + ' AVAX now in shared memory, owned by the P-chain wallet. Same UTXO a C-chain ExportTx would have produced. Export done.');
@@ -506,21 +479,14 @@ async function exportFromP() {
 async function importOnC() {
   const utxos = await getCUTXOs();
   if (!utxos.length) throw new Error('no UTXOs waiting in shared memory for ' + me);
-  const st = stepper(['Your EVM wallet sends one contract call', 'Issue the ImportTx to the C-chain']);
-  st.active(0, 'importFromP(' + utxos.length + ' UTXO(s), fee ' + avax(CFEE) + ' AVAX). The contract stores approval of the exact ImportTx hash, including your inputs, recipient, and fee.');
-  const receipt = await sendTx(iface.encodeFunctionData('importFromP', [NET.networkID, NET.avaxAssetIDHex, utxos.map(u => [u.txID, u.outputIndex, u.amount]), CFEE]));
-  const approval = importFromReceipt(receipt);
-  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' approved import hash ' + short(approval.id) + '. This receipt confirms approval, not completion.');
-  st.active(1, 'This page submits the import without another signature. The chain checks the approval in settled EVM state.');
+  const st = stepper(['Your EVM wallet sends one precompile call']);
+  st.active(0, 'importUTXOs(' + utxos.length + ' UTXO ID(s)). Nothing else. The block builder checks the UTXOs in shared memory before the block is accepted; execution credits you with the full amount.');
   const before = await cBalance();
-  const bytes = contractImportTx(approval.unsigned, utxos.length);
-  const r = await poll(async () => {
-    try { return await rpc('/ext/bc/C/avax', 'avax.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' }); }
-    catch (e) { if (e.message.includes('import not authorized in helper storage')) return null; throw e; }
-  }, 'approval to reach the atomic pool');
-  st.append(1, 'Submitted ImportTx ' + r.txID + ' (' + bytes.length + ' bytes). Waiting for execution...');
+  const receipt = await sendTx(iface.encodeFunctionData('importUTXOs', [utxos.map(u => [u.txID, u.outputIndex])]));
+  const imported = receipt.logs.filter(l => l.address.toLowerCase() === NET.precompile.toLowerCase()).map(l => iface.parseLog(l)).filter(e => e && e.name === 'Imported');
+  const total = imported.reduce((t, e) => t + e.args.amountNAVAX, 0n);
   const after = await poll(async () => { const b = await cBalance(); return b > before ? b : null; }, 'C-chain balance to rise');
-  st.done(1, 'ImportTx ' + r.txID + ' completed. C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX');
+  st.done(0, 'C-chain tx ' + short(receipt.transactionHash) + ' in block ' + parseInt(receipt.blockNumber, 16) + ' imported ' + avax(total) + ' AVAX in ' + imported.length + ' UTXO(s). C-chain balance ' + (Number(after) / 1e18).toFixed(4) + ' AVAX. Import done.');
 }
 
 // ---- boot ----
@@ -529,7 +495,7 @@ async function importOnC() {
     NET = await (await fetch(RPCBASE + '/network.json', { cache: 'no-store' })).json();
   } catch (e) { useLog('fb-setup'); log('network.json not available, the network may still be starting', 'err'); return; }
   $('chainid').textContent = NET.ethChainID;
-  setK('helper', NET.helper);
+  setK('precompile', NET.precompile);
   $('to').value = NET.pAddress;
   if (pAddr(pAddrBytes) !== NET.pAddress) { useLog('fb-setup'); log('page key does not match the network\'s P-chain wallet: ' + pAddr(pAddrBytes) + ' vs ' + NET.pAddress, 'err'); }
   if (typeof ethereum !== 'undefined') ethereum.on('accountsChanged', () => { if (me) connect(); });

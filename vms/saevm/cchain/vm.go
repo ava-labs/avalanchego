@@ -151,7 +151,6 @@ func (vm *VM) Initialize(
 		vm.now,
 		userConfig.desired(),
 		vm.metrics,
-		userConfig.HelperAddress,
 	)
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
 	if err != nil {
@@ -200,7 +199,7 @@ func (vm *VM) Initialize(
 		vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 		const maxTxPoolSize = 1024
-		txpool, err := txpool.New(snowCtx, vm.chainConfig, vm.pending, vm.VM, maxTxPoolSize, userConfig.HelperAddress)
+		txpool, err := txpool.New(snowCtx, vm.chainConfig, vm.pending, vm.VM, maxTxPoolSize)
 		if err != nil {
 			return fmt.Errorf("creating txpool: %w", err)
 		}

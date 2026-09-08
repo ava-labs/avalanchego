@@ -12,9 +12,7 @@ import (
 	"iter"
 	"slices"
 	"sync"
-	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
@@ -62,8 +60,6 @@ type Txpool struct {
 	executionLock sync.RWMutex
 	stateLock     sync.Mutex
 	state         libevm.StateReader
-
-	helper common.Address
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -79,7 +75,6 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
-	helper common.Address,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
@@ -105,8 +100,6 @@ func New(
 		sub:     sub,
 		maxSize: maxSize,
 		state:   state,
-
-		helper: helper,
 	}
 	p.wg.Go(func() {
 		p.updateState(chainConfig, chain, executed)
@@ -268,12 +261,7 @@ func (p *Txpool) verifyState(t *tx.Tx, op hook.Op) error {
 	p.stateLock.Lock()
 	defer p.stateLock.Unlock()
 
-	auth := &tx.ImportAuth{
-		State:     p.state,
-		Helper:    p.helper,
-		Timestamp: uint64(time.Now().Unix()), //#nosec G115 -- Known non-negative
-	}
-	if err := t.VerifyCredentials(p.snowCtx.SharedMemory, auth); err != nil {
+	if err := t.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
 	if err := verifyOp(p.state, op); err != nil {
@@ -298,12 +286,15 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 		inputs.Add(tx.AccountInputID(sender, t.Nonce()))
 	}
 
-	avaxTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	avaxTxs, imports, err := tx.ParseExtData(customtypes.BlockExtData(b))
 	if err != nil {
-		return nil, fmt.Errorf("parsing txs: %w", err)
+		return nil, fmt.Errorf("parsing extData: %w", err)
 	}
 	for _, t := range avaxTxs {
 		inputs.Union(t.InputIDs())
+	}
+	for _, imp := range imports {
+		inputs.Add(imp.UTXOID.InputID())
 	}
 	return inputs, nil
 }

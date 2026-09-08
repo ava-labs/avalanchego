@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/crosschain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
@@ -115,6 +116,9 @@ func TestParseGenesis(t *testing.T) {
 										avalancheutils.PointerTo[uint64](1709740800), // Durango
 									),
 								},
+								{
+									Config: crosschain.NewConfig(unscheduled),
+								},
 							},
 						},
 					},
@@ -182,6 +186,9 @@ func TestParseGenesis(t *testing.T) {
 										avalancheutils.PointerTo[uint64](1707840000), // Durango
 									),
 								},
+								{
+									Config: crosschain.NewConfig(unscheduled),
+								},
 							},
 						},
 					},
@@ -248,6 +255,9 @@ func TestParseGenesis(t *testing.T) {
 									Config: warp.NewDefaultConfig(
 										initiallyActive, // Durango
 									),
+								},
+								{
+									Config: crosschain.NewConfig(unscheduled),
 								},
 							},
 						},

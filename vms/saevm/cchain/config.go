@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
@@ -102,11 +101,6 @@ type config struct {
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
-	// HelperAddress exports AVAX to P through Warp messages and authorizes
-	// imports through contract storage. Zero disables this prototype.
-	//
-	// ponytail: consensus-critical, hardcode per network before shipping.
-	HelperAddress common.Address `json:"helper-address"`
 
 	internalConfig
 }

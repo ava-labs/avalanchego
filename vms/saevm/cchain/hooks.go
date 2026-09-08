@@ -5,7 +5,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/crosschain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -65,9 +64,6 @@ type hooks struct {
 	metrics     *metrics
 }
 
-// exportPayloadLen is owner (20 bytes) || amount in nAVAX (8 bytes).
-const exportPayloadLen = ids.ShortIDLen + 8
-
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
@@ -77,7 +73,6 @@ func newHooks(
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,
-	helper common.Address,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -94,25 +89,27 @@ func newHooks(
 			}
 		}
 	}
-	return &hooks{
+	h := &hooks{
 		builder{
 			ctx,
 			chainConfig,
 			now,
 			poolTxs,
 			desired,
-			helper,
 		},
 		state,
 		warpStorage,
 		metrics,
 	}
+	// RPC simulations run without a verified block and read live shared memory.
+	crosschain.SetResolver(h.resolveImports)
+	return h
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	rawTxs, _, err := tx.ParseExtData(customtypes.BlockExtData(b))
 	if err != nil {
-		return nil, fmt.Errorf("parsing txs: %w", err)
+		return nil, fmt.Errorf("parsing extData: %w", err)
 	}
 
 	txs := make([]*hookTx, len(rawTxs))
@@ -139,7 +136,6 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			priceExponent:  headerExtra.MinPriceExponent,
 			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
-		h.helper,
 	}, nil
 }
 
@@ -243,9 +239,9 @@ func blockTime(h *types.Header) time.Time {
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, _, err := tx.ParseExtData(customtypes.BlockExtData(b))
 	if err != nil {
-		return nil, fmt.Errorf("parsing txs: %w", err)
+		return nil, fmt.Errorf("parsing extData: %w", err)
 	}
 
 	ops := make([]hook.Op, len(txs))
@@ -263,18 +259,35 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
+func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, b *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	if isFirstDurangoBlock := rulesExtra.IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
+	if !rulesExtra.IsHelicon {
+		// Pre-SAE extData can hold codec types this package does not
+		// register, and it never carries precompile imports.
+		return nil
+	}
+	// The genesis never holds the precompile account, even when Helicon is
+	// active from genesis, so the first Helicon block creates it. The nonce
+	// keeps the account from being deleted as empty along with its storage.
+	if statedb.GetNonce(crosschain.ContractAddress) == 0 {
+		activatePrecompile(statedb, crosschain.ContractAddress)
+	}
+	_, imports, err := tx.ParseExtData(customtypes.BlockExtData(b))
+	if err != nil {
+		return fmt.Errorf("parsing extData: %w", err)
+	}
+	crosschain.SetBlockImports(b.NumberU64(), imports)
 	return nil
 }
 
 func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, _, err := tx.ParseExtData(customtypes.BlockExtData(b))
 	if err != nil {
-		return fmt.Errorf("parsing txs: %w", err)
+		return fmt.Errorf("parsing extData: %w", err)
 	}
 
 	extstatedb := extstate.New(statedb)
@@ -284,79 +297,45 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, rec
 		}
 	}
 
-	// The helper holds the caller's value until its message executes here,
-	// so the debit always succeeds; a shortfall means the helper is broken
-	// and the export must not mint.
-	exports, err := h.exports(receipts)
+	// exportAVAX leaves the caller's value at the precompile address. Debit it
+	// here so the export is reproduced by historical execution.
+	exports, _, err := crosschain.FromReceipts(receipts)
 	if err != nil {
 		return err
 	}
 	for _, e := range exports {
-		wei := new(uint256.Int).Mul(uint256.NewInt(e.amount), uint256.NewInt(params.GWei))
-		if statedb.GetBalance(e.helper).Lt(wei) {
-			return fmt.Errorf("%w: %s owes %d nAVAX", errHelperCannotCoverExport, e.helper, e.amount)
+		wei := new(uint256.Int).Mul(uint256.NewInt(e.Amount), uint256.NewInt(params.GWei))
+		if statedb.GetBalance(crosschain.ContractAddress).Lt(wei) {
+			return fmt.Errorf("%w: %d nAVAX", errPrecompileCannotCoverExport, e.Amount)
 		}
-		statedb.SubBalance(e.helper, wei)
+		statedb.SubBalance(crosschain.ContractAddress, wei)
 	}
 	return nil
 }
 
-var errHelperCannotCoverExport = errors.New("helper cannot cover export")
+var errPrecompileCannotCoverExport = errors.New("precompile cannot cover export")
 
-type export struct {
-	helper common.Address
-	owner  ids.ShortID
-	amount uint64
-	utxoID avax.UTXOID
-}
-
-// exports returns the exports a trusted helper emitted in the block: warp
-// messages whose payload is owner || amount. P-chain tx payloads are longer.
-func (h *hooks) exports(receipts types.Receipts) ([]export, error) {
-	var exports []export
-	for _, r := range receipts {
-		if r.Status != types.ReceiptStatusSuccessful {
-			continue
-		}
-		for _, log := range r.Logs {
-			if h.helper == (common.Address{}) || log.Address != corethwarp.ContractAddress || len(log.Topics) != 3 ||
-				log.Topics[0] != corethwarp.WarpABI.Events["SendWarpMessage"].ID || log.Topics[1] != common.BytesToHash(h.helper[:]) {
-				continue
-			}
-			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
-			if err != nil {
-				return nil, fmt.Errorf("parsing warp message (tx %s, log %d): %w", log.TxHash, log.Index, err)
-			}
-			call, err := payload.ParseAddressedCall(m.Payload)
-			if err != nil || len(call.Payload) != exportPayloadLen || len(call.SourceAddress) != common.AddressLength || common.BytesToAddress(call.SourceAddress) != h.helper {
-				continue
-			}
-			exports = append(exports, export{
-				helper: common.BytesToAddress(call.SourceAddress),
-				owner:  ids.ShortID(call.Payload[:ids.ShortIDLen]),
-				amount: binary.BigEndian.Uint64(call.Payload[ids.ShortIDLen:]),
-				utxoID: avax.UTXOID{TxID: ids.ID(log.TxHash), OutputIndex: uint32(log.Index)}, //#nosec G115 -- Won't overflow
-			})
-		}
-	}
-	return exports, nil
-}
-
-// exportElements turns the exports of a block into the P-chain UTXOs written
-// to shared memory, indexed by owner like a P-chain ExportTx would.
-func (h *hooks) exportElements(receipts types.Receipts) ([]*chainsatomic.Element, error) {
-	exports, err := h.exports(receipts)
+// sharedMemoryRequests turns the block's precompile exports and imports into
+// shared-memory requests, grouped by peer chain.
+func (h *hooks) sharedMemoryRequests(imports []tx.ImportRecord, receipts types.Receipts) (map[ids.ID]*chainsatomic.Requests, error) {
+	exports, credited, err := crosschain.FromReceipts(receipts)
 	if err != nil {
 		return nil, err
 	}
-	elements := make([]*chainsatomic.Element, len(exports))
-	for i, e := range exports {
+	reqs := make(map[ids.ID]*chainsatomic.Requests)
+	get := func(chainID ids.ID) *chainsatomic.Requests {
+		if reqs[chainID] == nil {
+			reqs[chainID] = &chainsatomic.Requests{}
+		}
+		return reqs[chainID]
+	}
+	for _, e := range exports {
 		utxo := &avax.UTXO{
-			UTXOID: e.utxoID,
+			UTXOID: e.UTXOID,
 			Asset:  avax.Asset{ID: h.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:          e.amount,
-				OutputOwners: secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{e.owner}},
+				Amt:          e.Amount,
+				OutputOwners: secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{e.To}},
 			},
 		}
 		utxoBytes, err := tx.MarshalUTXO(utxo)
@@ -364,28 +343,44 @@ func (h *hooks) exportElements(receipts types.Receipts) ([]*chainsatomic.Element
 			return nil, err
 		}
 		utxoID := utxo.InputID()
-		elements[i] = &chainsatomic.Element{
+		r := get(e.Destination)
+		r.PutRequests = append(r.PutRequests, &chainsatomic.Element{
 			Key:    utxoID[:],
 			Value:  utxoBytes,
-			Traits: [][]byte{e.owner[:]},
-		}
+			Traits: [][]byte{e.To[:]},
+		})
 	}
-	return elements, nil
+	byID := make(map[avax.UTXOID]tx.ImportRecord, len(imports))
+	for _, imp := range imports {
+		byID[imp.UTXOID] = imp
+	}
+	for _, c := range credited {
+		rec, ok := byID[c.UTXOID]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", errUnverifiedImportCredited, c.UTXOID.InputID())
+		}
+		inputID := rec.UTXOID.InputID()
+		r := get(rec.SourceChain)
+		r.RemoveRequests = append(r.RemoveRequests, inputID[:])
+	}
+	return reqs, nil
 }
+
+var errUnverifiedImportCredited = errors.New("execution credited a UTXO the block did not verify")
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, imports, err := tx.ParseExtData(customtypes.BlockExtData(b))
 	if err != nil {
-		return fmt.Errorf("parsing txs: %w", err)
+		return fmt.Errorf("parsing extData: %w", err)
 	}
 
-	exports, err := h.exportElements(receipts)
+	extra, err := h.sharedMemoryRequests(imports, receipts)
 	if err != nil {
-		return fmt.Errorf("collecting exports: %w", err)
+		return fmt.Errorf("collecting precompile transfers: %w", err)
 	}
-	if err := h.state.Apply(b.NumberU64(), txs, exports); err != nil {
+	if err := h.state.Apply(b.NumberU64(), txs, extra); err != nil {
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 
@@ -470,8 +465,6 @@ type builder struct {
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
-	// helper emits exports and stores approvals for imports on behalf of callers.
-	helper common.Address
 }
 
 var (
@@ -544,8 +537,9 @@ func (b *builder) PotentialEndOfBlockOps(
 	ctx context.Context,
 	building *types.Header,
 	settledHash common.Hash,
-	settledState libevm.StateReader,
+	_ libevm.StateReader,
 	source saetypes.BlockSource,
+	ethTxs []*types.Transaction,
 ) iter.Seq[*hookTx] {
 	return func(yield func(*hookTx) bool) {
 		// Transactions are verified against the last executed state. We must
@@ -560,10 +554,12 @@ func (b *builder) PotentialEndOfBlockOps(
 			)
 			return
 		}
-		auth := &tx.ImportAuth{
-			State:     settledState,
-			Helper:    b.helper,
-			Timestamp: building.Time,
+		// Precompile imports already included in this block consume UTXOs too.
+		for _, t := range ethTxs {
+			ids, _ := crosschain.ImportCalldata(t)
+			for _, id := range ids {
+				inputs.Add(id.InputID())
+			}
 		}
 
 		for t := range b.potentialTxs {
@@ -589,7 +585,7 @@ func (b *builder) PotentialEndOfBlockOps(
 			// verified against out-dated state, we need to ensure that import
 			// txs are consuming UTXOs that still exist so that our in-memory
 			// UTXO conflict checks are sufficient.
-			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory, auth); err != nil {
+			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),
 					zap.Error(err),
@@ -618,16 +614,114 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
+		txs, imports, err := tx.ParseExtData(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, fmt.Errorf("parsing extData: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
 		}
+		for _, imp := range imports {
+			s.Add(imp.UTXOID.InputID())
+		}
 		h = p.Header()
 	}
 	return s, nil
+}
+
+var (
+	errUTXONotFound       = errors.New("UTXO not found in shared memory")
+	errUTXOWrongAsset     = errors.New("UTXO is not AVAX")
+	errUTXOWrongOutput    = errors.New("UTXO is not a single-owner threshold-one transfer output")
+	errUTXOLocked         = errors.New("UTXO is time-locked")
+	errUTXOAlreadySpent   = errors.New("UTXO is consumed by a processing block or another transaction")
+	errDuplicateImportTxs = errors.New("duplicate UTXO in import calldata")
+)
+
+// resolveImports fetches the UTXOs a precompile import names and checks them
+// against the block time. It is the verifier's only shared-memory read.
+func (b *builder) resolveImports(utxos []avax.UTXOID, blockTime uint64) ([]tx.ImportRecord, error) {
+	records := make([]tx.ImportRecord, 0, len(utxos))
+	seen := set.NewSet[ids.ID](len(utxos))
+	for _, id := range utxos {
+		inputID := id.InputID()
+		if seen.Contains(inputID) {
+			return nil, fmt.Errorf("%w: %s", errDuplicateImportTxs, inputID)
+		}
+		seen.Add(inputID)
+
+		var (
+			utxoBytes [][]byte
+			source    ids.ID
+			err       error
+		)
+		for _, chainID := range []ids.ID{constants.PlatformChainID, b.ctx.XChainID} {
+			utxoBytes, err = b.ctx.SharedMemory.Get(chainID, [][]byte{inputID[:]})
+			if err == nil {
+				source = chainID
+				break
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %w", errUTXONotFound, inputID, err)
+		}
+		utxo, err := tx.ParseUTXO(utxoBytes[0])
+		if err != nil {
+			return nil, fmt.Errorf("parsing UTXO %s: %w", inputID, err)
+		}
+		if utxo.Asset.ID != b.ctx.AVAXAssetID {
+			return nil, fmt.Errorf("%w: %s", errUTXOWrongAsset, inputID)
+		}
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok || out.Threshold != 1 || len(out.Addrs) != 1 {
+			return nil, fmt.Errorf("%w: %s", errUTXOWrongOutput, inputID)
+		}
+		if out.Locktime > blockTime {
+			return nil, fmt.Errorf("%w: %s until %d", errUTXOLocked, inputID, out.Locktime)
+		}
+		records = append(records, tx.ImportRecord{
+			UTXOID:      id,
+			SourceChain: source,
+			Owner:       out.Addrs[0],
+			Amount:      out.Amt,
+		})
+	}
+	return records, nil
+}
+
+// TxFilter excludes precompile imports whose UTXOs are missing, invalid, or
+// already consumed by a processing ancestor or an earlier transaction in this
+// block. Other transactions pass.
+func (b *builder) TxFilter(
+	_ context.Context,
+	building *types.Header,
+	settledHash common.Hash,
+	_ libevm.StateReader,
+	source saetypes.BlockSource,
+) func(*types.Transaction) error {
+	inputs, ancestorsErr := ancestorInputIDs(building, settledHash, source)
+	return func(t *types.Transaction) error {
+		utxos, ok := crosschain.ImportCalldata(t)
+		if !ok {
+			return nil
+		}
+		if ancestorsErr != nil {
+			return fmt.Errorf("getting ancestor input IDs: %w", ancestorsErr)
+		}
+		records, err := b.resolveImports(utxos, building.Time)
+		if err != nil {
+			return err
+		}
+		for _, r := range records {
+			if inputs.Contains(r.UTXOID.InputID()) {
+				return fmt.Errorf("%w: %s", errUTXOAlreadySpent, r.UTXOID.InputID())
+			}
+		}
+		for _, r := range records {
+			inputs.Add(r.UTXOID.InputID())
+		}
+		return nil
+	}
 }
 
 var errEmptyBlock = errors.New("empty block")
@@ -648,9 +742,23 @@ func (b *builder) BuildBlock(
 	for i, avaxTx := range avaxTxs {
 		txs[i] = avaxTx.tx
 	}
-	extData, err := tx.MarshalSlice(txs)
+	var imports []tx.ImportRecord
+	for _, t := range ethTxs {
+		utxos, ok := crosschain.ImportCalldata(t)
+		if !ok {
+			continue
+		}
+		// TxFilter already admitted these UTXOs; resolve them again to record
+		// owner and amount in the block for execution and replay.
+		records, err := b.resolveImports(utxos, header.Time)
+		if err != nil {
+			return nil, fmt.Errorf("resolving imports of tx %s: %w", t.Hash(), err)
+		}
+		imports = append(imports, records...)
+	}
+	extData, err := tx.MarshalExtData(txs, imports)
 	if err != nil {
-		return nil, fmt.Errorf("marshalling txs: %w", err)
+		return nil, fmt.Errorf("marshalling extData: %w", err)
 	}
 
 	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)

@@ -11,17 +11,15 @@ go_library(
         "//genesis",
         "//graft/coreth/ethclient",
         "//tests",
-        "//tests/cchainhelper",
         "//tests/fixture/tmpnet",
+        "//vms/saevm/cchain/crosschain",
         "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/secp256k1",
         "//utils/formatting/address",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary",
-        "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//crypto",
     ],
 )
 

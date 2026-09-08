@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/crosschain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -126,6 +127,11 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 					{
 						Config: warp.NewDefaultConfig(
 							utils.TimeToNewUint64(u.DurangoTime),
+						),
+					},
+					{
+						Config: crosschain.NewConfig(
+							utils.TimeToNewUint64(u.HeliconTime),
 						),
 					},
 				},
@@ -374,6 +380,9 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
+	// The cross-chain transfer precompile is activated by the first Helicon
+	// block instead (see hooks.StartExecutingBlock), so that this genesis
+	// matches the one written by the pre-transition VM.
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}

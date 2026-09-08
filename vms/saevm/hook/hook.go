@@ -119,14 +119,28 @@ type BlockBuilder[T Transaction] interface {
 	// of the node's local execution progress.
 	//
 	// SAE will filter any transactions whose [Op] can not be safely applied to
-	// the state.
+	// the state. txs are the transactions already included in the block.
 	PotentialEndOfBlockOps(
 		ctx context.Context,
 		header *types.Header,
 		lastSettledBlock common.Hash,
 		settledState libevm.StateReader,
 		source saetypes.BlockSource,
+		txs []*types.Transaction,
 	) iter.Seq[T]
+	// TxFilter returns a predicate applied to each candidate transaction, in
+	// order, before it is included in the block being built. A returned error
+	// excludes the transaction. The predicate MAY keep state across calls for
+	// one build; SAE calls TxFilter once per build.
+	//
+	// The arguments match [BlockBuilder.PotentialEndOfBlockOps].
+	TxFilter(
+		ctx context.Context,
+		header *types.Header,
+		lastSettledBlock common.Hash,
+		settledState libevm.StateReader,
+		source saetypes.BlockSource,
+	) func(*types.Transaction) error
 	// BuildBlock constructs a block with the given components. The header
 	// MAY be modified, but all other arguments are read-only.
 	//

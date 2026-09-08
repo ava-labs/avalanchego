@@ -83,7 +83,7 @@ type (
 	// stateImpl is the surface common to [State] and [oldState]. It's used by the
 	// [SUT] so the same test helpers can drive either backend.
 	stateImpl interface {
-		Apply(height uint64, txs []*tx.Tx, exports []*chainsatomic.Element) error
+		Apply(height uint64, txs []*tx.Tx, extra map[ids.ID]*chainsatomic.Requests) error
 		GetTx(txID ids.ID) (*tx.Tx, uint64, error)
 		GetRoot(height uint64) (common.Hash, error)
 		CurrentHeight() uint64
@@ -163,7 +163,7 @@ func newOldState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMem
 	}
 }
 
-func (o *oldState) Apply(height uint64, txs []*tx.Tx, _ []*chainsatomic.Element) error {
+func (o *oldState) Apply(height uint64, txs []*tx.Tx, _ map[ids.ID]*chainsatomic.Requests) error {
 	var blockHash common.Hash
 	binary.BigEndian.PutUint64(blockHash[:], height)
 

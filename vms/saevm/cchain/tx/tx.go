@@ -9,10 +9,8 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
 	// Imported for [atomic.TxBytesGas] comment resolution.
@@ -52,7 +50,7 @@ var (
 
 // Tx is a signed transaction that interacts with shared memory.
 // The [Unsigned] body can be implemented by either [Export] or [Import].
-// Credentials are signatures or markers for imports authorized in EVM state.
+// Credentials are signatures authorizing the transaction's inputs.
 type Tx struct {
 	Unsigned Unsigned     `serialize:"true" json:"unsignedTx"`
 	Creds    []Credential `serialize:"true" json:"credentials"`
@@ -81,8 +79,8 @@ type Unsigned interface {
 	asOp(avaxAssetID ids.ID) (op, error)
 
 	// verifyCredentials verifies that the transaction is authorized by the
-	// provided credentials. auth backs [ContractCredential] verification.
-	verifyCredentials(sm chainsatomic.SharedMemory, auth *ImportAuth, creds []Credential) error
+	// provided credentials.
+	verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
@@ -101,8 +99,7 @@ type op struct {
 
 // Credential is used in [Tx] to authorize an input of a transaction.
 //
-// It is implemented by [secp256k1fx.Credential] and, for imports the owner
-// requested through a trusted helper contract, [ContractCredential]. An interface
+// It is implemented by [secp256k1fx.Credential]. An interface
 // must be used to correctly produce the canonical binary format during
 // serialization.
 type Credential interface {
@@ -147,12 +144,6 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
 	}
-	if slices.ContainsFunc(t.Creds, isContractCredential) {
-		gas, err = math.Add(gas, contractAuthGas)
-		if err != nil {
-			return hook.Op{}, fmt.Errorf("adding contract authorization gas: %w", err)
-		}
-	}
 
 	burned, err := t.Unsigned.burned(avaxAssetID)
 	if err != nil {
@@ -182,9 +173,6 @@ const (
 	// gasPerSig is an additional amount of gas that is charged per-signature
 	// included in a [Tx].
 	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
-	// contractAuthGas pays for one cold account and storage read. The existing
-	// byte and input charges remain, even though the marker has no signature.
-	contractAuthGas = gas.Gas(params.ColdAccountAccessCostEIP2929 + params.ColdSloadCostEIP2929)
 )
 
 func gasUsed(t Unsigned) (gas.Gas, error) {
@@ -257,9 +245,8 @@ func (t *Tx) SanityCheck(ctx *snow.Context) error {
 }
 
 // VerifyCredentials verifies that the transaction is properly authorized.
-// auth backs [ContractCredential] verification.
-func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory, auth *ImportAuth) error {
-	return t.Unsigned.verifyCredentials(sm, auth, t.Creds)
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
+	return t.Unsigned.verifyCredentials(sm, t.Creds)
 }
 
 // AtomicRequests returns shared-memory modifications that this transaction
