@@ -222,7 +222,7 @@ func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error
 	return m.backend.verifyUniqueInputs(blkID, inputs)
 }
 
-func (m *manager) verifyTransactionSizePreHelicon(tx *txs.Tx) error {
+func (m *manager) verifyTransactionSizePreHelicon(tx *platform.Tx) error {
 	if !m.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(m.txExecutorBackend.Clk.Time()) {
 		txSize := tx.Size()
 		if txSize > codec.DefaultMaxSize {
