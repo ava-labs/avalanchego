@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/triedb"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
@@ -159,6 +160,10 @@ func (*StateSync) ID() string {
 }
 
 func (t *StateSync) Sync(ctx context.Context) error {
+	t.log.Info("syncing state",
+		zap.Stringer("root", t.root),
+	)
+
 	// Start the leaf syncer and storage trie producer.
 	eg, egCtx := errgroup.WithContext(ctx)
 
@@ -176,7 +181,11 @@ func (t *StateSync) Sync(ctx context.Context) error {
 
 	// The errgroup wait will take care of returning the first error that occurs, or returning
 	// nil if syncing finish without an error.
-	return eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	t.log.Info("finished syncing state")
+	return nil
 }
 
 // onStorageTrieFinished is called after a storage trie finishes syncing.

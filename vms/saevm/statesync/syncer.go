@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
@@ -104,11 +103,6 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
-	s.snowCtx.Log.Info("syncing blocks",
-		zap.Stringer("acceptedHash", summary.AcceptedHash),
-		zap.Uint64("acceptedHeight", summary.AcceptedHeight),
-		zap.Uint64("numToFetch", numBlocksToFetch),
-	)
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
 		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
@@ -121,7 +115,6 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	if err := blockSyncer.Sync(ctx); err != nil {
 		return err
 	}
-	s.snowCtx.Log.Info("finished syncing blocks")
 
 	// With blocks now on disk, we can find the state root
 	hdr := rawdb.ReadHeader(s.db, summary.AcceptedHash, summary.AcceptedHeight)
@@ -153,11 +146,6 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
 	// TODO(powerslider): Remove dependency on graft.
-	s.snowCtx.Log.Info("syncing state",
-		zap.Stringer("settledRoot", hdr.Root),
-		zap.Stringer("acceptedHash", summary.AcceptedHash),
-		zap.Uint64("acceptedHeight", summary.AcceptedHeight),
-	)
 	evmSyncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
 		hashdb.NewClient(
@@ -188,7 +176,6 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		// This is not required for correctness.
 		return errors.Join(err, evmSyncer.Finalize())
 	}
-	s.snowCtx.Log.Info("finished syncing state")
 	return nil
 }
 
