@@ -75,11 +75,8 @@ type config struct {
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
-	Pruning bool `json:"pruning-enabled"`
-	// CommitInterval is the HashDB state trie persistence interval in blocks.
-	// For pruning Firewood, it is the maximum number of unpersisted revisions
-	// that can exist at a time.
-	CommitInterval    uint64 `json:"commit-interval"`
+	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
+	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Pruning Firewood: max unpersisted revisions.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
