@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -75,7 +76,7 @@ type config struct {
 
 	// State & trie
 	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval    uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
+	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Pruning Firewood: max unpersisted revisions.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
@@ -176,8 +177,10 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := saeCfg.DBConfig.Verify(); err != nil {
 		return config{}, err
 	}
-	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
-		constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) {
+	ci := saeCfg.DBConfig.CommitInterval
+	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
+		c.StateScheme != customrawdb.FirewoodScheme &&
+		ci != saedb.DefaultCommitInterval {
 		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
@@ -239,8 +242,14 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	}
 }
 
-func (c config) stateSyncConfig() statesync.Config {
+func (c config) stateSyncConfig(networkID uint32) statesync.Config {
 	saeCfg := c.saeConfig(nil)
+	// All nodes in production networks MUST agree which state summaries to
+	// serve to ensure the state sync engine can hit the required quorum to
+	// accept the summaries.
+	if constants.ProductionNetworkIDs.Contains(networkID) {
+		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
+	}
 	return statesync.Config{
 		DBConfig: saeCfg.DBConfig,
 		Enabled:  c.StateSyncEnabled,
