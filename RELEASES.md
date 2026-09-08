@@ -74,7 +74,7 @@ The P-Chain wallet adds builders for the ACP-236 transactions:
   - Client-side histograms: `avalanche_{vmName}_sync_firewood_sync_proof_verification_seconds`, `avalanche_{vmName}_sync_firewood_sync_proof_commit_seconds`, and `avalanche_{vmName}_sync_firewood_sync_received_proof_size_bytes`
   - Client-side gauge: `avalanche_{vmName}_sync_firewood_sync_request_key_limit`
 
-NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` and `cchain` metrics exist only on the C-Chain. Their `transition_` segment comes from the `transitionvm` wrapper.
+NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` and `cchain` metrics exist only on the C-Chain.
 
 ### Configs
 
