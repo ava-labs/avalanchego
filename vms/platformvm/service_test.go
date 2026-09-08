@@ -1550,7 +1550,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					SubnetID:  subnetID,
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
-					Weight:    0,
+					Weight:    1,
 					StartTime: time.Unix(2, 0),
 				},
 			},
