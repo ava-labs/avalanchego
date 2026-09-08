@@ -181,7 +181,7 @@ After Helicon activates, C-Chain nodes serve ACP-194 state summaries at every `c
 - Restarting a node mid-state sync will restart the sync from the beginning.
 - Disabling state sync after partially state syncing may result in an unrecoverable `FATAL` error.
 
-A node that starts on the SAE VM never falls back to executing pre-Helicon blocks. To recover from either `FATAL` error, delete the C-Chain database and restart.
+If encountering one of these `FATAL` errors, the only way to recover is by deleting the database and restarting.
 
 ### Fixes
 
