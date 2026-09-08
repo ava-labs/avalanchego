@@ -27,7 +27,7 @@ var (
 		Name:  Client,
 		Major: 1,
 		Minor: 15,
-		Patch: 0,
+		Patch: 1,
 	}
 	MinimumCompatibleVersion = &Application{
 		Name:  Client,
