@@ -6,6 +6,7 @@ package blocks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"testing"
@@ -181,25 +182,12 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
-// errAll requires the error to satisfy every `want`. [testerr] provides only
-// primitive matchers, leaving their composition to the caller.
-func errAll(wants ...testerr.Want) testerr.Want {
-	return testerr.Func(func(got error) string {
-		for _, w := range wants {
-			if diff := w.ErrDiff(got); diff != "" {
-				return diff
-			}
-		}
-		return ""
-	})
-}
-
 // errIsNot requires that the error does NOT wrap `target`; a nil error
 // trivially satisfies this.
 func errIsNot(target error) testerr.Want {
 	return testerr.Func(func(got error) string {
 		if errors.Is(got, target) {
-			return testerr.DiffMessage(got, "error that is not %v", target)
+			return fmt.Sprintf("error that is not %v", target)
 		}
 		return ""
 	})
@@ -246,7 +234,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 				t.Helper()
 				require.NoErrorf(t, xdb.Close(), "%T.Close()", xdb)
 			},
-			wantErr: errAll(
+			wantErr: testerr.AllOf(
 				testerr.Is(ErrMissingExecutionResults),
 				testerr.Is(database.ErrClosed),
 			),
@@ -273,7 +261,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 				require.NoErrorf(t, b.MarkExecuted(db, xdb, tm, time.Time{}, new(big.Int), receipts, common.Hash{}, new(atomic.Pointer[Block])), "%T.MarkExecuted()", b)
 				rawdb.DeleteReceipts(db, ethB.Hash(), ethB.NumberU64())
 			},
-			wantErr: errAll(
+			wantErr: testerr.AllOf(
 				errIsNot(ErrMissingExecutionResults),
 				testerr.Contains("deriving receipt fields"),
 			),

@@ -389,6 +389,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				s.SetTimestamp(now)
 				s.AddSubnetTransformation(&transformTx)
 				// State says validator exists
+				primaryNetworkVdr := &state.Staker{
+					EndTime:  mockable.MaxTime,
+					SubnetID: constants.PrimaryNetworkID,
+					NodeID:   verifiedTx.NodeID(),
+				}
+				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
 				staker := &state.Staker{
 					EndTime:  mockable.MaxTime,
 					SubnetID: subnetID,

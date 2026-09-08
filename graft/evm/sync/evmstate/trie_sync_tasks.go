@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/syncutils"
 )
@@ -129,7 +129,11 @@ func (s *storageTrieTask) OnStart() (bool, error) {
 		if err := writeAccountStorageSnapshotFromTrie(s.sync.db.NewBatch(), s.sync.batchSize, account, storageTrie); err != nil {
 			// If the storage trie cannot be iterated (due to an incomplete trie from pruning this storage trie in the past)
 			// then we re-sync it here. Therefore, this error is not fatal and we can safely continue here.
-			log.Info("could not populate storage snapshot from trie with existing root, syncing from peers instead", "account", account, "root", s.root, "err", err)
+			s.sync.log.Info("could not populate storage snapshot from trie with existing root, syncing from peers instead",
+				zap.Stringer("account", account),
+				zap.Stringer("root", s.root),
+				zap.Error(err),
+			)
 			return false, nil
 		}
 	}

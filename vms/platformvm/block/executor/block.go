@@ -7,6 +7,9 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
@@ -47,6 +50,10 @@ func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Con
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := b.verifyBlockSizePreHelicon(); err != nil {
+		return err
 	}
 
 	// If the block was previously executed, we don't need to execute it again,
@@ -102,4 +109,17 @@ func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 		b.manager.NewBlock(options.preferredBlock),
 		b.manager.NewBlock(options.alternateBlock),
 	}, nil
+}
+
+func (b *Block) verifyBlockSizePreHelicon() error {
+	if !b.manager.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()) {
+		blockSize := len(b.Bytes())
+		if blockSize > codec.DefaultMaxSize {
+			b.manager.ctx.Log.Debug("block verification failed, block too big",
+				zap.Int("blockSize", blockSize), zap.Int("maxBlockSize", codec.DefaultMaxSize))
+			return ErrBlockTooBigPreHelicon
+		}
+	}
+
+	return nil
 }

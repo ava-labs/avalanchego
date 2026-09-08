@@ -23,6 +23,7 @@ go_library(
         "//codec/linearcodec",
         "//ids",
         "//snow",
+        "//utils/constants",
         "//utils/hashing",
         "//utils/wrappers",
         "//vms/platformvm/txs",

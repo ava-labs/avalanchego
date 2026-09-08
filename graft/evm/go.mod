@@ -17,6 +17,7 @@ require (
 	github.com/prometheus/client_golang v1.23.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/goleak v1.3.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
 	golang.org/x/sync v0.20.0
@@ -87,7 +88,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect

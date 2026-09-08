@@ -9,11 +9,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const CodecVersion = txs.CodecVersion
+const (
+	CodecVersion = txs.CodecVersion
+	maxBlockSize = constants.DefaultMaxMessageSize
+)
 
 var (
 	// GenesisCodec allows blocks of larger than usual size to be parsed.
@@ -40,7 +44,7 @@ func init() {
 		)
 	}
 
-	Codec = codec.NewDefaultManager()
+	Codec = codec.NewManager(maxBlockSize)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 	errs.Add(
 		Codec.RegisterCodec(CodecVersion, c),
