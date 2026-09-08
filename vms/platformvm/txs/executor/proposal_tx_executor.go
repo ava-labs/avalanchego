@@ -78,7 +78,7 @@ func ProposalTx(
 }
 
 type proposalTxExecutor struct {
-	wrongTxType
+	unsupportedTxVisitor
 
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
