@@ -56,50 +56,127 @@ func TestBlock(t *testing.T) {
 	})
 }
 
-func TestStateSummary(t *testing.T) {
+// TestGetStateSummary asserts that a summary is served only for an
+// asynchronous block at a committed height.
+func TestGetStateSummary(t *testing.T) {
 	t.Parallel()
 
-	const numBlocks = defaultCommitInterval + 1
-	vm := newVM(t)
-	vm.acceptBlocks(t, numBlocks)
-	h := vm.Handler
-	lastCommitted := vm.blockAtHeight(t, defaultCommitInterval).EthBlock() // last block at a commit boundary
+	const (
+		lastCommitted = defaultCommitInterval
+		numBlocks     = defaultCommitInterval + 1
+	)
 
-	t.Run("GetLastStateSummary", func(t *testing.T) {
-		summary, err := h.GetLastStateSummary(t.Context())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, lastCommitted)
-	})
+	tests := []struct {
+		name            string
+		numBlocks       uint64
+		lastSynchronous uint64
+		height          uint64
+		wantErr         error
+	}{
+		{
+			name:      "committed_height",
+			numBlocks: numBlocks,
+			height:    lastCommitted,
+		},
+		{
+			name:      "uncommitted_height",
+			numBlocks: numBlocks,
+			height:    numBlocks,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:      "unknown_committed_height",
+			numBlocks: numBlocks,
+			height:    2 * defaultCommitInterval,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:      "genesis",
+			numBlocks: numBlocks,
+			height:    0,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:            "synchronous_committed_height",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted,
+			height:          lastCommitted,
+			wantErr:         database.ErrNotFound,
+		},
+	}
 
-	t.Run("GetStateSummary_at_committed_height", func(t *testing.T) {
-		summary, err := h.GetStateSummary(t.Context(), lastCommitted.NumberU64())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, lastCommitted)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("GetStateSummary_at_uncommitted_height", func(t *testing.T) {
-		_, err := h.GetStateSummary(t.Context(), numBlocks)
-		require.Equal(t, database.ErrNotFound, err)
-	})
+			vm := newVM(t, withLastSynchronous(tt.lastSynchronous))
+			vm.acceptBlocks(t, tt.numBlocks)
+
+			summary, err := vm.Handler.GetStateSummary(t.Context(), tt.height)
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				return
+			}
+			checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, tt.height).EthBlock())
+		})
+	}
 }
 
-func TestGenesisStateSummary(t *testing.T) {
+// TestGetLastStateSummary asserts that the last summary is served only if the
+// block at the last committed height is asynchronous.
+func TestGetLastStateSummary(t *testing.T) {
 	t.Parallel()
 
-	sut := newSUT(t)
-	genesis := sut.genesis.ToBlock()
+	const (
+		lastCommitted = defaultCommitInterval
+		numBlocks     = defaultCommitInterval + 1
+	)
 
-	t.Run("GetLastStateSummary", func(t *testing.T) {
-		summary, err := sut.GetLastStateSummary(t.Context())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, genesis)
-	})
+	tests := []struct {
+		name            string
+		numBlocks       uint64
+		lastSynchronous uint64
+		wantHeight      uint64
+		wantErr         error
+	}{
+		{
+			name:       "last_committed",
+			numBlocks:  numBlocks,
+			wantHeight: lastCommitted,
+		},
+		{
+			name:    "only_genesis",
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name:            "last_committed_synchronous",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted,
+			wantErr:         database.ErrNotFound,
+		},
+		{
+			name:            "last_committed_above_synchronous_threshold",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted - 1,
+			wantHeight:      lastCommitted,
+		},
+	}
 
-	t.Run("GetStateSummary", func(t *testing.T) {
-		summary, err := sut.GetStateSummary(t.Context(), genesis.NumberU64())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, genesis)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vm := newVM(t, withLastSynchronous(tt.lastSynchronous))
+			vm.acceptBlocks(t, tt.numBlocks)
+
+			summary, err := vm.Handler.GetLastStateSummary(t.Context())
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				return
+			}
+			checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, tt.wantHeight).EthBlock())
+		})
+	}
 }
 
 func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block) {

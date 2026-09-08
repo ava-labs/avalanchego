@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -46,9 +48,9 @@ var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
-	*sae.VM                   // created by [VM.SetState] as bootstrapping or normal op
-	*network.Network          // created by [VM.Initialize]
-	*statesync.SummaryHandler // created by [VM.Initialize]
+	*sae.VM            // created by [VM.SetState] as bootstrapping or normal op
+	*network.Network   // created by [VM.Initialize]
+	*statesync.Handler // created by [VM.Initialize]
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -104,7 +106,7 @@ func (vm *VM) Initialize(
 		return errAlreadyClosed
 	}
 
-	userConfig, err := parseConfig(configBytes, snowCtx.NetworkID)
+	userConfig, err := parseConfig(snowCtx, configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
@@ -165,7 +167,7 @@ func (vm *VM) Initialize(
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
-	vm.SummaryHandler, err = statesync.New(
+	vm.Handler, err = statesync.New(
 		userConfig.stateSyncConfig(),
 		ethDB,
 		snowCtx,
@@ -174,8 +176,10 @@ func (vm *VM) Initialize(
 		vm.state,
 	)
 	if err != nil {
-		return fmt.Errorf("creating summary handler: %w", err)
+		return fmt.Errorf("creating statesync handler: %w", err)
 	}
+	vm.onClose = append(vm.onClose, vm.Handler.Shutdown)
+
 	vm.handlers = api.NewMutableHTTPHandlers(handlerPaths...)
 
 	// [VM.finishInitialize] adds the [sae.VM] after all necessary state is available.
@@ -287,6 +291,22 @@ func (vm *VM) Initialize(
 				return fmt.Errorf("registering warp signature handler: %w", err)
 			}
 		}
+
+		// Register state sync server
+		{
+			// TODO(alarso16): Find a way to wire in Firewood.
+			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
+				// The triedb shouldn't share a cache with execution.
+				tdb := triedb.NewDatabase(ethDB, tdbConfig)
+				vm.onClose = append(vm.onClose, func(context.Context) error {
+					return tdb.Close()
+				})
+				_, snaps := vm.VM.EVMState()
+				if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
+					return fmt.Errorf("registering state sync server: %w", err)
+				}
+			}
+		}
 		return nil
 	}
 
@@ -314,6 +334,9 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.finishInitializeOnce.Do(func() {
+			if err = vm.Handler.SyncError(); err != nil {
+				return
+			}
 			err = vm.finishInitialize(ctx)
 		})
 		if err != nil {
@@ -332,7 +355,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 
 var (
 	_ stateDependent = (*sae.VM)(nil)
-	_ stateDependent = (*statesync.SummaryHandler)(nil)
+	_ stateDependent = (*statesync.Handler)(nil)
 )
 
 type stateDependent interface {
@@ -346,7 +369,7 @@ func (vm *VM) activeHandler() stateDependent {
 	if vm.mode.Get() >= snow.Bootstrapping {
 		return vm.VM
 	}
-	return vm.SummaryHandler
+	return vm.Handler
 }
 
 // ParseBlock parses a block from bytes.
@@ -392,7 +415,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		<-ctx.Done()
 		return 0, context.Cause(ctx)
 	case snow.StateSyncing:
-		return vm.SummaryHandler.WaitForEvent(ctx)
+		return vm.Handler.WaitForEvent(ctx)
 	}
 
 	// Throttle to avoid busy looping: the txpools only clear after block

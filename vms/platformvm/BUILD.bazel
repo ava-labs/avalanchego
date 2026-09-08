@@ -84,6 +84,7 @@ go_test(
         "//cache/lru",
         "//chains",
         "//chains/atomic",
+        "//codec",
         "//database",
         "//database/memdb",
         "//database/prefixdb",

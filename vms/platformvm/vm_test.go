@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -2265,4 +2266,59 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 	msg, err = vm.WaitForEvent(impatientContext)
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
+}
+
+func TestTxTooBig(t *testing.T) {
+	tests := []struct {
+		name      string
+		fork      upgradetest.Fork
+		verifyErr error
+	}{
+		{
+			name:      "PreHelicon",
+			fork:      upgradetest.Granite,
+			verifyErr: blockexecutor.ErrTxTooBigPreHelicon,
+		},
+		{
+			name: "PostHelicon",
+			fork: upgradetest.Helicon,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vm, _, _ := defaultVM(t, tt.fork)
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+
+			// Increase capacity so that the large tx passes gas validation.
+			vm.DynamicFeeConfig.MaxCapacity = 1_000_000
+			vm.state.SetFeeState(gas.State{Capacity: 1_000_000})
+
+			subnetID := testSubnet1.ID()
+			wallet := newWallet(t, vm, walletConfig{
+				subnetIDs: []ids.ID{subnetID},
+			})
+
+			// Use the wallet builder to construct a CreateChainTx with a
+			// genesis payload that makes the tx exceed codec.DefaultMaxSize.
+			bigGenesis := make([]byte, codec.DefaultMaxSize+1)
+			createChainTx, err := wallet.Builder().NewCreateChainTx(
+				subnetID,
+				bigGenesis,
+				ids.ID{'t', 'e', 's', 't', 'v', 'm'},
+				nil,
+				"big",
+			)
+			require.NoError(err)
+
+			bigTx := &txs.Tx{Unsigned: createChainTx}
+			require.NoError(wallet.Signer().Sign(t.Context(), bigTx))
+
+			err = vm.manager.VerifyTx(bigTx)
+			require.ErrorIs(err, tt.verifyErr)
+		})
+	}
 }

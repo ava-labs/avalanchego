@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -64,10 +65,11 @@ type (
 	}
 
 	sutConfig struct {
-		syncConfig Config
-		avaDB      database.Database
-		xdb        saetypes.ExecutionResults
-		startTime  time.Time
+		syncConfig      Config
+		avaDB           database.Database
+		xdb             saetypes.ExecutionResults
+		startTime       time.Time
+		lastSynchronous uint64
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -99,6 +101,27 @@ func withTime(t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.startTime = t
 	})
+}
+
+// withLastSynchronous makes the [Handler]'s hooks report every block at or
+// below height as synchronous, deferring to the real [hookstest.Stub]
+// implementation above it. This does NOT affect the [vmSUT].
+func withLastSynchronous(height uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.lastSynchronous = height
+	})
+}
+
+type settledOverride struct {
+	*hookstest.Stub
+	height uint64
+}
+
+func (s settledOverride) SettledBy(header *types.Header) hook.Settled {
+	if header.Number.Uint64() <= s.height {
+		return hook.Settled{}
+	}
+	return s.Stub.SettledBy(header)
 }
 
 const (
@@ -176,7 +199,7 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 		ethDB,
 		snowCtx,
 		net,
-		hooks,
+		settledOverride{Stub: hooks, height: cfg.lastSynchronous},
 	)
 	require.NoError(t, err, "New()")
 
@@ -203,7 +226,7 @@ func (s *sut) Sender() *saetest.Sender { return s.sender }
 func (s *sut) syncer() *Syncer {
 	return NewSyncer(
 		s.cfg.syncConfig,
-		s.hooks,
+		settledOverride{Stub: s.hooks, height: s.cfg.lastSynchronous},
 		s.snowCtx,
 		s.Network,
 		s.db,

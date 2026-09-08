@@ -45,9 +45,9 @@ type queuedBlock struct {
 	enqueuedAt time.Time
 }
 
-// Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
-// before [blocks.Block.Executed] returns true then there is no guarantee that
-// the block will be executed.
+// Enqueue pushes a new block to the FIFO queue. Every enqueued block is
+// executed before [Executor.Close] returns, unless an earlier block fails to
+// execute. Enqueue MUST NOT be called after [Executor.Close] or it will panic.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
@@ -66,8 +66,6 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-e.quit:
-		return errExecutorClosed
 	case <-e.done:
 		// `e.done` can also close due to [Executor.execute] errors.
 		return errExecutorClosed
@@ -77,38 +75,32 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 func (e *Executor) processQueue() {
 	defer close(e.done)
 
-	for {
-		select {
-		case <-e.quit:
-			return
+	for qb := range e.queue {
+		block := qb.block
+		log := e.log.With(
+			zap.Uint64("block_height", block.Height()),
+			zap.Uint64("block_time", block.BuildTime()),
+			zap.Stringer("block_hash", block.Hash()),
+			zap.Int("tx_count", len(block.Transactions())),
+		)
 
-		case qb := <-e.queue:
-			block := qb.block
-			log := e.log.With(
-				zap.Uint64("block_height", block.Height()),
-				zap.Uint64("block_time", block.BuildTime()),
-				zap.Stringer("block_hash", block.Hash()),
-				zap.Int("tx_count", len(block.Transactions())),
+		err := e.execute(block, log)
+		switch {
+		case errors.Is(err, errFatal):
+			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
+				"Block execution failed",
+				zap.Error(err),
 			)
-
-			err := e.execute(block, log)
-			switch {
-			case errors.Is(err, errFatal):
-				log.Fatal( //nolint:gocritic // False positive, will not terminate the process
-					"Block execution failed",
-					zap.Error(err),
-				)
-			case err != nil:
-				log.Error(
-					"Error of unknown severity in block execution",
-					zap.Error(err),
-				)
-			}
-			if err != nil {
-				return
-			}
-			e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
+		case err != nil:
+			log.Error(
+				"Error of unknown severity in block execution",
+				zap.Error(err),
+			)
 		}
+		if err != nil {
+			return
+		}
+		e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 	}
 }
 
@@ -439,7 +431,7 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
-	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
+	if err := e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err
 	}
 

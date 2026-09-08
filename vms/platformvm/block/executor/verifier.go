@@ -32,6 +32,8 @@ var (
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
+	ErrBlockTooBigPreHelicon                 = errors.New("block size exceeds max block size pre-Helicon")
+	ErrTxTooBigPreHelicon                    = errors.New("transaction size exceeds max transaction size pre-Helicon")
 )
 
 // verifier handles the logic for verifying a block.

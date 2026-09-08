@@ -8,6 +8,9 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -135,6 +138,10 @@ func (m *manager) VerifyTx(tx *platform.Tx) error {
 		}
 	}
 
+	if err := m.verifyTransactionSizePreHelicon(tx); err != nil {
+		return err
+	}
+
 	var (
 		recommendedPChainHeight uint64
 		err                     error
@@ -213,4 +220,17 @@ func (m *manager) VerifyTx(tx *platform.Tx) error {
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
 	return m.backend.verifyUniqueInputs(blkID, inputs)
+}
+
+func (m *manager) verifyTransactionSizePreHelicon(tx *txs.Tx) error {
+	if !m.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(m.txExecutorBackend.Clk.Time()) {
+		txSize := tx.Size()
+		if txSize > codec.DefaultMaxSize {
+			m.ctx.Log.Debug("transaction verification failed, transaction too big",
+				zap.Int("txSize", txSize), zap.Int("maxTxSize", codec.DefaultMaxSize))
+			return ErrTxTooBigPreHelicon
+		}
+	}
+
+	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -45,7 +46,7 @@ type (
 	// SUT bundles a [SummaryHandler] with the state it was built over. It is driven
 	// entirely through hand-populated storage, with no VM.
 	SUT struct {
-		*SummaryHandler
+		*Handler
 		state *state.State
 	}
 
@@ -124,9 +125,12 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
+	t.Cleanup(func() {
+		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
+	})
 	return &SUT{
-		SummaryHandler: handler,
-		state:          st,
+		Handler: handler,
+		state:   st,
 	}
 }
 
@@ -195,7 +199,7 @@ func TestGetStateSummary(t *testing.T) {
 
 	// Only committed heights can be served. Each settles a distinct, earlier
 	// height, so an incorrect height selection would embed a different root.
-	for _, blockHeight := range []uint64{0, commitInterval, 2 * commitInterval} {
+	for _, blockHeight := range []uint64{commitInterval, 2 * commitInterval} {
 		t.Run(fmt.Sprintf("height_%d", blockHeight), func(t *testing.T) {
 			got, err := sut.GetStateSummary(t.Context(), blockHeight)
 			require.NoErrorf(t, err, "GetStateSummary(%d)", blockHeight)
@@ -203,6 +207,13 @@ func TestGetStateSummary(t *testing.T) {
 			require.Equalf(t, sut.wantRoot(t, blockHeight), got.settledRoot, "GetStateSummary(%d).settledRoot", blockHeight)
 		})
 	}
+
+	// The genesis block is synchronous, so its summary must not be served
+	// even though height 0 is a committed height.
+	t.Run("height_0", func(t *testing.T) {
+		_, err := sut.GetStateSummary(t.Context(), 0)
+		require.ErrorIs(t, err, database.ErrNotFound, "GetStateSummary(0)")
+	})
 }
 
 func TestGetLastStateSummary(t *testing.T) {
@@ -216,20 +227,6 @@ func TestGetLastStateSummary(t *testing.T) {
 	require.NoError(t, err, "GetLastStateSummary()")
 	require.Equal(t, uint64(lastCommitted), got.Height(), "GetLastStateSummary().Height()")
 	require.Equal(t, sut.wantRoot(t, lastCommitted), got.settledRoot, "GetLastStateSummary().settledRoot")
-}
-
-func TestOnlyGenesis(t *testing.T) {
-	handler := newSUT(t)
-
-	got, err := handler.GetLastStateSummary(t.Context())
-	require.NoError(t, err, "GetLastStateSummary()")
-	require.Equal(t, uint64(0), got.Height(), "GetLastStateSummary().Height()")
-	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetLastStateSummary().settledRoot")
-
-	got, err = handler.GetStateSummary(t.Context(), 0)
-	require.NoError(t, err, "GetStateSummary(0)")
-	require.Equal(t, uint64(0), got.Height(), "GetStateSummary(0).Height()")
-	require.Equal(t, types.EmptyRootHash, got.settledRoot, "GetStateSummary(0).settledRoot")
 }
 
 func TestWaitForEvent(t *testing.T) {
@@ -248,7 +245,7 @@ func TestAcceptSummary(t *testing.T) {
 }
 
 // TestStateSyncEnabled checks that the configured value is reported back by
-// [SummaryHandler.StateSyncEnabled].
+// [Handler.StateSyncEnabled].
 func TestStateSyncEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -270,8 +267,8 @@ func TestStateSyncEnabled(t *testing.T) {
 			sut := newSUT(t, withEnabled(tt.enabled))
 
 			gotEnabled, err := sut.StateSyncEnabled(t.Context())
-			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
-			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.Handler)
+			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.Handler)
 		})
 	}
 }

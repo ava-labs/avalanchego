@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -44,7 +45,7 @@ func init() {
 		)
 	}
 
-	Codec = codec.NewDefaultManager()
+	Codec = codec.NewManager(constants.DefaultMaxMessageSize)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 	errs.Add(
 		Codec.RegisterCodec(CodecVersion, c),

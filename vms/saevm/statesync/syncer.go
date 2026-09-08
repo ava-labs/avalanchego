@@ -75,6 +75,10 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	}
 
 	// If any blocks have been accepted, don't state sync.
+	//
+	// TransitionVM assumes that a node will state-sync if state-sync is enabled
+	// and the node is at the genesis block. Until transitionvm is removed, this
+	// check MUST NOT change.
 	hash := rawdb.ReadHeadFastBlockHash(s.db)
 	if hash == (common.Hash{}) {
 		s.snowCtx.Log.Warn("no last accepted hash")
@@ -83,6 +87,8 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	height := rawdb.ReadHeaderNumber(s.db, hash)
 	return height == nil || *height == 0
 }
+
+var errSynchronousBlock = errors.New("cannot state sync to synchronous block")
 
 // Sync fetches all state associated with [Summary] and applies it to disk.
 // Any error returned MUST be treated as fatal. After this method returns
@@ -116,6 +122,11 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("couldn't find header %s at height %d", summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
+	if hook.Synchronous(s.hooks, hdr) {
+		// This requires malicious summary providers, but would corrupt database.
+		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
+	}
+
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
 		code.NewClient(s.network.Network, s.network.PeerTracker),
@@ -128,12 +139,15 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
+	s.snowCtx.Log.Info("wiping snapshot before syncing state")
 	if err := graftsnap.WipeSnapshotSync(ctx, s.db); err != nil {
 		return fmt.Errorf("wiping snapshot: %w", err)
 	}
+	s.snowCtx.Log.Info("finished wiping snapshot")
 
 	// TODO(powerslider): Remove dependency on graft.
 	evmSyncer, err := evmstate.NewSyncer(
+		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
 			s.network.Network,

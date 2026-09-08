@@ -1246,6 +1246,7 @@ func (n *Node) initVMs() error {
 			// is around a second, so 10 seconds provides plenty of time to
 			// ensure this doesn't happen.
 			TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+			Now:             time.Now,
 			APIDrainTimeout: 15 * time.Second,
 		}),
 	)
