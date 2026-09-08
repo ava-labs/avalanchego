@@ -7,7 +7,7 @@
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
 This release schedules the activation of the following Avalanche Community Proposals (ACPs):
-- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-streaming-asynchronous-execution/README.md) C-Chain Async Execution
+- [ACP-194](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/194-continuous-execution/README.md) C-Chain Async Execution
 - [ACP-236](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/236-auto-renewed-staking/README.md) Auto-Renewed Staking
 - [ACP-267](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/267-uptime-requirement-increase/README.md) Validator Uptime Requirements Increase
 - [ACP-273](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/273-reduce-minimum-staking-duration/README.md) Reduce Minimum Validator Staking Duration
@@ -22,14 +22,12 @@ This release updates the plugin version to `46`. All plugins must update to rema
 
 ### APIs
 
-The P-Chain wallet adds builders for the ACP-236 transactions:
-- `NewAddAutoRenewedValidatorTx`
-- `NewSetAutoRenewedValidatorConfigTx`
-
 #### C-Chain RPCs
 
-- State-dependent RPCs for an accepted block wait until that block executes. The `latest` tag always refers to the last executed block.
-- The C-Chain has no pending state. `pending` resolves to the last executed block by default. With `api-resolve-pending-to-last-executed` set to `false`, `pending` resolves to the last accepted block, and state queries on it return an error.
+- Named blocks under SAE:
+  - `pending` is the last executed block by default. With `api-resolve-pending-to-last-executed` set to `false`, `pending` is the last accepted block.
+  - `latest` is the last executed block.
+  - `safe` and `finalized` are both the last settled block.
 - The `avax.getAtomicTxStatus` RPC is deprecated. Use `avax.getAtomicTx`.
 - The `admin`, `warp`, and `personal` API namespaces are removed.
 - The `eth_accounts`, `eth_coinbase`, and `eth_etherbase` RPCs are removed.
@@ -42,6 +40,8 @@ The P-Chain wallet adds builders for the ACP-236 transactions:
   - `debug_getModifiedAccountsByNumber`
   - `debug_getModifiedAccountsByHash`
   - `debug_getAccessibleState`
+
+  If you rely on any of these `debug` RPCs, open an issue describing your use case.
 
 #### Metrics
 
@@ -90,7 +90,7 @@ NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` a
 - `state-sync-ids` in Coreth and Subnet-EVM configs is now a JSON array of node IDs (`["NodeID-..."]`) instead of a comma-separated string.
 - `api-max-duration` for C-Chain accepts only a duration string (for example `"30s"`) after Helicon. The node rejects a number. `0` means no limit.
 - `state-sync-enabled` for C-Chain defaults to `true` after Helicon.
-- `commit-interval` for C-Chain with `state-scheme` `firewood`: Coreth now accepts any value on Mainnet and Fuji, but the C-Chain rejects values other than `4096` after Helicon.
+- `commit-interval` for C-Chain must be `4096` on Mainnet and Fuji after Helicon.
 
 #### Deprecated in C-Chain
 
@@ -167,9 +167,7 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 ### Features
 
 - Subnet-EVM can set the initial ACP-226 minimum block delay at genesis via `InitialMinDelayMS` in the chain config.
-- Added `transitionvm`, a VM that swaps between two implementations at a configured time. The C-Chain uses it to switch from Coreth to the SAE VM at Helicon.
 - The Primary Network minimum validator staking duration decreases from 2 weeks to 48 hours at Helicon activation (ACP-273).
-- Changed the Firewood state sync protocol. A `v1.15.0` node cannot state sync with Firewood from a `v1.14.x` node. This does not affect the default `hash` state scheme.
 
 ### C-Chain State Sync
 
