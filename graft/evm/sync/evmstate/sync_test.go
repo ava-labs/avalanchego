@@ -81,6 +81,7 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 
 	// Create the state syncer.
 	stateSyncer, err := NewSyncer(
+		loggingtest.New(t, logging.Debug),
 		client.NewLeafFetcher(mockClient, leafReqType, message.StateTrieNode),
 		clientEthDB,
 		root,
@@ -631,6 +632,7 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 	require.NoError(t, err)
 
 	stateSyncer, err := NewSyncer(
+		log,
 		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
 		clientEthDB,
 		root,
