@@ -277,18 +277,21 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), err)
 	}
 
-	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
-	if err := e.receipts.DeriveFields(
-		chainConfig,
-		b.Hash(),
-		b.NumberU64(),
-		b.BuildTime(),
-		e.baseFee.ToBig(),
-		nil, // SAE does not support blob transactions.
-		b.Transactions(),
-	); err != nil {
-		return fmt.Errorf("deriving receipt fields: %v", err)
+	if e.receiptRoot != types.EmptyReceiptsHash {
+		e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
+		if err := e.receipts.DeriveFields(
+			chainConfig,
+			b.Hash(),
+			b.NumberU64(),
+			b.BuildTime(),
+			e.baseFee.ToBig(),
+			nil, // SAE does not support blob transactions.
+			b.Transactions(),
+		); err != nil {
+			return fmt.Errorf("deriving receipt fields: %v", err)
+		}
 	}
+
 	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 

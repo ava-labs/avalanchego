@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -15,10 +16,14 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -38,11 +43,12 @@ func TestParseConfig(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	tests := []struct {
-		name      string
-		json      string
-		networkID uint32
-		want      config
-		wantErr   testerr.Want
+		name         string
+		json         string
+		networkID    uint32
+		want         config
+		wantWarnings []*loggingtest.Record
+		wantErr      testerr.Want
 	}{
 		// Defaults and errors
 		{
@@ -140,6 +146,23 @@ func TestParseConfig(t *testing.T) {
 
 		// APIs
 		{
+			name: "api/apis",
+			json: `{"apis":["subscription","db","net","web3"]}`,
+			want: with(func(c *config) {
+				c.APIs = set.Of(rpc.APISubscription, rpc.APIDB, rpc.APINet, rpc.APIWeb3)
+			}),
+		},
+		{
+			name: "api/apis_explicit_empty",
+			json: `{"apis":[]}`,
+			want: with(func(c *config) { c.APIs.Clear() }),
+		},
+		{
+			name:    "api/apis_unknown_name",
+			json:    `{"apis":["eth"]}`,
+			wantErr: testerr.Is(rpc.ErrUnknownAPI),
+		},
+		{
 			name: "api/allow_unprotected_txs",
 			json: `{"allow-unprotected-txs":true}`,
 			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
@@ -158,6 +181,21 @@ func TestParseConfig(t *testing.T) {
 			name:    "api/batch_request_limit_too_large",
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
+		},
+		{
+			name: "api/api_max_duration",
+			json: `{"api-max-duration":"1m"}`,
+			want: with(func(c *config) { c.APIMaxDuration = duration{time.Minute} }),
+		},
+		{
+			name:    "api/api_max_duration_number",
+			json:    `{"api-max-duration":5000000000}`,
+			wantErr: errIsType[*json.UnmarshalTypeError](),
+		},
+		{
+			name:    "api/api_max_duration_unparseable",
+			json:    `{"api-max-duration":"not-a-duration"}`,
+			wantErr: testerr.Contains("invalid duration"),
 		},
 		{
 			name: "api/enable_map_pending_to_last_executed",
@@ -195,6 +233,18 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 
+		// Unrecognized options
+		{
+			name: "unrecognized/options",
+			json: `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
+			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+			wantWarnings: []*loggingtest.Record{{
+				Level:  logging.Warn,
+				Msg:    "ignoring unrecognized config options",
+				Fields: []zap.Field{zap.Strings("options", []string{"hello austin larson", "rpc-gas-cap"})},
+			}},
+		},
+
 		// All active fields
 		{
 			name: "all_active_fields",
@@ -211,8 +261,10 @@ func TestParseConfig(t *testing.T) {
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
+				"apis":["chain","trace"],
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
+				"api-max-duration":"30s",
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"],
 				"api-resolve-pending-to-last-executed":true,
@@ -231,8 +283,10 @@ func TestParseConfig(t *testing.T) {
 				LocalTxsEnabled:              true,
 				TxPoolAccountSlots:           8,
 				TxPoolGlobalSlots:            2048,
+				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
 				AllowUnprotectedTxs:          true,
 				BatchRequestLimit:            50,
+				APIMaxDuration:               duration{30 * time.Second},
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 				ResolvePendingToLastExecuted: true,
 				StateSyncEnabled:             false,
@@ -245,11 +299,14 @@ func TestParseConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
-			got, err := parseConfig([]byte(test.json), test.networkID)
+			log := loggingtest.NewRecorder(logging.Warn)
+			snowCtx := &snow.Context{NetworkID: test.networkID, Log: log}
+			got, err := parseConfig(snowCtx, []byte(test.json))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
+			require.Equal(t, test.wantWarnings, log.Records, "parseConfig(...) logs")
 		})
 	}
 }

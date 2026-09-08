@@ -17,9 +17,6 @@ on:
         description: "Load test duration: e.g. 5m, 10m, 1h..."
         required: false
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   load_test:
     name: Run load test on self-hosted runners

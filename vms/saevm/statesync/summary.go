@@ -29,7 +29,7 @@ type Summary struct {
 }
 
 // ParseStateSummary parses the given bytes into a [Summary].
-func (*SummaryHandler) ParseStateSummary(_ context.Context, summaryBytes []byte) (*Summary, error) {
+func (*Handler) ParseStateSummary(_ context.Context, summaryBytes []byte) (*Summary, error) {
 	var s Summary
 	if err := s.UnmarshalCanoto(summaryBytes); err != nil {
 		return nil, fmt.Errorf("parsing state summary: %w", err)
