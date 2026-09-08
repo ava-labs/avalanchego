@@ -8,9 +8,9 @@ common --experimental_isolated_extension_usages
 # Enable platform-specific config sections (build:macos, build:linux, etc.)
 common --enable_platform_specific_config
 
-# Go settings - match scripts/build_test.sh defaults
+# Go settings
 
-# Test settings (match scripts/build_test.sh)
+# Test settings
 test --test_output=errors
 # Per-category timeouts: short,moderate,long,eternal
 # "long" covers graft modules (coreth, evm, subnet-evm) via graft_go_test macro
@@ -18,23 +18,13 @@ test --test_timeout=60,120,900,3600
 # Set HOME for tests that need it (e.g., config tests that expand $HOME/.avalanchego)
 test --test_env=HOME
 
-# Race detection ON by default (matches scripts/build_test.sh)
-# Disable with: bazel build/test --config=norace //...
-build --@io_bazel_rules_go//go/config:race=true
-test --@io_bazel_rules_go//go/config:race=true
-
-# Explicit race config (kept for clarity/compat)
+# Config: enable race detection
 build:race --@io_bazel_rules_go//go/config:race=true
 test:race --@io_bazel_rules_go//go/config:race=true
 
-# Config: disable race (for faster local builds)
-build:norace --@io_bazel_rules_go//go/config:race=false
-test:norace --@io_bazel_rules_go//go/config:race=false
-
-# Shuffle ON by default (matches build_test.sh -shuffle=on)
-# Injected via go_test wrapper in .bazel/defs.bzl (not --test_arg, which
-# would break non-Go test rules like gazelle_test).
-# Disable with: bazel test --config=noshuffle //...
+# Scheduled Go test tasks enable shuffle with --test_arg after selecting only
+# go_test rules. Do not set a global test argument here because Bazel would
+# pass it to non-Go tests.
 
 # Coverage: use `bazel coverage //...` instead of `bazel test //...`
 # This matches build_test.sh's -coverprofile/-covermode flags
@@ -66,12 +56,9 @@ try-import %workspace%/.bazelrc.local
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache
 
-# Config: disable shuffle (for deterministic test ordering)
-# Overrides the shuffle=on injected by the go_test wrapper (last flag wins)
-test:noshuffle --test_arg=-test.shuffle=off
-
-# Config: fast local development (no shuffle, no race)
-test:fast --config=noshuffle --config=norace
+# Config: scheduled Go tests (race detection and shuffle)
+test:race-shuffle --config=race
+test:race-shuffle --test_arg=-test.shuffle=on
 
 # Stamp builds with git commit
 build:release --stamp

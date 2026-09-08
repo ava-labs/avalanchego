@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
+	syncclient "github.com/ava-labs/avalanchego/graft/evm/sync/client"
 )
 
 const (
@@ -123,11 +124,14 @@ func NewSyncer(client types.LeafClient, db *versiondb.Database, atomicTrie *atom
 	tasks <- &syncerLeafTask{syncer: syncer}
 	close(tasks)
 
-	syncer.syncer = leaf.NewCallbackSyncer(client, tasks, &leaf.SyncerConfig{
-		RequestSize:      cfg.requestSize,
-		NumWorkers:       cfg.numWorkers,
-		LeafsRequestType: message.CorethLeafsRequestType,
-	})
+	syncer.syncer = leaf.NewCallbackSyncer(
+		syncclient.NewLeafFetcher(client, message.CorethLeafsRequestType, TrieNode),
+		tasks,
+		&leaf.SyncerConfig{
+			RequestSize: cfg.requestSize,
+			NumWorkers:  cfg.numWorkers,
+		},
+	)
 
 	return syncer, nil
 }
@@ -246,7 +250,6 @@ type syncerLeafTask struct {
 
 func (a *syncerLeafTask) Start() []byte                  { return addZeroes(a.syncer.lastHeight + 1) }
 func (*syncerLeafTask) End() []byte                      { return nil }
-func (*syncerLeafTask) NodeType() message.NodeType       { return TrieNode }
 func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFinish() }
 func (*syncerLeafTask) OnStart() (bool, error)           { return false, nil }
 func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }

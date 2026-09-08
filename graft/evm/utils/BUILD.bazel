@@ -5,7 +5,6 @@ go_library(
     name = "utils",
     srcs = [
         "address_range.go",
-        "bounded_workers.go",
         "bytes.go",
         "denomination.go",
         "metered_cache.go",

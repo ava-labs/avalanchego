@@ -1,9 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "api",
     srcs = [
         "common_args_responses.go",
+        "lazy_http.go",
         "traced_handler.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/api",
@@ -11,9 +13,21 @@ go_library(
     deps = [
         "//ids",
         "//trace",
+        "//utils",
         "//utils/formatting",
         "//utils/json",
+        "//utils/lock",
         "@io_opentelemetry_go_otel//attribute",
         "@io_opentelemetry_go_otel_trace//:trace",
+    ],
+)
+
+go_test(
+    name = "api_test",
+    srcs = ["lazy_http_test.go"],
+    embed = [":api"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )

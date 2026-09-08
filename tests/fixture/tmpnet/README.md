@@ -18,6 +18,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Via code](#via-code)
   - [Enabling errors with stack traces](#enabling-errors-with-stack-traces)
     - [Ensuring stack trace support](#ensuring-stack-trace-support)
+  - [Kind cluster ingress](#kind-cluster-ingress)
 - [Networking configuration](#networking-configuration)
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
@@ -188,6 +189,29 @@ uris := network.GetNodeURIs()
 // Stop all nodes in the network
 network.Stop(context.Background())
 ```
+
+### Kind cluster ingress
+[Top](#table-of-contents)
+
+`tmpnetctl start-kind-cluster` installs Traefik. Traefik exposes node APIs at
+`http://localhost:30791/networks/<network-uuid>/<node-id>`.
+
+Each node Ingress uses the `traefik` IngressClass and a Traefik Middleware. The
+Middleware removes `/networks/<network-uuid>/<node-id>` before Traefik sends the
+request to the node Service. Keep the Ingress path and Middleware prefix the
+same. Otherwise, Traefik can route a request to a node that receives the wrong
+path.
+
+The command configures Traefik to publish `localhost` in Ingress status. The
+runtime waits for that status and for a ready EndpointSlice on the node HTTP
+port before it uses the Ingress. This prevents a health check from reaching an
+unready backend.
+
+A Kubernetes cluster that does not use `start-kind-cluster` must install
+Traefik, its Middleware CRD, and the `traefik` IngressClass. The tmpnet service
+account must be able to create and patch Middleware objects and list
+EndpointSlices. `yaml/tmpnet-rbac.yaml` grants these permissions in the tmpnet
+namespace.
 
 ### Enabling errors with stack traces
 [Top](#table-of-contents)

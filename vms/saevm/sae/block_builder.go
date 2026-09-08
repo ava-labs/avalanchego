@@ -54,7 +54,7 @@ type blockBuilderG[T hook.Transaction] struct {
 }
 
 func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return blocks.New(eth, parent, lastSettled, b.log)
+	return blocks.New(eth, parent, lastSettled, b.hooks, b.log)
 }
 
 func (b *blockBuilderG[_]) build(
@@ -373,6 +373,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	return block, nil
 }
 
+// maxFutureBlockDuration is the maximum time from the current time allowed for
+// blocks before they're considered future blocks and fail parsing or
+// verification.
+const (
+	maxFutureBlockSeconds  uint64 = 10
+	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
+)
+
 func lastToSettle(
 	hooks hook.Points,
 	hdr *types.Header,
@@ -398,7 +406,7 @@ func lastToSettle(
 	}
 
 	// Underflow of Add(-tau) is prevented by the above check.
-	lastSettled, ok, err := blocks.LastToSettleAt(hooks, bTime.Add(-saeparams.Tau), parent)
+	lastSettled, ok, err := blocks.LastToSettleAt(bTime.Add(-saeparams.Tau), parent)
 	if err != nil {
 		return nil, err
 	}

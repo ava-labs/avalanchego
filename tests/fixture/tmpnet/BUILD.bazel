@@ -68,6 +68,7 @@ go_library(
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//authentication/v1:authentication",
         "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//discovery/v1:discovery",
         "@io_k8s_api//networking/v1:networking",
         "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/api/resource",
@@ -92,10 +93,17 @@ go_library(
 
 go_test(
     name = "tmpnet_test",
-    srcs = ["network_test.go"],
+    srcs = [
+        "kube_runtime_test.go",
+        "network_test.go",
+    ],
     embed = [":tmpnet"],
     deps = [
+        "//config",
         "//utils/logging",
         "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//discovery/v1:discovery",
+        "@io_k8s_utils//ptr",
     ],
 )

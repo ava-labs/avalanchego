@@ -384,14 +384,10 @@ Artifacts produced:
 Antithesis test images are built and pushed to Google Artifact Registry on every merge to master via `publish_antithesis_images.yml`:
 
 - `antithesis-avalanchego-{config,node,workload}:latest`
-- `antithesis-xsvm-{config,node,workload}:latest`
 - `antithesis-subnet-evm-{config,node,workload}:latest`
 
-These are triggered daily for testing:
-
-- `trigger-antithesis-avalanchego.yml` - 10PM UTC
-- `trigger-antithesis-xsvm.yml` - 6AM UTC
-- `trigger-antithesis-subnet-evm.yml` - 2PM UTC
+See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing)
+for scheduled testing details.
 
 ### 10. Post-Release Version Bump
 

@@ -15,10 +15,14 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -854,6 +859,18 @@ func (p *KubeRuntime) getClientset() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
+func (p *KubeRuntime) getDynamicClient() (dynamic.Interface, error) {
+	kubeconfig, err := p.getKubeconfig()
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to create dynamic client: %w", err)
+	}
+	return dynamicClient, nil
+}
+
 func (p *KubeRuntime) forwardPort(ctx context.Context, port int) (uint16, chan struct{}, error) {
 	kubeconfig, err := p.getKubeconfig()
 	if err != nil {
@@ -1035,27 +1052,32 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		zap.String("service", serviceName),
 	)
 
+	// Create a Middleware that removes the node path prefix.
+	middlewareName := "strip-" + serviceName
+	if err := p.createTraefikMiddleware(ctx, middlewareName, namespace, networkUUID, nodeID); err != nil {
+		return stacktrace.Errorf("failed to create Traefik middleware: %w", err)
+	}
+
 	clientset, err := p.getClientset()
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
 
 	var (
-		ingressClassName = "nginx" // Assume nginx ingress controller
-		// Path pattern: /networks/<network-uuid>/<node-id>(/|$)(.*)
-		// Using (/|$)(.*) to properly handle trailing slashes
-		pathPattern = fmt.Sprintf("/networks/%s/%s", networkUUID, nodeID) + "(/|$)(.*)"
-		pathType    = networkingv1.PathTypeImplementationSpecific
+		ingressClassName = "traefik"
+		// Traefik matches this path and the Middleware removes it.
+		pathPrefix = fmt.Sprintf("/networks/%s/%s", networkUUID, nodeID)
+		pathType   = networkingv1.PathTypePrefix
 	)
 
-	// Build the ingress rules
+	// Create the Ingress rule.
 	ingressRules := []networkingv1.IngressRule{
 		{
 			IngressRuleValue: networkingv1.IngressRuleValue{
 				HTTP: &networkingv1.HTTPIngressRuleValue{
 					Paths: []networkingv1.HTTPIngressPath{
 						{
-							Path:     pathPattern,
+							Path:     pathPrefix,
 							PathType: &pathType,
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
@@ -1072,10 +1094,13 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		},
 	}
 
-	// Add host if not localhost
+	// Do not set a host for localhost.
 	if !strings.HasPrefix(runtimeConfig.IngressHost, "localhost") {
 		ingressRules[0].Host = runtimeConfig.IngressHost
 	}
+
+	// Traefik requires <namespace>-<name>@kubernetescrd.
+	middlewareRef := fmt.Sprintf("%s-%s@kubernetescrd", namespace, middlewareName)
 
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1087,11 +1112,8 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 				"node-id":      nodeID,
 			},
 			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/use-regex":          "true",
-				"nginx.ingress.kubernetes.io/rewrite-target":     "/$2",
-				"nginx.ingress.kubernetes.io/proxy-body-size":    "0",
-				"nginx.ingress.kubernetes.io/proxy-read-timeout": "600",
-				"nginx.ingress.kubernetes.io/proxy-send-timeout": "600",
+				// Apply the Middleware that removes the node path prefix.
+				"traefik.ingress.kubernetes.io/router.middlewares": middlewareRef,
 			},
 		},
 		Spec: networkingv1.IngressSpec{
@@ -1119,8 +1141,65 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 		zap.String("nodeID", nodeID),
 		zap.String("namespace", namespace),
 		zap.String("ingress", serviceName),
-		zap.String("path", pathPattern),
+		zap.String("path", pathPrefix),
+		zap.String("middleware", middlewareRef),
 	)
+
+	return nil
+}
+
+// createTraefikMiddleware creates a Middleware that removes the node path prefix.
+func (p *KubeRuntime) createTraefikMiddleware(ctx context.Context, name, namespace, networkUUID, nodeID string) error {
+	dynamicClient, err := p.getDynamicClient()
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	// Remove /networks/<uuid>/<node-id> before the request reaches the Service.
+	stripPrefix := fmt.Sprintf("/networks/%s/%s", networkUUID, nodeID)
+
+	// Use an unstructured object because the client has no Traefik types.
+	middleware := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "traefik.io/v1alpha1",
+			"kind":       "Middleware",
+			"metadata": map[string]any{
+				"name":      name,
+				"namespace": namespace,
+			},
+			"spec": map[string]any{
+				"stripPrefix": map[string]any{
+					"prefixes": []any{stripPrefix},
+				},
+			},
+		},
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "traefik.io",
+		Version:  "v1alpha1",
+		Resource: "middlewares",
+	}
+
+	// Use server-side apply to create or update the Middleware.
+	data, err := json.Marshal(middleware)
+	if err != nil {
+		return stacktrace.Errorf("failed to marshal middleware: %w", err)
+	}
+
+	_, err = dynamicClient.Resource(gvr).Namespace(namespace).Patch(
+		ctx,
+		name,
+		types.ApplyPatchType,
+		data,
+		metav1.PatchOptions{
+			FieldManager: "tmpnet",
+			Force:        ptr.To(true),
+		},
+	)
+	if err != nil {
+		return stacktrace.Errorf("failed to apply Traefik middleware: %w", err)
+	}
 
 	return nil
 }
@@ -1146,7 +1225,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 		return stacktrace.Wrap(err)
 	}
 
-	// Wait for the ingress to exist, be processed by the controller, and service endpoints to be available
+	// Wait for the Ingress and a ready Service backend.
 	err = wait.PollUntilContextCancel(
 		ctx,
 		statusCheckInterval,
@@ -1203,18 +1282,13 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 				return false, nil
 			}
 
-			// Check if service endpoints are available
-			endpoints, err := clientset.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				log.Verbo("waiting for Service endpoints to be created",
-					zap.String("nodeID", nodeID),
-					zap.String("namespace", namespace),
-					zap.String("service", serviceName),
-				)
-				return false, nil
-			}
+			// Traefik reads EndpointSlices. Wait for a ready endpoint on the
+			// Service HTTP port.
+			endpointSlices, err := clientset.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: discoveryv1.LabelServiceName + "=" + serviceName,
+			})
 			if err != nil {
-				log.Warn("failed to retrieve Service endpoints",
+				log.Warn("failed to retrieve Service EndpointSlices",
 					zap.String("nodeID", nodeID),
 					zap.String("namespace", namespace),
 					zap.String("service", serviceName),
@@ -1223,17 +1297,8 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 				return false, nil
 			}
 
-			// Check if endpoints have at least one ready address
-			hasReadyEndpoints := false
-			for _, subset := range endpoints.Subsets {
-				if len(subset.Addresses) > 0 {
-					hasReadyEndpoints = true
-					break
-				}
-			}
-
-			if !hasReadyEndpoints {
-				log.Verbo("waiting for Service endpoints to have ready addresses",
+			if !hasReadyServiceEndpoint(endpointSlices.Items, config.DefaultHTTPPort) {
+				log.Verbo("waiting for Service EndpointSlices to have ready endpoints",
 					zap.String("nodeID", nodeID),
 					zap.String("namespace", namespace),
 					zap.String("service", serviceName),
@@ -1260,6 +1325,28 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 	)
 
 	return nil
+}
+
+func hasReadyServiceEndpoint(endpointSlices []discoveryv1.EndpointSlice, port int) bool {
+	for _, endpointSlice := range endpointSlices {
+		hasHTTPPort := false
+		for _, endpointPort := range endpointSlice.Ports {
+			if endpointPort.Port != nil && *endpointPort.Port == int32(port) {
+				hasHTTPPort = true
+				break
+			}
+		}
+		if !hasHTTPPort {
+			continue
+		}
+
+		for _, endpoint := range endpointSlice.Endpoints {
+			if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // IsRunningInCluster detects if this code is running inside a Kubernetes cluster
