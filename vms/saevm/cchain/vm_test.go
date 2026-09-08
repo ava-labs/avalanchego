@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -1557,6 +1558,55 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 
 	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
 	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+}
+
+// A node bootstrapping from genesis MUST execute the synchronous history
+// itself, reproducing each block's committed state and receipts roots, and MUST
+// then extend the chain asynchronously with the last synchronous block as the
+// initial settled block.
+func TestBootstrapSynchronousBlocks(t *testing.T) {
+	fixture := synchronoustest.Load(t)
+
+	// Helicon follows the fixture's one-upgrade-per-day schedule, so every
+	// synchronous block predates it and the clock starts past all of them.
+	upgrades := fixture.Upgrades
+	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
+	timeOpt, clock := withVMTime(upgrades.HeliconTime)
+
+	ctx, sut := newSUT(t,
+		withGenesis(fixture.CoreGenesis(t)),
+		withUpgrades(upgrades),
+		timeOpt,
+		withState(snow.Bootstrapping),
+	)
+	require.Equal(t, ids.ID(fixture.Blocks[0].Hash), sut.lastAccepted(ctx, t), "genesis")
+
+	for _, blk := range fixture.Blocks[1:] {
+		parsed, err := sut.ParseBlock(ctx, blk.RLP)
+		require.NoErrorf(t, err, "%T.ParseBlock(height %d)", sut.VM, blk.Number)
+		require.NoErrorf(t, sut.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", sut.VM, blk.Number)
+		require.NoErrorf(t, sut.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", sut.VM, blk.Number)
+
+		hdr := parsed.Header()
+		assert.Equalf(t, hdr.Root, parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(t, hdr.ReceiptHash, types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+	}
+	tip := fixture.Blocks[len(fixture.Blocks)-1]
+	require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
+
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+	// The fixture funds three accounts and only the first two ever transact,
+	// so the third still has its genesis balance and a zero nonce.
+	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
+	first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
+	require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+
+	clock.AdvanceToSettle(ctx, t, first)
+	second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
