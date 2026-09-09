@@ -131,3 +131,25 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  e2e-bootstrap:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.e2e_timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run isolated C-Chain bootstrap test with Bazel-built binary
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh bazel-test-e2e-bootstrap
+          setup_bazel: 'true'
+          artifact_prefix: e2e-bootstrap-bazel-${{ inputs.platform_name }}
+          filter_by_owner: avalanchego-e2e-bootstrap
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
