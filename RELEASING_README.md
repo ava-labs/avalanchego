@@ -71,25 +71,35 @@ These changes prepare the merge commit that will be tagged.
 
    And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
-1. If this release adds a network upgrade, disable the `upgrade` job in
-   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
-   Comment out the `Run e2e tests` step. Keep the `actions/checkout` step, so the job
-   still reports success. Name `$VERSION` in the `TODO` comment:
+1. If this release adds a network upgrade, make both of these edits:
 
-   ```yaml
-   upgrade:
-     runs-on: ubuntu-24.04
-     steps:
-       - uses: actions/checkout@v5
-       # TODO: Reactivate test once $VERSION is published
-       # - name: Run e2e tests
-       #   ...
-   ```
+   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION`
+      to `$VERSION` without the leading `v`. Name the new upgrade in the comment above
+      it:
 
-   The test upgrades a network from `DEFAULT_VERSION` in
-   [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh) to the current code. That
-   version does not have the new upgrade, so the test fails until you publish
-   `$VERSION`. [Step 10](#10-post-release-version-bump) enables the job again.
+      ```bash
+      # v1.15.0 is the earliest version that supports Helicon.
+      DEFAULT_VERSION="1.15.0"
+      ```
+
+   1. In
+      [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
+      comment out the `Run e2e tests` step of the `upgrade` job. Keep the
+      `actions/checkout` step, so the job still reports success:
+
+      ```yaml
+      upgrade:
+        runs-on: ubuntu-24.04
+        steps:
+          - uses: actions/checkout@v5
+          # TODO: Reactivate test once $VERSION is published
+          # - name: Run e2e tests
+          #   ...
+      ```
+
+   The test upgrades a network from `DEFAULT_VERSION` to the current code. Only
+   `$VERSION` has the new upgrade, and it is not published yet, so the job must stay
+   off until [step 10](#10-post-release-version-bump).
 
 **Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
 
@@ -427,20 +437,10 @@ export NEXT_VERSION=v1.14.2
 
 1. Update all version files (as in step 3) to the next version.
 
-1. If you disabled the `upgrade` job in step 3, make both of these edits:
-
-   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION`
-      to `$VERSION` without the leading `v`. Name the new upgrade in the comment above
-      it:
-
-      ```bash
-      # v1.15.0 is the earliest version that supports Helicon.
-      DEFAULT_VERSION="1.15.0"
-      ```
-
-   1. In
-      [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
-      uncomment the `Run e2e tests` step. Delete the `TODO` comment.
+1. If you disabled the `upgrade` job in step 3, enable it again in
+   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
+   Uncomment the `Run e2e tests` step. Delete the `TODO` comment. Step 3 already set
+   `DEFAULT_VERSION` to `$VERSION`, and `$VERSION` is now published.
 
 1. Create PR and merge:
 
