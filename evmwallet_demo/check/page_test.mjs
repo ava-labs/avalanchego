@@ -31,7 +31,7 @@ const shims = { ethers, document, ethereum, location: { origin: BASE, search: ''
 const api = new Function(...Object.keys(shims), script + '\nreturn { run, connect, exportToP, importOnP, exportFromP, importOnC, refresh, refreshActivity };')(...Object.values(shims));
 // mirror what the page prints: log() spans and stepper descriptions
 const panels = ['fb-setup', 'fb-export', 'fb-importp', 'fb-exportp', 'fb-import'];
-for (const id of panels) document.getElementById(id).appendChild = c => { if (c.className === 'steps') els[id].steps = c; else process.stdout.write(c.textContent); };
+for (const id of panels) document.getElementById(id).appendChild = c => { if (c.className === 'steps') els[id].steps = c; else process.stdout.write(c.textContent || ''); };
 const stepEl = () => ({ className: '', children: [], d: el(), t: el(), appendChild(c) { this.children.push(c); }, querySelector(q) { return q === '.d' ? this.d : this.t; } });
 document.createElement = tag => tag === 'div' ? stepEl() : el();
 let failed = false;

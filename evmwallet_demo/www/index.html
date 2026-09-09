@@ -61,6 +61,14 @@
   .tag { display:inline-block; font-size:11px; border-radius:4px; padding:1px 6px; background:#e6f4ea; color:var(--green); }
   .tag.legacy { background:#fdecea; color:var(--red); }
   a { color:var(--blue); }
+  section.lane-evm { border-left:5px solid var(--blue); }
+  section.lane-p { border-left:5px solid var(--green); background:#f6fbf7; }
+  .who { display:inline-block; font-size:12px; font-weight:600; border-radius:999px; padding:2px 10px; margin-bottom:8px; }
+  .who.evm { background:#e3ecff; color:var(--blue); }
+  .who.p { background:#e6f4ea; color:var(--green); }
+  .countdown { display:flex; gap:10px; align-items:center; margin-top:12px; padding:10px 12px; border-radius:8px; background:#e6f4ea; color:var(--green); font-weight:600; }
+  .countdown button { background:var(--green); }
+  .countdown button.alt { background:#fff; color:var(--fg); }
 </style>
 </head>
 <body>
@@ -93,7 +101,8 @@
   <p class="note">The P-chain address is <code>ripemd160(sha256(pubkey))</code>, 20 bytes like an EVM address but a different one. Nothing on the C-chain side knows or needs the P-chain key.</p>
 </section>
 
-<section class="gated" hidden>
+<section class="gated lane-evm" hidden>
+  <span class="who evm">Your EVM wallet signs this</span>
   <img src="export_from_c.png" alt="Export from C" onerror="this.hidden=true">
   <h2>C &rarr; P: any EVM wallet exports with one contract call</h2>
   <p>You call <code>exportAVAX(destinationChainID, to)</code> on the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">cross-chain transfer precompile</a> at <span class="mono" data-k="precompile"></span> with AVAX attached. The precompile emits one <code>Exported</code> log with the owner and the amount. After the block executes, the <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">SAE hook</a> reads the log, debits the precompile and writes a UTXO owned by <code>to</code> into shared memory. No ExportTx, no credential, no relayer. The export is done when the UTXO sits in shared memory.</p>
@@ -103,23 +112,26 @@
   <div class="fb" id="fb-export" hidden></div>
 </section>
 
-<section class="gated" hidden>
+<section class="gated lane-p" hidden>
+  <span class="who p">Built-in P-chain wallet, runs by itself</span>
   <h2>P-chain wallet imports, as today</h2>
-  <p>Nothing new here. The P-chain wallet (Core, Ledger, an exchange) sees the UTXO in shared memory and issues its usual ImportTx with its usual secp256k1 signature. Here the page does it with the same test key.</p>
+  <p>Nothing new here. The P-chain wallet (Core, Ledger, an exchange) sees the UTXO in shared memory and issues its usual ImportTx with its usual secp256k1 signature. This page plays that wallet with the same test key and does it automatically five seconds after your export lands.</p>
   <div class="flow"><div class="stat"><div class="l">Shared memory, C &rarr; P</div><div class="v" data-k="c2p">&ndash;</div><div class="s" data-k="c2pn">waiting to be imported on P</div></div><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div></div>
-  <div class="row"><button onclick="run(importOnP)">Import on P (P-chain wallet signs)</button></div>
+  <div class="row"><button class="alt" onclick="run(importOnP)">Run now instead of waiting</button></div>
   <div class="fb" id="fb-importp" hidden></div>
 </section>
 
-<section class="gated" hidden>
+<section class="gated lane-p" hidden>
+  <span class="who p">Built-in P-chain wallet, runs by itself</span>
   <h2>P-chain wallet exports to your 0x address, as today</h2>
-  <p>A normal ExportTx signed by the P-chain wallet, exactly as it works now. The destination is the C-chain address of your 0x bytes. The export is done when the UTXO sits in shared memory.</p>
+  <p>A normal ExportTx signed by the P-chain wallet, exactly as it works now. The output is owned by your 0x address. The page does this automatically five seconds after the P-chain import, so the round trip needs nothing from you until the last step.</p>
   <div class="flow"><div class="stat"><div class="l">P-chain balance</div><div class="v" data-k="pbal">&ndash;</div><div class="s" data-k="paddr">&nbsp;</div></div><div class="stat"><div class="l">Shared memory, P &rarr; C</div><div class="v" data-k="p2c">&ndash;</div><div class="s" data-k="p2cn">waiting to be imported on C</div></div></div>
-  <div class="row"><button onclick="run(exportFromP)">Export 1 AVAX from the P-chain to your EVM wallet</button></div>
+  <div class="row"><button class="alt" onclick="run(exportFromP)">Run now instead of waiting</button></div>
   <div class="fb" id="fb-exportp" hidden></div>
 </section>
 
-<section class="gated" hidden>
+<section class="gated lane-evm" hidden>
+  <span class="who evm">Your EVM wallet signs this</span>
   <img src="import_to_c.png" alt="Import to C" onerror="this.hidden=true">
   <h2>P &rarr; C: your EVM wallet imports with one contract call</h2>
   <p>You call <code>importUTXOs(utxos, to)</code> on the same <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/crosschain/contract.go" target="_blank">precompile</a> with nothing but the UTXO IDs. The <a href="https://github.com/ava-labs/avalanchego/blob/containerman17/cchain-evm-wallet/vms/saevm/cchain/hooks.go" target="_blank">block builder</a> checks that the UTXOs exist in shared memory before the block is accepted and records owner and amount in the block. Execution credits <code>to</code> with the full amount and consumes the UTXOs. One transaction, one receipt, done. You pay gas only; there is no import fee taken from the funds. Someone else can import for you with <code>remoteImportUTXOs</code> if you allowed it once with <code>allowRemoteImport(true)</code>; those funds always land on you.</p>
@@ -428,6 +440,26 @@ function stepper(titles) {
     append(i, text) { steps[i].querySelector('.d').textContent += '\n' + text; },
   };
 }
+// Five-second countdown inside the P-chain wallet's panel, then the action runs by itself.
+let pendingAuto = null;
+function scheduleAuto(action, panelId, what) {
+  if (pendingAuto) pendingAuto.stop();
+  const panel = $(panelId); panel.hidden = false;
+  const el = document.createElement('div'); el.className = 'countdown';
+  const text = document.createElement('span');
+  const now = document.createElement('button'); now.textContent = 'Now';
+  const cancel = document.createElement('button'); cancel.className = 'alt'; cancel.textContent = 'Cancel';
+  el.appendChild(text); el.appendChild(now); el.appendChild(cancel);
+  let left = 5;
+  const render = () => { text.textContent = 'P-chain wallet ' + what + ' in ' + left + 's '; };
+  const stop = () => { clearInterval(timer); if (el.remove) el.remove(); pendingAuto = null; };
+  const fire = () => { stop(); run(action); };
+  now.onclick = fire; cancel.onclick = stop;
+  const timer = setInterval(() => { if (--left <= 0) fire(); else render(); }, 1000);
+  pendingAuto = { stop };
+  render(); panel.appendChild(el);
+  if (panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 async function runStage(fn, button) {
   if (busy) return;
   busy = true;
@@ -453,6 +485,7 @@ async function exportToP() {
   if (!toIsMine) { st.done(1, 'UTXO written for ' + pAddr(to) + '. Only that wallet can see and import it.'); return; }
   const utxos = await poll(async () => { const u = await getPUTXOs('C'); return u.length > before ? u : null; }, 'UTXO in shared memory');
   st.done(1, avax(sum(utxos)) + ' AVAX now in shared memory, owned by the P-chain wallet. Same UTXO a C-chain ExportTx would have produced. Export done.');
+  scheduleAuto(importOnP, 'fb-importp', 'imports it');
 }
 async function importOnP() {
   const st = stepper(['The P-chain wallet imports what is waiting']);
@@ -465,6 +498,7 @@ async function importOnP() {
   st.done(0, 'P-chain wallet signed and issued ImportTx ' + r.txID + ' (' + bytes.length + ' bytes, ' + utxos.length + ' secp256k1 signature(s)).');
   await poll(async () => sum(await getPUTXOs()) > before ? 1 : null, 'P-chain balance to rise');
   st.append(0, 'P-chain balance ' + avax(sum(await getPUTXOs())) + ' AVAX');
+  scheduleAuto(exportFromP, 'fb-exportp', 'exports 1 AVAX back to your 0x address');
 }
 async function exportFromP() {
   const amt = AMOUNT;
@@ -475,7 +509,9 @@ async function exportFromP() {
   const bytes = pSign(pExportTx(inputs, amt, hexBytes(me)), inputs.length);
   const r = await rpc('/ext/bc/P', 'platform.issueTx', { tx: hexChecksum(bytes), encoding: 'hex' });
   await poll(async () => { const u = await getCUTXOs(); return u.length > before ? u : null; }, 'UTXO in shared memory');
-  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX now in shared memory for ' + me + '. Export done.');
+  st.done(0, 'ExportTx ' + r.txID + ' accepted. ' + avax(amt) + ' AVAX now in shared memory for ' + me + '. Your turn: import it on C with your EVM wallet below.');
+  const importSection = $('fb-import').closest && $('fb-import').closest('section');
+  if (importSection && importSection.scrollIntoView) importSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 async function importOnC() {
   const utxos = await getCUTXOs();
