@@ -96,6 +96,7 @@ go_test(
     srcs = [
         "kube_runtime_test.go",
         "network_test.go",
+        "node_test.go",
     ],
     embed = [":tmpnet"],
     deps = [
