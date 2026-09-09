@@ -384,7 +384,7 @@ func TestGenesisHash(t *testing.T) {
 		{
 			name:      "local",
 			networkID: constants.LocalID,
-			want:      "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+			want:      "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 		},
 	}
 	for _, test := range tests {
