@@ -207,6 +207,7 @@ The plugin version is updated to `45`; all plugins must update to be compatible.
 
 ### Config
 
+- Added the `flatfirewood` `state-scheme` to the SAE C-chain config: Firewood plus a flat history of every state change, serving historical state at every height on a pruned node.
 - Added:
   - `--simplex-max-network-delay`
   - `--simplex-max-rebroadcast-wait`
