@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
@@ -168,43 +169,45 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 // Connecting mid-sleep, not before it, proves escalation: a working wait is
 // asleep and misses it, noticing only at the next wake-up.
 func TestSend_NoPeersBackoffEscalates(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
-	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
-	wantBytes, err := proto.Marshal(want)
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		nodeID := ids.GenerateTestNodeID()
+		want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
+		wantBytes, err := proto.Marshal(want)
+		require.NoError(t, err)
 
-	const (
-		initial = 30 * time.Millisecond
-		factor  = 4.0
-		// A working escalation only notices this at its next ~600ms wake-up. A
-		// flat or broken wait would notice within microseconds, well under minElapsed.
-		connectAfter = 150 * time.Millisecond
-		minElapsed   = 300 * time.Millisecond
-	)
-	ctx := t.Context()
+		const (
+			initial = 30 * time.Millisecond
+			factor  = 4.0
+			// A working escalation only notices this at its next ~600ms wake-up. A
+			// flat or broken wait would notice within microseconds, well under minElapsed.
+			connectAfter = 150 * time.Millisecond
+			minElapsed   = 300 * time.Millisecond
+		)
+		ctx := t.Context()
 
-	handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
-	_, tracker := newTestTracker(t)
-	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
-	c.policy = *options.ApplyTo(defaultRetryPolicy(),
-		WithNoPeersInitialBackoff(initial),
-		WithNoPeersFactor(factor),
-		WithNoPeersMaxBackoff(time.Second),
-	)
+		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
+		_, tracker := newTestTracker(t)
+		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
+		c.policy = *options.ApplyTo(defaultRetryPolicy(),
+			WithNoPeersInitialBackoff(initial),
+			WithNoPeersFactor(factor),
+			WithNoPeersMaxBackoff(time.Second),
+		)
 
-	start := time.Now()
-	go func() {
-		time.Sleep(connectAfter)
-		tracker.Connected(nodeID, &version.Application{Major: 99})
-	}()
+		start := time.Now()
+		go func() {
+			time.Sleep(connectAfter)
+			tracker.Connected(nodeID, &version.Application{Major: 99})
+		}()
 
-	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
-	elapsed := time.Since(start)
+		got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
+		elapsed := time.Since(start)
 
-	require.NoError(t, err)
-	require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
-	require.Greater(t, elapsed, minElapsed,
-		"Send noticed the connected peer too soon, the no-peers wait is not escalating")
+		require.NoError(t, err)
+		require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
+		require.Greater(t, elapsed, minElapsed,
+			"Send noticed the connected peer too soon, the no-peers wait is not escalating")
+	})
 }
 
 func TestSend_CtxCancelledBeforeStart(t *testing.T) {
