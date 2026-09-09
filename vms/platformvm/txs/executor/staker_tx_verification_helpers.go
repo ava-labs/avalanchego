@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type addValidatorRules struct {
@@ -225,13 +225,13 @@ func GetMaxWeight(
 	return max(currentMax, currentWeight), nil
 }
 
-func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSubnetTx, error) {
+func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*platform.TransformSubnetTx, error) {
 	transformSubnetIntf, err := chain.GetSubnetTransformation(subnetID)
 	if err != nil {
 		return nil, err
 	}
 
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*platform.TransformSubnetTx)
 	if !ok {
 		return nil, ErrIsNotTransformSubnetTx
 	}

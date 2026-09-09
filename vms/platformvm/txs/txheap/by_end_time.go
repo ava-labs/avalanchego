@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 var _ TimedHeap = (*byEndTime)(nil)
@@ -26,9 +26,9 @@ type byEndTime struct {
 func NewByEndTime() TimedHeap {
 	return &byEndTime{
 		txHeap: txHeap{
-			heap: heap.NewMap[ids.ID, *txs.Tx](func(a, b *txs.Tx) bool {
-				aTime := a.Unsigned.(txs.BoundedStaker).EndTime()
-				bTime := b.Unsigned.(txs.BoundedStaker).EndTime()
+			heap: heap.NewMap[ids.ID, *platform.Tx](func(a, b *platform.Tx) bool {
+				aTime := a.Unsigned.(platform.BoundedStaker).EndTime()
+				bTime := b.Unsigned.(platform.BoundedStaker).EndTime()
 				return aTime.Before(bTime)
 			}),
 		},
@@ -36,5 +36,5 @@ func NewByEndTime() TimedHeap {
 }
 
 func (h *byEndTime) Timestamp() time.Time {
-	return h.Peek().Unsigned.(txs.BoundedStaker).EndTime()
+	return h.Peek().Unsigned.(platform.BoundedStaker).EndTime()
 }

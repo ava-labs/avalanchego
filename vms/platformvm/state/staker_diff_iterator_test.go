@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestStakerDiffIterator(t *testing.T) {
@@ -21,7 +21,7 @@ func TestStakerDiffIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 	pendingStakers := []*Staker{
@@ -30,28 +30,28 @@ func TestStakerDiffIterator(t *testing.T) {
 			StartTime: time.Unix(0, 0),
 			EndTime:   time.Unix(5, 0),
 			NextTime:  time.Unix(0, 0),
-			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+			Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(5, 0),
 			EndTime:   time.Unix(10, 0),
 			NextTime:  time.Unix(5, 0),
-			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+			Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(11, 0),
-			Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+			Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(11, 0),
-			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+			Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 	}
 
@@ -119,19 +119,19 @@ func TestMutableStakerIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(20, 0),
 			NextTime: time.Unix(20, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(30, 0),
 			NextTime: time.Unix(30, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 
@@ -142,19 +142,19 @@ func TestMutableStakerIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(5, 0),
 			NextTime: time.Unix(5, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(15, 0),
 			NextTime: time.Unix(15, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(25, 0),
 			NextTime: time.Unix(25, 0),
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			Priority: platform.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 

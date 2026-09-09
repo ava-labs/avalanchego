@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -32,7 +32,7 @@ func TestTxComplexity_Individual(t *testing.T) {
 			txBytes, err := hex.DecodeString(test.tx)
 			require.NoError(err)
 
-			tx, err := txs.Parse(txs.Codec, txBytes)
+			tx, err := platform.ParseTx(platform.Codec, txBytes)
 			require.NoError(err)
 
 			// If the test fails, logging the transaction can be helpful for
@@ -57,7 +57,7 @@ func TestTxComplexity_Batch(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		unsignedTxs        = make([]txs.UnsignedTx, 0, len(txTests))
+		unsignedTxs        = make([]platform.UnsignedTx, 0, len(txTests))
 		expectedComplexity gas.Dimensions
 	)
 	for _, test := range txTests {
@@ -72,7 +72,7 @@ func TestTxComplexity_Batch(t *testing.T) {
 		txBytes, err := hex.DecodeString(test.tx)
 		require.NoError(err)
 
-		tx, err := txs.Parse(txs.Codec, txBytes)
+		tx, err := platform.ParseTx(platform.Codec, txBytes)
 		require.NoError(err)
 
 		unsignedTxs = append(unsignedTxs, tx.Unsigned)
@@ -91,7 +91,7 @@ func BenchmarkTxComplexity_Individual(b *testing.B) {
 			txBytes, err := hex.DecodeString(test.tx)
 			require.NoError(err)
 
-			tx, err := txs.Parse(txs.Codec, txBytes)
+			tx, err := platform.ParseTx(platform.Codec, txBytes)
 			require.NoError(err)
 
 			b.ResetTimer()
@@ -105,7 +105,7 @@ func BenchmarkTxComplexity_Individual(b *testing.B) {
 func BenchmarkTxComplexity_Batch(b *testing.B) {
 	require := require.New(b)
 
-	unsignedTxs := make([]txs.UnsignedTx, 0, len(txTests))
+	unsignedTxs := make([]platform.UnsignedTx, 0, len(txTests))
 	for _, test := range txTests {
 		if test.expectedComplexityErr != nil {
 			continue
@@ -114,7 +114,7 @@ func BenchmarkTxComplexity_Batch(b *testing.B) {
 		txBytes, err := hex.DecodeString(test.tx)
 		require.NoError(err)
 
-		tx, err := txs.Parse(txs.Codec, txBytes)
+		tx, err := platform.ParseTx(platform.Codec, txBytes)
 		require.NoError(err)
 
 		unsignedTxs = append(unsignedTxs, tx.Unsigned)
@@ -212,7 +212,7 @@ func TestOutputComplexity(t *testing.T) {
 				return
 			}
 
-			bytes, err := txs.Codec.Marshal(txs.CodecVersion, test.out)
+			bytes, err := platform.Codec.Marshal(platform.CodecVersion, test.out)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(bytes) - codec.VersionSize)
@@ -326,11 +326,11 @@ func TestInputComplexity(t *testing.T) {
 				return
 			}
 
-			inputBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.in)
+			inputBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.in)
 			require.NoError(err)
 
 			cred := test.cred
-			credentialBytes, err := txs.Codec.Marshal(txs.CodecVersion, &cred)
+			credentialBytes, err := platform.Codec.Marshal(platform.CodecVersion, &cred)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(inputBytes) + len(credentialBytes) - 2*codec.VersionSize)
@@ -342,12 +342,12 @@ func TestInputComplexity(t *testing.T) {
 func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 	tests := []struct {
 		name     string
-		vdr      txs.ConvertSubnetToL1Validator
+		vdr      platform.ConvertSubnetToL1Validator
 		expected gas.Dimensions
 	}{
 		{
 			name: "any can spend",
-			vdr: txs.ConvertSubnetToL1Validator{
+			vdr: platform.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -361,7 +361,7 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 		},
 		{
 			name: "single remaining balance owner",
-			vdr: txs.ConvertSubnetToL1Validator{
+			vdr: platform.ConvertSubnetToL1Validator{
 				NodeID: make([]byte, ids.NodeIDLen),
 				Signer: signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{
@@ -380,7 +380,7 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 		},
 		{
 			name: "single deactivation owner",
-			vdr: txs.ConvertSubnetToL1Validator{
+			vdr: platform.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -406,7 +406,7 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 			require.NoError(err)
 			require.Equal(test.expected, actual)
 
-			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
+			vdrBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.vdr)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(vdrBytes) - codec.VersionSize)
@@ -469,7 +469,7 @@ func TestOwnerComplexity(t *testing.T) {
 				return
 			}
 
-			ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.owner)
+			ownerBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.owner)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(ownerBytes) - codec.VersionSize)
@@ -543,10 +543,10 @@ func TestAuthComplexity(t *testing.T) {
 				return
 			}
 
-			authBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.auth)
+			authBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.auth)
 			require.NoError(err)
 
-			credentialBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.cred)
+			credentialBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.cred)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(authBytes) + len(credentialBytes) - 2*codec.VersionSize)
@@ -596,7 +596,7 @@ func TestSignerComplexity(t *testing.T) {
 				return
 			}
 
-			signerBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.signer)
+			signerBytes, err := platform.Codec.Marshal(platform.CodecVersion, test.signer)
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(signerBytes) - codec.VersionSize)
