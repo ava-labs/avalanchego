@@ -77,9 +77,9 @@
     <p class="sub">Two contract calls from your EVM wallet move AVAX to the P-chain and back. The P-chain side is a normal P-chain wallet doing what it does today; this page plays it in the background.</p>
   </div>
   <div class="setup">
-    <button class="alt" onclick="addNetwork()">1. Add network</button>
-    <button class="alt" onclick="copy('pk')" title="Import this test key into your wallet">2. Copy test key</button>
-    <button onclick="connect()">3. Connect wallet</button>
+    <button onclick="connect()">1. Connect wallet</button>
+    <button class="alt" onclick="addNetwork()">2. Add network</button>
+    <button class="alt" onclick="copy('pk')" title="Import this test key into your wallet, then reconnect">3. Copy test key</button>
     <span class="note" id="connected">not connected</span>
     <code id="pk" hidden></code><span id="rpcurl" hidden></span><span id="chainid" hidden></span>
   </div>
