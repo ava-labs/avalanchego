@@ -30,7 +30,6 @@ const (
 var (
 	_ txs.Visitor = (*proposalTxExecutor)(nil)
 
-	ErrInvalidID                     = errors.New("invalid ID")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 
 	errRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
@@ -237,10 +236,11 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 }
 
 func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
-	switch {
-	case tx == nil:
-		return txs.ErrNilTx
-	case len(e.tx.Creds) != 0:
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if len(e.tx.Creds) != 0 {
 		return errWrongNumberOfCredentials
 	}
 
@@ -271,12 +271,11 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 }
 
 func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
-	switch {
-	case tx == nil:
-		return txs.ErrNilTx
-	case tx.TxID == ids.Empty:
-		return ErrInvalidID
-	case len(e.tx.Creds) != 0:
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if len(e.tx.Creds) != 0 {
 		return errWrongNumberOfCredentials
 	}
 
