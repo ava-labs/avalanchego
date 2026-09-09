@@ -136,7 +136,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:     []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:       nil,
 			AP3Time:     genesistest.DefaultValidatorStartTime,
-			expectedErr: ErrPeriodMismatch,
+			expectedErr: errPeriodMismatch,
 		},
 		{
 			description: "validator not in the current or pending validator sets",
@@ -158,7 +158,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:     []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:       addMinStakeValidator,
 			AP3Time:     genesistest.DefaultValidatorStartTime,
-			expectedErr: ErrPeriodMismatch,
+			expectedErr: errPeriodMismatch,
 		},
 		{
 			description: "delegator stops before validator",
@@ -169,7 +169,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:     []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 			setup:       addMinStakeValidator,
 			AP3Time:     genesistest.DefaultValidatorStartTime,
-			expectedErr: ErrPeriodMismatch,
+			expectedErr: errPeriodMismatch,
 		},
 		{
 			description: "valid",
@@ -214,7 +214,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				require.NoError(t, env.state.Commit())
 			},
 			AP3Time:     genesistest.DefaultValidatorStartTime,
-			expectedErr: ErrFlowCheckFailed,
+			expectedErr: errFlowCheckFailed,
 		},
 		{
 			description: "over delegation before AP3",
@@ -326,7 +326,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -422,7 +422,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrNotValidator)
+		require.ErrorIs(err, errNotValidator)
 	}
 
 	addValTx := addDSTx.Unsigned.(*txs.AddValidatorTx)
@@ -477,7 +477,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -513,7 +513,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrPeriodMismatch)
+		require.ErrorIs(err, errPeriodMismatch)
 	}
 
 	{
@@ -877,7 +877,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, errAlreadyValidator)
 	}
 
 	{
@@ -927,7 +927,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, errAlreadyValidator)
 	}
 
 	{
@@ -969,6 +969,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrFlowCheckFailed)
+		require.ErrorIs(err, errFlowCheckFailed)
 	}
 }

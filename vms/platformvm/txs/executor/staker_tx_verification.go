@@ -23,26 +23,26 @@ import (
 )
 
 var (
-	ErrWeightTooSmall                  = errors.New("weight of this validator is too low")
-	ErrWeightTooLarge                  = errors.New("weight of this validator is too large")
-	ErrInsufficientDelegationFee       = errors.New("staker charges an insufficient delegation fee")
-	ErrStakeTooShort                   = errors.New("staking period is too short")
-	ErrStakeTooLong                    = errors.New("staking period is too long")
-	ErrFlowCheckFailed                 = errors.New("flow check failed")
-	ErrNotValidator                    = errors.New("isn't a current or pending validator")
-	ErrRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
-	ErrStakeOverflow                   = errors.New("validator stake exceeds limit")
-	ErrPeriodMismatch                  = errors.New("proposed staking period is not inside dependent staking period")
-	ErrOverDelegated                   = errors.New("validator would be over delegated")
-	ErrIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
-	ErrTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
-	ErrAlreadyValidator                = errors.New("already a validator")
-	ErrDuplicateValidator              = errors.New("duplicate validator")
-	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
-	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
-	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
-	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
-	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrStakeTooLong                = errors.New("staking period is too long")
+	ErrOverDelegated               = errors.New("validator would be over delegated")
+	ErrTimestampNotBeforeStartTime = errors.New("chain timestamp not before start time")
+	ErrDuplicateValidator          = errors.New("duplicate validator")
+
+	errWeightTooSmall                  = errors.New("weight of this validator is too low")
+	errWeightTooLarge                  = errors.New("weight of this validator is too large")
+	errInsufficientDelegationFee       = errors.New("staker charges an insufficient delegation fee")
+	errStakeTooShort                   = errors.New("staking period is too short")
+	errFlowCheckFailed                 = errors.New("flow check failed")
+	errNotValidator                    = errors.New("isn't a current or pending validator")
+	errRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
+	errStakeOverflow                   = errors.New("validator stake exceeds limit")
+	errPeriodMismatch                  = errors.New("proposed staking period is not inside dependent staking period")
+	errAlreadyValidator                = errors.New("already a validator")
+	errDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
+	errWrongStakedAssetID              = errors.New("incorrect staked assetID")
+	errDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
+	errAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
+	errAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
 	errInvalidStakerTxType             = errors.New("invalid staker tx type")
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
 )
@@ -60,7 +60,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 		return fmt.Errorf(
 			"%s %w of the primary network",
 			subnetValidator.NodeID,
-			ErrNotValidator,
+			errNotValidator,
 		)
 	}
 	if err != nil {
@@ -83,7 +83,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
-		return ErrPeriodMismatch
+		return errPeriodMismatch
 	}
 
 	return nil
@@ -104,7 +104,7 @@ func verifyAddValidatorTx(
 ) {
 	currentTimestamp := chainState.GetTimestamp()
 	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
-		return nil, ErrAddValidatorTxPostDurango
+		return nil, errAddValidatorTxPostDurango
 	}
 
 	// Verify the tx is well-formed
@@ -121,19 +121,19 @@ func verifyAddValidatorTx(
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, ErrWeightTooSmall
+		return nil, errWeightTooSmall
 
 	case tx.Validator.Wght > backend.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
-		return nil, ErrWeightTooLarge
+		return nil, errWeightTooLarge
 
 	case tx.DelegationShares < backend.Config.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return nil, ErrInsufficientDelegationFee
+		return nil, errInsufficientDelegationFee
 
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return nil, ErrStakeTooShort
+		return nil, errStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
@@ -158,7 +158,7 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
 			tx.Validator.NodeID,
-			ErrAlreadyValidator,
+			errAlreadyValidator,
 		)
 	}
 	if err != database.ErrNotFound {
@@ -190,7 +190,7 @@ func verifyAddValidatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return outs, nil
@@ -227,7 +227,7 @@ func verifyAddSubnetValidatorTx(
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return errStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
@@ -294,7 +294,7 @@ func verifyAddSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return nil
@@ -339,14 +339,14 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, fmt.Errorf(
 			"%s %w of %s: %w",
 			tx.NodeID,
-			ErrNotValidator,
+			errNotValidator,
 			tx.Subnet,
 			err,
 		)
 	}
 
 	if !vdr.Priority.IsPermissionedValidator() {
-		return nil, false, ErrRemovePermissionlessValidator
+		return nil, false, errRemovePermissionlessValidator
 	}
 
 	if !backend.Bootstrapped.Get() {
@@ -384,7 +384,7 @@ func verifyRemoveSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, false, fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return vdr, isCurrentValidator, nil
@@ -405,7 +405,7 @@ func verifyAddDelegatorTx(
 ) {
 	currentTimestamp := chainState.GetTimestamp()
 	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
-		return nil, ErrAddDelegatorTxPostDurango
+		return nil, errAddDelegatorTxPostDurango
 	}
 
 	// Verify the tx is well-formed
@@ -425,7 +425,7 @@ func verifyAddDelegatorTx(
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return nil, ErrStakeTooShort
+		return nil, errStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
@@ -433,7 +433,7 @@ func verifyAddDelegatorTx(
 
 	case tx.Validator.Wght < backend.Config.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, ErrWeightTooSmall
+		return nil, errWeightTooSmall
 	}
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
@@ -458,9 +458,9 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	maximumWeight, err := safemath.Mul(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
+	maximumWeight, err := safemath.Mul(primaryNetworkMaxValidatorWeightFactor, primaryNetworkValidator.Weight)
 	if err != nil {
-		return nil, ErrStakeOverflow
+		return nil, errStakeOverflow
 	}
 
 	if backend.Config.UpgradeConfig.IsApricotPhase3Activated(currentTimestamp) {
@@ -473,7 +473,7 @@ func verifyAddDelegatorTx(
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
-		return nil, ErrPeriodMismatch
+		return nil, errPeriodMismatch
 	}
 	overDelegated, err := overDelegated(
 		chainState,
@@ -511,7 +511,7 @@ func verifyAddDelegatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return outs, nil
@@ -562,19 +562,19 @@ func verifyAddPermissionlessValidatorTx(
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return ErrWeightTooSmall
+		return errWeightTooSmall
 
 	case tx.Validator.Wght > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
-		return ErrWeightTooLarge
+		return errWeightTooLarge
 
 	case tx.DelegationShares < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return ErrInsufficientDelegationFee
+		return errInsufficientDelegationFee
 
 	case duration < validatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return errStakeTooShort
 
 	case duration > validatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
@@ -584,7 +584,7 @@ func verifyAddPermissionlessValidatorTx(
 		// Wrong assetID used
 		return fmt.Errorf(
 			"%w: %s != %s",
-			ErrWrongStakedAssetID,
+			errWrongStakedAssetID,
 			validatorRules.assetID,
 			stakedAssetID,
 		)
@@ -640,7 +640,7 @@ func verifyAddPermissionlessValidatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return nil
@@ -694,11 +694,11 @@ func verifyAddPermissionlessDelegatorTx(
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
-		return ErrWeightTooSmall
+		return errWeightTooSmall
 
 	case duration < delegatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return errStakeTooShort
 
 	case duration > delegatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
@@ -708,7 +708,7 @@ func verifyAddPermissionlessDelegatorTx(
 		// Wrong assetID used
 		return fmt.Errorf(
 			"%w: %s != %s",
-			ErrWrongStakedAssetID,
+			errWrongStakedAssetID,
 			delegatorRules.assetID,
 			stakedAssetID,
 		)
@@ -739,7 +739,7 @@ func verifyAddPermissionlessDelegatorTx(
 		validator.StartTime,
 		validator.EndTime,
 	) {
-		return ErrPeriodMismatch
+		return errPeriodMismatch
 	}
 	overDelegated, err := overDelegated(
 		chainState,
@@ -764,7 +764,7 @@ func verifyAddPermissionlessDelegatorTx(
 		//            permissioned validator, so we verify this delegator is
 		//            pointing to a permissionless validator.
 		if validator.Priority.IsPermissionedValidator() {
-			return ErrDelegateToPermissionedValidator
+			return errDelegateToPermissionedValidator
 		}
 	}
 
@@ -794,7 +794,7 @@ func verifyAddPermissionlessDelegatorTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return nil
@@ -817,7 +817,7 @@ func verifyTransferSubnetOwnershipTx(
 		upgrades         = backend.Config.UpgradeConfig
 	)
 	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return ErrDurangoUpgradeNotActive
+		return errDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
@@ -865,7 +865,7 @@ func verifyTransferSubnetOwnershipTx(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return nil
@@ -905,19 +905,19 @@ func verifyAddAutoRenewedValidatorTx(
 	switch {
 	case tx.Weight() < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return ErrWeightTooSmall
+		return errWeightTooSmall
 
 	case tx.Weight() > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
-		return ErrWeightTooLarge
+		return errWeightTooLarge
 
 	case tx.Shares() < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return ErrInsufficientDelegationFee
+		return errInsufficientDelegationFee
 
 	case tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
 		// Ensure staking length is not too short
-		return ErrStakeTooShort
+		return errStakeTooShort
 
 	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		// Ensure staking length is not too long
@@ -1009,7 +1009,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	switch {
 	case tx.Period > 0 && tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
-		return nil, ErrStakeTooShort
+		return nil, errStakeTooShort
 	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
 	}
@@ -1083,7 +1083,7 @@ func verifySpend(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
 	}
 
 	return nil
