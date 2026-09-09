@@ -98,7 +98,8 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 // StateAtBlock returns the state database after executing the given block.
 //
 // The reexec, base, readOnly, and preferDisk parameters are ignored because SAE
-// does not implement geth's re-execution-from-archive strategy.
+// does not implement geth's re-execution-from-archive strategy, but relies on
+// internal details.
 //
 // Like geth, SAE only stores historical state roots, not full historical state.
 // The underlying trie data must still be present in the state cache/DB for
@@ -145,7 +146,7 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 		}
 
 		// A normal execution would commit this state or store it in the triedb.
-		sdb.Finalise(true /*EIP-151*/)
+		sdb.Finalise(true)
 		// The stored block carries the executed gas clock that the next block's
 		// execution reads from its parent.
 		parent = stored

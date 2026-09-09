@@ -102,6 +102,9 @@ func (a *accountTrie) hash() (common.Hash, error) {
 // [ffi.Proposal]. The boolean input was intended to indicate whether to add
 // the values as a leaf in the nodeset (corresponding to whether the caller
 // expects this to be an account trie or not).
+//
+// Commit returns an error if the parent root cannot be proposed on, since such
+// state can never be committed.
 func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	root, err := a.hash()
 	if err != nil {

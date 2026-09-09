@@ -60,7 +60,7 @@ type Config struct {
 	Scheme            string // trie database scheme to use; defaults to [rawdb.HashScheme]
 	TrieCacheMiB      uint64 // size of the TrieDB cache
 	SnapshotCacheMiB  uint64 // size of the snapshot cache - if 0, snapshots are disabled
-	Archival          bool   // if true, will store every state on disk
+	Archival          bool   // if true, state will be persisted regularly for RPC support
 	CommitInterval    uint64 // MUST be set to a non-zero value
 	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
 
