@@ -184,6 +184,11 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - `tx-pool-global-queue`
 - `api-max-blocks-per-request`
 
+### Config
+
+- Added:
+  - `proposerWindowMilliseconds` in subnet configs
+
 ### Fixes
 
 - Updated the minimum Go version from `1.25.8` to `1.25.10`.

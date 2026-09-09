@@ -19,6 +19,11 @@ type Config struct {
 	// Configurable minimal delay among blocks issued consecutively
 	MinBlkDelay time.Duration
 
+	// WindowDuration is the length of a single proposer slot. Consensus-critical;
+	// see subnets.Config.ProposerWindowMilliseconds. A value <= 0 falls back to
+	// [DefaultWindowDuration] (5s).
+	WindowDuration time.Duration
+
 	// Maximal number of block indexed.
 	// Zero signals all blocks are indexed.
 	NumHistoricalBlocks uint64

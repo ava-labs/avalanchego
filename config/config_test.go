@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -575,6 +576,22 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"custom proposer window milliseconds": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"proposerWindowMilliseconds": 1000
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.Equal(uint64(1000), config.ProposerWindowMilliseconds)
+				// an unset field must still inherit the default
+				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -584,6 +601,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.True(ok)
 				// should respect defaults
 				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+				require.Equal(uint64(proposervm.DefaultWindowDuration/time.Millisecond), config.ProposerWindowMilliseconds)
 			},
 			expectedErr: nil,
 		},
@@ -742,6 +760,22 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			test.testF(require, subnetConfigs)
 		})
 	}
+}
+
+// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
+// proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
+func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
+	t.Run("config is built from constants and never reads user input", func(t *testing.T) {
+		defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
+		require.Equal(t, defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+	})
+
+	t.Run("tracking the primary network is rejected", func(t *testing.T) {
+		v := setupViperFlags()
+		v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
+		_, err := getTrackedSubnets(v)
+		require.ErrorIs(t, err, errCannotTrackPrimaryNetwork)
+	})
 }
 
 func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
