@@ -3,9 +3,7 @@
 
 package sae
 
-import (
-	"context"
-)
+import "context"
 
 // HealthCheck returns the current health status of the VM.
 func (vm *VM) HealthCheck(context.Context) (any, error) {
