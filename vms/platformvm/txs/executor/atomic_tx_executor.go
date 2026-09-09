@@ -9,12 +9,12 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
-var _ txs.Visitor = (*atomicTxExecutor)(nil)
+var _ platform.TxVisitor = (*atomicTxExecutor)(nil)
 
 // AtomicTx executes the atomic transaction [tx] and returns the resulting state
 // modifications.
@@ -26,7 +26,7 @@ func AtomicTx(
 	feeCalculator fee.Calculator,
 	parentID ids.ID,
 	stateVersions state.Versions,
-	tx *txs.Tx,
+	tx *platform.Tx,
 ) (*state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
 	atomicExecutor := atomicTxExecutor{
 		backend:       backend,
@@ -48,7 +48,7 @@ type atomicTxExecutor struct {
 	feeCalculator fee.Calculator
 	parentID      ids.ID
 	stateVersions state.Versions
-	tx            *txs.Tx
+	tx            *platform.Tx
 
 	// outputs of visitor execution
 	onAccept       *state.Diff
@@ -56,95 +56,95 @@ type atomicTxExecutor struct {
 	atomicRequests map[ids.ID]*atomic.Requests
 }
 
-func (*atomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
+func (*atomicTxExecutor) AddValidatorTx(*platform.AddValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (*atomicTxExecutor) AddSubnetValidatorTx(*platform.AddSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*atomicTxExecutor) AddDelegatorTx(*platform.AddDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+func (*atomicTxExecutor) CreateChainTx(*platform.CreateChainTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (*atomicTxExecutor) CreateSubnetTx(*platform.CreateSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*atomicTxExecutor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*atomicTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (*atomicTxExecutor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (*atomicTxExecutor) TransformSubnetTx(*platform.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+func (*atomicTxExecutor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+func (*atomicTxExecutor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (*atomicTxExecutor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) BaseTx(*txs.BaseTx) error {
+func (*atomicTxExecutor) BaseTx(*platform.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
+func (*atomicTxExecutor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
+func (*atomicTxExecutor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+func (*atomicTxExecutor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+func (*atomicTxExecutor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+func (*atomicTxExecutor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+func (*atomicTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*atomicTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
+func (e *atomicTxExecutor) ImportTx(*platform.ImportTx) error {
 	return e.atomicTx()
 }
 
-func (e *atomicTxExecutor) ExportTx(*txs.ExportTx) error {
+func (e *atomicTxExecutor) ExportTx(*platform.ExportTx) error {
 	return e.atomicTx()
 }
 

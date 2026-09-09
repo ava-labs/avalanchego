@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -58,8 +58,8 @@ func main() {
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
 	addValidatorStartTime := time.Now()
-	addValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	addValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(startTime.Add(duration).Unix()),

@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
@@ -53,7 +53,7 @@ var (
 func verifySubnetValidatorPrimaryNetworkRequirements(
 	isDurangoActive bool,
 	chainState state.Chain,
-	subnetValidator txs.Validator,
+	subnetValidator platform.Validator,
 ) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
@@ -77,7 +77,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	if !isDurangoActive {
 		startTime = subnetValidator.StartTime()
 	}
-	if !txs.BoundedBy(
+	if !platform.BoundedBy(
 		startTime,
 		subnetValidator.EndTime(),
 		primaryNetworkValidator.StartTime,
@@ -96,8 +96,8 @@ func verifyAddValidatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddValidatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddValidatorTx,
 ) (
 	[]*avax.TransferableOutput,
 	error,
@@ -202,8 +202,8 @@ func verifyAddSubnetValidatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddSubnetValidatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddSubnetValidatorTx,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -312,8 +312,8 @@ func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.RemoveSubnetValidatorTx,
+	sTx *platform.Tx,
+	tx *platform.RemoveSubnetValidatorTx,
 ) (*state.Staker, bool, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -397,8 +397,8 @@ func verifyAddDelegatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddDelegatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddDelegatorTx,
 ) (
 	[]*avax.TransferableOutput,
 	error,
@@ -467,7 +467,7 @@ func verifyAddDelegatorTx(
 		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
-	if !txs.BoundedBy(
+	if !platform.BoundedBy(
 		startTime,
 		endTime,
 		primaryNetworkValidator.StartTime,
@@ -523,8 +523,8 @@ func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddPermissionlessValidatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddPermissionlessValidatorTx,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -652,8 +652,8 @@ func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddPermissionlessDelegatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddPermissionlessDelegatorTx,
 ) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
@@ -733,7 +733,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 	maximumWeight = min(maximumWeight, delegatorRules.maxValidatorStake)
 
-	if !txs.BoundedBy(
+	if !platform.BoundedBy(
 		startTime,
 		endTime,
 		validator.StartTime,
@@ -758,7 +758,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	if tx.Subnet != constants.PrimaryNetworkID {
 		// Invariant: Delegators must only be able to reference validator
-		//            transactions that implement [txs.ValidatorTx]. All
+		//            transactions that implement [platform.ValidatorTx]. All
 		//            validator transactions implement this interface except the
 		//            AddSubnetValidatorTx. AddSubnetValidatorTx is the only
 		//            permissioned validator, so we verify this delegator is
@@ -809,8 +809,8 @@ func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.TransferSubnetOwnershipTx,
+	sTx *platform.Tx,
+	tx *platform.TransferSubnetOwnershipTx,
 ) error {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
@@ -876,8 +876,8 @@ func verifyAddAutoRenewedValidatorTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddAutoRenewedValidatorTx,
+	sTx *platform.Tx,
+	tx *platform.AddAutoRenewedValidatorTx,
 ) error {
 	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
 		return errHeliconUpgradeNotActive
@@ -961,8 +961,8 @@ func verifySetAutoRenewedValidatorConfigTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.SetAutoRenewedValidatorConfigTx,
+	sTx *platform.Tx,
+	tx *platform.SetAutoRenewedValidatorConfigTx,
 ) (*state.Staker, error) {
 	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
 		return nil, errHeliconUpgradeNotActive
@@ -981,7 +981,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
-	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
 	}
@@ -1055,7 +1055,7 @@ func verifySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	tx txs.UnsignedTx,
+	tx platform.UnsignedTx,
 	creds []verify.Verifiable,
 ) error {
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)

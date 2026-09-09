@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -53,7 +53,7 @@ type Diff struct {
 	// Subnet ID --> Conversion of the subnet
 	subnetToL1Conversions map[ids.ID]SubnetToL1Conversion
 	// Subnet ID --> Tx that transforms the subnet
-	transformedSubnets map[ids.ID]*txs.Tx
+	transformedSubnets map[ids.ID]*platform.Tx
 
 	addedTxs map[ids.ID]*txAndStatus
 
@@ -581,7 +581,7 @@ func (d *Diff) SetSubnetToL1Conversion(subnetID ids.ID, conv SubnetToL1Conversio
 	})
 }
 
-func (d *Diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+func (d *Diff) GetSubnetTransformation(subnetID ids.ID) (*platform.Tx, error) {
 	tx, exists := d.transformedSubnets[subnetID]
 	if exists {
 		return tx, nil
@@ -595,10 +595,10 @@ func (d *Diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	return parentState.GetSubnetTransformation(subnetID)
 }
 
-func (d *Diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
-	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+func (d *Diff) AddSubnetTransformation(transformSubnetTxIntf *platform.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*platform.TransformSubnetTx)
 	if d.transformedSubnets == nil {
-		d.transformedSubnets = map[ids.ID]*txs.Tx{
+		d.transformedSubnets = map[ids.ID]*platform.Tx{
 			transformSubnetTx.Subnet: transformSubnetTxIntf,
 		}
 	} else {
@@ -610,14 +610,14 @@ func (d *Diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
 	})
 }
 
-func (d *Diff) AddChain(createChainTx *txs.Tx) {
+func (d *Diff) AddChain(createChainTx *platform.Tx) {
 	d.recordOp(func(c Chain) error {
 		c.AddChain(createChainTx)
 		return nil
 	})
 }
 
-func (d *Diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
+func (d *Diff) GetTx(txID ids.ID) (*platform.Tx, status.Status, error) {
 	if tx, exists := d.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
@@ -629,7 +629,7 @@ func (d *Diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	return parentState.GetTx(txID)
 }
 
-func (d *Diff) AddTx(tx *txs.Tx, status status.Status) {
+func (d *Diff) AddTx(tx *platform.Tx, status status.Status) {
 	txID := tx.ID()
 	txStatus := &txAndStatus{
 		tx:     tx,

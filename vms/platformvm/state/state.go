@@ -39,14 +39,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -143,13 +142,13 @@ type Chain interface {
 	GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error)
 	SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion)
 
-	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
-	AddSubnetTransformation(transformSubnetTx *txs.Tx)
+	GetSubnetTransformation(subnetID ids.ID) (*platform.Tx, error)
+	AddSubnetTransformation(transformSubnetTx *platform.Tx)
 
-	AddChain(createChainTx *txs.Tx)
+	AddChain(createChainTx *platform.Tx)
 
-	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
-	AddTx(tx *txs.Tx, status status.Status)
+	GetTx(txID ids.ID) (*platform.Tx, status.Status, error)
+	AddTx(tx *platform.Tx, status status.Status)
 }
 
 // Prior to https://github.com/ava-labs/avalanchego/pull/1719, blocks were
@@ -279,8 +278,8 @@ type State struct {
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID; if the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]block.Block            // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]platform.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, platform.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB           database.Database
@@ -313,8 +312,8 @@ type State struct {
 	validatorPublicKeyDiffsBySubnetIDDB database.Database
 	validatorPublicKeyDiffsByHeightDB   database.Database
 
-	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}; if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*platform.Tx, Status}
+	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*platform.Tx, Status}; if the entry is nil, it is not in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
@@ -338,16 +337,16 @@ type State struct {
 	subnetToL1ConversionCache cache.Cacher[ids.ID, SubnetToL1Conversion] // cache of subnetID -> conversion
 	subnetToL1ConversionDB    database.Database
 
-	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
-	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
+	transformedSubnets     map[ids.ID]*platform.Tx            // map of subnetID -> transformSubnetTx
+	transformedSubnetCache cache.Cacher[ids.ID, *platform.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
 
 	modifiedSupplies map[ids.ID]uint64             // map of subnetID -> current supply
 	supplyCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply; if the entry is nil, it is not in the database
 	supplyDB         database.Database
 
-	addedChains  map[ids.ID][]*txs.Tx                    // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher[ids.ID, []*txs.Tx]         // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	addedChains  map[ids.ID][]*platform.Tx               // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher[ids.ID, []*platform.Tx]    // cache of subnetID -> the chains after all local modifications []*platform.Tx
 	chainDBCache cache.Cacher[ids.ID, linkeddb.LinkedDB] // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
@@ -415,7 +414,7 @@ type txBytesAndStatus struct {
 }
 
 type txAndStatus struct {
-	tx     *txs.Tx
+	tx     *platform.Tx
 	status status.Status
 }
 
@@ -430,7 +429,7 @@ type SubnetToL1Conversion struct {
 	Addr         []byte `serialize:"true"`
 }
 
-func txSize(_ ids.ID, tx *txs.Tx) int {
+func txSize(_ ids.ID, tx *platform.Tx) int {
 	if tx == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
@@ -444,7 +443,7 @@ func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func blockSize(_ ids.ID, blk block.Block) int {
+func blockSize(_ ids.ID, blk platform.Block) int {
 	if blk == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
@@ -471,7 +470,7 @@ func New(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, block.Block](
+	blockCache, err := metercacher.New[ids.ID, platform.Block](
 		"block_cache",
 		metricsReg,
 		lru.NewSizedCache(execCfg.BlockCacheSize, blockSize),
@@ -569,7 +568,7 @@ func New(
 	}
 
 	utxoDB := prefixdb.New(UTXOPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, platform.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -618,10 +617,10 @@ func New(
 		return nil, err
 	}
 
-	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
+	chainCache, err := metercacher.New[ids.ID, []*platform.Tx](
 		"chain_cache",
 		metricsReg,
-		lru.NewCache[ids.ID, []*txs.Tx](execCfg.ChainCacheSize),
+		lru.NewCache[ids.ID, []*platform.Tx](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -650,7 +649,7 @@ func New(
 		blockIDCache:  blockIDCache,
 		blockIDDB:     prefixdb.New(BlockIDPrefix, baseDB),
 
-		addedBlocks: make(map[ids.ID]block.Block),
+		addedBlocks: make(map[ids.ID]platform.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(BlockPrefix, baseDB),
 
@@ -720,7 +719,7 @@ func New(
 		subnetToL1ConversionDB:    subnetToL1ConversionDB,
 		subnetToL1ConversionCache: subnetToL1ConversionCache,
 
-		transformedSubnets:     make(map[ids.ID]*txs.Tx),
+		transformedSubnets:     make(map[ids.ID]*platform.Tx),
 		transformedSubnetCache: transformedSubnetCache,
 		transformedSubnetDB:    prefixdb.New(TransformedSubnetPrefix, baseDB),
 
@@ -728,7 +727,7 @@ func New(
 		supplyCache:      supplyCache,
 		supplyDB:         prefixdb.New(SupplyPrefix, baseDB),
 
-		addedChains:  make(map[ids.ID][]*txs.Tx),
+		addedChains:  make(map[ids.ID][]*platform.Tx),
 		chainDB:      prefixdb.New(ChainPrefix, baseDB),
 		chainCache:   chainCache,
 		chainDBCache: chainDBCache,
@@ -1141,7 +1140,7 @@ func (s *State) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	ownerBytes, err := s.subnetOwnerDB.Get(subnetID[:])
 	if err == nil {
 		var owner fx.Owner
-		if _, err := block.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
+		if _, err := platform.GenesisCodec.Unmarshal(ownerBytes, &owner); err != nil {
 			return nil, err
 		}
 		s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{
@@ -1162,7 +1161,7 @@ func (s *State) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		return nil, err
 	}
 
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	subnet, ok := subnetIntf.Unsigned.(*platform.CreateSubnetTx)
 	if !ok {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
 	}
@@ -1191,7 +1190,7 @@ func (s *State) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, 
 	}
 
 	var c SubnetToL1Conversion
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &c); err != nil {
+	if _, err := platform.GenesisCodec.Unmarshal(bytes, &c); err != nil {
 		return SubnetToL1Conversion{}, err
 	}
 	s.subnetToL1ConversionCache.Put(subnetID, c)
@@ -1202,7 +1201,7 @@ func (s *State) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion)
 	s.subnetToL1Conversions[subnetID] = c
 }
 
-func (s *State) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+func (s *State) GetSubnetTransformation(subnetID ids.ID) (*platform.Tx, error) {
 	if tx, exists := s.transformedSubnets[subnetID]; exists {
 		return tx, nil
 	}
@@ -1231,12 +1230,12 @@ func (s *State) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	return transformSubnetTx, nil
 }
 
-func (s *State) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
-	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+func (s *State) AddSubnetTransformation(transformSubnetTxIntf *platform.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*platform.TransformSubnetTx)
 	s.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 }
 
-func (s *State) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
+func (s *State) GetChains(subnetID ids.ID) ([]*platform.Tx, error) {
 	if chains, cached := s.chainCache.Get(subnetID); cached {
 		return chains, nil
 	}
@@ -1244,7 +1243,7 @@ func (s *State) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	chainDBIt := chainDB.NewIterator()
 	defer chainDBIt.Release()
 
-	txs := []*txs.Tx(nil)
+	txs := []*platform.Tx(nil)
 	for chainDBIt.Next() {
 		chainIDBytes := chainDBIt.Key()
 		chainID, err := ids.ToID(chainIDBytes)
@@ -1265,8 +1264,8 @@ func (s *State) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	return txs, nil
 }
 
-func (s *State) AddChain(createChainTxIntf *txs.Tx) {
-	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
+func (s *State) AddChain(createChainTxIntf *platform.Tx) {
+	createChainTx := createChainTxIntf.Unsigned.(*platform.CreateChainTx)
 	subnetID := createChainTx.SubnetID
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
 	if chains, cached := s.chainCache.Get(subnetID); cached {
@@ -1285,7 +1284,7 @@ func (s *State) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (s *State) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
+func (s *State) GetTx(txID ids.ID) (*platform.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
@@ -1304,11 +1303,11 @@ func (s *State) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	}
 
 	stx := txBytesAndStatus{}
-	if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
+	if _, err := platform.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
 		return nil, status.Unknown, err
 	}
 
-	tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
+	tx, err := platform.ParseTx(platform.GenesisCodec, stx.Tx)
 	if err != nil {
 		return nil, status.Unknown, err
 	}
@@ -1322,7 +1321,7 @@ func (s *State) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	return ptx.tx, ptx.status, nil
 }
 
-func (s *State) AddTx(tx *txs.Tx, status status.Status) {
+func (s *State) AddTx(tx *platform.Tx, status status.Status) {
 	s.addedTxs[tx.ID()] = &txAndStatus{
 		tx:     tx,
 		status: status,
@@ -1345,7 +1344,7 @@ func (s *State) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := platform.Codec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -1768,7 +1767,7 @@ func (s *State) ApplyValidatorPublicKeyDiffs(
 	return diffIter.Error()
 }
 
-func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) error {
+func (s *State) syncGenesis(genesisBlk platform.Block, genesis *genesis.Genesis) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1787,7 +1786,7 @@ func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 		// AddPermissionlessValidatorTx.
 		//
 		// TODO: Enforce stricter type check
-		validatorTx, ok := vdrTx.Unsigned.(txs.ScheduledStaker)
+		validatorTx, ok := vdrTx.Unsigned.(platform.ScheduledStaker)
 		if !ok {
 			return fmt.Errorf("expected a scheduled staker but got %T", vdrTx.Unsigned)
 		}
@@ -1826,9 +1825,9 @@ func (s *State) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 	}
 
 	for _, chain := range genesis.Chains {
-		unsignedChain, ok := chain.Unsigned.(*txs.CreateChainTx)
+		unsignedChain, ok := chain.Unsigned.(*platform.CreateChainTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
+			return fmt.Errorf("expected tx type *platform.CreateChainTx but got %T", chain.Unsigned)
 		}
 
 		// Ensure all chains that the genesis bytes say to create have the right
@@ -1913,7 +1912,7 @@ func (s *State) loadMetadata() error {
 	}
 
 	indexedHeights := &heightRange{}
-	_, err = block.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights)
+	_, err = platform.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights)
 	if err != nil {
 		return err
 	}
@@ -1964,7 +1963,7 @@ func (s *State) loadActiveL1Validators() error {
 				ValidationID: validationID,
 			}
 		)
-		if _, err := block.GenesisCodec.Unmarshal(value, &l1Validator); err != nil {
+		if _, err := platform.GenesisCodec.Unmarshal(value, &l1Validator); err != nil {
 			return fmt.Errorf("failed to unmarshal L1 validator: %w", err)
 		}
 
@@ -1994,7 +1993,7 @@ func (s *State) loadCurrentValidators() error {
 		metadata := &validatorMetadata{
 			txID: txID,
 		}
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+		if scheduledStakerTx, ok := tx.Unsigned.(platform.ScheduledStaker); ok {
 			// Populate [StakerStartTime] using the tx as a default in the event
 			// it was added pre-durango and is not stored in the database.
 			//
@@ -2008,7 +2007,7 @@ func (s *State) loadCurrentValidators() error {
 
 		var staker *Staker
 		switch stakerTx := tx.Unsigned.(type) {
-		case *txs.AddAutoRenewedValidatorTx:
+		case *platform.AddAutoRenewedValidatorTx:
 			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedValidationRewards)
 			if err != nil {
 				return fmt.Errorf("adding accrued validation rewards: %w", err)
@@ -2029,7 +2028,7 @@ func (s *State) loadCurrentValidators() error {
 			if err != nil {
 				return fmt.Errorf("failed creating staker: %w", err)
 			}
-		case txs.BoundedStaker:
+		case platform.BoundedStaker:
 			staker, err = NewCurrentStaker(
 				txID,
 				stakerTx,
@@ -2066,16 +2065,16 @@ func (s *State) loadCurrentValidators() error {
 			return err
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.BoundedStaker)
+		stakerTx, ok := tx.Unsigned.(platform.BoundedStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.BoundedStaker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type platform.BoundedStaker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
 		metadata := &validatorMetadata{
 			txID: txID,
 		}
-		if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+		if scheduledStakerTx, ok := tx.Unsigned.(platform.ScheduledStaker); ok {
 			// Populate [StakerStartTime] and [LastUpdated] using the tx as a
 			// default in the event they are not stored in the database.
 			startTime := uint64(scheduledStakerTx.StartTime().Unix())
@@ -2123,16 +2122,16 @@ func (s *State) loadCurrentValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.BoundedStaker)
+			stakerTx, ok := tx.Unsigned.(platform.BoundedStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.BoundedStaker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type platform.BoundedStaker but got %T", tx.Unsigned)
 			}
 
 			metadataBytes := delegatorIt.Value()
 			metadata := &delegatorMetadata{
 				txID: txID,
 			}
-			if scheduledStakerTx, ok := tx.Unsigned.(txs.ScheduledStaker); ok {
+			if scheduledStakerTx, ok := tx.Unsigned.(platform.ScheduledStaker); ok {
 				// Populate [StakerStartTime] using the tx as a default in the
 				// event it was added pre-durango and is not stored in the
 				// database.
@@ -2194,9 +2193,9 @@ func (s *State) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+			stakerTx, ok := tx.Unsigned.(platform.ScheduledStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type platform.ScheduledStaker but got %T", tx.Unsigned)
 			}
 
 			staker, err := NewPendingStaker(txID, stakerTx)
@@ -2229,9 +2228,9 @@ func (s *State) loadPendingValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
+			stakerTx, ok := tx.Unsigned.(platform.ScheduledStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type platform.ScheduledStaker but got %T", tx.Unsigned)
 			}
 
 			staker, err := NewPendingStaker(txID, stakerTx)
@@ -2470,7 +2469,7 @@ func (s *State) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := block.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	genesisBlock, err := platform.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
@@ -2492,7 +2491,7 @@ func (s *State) init(genesisBytes []byte) error {
 
 // AddStatelessBlock stores block as an accepted block.
 // Invariant: [block] is an accepted block.
-func (s *State) AddStatelessBlock(block block.Block) {
+func (s *State) AddStatelessBlock(block platform.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
@@ -2566,7 +2565,7 @@ func (s *State) writeBlocks() error {
 	return nil
 }
 
-func (s *State) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
+func (s *State) GetStatelessBlock(blockID ids.ID) (platform.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
 	}
@@ -3150,8 +3149,8 @@ func (s *State) writeTXs() error {
 		}
 
 		// Note that we're serializing a [txBytesAndStatus] here, not a
-		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, &stx)
+		// *platform.Tx, so we don't use [platform.Codec].
+		txBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
 		}
@@ -3176,7 +3175,7 @@ func (s *State) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, utxo)
+			utxoBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
@@ -3220,7 +3219,7 @@ func (s *State) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
 		delete(s.subnetOwners, subnetID)
 
-		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
+		ownerBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, &owner)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet owner: %w", err)
 		}
@@ -3241,7 +3240,7 @@ func (s *State) writeSubnetToL1Conversions() error {
 	for subnetID, c := range s.subnetToL1Conversions {
 		delete(s.subnetToL1Conversions, subnetID)
 
-		bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &c)
+		bytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, &c)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet conversion: %w", err)
 		}
@@ -3335,7 +3334,7 @@ func (s *State) writeMetadata() error {
 		s.persistedLastAccepted = s.lastAccepted
 	}
 	if s.indexedHeights != nil {
-		indexedHeightsBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, s.indexedHeights)
+		indexedHeightsBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, s.indexedHeights)
 		if err != nil {
 			return err
 		}
@@ -3350,20 +3349,20 @@ func (s *State) writeMetadata() error {
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
 // TODO: Remove after v1.14.x is activated
-func parseStoredBlock(blkBytes []byte) (block.Block, bool, error) {
+func parseStoredBlock(blkBytes []byte) (platform.Block, bool, error) {
 	// Attempt to parse as blocks.Block
-	blk, err := block.Parse(block.GenesisCodec, blkBytes)
+	blk, err := platform.ParseBlock(platform.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, false, nil
 	}
 
 	// Fallback to [stateBlk]
 	blkState := stateBlk{}
-	if _, err := block.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+	if _, err := platform.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, false, err
 	}
 
-	blk, err = block.Parse(block.GenesisCodec, blkState.Bytes)
+	blk, err = platform.ParseBlock(platform.GenesisCodec, blkState.Bytes)
 	return blk, true, err
 }
 
@@ -3524,7 +3523,7 @@ func isInitialized(db database.KeyValueReader) (bool, error) {
 }
 
 func putFeeState(db database.KeyValueWriter, feeState gas.State) error {
-	feeStateBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, feeState)
+	feeStateBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, feeState)
 	if err != nil {
 		return err
 	}
@@ -3541,7 +3540,7 @@ func getFeeState(db database.KeyValueReader) (gas.State, error) {
 	}
 
 	var feeState gas.State
-	if _, err := block.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
+	if _, err := platform.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
 		return gas.State{}, err
 	}
 	return feeState, nil

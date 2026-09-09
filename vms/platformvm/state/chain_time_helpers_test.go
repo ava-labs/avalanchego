@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
@@ -117,7 +117,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 					StartTime: genesistest.DefaultValidatorStartTime.Add(time.Second),
 					EndTime:   genesistest.DefaultValidatorEndTime,
 					NextTime:  genesistest.DefaultValidatorStartTime.Add(time.Second),
-					Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+					Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 				},
 			},
 			maxTime:  mockable.MaxTime,
