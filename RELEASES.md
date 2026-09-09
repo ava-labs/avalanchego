@@ -6,6 +6,14 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 
+### APIs
+
+- The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
+
+### Configs
+
+- The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
 This release schedules the activation of the Helicon network upgrade at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.

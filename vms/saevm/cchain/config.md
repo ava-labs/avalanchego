@@ -26,7 +26,7 @@ Default values are overridden only if specified in the given config file. It is 
 
 Configuration is provided as a JSON object. All fields are optional unless otherwise specified.
 
-Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them. The one exception is [`eth-apis`](#deprecated-eth-apis), which is deprecated but still honoured.
+Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them.
 
 ## Block Building
 
@@ -82,16 +82,6 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `profile` | disabled | Process introspection and profiling: `debug_blockProfile`, `debug_cpuProfile`, `debug_freeOSMemory`, `debug_gcStats`, `debug_goTrace`, `debug_memStats`, `debug_mutexProfile`, `debug_setBlockProfileRate`, `debug_setGCPercent`, `debug_setMutexProfileFraction`, `debug_stacks`, `debug_start{CPUProfile,GoTrace}`, `debug_stop{CPUProfile,GoTrace}`, `debug_verbosity`, `debug_vmodule`, `debug_write{Block,Mem,Mutex}Profile` |
 
 `eth_subscribe` is only available over the websocket endpoint (`/ext/bc/C/ws`).
-
-### Deprecated: `eth-apis`
-
-`eth-apis`, the pre-SAE C-Chain's API allowlist, is deprecated and **WILL BE
-REMOVED in the next release**; migrate to `apis`. Until then, the node maps
-each `eth-apis` name onto the `apis` values that serve the same methods and
-logs the resulting `apis` value to copy into the config. Names whose methods no
-longer exist (e.g. `admin`, `internal-personal`) are ignored with a warning, and
-an unrecognised name remains a fatal configuration error. If a config sets both
-options, `apis` wins and `eth-apis` is ignored.
 
 ## State Sync
 

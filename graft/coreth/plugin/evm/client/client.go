@@ -71,18 +71,28 @@ func (c *Client) GetAtomicTxStatus(ctx context.Context, txID ids.ID, options ...
 	return res.Status, err
 }
 
+// FormattedTx defines the GetAtomicTx replies returned from the API
+type FormattedTx struct {
+	api.FormattedTx
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
+}
+
 // GetAtomicTx returns the byte representation of [txID]
 func (c *Client) GetAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
-	res := &api.FormattedTx{}
+	res, err := c.getAtomicTx(ctx, txID, options...)
+	if err != nil {
+		return nil, err
+	}
+	return formatting.Decode(formatting.Hex, res.Tx)
+}
+
+func (c *Client) getAtomicTx(ctx context.Context, txID ids.ID, options ...rpc.Option) (*FormattedTx, error) {
+	res := &FormattedTx{}
 	err := c.requester.SendRequest(ctx, "avax.getAtomicTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, res, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	return formatting.Decode(formatting.Hex, res.Tx)
+	return res, err
 }
 
 // GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
@@ -157,25 +167,24 @@ func (c *Client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*confi
 	return res.Config, err
 }
 
-// AwaitTxAccepted polls GetAtomicTxStatus every freq until txID is accepted
-// or ctx is cancelled.
+// AwaitTxAccepted polls GetAtomicTx every freq until txID is included in an
+// accepted block or ctx is cancelled.
 func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 
 	for {
-		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
-		if err != nil {
-			return err
-		}
-
-		if status == atomic.Accepted {
+		res, err := c.getAtomicTx(ctx, txID, options...)
+		if err == nil && res.BlockHeight != nil {
 			return nil
 		}
 
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
+			if err != nil {
+				return fmt.Errorf("%w: %w", ctx.Err(), err)
+			}
 			return ctx.Err()
 		}
 	}
