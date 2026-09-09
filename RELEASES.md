@@ -6,6 +6,7 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
 ### Metrics
 
