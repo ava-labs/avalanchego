@@ -2,7 +2,7 @@
 
 ## Pending (v1.15.1)
 
-- None (delete and fill in as you work)
+- Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

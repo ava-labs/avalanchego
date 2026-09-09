@@ -71,6 +71,52 @@ These changes prepare the merge commit that will be tagged.
 
    And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
+1. If this release adds a network upgrade, make all three of these edits:
+
+   1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the new upgrade's time in
+      `Default` to `InitiallyActiveTime`. `Default` is the schedule for local
+      networks. Until it activates the upgrade, no test that relies on the default
+      schedule exercises the upgrade:
+
+      ```go
+      Default = Config{
+          // ...
+          HeliconTime: InitiallyActiveTime,
+      }
+      ```
+
+      Update any test that pins the local schedule, such as `TestParseGenesis` in
+      [`vms/saevm/cchain/genesis_test.go`](vms/saevm/cchain/genesis_test.go).
+
+   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION`
+      to `$VERSION` without the leading `v`. Name the new upgrade in the comment above
+      it:
+
+      ```bash
+      # v1.15.1 is the earliest version that activates Helicon on local networks.
+      DEFAULT_VERSION="1.15.1"
+      ```
+
+   1. In
+      [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
+      comment out the `Run e2e tests` step of the `upgrade` job. Keep the
+      `actions/checkout` step, so the job still reports success:
+
+      ```yaml
+      upgrade:
+        runs-on: ubuntu-24.04
+        steps:
+          - uses: actions/checkout@v5
+          # TODO: Reactivate test once $VERSION is published
+          # - name: Run e2e tests
+          #   ...
+      ```
+
+   The test starts a network on `DEFAULT_VERSION` and restarts it on the current
+   code, so both MUST use the same local schedule. Only `$VERSION` activates the new
+   upgrade locally, and it is not published yet, so the job must stay off until
+   [step 10](#10-post-release-version-bump).
+
 **Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
 
 1. Update submodule require directives to reference the future tag:
@@ -406,6 +452,10 @@ export NEXT_VERSION=v1.14.2
    ```
 
 1. Update all version files (as in step 3) to the next version.
+
+1. If you disabled the `upgrade` job in step 3, enable it again in
+   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
+   Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 

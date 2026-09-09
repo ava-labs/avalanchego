@@ -522,7 +522,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      #  TODO: Reactivate test once v1.15.0 is published
+      # TODO: Reactivate test once v1.15.1 is published
       # - name: Run e2e tests
       #   uses: ./.github/actions/run-monitored-tmpnet-cmd
       #   with:
