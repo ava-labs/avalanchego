@@ -98,7 +98,7 @@ func New(
 	}
 	e.lastExecuted.Store(lastExecuted)
 
-	go e.processQueue()
+	go e.processQueue() //nolint:errcheck // Stored in [Executor.queueErr] for access via [Executor.HealthCheck]
 	return e, nil
 }
 
