@@ -34,6 +34,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		TrieDirtyCache                  int
 		TrieDirtyCommitTarget           int
 		TriePrefetcherParallelism       int
+		SpeculativeWarmup               bool
 		SnapshotCache                   int
 		Preimages                       bool
 		AcceptedCacheSize               int
@@ -77,6 +78,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.TrieDirtyCache = c.TrieDirtyCache
 	enc.TrieDirtyCommitTarget = c.TrieDirtyCommitTarget
 	enc.TriePrefetcherParallelism = c.TriePrefetcherParallelism
+	enc.SpeculativeWarmup = c.SpeculativeWarmup
 	enc.SnapshotCache = c.SnapshotCache
 	enc.Preimages = c.Preimages
 	enc.AcceptedCacheSize = c.AcceptedCacheSize
@@ -124,6 +126,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		TrieDirtyCache                  *int
 		TrieDirtyCommitTarget           *int
 		TriePrefetcherParallelism       *int
+		SpeculativeWarmup               *bool
 		SnapshotCache                   *int
 		Preimages                       *bool
 		AcceptedCacheSize               *int
@@ -203,6 +206,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.TriePrefetcherParallelism != nil {
 		c.TriePrefetcherParallelism = *dec.TriePrefetcherParallelism
+	}
+	if dec.SpeculativeWarmup != nil {
+		c.SpeculativeWarmup = *dec.SpeculativeWarmup
 	}
 	if dec.SnapshotCache != nil {
 		c.SnapshotCache = *dec.SnapshotCache

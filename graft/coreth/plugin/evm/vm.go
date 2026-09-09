@@ -371,6 +371,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.TrieDirtyCache = vm.config.TrieDirtyCache
 	vm.ethConfig.TrieDirtyCommitTarget = vm.config.TrieDirtyCommitTarget
 	vm.ethConfig.TriePrefetcherParallelism = vm.config.TriePrefetcherParallelism
+	vm.ethConfig.SpeculativeWarmup = vm.config.SpeculativeWarmup
 	vm.ethConfig.SnapshotCache = vm.config.SnapshotCache
 	vm.ethConfig.AcceptorQueueLimit = vm.config.AcceptorQueueLimit
 	vm.ethConfig.PopulateMissingTries = vm.config.PopulateMissingTries
