@@ -2,6 +2,10 @@
 
 ## Pending (v1.15.1)
 
+### Features
+
+- SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
+
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
