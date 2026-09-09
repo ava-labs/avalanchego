@@ -722,7 +722,7 @@ func TestDebugIntermediateRoots(t *testing.T) {
 			)...)
 
 			for _, block := range blks {
-				t.Run(fmt.Sprintf("block_%02d", block.NumberU64()), func(t *testing.T) {
+				t.Run(fmt.Sprintf("block_%d", block.NumberU64()), func(t *testing.T) {
 					var roots []common.Hash
 					require.NoError(t, sut.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "CallContext(debug_intermediateRoots)")
 

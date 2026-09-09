@@ -79,7 +79,7 @@ func (a *accountTrie) Hash() common.Hash {
 }
 
 // hash applies all pending updates via the [hasher] and returns the root. If the
-// previous root was a historical revision,  an [ffi.Reconstruction] will be made.
+// previous root was a historical revision, an [ffi.Reconstructed] will be made.
 func (a *accountTrie) hash() (common.Hash, error) {
 	root, err := a.hasher.hash(a.updateOps)
 	if !errors.Is(err, errNotProposable) {

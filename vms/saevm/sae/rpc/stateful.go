@@ -126,6 +126,10 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 	}
 
 	for _, stored := range toReexec {
+		if ctx.Err() != nil {
+			return nil, nil, context.Cause(ctx)
+		}
+
 		// A settled block has no ancestry, which [saexec.Execute] requires,
 		// so it is rebuilt on top of the previous block.
 		bl, err := b.NewBlock(stored.EthBlock(), parent, nil)
@@ -139,7 +143,6 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 			b.ChainConfig(),
 			b.ChainContext(),
 			b.Logger(),
-			saexec.SkipEndOfBlockOps(),
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("re-executing block %d: %w", stored.NumberU64(), err)
@@ -147,12 +150,11 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 
 		// A normal execution would commit this state or store it in the triedb.
 		sdb.Finalise(true)
-		// The stored block carries the executed gas clock that the next block's
-		// execution reads from its parent.
-		parent = stored
+
+		parent = stored // The stored block is marked as executed.
 	}
 
-	return sdb.Copy(), parent, nil
+	return sdb, parent, nil
 }
 
 // lastBlockWithState searches backwards from block num for the most recent
@@ -163,10 +165,13 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 	const maxReexec = 8192 // TODO(alarso16): determine using commit interval and settlement height
 
 	var (
-		toReexec     []*blocks.Block
-		notFoundType = new(trie.MissingNodeError)
+		toReexec    []*blocks.Block
+		errNotFound = new(trie.MissingNodeError)
 	)
 	for i := range uint64(maxReexec) {
+		if ctx.Err() != nil {
+			return nil, nil, nil, context.Cause(ctx)
+		}
 		if num < i {
 			break
 		}
@@ -177,7 +182,7 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 		}
 		sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 		switch {
-		case errors.As(err, &notFoundType):
+		case errors.As(err, &errNotFound):
 			toReexec = append(toReexec, bl)
 			continue
 		case err != nil:

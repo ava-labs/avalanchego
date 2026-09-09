@@ -127,7 +127,7 @@ func (r *reconstructedHasher) hash(ops []ffi.BatchOp) (common.Hash, error) {
 	}
 
 	if err := r.view.Reconstruct(ops[r.applied:]); err != nil {
-		// On error, the [ffi.Reconstruction] has released its resources and is no longer
+		// On error, the [ffi.Reconstructed] has released its resources and is no longer
 		// usable.
 		r.view = nil
 		r.applied = 0
