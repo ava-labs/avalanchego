@@ -180,8 +180,8 @@ var _ = ginkgo.Describe("[Warp]", func() {
 				w.sendMessageFromSendingSubnet()
 			})
 
-			ginkgo.It("should aggregate signatures via API", func() {
-				w.aggregateSignaturesViaAPI()
+			ginkgo.It("should aggregate signatures", func() {
+				w.aggregateSignatures()
 			})
 
 			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
@@ -395,6 +395,16 @@ func verifyAndExtractWarpMessage(
 	sender common.Address,
 ) *avalancheWarp.UnsignedMessage {
 	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+
+	// SAE serves a receipt as soon as its transaction executes. The block's
+	// logs are only written once the whole block executes, and the block
+	// number advances after that.
+	tc.Eventually(func() bool {
+		height, err := client.BlockNumber(ctx)
+		require.NoError(err)
+		return height >= blockNumber
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "block should become the latest block")
 
 	log.Info("Filtering SendWarpMessage events using binding")
 	warpFilterer, err := warpbindings.NewIWarpMessengerFilterer(warp.Module.Address, client)
@@ -431,7 +441,7 @@ func verifyAndExtractWarpMessage(
 	return unsignedMessage
 }
 
-func (w *warpTest) aggregateSignaturesViaAPI() {
+func (w *warpTest) aggregateSignatures() {
 	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
@@ -447,24 +457,25 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 		warpAPIs[nodeID] = client
 	}
 
-	pChainClient := platformvm.NewClient(w.sendingSubnetURIs[0])
-	pChainHeight, err := pChainClient.GetHeight(ctx)
-	require.NoError(err)
-	// If the source subnet is the Primary Network, then we only need to aggregate signatures from the receiving
-	// subnet's validator set instead of the entire Primary Network.
-	// If the destination turns out to be the Primary Network as well, then this is a no-op.
-	var vdrs map[ids.NodeID]*validators.GetValidatorOutput
-	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		vdrs, err = pChainClient.GetValidatorsAt(ctx, w.receivingSubnet.SubnetID, api.Height(pChainHeight))
-	} else {
-		vdrs, err = pChainClient.GetValidatorsAt(ctx, w.sendingSubnet.SubnetID, api.Height(pChainHeight))
-	}
-	require.NoError(err)
-	require.NotEmpty(vdrs)
+	warpValidators := w.warpValidators(ctx)
 
-	warpValidators, err := validators.FlattenValidatorSet(vdrs)
-	require.NoError(err)
-	require.NotEmpty(warpValidators)
+	// The C-Chain runs SAE, which has no warp API. Validators still sign
+	// messages over p2p (ACP-118), and the requester aggregates the signatures.
+	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
+		network := e2e.GetEnv(tc).GetNetwork()
+		signedMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, w.addressedCallUnsignedMessage)
+		require.NoError(err)
+		w.addressedCallSignedMessage = signedMessage
+
+		blockHashPayload, err := warpPayload.NewHash(w.blockID)
+		require.NoError(err)
+		unsignedBlockMessage, err := avalancheWarp.NewUnsignedMessage(w.networkID, w.sendingSubnet.BlockchainID, blockHashPayload.Bytes())
+		require.NoError(err)
+		signedBlockMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, unsignedBlockMessage)
+		require.NoError(err)
+		w.blockPayloadSignedMessage = signedBlockMessage
+		return
+	}
 
 	// Verify that the signature aggregation matches the results of manually constructing the warp message
 	client, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
@@ -498,6 +509,31 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	err = parsedWarpBlockMessage.Signature.Verify(&parsedWarpBlockMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
 	require.NoError(err)
 	w.blockPayloadSignedMessage = parsedWarpBlockMessage
+}
+
+// warpValidators returns the validators that sign messages from the sending
+// subnet to the receiving subnet.
+func (w *warpTest) warpValidators(ctx context.Context) validators.WarpSet {
+	require := require.New(ginkgo.GinkgoT())
+
+	pChainClient := platformvm.NewClient(w.sendingSubnetURIs[0])
+	pChainHeight, err := pChainClient.GetHeight(ctx)
+	require.NoError(err)
+	// If the source subnet is the Primary Network, then we only need to aggregate signatures from the receiving
+	// subnet's validator set instead of the entire Primary Network.
+	// If the destination turns out to be the Primary Network as well, then this is a no-op.
+	subnetID := w.sendingSubnet.SubnetID
+	if subnetID == constants.PrimaryNetworkID {
+		subnetID = w.receivingSubnet.SubnetID
+	}
+	vdrs, err := pChainClient.GetValidatorsAt(ctx, subnetID, api.Height(pChainHeight))
+	require.NoError(err)
+	require.NotEmpty(vdrs)
+
+	warpValidators, err := validators.FlattenValidatorSet(vdrs)
+	require.NoError(err)
+	require.NotEmpty(warpValidators)
+	return warpValidators
 }
 
 func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
@@ -736,12 +772,8 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpSendLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 
-	warpClient, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
-	require.NoError(err)
-	subnetIDStr := ""
-	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		subnetIDStr = w.receivingSubnet.SubnetID.String()
-	}
+	network := e2e.GetEnv(tc).GetNetwork()
+	warpValidators := w.warpValidators(ctx)
 
 	log.Info("Executing warp delivery sequences...")
 	warpDeliverSequences, err := txs.GenerateTxSequences(ctx, func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error) {
@@ -752,9 +784,9 @@ func (w *warpTest) warpLoad() {
 		if err != nil {
 			return nil, err
 		}
-		log.Info("Fetching addressed call aggregate signature via p2p API")
+		log.Info("Aggregating addressed call signature")
 
-		signedWarpMessageBytes, err := warpClient.GetMessageAggregateSignature(ctx, unsignedMessage.ID(), warp.WarpDefaultQuorumNumerator, subnetIDStr)
+		signedWarpMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, unsignedMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -775,7 +807,7 @@ func (w *warpTest) warpLoad() {
 			AccessList: types.AccessList{
 				{
 					Address:     warp.ContractAddress,
-					StorageKeys: predicate.New(signedWarpMessageBytes),
+					StorageKeys: predicate.New(signedWarpMessage.Bytes()),
 				},
 			},
 		})

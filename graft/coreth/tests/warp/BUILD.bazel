@@ -31,6 +31,7 @@ graft_go_test(
         "//vms/platformvm",
         "//vms/platformvm/api",
         "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
