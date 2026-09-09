@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -89,116 +89,116 @@ func TestVerifyWarpMessages(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		tx          txs.UnsignedTx
+		tx          platform.UnsignedTx
 		expectedErr error
 	}{
 		{
 			name: "AddValidatorTx",
-			tx:   &txs.AddValidatorTx{},
+			tx:   &platform.AddValidatorTx{},
 		},
 		{
 			name: "AddSubnetValidatorTx",
-			tx:   &txs.AddSubnetValidatorTx{},
+			tx:   &platform.AddSubnetValidatorTx{},
 		},
 		{
 			name: "AddDelegatorTx",
-			tx:   &txs.AddDelegatorTx{},
+			tx:   &platform.AddDelegatorTx{},
 		},
 		{
 			name: "CreateChainTx",
-			tx:   &txs.CreateChainTx{},
+			tx:   &platform.CreateChainTx{},
 		},
 		{
 			name: "CreateSubnetTx",
-			tx:   &txs.CreateSubnetTx{},
+			tx:   &platform.CreateSubnetTx{},
 		},
 		{
 			name: "ImportTx",
-			tx:   &txs.ImportTx{},
+			tx:   &platform.ImportTx{},
 		},
 		{
 			name: "ExportTx",
-			tx:   &txs.ExportTx{},
+			tx:   &platform.ExportTx{},
 		},
 		{
 			name: "AdvanceTimeTx",
-			tx:   &txs.AdvanceTimeTx{},
+			tx:   &platform.AdvanceTimeTx{},
 		},
 		{
 			name: "RewardValidatorTx",
-			tx:   &txs.RewardValidatorTx{},
+			tx:   &platform.RewardValidatorTx{},
 		},
 		{
 			name: "RemoveSubnetValidatorTx",
-			tx:   &txs.RemoveSubnetValidatorTx{},
+			tx:   &platform.RemoveSubnetValidatorTx{},
 		},
 		{
 			name: "TransformSubnetTx",
-			tx:   &txs.TransformSubnetTx{},
+			tx:   &platform.TransformSubnetTx{},
 		},
 		{
 			name: "AddPermissionlessValidatorTx",
-			tx:   &txs.AddPermissionlessValidatorTx{},
+			tx:   &platform.AddPermissionlessValidatorTx{},
 		},
 		{
 			name: "AddPermissionlessDelegatorTx",
-			tx:   &txs.AddPermissionlessDelegatorTx{},
+			tx:   &platform.AddPermissionlessDelegatorTx{},
 		},
 		{
 			name: "TransferSubnetOwnershipTx",
-			tx:   &txs.TransferSubnetOwnershipTx{},
+			tx:   &platform.TransferSubnetOwnershipTx{},
 		},
 		{
 			name: "BaseTx",
-			tx:   &txs.BaseTx{},
+			tx:   &platform.BaseTx{},
 		},
 		{
 			name: "ConvertSubnetToL1Tx",
-			tx:   &txs.ConvertSubnetToL1Tx{},
+			tx:   &platform.ConvertSubnetToL1Tx{},
 		},
 		{
 			name:        "RegisterL1ValidatorTx with unparsable message",
-			tx:          &txs.RegisterL1ValidatorTx{},
+			tx:          &platform.RegisterL1ValidatorTx{},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "RegisterL1ValidatorTx with invalid message",
-			tx: &txs.RegisterL1ValidatorTx{
+			tx: &platform.RegisterL1ValidatorTx{
 				Message: invalidWarpMessage.Bytes(),
 			},
 			expectedErr: warp.ErrWrongNetworkID,
 		},
 		{
 			name: "RegisterL1ValidatorTx with valid message",
-			tx: &txs.RegisterL1ValidatorTx{
+			tx: &platform.RegisterL1ValidatorTx{
 				Message: validWarpMessage.Bytes(),
 			},
 		},
 		{
 			name:        "SetL1ValidatorWeightTx with unparsable message",
-			tx:          &txs.SetL1ValidatorWeightTx{},
+			tx:          &platform.SetL1ValidatorWeightTx{},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "SetL1ValidatorWeightTx with invalid message",
-			tx: &txs.SetL1ValidatorWeightTx{
+			tx: &platform.SetL1ValidatorWeightTx{
 				Message: invalidWarpMessage.Bytes(),
 			},
 			expectedErr: warp.ErrWrongNetworkID,
 		},
 		{
 			name: "SetL1ValidatorWeightTx with valid message",
-			tx: &txs.SetL1ValidatorWeightTx{
+			tx: &platform.SetL1ValidatorWeightTx{
 				Message: validWarpMessage.Bytes(),
 			},
 		},
 		{
 			name: "IncreaseL1ValidatorBalanceTx",
-			tx:   &txs.IncreaseL1ValidatorBalanceTx{},
+			tx:   &platform.IncreaseL1ValidatorBalanceTx{},
 		},
 		{
 			name: "DisableL1ValidatorTx",
-			tx:   &txs.DisableL1ValidatorTx{},
+			tx:   &platform.DisableL1ValidatorTx{},
 		},
 	}
 	for _, test := range tests {

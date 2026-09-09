@@ -168,7 +168,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 	vm.Handler, err = statesync.New(
-		userConfig.stateSyncConfig(),
+		userConfig.stateSyncConfig(snowCtx.NetworkID),
 		ethDB,
 		snowCtx,
 		vm.Network,

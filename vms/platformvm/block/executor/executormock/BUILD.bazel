@@ -10,9 +10,8 @@ go_library(
         "//snow/consensus/snowman",
         "//snow/engine/snowman/block",
         "//utils/set",
-        "//vms/platformvm/block",
+        "//vms/platformvm/platform",
         "//vms/platformvm/state",
-        "//vms/platformvm/txs",
         "@org_uber_go_mock//gomock",
     ],
 )

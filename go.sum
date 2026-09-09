@@ -331,8 +331,8 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/arr4n/shed v0.0.0-20260907160111-1d80ceaf95df h1:vAkzKgGbXjndNCQS3e6DHRoF2rwxhCVVg2UR+M2bXtw=
-github.com/arr4n/shed v0.0.0-20260907160111-1d80ceaf95df/go.mod h1:eD5UkxiWTdbkqM7mg2Xf981SAeWQ/Q80js/1rFcKpfg=
+github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127 h1:TU5hfzfrqHuGepNJCL3Y3mZi/DmDDiM6RKITFtpTVTc=
+github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127/go.mod h1:eD5UkxiWTdbkqM7mg2Xf981SAeWQ/Q80js/1rFcKpfg=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0 h1:EDhwnUb6Fy/88cqUCcuj0R5u8isB+Vv++v/r2mawp2g=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
 github.com/ava-labs/libevm v1.13.15-0.20260903154605-2eaf73af626c h1:EXYCiPFEnTRTV5hX+Yv+WlOFxVm2Py59KtVnXAJJCmM=
