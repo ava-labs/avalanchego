@@ -34,6 +34,7 @@ go_library(
         "transform_subnet_tx.go",
         "tx.go",
         "unsigned_tx.go",
+        "unsupported_tx_visitor.go",
         "validator.go",
         "visitor.go",
     ],
