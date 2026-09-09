@@ -136,6 +136,11 @@ func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error 
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (*backendVisitor) CreateL1Tx(*txs.CreateL1Tx) error {
+	// this function will be implemented in a follow-up PR. until then, this transaction is rejected.
+	return ErrUnsupportedTxType
+}
+
 func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
