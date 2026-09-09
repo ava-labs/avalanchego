@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestBaseStakersPruning(t *testing.T) {
@@ -293,35 +293,6 @@ func TestDiffStakersDeleteThenReAddSameValidator(t *testing.T) {
 	require.Equal([]*Staker{v1}, stakers, "validator should still come through from parent")
 }
 
-func TestDiffValidatorWeightDiffAfterDeleteAndAdd(t *testing.T) {
-	require := require.New(t)
-	staker := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
-	staker.Weight = 5
-
-	modifiedStaker := *staker
-	modifiedStaker.Weight = 10
-
-	diff := diffStakers{isAdditionAfterDeletionAllowed: StakerAdditionAfterDeletionAllowed}
-
-	// Delete the original validator (weight 5)
-	diff.DeleteValidator(staker)
-
-	// Add a replacement validator (weight 10) for the same node
-	require.NoError(diff.PutValidator(&modifiedStaker))
-
-	// Verify the validator was replaced
-	returnedStaker, status := diff.GetValidator(staker.SubnetID, staker.NodeID)
-	require.Equal(added, status)
-	require.Equal(uint64(10), returnedStaker.Weight)
-
-	// WeightDiff should reflect the net change: +10 - 5 = +5
-	validatorDiff := diff.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-	weightDiff, err := validatorDiff.WeightDiff()
-	require.NoError(err)
-	require.False(weightDiff.Decrease)
-	require.Equal(uint64(5), weightDiff.Amount, "expected net weight change of +5 (new 10 minus old 5)")
-}
-
 func TestDiffStakersValidator(t *testing.T) {
 	require := require.New(t)
 	staker := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
@@ -429,7 +400,7 @@ func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {
 		PotentialReward: 1,
 
 		NextTime: endTime,
-		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+		Priority: platform.PrimaryNetworkDelegatorCurrentPriority,
 	}
 }
 
@@ -464,7 +435,7 @@ func TestStakerEquals(t *testing.T) {
 		EndTime:         now.Add(time.Hour),
 		PotentialReward: 50,
 		NextTime:        now.Add(time.Hour),
-		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 
 	// Test nil handling

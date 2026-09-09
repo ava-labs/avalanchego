@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -48,7 +49,6 @@ import (
 
 	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 	xtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
@@ -819,7 +819,7 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 	return nil
 }
 
-func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
+func (w *workload) confirmPChainTx(ctx context.Context, tx *platform.Tx) error {
 	ctx, cancel := context.WithTimeout(ctx, txConfirmationTimeout)
 	defer cancel()
 
@@ -894,7 +894,7 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 	)
 }
 
-func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx) {
+func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *platform.Tx) {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
@@ -904,7 +904,7 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 			ctx,
 			utxos,
 			client,
-			ptxs.Codec,
+			platform.Codec,
 			constants.PlatformChainID,
 			constants.PlatformChainID,
 			w.addrs.List(),

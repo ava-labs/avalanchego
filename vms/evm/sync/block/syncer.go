@@ -73,6 +73,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	nextHeight := s.fromHeight
 	toFetch := s.blocksToFetch
 
+	s.log.Info("syncing blocks",
+		zap.Stringer("fromHash", nextHash),
+		zap.Uint64("fromHeight", nextHeight),
+		zap.Uint64("numToFetch", toFetch),
+	)
 	for toFetch > 0 {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -106,6 +111,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			return fmt.Errorf("writing blocks after %d (%s): %w", nextHeight, nextHash, err)
 		}
 	}
+	s.log.Info("finished syncing blocks")
 	return nil
 }
 
