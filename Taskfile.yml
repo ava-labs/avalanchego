@@ -88,6 +88,21 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
+  bazel-test-e2e-bootstrap:
+    desc: Run the isolated C-Chain bootstrap test with a Bazel-built binary
+    env:
+      E2E_SERIAL: 1
+      E2E_TARGET: ./tests/bootstrap/interchain
+    cmds:
+      - task: bazel-build
+      - cmd: |
+          {{.NIX_RUN}} bash -c '
+            AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null)
+            export AVALANCHEGO_PATH
+            bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=tests/bootstrap/interchain/bootstrap.go --activate-latest-after=-1ns --check-metrics-collected=false --check-logs-collected=false --start-metrics-collector=false --start-logs-collector=false
+            bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=tests/bootstrap/interchain/bootstrap.go --activate-latest-after=0 --check-metrics-collected=false --check-logs-collected=false --start-metrics-collector=false --start-logs-collector=false
+          '
+
   bazel-test-e2e-ci:
     desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
     env:
