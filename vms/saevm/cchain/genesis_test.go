@@ -53,7 +53,6 @@ func TestParseGenesis(t *testing.T) {
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
 		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
-		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
 	)
 	tests := []struct {
 		name    string
@@ -236,7 +235,7 @@ func TestParseGenesis(t *testing.T) {
 							EtnaTimestamp:                   initiallyActive,
 							FortunaTimestamp:                initiallyActive,
 							GraniteTimestamp:                initiallyActive,
-							HeliconTimestamp:                unscheduled,
+							HeliconTimestamp:                initiallyActive,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: localCtx,
