@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"math"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -291,4 +292,22 @@ func TestHasBlock(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetMissingDataFileDoesNotCreate(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	require.NoError(t, db.Put(0, randomBlock(t)))
+
+	dataFilePath := db.dataFilePath(0)
+	missingDataFilePath := dataFilePath + ".missing"
+	// Force Get to reopen the missing file instead of reusing the cached handle.
+	db.fileCache.Flush()
+	require.NoError(t, os.Rename(dataFilePath, missingDataFilePath))
+
+	_, err := db.Get(0)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(dataFilePath)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(missingDataFilePath, dataFilePath))
+	require.NoError(t, db.Close())
 }
