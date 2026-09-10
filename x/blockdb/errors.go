@@ -7,7 +7,7 @@ import "errors"
 
 var (
 	ErrInvalidBlockHeight = errors.New("blockdb: invalid block height")
-	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
+	ErrCorrupted          = errors.New("blockdb: corrupted data")
 	ErrBlockTooLarge      = errors.New("blockdb: block size too large")
 
 	errConfigMismatch = errors.New("blockdb: config does not match persisted index header")

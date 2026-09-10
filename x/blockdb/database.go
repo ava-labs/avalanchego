@@ -472,40 +472,40 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, err
 	}
 
-	totalReadSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(indexEntry.Size))
+	dataEnd, err := db.dataFileEndForOffset(indexEntry.Offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compute total read size: %w", err)
+		if errors.Is(err, ErrCorrupted) {
+			return nil, db.blockUnavailableError(height, indexEntry, err)
+		}
+		return nil, err
 	}
-	buf := make([]byte, int(totalReadSize))
-
-	dataFile, localOffset, fileIndex, err := db.getDataFileAndOffset(indexEntry.Offset)
+	bh, block, err := db.readBlockAtOffset(indexEntry.Offset, dataEnd, &indexEntry.Size)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get data file and offset: %w", err)
-	}
-	if err := db.readDataFileAt(fileIndex, dataFile, buf, int64(localOffset)); err != nil {
-		return nil, fmt.Errorf("failed to read block header and data: %w", err)
-	}
-
-	var bh blockEntryHeader
-	if err := bh.UnmarshalBinary(buf[:int(sizeOfBlockEntryHeader)]); err != nil {
-		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
+		if errors.Is(err, ErrCorrupted) {
+			return nil, db.blockUnavailableError(height, indexEntry, err)
+		}
+		return nil, err
 	}
 	if bh.Height != height {
-		return nil, fmt.Errorf("%w: requested block height %d does not match stored height %d", ErrCorrupted, height, bh.Height)
-	}
-	compressedData := buf[int(sizeOfBlockEntryHeader):]
-	decompressed, err := db.compressor.Decompress(compressedData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress block data: %w", err)
-	}
-
-	// Verify checksum on uncompressed data
-	calculatedChecksum := calculateChecksum(decompressed)
-	if calculatedChecksum != bh.Checksum {
-		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
+		return nil, db.blockUnavailableError(height, indexEntry, fmt.Errorf(
+			"%w: requested block height %d does not match stored height %d",
+			ErrCorrupted,
+			height,
+			bh.Height,
+		))
 	}
 
-	return decompressed, nil
+	return block, nil
+}
+
+func (db *Database) blockUnavailableError(height BlockHeight, entry indexEntry, err error) error {
+	db.log.Error("Indexed block data is unavailable",
+		zap.Uint64("height", height),
+		zap.Uint64("dataOffset", entry.Offset),
+		zap.Uint32("indexedSize", entry.Size),
+		zap.Error(err),
+	)
+	return fmt.Errorf("block at height %d is unavailable: %w", height, err)
 }
 
 // Has checks if a block exists at the given height.
@@ -735,69 +735,76 @@ func (db *Database) dataFileEnd(idx int, path string) (uint64, error) {
 	return fileEnd, nil
 }
 
+func (db *Database) dataFileEndForOffset(offset uint64) (uint64, error) {
+	idx, _, err := db.dataFileIndexAndOffset(offset)
+	if err != nil {
+		return 0, fmt.Errorf("%w: calculating data file index for offset %d: %w", ErrCorrupted, offset, err)
+	}
+	fileEnd, err := db.dataFileEnd(idx, db.dataFilePath(idx))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, fmt.Errorf("%w: indexed data file %d does not exist", ErrCorrupted, idx)
+		}
+		return 0, err
+	}
+	if offset >= fileEnd {
+		return 0, fmt.Errorf("%w: index offset %d is outside data file %d", ErrCorrupted, offset, idx)
+	}
+	return fileEnd, nil
+}
+
 // recover detects and recovers unindexed blocks by scanning data files and updating the index.
 // It compares the actual data file sizes on disk with the indexed data size to detect
 // blocks that were written but not properly indexed.
 // For each unindexed block found, it validates the block, then
 // writes the corresponding index entry and updates block height tracking.
 func (db *Database) recover() error {
-	dataFiles, maxIndex, err := db.listDataFiles()
+	checkpoint := db.header.NextWriteOffset
+	files, maxIdx, err := db.listDataFiles()
 	if err != nil {
 		return fmt.Errorf("failed to list data files for recovery: %w", err)
 	}
 
-	if len(dataFiles) == 0 {
-		if db.header.NextWriteOffset > 0 {
-			return fmt.Errorf("%w: index checkpoint is %d bytes, but no data files exist", ErrCorrupted, db.header.NextWriteOffset)
+	if len(files) == 0 {
+		if checkpoint > 0 {
+			return fmt.Errorf(
+				"%w: index checkpoint is %d bytes, but no data files exist",
+				ErrCorrupted,
+				checkpoint,
+			)
 		}
 		return nil
 	}
 
-	if db.header.MaxDataFileSize == math.MaxUint64 && len(dataFiles) > 1 {
-		return fmt.Errorf("%w: only one data file expected when MaxDataFileSize is max uint64, got %d files with max index %d", ErrCorrupted, len(dataFiles), maxIndex)
+	if db.header.MaxDataFileSize == math.MaxUint64 && len(files) > 1 {
+		return fmt.Errorf("%w: only one data file expected when MaxDataFileSize is max uint64, got %d files with max index %d", ErrCorrupted, len(files), maxIdx)
 	}
 
-	// ensure no data files are missing
-	// If any data files are missing, we would need to recalculate the max height.
-	// This can be supported in the future but for now to keep things simple,
-	// we will just error if the data files are not as expected.
-	for i := 0; i <= maxIndex; i++ {
-		if _, exists := dataFiles[i]; !exists {
+	// File presence and extent are cheap structural checks. Recovery does not
+	// rescan record contents before the persisted checkpoint.
+	for i := 0; i <= maxIdx; i++ {
+		if _, ok := files[i]; !ok {
 			return fmt.Errorf("%w: data file at index %d is missing", ErrCorrupted, i)
 		}
 	}
 
-	// Calculate the expected next write offset based on the data on disk.
-	var calculatedNextDataWriteOffset uint64
-	fileSizeContribution, err := safemath.Mul(uint64(maxIndex), db.header.MaxDataFileSize)
+	dataEnd, err := db.calculatePhysicalDataEnd(files, maxIdx)
 	if err != nil {
-		return fmt.Errorf("calculating file size contribution would overflow: %w", err)
-	}
-	calculatedNextDataWriteOffset = fileSizeContribution
-
-	lastFileInfo, err := os.Stat(dataFiles[maxIndex])
-	if err != nil {
-		return fmt.Errorf("failed to get stats for last data file %s: %w", dataFiles[maxIndex], err)
-	}
-	calculatedNextDataWriteOffset, err = safemath.Add(calculatedNextDataWriteOffset, uint64(lastFileInfo.Size()))
-	if err != nil {
-		return fmt.Errorf("adding last file size would overflow: %w", err)
+		return err
 	}
 
-	nextDataReservationOffset := db.nextDataReservationOffset.Load()
 	switch {
-	case calculatedNextDataWriteOffset == nextDataReservationOffset:
+	case dataEnd == checkpoint:
 		db.log.Debug("Recovery: data files match index header, no recovery needed.")
 		return nil
 
-	case calculatedNextDataWriteOffset < nextDataReservationOffset:
-		// this happens when the index claims to have more data than is actually on disk
-		return fmt.Errorf("%w: index header claims to have more data than is actually on disk "+
-			"(calculated: %d bytes, index header: %d bytes)",
-			ErrCorrupted, calculatedNextDataWriteOffset, nextDataReservationOffset)
+	case dataEnd < checkpoint:
+		return fmt.Errorf("%w: index checkpoint is ahead of physical data "+
+			"(physical data end: %d bytes, checkpoint: %d bytes)",
+			ErrCorrupted, dataEnd, checkpoint)
 	default:
 		// The data on disk is ahead of the index. We need to recover unindexed blocks.
-		if err := db.recoverUnindexedBlocks(nextDataReservationOffset, calculatedNextDataWriteOffset); err != nil {
+		if err := db.recoverUnindexedBlocks(checkpoint, dataEnd); err != nil {
 			return err
 		}
 	}
@@ -812,27 +819,49 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 	)
 
 	var (
-		// Start scan from where the index left off.
+		// Start at the persisted checkpoint, where the index was last synchronized.
 		currentScanOffset   = startOffset
 		numRecoveredHeights int
-		maxRecoveredHeight  BlockHeight
+		currentFileIndex    = -1
+		currentFileEnd      uint64
+		badOffset           uint64
+		badErr              error
 	)
 	for currentScanOffset < endOffset {
-		bh, err := db.recoverBlockAtOffset(currentScanOffset, endOffset)
+		idx, _, err := db.dataFileIndexAndOffset(currentScanOffset)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				// Reached end of this file, try to read the next file
-				currentFileIndex := int(currentScanOffset / db.header.MaxDataFileSize)
-				nextFileIndex, err := safemath.Add(uint64(currentFileIndex), 1)
-				if err != nil {
-					return fmt.Errorf("recovery: overflow in file index calculation: %w", err)
-				}
-				if currentScanOffset, err = safemath.Mul(nextFileIndex, db.header.MaxDataFileSize); err != nil {
-					return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
-				}
-				continue
+			return fmt.Errorf("recovery: %w: calculating data file index for offset %d: %w", ErrCorrupted, currentScanOffset, err)
+		}
+		if idx != currentFileIndex {
+			currentFileIndex = idx
+			fileEnd, err := db.dataFileEnd(currentFileIndex, db.dataFilePath(currentFileIndex))
+			if err != nil {
+				return fmt.Errorf("recovery: %w", err)
 			}
-			return err
+			currentFileEnd = fileEnd
+		}
+		if currentScanOffset >= currentFileEnd {
+			// A block that crosses a file boundary leaves this file's remaining range unused.
+			nextIdx, err := safemath.Add(uint64(currentFileIndex), 1)
+			if err != nil {
+				return fmt.Errorf("recovery: overflow in file index calculation: %w", err)
+			}
+			if currentScanOffset, err = safemath.Mul(nextIdx, db.header.MaxDataFileSize); err != nil {
+				return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
+			}
+			continue
+		}
+
+		bh, err := db.recoverBlockAtOffset(currentScanOffset, currentFileEnd)
+		if err != nil {
+			if !errors.Is(err, ErrCorrupted) {
+				return err
+			}
+			badOffset = currentScanOffset
+			badErr = err
+			// The checkpoint header can lag a later index entry, so preserve this suffix.
+			currentScanOffset = endOffset
+			break
 		}
 		db.log.Debug("Recovery: Successfully validated and indexed block",
 			zap.Uint64("height", bh.Height),
@@ -840,107 +869,175 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 			zap.Uint64("dataOffset", currentScanOffset),
 		)
 		numRecoveredHeights++
-		maxRecoveredHeight = max(maxRecoveredHeight, bh.Height)
-		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
+		db.updateBlockMaxHeight(bh.Height)
+		blockSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 		if err != nil {
 			return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
 		}
-		currentScanOffset, err = safemath.Add(currentScanOffset, blockTotalSize)
+		currentScanOffset, err = safemath.Add(currentScanOffset, blockSize)
 		if err != nil {
 			return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
 		}
 	}
+	// Append after recovered data and any malformed suffix left as an orphan.
 	db.nextDataReservationOffset.Store(currentScanOffset)
-
-	// Update the max block height if max recovered height is greater than
-	// the current max height.
-	if numRecoveredHeights > 0 {
-		currentMaxHeight := db.maxBlockHeight.Load()
-		if maxRecoveredHeight > currentMaxHeight || currentMaxHeight == unsetHeight {
-			db.maxBlockHeight.Store(maxRecoveredHeight)
+	if badErr != nil {
+		// Valid entries past malformed data need a max-height update or Get
+		// short-circuits before reading them.
+		info, err := db.indexFile.Stat()
+		if err != nil {
+			return fmt.Errorf("recovery: failed to get index file stats: %w", err)
+		}
+		indexSize := uint64(info.Size())
+		if indexSize > sizeOfIndexFileHeader {
+			entryCount := (indexSize - sizeOfIndexFileHeader) / sizeOfIndexEntry
+			for entryCount > 0 {
+				entryCount--
+				height, err := safemath.Add(db.header.MinHeight, entryCount)
+				if err != nil {
+					return fmt.Errorf("recovery: %w: calculating max indexed height: %w", ErrCorrupted, err)
+				}
+				entry, err := db.readIndexEntry(height)
+				if errors.Is(err, database.ErrNotFound) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to read index entry at height %d: %w", height, err)
+				}
+				dataEnd, err := db.dataFileEndForOffset(entry.Offset)
+				if errors.Is(err, ErrCorrupted) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to get data end for indexed block %d: %w", height, err)
+				}
+				bh, _, err := db.readBlockAtOffset(entry.Offset, dataEnd, &entry.Size)
+				if errors.Is(err, ErrCorrupted) {
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("recovery: failed to validate indexed block %d: %w", height, err)
+				}
+				if bh.Height == height {
+					db.updateBlockMaxHeight(height)
+					break
+				}
+			}
 		}
 	}
 
 	if err := db.persistIndexHeader(); err != nil {
 		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
 	}
+	if badErr != nil {
+		db.log.Warn("Recovery stopped at malformed data; remaining suffix left orphaned",
+			zap.Uint64("dataOffset", badOffset),
+			zap.Uint64("dataEnd", endOffset),
+			zap.Error(badErr),
+		)
+	}
 
 	maxHeight := db.maxBlockHeight.Load()
 	db.log.Info("Recovery: Scan finished",
 		zap.Int("recoveredBlocks", numRecoveredHeights),
-		zap.Uint64("finalNextWriteOffset", db.nextDataReservationOffset.Load()),
+		zap.Uint64("finalNextDataReservationOffset", db.nextDataReservationOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 	return nil
 }
 
-func (db *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntryHeader, error) {
+func (db *Database) recoverBlockAtOffset(offset, fileEndOffset uint64) (blockEntryHeader, error) {
+	bh, _, err := db.readBlockAtOffset(offset, fileEndOffset, nil)
+	if err != nil {
+		return bh, err
+	}
+	indexOffset, err := db.indexEntryOffset(bh.Height)
+	if err != nil {
+		return bh, fmt.Errorf("%w: cannot get index offset for recovered block %d: %w", ErrCorrupted, bh.Height, err)
+	}
+	if err := db.writeIndexEntryAt(indexOffset, offset, bh.Size); err != nil {
+		return bh, fmt.Errorf("failed to write index entry for recovered block %d: %w", bh.Height, err)
+	}
+	return bh, nil
+}
+
+func (db *Database) readBlockAtOffset(offset, fileEndOffset uint64, indexedSize *uint32) (blockEntryHeader, BlockData, error) {
 	var bh blockEntryHeader
-	if totalDataSize-offset < uint64(sizeOfBlockEntryHeader) {
-		return bh, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
+	if fileEndOffset-offset < uint64(sizeOfBlockEntryHeader) {
+		return bh, nil, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
 	}
 
-	dataFile, localOffset, _, err := db.getDataFileAndOffset(offset)
+	idx, localOffset, err := db.dataFileIndexAndOffset(offset)
 	if err != nil {
-		return bh, fmt.Errorf("recovery: failed to get data file for offset %d: %w", offset, err)
+		return bh, nil, fmt.Errorf("%w: calculating data file index for offset %d: %w", ErrCorrupted, offset, err)
+	}
+	f, err := db.getDataFile(idx, os.O_RDWR)
+	if err != nil {
+		return bh, nil, blockReadError("header", offset, err)
 	}
 	bhBuf := make([]byte, sizeOfBlockEntryHeader)
-	if _, err := dataFile.ReadAt(bhBuf, int64(localOffset)); err != nil {
-		return bh, fmt.Errorf("%w: error reading block header at offset %d: %w", ErrCorrupted, offset, err)
+	if err := db.readDataFileAt(idx, f, bhBuf, int64(localOffset)); err != nil {
+		return bh, nil, blockReadError("header", offset, err)
 	}
 	if err := bh.UnmarshalBinary(bhBuf); err != nil {
-		return bh, fmt.Errorf("%w: error deserializing block header at offset %d: %w", ErrCorrupted, offset, err)
+		return bh, nil, fmt.Errorf("%w: error deserializing block header at offset %d: %w", ErrCorrupted, offset, err)
 	}
 	if bh.Size == 0 {
-		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
+		return bh, nil, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
+	}
+	// Validate the indexed size before allocating based on the stored header.
+	if indexedSize != nil && bh.Size != *indexedSize {
+		return bh, nil, fmt.Errorf("%w: indexed block size %d does not match stored size %d", ErrCorrupted, *indexedSize, bh.Size)
 	}
 	if bh.Version > BlockEntryVersion {
-		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, BlockEntryVersion)
+		return bh, nil, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, BlockEntryVersion)
 	}
 	if bh.Height < db.header.MinHeight || bh.Height == unsetHeight {
-		return bh, fmt.Errorf(
+		return bh, nil, fmt.Errorf(
 			"%w: invalid block height in header at offset %d: found %d, expected >= %d",
 			ErrCorrupted, offset, bh.Height, db.header.MinHeight,
 		)
 	}
-	expectedBlockEndOffset, err := safemath.Add(offset, uint64(sizeOfBlockEntryHeader))
+	blockEnd, err := safemath.Add(offset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
-		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
+		return bh, nil, fmt.Errorf("%w: calculating block end offset would overflow at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	expectedBlockEndOffset, err = safemath.Add(expectedBlockEndOffset, uint64(bh.Size))
+	blockEnd, err = safemath.Add(blockEnd, uint64(bh.Size))
 	if err != nil {
-		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
+		return bh, nil, fmt.Errorf("%w: calculating block end offset would overflow at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	if expectedBlockEndOffset > totalDataSize {
-		return bh, fmt.Errorf("%w: block data out of bounds at offset %d", ErrCorrupted, offset)
+	if blockEnd > fileEndOffset {
+		return bh, nil, fmt.Errorf("%w: block data out of bounds at offset %d", ErrCorrupted, offset)
 	}
-	blockData := make([]byte, bh.Size)
-	blockDataOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
+	compressed := make([]byte, bh.Size)
+	dataOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
-		return bh, fmt.Errorf("calculating block data offset would overflow at offset %d: %w", offset, err)
+		return bh, nil, fmt.Errorf("%w: calculating block data offset would overflow at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	if _, err := dataFile.ReadAt(blockData, int64(blockDataOffset)); err != nil {
-		return bh, fmt.Errorf("%w: failed to read block data at offset %d: %w", ErrCorrupted, offset, err)
+	if err := db.readDataFileAt(idx, f, compressed, int64(dataOffset)); err != nil {
+		return bh, nil, blockReadError("data", offset, err)
 	}
-	// Decompress block data and verify checksum
-	decompressed, err := db.compressor.Decompress(blockData)
+	block, err := db.compressor.Decompress(compressed)
 	if err != nil {
-		return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %w", ErrCorrupted, offset, err)
+		return bh, nil, fmt.Errorf("%w: failed to decompress block at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	calculatedChecksum := calculateChecksum(decompressed)
-	if calculatedChecksum != bh.Checksum {
-		return bh, fmt.Errorf("%w: checksum mismatch for block at offset %d", ErrCorrupted, offset)
+	checksum := calculateChecksum(block)
+	if checksum != bh.Checksum {
+		return bh, nil, fmt.Errorf("%w: checksum mismatch for block at offset %d", ErrCorrupted, offset)
 	}
 
-	// Write index entry for this block
-	indexFileOffset, idxErr := db.indexEntryOffset(bh.Height)
-	if idxErr != nil {
-		return bh, fmt.Errorf("cannot get index offset for recovered block %d: %w", bh.Height, idxErr)
+	return bh, block, nil
+}
+
+func blockReadError(part string, offset uint64, err error) error {
+	switch {
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return fmt.Errorf("%w: incomplete block %s at offset %d: %w", ErrCorrupted, part, offset, err)
+	case errors.Is(err, os.ErrNotExist):
+		return fmt.Errorf("%w: data file for offset %d does not exist: %w", ErrCorrupted, offset, err)
+	default:
+		return fmt.Errorf("failed to read block %s at offset %d: %w", part, offset, err)
 	}
-	if err := db.writeIndexEntryAt(indexFileOffset, offset, bh.Size); err != nil {
-		return bh, fmt.Errorf("failed to update index for recovered block %d: %w", bh.Height, err)
-	}
-	return bh, nil
 }
 
 func (db *Database) listDataFiles() (map[int]string, int, error) {
@@ -1271,13 +1368,4 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (dataReservation, error
 			}, nil
 		}
 	}
-}
-
-func (db *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
-	fileIndex, localOffset, err := db.dataFileIndexAndOffset(globalOffset)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	handle, err := db.getDataFile(fileIndex, os.O_RDWR)
-	return handle, localOffset, fileIndex, err
 }
