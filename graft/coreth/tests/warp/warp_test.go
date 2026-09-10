@@ -21,6 +21,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/key"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/load"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/tests/utils"
+	"github.com/ava-labs/avalanchego/graft/evm/tests/warptest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -41,6 +43,7 @@ import (
 
 	warpBackend "github.com/ava-labs/avalanchego/graft/coreth/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	warpPayload "github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	ethereum "github.com/ava-labs/libevm"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -161,8 +164,8 @@ var _ = ginkgo.Describe("[Warp]", func() {
 				w.sendMessageFromSendingSubnet()
 			})
 
-			ginkgo.It("should aggregate signatures via API", func() {
-				w.aggregateSignaturesViaAPI()
+			ginkgo.It("should aggregate signatures", func() {
+				w.aggregateSignatures()
 			})
 
 			ginkgo.It("should deliver addressed call payload to receiving subnet", func() {
@@ -311,6 +314,13 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	w.blockID = ids.ID(blockHash) // Set blockID to construct a warp message containing a block hash payload later
 	require.NoError(err)
 
+	// SAE exposes the receipt before its block becomes latest.
+	tc.Eventually(func() bool {
+		height, err := client.BlockNumber(ctx)
+		require.NoError(err)
+		return height >= blockNumber
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "block with sendWarpMessage should become the latest block")
+
 	ginkgo.GinkgoLogr.Info("Fetching relevant warp logs from the newly produced block")
 	logs, err := client.FilterLogs(ctx, ethereum.FilterQuery{
 		BlockHash: &blockHash,
@@ -346,40 +356,30 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	}
 }
 
-func (w *warpTest) aggregateSignaturesViaAPI() {
+func (w *warpTest) aggregateSignatures() {
 	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
-	warpAPIs := make(map[ids.NodeID]warpBackend.Client, len(w.sendingSubnetURIs))
-	for _, uri := range w.sendingSubnetURIs {
-		client, err := warpBackend.NewClient(uri, w.sendingSubnet.BlockchainID.String())
-		require.NoError(err)
+	warpValidators := w.warpValidators(ctx)
 
-		infoClient := info.NewClient(uri)
-		nodeID, _, err := infoClient.GetNodeID(ctx)
-		require.NoError(err)
-		warpAPIs[nodeID] = client
-	}
-
-	pChainClient := platformvm.NewClient(w.sendingSubnetURIs[0])
-	pChainHeight, err := pChainClient.GetHeight(ctx)
-	require.NoError(err)
-	// If the source subnet is the Primary Network, then we only need to aggregate signatures from the receiving
-	// subnet's validator set instead of the entire Primary Network.
-	// If the destination turns out to be the Primary Network as well, then this is a no-op.
-	var vdrs map[ids.NodeID]*validators.GetValidatorOutput
+	// SAE has no Warp API, so sign directly with the tmpnet validator keys.
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		vdrs, err = pChainClient.GetValidatorsAt(ctx, w.receivingSubnet.SubnetID, api.Height(pChainHeight))
-	} else {
-		vdrs, err = pChainClient.GetValidatorsAt(ctx, w.sendingSubnet.SubnetID, api.Height(pChainHeight))
-	}
-	require.NoError(err)
-	require.NotEmpty(vdrs)
+		network := e2e.GetEnv(tc).GetNetwork()
+		signingKeys := warpSigningKeys(network)
+		signedMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, w.addressedCallUnsignedMessage)
+		require.NoError(err)
+		w.addressedCallSignedMessage = signedMessage
 
-	warpValidators, err := validators.FlattenValidatorSet(vdrs)
-	require.NoError(err)
-	require.NotEmpty(warpValidators)
+		blockHashPayload, err := warpPayload.NewHash(w.blockID)
+		require.NoError(err)
+		unsignedBlockMessage, err := avalancheWarp.NewUnsignedMessage(w.networkID, w.sendingSubnet.BlockchainID, blockHashPayload.Bytes())
+		require.NoError(err)
+		signedBlockMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, unsignedBlockMessage)
+		require.NoError(err)
+		w.blockPayloadSignedMessage = signedBlockMessage
+		return
+	}
 
 	// Verify that the signature aggregation matches the results of manually constructing the warp message
 	client, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
@@ -413,6 +413,28 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	err = parsedWarpBlockMessage.Signature.Verify(&parsedWarpBlockMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
 	require.NoError(err)
 	w.blockPayloadSignedMessage = parsedWarpBlockMessage
+}
+
+// warpValidators returns the message signers.
+func (w *warpTest) warpValidators(ctx context.Context) validators.WarpSet {
+	require := require.New(ginkgo.GinkgoT())
+
+	pChainClient := platformvm.NewClient(w.sendingSubnetURIs[0])
+	pChainHeight, err := pChainClient.GetHeight(ctx)
+	require.NoError(err)
+	// Primary Network messages use the destination subnet's validator set.
+	subnetID := w.sendingSubnet.SubnetID
+	if subnetID == constants.PrimaryNetworkID {
+		subnetID = w.receivingSubnet.SubnetID
+	}
+	vdrs, err := pChainClient.GetValidatorsAt(ctx, subnetID, api.Height(pChainHeight))
+	require.NoError(err)
+	require.NotEmpty(vdrs)
+
+	warpValidators, err := validators.FlattenValidatorSet(vdrs)
+	require.NoError(err)
+	require.NotEmpty(warpValidators)
+	return warpValidators
 }
 
 func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
@@ -591,12 +613,9 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpSendLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 
-	warpClient, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
-	require.NoError(err)
-	subnetIDStr := ""
-	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		subnetIDStr = w.receivingSubnet.SubnetID.String()
-	}
+	network := e2e.GetEnv(tc).GetNetwork()
+	signingKeys := warpSigningKeys(network)
+	warpValidators := w.warpValidators(ctx)
 
 	ginkgo.GinkgoLogr.Info("Executing warp delivery sequences...")
 	warpDeliverSequences, err := txs.GenerateTxSequences(ctx, func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error) {
@@ -607,9 +626,9 @@ func (w *warpTest) warpLoad() {
 		if err != nil {
 			return nil, err
 		}
-		ginkgo.GinkgoLogr.Info("Fetching addressed call aggregate signature via p2p API")
+		ginkgo.GinkgoLogr.Info("Aggregating addressed call signature")
 
-		signedWarpMessageBytes, err := warpClient.GetMessageAggregateSignature(ctx, unsignedMessage.ID(), warp.WarpDefaultQuorumNumerator, subnetIDStr)
+		signedWarpMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, unsignedMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -630,7 +649,7 @@ func (w *warpTest) warpLoad() {
 			AccessList: types.AccessList{
 				{
 					Address:     warp.ContractAddress,
-					StorageKeys: predicate.New(signedWarpMessageBytes),
+					StorageKeys: predicate.New(signedWarpMessage.Bytes()),
 				},
 			},
 		})
@@ -643,6 +662,14 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpDeliverLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 	ginkgo.GinkgoLogr.Info("Completed warp delivery successfully.")
+}
+
+func warpSigningKeys(network *tmpnet.Network) map[ids.NodeID]string {
+	signingKeys := make(map[ids.NodeID]string, len(network.Nodes))
+	for _, node := range network.Nodes {
+		signingKeys[node.NodeID] = node.Flags[config.StakingSignerKeyContentKey]
+	}
+	return signingKeys
 }
 
 func generateKeys(preFundedKey *ecdsa.PrivateKey, numWorkers int) ([]*key.Key, []*ecdsa.PrivateKey) {
