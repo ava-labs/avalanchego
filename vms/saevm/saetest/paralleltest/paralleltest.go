@@ -79,7 +79,7 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	xdb := saetest.NewExecutionResultsDB()
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock).AsHeaderSource()
-	dbConfig := saedb.Config{CommitInterval: 4096}
+	dbConfig := saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval}
 
 	tr, err := saedb.NewTracker(db, dbConfig, genesis.Hash(), tb.TempDir(), logger)
 	require.NoError(tb, err, "saedb.NewTracker()")

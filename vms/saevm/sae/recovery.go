@@ -50,14 +50,6 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
 func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
-	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig(rec.snowCtx.ChainDataDir, rec.snowCtx.Log))
-	defer func() {
-		// Unlike elsewhere in this package, the trie database MUST be closed on
-		// both the success and error paths; it is only used to probe for
-		// available state and ownership is never transferred to the caller.
-		retErr = errors.Join(retErr, cache.TrieDB().Close())
-	}()
-
 	lastSettledHash := rawdb.ReadFinalizedBlockHash(rec.db)
 	if lastSettledHash == (common.Hash{}) {
 		return nil, errors.New("no finalized block recorded")
@@ -72,6 +64,18 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		zap.Stringer("hash", lastSettledHash),
 		zap.Uint64("height", *lastSettledHeight),
 	)
+
+	tdb, err := rec.config.DBConfig.Open(rec.db, rec.snowCtx.ChainDataDir, rec.snowCtx.Log)
+	if err != nil {
+		return nil, fmt.Errorf("opening trie database: %w", err)
+	}
+	defer func() {
+		// Unlike elsewhere in this package, the trie database MUST be closed on
+		// both the success and error paths; it is only used to probe for
+		// available state and ownership is never transferred to the caller.
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+	cache := state.NewDatabaseWithNodeDB(rec.db, tdb)
 
 	// Search for highest settled post-execution state
 	// Invariant: The state is written to disk AFTER the block is written to

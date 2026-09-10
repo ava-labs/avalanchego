@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -106,24 +107,37 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
 	config := saetest.ChainConfig()
-	saedbConfig := saedb.Config{
-		Archival:         sutCfg.archival,
-		CommitInterval:   sutCfg.commitInterval,
-		SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
-		Scheme:           sutCfg.dbScheme,
+
+	var saedbConfig saedb.Config
+	switch sutCfg.dbScheme {
+	case customrawdb.FirewoodScheme:
+		saedbConfig = saedb.FirewoodConfig{
+			Config: firewood.Config{
+				MaxPersistGap:     sutCfg.commitInterval,
+				RevisionsInMemory: 2 * sutCfg.commitInterval,
+				RootStore:         sutCfg.archival,
+			},
+		}
+	default:
+		saedbConfig = saedb.HashDBConfig{
+			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
+			CommitInterval:   sutCfg.commitInterval,
+			Archival:         sutCfg.archival,
+		}
 	}
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
 
-	tdbCfg := saedbConfig.TrieDBConfig(chainDataDir, logger)
+	tdb, err := saedbConfig.Open(db, chainDataDir, logger)
+	require.NoErrorf(tb, err, "%T.Open()", saedbConfig)
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
 	maps.Copy(alloc, sutCfg.extraAlloc)
 
 	genOpts := []blockstest.GenesisOption{
-		blockstest.WithTrieDBConfig(tdbCfg),
+		blockstest.WithTrieDB(tdb),
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
@@ -1074,7 +1088,7 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 
 			var want testerr.Want
 			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
+			case saedb.ShouldCommitTrieDB(b.NumberU64(), commitInterval):
 				// on disk
 			case expectReferenced(b.NumberU64()):
 				// still referenced

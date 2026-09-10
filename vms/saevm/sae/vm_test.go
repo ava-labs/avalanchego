@@ -53,11 +53,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
@@ -158,10 +158,8 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		})),
 		vmConfig: Config{
 			MempoolConfig: mempoolConf,
-			DBConfig: saedb.Config{
-				CommitInterval: saedb.DefaultCommitInterval,
-			},
-			RPCConfig: saerpc.Config{APIs: saerpc.DefaultAPIs()},
+			DBConfig:      saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval},
+			RPCConfig:     saerpc.Config{APIs: saerpc.DefaultAPIs()},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
@@ -307,37 +305,26 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 	})
 }
 
-func withCommitInterval(interval uint64) sutOption {
+// withHashDB overrides the default [saedb.HashDBConfig], which uses
+// [saedb.DefaultCommitInterval] with pruning and no snapshot.
+func withHashDB(cfg saedb.HashDBConfig) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.CommitInterval = interval
+		c.vmConfig.DBConfig = cfg
+	})
+}
+
+// withFirewood replaces the default HashDB with a Firewood-backed
+// [saedb.FirewoodConfig]. Zero-valued cache size and revisions in memory take
+// the defaults applied by [saedb.FirewoodConfig.Open].
+func withFirewood(cfg firewood.Config) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig = saedb.FirewoodConfig{Config: cfg}
 	})
 }
 
 func withDB(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
-	})
-}
-
-// withFirewood selects Firewood as the trie database instead of the default
-// HashDB.
-func withFirewood() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
-	})
-}
-
-// withArchival disables pruning, persisting every executed state root.
-func withArchival() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.Archival = true
-	})
-}
-
-// withSnapshot enables the state snapshot with a minimal cache.
-func withSnapshot() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.SnapshotCacheMiB = 1
 	})
 }
 
@@ -1290,7 +1277,8 @@ func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
 	storageRoot := storageTrieRoot(t, storageSlot, storageVal)
 
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, timeOpt, withSnapshot(), options.Func[sutConfig](func(c *sutConfig) {
+	withSnapshot := withHashDB(saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval, SnapshotCacheMiB: 1})
+	ctx, sut := newSUT(t, 1, timeOpt, withSnapshot, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc[storageAddr] = types.Account{
 			Storage: map[common.Hash]common.Hash{storageSlot: storageVal},
 			Balance: big.NewInt(1),
