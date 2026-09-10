@@ -501,3 +501,35 @@ func TestOpenAndInitializeIndexClosesFileOnFailure(t *testing.T) {
 	_, err := db.indexFile.Stat()
 	require.ErrorIs(t, err, os.ErrClosed)
 }
+
+func TestSyncRetriesClosedCachedFile(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	block := []byte("block")
+	require.NoError(t, db.Put(0, block))
+
+	f, ok := db.fileCache.Get(0)
+	require.True(t, ok)
+	// Force Sync to reopen the cached data file after its handle is closed.
+	require.NoError(t, f.Close())
+
+	require.NoError(t, db.Sync(0, 0))
+	got, err := db.Get(0)
+	require.NoError(t, err)
+	require.Equal(t, block, got)
+}
+
+func TestRetryDataFileOperationPreservesReplacement(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, db.Put(0, []byte("block")))
+	stale, err := db.getDataFile(0, os.O_RDWR)
+	require.NoError(t, err)
+	db.fileCache.Evict(0)
+	replacement, err := db.getDataFile(0, os.O_RDWR)
+	require.NoError(t, err)
+
+	require.NoError(t, db.retryDataFileOperation(0, stale, (*os.File).Sync))
+	_, err = replacement.Stat()
+	require.NoError(t, err)
+}
