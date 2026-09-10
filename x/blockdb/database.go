@@ -471,6 +471,9 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 	if err := bh.UnmarshalBinary(buf[:int(sizeOfBlockEntryHeader)]); err != nil {
 		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
 	}
+	if bh.Height != height {
+		return nil, fmt.Errorf("%w: requested block height %d does not match stored height %d", ErrCorrupted, height, bh.Height)
+	}
 	compressedData := buf[int(sizeOfBlockEntryHeader):]
 	decompressed, err := db.compressor.Decompress(compressedData)
 	if err != nil {
