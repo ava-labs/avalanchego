@@ -21,6 +21,7 @@ graft_go_test(
         "//graft/coreth/params",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/coreth/tests/utils",
+        "//graft/evm/tests/warptest",
         "//graft/coreth/warp",
         "//ids",
         "//snow/validators",
