@@ -300,6 +300,9 @@ func assertRewardAutoRenewedValidator(
 		require.Equal(t, want.commitWeight, validator.Weight)
 		require.Equal(t, want.commitAccruedValidationRewards, stakingInfo.AccruedValidationRewards)
 		require.Equal(t, want.commitAccruedDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
+		// The renewed period starts with no pending commission: restake must
+		// reset DelegateeReward after distributing it.
+		require.Zero(t, stakingInfo.DelegateeReward)
 
 		assertRewards(t, onCommitState, stakerTx, rewardTx.ID(), want.commitReward)
 		// The stake is restaked rather than returned: no UTXO at the first stake index.

@@ -622,8 +622,8 @@ platform.getCurrentValidators({
   not be included in the response.
 - `validators` can include different fields based on the subnet type (L1, PoA Subnets, the Primary Network):
   - `txID` is the validator transaction.
-  - `startTime` is the Unix time when the validator starts validating the Subnet.
-  - `endTime` is the Unix time when the validator stops validating the Subnet. Omitted if `subnetID` is a L1 Subnet.
+  - `start` is the Unix time when the validator starts validating the Subnet.
+  - `end` is the Unix time when the validator stops validating the Subnet. Omitted if `subnetID` is a L1 Subnet.
   - `nodeID` is the validator’s node ID.
   - `weight` is the validator’s weight (stake) when sampling validators.
   - `validationID` is the ID for L1 subnet validator registration transaction. Omitted if `subnetID` is not an L1 Subnet.
@@ -651,8 +651,8 @@ platform.getCurrentValidators({
     Omitted if `subnetID` is not the Primary Network.
   - `delegators` is the list of delegators to this validator. Omitted if `subnetID` is not the Primary Network. Omitted unless `nodeIDs` specifies a single NodeID.
     - `txID` is the delegator transaction.
-    - `startTime` is the Unix time when the delegator started.
-    - `endTime` is the Unix time when the delegator stops.
+    - `start` is the Unix time when the delegator started.
+    - `end` is the Unix time when the delegator stops.
     - `weight` is the amount of nAVAX this delegator staked.
     - `nodeID` is the validating node’s node ID.
     - `rewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and array of
@@ -928,7 +928,7 @@ platform.getL1Validator({
 - `publicKey` is the compressed BLS public key of the validator.
 - `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
 - `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
-- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
+- `start` is the unix timestamp, in seconds, of when this validator was added to the validator set.
 - `weight` is weight of this validator used for consensus voting and ICM.
 - `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid.
 - `balance` is current remaining balance that can be used to pay for the validators continuous fee.

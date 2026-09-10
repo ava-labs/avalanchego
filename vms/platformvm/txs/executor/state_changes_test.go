@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -383,8 +384,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		nodeID    = ids.GenerateTestNodeID()
 	)
 
+	validatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   units.MilliAvax,
+	}}}
 	require.NoError(t, s.PutPendingValidator(&state.Staker{
-		TxID:     ids.GenerateTestID(),
+		TxID:     validatorTx.ID(),
 		NodeID:   nodeID,
 		SubnetID: constants.PrimaryNetworkID,
 		Weight:   units.MilliAvax,
@@ -394,9 +401,16 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 	}))
+	s.AddTx(validatorTx, status.Committed)
 
+	delegatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   units.MilliAvax,
+	}}}
 	s.PutPendingDelegator(&state.Staker{
-		TxID:     ids.GenerateTestID(),
+		TxID:     delegatorTx.ID(),
 		NodeID:   nodeID,
 		SubnetID: constants.PrimaryNetworkID,
 		Weight:   units.MilliAvax,
@@ -406,6 +420,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
+	s.AddTx(delegatorTx, status.Committed)
 
 	updated, err := AdvanceTimeTo(
 		&Backend{
@@ -463,8 +478,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		delegatorWeight = units.KiloAvax
 	)
 
+	validatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddValidatorTx{Validator: platform.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   validatorWeight,
+	}}}
 	require.NoError(t, s.PutPendingValidator(&state.Staker{
-		TxID:      ids.GenerateTestID(),
+		TxID:      validatorTx.ID(),
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
 		Weight:    validatorWeight,
@@ -473,9 +494,16 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 	}))
+	s.AddTx(validatorTx, status.Committed)
 
+	delegatorTx := &platform.Tx{TxID: ids.GenerateTestID(), Unsigned: &platform.AddDelegatorTx{Validator: platform.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(endTime.Unix()),
+		Wght:   delegatorWeight,
+	}}}
 	s.PutPendingDelegator(&state.Staker{
-		TxID:      ids.GenerateTestID(),
+		TxID:      delegatorTx.ID(),
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
 		Weight:    delegatorWeight,
@@ -484,6 +512,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		NextTime:  startTime,
 		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
+	s.AddTx(delegatorTx, status.Committed)
 
 	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,

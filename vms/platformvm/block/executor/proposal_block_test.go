@@ -85,6 +85,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		TxID:      addValTx.ID(),
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 		Weight:    utx.Weight(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,

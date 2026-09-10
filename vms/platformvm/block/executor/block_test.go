@@ -281,6 +281,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
@@ -338,6 +339,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.SubnetPermissionlessValidatorCurrentPriority,
 					}
 				)
 				uptimes := uptime.TestCalculator{}
@@ -395,6 +397,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.SubnetPermissionlessValidatorCurrentPriority,
 					}
 					transformSubnetTx = &platform.Tx{
 						Unsigned: &platform.TransformSubnetTx{
@@ -461,6 +464,7 @@ func TestBlockOptions(t *testing.T) {
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
 						SubnetID:  subnetID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 					transformSubnetTx = &platform.Tx{
 						Unsigned: &platform.TransformSubnetTx{
@@ -519,6 +523,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
@@ -570,6 +575,7 @@ func TestBlockOptions(t *testing.T) {
 					staker                           = &state.Staker{
 						StartTime: primaryNetworkValidatorStartTime,
 						NodeID:    nodeID,
+						Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 					}
 				)
 
@@ -652,6 +658,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 				StartTime: tt.startTime,
 				NodeID:    nodeID,
 				SubnetID:  constants.PrimaryNetworkID,
+				Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
 			}
 			proposalTimestamp = tt.startTime.Add(time.Hour)
 		)

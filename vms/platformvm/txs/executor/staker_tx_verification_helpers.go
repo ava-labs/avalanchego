@@ -6,7 +6,6 @@ package executor
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -102,34 +101,26 @@ func getDelegatorRules(
 	}, nil
 }
 
-// GetValidator returns information about the given validator, which may be a
-// current validator or pending validator.
-func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
-	validator, err := state.GetCurrentValidator(subnetID, nodeID)
-	if err == nil {
-		// This node is currently validating the subnet.
-		return validator, nil
-	}
-	if err != database.ErrNotFound {
-		// Unexpected error occurred.
-		return nil, err
-	}
-	return state.GetPendingValidator(subnetID, nodeID)
-}
-
 // overDelegated returns true if [validator] will be overdelegated when adding [delegator].
 //
 // A [validator] would become overdelegated if:
 // - the maximum total weight on [validator] exceeds [weightLimit]
 func overDelegated(
 	state state.Chain,
-	validator *state.Staker,
+	validator state.StakingPeriod,
 	weightLimit uint64,
 	delegatorWeight uint64,
 	delegatorStartTime time.Time,
 	delegatorEndTime time.Time,
 ) (bool, error) {
-	maxWeight, err := GetMaxWeight(state, validator, delegatorStartTime, delegatorEndTime)
+	maxWeight, err := getMaxWeight(
+		state,
+		validator.SubnetID(),
+		validator.NodeID(),
+		validator.Weight(),
+		delegatorStartTime,
+		delegatorEndTime,
+	)
 	if err != nil {
 		return true, err
 	}
@@ -140,19 +131,23 @@ func overDelegated(
 	return newMaxWeight > weightLimit, nil
 }
 
-// GetMaxWeight returns the maximum total weight of the [validator], including
+// getMaxWeight returns the maximum total weight of the validator, including
 // its own weight, between [startTime] and [endTime].
 // The weight changes are applied in the order they will be applied as chain
 // time advances.
 // Invariant:
-// - [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
-func GetMaxWeight(
+// - [validator.StartTime()] <= [startTime] < [endTime] <= [validator.EndTime()]
+func getMaxWeight(
 	chainState state.Chain,
-	validator *state.Staker,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	validatorWeight uint64,
 	startTime time.Time,
 	endTime time.Time,
 ) (uint64, error) {
-	currentDelegatorIterator, err := chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	typedState := state.NewAdapter(chainState)
+
+	currentDelegators, err := typedState.GetCurrentDelegators(subnetID, nodeID)
 	if err != nil {
 		return 0, err
 	}
@@ -163,58 +158,46 @@ func GetMaxWeight(
 	// Calculate the current total weight on this validator, including the
 	// weight of the actual validator and the sum of the weights of all of the
 	// currently active delegators.
-	currentWeight := validator.Weight
-	for currentDelegatorIterator.Next() {
-		currentDelegator := currentDelegatorIterator.Value()
-
-		currentWeight, err = math.Add(currentWeight, currentDelegator.Weight)
+	currentWeight := validatorWeight
+	for delegator := range currentDelegators {
+		currentWeight, err = math.Add(currentWeight, delegator.StakingPeriod().Weight())
 		if err != nil {
-			currentDelegatorIterator.Release()
 			return 0, err
 		}
 	}
-	currentDelegatorIterator.Release()
 
-	currentDelegatorIterator, err = chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	delegatorDiffs, err := typedState.GetDelegatorDiffs(subnetID, nodeID)
 	if err != nil {
 		return 0, err
 	}
-	pendingDelegatorIterator, err := chainState.GetPendingDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		currentDelegatorIterator.Release()
-		return 0, err
-	}
-	delegatorChangesIterator := state.NewStakerDiffIterator(currentDelegatorIterator, pendingDelegatorIterator)
-	defer delegatorChangesIterator.Release()
 
 	// Iterate over the future stake weight changes and calculate the maximum
 	// total weight on the validator, only including the points in the time
 	// range [startTime, endTime].
 	var currentMax uint64
-	for delegatorChangesIterator.Next() {
-		delegator, isAdded := delegatorChangesIterator.Value()
-		// [delegator.NextTime] > [endTime]
-		if delegator.NextTime.After(endTime) {
+	for diff := range delegatorDiffs {
+		// [diff.Time] > [endTime]
+		if diff.Time.After(endTime) {
 			// This delegation change (and all following changes) occurs after
 			// [endTime]. Since we're calculating the max amount staked in
 			// [startTime, endTime], we can stop.
 			break
 		}
 
-		// [delegator.NextTime] >= [startTime]
-		if !delegator.NextTime.Before(startTime) {
+		// [diff.Time] >= [startTime]
+		if !diff.Time.Before(startTime) {
 			// We have advanced time to be at the inside of the delegation
 			// window. Make sure that the max weight is updated accordingly.
 			currentMax = max(currentMax, currentWeight)
 		}
 
 		var op func(uint64, uint64) (uint64, error)
-		if isAdded {
+		if diff.Added {
 			op = math.Add
 		} else {
 			op = math.Sub
 		}
-		currentWeight, err = op(currentWeight, delegator.Weight)
+		currentWeight, err = op(currentWeight, diff.StakingPeriod.Weight())
 		if err != nil {
 			return 0, err
 		}
