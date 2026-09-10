@@ -7,9 +7,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -18,7 +17,7 @@ import (
 
 // AggregateSignatures signs msg with every validator in vdrs.
 func AggregateSignatures(
-	network *tmpnet.Network,
+	signingKeys map[ids.NodeID]string,
 	vdrs validators.WarpSet,
 	msg *warp.UnsignedMessage,
 ) (*warp.Message, error) {
@@ -27,14 +26,12 @@ func AggregateSignatures(
 	sigs := make([]*bls.Signature, 0, len(vdrs.Validators))
 	for i, vdr := range vdrs.Validators {
 		nodeID := vdr.NodeIDs[0]
-		node, err := network.GetNode(nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("getting validator %s: %w", nodeID, err)
+		signingKey, ok := signingKeys[nodeID]
+		if !ok {
+			return nil, fmt.Errorf("missing signing key for validator %s", nodeID)
 		}
 
-		// ponytail: tmpnet owns these keys, so signing locally avoids a
-		// test-only P2P client.
-		keyBytes, err := base64.StdEncoding.DecodeString(node.Flags[config.StakingSignerKeyContentKey])
+		keyBytes, err := base64.StdEncoding.DecodeString(signingKey)
 		if err != nil {
 			return nil, fmt.Errorf("decoding signing key for %s: %w", nodeID, err)
 		}

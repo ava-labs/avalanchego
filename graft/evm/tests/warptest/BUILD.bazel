@@ -7,9 +7,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/tests/warptest",
     visibility = ["//visibility:public"],
     deps = [
-        "//config",
+        "//ids",
         "//snow/validators",
-        "//tests/fixture/tmpnet",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/set",
@@ -24,7 +23,7 @@ graft_go_test(
     deps = [
         "//ids",
         "//snow/validators",
-        "//tests/fixture/tmpnet",
+        "//utils/crypto/bls/signer/localsigner",
         "//vms/platformvm/warp",
         "@com_github_stretchr_testify//require",
     ],
