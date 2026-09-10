@@ -127,6 +127,18 @@ func TestAdapterStakerOps(t *testing.T) {
 		}
 	}
 
+	setDelegateeReward := func(subnetID ids.ID, nodeID ids.NodeID, reward uint64) op {
+		return func(t *testing.T, a Adapter) {
+			require.NoError(t, a.SetDelegateeReward(subnetID, nodeID, reward))
+		}
+	}
+
+	setMissingDelegateeReward := func(subnetID ids.ID, nodeID ids.NodeID) op {
+		return func(t *testing.T, a Adapter) {
+			require.ErrorIs(t, a.SetDelegateeReward(subnetID, nodeID, 0), database.ErrNotFound)
+		}
+	}
+
 	restakeValidator := func(subnetID ids.ID, nodeID ids.NodeID, start, end time.Time, weight, potentialReward uint64) op {
 		return func(t *testing.T, a Adapter) {
 			v, err := a.GetCurrentValidator(subnetID, nodeID)
@@ -229,6 +241,21 @@ func TestAdapterStakerOps(t *testing.T) {
 	noRestakedRewards := func(subnetID ids.ID, nodeID ids.NodeID) assertion {
 		return func(t *testing.T, a Adapter) {
 			_, err := a.GetRestakedRewards(subnetID, nodeID)
+			require.ErrorIs(t, err, database.ErrNotFound)
+		}
+	}
+
+	hasDelegateeReward := func(subnetID ids.ID, nodeID ids.NodeID, want uint64) assertion {
+		return func(t *testing.T, a Adapter) {
+			got, err := a.GetDelegateeReward(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		}
+	}
+
+	noDelegateeReward := func(subnetID ids.ID, nodeID ids.NodeID) assertion {
+		return func(t *testing.T, a Adapter) {
+			_, err := a.GetDelegateeReward(subnetID, nodeID)
 			require.ErrorIs(t, err, database.ErrNotFound)
 		}
 	}
@@ -575,6 +602,24 @@ func TestAdapterStakerOps(t *testing.T) {
 			},
 		},
 		{
+			name: "delegatee_reward_lifecycle",
+			txs:  []*platform.Tx{validatorTx},
+			diffs: []diff{
+				{
+					ops: []op{putCurrentValidator(validator)},
+					assertions: []assertion{
+						hasDelegateeReward(constants.PrimaryNetworkID, validatorNodeID, 0),
+					},
+				},
+				{
+					ops: []op{setDelegateeReward(constants.PrimaryNetworkID, validatorNodeID, 21)},
+					assertions: []assertion{
+						hasDelegateeReward(constants.PrimaryNetworkID, validatorNodeID, 21),
+					},
+				},
+			},
+		},
+		{
 			name: "restake_current_validator",
 			txs:  []*platform.Tx{validatorTx},
 			diffs: []diff{
@@ -600,12 +645,14 @@ func TestAdapterStakerOps(t *testing.T) {
 						deleteMissingPendingValidator(constants.PrimaryNetworkID, missingNodeID),
 						setMissingRestakeConfig(constants.PrimaryNetworkID, missingNodeID),
 						setMissingRestakedRewards(constants.PrimaryNetworkID, missingNodeID),
+						setMissingDelegateeReward(constants.PrimaryNetworkID, missingNodeID),
 					},
 					assertions: []assertion{
 						noCurrentValidator(constants.PrimaryNetworkID, missingNodeID),
 						noPendingValidator(constants.PrimaryNetworkID, missingNodeID),
 						noRestakeConfig(constants.PrimaryNetworkID, missingNodeID),
 						noRestakedRewards(constants.PrimaryNetworkID, missingNodeID),
+						noDelegateeReward(constants.PrimaryNetworkID, missingNodeID),
 					},
 				},
 			},

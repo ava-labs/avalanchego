@@ -58,6 +58,36 @@ func (a Adapter) DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) erro
 	return a.legacy.DeleteCurrentValidator(v)
 }
 
+// GetDelegateeReward returns the delegatee reward accrued during the current
+// staking period by the validator on subnetID with nodeID, or an error
+// wrapping [database.ErrNotFound] if the validator is not in the current
+// validator set. A reward that was never set reads as zero,
+// indistinguishable from a reward explicitly set to zero: no commission is
+// pending.
+func (a Adapter) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error) {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return 0, err
+	}
+
+	return si.DelegateeReward, nil
+}
+
+// SetDelegateeReward sets the delegatee reward accrued during the current
+// staking period by the validator on subnetID with nodeID. It returns an
+// error wrapping [database.ErrNotFound] if the validator is not in the
+// current validator set.
+func (a Adapter) SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, delegateeReward uint64) error {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return err
+	}
+
+	si.DelegateeReward = delegateeReward
+
+	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
+}
+
 // RestakeConfig defines how a validator's next staking period is derived when
 // its current period ends. The zero value means the validator does not
 // restake: state does not distinguish a bounded validator from a restaking
