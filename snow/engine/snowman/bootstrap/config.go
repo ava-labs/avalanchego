@@ -42,5 +42,10 @@ type Config struct {
 
 	Bootstrapped func()
 
+	// FollowOnly, when true, prevents this chain from ever handing off to
+	// consensus. After catching up it re-arms the bootstrap loop to keep
+	// re-syncing to the latest tip forever.
+	FollowOnly bool
+
 	common.Haltable
 }

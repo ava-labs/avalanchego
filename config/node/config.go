@@ -72,8 +72,11 @@ type IPConfig struct {
 
 type StakingConfig struct {
 	genesis.StakingConfig
-	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
-	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
+	SybilProtectionEnabled    bool `json:"sybilProtectionEnabled"`
+	PartialSyncPrimaryNetwork bool `json:"partialSyncPrimaryNetwork"`
+	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
+	// joining consensus.
+	PChainFollowOnly              bool            `json:"pChainFollowOnly"`
 	StakingTLSCert                tls.Certificate `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
