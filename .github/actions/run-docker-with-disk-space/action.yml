@@ -17,6 +17,8 @@ inputs:
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/setup-task
+
     - uses: ./.github/actions/ensure-disk-space
       with:
         diagnostic-groups: docker

@@ -45,10 +45,10 @@ runs:
       if: ${{ runner.os == 'Linux' && steps.initial-check.outputs.below_threshold == 'true' }}
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
       with:
-        # Do not set tool-cache to true. It deletes /opt/hostedtoolcache, which
-        # holds the Go toolchain from the runner image or from setup-go. Jobs
-        # that start task with `go tool` then fail with exit 127.
-        tool-cache: false
+        # CI bootstraps Task from the cached release binary or the Nix dev
+        # shell, rather than from the runner's Go toolchain. Reclaim the runner
+        # tool cache when disk pressure requires cleanup.
+        tool-cache: true
         docker-images: true
 
     - name: Re-check runner disk space
