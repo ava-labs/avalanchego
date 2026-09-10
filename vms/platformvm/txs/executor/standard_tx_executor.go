@@ -34,7 +34,7 @@ import (
 )
 
 // TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
-const registerL1ValidatorTxExpiryWindow = uint64(24 * time.Hour / time.Second)
+const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
 
 var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
@@ -278,10 +278,10 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	e.applyBaseTx(&tx.BaseTx)
+
 	// Add the new subnet to the database
+	txID := e.tx.ID()
 	e.state.AddSubnet(txID)
 	e.state.SetSubnetOwner(txID, tx.Owner)
 	return nil
@@ -908,8 +908,8 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindow {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindow)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindowSeconds {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindowSeconds)
 	}
 
 	// Verify that this warp message isn't being replayed.
