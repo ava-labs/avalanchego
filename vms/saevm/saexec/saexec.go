@@ -83,7 +83,7 @@ func New(
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
 		// queue is closed by [Executor.Close].
-		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
+		queue: make(chan queuedBlock, 2*saedb.DefaultCommitInterval),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op

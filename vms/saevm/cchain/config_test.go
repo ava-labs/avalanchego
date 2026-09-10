@@ -103,6 +103,11 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.StateScheme = customrawdb.FirewoodScheme }),
 		},
 		{
+			name:    "state_scheme/unknown",
+			json:    `{"state-scheme":"path"}`,
+			wantErr: testerr.Is(errUnknownScheme),
+		},
+		{
 			name:      "state/commit_interval",
 			json:      `{"commit-interval":256}`,
 			networkID: constants.UnitTestID,
@@ -132,6 +137,16 @@ func TestParseConfig(t *testing.T) {
 			name: "state/snapshot_cache",
 			json: `{"snapshot-cache":128}`,
 			want: with(func(c *config) { c.SnapshotCache = 128 }),
+		},
+		{
+			name:    "state/hash_trie_clean_cache_overflows_bytes",
+			json:    `{"trie-clean-cache":18446744073709551615}`, // math.MaxUint64
+			wantErr: testerr.Contains("cache size exceeds maximum"),
+		},
+		{
+			name:    "state/firewood_trie_clean_cache_overflows_bytes",
+			json:    `{"state-scheme":"firewood","trie-clean-cache":18446744073709551615}`, // math.MaxUint64
+			wantErr: testerr.Contains("CacheSizeMiB must be <="),
 		},
 		{
 			name: "state/allow_missing_tries",
@@ -350,11 +365,10 @@ func TestConfigStateSyncInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := defaultConfig()
-			c.StateScheme = customrawdb.FirewoodScheme
 			c.CommitInterval = tt.commitInterval
 
-			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
-			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
+			got := c.stateSyncConfig(tt.networkID).SummaryInterval
+			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).SummaryInterval", c, tt.networkID)
 		})
 	}
 }

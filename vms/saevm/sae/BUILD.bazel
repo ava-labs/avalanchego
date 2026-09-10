@@ -102,6 +102,7 @@ go_test(
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/cmputils",
+        "//vms/saevm/firewood",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",

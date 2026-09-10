@@ -148,10 +148,8 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 
 	cfg := options.ApplyTo(&sutConfig{
 		syncConfig: Config{
-			Enabled: true,
-			DBConfig: saedb.Config{
-				CommitInterval: defaultCommitInterval,
-			},
+			Enabled:         true,
+			SummaryInterval: defaultCommitInterval,
 		},
 		avaDB:     memdb.New(),
 		xdb:       saetest.NewExecutionResultsDB(),
@@ -271,7 +269,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	mempoolConf.Journal = ""                // no on-disk journal in tests
 	vm, err := sae.NewVM(ctx, s.hooks, sae.Config{
 		MempoolConfig: mempoolConf,
-		DBConfig:      s.cfg.syncConfig.DBConfig,
+		DBConfig:      saedb.HashDBConfig{CommitInterval: s.cfg.syncConfig.SummaryInterval},
 		Now:           s.clock.Now,
 	}, s.snowCtx, chainConfig, s.db, s.network)
 	require.NoError(t, err, "NewVM()")

@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -115,8 +114,8 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 
 	handler, err := New(
 		saestatesync.Config{
-			DBConfig: saedb.Config{CommitInterval: commitInterval},
-			Enabled:  cfg.enabled,
+			SummaryInterval: commitInterval,
+			Enabled:         cfg.enabled,
 		},
 		ethDB,
 		snowCtx,

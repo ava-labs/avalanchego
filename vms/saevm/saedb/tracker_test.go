@@ -23,64 +23,55 @@ import (
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
 func TestNewTracker(t *testing.T) {
-	defaults := Config{CommitInterval: 1}
-
 	tests := []struct {
-		name    string
-		with    func(*Config)
-		wantErr error
+		name         string
+		cfg          Config
+		wantErr      error
+		wantSnapshot bool
 	}{
 		{
-			name: "defaults",
+			name: "hashdb",
+			cfg:  HashDBConfig{CommitInterval: 1},
 		},
 		{
 			name: "firewood",
-			with: func(c *Config) { c.Scheme = customrawdb.FirewoodScheme },
+			cfg:  FirewoodConfig{Config: firewood.Config{RevisionsInMemory: 2, MaxPersistGap: 1}},
 		},
 		{
 			name:    "zero_commit_interval",
-			with:    func(c *Config) { c.CommitInterval = 0 },
+			cfg:     HashDBConfig{},
 			wantErr: errZeroCommitInterval,
 		},
 		{
-			name: "with_snapshot",
-			with: func(c *Config) {
-				c.SnapshotCacheMiB = 1
-			},
+			name:         "with_snapshot",
+			cfg:          HashDBConfig{CommitInterval: 1, SnapshotCacheMiB: 1},
+			wantSnapshot: true,
 		},
 		{
-			name:    "trie_cache_overflows_bytes",
-			with:    func(c *Config) { c.TrieCacheMiB = math.MaxInt },
+			name:    "hashdb_trie_cache_overflows_bytes",
+			cfg:     HashDBConfig{CommitInterval: 1, TrieCacheMiB: math.MaxInt},
 			wantErr: errCacheTooLarge,
 		},
 		{
 			name:    "snapshot_cache_overflows_bytes",
-			with:    func(c *Config) { c.SnapshotCacheMiB = math.MaxInt },
+			cfg:     HashDBConfig{CommitInterval: 1, SnapshotCacheMiB: math.MaxInt},
 			wantErr: errCacheTooLarge,
-		},
-		{
-			name:    "unknown_scheme",
-			with:    func(c *Config) { c.Scheme = rawdb.PathScheme },
-			wantErr: errUnknownScheme,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := defaults
-			if tt.with != nil {
-				tt.with(&cfg)
-			}
 			db := rawdb.NewMemoryDatabase()
 			log := loggingtest.New(t, logging.Debug)
 
-			tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
+			tr, err := NewTracker(db, tt.cfg, types.EmptyRootHash, t.TempDir(), log)
 			require.ErrorIs(t, err, tt.wantErr, "NewTracker()")
 			if err != nil {
 				return
@@ -89,7 +80,7 @@ func TestNewTracker(t *testing.T) {
 
 			// If the snapshot is enabled, we would expect to find the root on disk.
 			var wantRoot common.Hash
-			if cfg.SnapshotCacheMiB > 0 {
+			if tt.wantSnapshot {
 				wantRoot = types.EmptyRootHash
 			}
 			gotRoot := rawdb.ReadSnapshotRoot(db)
@@ -102,7 +93,7 @@ func TestNewTracker(t *testing.T) {
 // the same database. The first run, on a fresh database, always succeeds;
 // only the second may error.
 func TestProtectTrieIndex(t *testing.T) {
-	configs := map[string]Config{
+	configs := map[string]HashDBConfig{
 		"archival":        {Archival: true},
 		"archival_allow":  {Archival: true, AllowMissingTries: true},
 		"pruning":         {},
@@ -172,9 +163,9 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 // TestTrackerClose verifies both the trie and the snapshot can be opened at the
 // state persisted by [Tracker.Close].
 func TestTrackerClose(t *testing.T) {
-	cfg := Config{
-		CommitInterval:   DefaultCommitInterval,
+	cfg := HashDBConfig{
 		SnapshotCacheMiB: 1,
+		CommitInterval:   DefaultCommitInterval,
 	}
 	db := rawdb.NewMemoryDatabase()
 	log := loggingtest.New(t, logging.Debug)
@@ -219,7 +210,7 @@ func TestTrackerClose(t *testing.T) {
 func TestTrackerMaybeCap(t *testing.T) {
 	const (
 		commitInterval    = 64
-		maxCapBytes       = 2 * mibToBytes
+		maxCapBytes       = 2 * units.MiB
 		targetCommitBytes = 128 * 1024
 
 		// MUST be > [ethdb.IdealBatchSize] so that [Tracker.maybeCap] never
@@ -227,7 +218,7 @@ func TestTrackerMaybeCap(t *testing.T) {
 		_ uint = targetCommitBytes - ethdb.IdealBatchSize
 	)
 
-	cfg := Config{
+	cfg := HashDBConfig{
 		CommitInterval:    commitInterval,
 		maxCapBytes:       maxCapBytes,
 		targetCommitBytes: targetCommitBytes,
@@ -285,8 +276,8 @@ func TestTrackerMaybeCap(t *testing.T) {
 // spent in a single block.
 func BenchmarkTrackerCommitInterval(b *testing.B) {
 	const (
-		maxCapBytes       = 8 * mibToBytes
-		targetCommitBytes = 512 * 1024
+		maxCapBytes       = 8 * units.MiB
+		targetCommitBytes = 512 * units.KiB
 
 		// MUST be >= [ethdb.IdealBatchSize] so that [Tracker.maybeCap] never
 		// calls Cap with a negative limit.
@@ -333,7 +324,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 	for _, tt := range tests {
 		for _, mode := range modes {
 			b.Run(tt.name+"/"+mode.name, func(b *testing.B) {
-				cfg := Config{
+				cfg := HashDBConfig{
 					CommitInterval:    64,
 					TrieCacheMiB:      1,
 					maxCapBytes:       mode.maxCapBytes,
@@ -373,7 +364,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 				}
 				b.ReportMetric(float64(cfg.CommitInterval), "blocks/op")
 				b.ReportMetric(float64(maxPause.Milliseconds()), "max-pause-ms")
-				b.ReportMetric(float64(peakDirty)/mibToBytes, "peak-dirty-MiB")
+				b.ReportMetric(float64(peakDirty)/units.MiB, "peak-dirty-MiB")
 			})
 		}
 	}

@@ -7,6 +7,7 @@ package statesync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -28,8 +29,21 @@ import (
 
 // Config provides all user-configurable information for the [Handler].
 type Config struct {
-	DBConfig saedb.Config
-	Enabled  bool
+	// SummaryInterval is the number of blocks between heights at which state
+	// summaries are served. It MUST be non-zero and MUST match the interval at
+	// which the trie database commits settled state.
+	SummaryInterval uint64
+	Enabled         bool
+	Scheme          string
+}
+
+var errZeroSummaryInterval = errors.New("summary interval must be non-zero")
+
+func (c Config) Verify() error {
+	if c.SummaryInterval == 0 {
+		return errZeroSummaryInterval
+	}
+	return nil
 }
 
 // Handler implements provides server-side [Summary] handling and parsing, as
@@ -52,7 +66,7 @@ func New(
 	network *network.Network,
 	hooks hook.Points,
 ) (*Handler, error) {
-	if err := cfg.DBConfig.Verify(); err != nil {
+	if err := cfg.Verify(); err != nil {
 		return nil, err
 	}
 	return &Handler{
@@ -88,14 +102,14 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 		return nil, err
 	}
 
-	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.DBConfig.CommitInterval)
+	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.SummaryInterval)
 	return h.getSummaryAtHeight(height)
 }
 
 // GetStateSummary returns the summary of the block at the given height, if it
 // is available to be served. Otherwise, [database.ErrNotFound] is returned.
 func (h *Handler) GetStateSummary(_ context.Context, height uint64) (*Summary, error) {
-	if !saedb.ShouldCommitTrieDB(height, h.cfg.DBConfig.CommitInterval) {
+	if !saedb.ShouldCommitTrieDB(height, h.cfg.SummaryInterval) {
 		// can't serve committed state at this height
 		return nil, database.ErrNotFound
 	}
