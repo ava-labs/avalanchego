@@ -118,6 +118,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
+		require.NoErrorf(t, tr.Close(exec.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tr)
 	})
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())

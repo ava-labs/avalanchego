@@ -21,6 +21,7 @@ go_library(
         "//database/versiondb",
         "//graft/coreth/plugin/evm/atomic/state",
         "//graft/evm/message",
+        "//graft/evm/sync/client",
         "//graft/evm/sync/handlers",
         "//graft/evm/sync/handlers/stats",
         "//graft/evm/sync/leaf",

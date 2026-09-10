@@ -16,9 +16,9 @@ message GetLeafRequest {
   bytes root_hash = 1;
   // Empty for account trie, non-empty for storage trie.
   bytes account_hash = 2;
+  // Empty for the first key.
   bytes start_key = 3;
-  bytes end_key = 4;
-  uint32 key_limit = 5;
+  uint32 key_limit = 4;
 }
 
 message GetLeafResponse {

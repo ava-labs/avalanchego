@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	platformvmgenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -95,7 +95,7 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 
 	genesis := &platformvmgenesis.Genesis{
 		UTXOs:         make([]*platformvmgenesis.UTXO, len(c.FundedKeys)),
-		Validators:    make([]*txs.Tx, len(c.NodeIDs)),
+		Validators:    make([]*platform.Tx, len(c.NodeIDs)),
 		Timestamp:     uint64(c.ValidatorStartTime.Unix()),
 		InitialSupply: InitialSupply,
 	}
@@ -125,12 +125,12 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 				key.Address(),
 			},
 		}
-		validator := &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		validator := &platform.AddValidatorTx{
+			BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    c.NetworkID,
 				BlockchainID: constants.PlatformChainID,
 			}},
-			Validator: txs.Validator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(c.ValidatorStartTime.Unix()),
 				End:    uint64(c.ValidatorEndTime.Unix()),
@@ -148,14 +148,14 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 			RewardsOwner:     &owner,
 			DelegationShares: ValidatorDelegationShares,
 		}
-		validatorTx := &txs.Tx{Unsigned: validator}
-		require.NoError(validatorTx.Initialize(txs.GenesisCodec))
+		validatorTx := &platform.Tx{Unsigned: validator}
+		require.NoError(validatorTx.Initialize(platform.GenesisCodec))
 
 		genesis.Validators[i] = validatorTx
 	}
 
-	chain := &txs.CreateChainTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	chain := &platform.CreateChainTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    c.NetworkID,
 			BlockchainID: constants.PlatformChainID,
 		}},
@@ -164,10 +164,10 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 		VMID:       constants.AVMID,
 		SubnetAuth: &secp256k1fx.Input{},
 	}
-	chainTx := &txs.Tx{Unsigned: chain}
-	require.NoError(chainTx.Initialize(txs.GenesisCodec))
+	chainTx := &platform.Tx{Unsigned: chain}
+	require.NoError(chainTx.Initialize(platform.GenesisCodec))
 
-	genesis.Chains = []*txs.Tx{chainTx}
+	genesis.Chains = []*platform.Tx{chainTx}
 	return genesis
 }
 
