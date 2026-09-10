@@ -22,6 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
+// preferenceID returns just the preferred block ID, for assertions that
+// don't care about the preferred height.
+func preferenceID(sm Consensus) ids.ID {
+	prefID, _ := sm.Preference()
+	return prefID
+}
+
 type testFunc func(*testing.T, Factory)
 
 var (
@@ -45,6 +52,7 @@ var (
 		RecordPollTransitiveVotingTest,
 		RecordPollDivergedVotingWithNoConflictingBitTest,
 		RecordPollChangePreferredChainTest,
+		RecordPollPreferenceHeightAfterSwitchTest,
 		LastAcceptedTest,
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
@@ -101,7 +109,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		snowmantest.GenesisTimestamp,
 	))
 
-	require.Equal(snowmantest.GenesisID, sm.Preference())
+	require.Equal(snowmantest.GenesisID, preferenceID(sm))
 	require.Zero(sm.NumProcessing())
 }
 
@@ -174,7 +182,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(block))
-	require.Equal(block.ID(), sm.Preference())
+	require.Equal(block.ID(), preferenceID(sm))
 	require.True(sm.IsPreferred(block.ID()))
 
 	pref, ok := sm.PreferenceAtHeight(block.Height())
@@ -213,12 +221,12 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	// Adding to the previous preference will update the preference
 	require.NoError(sm.Add(firstBlock))
-	require.Equal(firstBlock.IDV, sm.Preference())
+	require.Equal(firstBlock.IDV, preferenceID(sm))
 
 	// Adding to something other than the previous preference won't update the
 	// preference
 	require.NoError(sm.Add(secondBlock))
-	require.Equal(firstBlock.IDV, sm.Preference())
+	require.Equal(firstBlock.IDV, preferenceID(sm))
 }
 
 // Make sure that adding a block that is detached from the rest of the tree
@@ -435,12 +443,12 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	votes := bag.Of(block.ID())
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(block.ID(), sm.Preference())
+	require.Equal(block.ID(), preferenceID(sm))
 	require.Equal(1, sm.NumProcessing())
 	require.Equal(snowtest.Undecided, block.Status)
 
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(block.ID(), sm.Preference())
+	require.Equal(block.ID(), preferenceID(sm))
 	require.Zero(sm.NumProcessing())
 	require.Equal(snowtest.Accepted, block.Status)
 }
@@ -479,13 +487,13 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	votes := bag.Of(firstBlock.ID())
 
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(firstBlock.ID(), sm.Preference())
+	require.Equal(firstBlock.ID(), preferenceID(sm))
 	require.Equal(2, sm.NumProcessing())
 	require.Equal(snowtest.Undecided, firstBlock.Status)
 	require.Equal(snowtest.Undecided, secondBlock.Status)
 
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(firstBlock.ID(), sm.Preference())
+	require.Equal(firstBlock.ID(), preferenceID(sm))
 	require.Zero(sm.NumProcessing())
 	require.Equal(snowtest.Accepted, firstBlock.Status)
 	require.Equal(snowtest.Rejected, secondBlock.Status)
@@ -532,7 +540,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	// The first poll will accept shared bits
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(firstBlock.ID(), sm.Preference())
+	require.Equal(firstBlock.ID(), preferenceID(sm))
 	require.Equal(2, sm.NumProcessing())
 
 	metrics := gatherCounterGauge(t, registerer)
@@ -541,7 +549,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(t.Context(), votes))
-	require.Equal(firstBlock.ID(), sm.Preference())
+	require.Equal(firstBlock.ID(), preferenceID(sm))
 	require.Equal(2, sm.NumProcessing())
 
 	metrics = gatherCounterGauge(t, registerer)
@@ -577,7 +585,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	votes := bag.Of(snowmantest.GenesisID)
 	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Zero(sm.NumProcessing())
-	require.Equal(snowmantest.GenesisID, sm.Preference())
+	require.Equal(snowmantest.GenesisID, preferenceID(sm))
 }
 
 func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
@@ -629,7 +637,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// Tail = 0
 
 	require.Zero(sm.NumProcessing())
-	require.Equal(block0.ID(), sm.Preference())
+	require.Equal(block0.ID(), preferenceID(sm))
 	require.Equal(snowtest.Accepted, block0.Status)
 	require.Equal(snowtest.Rejected, block1.Status)
 	require.Equal(snowtest.Rejected, block2.Status)
@@ -680,25 +688,25 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor2 := bag.Of(block2.ID())
 	require.NoError(sm.RecordPoll(t.Context(), votesFor2))
 	require.Equal(4, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block2.ID(), preferenceID(sm))
 
 	emptyVotes := bag.Bag[ids.ID]{}
 	require.NoError(sm.RecordPoll(t.Context(), emptyVotes))
 	require.Equal(4, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block2.ID(), preferenceID(sm))
 
 	require.NoError(sm.RecordPoll(t.Context(), votesFor2))
 	require.Equal(4, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block2.ID(), preferenceID(sm))
 
 	votesFor3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(t.Context(), votesFor3))
 	require.Equal(2, sm.NumProcessing())
-	require.Equal(block3.ID(), sm.Preference())
+	require.Equal(block3.ID(), preferenceID(sm))
 
 	require.NoError(sm.RecordPoll(t.Context(), votesFor3))
 	require.Zero(sm.NumProcessing())
-	require.Equal(block3.ID(), sm.Preference())
+	require.Equal(block3.ID(), preferenceID(sm))
 	require.Equal(snowtest.Rejected, block0.Status)
 	require.Equal(snowtest.Accepted, block1.Status)
 	require.Equal(snowtest.Rejected, block2.Status)
@@ -742,7 +750,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(t.Context(), invalidVotes))
 	require.NoError(sm.RecordPoll(t.Context(), validVotes))
 	require.Equal(1, sm.NumProcessing())
-	require.Equal(block.ID(), sm.Preference())
+	require.Equal(block.ID(), preferenceID(sm))
 }
 
 func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
@@ -804,7 +812,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// Tail = 2
 
 	require.Equal(4, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block2.ID(), preferenceID(sm))
 	require.Equal(snowtest.Accepted, block0.Status)
 	require.Equal(snowtest.Undecided, block1.Status)
 	require.Equal(snowtest.Undecided, block2.Status)
@@ -819,7 +827,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// Tail = 2
 
 	require.Zero(sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block2.ID(), preferenceID(sm))
 	require.Equal(snowtest.Accepted, block0.Status)
 	require.Equal(snowtest.Accepted, block1.Status)
 	require.Equal(snowtest.Accepted, block2.Status)
@@ -897,7 +905,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// rejected.
 	require.NoError(sm.Add(block3))
 
-	require.Equal(block0.ID(), sm.Preference())
+	require.Equal(block0.ID(), preferenceID(sm))
 	require.Equal(snowtest.Undecided, block0.Status, "should not be decided yet")
 	require.Equal(snowtest.Undecided, block1.Status, "should not be decided yet")
 	require.Equal(snowtest.Undecided, block2.Status, "should not be decided yet")
@@ -964,7 +972,9 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(b1Block))
 	require.NoError(sm.Add(b2Block))
 
-	require.Equal(a2Block.ID(), sm.Preference())
+	prefID, prefHeight := sm.Preference()
+	require.Equal(a2Block.ID(), prefID)
+	require.Equal(a2Block.Height(), prefHeight)
 
 	require.True(sm.IsPreferred(a1Block.ID()))
 	require.True(sm.IsPreferred(a2Block.ID()))
@@ -982,7 +992,9 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	b2Votes := bag.Of(b2Block.ID())
 	require.NoError(sm.RecordPoll(t.Context(), b2Votes))
 
-	require.Equal(b2Block.ID(), sm.Preference())
+	prefID, prefHeight = sm.Preference()
+	require.Equal(b2Block.ID(), prefID)
+	require.Equal(b2Block.Height(), prefHeight)
 	require.False(sm.IsPreferred(a1Block.ID()))
 	require.False(sm.IsPreferred(a2Block.ID()))
 	require.True(sm.IsPreferred(b1Block.ID()))
@@ -1000,7 +1012,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.NoError(sm.RecordPoll(t.Context(), a1Votes))
 	require.NoError(sm.RecordPoll(t.Context(), a1Votes))
 
-	require.Equal(a2Block.ID(), sm.Preference())
+	require.Equal(a2Block.ID(), preferenceID(sm))
 	require.True(sm.IsPreferred(a1Block.ID()))
 	require.True(sm.IsPreferred(a2Block.ID()))
 	require.False(sm.IsPreferred(b1Block.ID()))
@@ -1013,6 +1025,67 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	pref, ok = sm.PreferenceAtHeight(a2Block.Height())
 	require.True(ok)
 	require.Equal(a2Block.ID(), pref)
+}
+
+// RecordPollPreferenceHeightAfterSwitchTest checks that when a poll switches the
+// preference from one branch to a deeper branch, Preference() returns the new
+// preferred block along with its own height.
+func RecordPollPreferenceHeightAfterSwitchTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
+	sm := factory.New()
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	params := snowball.Parameters{
+		K:                     1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
+		Beta:                  10,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(
+		ctx,
+		params,
+		snowmantest.GenesisID,
+		snowmantest.GenesisHeight,
+		snowmantest.GenesisTimestamp,
+	))
+
+	// Two branches fork from genesis. The a-branch is preferred (added first), so
+	// its tip a1 is the initial preference. The b-branch is deeper.
+	//
+	//	height
+	//	  3            b3
+	//	               |
+	//	  2            b2
+	//	               |
+	//	  1     a1     b1
+	//	         \    /
+	//	  0      genesis
+	a1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	b1Block := snowmantest.BuildChild(snowmantest.Genesis)
+	b2Block := snowmantest.BuildChild(b1Block)
+	b3Block := snowmantest.BuildChild(b2Block)
+
+	require.NoError(sm.Add(a1Block)) // we have extended the preference (genesis) so this should be the new preference
+	require.NoError(sm.Add(b1Block))
+	require.NoError(sm.Add(b2Block))
+	require.NoError(sm.Add(b3Block))
+
+	prefID, prefHeight := sm.Preference()
+	require.Equal(a1Block.ID(), prefID)
+	require.Equal(a1Block.Height(), prefHeight)
+
+	// A single vote for b1 flips the preference to the b-branch.
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(b1Block.ID())))
+
+	prefID, prefHeight = sm.Preference()
+	require.Equal(b3Block.ID(), prefID)
+	require.Equal(b3Block.Height(), prefHeight)
 }
 
 func LastAcceptedTest(t *testing.T, factory Factory) {
