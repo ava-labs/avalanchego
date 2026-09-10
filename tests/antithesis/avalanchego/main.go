@@ -997,6 +997,10 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("failed to get receipt for tx %s on %s: %w", txHash, uri, err)
 		}
 
+		if err := e2e.WaitForEthBlockExecution(ctx, client, receipt.BlockNumber); err != nil {
+			return fmt.Errorf("failed to wait for execution of tx %s on %s: %w", txHash, uri, err)
+		}
+
 		if receipt.Status != types.ReceiptStatusSuccessful {
 			// A failed receipt should be unreachable for this workload. These are
 			// funded EOA self-transfers with the accepted nonce, no calldata, and

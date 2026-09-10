@@ -64,15 +64,14 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 			require.NoError(err)
 
-			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			receipt := e2e.SendEthTransactionAndWait(tc, ethClient, signedTx)
 			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
-			tc.By("waiting for the C-Chain recipient address to have received the sent funds")
-			tc.Eventually(func() bool {
+			tc.By("checking that the C-Chain recipient address received the sent funds", func() {
 				balance, err := ethClient.BalanceAt(tc.DefaultContext(), recipientEthAddress, nil)
 				require.NoError(err)
-				return balance.Cmp(big.NewInt(0)) > 0
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see funds delivered before timeout")
+				require.Positive(balance.Cmp(big.NewInt(0)))
+			})
 		})
 
 		// Wallet must be initialized after sending funds on the
