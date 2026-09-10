@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -214,6 +216,181 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 	checkDatabaseState(t, store, 19)
 }
 
+func TestCheckpointWaitsForIncompletePut(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithCheckpointInterval(2))
+	firstBlock := []byte("first block")
+	secondBlock := []byte("second block")
+
+	// Pause the first Put after reservation, before it can open the data file.
+	db.fileOpenMu.Lock()
+	release := sync.OnceFunc(db.fileOpenMu.Unlock)
+	t.Cleanup(release)
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- db.Put(1, firstBlock) }()
+	require.Eventually(t, func() bool {
+		return db.nextDataReservationOffset.Load() > 0
+	}, 5*time.Second, time.Millisecond)
+
+	// A cached handle lets the later Put finish its writes while the first waits.
+	f, err := os.OpenFile(db.dataFilePath(0), os.O_RDWR|os.O_CREATE, defaultFilePermissions)
+	require.NoError(t, err)
+	db.fileCache.Put(0, f)
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- db.Put(2, secondBlock) }()
+	require.Eventually(t, func() bool {
+		if db.checkpointMu.TryRLock() {
+			db.checkpointMu.RUnlock()
+			return false
+		}
+		return true
+	}, 5*time.Second, time.Millisecond)
+
+	headerBytes := make([]byte, sizeOfIndexFileHeader)
+	_, err = db.indexFile.ReadAt(headerBytes, 0)
+	require.NoError(t, err)
+	var header indexFileHeader
+	require.NoError(t, header.UnmarshalBinary(headerBytes))
+	require.Zero(t, header.NextWriteOffset)
+
+	release()
+	require.NoError(t, <-firstDone)
+	require.NoError(t, <-secondDone)
+	entry, err := db.readIndexEntry(2)
+	require.NoError(t, err)
+	_, err = db.indexFile.ReadAt(headerBytes, 0)
+	require.NoError(t, err)
+	require.NoError(t, header.UnmarshalBinary(headerBytes))
+	require.Equal(t, entry.Offset+uint64(sizeOfBlockEntryHeader)+uint64(entry.Size), header.NextWriteOffset)
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, db.config)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	for i, block := range [][]byte{firstBlock, secondBlock} {
+		got, err := db.Get(uint64(i + 1))
+		require.NoError(t, err)
+		require.Equal(t, block, got)
+	}
+}
+
+func TestCheckpointAfterPartialWriteRollback(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithCheckpointInterval(2))
+	// A rolled-back partial write can leave bytes beyond the next successful write.
+	require.NoError(t, os.WriteFile(db.dataFilePath(0), make([]byte, 128), defaultFilePermissions))
+	require.NoError(t, db.Put(2, []byte("short retry")))
+
+	// Fail after syncing the next record, before writing its index entry.
+	require.NoError(t, db.indexFile.Close())
+	block := []byte("next block")
+	require.ErrorIs(t, db.Put(3, block), os.ErrClosed)
+	db.closeFiles()
+	require.NoError(t, db.locks.Release())
+
+	db = newDatabase(t, db.config)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	got, err := db.Get(3)
+	require.NoError(t, err)
+	require.Equal(t, block, got)
+}
+
+func TestPutContinuesAfterIndexWriteFailure(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithDir(t.TempDir()))
+	indexPath := db.indexFile.Name()
+	// Fail after the data write, when Put attempts to write the index entry.
+	require.NoError(t, db.indexFile.Close())
+
+	err := db.Put(1, []byte("failed index write"))
+	require.ErrorIs(t, err, os.ErrClosed)
+
+	indexFile, err := os.OpenFile(indexPath, os.O_RDWR, defaultFilePermissions)
+	require.NoError(t, err)
+	db.indexFile = indexFile
+	require.NoError(t, db.Put(2, []byte("successful later write")))
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, db.config)
+	_, err = db.Get(1)
+	require.ErrorIs(t, err, database.ErrNotFound)
+	got, err := db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, []byte("successful later write"), got)
+	require.NoError(t, db.Close())
+}
+
+func TestFailedPutDoesNotAdvanceCheckpoint(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	config := DefaultConfig().
+		WithIndexDir(filepath.Join(dir, "index")).
+		WithDataDir(dataDir)
+	db := newDatabase(t, config)
+	blocks := [][]byte{
+		[]byte("first block"),
+		[]byte("second block"),
+	}
+	for height, block := range blocks {
+		require.NoError(t, db.Put(uint64(height), block))
+	}
+	// Make the next Put reserve an offset, then fail reopening the unavailable data file.
+	db.fileCache.Flush()
+
+	movedDataDir := filepath.Join(dir, "moved-data")
+	require.NoError(t, os.Rename(dataDir, movedDataDir))
+	err := db.Put(uint64(len(blocks)), []byte("failed data write"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(movedDataDir, dataDir))
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, config)
+	for height, block := range blocks {
+		got, err := db.Get(uint64(height))
+		require.NoError(t, err)
+		require.Equal(t, block, got)
+	}
+	_, err = db.Get(uint64(len(blocks)))
+	require.ErrorIs(t, err, database.ErrNotFound)
+	require.NoError(t, db.Close())
+}
+
+func TestPutContinuesAfterDataWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	config := DefaultConfig().
+		WithIndexDir(filepath.Join(dir, "index")).
+		WithDataDir(dataDir).
+		WithMaxDataFileSize(100)
+	db := newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	require.NoError(t, db.Put(0, make([]byte, 40)))
+	wantLaterOffset := db.nextDataReservationOffset.Load()
+
+	// Force the failed Put to reserve in the next data file, then fail opening it.
+	db.fileCache.Flush()
+	movedDataDir := filepath.Join(dir, "moved-data")
+	require.NoError(t, os.Rename(dataDir, movedDataDir))
+	err := db.Put(1, make([]byte, 20))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.Rename(movedDataDir, dataDir))
+
+	laterBlock := []byte("later")
+	require.NoError(t, db.Put(2, laterBlock))
+	laterEntry, err := db.readIndexEntry(2)
+	require.NoError(t, err)
+	require.Equal(t, wantLaterOffset, laterEntry.Offset)
+	got, err := db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, laterBlock, got)
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, config)
+	db.compressor = compression.NewNoCompressor()
+	_, err = db.Get(1)
+	require.ErrorIs(t, err, database.ErrNotFound)
+	got, err = db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, laterBlock, got)
+	require.NoError(t, db.Close())
+}
+
 func TestWriteBlock_Errors(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -263,7 +440,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			config:             DefaultConfig(),
 			setup: func(db *Database) {
 				// Set the next write offset to near max to trigger overflow
-				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
+				db.nextDataReservationOffset.Store(math.MaxUint64 - 50)
 			},
 			wantErr: safemath.ErrOverflow,
 		},

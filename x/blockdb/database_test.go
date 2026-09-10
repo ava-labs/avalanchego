@@ -533,3 +533,30 @@ func TestRetryDataFileOperationPreservesReplacement(t *testing.T) {
 	_, err = replacement.Stat()
 	require.NoError(t, err)
 }
+
+func TestOpenRejectsCheckpointPastPhysicalData(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithCheckpointInterval(1))
+	require.NoError(t, db.Put(0, []byte("first block")))
+	info, err := os.Stat(db.dataFilePath(0))
+	require.NoError(t, err)
+	firstEnd := info.Size()
+	require.NoError(t, db.Put(1, []byte("second block")))
+	require.NoError(t, db.Close())
+
+	// Simulate external data loss after a clean shutdown.
+	require.NoError(t, os.Truncate(db.dataFilePath(0), firstEnd))
+
+	_, err = New(db.config, logging.NoLog{})
+	require.ErrorIs(t, err, ErrCorrupted)
+}
+
+func TestCloseRejectsCheckpointPastPhysicalData(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithCheckpointInterval(1))
+	require.NoError(t, db.Put(0, []byte("first block")))
+	info, err := os.Stat(db.dataFilePath(0))
+	require.NoError(t, err)
+	require.NoError(t, db.Put(1, []byte("second block")))
+
+	require.NoError(t, os.Truncate(db.dataFilePath(0), info.Size()))
+	require.ErrorIs(t, db.Close(), ErrCorrupted)
+}

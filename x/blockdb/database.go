@@ -188,10 +188,10 @@ type Database struct {
 
 	// maxBlockHeight tracks the highest block height written
 	maxBlockHeight atomic.Uint64
-	// nextDataWriteOffset tracks the next position to write new data in the data file.
-	nextDataWriteOffset atomic.Uint64
-	// headerWriteOccupied prevents concurrent writes to the index header
-	headerWriteOccupied atomic.Bool
+	// nextDataReservationOffset tracks the next position available for a data write.
+	nextDataReservationOffset atomic.Uint64
+	// checkpointMu keeps a checkpoint from observing an incomplete Put.
+	checkpointMu sync.RWMutex
 }
 
 // New creates a block database.
@@ -260,7 +260,7 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 
 	maxHeight := db.maxBlockHeight.Load()
 	db.log.Info("BlockDB initialized successfully",
-		zap.Uint64("nextWriteOffset", db.nextDataWriteOffset.Load()),
+		zap.Uint64("nextWriteOffset", db.nextDataReservationOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 
@@ -333,56 +333,26 @@ func (db *Database) Put(height BlockHeight, block BlockData) error {
 	}
 	blockDataLen := uint32(len(blockToWrite))
 
-	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
-	if err != nil {
-		db.log.Error("Failed to write block: block size calculation overflow",
-			zap.Uint64("height", height),
-			zap.Uint32("blockSize", blockDataLen),
-			zap.Error(err),
-		)
-		return fmt.Errorf("calculating total block size would overflow for block at height %d: %w", height, err)
-	}
-	writeDataOffset, err := db.allocateBlockSpace(sizeWithDataHeader)
-	if err != nil {
-		db.log.Error("Failed to write block: failed to allocate block space",
-			zap.Uint64("height", height),
-			zap.Uint32("totalSize", sizeWithDataHeader),
-			zap.Error(err),
-		)
-		return err
-	}
-
 	bh := blockEntryHeader{
 		Height:   height,
 		Size:     blockDataLen,
 		Checksum: calculateChecksum(block),
 		Version:  BlockEntryVersion,
 	}
-	if err := db.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
-		db.log.Error("Failed to write block: error writing block data",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", writeDataOffset),
-			zap.Error(err),
-		)
+	writeDataOffset, err := db.writeBlock(indexFileOffset, bh, blockToWrite)
+	if err != nil {
 		return err
 	}
 
-	if err := db.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen); err != nil {
-		db.log.Error("Failed to write block: error writing index entry",
-			zap.Uint64("height", height),
-			zap.Uint64("indexOffset", indexFileOffset),
-			zap.Uint64("dataOffset", writeDataOffset),
-			zap.Error(err),
-		)
-		return err
-	}
-
-	if err := db.updateBlockMaxHeight(height); err != nil {
-		db.log.Error("Failed to write block: error updating max block height",
-			zap.Uint64("height", height),
-			zap.Error(err),
-		)
-		return err
+	if height%db.config.CheckpointInterval == 0 {
+		if err := db.persistIndexHeader(); err != nil {
+			err = fmt.Errorf("block %d was written, but checkpointing failed: %w", height, err)
+			db.log.Error("Failed to checkpoint written block",
+				zap.Uint64("height", height),
+				zap.Error(err),
+			)
+			return err
+		}
 	}
 
 	db.log.Debug("Block written successfully",
@@ -392,6 +362,55 @@ func (db *Database) Put(height BlockHeight, block BlockData) error {
 	)
 
 	return nil
+}
+
+func (db *Database) writeBlock(indexFileOffset uint64, bh blockEntryHeader, block []byte) (uint64, error) {
+	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, bh.Size)
+	if err != nil {
+		db.log.Error("Failed to write block: block size calculation overflow",
+			zap.Uint64("height", bh.Height),
+			zap.Uint32("blockSize", bh.Size),
+			zap.Error(err),
+		)
+		return 0, fmt.Errorf("calculating total block size would overflow for block at height %d: %w", bh.Height, err)
+	}
+	db.checkpointMu.RLock()
+	defer db.checkpointMu.RUnlock()
+
+	reservation, err := db.allocateBlockSpace(sizeWithDataHeader)
+	if err != nil {
+		db.log.Error("Failed to write block: failed to allocate block space",
+			zap.Uint64("height", bh.Height),
+			zap.Uint32("totalSize", sizeWithDataHeader),
+			zap.Error(err),
+		)
+		return 0, err
+	}
+	writeDataOffset := reservation.writeOffset
+
+	if err := db.writeBlockAt(writeDataOffset, bh, block); err != nil {
+		// Reclaim the range only if no later Put has reserved past it.
+		db.nextDataReservationOffset.CompareAndSwap(reservation.endOffset, reservation.previousOffset)
+		db.log.Error("Failed to write block: error writing block data",
+			zap.Uint64("height", bh.Height),
+			zap.Uint64("dataOffset", writeDataOffset),
+			zap.Error(err),
+		)
+		return 0, err
+	}
+
+	if err := db.writeIndexEntryAt(indexFileOffset, writeDataOffset, bh.Size); err != nil {
+		db.log.Error("Failed to write block: error writing index entry",
+			zap.Uint64("height", bh.Height),
+			zap.Uint64("indexOffset", indexFileOffset),
+			zap.Uint64("dataOffset", writeDataOffset),
+			zap.Error(err),
+		)
+		return 0, err
+	}
+
+	db.updateBlockMaxHeight(bh.Height)
+	return writeDataOffset, nil
 }
 
 // readBlockIndex reads the index entry for the given height.
@@ -639,37 +658,81 @@ func (db *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint6
 }
 
 func (db *Database) persistIndexHeader() error {
-	if db.headerWriteOccupied.CompareAndSwap(false, true) {
-		defer db.headerWriteOccupied.Store(false)
-		return db.persistIndexHeaderInternal()
-	}
-	db.log.Info("Skipping persistIndexHeader due to concurrent header write")
-	return nil
-}
+	db.checkpointMu.Lock()
+	defer db.checkpointMu.Unlock()
 
-func (db *Database) persistIndexHeaderInternal() error {
+	// Persist the physical extent, not the reservation frontier, because a failed
+	// WriteAt may have created only part of its reserved record.
+	files, maxIdx, err := db.listDataFiles()
+	if err != nil {
+		return fmt.Errorf("failed to list data files before checkpointing: %w", err)
+	}
+	dataEnd, err := db.calculatePhysicalDataEnd(files, maxIdx)
+	if err != nil {
+		return err
+	}
+	// Do not checkpoint an index state that references missing data.
+	if dataEnd < db.header.NextWriteOffset {
+		return fmt.Errorf("%w: index checkpoint is ahead of physical data "+
+			"(physical data end: %d bytes, checkpoint: %d bytes)",
+			ErrCorrupted, dataEnd, db.header.NextWriteOffset)
+	}
+
+	// A rolled-back partial write may extend beyond the reservation offset.
+	// Future writes must start at or after the checkpoint to remain recoverable.
+	db.nextDataReservationOffset.Store(max(db.nextDataReservationOffset.Load(), dataEnd))
+
 	// The index file must be fsync'd before the header is written to prevent
 	// a state where the header is persisted but the index entries it refers to
 	// are not. This could lead to data inconsistency on recovery.
 	if db.config.SyncToDisk {
 		if err := db.indexFile.Sync(); err != nil {
-			return fmt.Errorf("failed to sync index file before writing header state: %w", err)
+			return fmt.Errorf("failed to sync index entries before checkpointing: %w", err)
 		}
 	}
 
 	header := db.header
 
 	// Update the header with the current state of the database.
-	header.NextWriteOffset = db.nextDataWriteOffset.Load()
+	header.NextWriteOffset = dataEnd
 	header.MaxHeight = db.maxBlockHeight.Load()
 	headerBytes, err := header.MarshalBinary()
 	if err != nil {
-		return fmt.Errorf("failed to serialize header for writing state: %w", err)
+		return fmt.Errorf("failed to marshal checkpoint header: %w", err)
 	}
 	if _, err := db.indexFile.WriteAt(headerBytes, 0); err != nil {
-		return fmt.Errorf("failed to write header state to index file: %w", err)
+		return fmt.Errorf("failed to write checkpoint header: %w", err)
 	}
+	if db.config.SyncToDisk {
+		if err := db.indexFile.Sync(); err != nil {
+			return fmt.Errorf("failed to sync checkpoint header: %w", err)
+		}
+	}
+	db.header.NextWriteOffset = dataEnd
 	return nil
+}
+
+func (db *Database) calculatePhysicalDataEnd(files map[int]string, maxIdx int) (uint64, error) {
+	if maxIdx < 0 {
+		return 0, nil
+	}
+	return db.dataFileEnd(maxIdx, files[maxIdx])
+}
+
+func (db *Database) dataFileEnd(idx int, path string) (uint64, error) {
+	fileOffset, err := safemath.Mul(uint64(idx), db.header.MaxDataFileSize)
+	if err != nil {
+		return 0, fmt.Errorf("%w: calculating data file %d offset would overflow: %w", ErrCorrupted, idx, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get stats for data file %d: %w", idx, err)
+	}
+	fileEnd, err := safemath.Add(fileOffset, uint64(info.Size()))
+	if err != nil {
+		return 0, fmt.Errorf("%w: calculating data file %d end would overflow: %w", ErrCorrupted, idx, err)
+	}
+	return fileEnd, nil
 }
 
 // recover detects and recovers unindexed blocks by scanning data files and updating the index.
@@ -721,20 +784,20 @@ func (db *Database) recover() error {
 		return fmt.Errorf("adding last file size would overflow: %w", err)
 	}
 
-	nextDataWriteOffset := db.nextDataWriteOffset.Load()
+	nextDataReservationOffset := db.nextDataReservationOffset.Load()
 	switch {
-	case calculatedNextDataWriteOffset == nextDataWriteOffset:
+	case calculatedNextDataWriteOffset == nextDataReservationOffset:
 		db.log.Debug("Recovery: data files match index header, no recovery needed.")
 		return nil
 
-	case calculatedNextDataWriteOffset < nextDataWriteOffset:
+	case calculatedNextDataWriteOffset < nextDataReservationOffset:
 		// this happens when the index claims to have more data than is actually on disk
 		return fmt.Errorf("%w: index header claims to have more data than is actually on disk "+
 			"(calculated: %d bytes, index header: %d bytes)",
-			ErrCorrupted, calculatedNextDataWriteOffset, nextDataWriteOffset)
+			ErrCorrupted, calculatedNextDataWriteOffset, nextDataReservationOffset)
 	default:
 		// The data on disk is ahead of the index. We need to recover unindexed blocks.
-		if err := db.recoverUnindexedBlocks(nextDataWriteOffset, calculatedNextDataWriteOffset); err != nil {
+		if err := db.recoverUnindexedBlocks(nextDataReservationOffset, calculatedNextDataWriteOffset); err != nil {
 			return err
 		}
 	}
@@ -787,7 +850,7 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 			return fmt.Errorf("recovery: overflow in scan offset calculation: %w", err)
 		}
 	}
-	db.nextDataWriteOffset.Store(currentScanOffset)
+	db.nextDataReservationOffset.Store(currentScanOffset)
 
 	// Update the max block height if max recovered height is greater than
 	// the current max height.
@@ -805,7 +868,7 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 	maxHeight := db.maxBlockHeight.Load()
 	db.log.Info("Recovery: Scan finished",
 		zap.Int("recoveredBlocks", numRecoveredHeights),
-		zap.Uint64("finalNextWriteOffset", db.nextDataWriteOffset.Load()),
+		zap.Uint64("finalNextWriteOffset", db.nextDataReservationOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 	return nil
@@ -967,7 +1030,7 @@ func (db *Database) loadOrInitializeHeader() error {
 	if db.header.Version != IndexFileVersion {
 		return fmt.Errorf("mismatched index file version: found %d, expected %d", db.header.Version, IndexFileVersion)
 	}
-	db.nextDataWriteOffset.Store(db.header.NextWriteOffset)
+	db.nextDataReservationOffset.Store(db.header.NextWriteOffset)
 	db.maxBlockHeight.Store(db.header.MaxHeight)
 	return db.validateConfigMatchesHeader()
 }
@@ -1110,54 +1173,42 @@ func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block Block
 	return nil
 }
 
-func (db *Database) updateBlockMaxHeight(writtenBlockHeight BlockHeight) error {
+func (db *Database) updateBlockMaxHeight(height BlockHeight) {
 	for {
 		maxHeight := db.maxBlockHeight.Load()
-		if writtenBlockHeight <= maxHeight && maxHeight != unsetHeight {
-			break
+		if height <= maxHeight && maxHeight != unsetHeight {
+			return
 		}
-		if db.maxBlockHeight.CompareAndSwap(maxHeight, writtenBlockHeight) {
-			break
+		if db.maxBlockHeight.CompareAndSwap(maxHeight, height) {
+			return
 		}
 		// If CAS failed, retry with the new max height
 	}
-
-	// Check if we need to persist header on checkpoint interval
-	if writtenBlockHeight%db.config.CheckpointInterval == 0 {
-		if err := db.persistIndexHeader(); err != nil {
-			return fmt.Errorf("block %d written, but checkpoint failed: %w", writtenBlockHeight, err)
-		}
-	}
-
-	return nil
 }
 
-// allocateBlockSpace reserves space for a block and returns the data file offset where it should be written.
-//
-// This function atomically reserves space by updating the nextWriteOffset and handles
-// file splitting by advancing the nextWriteOffset when a data file would be exceeded.
-//
-// Parameters:
-//   - totalSize: The total size in bytes needed for the block
-//
-// Returns:
-//   - writeDataOffset: The data file offset where the block should be written
-//   - err: Error if allocation fails (e.g., block too large, overflow, etc.)
-func (db *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64, err error) {
+type dataReservation struct {
+	writeOffset    uint64
+	endOffset      uint64
+	previousOffset uint64
+}
+
+// allocateBlockSpace atomically reserves space for a block, skipping to the
+// next data file when the block would cross a file boundary.
+func (db *Database) allocateBlockSpace(totalSize uint32) (dataReservation, error) {
 	maxDataFileSize := db.header.MaxDataFileSize
 
 	// Check if a single block would exceed the max data file size
 	if uint64(totalSize) > maxDataFileSize {
-		return 0, fmt.Errorf("%w: block of size %d exceeds max data file size of %d", ErrBlockTooLarge, totalSize, maxDataFileSize)
+		return dataReservation{}, fmt.Errorf("%w: block of size %d exceeds max data file size of %d", ErrBlockTooLarge, totalSize, maxDataFileSize)
 	}
 
 	for {
-		currentOffset := db.nextDataWriteOffset.Load()
+		currentOffset := db.nextDataReservationOffset.Load()
 
 		// Calculate where this block would end if written at current offset
 		blockEndOffset, err := safemath.Add(currentOffset, uint64(totalSize))
 		if err != nil {
-			return 0, fmt.Errorf(
+			return dataReservation{}, fmt.Errorf(
 				"adding block of size %d to offset %d would overflow uint64 data file pointer: %w",
 				totalSize, currentOffset, err,
 			)
@@ -1170,32 +1221,41 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64
 
 		// If we have a max file size, check if we need to start a new file
 		if maxDataFileSize > 0 {
-			currentFileIndex := int(currentOffset / maxDataFileSize)
-			offsetWithinCurrentFile := currentOffset % maxDataFileSize
+			idx, localOffset, err := db.dataFileIndexAndOffset(currentOffset)
+			if err != nil {
+				return dataReservation{}, fmt.Errorf("calculating data file index for offset %d: %w", currentOffset, err)
+			}
 
 			// Check if this block would span across file boundaries
-			blockEndWithinFile, err := safemath.Add(offsetWithinCurrentFile, uint64(totalSize))
+			localEnd, err := safemath.Add(localOffset, uint64(totalSize))
 			if err != nil {
-				return 0, fmt.Errorf(
+				return dataReservation{}, fmt.Errorf(
 					"calculating block end within file would overflow: %w",
 					err,
 				)
 			}
-			if blockEndWithinFile > maxDataFileSize {
+			if localEnd > maxDataFileSize {
 				// Advance the current write offset to the start of the next file since
 				// it would exceed the current file size.
-				nextFileStartOffset, err := safemath.Mul(uint64(currentFileIndex+1), maxDataFileSize)
+				nextIdx, err := safemath.Add(uint64(idx), 1)
 				if err != nil {
-					return 0, fmt.Errorf(
+					return dataReservation{}, fmt.Errorf("calculating next data file index would overflow: %w", err)
+				}
+				if nextIdx > math.MaxInt {
+					return dataReservation{}, fmt.Errorf("calculating next data file index would overflow: %w", safemath.ErrOverflow)
+				}
+				nextFileOffset, err := safemath.Mul(nextIdx, maxDataFileSize)
+				if err != nil {
+					return dataReservation{}, fmt.Errorf(
 						"calculating next file offset would overflow: %w",
 						err,
 					)
 				}
-				actualWriteOffset = nextFileStartOffset
+				actualWriteOffset = nextFileOffset
 
 				// Recalculate the end offset for the block space to set the next write offset
 				if actualBlockEndOffset, err = safemath.Add(actualWriteOffset, uint64(totalSize)); err != nil {
-					return 0, fmt.Errorf(
+					return dataReservation{}, fmt.Errorf(
 						"adding block of size %d to new file offset %d would overflow: %w",
 						totalSize, actualWriteOffset, err,
 					)
@@ -1203,8 +1263,12 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64
 			}
 		}
 
-		if db.nextDataWriteOffset.CompareAndSwap(currentOffset, actualBlockEndOffset) {
-			return actualWriteOffset, nil
+		if db.nextDataReservationOffset.CompareAndSwap(currentOffset, actualBlockEndOffset) {
+			return dataReservation{
+				writeOffset:    actualWriteOffset,
+				endOffset:      actualBlockEndOffset,
+				previousOffset: currentOffset,
+			}, nil
 		}
 	}
 }
