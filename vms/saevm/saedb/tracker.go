@@ -56,6 +56,8 @@ const (
 )
 
 // Config allows parameterization of the TrieDB and when state is committed.
+//
+// TODO(alarso16): completely separate HashDB and Firewood options.
 type Config struct {
 	Scheme            string // trie database scheme to use; defaults to [rawdb.HashScheme]
 	TrieCacheMiB      uint64 // size of the TrieDB cache
