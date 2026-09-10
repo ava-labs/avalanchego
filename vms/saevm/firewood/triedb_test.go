@@ -813,3 +813,170 @@ func TestCopyClonesReconstruction(t *testing.T) {
 	_, err = cp.Commit(2, true)
 	require.ErrorIs(t, err, errHistoricalNotCommittable, "copy Commit()")
 }
+
+// TestReadOnlyState verifies that read-only state at the tip hashes via a
+// reconstruction and agrees with the canonical root, but cannot be committed.
+func TestReadOnlyState(t *testing.T) {
+	tests := []struct {
+		name          string
+		readOnly      bool
+		wantHasher    hasher
+		wantCommitErr error
+	}{
+		{
+			name:       "canonical",
+			wantHasher: &proposalHasher{},
+		},
+		{
+			name:          "read_only",
+			readOnly:      true,
+			wantHasher:    &reconstructedHasher{},
+			wantCommitErr: ErrReadOnlyNotCommittable,
+		},
+	}
+
+	tip := types.EmptyRootHash
+	// Hashing the same change canonically gives the root both cases must reach.
+	reference := newStateDB(t, newDB(t), tip)
+	reference.SetNonce(addr1, 1)
+	wantRoot := reference.IntermediateRoot(true)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newDB(t)
+			if tt.readOnly {
+				ro, ok := db.(ReadOnlyDatabase)
+				require.Truef(t, ok, "%T implements ReadOnlyDatabase", db)
+				db = ro.ReadOnly()
+			}
+
+			tr, err := db.OpenTrie(tip)
+			require.NoErrorf(t, err, "db.OpenTrie(%s)", tip)
+			require.IsType(t, tt.wantHasher, tr.(*accountTrie).hasher, "hasher at the tip")
+
+			sdb := newStateDB(t, db, tip)
+			sdb.SetNonce(addr1, 1)
+			require.Equal(t, wantRoot, sdb.IntermediateRoot(true), "root")
+
+			_, err = sdb.Commit(1, true)
+			require.ErrorIs(t, err, tt.wantCommitErr, "Commit()")
+		})
+	}
+}
+
+// TestReadOnlyStateAcrossTipMove verifies that read-only state opened on an
+// unpersisted proposal keeps hashing once settlement moves the Firewood tip.
+func TestReadOnlyStateAcrossTipMove(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+
+	blk1 := newStateDB(t, db, types.EmptyRootHash)
+	blk1.SetNonce(addr1, 1)
+	root1, err := blk1.Commit(1, true)
+	require.NoError(t, err, "blk1.Commit()")
+
+	// root1 is handed over but not persisted, so read-only state on it must
+	// hash by proposing.
+	ro, ok := db.(ReadOnlyDatabase)
+	require.Truef(t, ok, "%T implements ReadOnlyDatabase", db)
+	sdb, err := state.New(root1, ro.ReadOnly(), nil)
+	require.NoErrorf(t, err, "state.New(%s, [read-only])", root1)
+	sdb.SetNonce(addr2, 1)
+	first := sdb.IntermediateRoot(true)
+	require.NotEqual(t, common.Hash{}, first, "first root")
+
+	// Settle root1 and move the tip past it, which is what makes the proposal
+	// parent unavailable for the next hash.
+	require.NoErrorf(t, tdb.Commit(root1, false), "triedb.Commit(%s)", root1)
+	blk2 := newStateDB(t, db, root1)
+	blk2.SetNonce(addr3, 1)
+	root2, err := blk2.Commit(2, true)
+	require.NoError(t, err, "blk2.Commit()")
+	require.NoErrorf(t, tdb.Commit(root2, false), "triedb.Commit(%s)", root2)
+
+	sdb.SetNonce(addr2, 2)
+	second := sdb.IntermediateRoot(true)
+	require.NotEqual(t, common.Hash{}, second, "root after the tip moved")
+	require.NotEqual(t, first, second, "the change is reflected")
+	require.NoError(t, sdb.Error(), "StateDB.Error()")
+
+	want := newStateDB(t, db, root1)
+	want.SetNonce(addr2, 2)
+	require.Equal(t, want.IntermediateRoot(true), second, "root matches canonical")
+}
+
+// TestReadOnlyHasherByRootType verifies that read-only state hashes by
+// whichever mechanism the root permits, since [ffi.Revision.Reconstruct]
+// requires a committed revision.
+func TestReadOnlyHasherByRootType(t *testing.T) {
+	tests := []struct {
+		name       string
+		rootType   string
+		wantHasher hasher
+	}{
+		{
+			name:       "historical_committed",
+			rootType:   "historical",
+			wantHasher: &reconstructedHasher{},
+		},
+		{
+			name:       "on_disk_tip",
+			rootType:   "tip",
+			wantHasher: &reconstructedHasher{},
+		},
+		{
+			name:       "unpersisted_proposal",
+			rootType:   "proposal",
+			wantHasher: &proposalHasher{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newDB(t)
+			tdb := db.TrieDB()
+
+			blk1 := newStateDB(t, db, types.EmptyRootHash)
+			blk1.SetNonce(addr1, 1)
+			root1, err := blk1.Commit(1, true)
+			require.NoError(t, err)
+			require.NoError(t, tdb.Commit(root1, false))
+
+			blk2 := newStateDB(t, db, root1)
+			blk2.SetNonce(addr2, 1)
+			root2, err := blk2.Commit(2, true)
+			require.NoError(t, err)
+
+			// An unpersisted proposal is root2 as it stands, so only the
+			// committed cases persist it.
+			target := root2
+			if tt.rootType != "proposal" {
+				require.NoErrorf(t, tdb.Commit(root2, false), "triedb.Commit(%s)", root2)
+			}
+			if tt.rootType == "historical" {
+				target = root1 // committed, no longer the tip
+			}
+
+			canonical := newStateDB(t, db, target)
+			canonical.SetNonce(addr3, 7)
+			wantRoot := canonical.IntermediateRoot(true)
+
+			ro, ok := db.(ReadOnlyDatabase)
+			require.True(t, ok)
+			roDB := ro.ReadOnly()
+
+			tr, err := roDB.OpenTrie(target)
+			require.NoError(t, err, "OpenTrie")
+			require.IsType(t, tt.wantHasher, tr.(*accountTrie).hasher, "hasher")
+
+			sdb, err := state.New(target, roDB, nil)
+			require.NoError(t, err)
+			sdb.SetNonce(addr3, 7)
+			require.Equal(t, wantRoot, sdb.IntermediateRoot(true), "read-only root matches canonical")
+			require.NoError(t, sdb.Error(), "StateDB.Error()")
+
+			_, err = sdb.Commit(3, true)
+			require.ErrorIs(t, err, ErrReadOnlyNotCommittable, "Commit()")
+		})
+	}
+}

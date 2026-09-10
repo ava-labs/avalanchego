@@ -12,6 +12,10 @@ import (
 
 var errHistoricalNotCommittable = errors.New("state built on a historical revision cannot be committed")
 
+// ErrReadOnlyNotCommittable is returned when committing state opened through
+// [ReadOnlyDatabase].
+var ErrReadOnlyNotCommittable = errors.New("read-only state cannot be committed")
+
 // hasher serves reads from, and computes the root of, a parent state with the
 // trie's pending updates applied. Exactly one hasher backs each [accountTrie].
 //

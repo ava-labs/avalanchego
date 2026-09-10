@@ -46,10 +46,15 @@ func interceptor(db state.Database) state.Database {
 type stateAccessor struct {
 	state.Database
 	triedb *TrieDB
+
+	readOnly bool // opens tries that can be hashed but never committed
 }
 
 // OpenTrie opens the main account trie.
 func (s *stateAccessor) OpenTrie(root common.Hash) (state.Trie, error) {
+	if s.readOnly {
+		return newReadOnlyAccountTrie(root, s.triedb, nil /*ops*/)
+	}
 	return newAccountTrie(root, s.triedb, nil /*ops*/)
 }
 
@@ -84,4 +89,20 @@ func (s *stateAccessor) CopyTrie(t state.Trie) state.Trie {
 		s.triedb.log.Fatal("unknown trie type", zap.String("type", fmt.Sprintf("%T", t)))
 		return nil
 	}
+}
+
+// ReadOnlyDatabase provides state that can be read and hashed but never
+// committed. HashDB does not implement it, having no such distinction.
+type ReadOnlyDatabase interface {
+	ReadOnly() state.Database
+}
+
+var _ ReadOnlyDatabase = (*stateAccessor)(nil)
+
+// ReadOnly returns a [state.Database] whose tries refuse to commit. Each hashes
+// via [ffi.Reconstructed] where its root permits, otherwise by proposing.
+func (s *stateAccessor) ReadOnly() state.Database {
+	ro := *s
+	ro.readOnly = true
+	return &ro
 }

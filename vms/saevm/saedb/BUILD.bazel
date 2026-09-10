@@ -41,6 +41,7 @@ go_test(
         "//utils/logging/loggingtest",
         "//vms/evm/database",
         "//vms/evm/sync/customrawdb",
+        "//vms/saevm/firewood",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

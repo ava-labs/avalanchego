@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
@@ -376,5 +377,53 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 				b.ReportMetric(float64(peakDirty)/mibToBytes, "peak-dirty-MiB")
 			})
 		}
+	}
+}
+
+// TestReadOnlyStateDB verifies that read-only state cannot be committed under
+// Firewood, and that HashDB, which has no such distinction, is unaffected.
+func TestReadOnlyStateDB(t *testing.T) {
+	tests := []struct {
+		name          string
+		scheme        string
+		wantCommitErr error
+	}{
+		{
+			name:   "hashdb_commits",
+			scheme: rawdb.HashScheme,
+		},
+		{
+			name:          "firewood_rejects_commit",
+			scheme:        customrawdb.FirewoodScheme,
+			wantCommitErr: firewood.ErrReadOnlyNotCommittable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{CommitInterval: DefaultCommitInterval, Scheme: tt.scheme}
+			tr, err := NewTracker(rawdb.NewMemoryDatabase(), cfg, types.EmptyRootHash, t.TempDir(), loggingtest.New(t, logging.Debug))
+			require.NoError(t, err, "NewTracker()")
+			t.Cleanup(func() {
+				assert.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr)
+			})
+
+			sdb, err := tr.ReadOnlyStateDB(types.EmptyRootHash)
+			require.NoErrorf(t, err, "%T.ReadOnlyStateDB()", tr)
+			sdb.SetNonce(common.Address{1}, 1)
+			got := sdb.IntermediateRoot(true)
+
+			canonical, err := tr.StateDB(types.EmptyRootHash)
+			require.NoErrorf(t, err, "%T.StateDB()", tr)
+			canonical.SetNonce(common.Address{1}, 1)
+			require.Equal(t, canonical.IntermediateRoot(true), got, "read-only root matches canonical")
+
+			_, err = sdb.Commit(1, true)
+			require.ErrorIsf(t, err, tt.wantCommitErr, "%T.Commit() on read-only state", sdb)
+
+			// Canonical state stays committable whatever the scheme.
+			_, err = canonical.Commit(1, true)
+			require.NoErrorf(t, err, "%T.Commit() on canonical state", canonical)
+		})
 	}
 }

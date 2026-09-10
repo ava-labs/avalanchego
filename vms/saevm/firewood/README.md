@@ -39,7 +39,7 @@ The linear invariant means:
 
 Firewood can only propose on top of its most recent revision or a not-yet-committed proposal, so a `state.StateDB` opened at any older root could historically be read but not hashed. To allow hashing changes on historical roots, Firewood added `ffi.Reconstructed`, a Rust-side view that applies a batch on top of an `ffi.Revision` and can be read and re-hashed, but never committed.
 
-The `state.StateDB` never knows whether it's being used for canonical execution or for an RPC call, so we can't determine which hashable structure to create at construction time. Additionally, the tip state change during use, so it must be updated accordingly at every hash.
+Which structure a trie can use is decided by its root rather than by its caller: `ffi.Revision.Reconstruct` requires a committed revision, so an unpersisted proposal root can only be hashed by proposing on it. Whether the caller intends to commit at all is a separate question, carried by `ReadOnlyDatabase`. The tip can also change during use, so the choice must be revisited at every hash.
 
 Some differences between the proposal and reconstructed implementations:
 

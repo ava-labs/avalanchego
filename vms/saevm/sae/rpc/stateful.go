@@ -180,7 +180,7 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		sdb, err := b.StateDB(bl.PostExecutionStateRoot())
+		sdb, err := b.ReadOnlyStateDB(bl.PostExecutionStateRoot())
 		switch {
 		case errors.As(err, &errNotFound):
 			toReexec = append(toReexec, bl)
