@@ -12,6 +12,7 @@ graft_go_test(
     tags = ["manual"],  # keep
     deps = [
         "//api/info",
+        "//config",
         "//graft/coreth/accounts/abi/bind",
         "//graft/coreth/cmd/simulator/key",
         "//graft/coreth/cmd/simulator/load",
@@ -21,8 +22,8 @@ graft_go_test(
         "//graft/coreth/params",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/coreth/tests/utils",
-        "//graft/evm/tests/warptest",
         "//graft/coreth/warp",
+        "//graft/evm/tests/warptest",
         "//ids",
         "//snow/validators",
         "//tests/fixture/e2e",
