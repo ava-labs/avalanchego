@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
@@ -46,12 +47,14 @@ func registerWarpHandler(
 	network *network.Network,
 	storage *cchainwarp.Storage,
 	signer avalanchewarp.Signer,
+	log logging.Logger,
 ) error {
 	const cacheSize = 512
 	handler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](cacheSize),
 		cchainwarp.NewVerifier(&warpBackend{vm}, storage),
 		signer,
+		log,
 	)
 	return network.AddHandler(acp118.HandlerID, handler)
 }

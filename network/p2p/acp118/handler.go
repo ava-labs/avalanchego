@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -38,12 +40,13 @@ type Verifier interface {
 }
 
 // NewHandler returns an instance of Handler
-func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
-	return NewCachedHandler(
-		&cache.Empty[ids.ID, []byte]{},
-		verifier,
-		signer,
-	)
+func NewHandler(verifier Verifier, signer warp.Signer, log logging.Logger) *Handler {
+	return &Handler{
+		signatureCache: &cache.Empty[ids.ID, []byte]{},
+		verifier:       verifier,
+		signer:         signer,
+		log:            log,
+	}
 }
 
 // NewCachedHandler returns an instance of Handler that caches successful
@@ -52,11 +55,13 @@ func NewCachedHandler(
 	cacher cache.Cacher[ids.ID, []byte],
 	verifier Verifier,
 	signer warp.Signer,
+	log logging.Logger,
 ) *Handler {
 	return &Handler{
 		signatureCache: cacher,
 		verifier:       verifier,
 		signer:         signer,
+		log:            log,
 	}
 }
 
@@ -67,6 +72,7 @@ type Handler struct {
 	signatureCache cache.Cacher[ids.ID, []byte]
 	verifier       Verifier
 	signer         warp.Signer
+	log            logging.Logger
 }
 
 func (h *Handler) AppRequest(
@@ -98,6 +104,9 @@ func (h *Handler) AppRequest(
 
 	// Verify that the payload is valid to sign.
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
+		h.log.Warn("dropping acp118 signature request for message that failed verification",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -105,6 +114,9 @@ func (h *Handler) AppRequest(
 	// populated with the expected values.
 	signature, err := h.signer.Sign(msg)
 	if err != nil {
+		h.log.Warn("failed to sign message",
+			zap.Error(err),
+		)
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to sign message: %s", err),
@@ -112,7 +124,14 @@ func (h *Handler) AppRequest(
 	}
 
 	h.signatureCache.Put(msgID, signature)
-	return signatureToResponse(signature)
+	resp, appErr := signatureToResponse(signature)
+	if err != nil {
+		h.log.Warn("failed to marshal response",
+			zap.Error(err),
+		)
+		return nil, appErr
+	}
+	return resp, nil
 }
 
 func signatureToResponse(signature []byte) ([]byte, *common.AppError) {

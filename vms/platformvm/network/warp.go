@@ -4,11 +4,16 @@
 package network
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
 
+	"go.uber.org/zap"
+	"golang.org/x/crypto/sha3"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -16,6 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -43,17 +51,28 @@ const (
 	ErrImpossibleNonce
 	ErrWrongNonce
 	ErrWrongWeight
+
+	ErrValidatorSetDiffInvalidHeightProgression
+	ErrValidatorSetDiffInvalidPreviousTimestamp
+	ErrValidatorSetDiffInvalidCurrentTimestamp
+	ErrValidatorSetDiffMismatch
+
+	ErrValidatorSetMetadataInvalidJustification
+	ErrValidatorSetMetadataShardCountMismatch
+	ErrValidatorSetMetadataShardHashMismatch
 )
 
 var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
 
 type signatureRequestVerifier struct {
+	vdrsState validators.State
 	stateLock sync.Locker
-	state     state.Chain
+	state     *state.State
+	log       logging.Logger
 }
 
 func (s signatureRequestVerifier) Verify(
-	_ context.Context,
+	ctx context.Context,
 	unsignedMessage *warp.UnsignedMessage,
 	justification []byte,
 ) *common.AppError {
@@ -86,6 +105,14 @@ func (s signatureRequestVerifier) Verify(
 		return s.verifyL1ValidatorRegistration(payload, justification)
 	case *message.L1ValidatorWeight:
 		return s.verifyL1ValidatorWeight(payload)
+	case *message.ValidatorSetMerkleCommitment:
+		return s.verifyValidatorSetMerkleCommitment(ctx, payload)
+	case *message.ValidatorSetState:
+		return s.verifyValidatorSetState(ctx, payload)
+	case *message.ValidatorSetDiff:
+		return s.verifyValidatorSetDiff(ctx, payload)
+	case *message.ValidatorSetMetadata:
+		return s.verifyValidatorSetMetadata(ctx, payload, justification)
 	default:
 		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
@@ -356,4 +383,755 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	default:
 		return nil // The nonce and weight are correct
 	}
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetState(
+	ctx context.Context,
+	msg *message.ValidatorSetState,
+) *common.AppError {
+	s.log.Debug("verifying validator set state",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Stringer("validatorSetHash", msg.ValidatorSetHash),
+	)
+
+	// Check that the P-Chain height exists and is within the window of this node
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight < minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	// Check that the blocktime stamp is correct for the given P-Chain height.
+	blockID, err := s.state.GetBlockIDAtHeight(msg.PChainHeight)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block ID at height: " + err.Error(),
+		}
+	}
+	statelessBlock, err := s.state.GetStatelessBlock(blockID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get block: " + err.Error(),
+		}
+	}
+	banffBlock, ok := statelessBlock.(block.BanffBlock)
+	if !ok {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "block is not a Banff block",
+		}
+	}
+
+	blockTime := banffBlock.Timestamp()
+	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime.Unix()),
+		}
+	}
+
+	// Get the validator set for the given blockchain ID at the given P-Chain height.
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	// Check that the validator set hash is correct for the given blockchain ID at the given P-Chain height.
+	validators := make([]*message.Validator, len(canonicalValidatorSet.Validators))
+	for i, validator := range canonicalValidatorSet.Validators {
+		validators[i] = &message.Validator{
+			UncompressedPublicKeyBytes: [96]byte(validator.PublicKey.Serialize()),
+			Weight:                     validator.Weight,
+		}
+	}
+	bytes, err := message.Codec.Marshal(message.CodecVersion, validators)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to marshal validator set: " + err.Error(),
+		}
+	}
+	hash := sha256.Sum256(bytes)
+	if msg.ValidatorSetHash != ids.ID(hash) {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid validator set hash. provided %q. expected %q", msg.ValidatorSetHash, ids.ID(hash[:])),
+		}
+	}
+
+	s.log.Info("validator set state verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Stringer("validatorSetHash", msg.ValidatorSetHash),
+	)
+
+	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMetadata(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	justification []byte,
+) *common.AppError {
+	// Justification format:
+	//   8 bytes  — subset format (shard_size)
+	//   24 bytes — diff format   (shard_size + prev_height + prev_timestamp)
+	var shardSize, prevHeight, prevTimestamp uint64
+	isDiff := false
+	switch len(justification) {
+	case 8:
+		shardSize = binary.BigEndian.Uint64(justification[:8])
+	case 24:
+		shardSize = binary.BigEndian.Uint64(justification[:8])
+		prevHeight = binary.BigEndian.Uint64(justification[8:16])
+		prevTimestamp = binary.BigEndian.Uint64(justification[16:24])
+		isDiff = true
+	default:
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataInvalidJustification,
+			Message: fmt.Sprintf("justification must be 8 or 24 bytes, got %d bytes", len(justification)),
+		}
+	}
+	if shardSize == 0 {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataInvalidJustification,
+			Message: "shard size must be greater than zero",
+		}
+	}
+
+	s.log.Debug("verifying validator set metadata",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Uint64("shardSize", shardSize),
+		zap.Bool("isDiff", isDiff),
+		zap.Int("numShardHashes", len(msg.ShardHashes)),
+	)
+
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight < minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	if appErr := s.verifyBlockTimestamp(msg.PChainHeight, msg.PChainTimestamp, common.ErrUndefined.Code, "current"); appErr != nil {
+		return appErr
+	}
+
+	if isDiff {
+		return s.verifyValidatorSetMetadataDiff(ctx, msg, shardSize, prevHeight, prevTimestamp)
+	}
+	return s.verifyValidatorSetMetadataSubset(ctx, msg, shardSize)
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMetadataSubset(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	shardSize uint64,
+) *common.AppError {
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	validators := make([]*message.Validator, len(canonicalValidatorSet.Validators))
+	for i, validator := range canonicalValidatorSet.Validators {
+		validators[i] = &message.Validator{
+			UncompressedPublicKeyBytes: [96]byte(validator.PublicKey.Serialize()),
+			Weight:                     validator.Weight,
+		}
+	}
+
+	numValidators := uint64(len(validators))
+	numShards := (numValidators + shardSize - 1) / shardSize
+	if numShards == 0 {
+		numShards = 1
+	}
+
+	if uint64(len(msg.ShardHashes)) != numShards {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataShardCountMismatch,
+			Message: fmt.Sprintf("shard count mismatch: message has %d, expected %d (validators=%d, shardSize=%d)", len(msg.ShardHashes), numShards, numValidators, shardSize),
+		}
+	}
+
+	for i := uint64(0); i < numShards; i++ {
+		start := i * shardSize
+		end := start + shardSize
+		if end > numValidators {
+			end = numValidators
+		}
+		shard := validators[start:end]
+		shardBytes, err := message.Codec.Marshal(message.CodecVersion, shard)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: fmt.Sprintf("failed to marshal shard %d: %s", i, err),
+			}
+		}
+		hash := sha256.Sum256(shardBytes)
+		if msg.ShardHashes[i] != ids.ID(hash) {
+			return &common.AppError{
+				Code:    ErrValidatorSetMetadataShardHashMismatch,
+				Message: fmt.Sprintf("shard %d hash mismatch: provided %q, expected %q", i, msg.ShardHashes[i], ids.ID(hash)),
+			}
+		}
+	}
+
+	s.log.Info("validator set metadata (subset) verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numShards", len(msg.ShardHashes)),
+	)
+	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMetadataDiff(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	shardSize uint64,
+	prevHeight uint64,
+	prevTimestamp uint64,
+) *common.AppError {
+	// prevHeight == 0 means first registration (empty previous set).
+	if prevHeight > 0 {
+		if appErr := s.verifyBlockTimestamp(prevHeight, prevTimestamp, common.ErrUndefined.Code, "previous"); appErr != nil {
+			return appErr
+		}
+	}
+
+	// Get canonical validator sets at both heights, sorted by public key.
+	var prevSet validators.WarpSet
+	if prevHeight > 0 {
+		var err error
+		prevSet, err = warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, prevHeight, msg.BlockchainID)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: "failed to get previous validator set: " + err.Error(),
+			}
+		}
+	}
+	currSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get current validator set: " + err.Error(),
+		}
+	}
+
+	// Compute the diff via sorted merge-walk (same algorithm as the relayer).
+	type vdr struct {
+		pk     [96]byte
+		weight uint64
+	}
+	oldVdrs := make([]vdr, len(prevSet.Validators))
+	for i, v := range prevSet.Validators {
+		oldVdrs[i] = vdr{pk: [96]byte(v.PublicKey.Serialize()), weight: v.Weight}
+	}
+	newVdrs := make([]vdr, len(currSet.Validators))
+	for i, v := range currSet.Validators {
+		newVdrs[i] = vdr{pk: [96]byte(v.PublicKey.Serialize()), weight: v.Weight}
+	}
+
+	var changes []message.ValidatorChange
+	oi, ni := 0, 0
+	for oi < len(oldVdrs) || ni < len(newVdrs) {
+		var cmp int
+		switch {
+		case oi >= len(oldVdrs):
+			cmp = 1
+		case ni >= len(newVdrs):
+			cmp = -1
+		default:
+			cmp = bytes.Compare(oldVdrs[oi].pk[:], newVdrs[ni].pk[:])
+		}
+		switch {
+		case cmp < 0:
+			changes = append(changes, message.ValidatorChange{
+				UncompressedPublicKeyBytes: oldVdrs[oi].pk,
+				Weight:                     0,
+			})
+			oi++
+		case cmp > 0:
+			changes = append(changes, message.ValidatorChange{
+				UncompressedPublicKeyBytes: newVdrs[ni].pk,
+				Weight:                     newVdrs[ni].weight,
+			})
+			ni++
+		default:
+			if oldVdrs[oi].weight != newVdrs[ni].weight {
+				changes = append(changes, message.ValidatorChange{
+					UncompressedPublicKeyBytes: newVdrs[ni].pk,
+					Weight:                     newVdrs[ni].weight,
+				})
+			}
+			oi++
+			ni++
+		}
+	}
+
+	// Shard the changes into ValidatorSetDiff messages, computing per-shard
+	// numAdded using the running set (mirrors relayer shardDiff logic).
+	ss := int(shardSize)
+	numChanges := len(changes)
+	numShards := (numChanges + ss - 1) / ss
+	if numShards == 0 {
+		numShards = 1
+	}
+
+	if len(msg.ShardHashes) != numShards {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataShardCountMismatch,
+			Message: fmt.Sprintf("shard count mismatch: message has %d, expected %d (changes=%d, shardSize=%d)", len(msg.ShardHashes), numShards, numChanges, shardSize),
+		}
+	}
+
+	existingKeys := make(map[[96]byte]struct{}, len(oldVdrs))
+	for _, v := range oldVdrs {
+		existingKeys[v.pk] = struct{}{}
+	}
+
+	for i := 0; i < numShards; i++ {
+		start := i * ss
+		end := start + ss
+		if end > numChanges {
+			end = numChanges
+		}
+		shardChanges := changes[start:end]
+
+		var shardNumAdded uint32
+		for _, c := range shardChanges {
+			if c.Weight > 0 {
+				if _, exists := existingKeys[c.UncompressedPublicKeyBytes]; !exists {
+					shardNumAdded++
+				}
+			}
+		}
+
+		// Update existingKeys for the next shard.
+		for _, c := range shardChanges {
+			if c.Weight == 0 {
+				delete(existingKeys, c.UncompressedPublicKeyBytes)
+			} else {
+				existingKeys[c.UncompressedPublicKeyBytes] = struct{}{}
+			}
+		}
+
+		diff, err := message.NewValidatorSetDiff(
+			msg.BlockchainID,
+			prevHeight,
+			prevTimestamp,
+			msg.PChainHeight,
+			msg.PChainTimestamp,
+			shardChanges,
+			shardNumAdded,
+		)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: fmt.Sprintf("failed to create ValidatorSetDiff for shard %d: %s", i, err),
+			}
+		}
+
+		hash := sha256.Sum256(diff.Bytes())
+		if msg.ShardHashes[i] != ids.ID(hash) {
+			return &common.AppError{
+				Code:    ErrValidatorSetMetadataShardHashMismatch,
+				Message: fmt.Sprintf("shard %d hash mismatch: provided %q, expected %q", i, msg.ShardHashes[i], ids.ID(hash)),
+			}
+		}
+	}
+
+	s.log.Info("validator set metadata (diff) verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("prevHeight", prevHeight),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numChanges", numChanges),
+		zap.Int("numShards", len(msg.ShardHashes)),
+	)
+	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetDiff(
+	ctx context.Context,
+	msg *message.ValidatorSetDiff,
+) *common.AppError {
+	s.log.Debug("verifying validator set diff",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("previousHeight", msg.PreviousHeight),
+		zap.Uint64("currentHeight", msg.CurrentHeight),
+	)
+
+	if msg.CurrentHeight <= msg.PreviousHeight {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffInvalidHeightProgression,
+			Message: fmt.Sprintf("invalid height progression: current %d <= previous %d", msg.CurrentHeight, msg.PreviousHeight),
+		}
+	}
+
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PreviousHeight < minHeight {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffInvalidHeightProgression,
+			Message: fmt.Sprintf("previous height %d is below minimum retained height %d", msg.PreviousHeight, minHeight),
+		}
+	}
+
+	if appErr := s.verifyBlockTimestamp(msg.PreviousHeight, msg.PreviousTimestamp, ErrValidatorSetDiffInvalidPreviousTimestamp, "previous"); appErr != nil {
+		return appErr
+	}
+	if appErr := s.verifyBlockTimestamp(msg.CurrentHeight, msg.CurrentTimestamp, ErrValidatorSetDiffInvalidCurrentTimestamp, "current"); appErr != nil {
+		return appErr
+	}
+
+	subnetID, err := s.vdrsState.GetSubnetID(ctx, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet ID: " + err.Error(),
+		}
+	}
+
+	s.stateLock.Lock()
+	dbDiffs, err := s.state.GetAggregatedValidatorDiffs(ctx, subnetID, msg.PreviousHeight, msg.CurrentHeight)
+	s.stateLock.Unlock()
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get aggregated validator diffs: " + err.Error(),
+		}
+	}
+
+	s.log.Debug("fetched aggregated diffs",
+		zap.Int("dbDiffsCount", len(dbDiffs)),
+		zap.Int("msgChanges", len(msg.Changes)),
+		zap.Uint32("msgNumAdded", msg.NumAdded),
+	)
+
+	if len(msg.Changes) != len(dbDiffs) {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("diff count mismatch: message has %d changes, database has %d", len(msg.Changes), len(dbDiffs)),
+		}
+	}
+
+	// Additions and removals have PublicKey set in the DB diff, so we can
+	// verify them exactly by public key. Weight-only modifications (both
+	// PreviousWeight and CurrentWeight > 0) may not have the public key
+	// stored, so we verify those in aggregate (count + weight multiset).
+	type expectedDiff struct {
+		isAddition bool
+		weight     uint64
+	}
+	expectedByKey := make(map[[96]byte]*expectedDiff, len(dbDiffs))
+	var expectedNumAdded uint32
+
+	// expectedWeightMods tracks the multiset of CurrentWeights for
+	// weight-only modifications (keyed by weight, value is count).
+	expectedWeightMods := make(map[uint64]int)
+	var expectedWeightModCount int
+
+	for _, diff := range dbDiffs {
+		switch {
+		case diff.PreviousWeight == 0 && diff.CurrentWeight > 0:
+			// Addition
+			if len(diff.PublicKey) != 96 {
+				return &common.AppError{
+					Code:    common.ErrUndefined.Code,
+					Message: "addition diff missing public key",
+				}
+			}
+			var key [96]byte
+			copy(key[:], diff.PublicKey)
+			expectedByKey[key] = &expectedDiff{isAddition: true, weight: diff.CurrentWeight}
+			expectedNumAdded++
+
+		case diff.PreviousWeight > 0 && diff.CurrentWeight == 0:
+			// Removal
+			if len(diff.PublicKey) != 96 {
+				return &common.AppError{
+					Code:    common.ErrUndefined.Code,
+					Message: "removal diff missing public key",
+				}
+			}
+			var key [96]byte
+			copy(key[:], diff.PublicKey)
+			expectedByKey[key] = &expectedDiff{isAddition: false, weight: 0}
+
+		default:
+			// Weight-only modification: public key may not be available,
+			// so verify in aggregate rather than per key.
+			expectedWeightMods[diff.CurrentWeight]++
+			expectedWeightModCount++
+		}
+	}
+
+	if msg.NumAdded != expectedNumAdded {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("numAdded mismatch: message has %d, expected %d", msg.NumAdded, expectedNumAdded),
+		}
+	}
+
+	// Walk message changes. Entries whose public key matches an addition or
+	// removal are verified exactly. Remaining entries are collected and
+	// compared against the weight-modification multiset.
+	var msgWeightModCount int
+	msgWeightMods := make(map[uint64]int)
+
+	for _, change := range msg.Changes {
+		exp, hasKey := expectedByKey[change.UncompressedPublicKeyBytes]
+		if !hasKey {
+			msgWeightMods[change.Weight]++
+			msgWeightModCount++
+			continue
+		}
+
+		if exp.isAddition && change.Weight != exp.weight {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: fmt.Sprintf("addition weight mismatch: message has %d, database has %d", change.Weight, exp.weight),
+			}
+		}
+		if !exp.isAddition && change.Weight != 0 {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: "message shows non-zero weight but database shows removal",
+			}
+		}
+	}
+
+	if msgWeightModCount != expectedWeightModCount {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("weight modification count mismatch: message has %d, database has %d", msgWeightModCount, expectedWeightModCount),
+		}
+	}
+	for weight, count := range expectedWeightMods {
+		if msgWeightMods[weight] != count {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: fmt.Sprintf("weight modification multiset mismatch for weight %d: message has %d, database has %d", weight, msgWeightMods[weight], count),
+			}
+		}
+	}
+
+	s.log.Info("validator set diff verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("previousHeight", msg.PreviousHeight),
+		zap.Uint64("currentHeight", msg.CurrentHeight),
+		zap.Int("numChanges", len(msg.Changes)),
+		zap.Uint32("numAdded", msg.NumAdded),
+	)
+
+	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMerkleCommitment(
+	ctx context.Context,
+	msg *message.ValidatorSetMerkleCommitment,
+) *common.AppError {
+	s.log.Debug("verifying validator set merkle commitment",
+		zap.Stringer("blockchainID", msg.AvalancheBlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+	)
+
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight < minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	if appErr := s.verifyBlockTimestamp(msg.PChainHeight, msg.PChainTimestamp, common.ErrUndefined.Code, "current"); appErr != nil {
+		return appErr
+	}
+
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.AvalancheBlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	var totalWeight uint64
+	layer := make([][32]byte, len(canonicalValidatorSet.Validators))
+	for i, v := range canonicalValidatorSet.Validators {
+		totalWeight += v.Weight
+		layer[i] = merkleValidatorLeafHash([96]byte(v.PublicKey.Serialize()), v.Weight)
+	}
+
+	if msg.TotalWeight != totalWeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("total weight mismatch: provided %d, expected %d", msg.TotalWeight, totalWeight),
+		}
+	}
+
+	root := buildMerkleRoot(layer)
+	if msg.RootHash != root {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("merkle root mismatch: provided %x, expected %x", msg.RootHash, root),
+		}
+	}
+
+	s.log.Info("validator set merkle commitment verified",
+		zap.Stringer("blockchainID", msg.AvalancheBlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numValidators", len(canonicalValidatorSet.Validators)),
+		zap.Uint64("totalWeight", totalWeight),
+	)
+
+	return nil
+}
+
+// keccak256 computes the Ethereum-compatible Keccak-256 hash of data.
+func keccak256(data []byte) [32]byte {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(data)
+	var result [32]byte
+	copy(result[:], h.Sum(nil))
+	return result
+}
+
+// merkleValidatorLeafHash computes the Merkle leaf hash for a validator,
+// matching Solidity's keccakValidator: keccak256(abi.encodePacked(uint256(1), blsPublicKey, weight)).
+// The padded key format is [16 zeros][48 bytes X][16 zeros][48 bytes Y] (128 bytes),
+// so the full input is 32 + 128 + 8 = 168 bytes.
+func merkleValidatorLeafHash(pk [96]byte, weight uint64) [32]byte {
+	var buf [168]byte // 32 bytes uint256(1) + 128 bytes padded key + 8 bytes weight
+	buf[31] = 1       // uint256(1) leaf domain separator
+	copy(buf[48:96], pk[:48])   // X coordinate → bytes 48-95
+	copy(buf[112:160], pk[48:]) // Y coordinate → bytes 112-159
+	binary.BigEndian.PutUint64(buf[160:], weight)
+	return keccak256(buf[:])
+}
+
+// nullLeafHash matches keccakValidator(Validator{blsPublicKey: zeroes, weight: 0})
+// in ValidatorSets.sol: keccak256(uint256(1) ++ 128-zero padded key ++ 8-zero weight).
+var nullLeafHash = func() [32]byte {
+	var buf [168]byte
+	buf[31] = 1 // uint256(1) leaf domain separator
+	return keccak256(buf[:])
+}()
+
+// buildMerkleRoot builds a Merkle root from a slice of leaf hashes using
+// sorted-pair hashing at each level. The leaf set is padded to the next power
+// of two with nullLeafHash to match the relayer's BuildMerkleRoot.
+func buildMerkleRoot(layer [][32]byte) [32]byte {
+	if len(layer) == 0 {
+		return [32]byte{}
+	}
+	// Pad to next power of two.
+	n := 1
+	for n < len(layer) {
+		n <<= 1
+	}
+	padded := make([][32]byte, n)
+	copy(padded, layer)
+	for i := len(layer); i < n; i++ {
+		padded[i] = nullLeafHash
+	}
+	layer = padded
+	for len(layer) > 1 {
+		nextLen := len(layer) / 2 // always even after padding
+		nextLayer := make([][32]byte, nextLen)
+		for i := 0; i < nextLen; i++ {
+			nextLayer[i] = merklePairHash(layer[2*i], layer[2*i+1])
+		}
+		layer = nextLayer
+	}
+	return layer[0]
+}
+
+// merklePairHash hashes two 32-byte values together, matching Solidity's
+// keccakInternalPair: keccak256(abi.encodePacked(uint256(0), smaller, larger)).
+// The uint256(0) prefix is the internal-node domain separator.
+func merklePairHash(a, b [32]byte) [32]byte {
+	if bytes.Compare(a[:], b[:]) > 0 {
+		a, b = b, a
+	}
+	var buf [96]byte // 32 bytes uint256(0) + 32 bytes smaller + 32 bytes larger
+	copy(buf[32:64], a[:])
+	copy(buf[64:96], b[:])
+	return keccak256(buf[:])
+}
+
+// verifyBlockTimestamp verifies that the block at the given height is a Banff
+// block and that its timestamp matches the provided value.
+func (s signatureRequestVerifier) verifyBlockTimestamp(
+	height uint64,
+	expectedTimestamp uint64,
+	errCode int32,
+	label string,
+) *common.AppError {
+	blockID, err := s.state.GetBlockIDAtHeight(height)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("failed to get %s block ID: %s", label, err),
+		}
+	}
+	statelessBlock, err := s.state.GetStatelessBlock(blockID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("failed to get %s block: %s", label, err),
+		}
+	}
+	banffBlock, ok := statelessBlock.(block.BanffBlock)
+	if !ok {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("%s block is not a Banff block", label),
+		}
+	}
+	blockTime := uint64(banffBlock.Timestamp().Unix())
+	if expectedTimestamp != blockTime {
+		return &common.AppError{
+			Code:    errCode,
+			Message: fmt.Sprintf("%s timestamp mismatch: provided %d, expected %d", label, expectedTimestamp, blockTime),
+		}
+	}
+	return nil
 }
