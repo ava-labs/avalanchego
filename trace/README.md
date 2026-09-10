@@ -26,3 +26,26 @@ The default export endpoint is `localhost:4317`, which matches the Jaeger contai
 ## 3. View traces
 
 Open <http://localhost:16686>, select the `avalanchego` service, and click Find Traces.
+
+## OpenTelemetry environment variables
+
+Tracing is enabled with the `--tracing-exporter-type` flag (or its
+`AVAGO_TRACING_EXPORTER_TYPE` form). When the flag isn't explicitly set, the
+standard `OTEL_TRACES_EXPORTER` variable is honored instead: `otlp` enables
+tracing (with the transport from `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` or
+`OTEL_EXPORTER_OTLP_PROTOCOL`, defaulting to `http/protobuf`) and `none`
+disables it. If neither the flag nor `OTEL_TRACES_EXPORTER` is set, tracing
+stays disabled.
+
+Once enabled, the standard
+[OTel SDK](https://opentelemetry.io/docs/languages/sdk-configuration/) and
+[OTLP exporter](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/)
+environment variables are honored, e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`,
+`OTEL_TRACES_SAMPLER` and `OTEL_BSP_*`.
+
+Where a `--tracing-*` flag configures the same thing, the flag takes
+precedence, with two exceptions: `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES`
+override the default resource, and `OTEL_TRACES_SAMPLER` (with
+`OTEL_TRACES_SAMPLER_ARG`) takes precedence over `--tracing-sample-rate`, since
+setting either is an explicit opt-in.

@@ -26,7 +26,14 @@ go_library(
 
 go_test(
     name = "trace_test",
-    srcs = ["exporter_type_test.go"],
+    srcs = [
+        "exporter_type_test.go",
+        "tracer_test.go",
+    ],
     embed = [":trace"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel//semconv/v1.4.0:v1_4_0",
+    ],
 )

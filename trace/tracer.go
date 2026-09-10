@@ -6,6 +6,7 @@ package trace
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -52,6 +53,30 @@ func (t *tracer) Close() error {
 	return t.tp.Shutdown(ctx)
 }
 
+// newResource describes this process for exported spans. The env detector
+// runs after the defaults, so the standard OTEL_SERVICE_NAME and
+// OTEL_RESOURCE_ATTRIBUTES variables take precedence over them.
+func newResource(appName, version string) (*resource.Resource, error) {
+	return resource.New(context.Background(),
+		resource.WithSchemaURL(semconv.SchemaURL),
+		resource.WithAttributes(
+			attribute.String("version", version),
+			semconv.ServiceNameKey.String(appName),
+		),
+		resource.WithFromEnv(),
+	)
+}
+
+// batcherOptions pins [tracerExportTimeout] as the batcher's export timeout
+// unless the standard OTEL_BSP_EXPORT_TIMEOUT variable is set, which an
+// explicit option would otherwise override.
+func batcherOptions() []sdktrace.BatchSpanProcessorOption {
+	if _, ok := os.LookupEnv("OTEL_BSP_EXPORT_TIMEOUT"); ok {
+		return nil
+	}
+	return []sdktrace.BatchSpanProcessorOption{sdktrace.WithExportTimeout(tracerExportTimeout)}
+}
+
 func New(config Config) (Tracer, error) {
 	if config.ExporterConfig.Type == Disabled {
 		return Noop, nil
@@ -62,13 +87,20 @@ func New(config Config) (Tracer, error) {
 		return nil, err
 	}
 
+	res, err := newResource(config.AppName, config.Version)
+	if err != nil {
+		return nil, err
+	}
+
 	tracerProviderOpts := []sdktrace.TracerProviderOption{
-		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
-		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL,
-			attribute.String("version", config.Version),
-			semconv.ServiceNameKey.String(config.AppName),
-		)),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
+		sdktrace.WithBatcher(exporter, batcherOptions()...),
+		sdktrace.WithResource(res),
+	}
+	// An explicit sampler would override the SDK's handling of the standard
+	// OTEL_TRACES_SAMPLER (and _ARG) variables, so only configure one from
+	// TraceSampleRate when sampling isn't configured via the environment.
+	if _, ok := os.LookupEnv("OTEL_TRACES_SAMPLER"); !ok {
+		tracerProviderOpts = append(tracerProviderOpts, sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)))
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(tracerProviderOpts...)
