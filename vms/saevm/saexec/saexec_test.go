@@ -1110,61 +1110,82 @@ func TestHashDBStateRootAvailability(t *testing.T) {
 // execute subsequent blocks.
 func TestRecoveryStateAvailability(t *testing.T) {
 	const (
-		commitInterval = 16
-		numBlocks      = commitInterval + 10
+		defaultCommitInterval = 16
+		numBlocks             = defaultCommitInterval + 10
+	)
+
+	type availability int
+	const (
+		available availability = iota + 1
+		unavailable
+		unknown
 	)
 
 	tests := []struct {
 		name            string
 		scheme          string
 		archival        bool
-		expectAvailable func(height uint64) bool
+		commitInterval  uint64
+		expectAvailable func(height uint64) availability
 	}{
 		{
-			name:     "hash_archival",
-			scheme:   rawdb.HashScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
+			name:           "hash_archival",
+			scheme:         rawdb.HashScheme,
+			archival:       true,
+			commitInterval: 1,
+			expectAvailable: func(height uint64) availability {
 				// All executed states MUST be available.
-				return height <= numBlocks
+				if height <= numBlocks {
+					return available
+				}
+				return unavailable
 			},
 		},
 		{
-			name:     "firewood_archival",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: true,
-			expectAvailable: func(height uint64) bool {
-				// Firewood is guaranteed to persist halfway to the commit interval.
-				// It MUST also have the most recent state.
-				return height%(commitInterval/2) == 0 || height == numBlocks
+			name:           "firewood_archival",
+			scheme:         customrawdb.FirewoodScheme,
+			archival:       true,
+			commitInterval: defaultCommitInterval,
+			expectAvailable: func(height uint64) availability {
+				// The commitInterval is the MAXIMUM number of blocks before
+				// a state is persisted. The genesis is persisted separately.
+				if height == 0 || height == numBlocks {
+					return available
+				}
+				return unknown
 			},
 		},
 		{
-			name:     "firewood",
-			scheme:   customrawdb.FirewoodScheme,
-			archival: false,
-			expectAvailable: func(height uint64) bool {
+			name:           "firewood",
+			scheme:         customrawdb.FirewoodScheme,
+			archival:       false,
+			commitInterval: defaultCommitInterval,
+			expectAvailable: func(height uint64) availability {
 				// Only the state committed at shutdown should be available.
-				return height == numBlocks
+				if height == numBlocks {
+					return available
+				}
+				return unavailable
 			},
 		},
 		{
-			name:     "hash",
-			scheme:   rawdb.HashScheme,
-			archival: false,
-			expectAvailable: func(height uint64) bool {
+			name:           "hash",
+			scheme:         rawdb.HashScheme,
+			archival:       false,
+			commitInterval: defaultCommitInterval,
+			expectAvailable: func(height uint64) availability {
 				switch {
-				case saedb.ShouldCommitTrieDB(height+1, commitInterval):
+				case saedb.ShouldCommitTrieDB(height+1, defaultCommitInterval):
 					// in this test, each block settles the previous
-					return true
+					return available
 				case height == numBlocks:
 					// state committed at shutdown
-					return true
+					return available
 				case height == 0:
 					// genesis state
-					return true
+					return available
 				default:
-					return false
+					return unavailable
 				}
 			},
 		},
@@ -1173,7 +1194,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 				c.archival = tt.archival
-				c.commitInterval = commitInterval
+				c.commitInterval = tt.commitInterval
 				c.dbScheme = tt.scheme
 			}))
 			e, chain := sut.Executor, sut.chain
@@ -1211,11 +1232,18 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				})
 
 				for _, b := range chain.AllBlocks() {
-					var wantErr testerr.Want
 					root := b.PostExecutionStateRoot()
-					if !tt.expectAvailable(b.NumberU64()) {
+
+					var wantErr testerr.Want
+					switch tt.expectAvailable(b.NumberU64()) {
+					case available:
+						wantErr = nil
+					case unavailable:
 						wantErr = missingTrieNodeError(root)
+					default:
+						continue
 					}
+
 					_, err := e.StateDB(root)
 					if diff := testerr.Diff(err, wantErr); diff != "" {
 						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", e, b.NumberU64(), diff)
