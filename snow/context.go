@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -43,6 +44,9 @@ type Context struct {
 	AVAXAssetID ids.ID
 
 	Log logging.Logger
+	// Tracer records spans for chain operations. VMs SHOULD use it to trace
+	// their internals. It is [trace.Noop] when tracing is disabled.
+	Tracer trace.Tracer
 	// Deprecated: This lock should not be used unless absolutely necessary.
 	// This lock will be removed in a future release once it is replaced with
 	// more granular locks.
