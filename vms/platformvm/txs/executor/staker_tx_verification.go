@@ -758,7 +758,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	if tx.Subnet != constants.PrimaryNetworkID {
 		// Invariant: Delegators must only be able to reference validator
-		//            transactions that implement [platform.ValidatorTx]. All
+		//            transactions that implement [platform.PermissionlessValidatorTx]. All
 		//            validator transactions implement this interface except the
 		//            AddSubnetValidatorTx. AddSubnetValidatorTx is the only
 		//            permissioned validator, so we verify this delegator is

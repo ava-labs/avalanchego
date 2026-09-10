@@ -358,11 +358,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 
 	// Dispatch on the concrete staker type. Only these four are rewarded here.
 	//
-	// [*platform.AddAutoRenewedValidatorTx] also implements [platform.ValidatorTx] but is
+	// [*platform.AddAutoRenewedValidatorTx] also implements [platform.PermissionlessValidatorTx] but is
 	// rewarded through [platform.RewardAutoRenewedValidatorTx].
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case *platform.AddValidatorTx, *platform.AddPermissionlessValidatorTx:
-		if err := e.rewardValidatorTx(uStakerTx.(platform.ValidatorTx), stakerToReward); err != nil {
+		if err := e.rewardValidatorTx(uStakerTx.(platform.PermissionlessValidatorTx), stakerToReward); err != nil {
 			return err
 		}
 
@@ -519,7 +519,7 @@ func (e *proposalTxExecutor) undoSupplyMintOnAbort(staker *state.Staker) error {
 	return nil
 }
 
-func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx platform.ValidatorTx, validator *state.Staker) error {
+func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx platform.PermissionlessValidatorTx, validator *state.Staker) error {
 	var (
 		txID    = validator.TxID
 		stake   = uValidatorTx.Stake()
@@ -627,10 +627,10 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 	}
 
 	// Invariant: Delegators must only be able to reference validator
-	//            transactions that implement [platform.ValidatorTx]. All
+	//            transactions that implement [platform.PermissionlessValidatorTx]. All
 	//            validator transactions implement this interface except the
 	//            AddSubnetValidatorTx.
-	vdrTx, ok := vdrTxIntf.Unsigned.(platform.ValidatorTx)
+	vdrTx, ok := vdrTxIntf.Unsigned.(platform.PermissionlessValidatorTx)
 	if !ok {
 		return ErrWrongTxType
 	}

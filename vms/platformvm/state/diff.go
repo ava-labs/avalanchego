@@ -301,6 +301,9 @@ func (d *Diff) PutL1Validator(l1Validator L1Validator) error {
 	return nil
 }
 
+// GetCurrentValidator returns a native current validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
@@ -361,6 +364,9 @@ func (d *Diff) GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, 
 	return parentState.GetStakingInfo(subnetID, nodeID)
 }
 
+// PutCurrentValidator adds a native current validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) PutCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil && !errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf("getting current validator: %w", err)
@@ -380,6 +386,9 @@ func (d *Diff) PutCurrentValidator(staker *Staker) error {
 	return nil
 }
 
+// DeleteCurrentValidator removes a native current validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) DeleteCurrentValidator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
@@ -398,6 +407,9 @@ func (d *Diff) DeleteCurrentValidator(staker *Staker) error {
 	return nil
 }
 
+// GetCurrentDelegatorIterator returns native current delegators.
+//
+// Deprecated: use [Adapter.GetCurrentDelegatorIterator].
 func (d *Diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -412,6 +424,9 @@ func (d *Diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 	return d.currentStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
 }
 
+// PutCurrentDelegator adds a native current delegator.
+//
+// Deprecated: use [Adapter.PutCurrentDelegator].
 func (d *Diff) PutCurrentDelegator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
@@ -424,6 +439,9 @@ func (d *Diff) PutCurrentDelegator(staker *Staker) error {
 	return nil
 }
 
+// DeleteCurrentDelegator removes a native current delegator.
+//
+// Deprecated: use [Adapter.DeleteCurrentDelegator].
 func (d *Diff) DeleteCurrentDelegator(staker *Staker) error {
 	if _, err := d.GetCurrentValidator(staker.SubnetID, staker.NodeID); err != nil {
 		return fmt.Errorf("getting current validator: %w", err)
@@ -436,6 +454,9 @@ func (d *Diff) DeleteCurrentDelegator(staker *Staker) error {
 	return nil
 }
 
+// GetCurrentStakerIterator returns native current stakers.
+//
+// Deprecated: use [Adapter.GetCurrentStakerIterator].
 func (d *Diff) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -450,6 +471,9 @@ func (d *Diff) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	return d.currentStakerDiffs.GetStakerIterator(parentIterator), nil
 }
 
+// GetPendingValidator returns a native pending validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
@@ -469,6 +493,9 @@ func (d *Diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	}
 }
 
+// PutPendingValidator adds a native pending validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) PutPendingValidator(staker *Staker) error {
 	if err := d.pendingStakerDiffs.PutValidator(staker); err != nil {
 		return err
@@ -479,6 +506,9 @@ func (d *Diff) PutPendingValidator(staker *Staker) error {
 	return nil
 }
 
+// DeletePendingValidator removes a native pending validator.
+//
+// Deprecated: use [NewAdapter] and the typed validator accessors.
 func (d *Diff) DeletePendingValidator(staker *Staker) {
 	d.pendingStakerDiffs.DeleteValidator(staker)
 	d.recordOp(func(c Chain) error {
@@ -487,6 +517,9 @@ func (d *Diff) DeletePendingValidator(staker *Staker) {
 	})
 }
 
+// GetPendingDelegatorIterator returns native pending delegators.
+//
+// Deprecated: use [Adapter.GetPendingDelegatorIterator].
 func (d *Diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -501,6 +534,9 @@ func (d *Diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (
 	return d.pendingStakerDiffs.GetDelegatorIterator(parentIterator, subnetID, nodeID), nil
 }
 
+// PutPendingDelegator adds a native pending delegator.
+//
+// Deprecated: use [Adapter.PutPendingDelegator].
 func (d *Diff) PutPendingDelegator(staker *Staker) {
 	d.pendingStakerDiffs.PutDelegator(staker)
 	d.recordOp(func(c Chain) error {
@@ -509,6 +545,9 @@ func (d *Diff) PutPendingDelegator(staker *Staker) {
 	})
 }
 
+// DeletePendingDelegator removes a native pending delegator.
+//
+// Deprecated: use [Adapter.DeletePendingDelegator].
 func (d *Diff) DeletePendingDelegator(staker *Staker) {
 	d.pendingStakerDiffs.DeleteDelegator(staker)
 	d.recordOp(func(c Chain) error {
@@ -517,6 +556,9 @@ func (d *Diff) DeletePendingDelegator(staker *Staker) {
 	})
 }
 
+// GetPendingStakerIterator returns native pending stakers.
+//
+// Deprecated: use [Adapter.GetPendingStakerIterator].
 func (d *Diff) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {

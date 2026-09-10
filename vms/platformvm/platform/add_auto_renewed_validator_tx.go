@@ -22,11 +22,6 @@ import (
 )
 
 var (
-	_ UnsignedTx  = (*AddAutoRenewedValidatorTx)(nil)
-	_ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
-)
-
-var (
 	errMissingSigner                   = errors.New("missing signer")
 	errMissingPeriod                   = errors.New("missing period")
 	errTooManyAutoCompoundRewardShares = fmt.Errorf("a staker can only restake at most %d shares from rewards", reward.PercentDenominator)
@@ -70,6 +65,13 @@ type AddAutoRenewedValidatorTx struct {
 	// Period is the validation cycle duration, in seconds.
 	Period uint64 `serialize:"true" json:"period"`
 }
+
+var (
+	_ UnsignedTx                = (*AddAutoRenewedValidatorTx)(nil)
+	_ PermissionlessValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
+)
+
+func (*AddAutoRenewedValidatorTx) validatorStaker() {}
 
 func (*AddAutoRenewedValidatorTx) SubnetID() ids.ID {
 	return constants.PrimaryNetworkID

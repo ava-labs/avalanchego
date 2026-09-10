@@ -9,16 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	_ StakerTx        = (*AddSubnetValidatorTx)(nil)
-	_ ScheduledStaker = (*AddSubnetValidatorTx)(nil)
-
-	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
-)
+var errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 
 // AddSubnetValidatorTx is an unsigned addSubnetValidatorTx
 type AddSubnetValidatorTx struct {
@@ -30,12 +24,16 @@ type AddSubnetValidatorTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
+var (
+	_ StakerTx        = (*AddSubnetValidatorTx)(nil)
+	_ ValidatorTx     = (*AddSubnetValidatorTx)(nil)
+	_ ScheduledStaker = (*AddSubnetValidatorTx)(nil)
+)
+
+func (*AddSubnetValidatorTx) validatorStaker() {}
+
 func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID {
 	return tx.SubnetValidator.NodeID
-}
-
-func (*AddSubnetValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
-	return nil, false, nil
 }
 
 func (*AddSubnetValidatorTx) PendingPriority() Priority {

@@ -47,6 +47,7 @@ type stakerDiffIterator struct {
 	isAdded        bool
 }
 
+// NewStakerDiffIterator returns a native staker-diff iterator.
 func NewStakerDiffIterator(currentIterator, pendingIterator iterator.Iterator[*Staker]) StakerDiffIterator {
 	mutableCurrentIterator := newMutableStakerIterator(currentIterator)
 	return &stakerDiffIterator{

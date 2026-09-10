@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -19,9 +18,6 @@ import (
 )
 
 var (
-	_ DelegatorTx     = (*AddDelegatorTx)(nil)
-	_ ScheduledStaker = (*AddDelegatorTx)(nil)
-
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 	errStakeMustBeAVAX         = errors.New("stake must be AVAX")
 )
@@ -37,6 +33,14 @@ type AddDelegatorTx struct {
 	// Where to send staking rewards when done validating
 	DelegationRewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
+
+var (
+	_ DelegatorTx     = (*AddDelegatorTx)(nil)
+	_ Delegator       = (*AddDelegatorTx)(nil)
+	_ ScheduledStaker = (*AddDelegatorTx)(nil)
+)
+
+func (*AddDelegatorTx) delegator() {}
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedAddDelegatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
@@ -56,10 +60,6 @@ func (*AddDelegatorTx) SubnetID() ids.ID {
 
 func (tx *AddDelegatorTx) NodeID() ids.NodeID {
 	return tx.Validator.NodeID
-}
-
-func (*AddDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
-	return nil, false, nil
 }
 
 func (*AddDelegatorTx) PendingPriority() Priority {

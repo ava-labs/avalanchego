@@ -19,6 +19,9 @@ var _ btree.LessFunc[*Staker] = (*Staker).Less
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
 // Invariant: Staker's size is bounded to prevent OOM DoS attacks.
+//
+// Deprecated: Staker is a storage detail. Use the typed records exposed
+// through [Adapter].
 type Staker struct {
 	TxID            ids.ID
 	NodeID          ids.NodeID
@@ -96,6 +99,8 @@ func (s *Staker) Less(than *Staker) bool {
 
 // NewCurrentStaker returns a current-priority Staker built from [platform.Staker]
 // with the provided start time, end time, weight, and potential reward.
+//
+// Deprecated: use a typed current-staker constructor with [NewAdapter].
 func NewCurrentStaker(
 	txID ids.ID,
 	staker platform.Staker,
@@ -104,7 +109,7 @@ func NewCurrentStaker(
 	weight uint64,
 	potentialReward uint64,
 ) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
+	publicKey, err := optionalPublicKey(staker)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +129,10 @@ func NewCurrentStaker(
 
 // NewPendingStaker returns a pending Staker built from a [platform.ScheduledStaker]
 // transaction.
+//
+// Deprecated: use a typed pending-staker constructor with [NewAdapter].
 func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
+	publicKey, err := optionalPublicKey(staker)
 	if err != nil {
 		return nil, err
 	}
@@ -141,4 +148,15 @@ func NewPendingStaker(txID ids.ID, staker platform.ScheduledStaker) (*Staker, er
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
 	}, nil
+}
+
+// optionalPublicKey returns the BLS key staker registers, or nil if its
+// transaction kind cannot register one.
+func optionalPublicKey(staker platform.Staker) (*bls.PublicKey, error) {
+	keyed, ok := staker.(platform.PermissionlessValidatorTx)
+	if !ok {
+		return nil, nil
+	}
+	publicKey, _, err := keyed.PublicKey()
+	return publicKey, err
 }

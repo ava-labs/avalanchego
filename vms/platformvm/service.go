@@ -675,7 +675,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	}
 
 	switch stakerTx := tx.Unsigned.(type) {
-	case platform.ValidatorTx:
+	case platform.PermissionlessValidatorTx:
 		attr = &stakerAttributes{
 			shares:                 stakerTx.Shares(),
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),

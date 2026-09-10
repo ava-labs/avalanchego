@@ -88,6 +88,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 	return nil
 }
 
+// Deprecated: callers should use [Adapter]
 // StakingInfo holds mutable validator data that can be modified.
 type StakingInfo struct {
 	// DelegateeReward is the delegatee reward accrued during the current cycle.
