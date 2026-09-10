@@ -21,6 +21,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/key"
 	"github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/load"
@@ -313,9 +314,7 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	w.blockID = ids.ID(blockHash) // Set blockID to construct a warp message containing a block hash payload later
 	require.NoError(err)
 
-	// SAE serves a receipt as soon as its transaction executes. The block's
-	// logs are only written once the whole block executes, and the block
-	// number advances after that.
+	// SAE exposes the receipt before its block becomes latest.
 	tc.Eventually(func() bool {
 		height, err := client.BlockNumber(ctx)
 		require.NoError(err)
@@ -364,11 +363,11 @@ func (w *warpTest) aggregateSignatures() {
 
 	warpValidators := w.warpValidators(ctx)
 
-	// The C-Chain runs SAE, which has no warp API. The tmpnet validator keys are
-	// available to tests, so aggregate their signatures directly.
+	// SAE has no Warp API, so sign directly with the tmpnet validator keys.
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
 		network := e2e.GetEnv(tc).GetNetwork()
-		signedMessage, err := warptest.AggregateSignatures(network, warpValidators, w.addressedCallUnsignedMessage)
+		signingKeys := warpSigningKeys(network)
+		signedMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, w.addressedCallUnsignedMessage)
 		require.NoError(err)
 		w.addressedCallSignedMessage = signedMessage
 
@@ -376,7 +375,7 @@ func (w *warpTest) aggregateSignatures() {
 		require.NoError(err)
 		unsignedBlockMessage, err := avalancheWarp.NewUnsignedMessage(w.networkID, w.sendingSubnet.BlockchainID, blockHashPayload.Bytes())
 		require.NoError(err)
-		signedBlockMessage, err := warptest.AggregateSignatures(network, warpValidators, unsignedBlockMessage)
+		signedBlockMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, unsignedBlockMessage)
 		require.NoError(err)
 		w.blockPayloadSignedMessage = signedBlockMessage
 		return
@@ -416,17 +415,14 @@ func (w *warpTest) aggregateSignatures() {
 	w.blockPayloadSignedMessage = parsedWarpBlockMessage
 }
 
-// warpValidators returns the validators that sign messages from the sending
-// subnet to the receiving subnet.
+// warpValidators returns the message signers.
 func (w *warpTest) warpValidators(ctx context.Context) validators.WarpSet {
 	require := require.New(ginkgo.GinkgoT())
 
 	pChainClient := platformvm.NewClient(w.sendingSubnetURIs[0])
 	pChainHeight, err := pChainClient.GetHeight(ctx)
 	require.NoError(err)
-	// If the source subnet is the Primary Network, then we only need to aggregate signatures from the receiving
-	// subnet's validator set instead of the entire Primary Network.
-	// If the destination turns out to be the Primary Network as well, then this is a no-op.
+	// Primary Network messages use the destination subnet's validator set.
 	subnetID := w.sendingSubnet.SubnetID
 	if subnetID == constants.PrimaryNetworkID {
 		subnetID = w.receivingSubnet.SubnetID
@@ -618,6 +614,7 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 
 	network := e2e.GetEnv(tc).GetNetwork()
+	signingKeys := warpSigningKeys(network)
 	warpValidators := w.warpValidators(ctx)
 
 	ginkgo.GinkgoLogr.Info("Executing warp delivery sequences...")
@@ -631,7 +628,7 @@ func (w *warpTest) warpLoad() {
 		}
 		ginkgo.GinkgoLogr.Info("Aggregating addressed call signature")
 
-		signedWarpMessage, err := warptest.AggregateSignatures(network, warpValidators, unsignedMessage)
+		signedWarpMessage, err := warptest.AggregateSignatures(signingKeys, warpValidators, unsignedMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -665,6 +662,14 @@ func (w *warpTest) warpLoad() {
 	require.NoError(warpDeliverLoader.Execute(ctx))
 	require.NoError(warpSendLoader.ConfirmReachedTip(ctx))
 	ginkgo.GinkgoLogr.Info("Completed warp delivery successfully.")
+}
+
+func warpSigningKeys(network *tmpnet.Network) map[ids.NodeID]string {
+	signingKeys := make(map[ids.NodeID]string, len(network.Nodes))
+	for _, node := range network.Nodes {
+		signingKeys[node.NodeID] = node.Flags[config.StakingSignerKeyContentKey]
+	}
+	return signingKeys
 }
 
 func generateKeys(preFundedKey *ecdsa.PrivateKey, numWorkers int) ([]*key.Key, []*ecdsa.PrivateKey) {

@@ -4,29 +4,32 @@
 package warptest
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 func TestAggregateSignatures(t *testing.T) {
 	require := require.New(t)
-	network := &tmpnet.Network{
-		Nodes: tmpnet.NewNodesOrPanic(3),
-	}
-
+	signingKeys := make(map[ids.NodeID]string, 3)
 	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 2)
-	for i, node := range network.Nodes[:2] {
-		pop, err := node.GetProofOfPossession()
-		require.NoError(err, "node.GetProofOfPossession()")
-		validatorSet[node.NodeID] = &validators.GetValidatorOutput{
-			NodeID:    node.NodeID,
-			PublicKey: pop.Key(),
+	for i := range 3 {
+		nodeID := ids.GenerateTestNodeID()
+		signer, err := localsigner.New()
+		require.NoError(err, "localsigner.New()")
+		signingKeys[nodeID] = base64.StdEncoding.EncodeToString(signer.ToBytes())
+		if i == 2 {
+			continue
+		}
+		validatorSet[nodeID] = &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: signer.PublicKey(),
 			Weight:    uint64(i + 1),
 		}
 	}
@@ -35,7 +38,7 @@ func TestAggregateSignatures(t *testing.T) {
 
 	unsignedMessage, err := warp.NewUnsignedMessage(1, ids.GenerateTestID(), []byte("payload"))
 	require.NoError(err, "warp.NewUnsignedMessage()")
-	signedMessage, err := AggregateSignatures(network, warpSet, unsignedMessage)
+	signedMessage, err := AggregateSignatures(signingKeys, warpSet, unsignedMessage)
 	require.NoError(err, "AggregateSignatures()")
 
 	require.Equal(unsignedMessage.Bytes(), signedMessage.UnsignedMessage.Bytes(), "AggregateSignatures() unsigned message")
