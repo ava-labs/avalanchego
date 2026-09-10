@@ -71,6 +71,7 @@ go_test(
     name = "sae_test",
     srcs = [
         "always_test.go",
+        "health_test.go",
         "networked_test.go",
         "recovery_test.go",
         "rpc_custom_test.go",
@@ -110,6 +111,7 @@ go_test(
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",
+        "//vms/saevm/saexec",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
         "@com_github_arr4n_shed//testerr",
@@ -147,6 +149,7 @@ go_test(
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//zapcore",
     ],
 )
 
