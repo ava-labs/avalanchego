@@ -1,0 +1,306 @@
+name: release
+
+on:
+  # Dispatch-driven, NOT tag-push-driven. The release procedure pushes four
+  # tags at once (root + three graft modules), and GitHub creates no tag push
+  # events when more than three tags are pushed together
+  # (https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push),
+  # so a `push: tags` trigger would silently never fire. Dispatching explicitly
+  # (see `task release:trigger -- vX.Y.Z`) also keeps a release from waking the
+  # repo's wildcard `tags: "*"` workflows (CI, Bazel, buf, Docker publish),
+  # which the four-tag push otherwise leaves suppressed. The release still lands
+  # as a DRAFT (see the publish job); a human publishes it from the GitHub UI.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and draft a release for (e.g. v1.15.0)'
+        required: true
+
+# Serialize publishers for the same tag: re-dispatching a tag while a run is in
+# flight makes the second run wait, then hit the fail-closed existence check.
+concurrency:
+  group: release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+# Principle of least privilege. Default workflow scope to read-only. Each
+# fan-out job declares its own permissions to match the producer's actual
+# needs (id-token: write only for the AWS-OIDC producers). Two jobs override
+# to `contents: write`: `publish` (creates the release) and `validate-tag`
+# (see its permissions block for why a read-only check is not enough).
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-22.04
+    permissions:
+      # contents:write so the releases LISTING includes drafts — GitHub only
+      # returns draft releases to push-capable tokens, and drafts are this
+      # workflow's default output, so the most common duplicate (a re-run
+      # after a prior run already created the draft) is invisible to a
+      # read-only token and the fail-fast guard would fail open. No new
+      # exposure: `publish` already runs tag-controlled scripts with the
+      # same scope, so a malicious tag-pusher gains no capability here.
+      contents: write
+    outputs:
+      tag: ${{ steps.derive.outputs.tag }}
+      kind: ${{ steps.classify.outputs.kind }}
+      # Peeled commit the tag pointed to at validation time. publish re-checks
+      # the remote tag against this and fails closed if it was moved mid-build.
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      # Fail fast, before checkout, if the dispatched input is not an actual tag
+      # in origin. Runs before checkout (git ls-remote needs no local clone) so
+      # the tag checkout below gets a friendly message instead of a cryptic
+      # failure. The full multi-module tag set is verified after checkout.
+      - name: Assert the release tag exists in origin
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          if [[ ! "${TAG_INPUT}" =~ ^v[0-9] ]]; then
+            echo "ERROR: tag '${TAG_INPUT}' must start with 'v<digit>' (e.g. v1.15.0)" >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code "https://github.com/${REPO}.git" "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "ERROR: '${TAG_INPUT}' is not a tag in ${REPO}; push the release tags first (task tags-push -- ${TAG_INPUT})." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          # Fully-qualified tag ref (not a bare name) so a like-named branch can
+          # never shadow the tag. Runs the tag's own RELEASES.md + release
+          # scripts, not whatever is on the dispatch ref (the default branch).
+          ref: refs/tags/${{ github.event.inputs.tag }}
+
+      - name: Resolve tag commit SHA
+        id: sha
+        # HEAD is the commit the tag points to (the checkout above resolved the
+        # fully-qualified tag). Assignment-first so a rev-parse failure fails
+        # this step rather than emitting an empty output.
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Derive tag
+        id: derive
+        # Assignment-first so a resolver failure fails this step with its own
+        # diagnostic (`echo "tag=$(script)"` would swallow the exit code).
+        run: |
+          tag="$(./.github/workflows/release-resolve-tag.sh)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+
+      - name: Verify all release tags exist in origin
+        # The root-tag preflight above only lets the checkout succeed; this
+        # asserts the full multi-module tag set (root + graft/coreth, graft/evm,
+        # graft/subnet-evm, from lib_go_modules.sh) was pushed, so a partial
+        # tags-push cannot yield a release with missing module tags.
+        run: ./scripts/workflow-verify-tag-set.sh "$TAG"
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
+        shell: bash
+
+      - name: Classify tag (stable vs prerelease)
+        id: classify
+        # Assignment-first: a swallowed classifier failure would leave `kind`
+        # empty, which downstream evaluates as "not prerelease" — i.e. an
+        # invalid tag would silently ship as a stable release.
+        run: |
+          kind="$(./.github/workflows/release-classify-tag.sh "$TAG")"
+          echo "kind=${kind}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
+
+      - name: Fail if release already exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.derive.outputs.tag }}
+        run: ./.github/workflows/release-check-exists.sh "$TAG"
+
+      # Fail-fast if RELEASES.md has no section for the pushed tag. Critical
+      # placement in the fan-out variant — this check sits inside validate-tag,
+      # BEFORE the 30+ min build fan-out, so a missing release-notes entry
+      # costs ~100ms of runner time instead of blowing the full build matrix.
+      - name: Verify RELEASES.md has release notes for the tag
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
+        run: ./.github/workflows/release-assert-notes-exist.sh "$TAG"
+
+  build-linux-packages:
+    needs: validate-tag
+    # Unified RPM + DEB producer (master's build-linux-packages.yml, made
+    # reusable). Builds all four format x arch packages; on this tag-push its
+    # upload-debs-s3 job fans each deb into the jammy + noble S3 prefixes,
+    # preserving the codename split at the distribution layer.
+    uses: ./.github/workflows/build-linux-packages.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write   # upload-debs-s3 (jammy/noble) assumes an AWS role via OIDC
+
+  build-linux:
+    needs: validate-tag
+    uses: ./.github/workflows/build-linux-binaries.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  build-macos:
+    needs: validate-tag
+    uses: ./.github/workflows/build-macos-release.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+      sha: ${{ needs.validate-tag.outputs.sha }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  publish:
+    needs:
+      - validate-tag
+      - build-linux-packages
+      - build-linux
+      - build-macos
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.validate-tag.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Pin to the exact commit validate-tag resolved, not the mutable tag
+          # name, so the release body and publish-set are rendered from the
+          # validated tree even if the tag is moved mid-run. The tag-move guard
+          # below still confirms origin's tag (which the release points at via
+          # tag_name) has not moved off this commit before publishing.
+          ref: ${{ needs.validate-tag.outputs.sha }}
+
+      - name: Find previous tag in RELEASES.md
+        id: prev
+        # Assignment-first so the wrapper's fatal exit 2 ("tag not in
+        # RELEASES.md") fails this step instead of silently degrading into
+        # the benign empty-previous_tag case (`echo "k=$(script)"` swallows
+        # the substitution's exit code under bash -e).
+        run: |
+          prev="$(./.github/workflows/release-resolve-previous-tag.sh "$TAG")"
+          echo "previous_tag=${prev}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release body
+        run: ./.github/workflows/release-build-body.sh "$TAG" "$PREV_TAG" RELEASES.md > release-body.md
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous_tag }}
+
+      - name: Download in-run artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: release-assets
+
+      - name: List artifacts before assembly
+        run: find release-assets -type f | sort
+
+      - name: Build publish-set from canonical manifest
+        run: ./.github/workflows/release-build-publish-set.sh "$TAG" release-assets publish-assets
+
+      - name: Assert publish-set equals manifest exactly
+        run: ./.github/workflows/release-assert-publish-set.sh "$TAG" publish-assets
+
+      # Fail closed if the tag was force-moved during the build window: the
+      # artifacts and body were built/rendered from the commit validate-tag
+      # resolved, so refuse to publish if origin's tag no longer points there.
+      # Release tags are annotated (git tag -s); peel with ^{} to the commit.
+      - name: Assert the release tag still points to the validated commit
+        env:
+          TAG: ${{ env.TAG }}
+          EXPECTED_SHA: ${{ needs.validate-tag.outputs.sha }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          url="https://github.com/${REPO}.git"
+          peeled="$(git ls-remote "$url" "refs/tags/${TAG}^{}" | awk '{print $1}')"
+          if [[ -z "$peeled" ]]; then
+            # Lightweight tag: the ref itself is the commit.
+            peeled="$(git ls-remote "$url" "refs/tags/${TAG}" | awk '{print $1}')"
+          fi
+          if [[ -z "$peeled" ]]; then
+            echo "ERROR: tag '${TAG}' no longer exists in ${REPO}; refusing to publish." >&2
+            exit 1
+          fi
+          if [[ "$peeled" != "${EXPECTED_SHA}" ]]; then
+            echo "ERROR: tag '${TAG}' moved since validation (validated ${EXPECTED_SHA}, now ${peeled}); refusing to publish." >&2
+            exit 1
+          fi
+          echo "Tag '${TAG}' still points to the validated commit ${EXPECTED_SHA}."
+
+      # Re-verify the full coordinated tag set immediately before release
+      # creation. validate-tag ran this before the ~30 min build window, so a
+      # module tag (graft/coreth, graft/evm, graft/subnet-evm) could have been
+      # moved or deleted since. verify_tags_remote.sh asserts all release tags
+      # still exist and peel to one commit; the guard above already pinned the
+      # root tag to the validated SHA, so the whole set is at that commit.
+      - name: Re-verify the full release tag set is intact
+        run: ./scripts/workflow-verify-tag-set.sh "$TAG"
+        shell: bash
+
+      # Existence re-check LAST, immediately before softprops. validate-tag
+      # checked at the top of the workflow, but a manual `gh release create`, a
+      # retry, or a sibling pipeline can create the release during the 30+ min
+      # build/guard window. Running it after the tag guards makes it the final
+      # gate, so we fail closed rather than conflict with an existing release.
+      - name: Final pre-publish existence re-check
+        run: ./.github/workflows/release-check-exists.sh "$TAG"
+
+      - name: Create GitHub release (as draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: release-body.md
+          prerelease: ${{ needs.validate-tag.outputs.kind == 'prerelease' }}
+          fail_on_unmatched_files: true
+          files: |
+            publish-assets/*
+          # The workflow always lands the release as a DRAFT. A human
+          # publishes it via the GitHub UI after reviewing title, body,
+          # assets, and pre-release/latest flags. Drafts aren't visible
+          # to non-collaborators, so a mid-upload failure leaves an
+          # invisible partial-state that's safe to delete and retry.
+          draft: true
+          #
+          # `make_latest` is a publish-time global pointer — it asks
+          # GitHub to designate THIS release as the repository's /latest,
+          # which a draft can't satisfy because drafts aren't publicly
+          # addressable. We leave it OFF the active draft path so the
+          # human publisher can decide "set as latest" in the GitHub UI.
+          #
+          # HIDDEN DIRECT-PUBLISH OPT-IN (not the default):
+          # To skip the manual review step and publish immediately, set
+          # `draft: false` (or remove the line above — softprops defaults
+          # to published when `draft` is unset) AND uncomment make_latest.
+          # draft: false
+          # make_latest: ${{ needs.validate-tag.outputs.kind == 'stable' }}
+
+      # softprops/action-gh-release silently no-ops on duplicate
+      # filenames, so trust-but-verify the GitHub state matches what we
+      # expected to upload. Fails loudly so the release can be deleted
+      # +republished rather than left half-baked.
+      - name: Verify published release assets equal the manifest
+        run: ./.github/workflows/release-assert-published-assets.sh "$TAG"
