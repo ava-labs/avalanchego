@@ -3,6 +3,7 @@ package flatfirewood
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -35,4 +36,61 @@ func (s *store) latestRowLE(prefix byte, key []byte, targetBlock uint64) ([]byte
 	block := blockFromRowKey(iter.Key())
 	value := bytes.Clone(iter.Value())
 	return value, block, true, iter.Error()
+}
+
+type mutationKind uint8
+
+const (
+	mutationPut mutationKind = iota
+	mutationDelete
+	mutationDestruct
+)
+
+type mutation struct {
+	kind  mutationKind
+	key   []byte
+	value []byte
+}
+
+const (
+	prefixAccount  byte = 'A'
+	prefixStorage  byte = 'S'
+	prefixDestruct byte = 'D'
+)
+
+func (s *store) flush(block uint64, mutations []mutation) error {
+	batch := s.db.NewBatch()
+
+	for _, mutation := range mutations {
+		switch mutation.kind {
+		case mutationPut, mutationDelete:
+			if mutation.kind == mutationDelete {
+				mutation.value = nil
+			}
+			var prefix byte
+			if len(mutation.key) == 20 {
+				prefix = prefixAccount
+			} else {
+				prefix = prefixStorage
+			}
+			targetKey := rowKey(prefix, mutation.key, block)
+			err := batch.Put(targetKey, mutation.value)
+			if err != nil {
+				return err
+			}
+		case mutationDestruct:
+			if len(mutation.key) != 20 {
+				return fmt.Errorf("destruct key must be 20 bytes")
+			}
+			err := batch.Put(rowKey(prefixAccount, mutation.key, block), nil)
+			if err != nil {
+				return err
+			}
+			err = batch.Put(rowKey(prefixDestruct, mutation.key, block), nil)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return batch.Write()
 }
