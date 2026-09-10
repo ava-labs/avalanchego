@@ -58,6 +58,101 @@ func (a Adapter) DeleteCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) erro
 	return a.legacy.DeleteCurrentValidator(v)
 }
 
+// RestakeConfig defines how a validator's next staking period is derived when
+// its current period ends. The zero value means the validator does not
+// restake: state does not distinguish a bounded validator from a restaking
+// validator that is gracefully exiting — the adding transaction kind, checked
+// by execution, is the discriminator.
+type RestakeConfig struct {
+	// AutoCompoundRewardShares is the percentage of rewards to restake at the
+	// end of a cycle.
+	AutoCompoundRewardShares uint32
+	// NextPeriod is the next validation cycle duration, in seconds.
+	NextPeriod uint64
+}
+
+// GetRestakeConfig returns the restake configuration of the validator on
+// subnetID with nodeID, or an error wrapping [database.ErrNotFound] if the
+// validator is not in the current validator set. A configuration that was
+// never set reads as the zero value, indistinguishable from one explicitly
+// set to zero: the validator will not restake. Use the adding transaction
+// kind, not this value, to decide whether a validator is capable of
+// restaking.
+func (a Adapter) GetRestakeConfig(subnetID ids.ID, nodeID ids.NodeID) (RestakeConfig, error) {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return RestakeConfig{}, err
+	}
+
+	return RestakeConfig{
+		AutoCompoundRewardShares: si.AutoCompoundRewardShares,
+		NextPeriod:               si.NextPeriod,
+	}, nil
+}
+
+// SetRestakeConfig sets the restake configuration of the validator on
+// subnetID with nodeID. It returns an error wrapping [database.ErrNotFound]
+// if the validator is not in the current validator set: a validator's config
+// can only be written after the validator itself is put.
+func (a Adapter) SetRestakeConfig(subnetID ids.ID, nodeID ids.NodeID, config RestakeConfig) error {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return err
+	}
+
+	si.AutoCompoundRewardShares = config.AutoCompoundRewardShares
+	si.NextPeriod = config.NextPeriod
+
+	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
+}
+
+// RestakedRewards is the reward state a restaking validator carries across
+// cycles: amounts earned in previous cycles and restaked rather than paid.
+// Execution rewrites it only at a cycle boundary, alongside the staking
+// period it restakes. It is the zero value for a validator that has never
+// restaked.
+type RestakedRewards struct {
+	// Validation is the sum of validation rewards restaked from previous
+	// cycles.
+	Validation uint64
+	// Delegatee is the sum of delegatee rewards restaked from previous
+	// cycles.
+	Delegatee uint64
+}
+
+// GetRestakedRewards returns the rewards restaked in previous cycles by the
+// validator on subnetID with nodeID, or an error wrapping
+// [database.ErrNotFound] if the validator is not in the current validator
+// set. Rewards that were never set read as the zero value, indistinguishable
+// from rewards explicitly set to zero: the validator has never restaked.
+func (a Adapter) GetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID) (RestakedRewards, error) {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return RestakedRewards{}, err
+	}
+
+	return RestakedRewards{
+		Validation: si.AccruedValidationRewards,
+		Delegatee:  si.AccruedDelegateeRewards,
+	}, nil
+}
+
+// SetRestakedRewards sets the rewards restaked in previous cycles by the
+// validator on subnetID with nodeID. It returns an error wrapping
+// [database.ErrNotFound] if the validator is not in the current validator
+// set.
+func (a Adapter) SetRestakedRewards(subnetID ids.ID, nodeID ids.NodeID, restaked RestakedRewards) error {
+	si, err := a.legacy.GetStakingInfo(subnetID, nodeID)
+	if err != nil {
+		return err
+	}
+
+	si.AccruedValidationRewards = restaked.Validation
+	si.AccruedDelegateeRewards = restaked.Delegatee
+
+	return a.legacy.SetStakingInfo(subnetID, nodeID, si)
+}
+
 // seqFromStakerIterator adapts a native staker iterator into a single-use sequence of
 // typed records. The native iterator is released when iteration stops, so
 // the sequence must be ranged, even if the loop exits early.

@@ -241,6 +241,21 @@ func newCurrentValidatorStakingPeriod(
 	return stakingPeriod, nil
 }
 
+// Restake returns the validator's record for its next staking period. The
+// validator's identity, transaction, and BLS key carry over; the caller
+// provides the new period bounds, weight, and potential reward it calculated.
+func (v CurrentValidator) Restake(start, end time.Time, weight, potentialReward uint64) CurrentValidator {
+	stakingPeriod := v.stakingPeriod
+	stakingPeriod.start = start
+	stakingPeriod.end = end
+	stakingPeriod.weight = weight
+
+	return CurrentValidator{
+		stakingPeriod:   stakingPeriod,
+		potentialReward: potentialReward,
+	}
+}
+
 func (v CurrentValidator) StakingPeriod() StakingPeriod { return v.stakingPeriod }
 
 // IsPermissioned returns whether the validator was added by a permissioned

@@ -103,6 +103,39 @@ func TestAdapterStakerOps(t *testing.T) {
 		}
 	}
 
+	setRestakeConfig := func(subnetID ids.ID, nodeID ids.NodeID, config RestakeConfig) op {
+		return func(t *testing.T, a Adapter) {
+			require.NoError(t, a.SetRestakeConfig(subnetID, nodeID, config))
+		}
+	}
+
+	setMissingRestakeConfig := func(subnetID ids.ID, nodeID ids.NodeID) op {
+		return func(t *testing.T, a Adapter) {
+			require.ErrorIs(t, a.SetRestakeConfig(subnetID, nodeID, RestakeConfig{}), database.ErrNotFound)
+		}
+	}
+
+	setRestakedRewards := func(subnetID ids.ID, nodeID ids.NodeID, restaked RestakedRewards) op {
+		return func(t *testing.T, a Adapter) {
+			require.NoError(t, a.SetRestakedRewards(subnetID, nodeID, restaked))
+		}
+	}
+
+	setMissingRestakedRewards := func(subnetID ids.ID, nodeID ids.NodeID) op {
+		return func(t *testing.T, a Adapter) {
+			require.ErrorIs(t, a.SetRestakedRewards(subnetID, nodeID, RestakedRewards{}), database.ErrNotFound)
+		}
+	}
+
+	restakeValidator := func(subnetID ids.ID, nodeID ids.NodeID, start, end time.Time, weight, potentialReward uint64) op {
+		return func(t *testing.T, a Adapter) {
+			v, err := a.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(t, err)
+			require.NoError(t, a.DeleteCurrentValidator(subnetID, nodeID))
+			require.NoError(t, a.PutCurrentValidator(v.Restake(start, end, weight, potentialReward)))
+		}
+	}
+
 	hasCurrentValidator := func(want CurrentValidator) assertion {
 		return func(t *testing.T, a Adapter) {
 			got, err := a.GetCurrentValidator(want.StakingPeriod().SubnetID(), want.StakingPeriod().NodeID())
@@ -167,6 +200,36 @@ func TestAdapterStakerOps(t *testing.T) {
 			got, err := a.GetPendingStakers()
 			require.NoError(t, err)
 			require.ElementsMatch(t, want, slices.Collect(got))
+		}
+	}
+
+	hasRestakeConfig := func(subnetID ids.ID, nodeID ids.NodeID, want RestakeConfig) assertion {
+		return func(t *testing.T, a Adapter) {
+			got, err := a.GetRestakeConfig(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		}
+	}
+
+	noRestakeConfig := func(subnetID ids.ID, nodeID ids.NodeID) assertion {
+		return func(t *testing.T, a Adapter) {
+			_, err := a.GetRestakeConfig(subnetID, nodeID)
+			require.ErrorIs(t, err, database.ErrNotFound)
+		}
+	}
+
+	hasRestakedRewards := func(subnetID ids.ID, nodeID ids.NodeID, want RestakedRewards) assertion {
+		return func(t *testing.T, a Adapter) {
+			got, err := a.GetRestakedRewards(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		}
+	}
+
+	noRestakedRewards := func(subnetID ids.ID, nodeID ids.NodeID) assertion {
+		return func(t *testing.T, a Adapter) {
+			_, err := a.GetRestakedRewards(subnetID, nodeID)
+			require.ErrorIs(t, err, database.ErrNotFound)
 		}
 	}
 
@@ -287,6 +350,37 @@ func TestAdapterStakerOps(t *testing.T) {
 		NextTime:        end,
 		Priority:        platform.PrimaryNetworkDelegatorCurrentPriority,
 	})
+
+	// restakedValidator is validator's record for its next staking period,
+	// built from a raw staker so the test does not trust
+	// [CurrentValidator.Restake] to produce its own expectation: the identity,
+	// transaction, and BLS key carry over while the bounds, weight, and
+	// potential reward are new.
+	validatorKey, _, err := validatorUnsigned.PublicKey()
+	require.NoError(t, err)
+	restakeStart := end
+	restakeEnd := end.Add(time.Hour)
+	restakedValidator := currentValidatorFromStaker(&Staker{
+		TxID:            validatorTx.ID(),
+		NodeID:          validatorNodeID,
+		SubnetID:        constants.PrimaryNetworkID,
+		PublicKey:       validatorKey,
+		Weight:          6,
+		StartTime:       restakeStart,
+		EndTime:         restakeEnd,
+		PotentialReward: 20,
+		NextTime:        restakeEnd,
+		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
+	})
+
+	restakeConfig := RestakeConfig{
+		AutoCompoundRewardShares: 500_000,
+		NextPeriod:               3600,
+	}
+	restakedRewards := RestakedRewards{
+		Validation: 17,
+		Delegatee:  9,
+	}
 
 	missingNodeID := ids.GenerateTestNodeID()
 
@@ -445,16 +539,73 @@ func TestAdapterStakerOps(t *testing.T) {
 			},
 		},
 		{
+			name: "restake_config_lifecycle",
+			txs:  []*platform.Tx{validatorTx},
+			diffs: []diff{
+				{
+					ops: []op{putCurrentValidator(validator)},
+					assertions: []assertion{
+						hasRestakeConfig(constants.PrimaryNetworkID, validatorNodeID, RestakeConfig{}),
+					},
+				},
+				{
+					ops: []op{setRestakeConfig(constants.PrimaryNetworkID, validatorNodeID, restakeConfig)},
+					assertions: []assertion{
+						hasRestakeConfig(constants.PrimaryNetworkID, validatorNodeID, restakeConfig),
+					},
+				},
+			},
+		},
+		{
+			name: "restaked_rewards_lifecycle",
+			txs:  []*platform.Tx{validatorTx},
+			diffs: []diff{
+				{
+					ops: []op{putCurrentValidator(validator)},
+					assertions: []assertion{
+						hasRestakedRewards(constants.PrimaryNetworkID, validatorNodeID, RestakedRewards{}),
+					},
+				},
+				{
+					ops: []op{setRestakedRewards(constants.PrimaryNetworkID, validatorNodeID, restakedRewards)},
+					assertions: []assertion{
+						hasRestakedRewards(constants.PrimaryNetworkID, validatorNodeID, restakedRewards),
+					},
+				},
+			},
+		},
+		{
+			name: "restake_current_validator",
+			txs:  []*platform.Tx{validatorTx},
+			diffs: []diff{
+				{
+					ops:        []op{putCurrentValidator(validator)},
+					assertions: []assertion{hasCurrentValidator(validator)},
+				},
+				{
+					ops: []op{restakeValidator(constants.PrimaryNetworkID, validatorNodeID, restakeStart, restakeEnd, 6, 20)},
+					assertions: []assertion{
+						hasCurrentValidator(restakedValidator),
+						hasCurrentStakers(restakedValidator),
+					},
+				},
+			},
+		},
+		{
 			name: "not_found",
 			diffs: []diff{
 				{
 					ops: []op{
 						deleteMissingCurrentValidator(constants.PrimaryNetworkID, missingNodeID),
 						deleteMissingPendingValidator(constants.PrimaryNetworkID, missingNodeID),
+						setMissingRestakeConfig(constants.PrimaryNetworkID, missingNodeID),
+						setMissingRestakedRewards(constants.PrimaryNetworkID, missingNodeID),
 					},
 					assertions: []assertion{
 						noCurrentValidator(constants.PrimaryNetworkID, missingNodeID),
 						noPendingValidator(constants.PrimaryNetworkID, missingNodeID),
+						noRestakeConfig(constants.PrimaryNetworkID, missingNodeID),
+						noRestakedRewards(constants.PrimaryNetworkID, missingNodeID),
 					},
 				},
 			},
