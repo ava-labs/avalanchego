@@ -23,6 +23,7 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/warp/warpbindings",
         "//graft/subnet-evm/precompile/contracts/warp/warptest/bindings",
         "//graft/subnet-evm/tests/utils",
+        "//graft/evm/tests/warptest",
         "//graft/subnet-evm/warp",
         "//ids",
         "//snow/validators",

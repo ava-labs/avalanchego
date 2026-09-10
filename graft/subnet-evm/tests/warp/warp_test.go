@@ -22,6 +22,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/graft/evm/tests/warptest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/load"
@@ -446,24 +447,13 @@ func (w *warpTest) aggregateSignatures() {
 	tc := e2e.NewTestContext()
 	ctx := tc.DefaultContext()
 
-	warpAPIs := make(map[ids.NodeID]warpBackend.Client, len(w.sendingSubnetURIs))
-	for _, uri := range w.sendingSubnetURIs {
-		client, err := warpBackend.NewClient(uri, w.sendingSubnet.BlockchainID.String())
-		require.NoError(err)
-
-		infoClient := info.NewClient(uri)
-		nodeID, _, err := infoClient.GetNodeID(ctx)
-		require.NoError(err)
-		warpAPIs[nodeID] = client
-	}
-
 	warpValidators := w.warpValidators(ctx)
 
-	// The C-Chain runs SAE, which has no warp API. Validators still sign
-	// messages over p2p (ACP-118), and the requester aggregates the signatures.
+	// The C-Chain runs SAE, which has no warp API. The tmpnet validator keys are
+	// available to tests, so aggregate their signatures directly.
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
 		network := e2e.GetEnv(tc).GetNetwork()
-		signedMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, w.addressedCallUnsignedMessage)
+		signedMessage, err := warptest.AggregateSignatures(network, warpValidators, w.addressedCallUnsignedMessage)
 		require.NoError(err)
 		w.addressedCallSignedMessage = signedMessage
 
@@ -471,7 +461,7 @@ func (w *warpTest) aggregateSignatures() {
 		require.NoError(err)
 		unsignedBlockMessage, err := avalancheWarp.NewUnsignedMessage(w.networkID, w.sendingSubnet.BlockchainID, blockHashPayload.Bytes())
 		require.NoError(err)
-		signedBlockMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, unsignedBlockMessage)
+		signedBlockMessage, err := warptest.AggregateSignatures(network, warpValidators, unsignedBlockMessage)
 		require.NoError(err)
 		w.blockPayloadSignedMessage = signedBlockMessage
 		return
@@ -786,7 +776,7 @@ func (w *warpTest) warpLoad() {
 		}
 		log.Info("Aggregating addressed call signature")
 
-		signedWarpMessage, err := utils.AggregateWarpSignature(ctx, network, warpValidators, unsignedMessage)
+		signedWarpMessage, err := warptest.AggregateSignatures(network, warpValidators, unsignedMessage)
 		if err != nil {
 			return nil, err
 		}
