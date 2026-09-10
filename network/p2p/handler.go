@@ -32,6 +32,10 @@ const (
 	EVMBlockRequestHandlerID
 	// EVMAtomicLeafRequestHandlerID is reserved for the coreth atomic-trie syncer.
 	EVMAtomicLeafRequestHandlerID
+	// OracleSignatureRequestHandlerID is the handler ID for oracle attestation
+	// signature requests. Distinct from SignatureRequestHandlerID (ACP-118)
+	// which is reserved for native warp.
+	OracleSignatureRequestHandlerID
 )
 
 var (

@@ -20,6 +20,10 @@ awscpu
 
 # Test binary, build with `go test -c`
 *.test
+
+# Built sidecar binary (the /sidecar rule ignores the binary; !/sidecar/ re-includes the source dir)
+/sidecar
+!/sidecar/
 tmp/
 
 # Output of the go coverage tool, specifically when used with LiteIDE
