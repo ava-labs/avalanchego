@@ -30,6 +30,8 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"sync"
+	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -96,8 +98,28 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
 		ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
 	}
+
+	// Optionally warm the state caches by speculatively executing the block's
+	// transactions in parallel with the sequential execution below.
+	// mainProgress publishes the index of the transaction currently being
+	// executed so the warmup can skip transactions it can no longer help.
+	var (
+		mainProgress atomic.Int64
+		warmupDone   = make(chan struct{})
+		warmupWg     sync.WaitGroup
+	)
+	mainProgress.Store(-1)
+	if p.bc.cacheConfig.SpeculativeWarmup {
+		warmupWg.Add(1)
+		go func() {
+			defer warmupWg.Done()
+			p.speculativeWarmup(warmupDone, block, parent, cfg, &mainProgress)
+		}()
+	}
+
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
+		mainProgress.Store(int64(i))
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -110,6 +132,9 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
+	close(warmupDone)
+	warmupWg.Wait()
+
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	if err := p.engine.Finalize(p.bc, block, parent, statedb, receipts); err != nil {
 		return nil, nil, 0, fmt.Errorf("engine finalization check failed: %w", err)

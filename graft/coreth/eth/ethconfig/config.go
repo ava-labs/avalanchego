@@ -106,6 +106,7 @@ type Config struct {
 	TrieDirtyCache            int
 	TrieDirtyCommitTarget     int
 	TriePrefetcherParallelism int
+	SpeculativeWarmup         bool
 	SnapshotCache             int
 	Preimages                 bool
 
