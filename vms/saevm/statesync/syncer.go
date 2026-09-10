@@ -64,7 +64,7 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 		return false
 	}
 
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+	if s.cfg.Scheme == customrawdb.FirewoodScheme {
 		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false
 	}

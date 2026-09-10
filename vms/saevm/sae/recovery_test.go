@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -51,7 +52,7 @@ func TestRecoverAfterCrash(t *testing.T) {
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withHashDB(saedb.HashDBConfig{CommitInterval: commitInterval}), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
@@ -69,7 +70,7 @@ func TestRecoverAfterCrash(t *testing.T) {
 	}
 
 	newDB := saetest.CopyDB(t, srcDB) // note: src is still running, but concurrent safe
-	sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withHashDB(saedb.HashDBConfig{CommitInterval: commitInterval}), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = newDB
 		c.logLevel = logging.Warn
 	}))
@@ -113,7 +114,7 @@ func TestRecoverWithBLOCKHASH(t *testing.T) {
 
 	var srcDB database.Database
 	srcHDB := saetest.NewHeightIndexDB()
-	ctx, src := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	ctx, src := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB), withHashDB(saedb.HashDBConfig{CommitInterval: commitInterval}), options.Func[sutConfig](func(c *sutConfig) {
 		srcDB = c.db
 		c.logLevel = logging.Warn
 	}))
@@ -131,7 +132,7 @@ func TestRecoverWithBLOCKHASH(t *testing.T) {
 
 	// Recreating the VM replays all accepted blocks since the last trie
 	// commit, re-executing the BLOCKHASH transactions.
-	_, sut := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+	_, sut := newSUT(t, 1, timeOpt, withContract, withExecResultsDB(srcHDB.Clone()), withHashDB(saedb.HashDBConfig{CommitInterval: commitInterval}), options.Func[sutConfig](func(c *sutConfig) {
 		c.db = saetest.CopyDB(t, srcDB)
 		c.logLevel = logging.Warn
 	}))
@@ -201,12 +202,22 @@ func TestRecover(t *testing.T) {
 			srcHDB := saetest.NewHeightIndexDB()
 			tempDir := t.TempDir()
 
+			dbOpt := withHashDB(saedb.HashDBConfig{
+				CommitInterval: commitInterval,
+				Archival:       tt.archival,
+			})
+			if tt.scheme == customrawdb.FirewoodScheme {
+				dbOpt = withFirewood(firewood.Config{
+					MaxPersistGap:     commitInterval,
+					RevisionsInMemory: 2 * commitInterval, // small enough for the beyond_revision_window case to evict
+					RootStore:         tt.archival,
+				})
+			}
+
 			sutOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+			ctx, src := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB), dbOpt, options.Func[sutConfig](func(c *sutConfig) {
 				srcDB = c.db
 				c.logLevel = logging.Warn
-				c.vmConfig.DBConfig.Archival = tt.archival
-				c.vmConfig.DBConfig.Scheme = tt.scheme
 				c.dataDir = tempDir
 			}))
 
@@ -222,11 +233,9 @@ func TestRecover(t *testing.T) {
 			src.close()
 
 			newDB := saetest.CopyDB(t, srcDB)
-			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
+			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), dbOpt, options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
-				c.vmConfig.DBConfig.Archival = tt.archival
-				c.vmConfig.DBConfig.Scheme = tt.scheme
 				c.dataDir = tempDir
 			}))
 
@@ -298,7 +307,7 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	sharedOpts := []options.Option[sutConfig]{
 		timeOpt,
-		withSnapshot(),
+		withHashDB(saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval, SnapshotCacheMiB: 1}),
 	}
 	db := memdb.New()
 	xdb := saetest.NewHeightIndexDB()

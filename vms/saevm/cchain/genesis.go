@@ -330,17 +330,16 @@ func activatePrecompile(statedb *state.StateDB, addr common.Address) {
 }
 
 // setupTrieDB commits the genesis allocation to the state database if
-// it is not already present.
-func (g *genesis) setupTrieDB(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+// it is not already present, closing tdb when done.
+func (g *genesis) setupTrieDB(db ethdb.Database, tdb *triedb.Database) (retErr error) {
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
 	root, err := g.root()
 	if err != nil {
 		return fmt.Errorf("computing genesis root: %w", err)
 	}
-
-	tdb := triedb.NewDatabase(db, trieConfig)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
 
 	if tdb.Initialized(root) {
 		return nil
