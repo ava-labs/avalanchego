@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "txs",
+    srcs = ["unsupported_tx_visitor.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs",
+    visibility = ["//visibility:public"],
+    deps = ["//vms/platformvm/platform"],
+)
