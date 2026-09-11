@@ -1,4 +1,4 @@
-// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -15,6 +15,16 @@ func TestCheck(t *testing.T) {
 		checks  []string
 		wantErr error
 	}{
+		{
+			name:    "Task cache restore",
+			checks:  []string{taskCacheRestoreCheck},
+			wantErr: errCheckUnimplemented,
+		},
+		{
+			name:    "module cache restore",
+			checks:  []string{goModCacheRestoreCheck},
+			wantErr: errCheckUnimplemented,
+		},
 		{
 			name:    "unit cache restore",
 			checks:  []string{goUnitCacheRestoreCheck},
@@ -42,10 +52,12 @@ func TestCheck(t *testing.T) {
 
 func TestCheckReportsAllFailures(t *testing.T) {
 	err := check([]byte("job output"), []string{
+		taskCacheRestoreCheck,
+		goModCacheRestoreCheck,
 		goUnitCacheRestoreCheck,
 		goUnitTestResultsCheck,
 	})
 
 	require.ErrorIs(t, err, errCheckUnimplemented)
-	require.Equal(t, "cache check is not implemented: \"go-unit-cache-restore\"\ncache check is not implemented: \"go-unit-test-results\"", err.Error())
+	require.Equal(t, "cache check is not implemented: \"task-cache-restore\"\ncache check is not implemented: \"go-mod-cache-restore\"\ncache check is not implemented: \"go-unit-cache-restore\"\ncache check is not implemented: \"go-unit-test-results\"", err.Error())
 }

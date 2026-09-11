@@ -13,7 +13,16 @@
 name: 'Install Go toolchain with project defaults'
 description: 'Install a go toolchain with project defaults'
 
+inputs:
+  cache-validation:
+    description: Use PR-scoped validation caches
+    required: false
+    default: 'false'
+
 outputs:
+  task-cache-hit:
+    description: 'Whether the Task cache was restored with an exact key'
+    value: ${{ steps.setup-task.outputs.cache-hit }}
   go-mod-cache-hit:
     description: 'Whether the Go module cache was restored with an exact key'
     value: ${{ steps.go-mod-cache.outputs.cache-hit }}
@@ -27,7 +36,10 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-task
+    - id: setup-task
+      uses: ./.github/actions/setup-task
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -52,6 +64,6 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.cache-paths.outputs.go-mod-cache }}
-        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}', runner.os) || format('go-mod-{0}-{1}', runner.os, hashFiles('go.work.sum', '**/go.sum')) }}
         restore-keys: |
-          go-mod-${{ runner.os }}-
+          ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}', runner.os) || format('go-mod-{0}-', runner.os) }}
