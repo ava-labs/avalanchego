@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -89,31 +88,25 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	return nil
 }
 
-// verifyAddValidatorTx carries out the validation for an AddValidatorTx.
-// It returns the tx outputs that should be returned if this validator is not
-// added to the staking set.
+// verifyAddValidatorTx carries out the validation for an [txs.AddValidatorTx].
 func verifyAddValidatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddValidatorTx,
-) (
-	[]*avax.TransferableOutput,
-	error,
-) {
+) error {
 	currentTimestamp := chainState.GetTimestamp()
 	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
-		return nil, ErrAddValidatorTxPostDurango
+		return ErrAddValidatorTxPostDurango
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, false /*=isDurangoActive*/); err != nil {
-		return nil, err
+		return err
 	}
 
 	startTime := tx.StartTime()
@@ -121,110 +114,16 @@ func verifyAddValidatorTx(
 	switch {
 	case tx.Validator.Wght < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, ErrWeightTooSmall
+		return ErrWeightTooSmall
 
 	case tx.Validator.Wght > backend.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
-		return nil, ErrWeightTooLarge
+		return ErrWeightTooLarge
 
 	case tx.DelegationShares < backend.Config.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
-		return nil, ErrInsufficientDelegationFee
+		return ErrInsufficientDelegationFee
 
-	case duration < backend.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return nil, ErrStakeTooShort
-
-	case duration > backend.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return nil, ErrStakeTooLong
-	}
-
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, fmt.Errorf("getting utxos %w", err)
-	}
-
-	if !backend.Bootstrapped.Get() {
-		return outs, nil
-	}
-
-	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
-		return nil, err
-	}
-
-	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == nil {
-		return nil, fmt.Errorf(
-			"%s is %w of the primary network",
-			tx.Validator.NodeID,
-			ErrAlreadyValidator,
-		)
-	}
-	if err != database.ErrNotFound {
-		return nil, fmt.Errorf(
-			"failed to find whether %s is a primary network validator: %w",
-			tx.Validator.NodeID,
-			err,
-		)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return outs, nil
-}
-
-// verifyAddSubnetValidatorTx carries out the validation for an
-// AddSubnetValidatorTx.
-func verifyAddSubnetValidatorTx(
-	backend *Backend,
-	feeCalculator fee.Calculator,
-	chainState state.Chain,
-	sTx *platform.Tx,
-	tx *platform.AddSubnetValidatorTx,
-) error {
-	// Verify the tx is well-formed
-	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
-	}
-
-	var (
-		currentTimestamp = chainState.GetTimestamp()
-		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
-	}
-
-	startTime := currentTimestamp
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
-	duration := tx.EndTime().Sub(startTime)
-
-	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
@@ -238,86 +137,41 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
 		return err
 	}
 
-	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
-			"attempted to issue %w for %s on subnet %s",
-			ErrDuplicateValidator,
+			"%s is %w of the primary network",
 			tx.Validator.NodeID,
-			tx.SubnetValidator.Subnet,
+			ErrAlreadyValidator,
 		)
 	}
 	if err != database.ErrNotFound {
 		return fmt.Errorf(
-			"failed to find whether %s is a subnet validator: %w",
+			"failed to find whether %s is a primary network validator: %w",
 			tx.Validator.NodeID,
 			err,
 		)
 	}
 
-	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
-		return err
-	}
-
-	baseTxCreds, err := verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
 	return nil
 }
 
-// Returns the representation of [tx.NodeID] validating [tx.Subnet].
-// Returns true if [tx.NodeID] is a current validator of [tx.Subnet].
-// Returns an error if the given tx is invalid.
-// The transaction is valid if:
-// * [tx.NodeID] is a current/pending PoA validator of [tx.Subnet].
-// * [sTx]'s creds authorize it to spend the stated inputs.
-// * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
-// * The flow checker passes.
-func verifyRemoveSubnetValidatorTx(
+// verifyAddSubnetValidatorTx carries out the validation for an
+// AddSubnetValidatorTx. It returns the credentials authorizing the spend of the
+// tx inputs.
+func verifyAddSubnetValidatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
-	tx *platform.RemoveSubnetValidatorTx,
-) (*state.Staker, bool, error) {
+	tx *platform.AddSubnetValidatorTx,
+) ([]verify.Verifiable, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	var (
@@ -325,18 +179,90 @@ func verifyRemoveSubnetValidatorTx(
 		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	isCurrentValidator := true
+	startTime := currentTimestamp
+	if !isDurangoActive {
+		startTime = tx.StartTime()
+	}
+	duration := tx.EndTime().Sub(startTime)
+
+	switch {
+	case duration < backend.Config.MinStakeDuration:
+		// Ensure staking length is not too short
+		return nil, ErrStakeTooShort
+
+	case duration > backend.Config.MaxStakeDuration:
+		// Ensure staking length is not too long
+		return nil, ErrStakeTooLong
+	}
+
+	if !backend.Bootstrapped.Get() {
+		return nil, nil
+	}
+
+	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
+		return nil, err
+	}
+
+	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
+	if err == nil {
+		return nil, fmt.Errorf(
+			"attempted to issue %w for %s on subnet %s",
+			ErrDuplicateValidator,
+			tx.Validator.NodeID,
+			tx.SubnetValidator.Subnet,
+		)
+	}
+	if err != database.ErrNotFound {
+		return nil, fmt.Errorf(
+			"failed to find whether %s is a subnet validator: %w",
+			tx.Validator.NodeID,
+			err,
+		)
+	}
+
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
+		return nil, err
+	}
+
+	return verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
+}
+
+// Returns the representation of tx.NodeID validating tx.Subnet, which may
+// be either a current or a pending validator, and the credentials authorizing
+// the spend of the tx inputs.
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * tx.NodeI] is a current/pending PoA validator of tx.Subnet.
+// * sTx's creds authorize it to remove a validator from tx.Subnet.
+func verifyRemoveSubnetValidatorTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *platform.Tx,
+	tx *platform.RemoveSubnetValidatorTx,
+) (*state.Staker, []verify.Verifiable, error) {
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, nil, err
+	}
+
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return nil, nil, err
+	}
+
 	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
 	if err == database.ErrNotFound {
 		vdr, err = chainState.GetPendingValidator(tx.Subnet, tx.NodeID)
-		isCurrentValidator = false
 	}
 	if err != nil {
 		// It isn't a current or pending validator.
-		return nil, false, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"%s %w of %s: %w",
 			tx.NodeID,
 			ErrNotValidator,
@@ -346,75 +272,41 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	if !vdr.Priority.IsPermissionedValidator() {
-		return nil, false, ErrRemovePermissionlessValidator
+		return nil, nil, ErrRemovePermissionlessValidator
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return vdr, isCurrentValidator, nil
+		return vdr, nil, nil
 	}
 
 	baseTxCreds, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, err
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, false, fmt.Errorf("getting utxos: %w", err)
-	}
-
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return nil, false, err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, false, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return vdr, isCurrentValidator, nil
+	return vdr, baseTxCreds, nil
 }
 
 // verifyAddDelegatorTx carries out the validation for an AddDelegatorTx.
-// It returns the tx outputs that should be returned if this delegator is not
-// added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddDelegatorTx,
-) (
-	[]*avax.TransferableOutput,
-	error,
-) {
+) error {
 	currentTimestamp := chainState.GetTimestamp()
 	if backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp) {
-		return nil, ErrAddDelegatorTxPostDurango
+		return ErrAddDelegatorTxPostDurango
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, false /*=isDurangoActive*/); err != nil {
-		return nil, err
+		return err
 	}
 
 	var (
@@ -425,33 +317,28 @@ func verifyAddDelegatorTx(
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return nil, ErrStakeTooShort
+		return ErrStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return nil, ErrStakeTooLong
+		return ErrStakeTooLong
 
 	case tx.Validator.Wght < backend.Config.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, ErrWeightTooSmall
-	}
-
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, fmt.Errorf("getting utxos: %w", err)
+		return ErrWeightTooSmall
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return outs, nil
+		return nil
 	}
 
 	if err := verifyStakerStartTime(false /*=isDurangoActive*/, currentTimestamp, startTime); err != nil {
-		return nil, err
+		return err
 	}
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
 			tx.Validator.NodeID,
 			err,
@@ -460,7 +347,7 @@ func verifyAddDelegatorTx(
 
 	maximumWeight, err := safemath.Mul(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
 	if err != nil {
-		return nil, ErrStakeOverflow
+		return ErrStakeOverflow
 	}
 
 	if backend.Config.UpgradeConfig.IsApricotPhase3Activated(currentTimestamp) {
@@ -473,7 +360,7 @@ func verifyAddDelegatorTx(
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
-		return nil, ErrPeriodMismatch
+		return ErrPeriodMismatch
 	}
 	overDelegated, err := overDelegated(
 		chainState,
@@ -484,44 +371,19 @@ func verifyAddDelegatorTx(
 		endTime,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if overDelegated {
-		return nil, ErrOverDelegated
+		return ErrOverDelegated
 	}
 
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return outs, nil
+	return nil
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
 // AddPermissionlessValidatorTx.
 func verifyAddPermissionlessValidatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddPermissionlessValidatorTx,
@@ -614,35 +476,6 @@ func verifyAddPermissionlessValidatorTx(
 		}
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
 	return nil
 }
 
@@ -650,7 +483,6 @@ func verifyAddPermissionlessValidatorTx(
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddPermissionlessDelegatorTx,
@@ -768,113 +600,49 @@ func verifyAddPermissionlessDelegatorTx(
 		}
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
 	return nil
 }
 
+// Returns the credentials authorizing the spend of the tx inputs. The flow
+// check is left to the caller.
 // Returns an error if the given tx is invalid.
 // The transaction is valid if:
-// * [sTx]'s creds authorize it to spend the stated inputs.
 // * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
-// * The flow checker passes.
 func verifyTransferSubnetOwnershipTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.TransferSubnetOwnershipTx,
-) error {
+) ([]verify.Verifiable, error) {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		upgrades         = backend.Config.UpgradeConfig
 	)
 	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return ErrDurangoUpgradeNotActive
+		return nil, ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
+		return nil, err
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return nil
+		return nil, nil
 	}
 
-	baseTxCreds, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return nil
+	return verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 }
 
-// verifyAddAutoRenewedValidatorTx carries out the validation for an AddAutoRenewedValidatorTx.
+// verifyAddAutoRenewedValidatorTx carries out the validation for an
+// AddAutoRenewedValidatorTx.
 func verifyAddAutoRenewedValidatorTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddAutoRenewedValidatorTx,
@@ -943,93 +711,75 @@ func verifyAddAutoRenewedValidatorTx(
 		)
 	}
 
-	if err := verifySpend(
-		backend,
-		feeCalculator,
-		chainState,
-		tx,
-		sTx.Creds,
-	); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-// verifySetAutoRenewedValidatorConfigTx carries out the validation for an SetAutoRenewedValidatorConfigTx.
+// verifySetAutoRenewedValidatorConfigTx carries out the validation for a
+// SetAutoRenewedValidatorConfigTx. It returns the validator being configured
+// and the credentials authorizing the spend of the tx inputs.
 func verifySetAutoRenewedValidatorConfigTx(
 	backend *Backend,
-	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.SetAutoRenewedValidatorConfigTx,
-) (*state.Staker, error) {
+) (*state.Staker, []verify.Verifiable, error) {
 	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
-		return nil, errHeliconUpgradeNotActive
+		return nil, nil, errHeliconUpgradeNotActive
 	}
 
+	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		return nil, fmt.Errorf("getting staker tx: %w", err)
+		return nil, nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
+		return nil, nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
 	}
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+		return nil, nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
-		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
+		return nil, nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return validator, nil
+		return validator, nil, nil
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
 	if err != nil {
-		return nil, fmt.Errorf("getting validator rules: %w", err)
+		return nil, nil, fmt.Errorf("getting validator rules: %w", err)
 	}
 
 	switch {
 	case tx.Period > 0 && tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
-		return nil, ErrStakeTooShort
+		return nil, nil, ErrStakeTooShort
 	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
-		return nil, ErrStakeTooLong
+		return nil, nil, ErrStakeTooLong
 	}
 
 	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if err := verifySpend(
-		backend,
-		feeCalculator,
-		chainState,
-		tx,
-		baseTxCreds,
-	); err != nil {
-		return nil, err
-	}
-
-	return validator, nil
+	return validator, baseTxCreds, nil
 }
 
 // Ensure the proposed validator starts after the current time
@@ -1051,18 +801,18 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 	return nil
 }
 
+// verifySpend verifies that ins, authorized by creds, fund outs plus
+// producedAVAX and the fee of tx for the current fee configuration.
 func verifySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	tx platform.UnsignedTx,
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+	producedAVAX uint64,
 	creds []verify.Verifiable,
 ) error {
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos: %w", err)
-	}
-
 	txFee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return fmt.Errorf("calculating fee: %w", err)
