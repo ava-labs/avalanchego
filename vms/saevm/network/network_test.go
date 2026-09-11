@@ -58,6 +58,27 @@ func TestWithAllowedTrackedPeers(t *testing.T) {
 			require.True(t, net.Peers.Has(peer), "Peers.Has() connected peer")
 
 			require.Equalf(t, tt.expectedSize, net.PeerTracker.Size(), "PeerTracker.Size()")
+			require.Equalf(t, tt.expectedSize, net.StateTriePeerTracker.Size(), "StateTriePeerTracker.Size()")
 		})
 	}
+}
+
+// TestStateTriePeerTrackerIsolated checks that failures recorded against the
+// state trie tracker do not influence peer selection in the general tracker.
+func TestStateTriePeerTrackerIsolated(t *testing.T) {
+	peer := ids.GenerateTestNodeID()
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	net, err := New(snowCtx, &enginetest.Sender{})
+	require.NoError(t, err, "New()")
+	require.NotSame(t, net.PeerTracker, net.StateTriePeerTracker, "trackers MUST be distinct")
+
+	require.NoError(t, net.Connected(t.Context(), peer, nil), "Connected()")
+
+	// Only the state trie tracker records the failure.
+	net.StateTriePeerTracker.RegisterRequest(peer)
+	net.StateTriePeerTracker.RegisterFailure(peer)
+
+	got, ok := net.PeerTracker.SelectPeer()
+	require.True(t, ok, "PeerTracker.SelectPeer() ok")
+	require.Equal(t, peer, got, "PeerTracker.SelectPeer()")
 }

@@ -140,10 +140,32 @@ func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 	saetest.AssertEqualDBs(t, other.sharedMemoryDB, s.sharedMemoryDB, "shared memory")
 }
 
-// TestStateSyncNewNodeJoins is the happy path: a fresh node state syncs from a
+// TestStateSyncNewNode is the happy path: a fresh node state syncs from a
 // running source VM, bootstraps the remaining blocks, and then participates in
-// the network, both accepting the source's blocks and building its own.
+// the network, both accepting the source's blocks and building its own. Both
+// nodes run the same trie scheme, as they serve scheme-specific requests.
 func TestStateSyncNewNode(t *testing.T) {
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb",
+		},
+		{
+			name: "firewood",
+			opts: []sutOption{withFirewood()},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testStateSyncNewNode(t, tt.opts...)
+		})
+	}
+}
+
+func testStateSyncNewNode(t *testing.T, schemeOpts ...sutOption) {
 	const commitInterval = 8
 
 	key := txtest.NewKey(t)
@@ -152,11 +174,11 @@ func TestStateSyncNewNode(t *testing.T) {
 	timeOpt, _ := withVMTime(testStartTime)
 	// sharedOpts are the genesis-, clock-, and config-affecting options that
 	// every peer of src MUST reuse to share src's chain.
-	sharedOpts := []sutOption{
+	sharedOpts := append([]sutOption{
 		timeOpt,
 		withMaxAllocFor(key.EthAddress(), dstKey.EthAddress(), ethW.Addresses()[0]),
 		withCommitInterval(commitInterval),
-	}
+	}, schemeOpts...)
 	srcCtx, src := newSUT(t, sharedOpts...)
 	w := newWallet(key, src.ctx, src.Client)
 

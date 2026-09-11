@@ -10,25 +10,31 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 )
@@ -42,17 +48,20 @@ type Syncer struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	db          ethdb.Database
+	registerer  prometheus.Registerer
 	blockParser syncblock.Parser
 }
 
-// Syncer returns a [Syncer] using the same data as the [Handler].
-func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database) *Syncer {
+// Syncer returns a [Syncer] using the same data as the [Handler]. Metrics
+// specific to the trie scheme's syncer are registered on registerer.
+func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database, registerer prometheus.Registerer) *Syncer {
 	return &Syncer{
 		cfg:         cfg,
 		hooks:       hooks,
 		snowCtx:     snowCtx,
 		network:     network,
 		db:          db,
+		registerer:  registerer,
 		blockParser: parser(hooks),
 	}
 }
@@ -61,11 +70,6 @@ func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *ne
 // given the current disk state.
 func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	if !s.cfg.Enabled {
-		return false
-	}
-
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false
 	}
 
@@ -95,13 +99,10 @@ var errSynchronousBlock = errors.New("cannot state sync to synchronous block")
 // without error, one MUST call [Syncer.WriteSynced] to finalize the state
 // sync.
 func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
-	const (
-		// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from
-		// the last settled. We should find a way to guarantee sufficient
-		// blocks, but this overestimate will work for now.
-		numBlocksToFetch   = 512
-		maxLeafRequestSize = 1024
-	)
+	// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from
+	// the last settled. We should find a way to guarantee sufficient
+	// blocks, but this overestimate will work for now.
+	const numBlocksToFetch = 512
 
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
@@ -136,6 +137,17 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
+	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		return s.syncFirewood(ctx, hdr.Root, codeSyncer)
+	}
+	return s.syncHashDB(ctx, hdr.Root, codeSyncer)
+}
+
+// syncHashDB fetches the state trie at root as HashDB leaves, writing them to
+// [Syncer.db], and fetches all code referenced by it via codeSyncer.
+func (s *Syncer) syncHashDB(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
+	const maxLeafRequestSize = 1024
+
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
@@ -153,10 +165,10 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 			s.network.Network,
 			p2p.EVMLeafRequestHandlerID,
 			common.HashLength,
-			s.network.PeerTracker,
+			s.network.StateTriePeerTracker,
 		),
 		s.db,
-		hdr.Root,
+		root,
 		codeSyncer,
 		maxLeafRequestSize,
 	)
@@ -178,6 +190,80 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	return nil
 }
+
+// Firewood revision limits used only while syncing. Every committed range
+// proof creates a revision and only the latest is ever needed, so the
+// operator's [saedb.Config.RevisionsInMemory], sized for serving peers during
+// execution, would pin far too much in memory.
+const (
+	syncRevisionsInMemory      = 8
+	syncDeferredCommitInterval = 4 // MUST be < syncRevisionsInMemory
+)
+
+// syncFirewood fetches the state trie at root as Firewood range proofs,
+// committing them to the Firewood database that the [sae.VM] will later open,
+// and fetches all code referenced by them via codeSyncer.
+func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) (retErr error) {
+	fwCfg := s.cfg.DBConfig.FirewoodConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log)
+	fwCfg.RevisionsInMemory = syncRevisionsInMemory
+	fwCfg.DeferredCommitInterval = syncDeferredCommitInterval
+	fw, err := firewood.New(fwCfg)
+	if err != nil {
+		return fmt.Errorf("opening firewood for state sync: %w", err)
+	}
+	defer func() {
+		// Firewood holds a file lock, so the [sae.VM] can only open the
+		// database once this handle is closed. Closing also persists the latest
+		// committed revision.
+		retErr = errors.Join(retErr, fw.Close())
+	}()
+
+	// TODO(alarso16): Resume from partially synced state instead of clearing.
+	if got := common.Hash(fw.Firewood.Root()); got != types.EmptyRootHash {
+		s.snowCtx.Log.Info("clearing partially synced firewood state",
+			zap.Stringer("root", got),
+		)
+		if _, err := fw.Firewood.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})}); err != nil {
+			return fmt.Errorf("clearing firewood: %w", err)
+		}
+	}
+
+	fwSyncer, err := fwsyncer.NewEVM(
+		fwsyncer.Config{
+			Log:         s.snowCtx.Log,
+			Registerer:  s.registerer,
+			PeerTracker: s.network.StateTriePeerTracker,
+		},
+		fw.Firewood,
+		codeSyncer,
+		ids.ID(root),
+		s.network.NewClient(p2p.FirewoodProofHandlerID, noSampler{}),
+	)
+	if err != nil {
+		return fmt.Errorf("creating firewood state syncer: %w", err)
+	}
+
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		return codeSyncer.Sync(egCtx)
+	})
+	eg.Go(func() error {
+		// The code syncer can only finish once no more code can be enqueued,
+		// which is after the last proof is committed or on failure.
+		defer codeSyncer.DoneAdding()
+		return fwSyncer.Sync(egCtx)
+	})
+	return eg.Wait()
+}
+
+var _ p2p.NodeSampler = noSampler{}
+
+// noSampler is a [p2p.NodeSampler] that never returns a node. It is used for
+// the Firewood proof client, whose peers are always chosen explicitly by the
+// syncer's [p2p.PeerTracker] rather than by [p2p.Client.AppRequestAny].
+type noSampler struct{}
+
+func (noSampler) Sample(context.Context, int) []ids.NodeID { return nil }
 
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
 // start up from [Summary.AcceptedHash] as the last accepted block. It MUST be

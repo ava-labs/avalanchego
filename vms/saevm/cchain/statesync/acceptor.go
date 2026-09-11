@@ -48,6 +48,7 @@ func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyn
 		h.snowCtx,
 		h.network,
 		h.ethDB,
+		h.syncClientReg,
 	)
 	shouldSync := evmSyncer.ShouldAcceptSummary(&s.summary)
 	if !shouldSync {

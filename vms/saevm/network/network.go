@@ -49,7 +49,15 @@ type Network struct {
 	*p2p.Network
 	ValidatorPeers *p2p.Validators
 	Peers          *p2p.Peers
-	PeerTracker    *p2p.PeerTracker
+	// PeerTracker ranks peers on their responses to scheme-independent
+	// requests (blocks, code, cross-chain state).
+	PeerTracker *p2p.PeerTracker
+	// StateTriePeerTracker ranks peers solely on their responses to state trie
+	// requests, which are specific to this node's trie scheme (HashDB leaves or
+	// Firewood proofs). Keeping it separate from [Network.PeerTracker] ensures
+	// a peer that serves scheme-independent requests well is not preferred for
+	// state trie requests it may be unable to serve.
+	StateTriePeerTracker *p2p.PeerTracker
 }
 
 // New creates the P2P network with a registered validator set.
@@ -73,15 +81,26 @@ func New(
 		maxValidatorSetStaleness,
 	)
 
-	peerTracker, err := p2p.NewPeerTracker(
-		snowCtx.Log,
-		"peer_tracker",
-		reg,
-		set.Of(snowCtx.NodeID),
-		nil,
-	)
+	newTracker := func(namespace string) (*p2p.PeerTracker, error) {
+		pt, err := p2p.NewPeerTracker(
+			snowCtx.Log,
+			namespace,
+			reg,
+			set.Of(snowCtx.NodeID),
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating %s: %w", namespace, err)
+		}
+		return pt, nil
+	}
+	peerTracker, err := newTracker("peer_tracker")
 	if err != nil {
-		return nil, fmt.Errorf("creating peer tracker: %w", err)
+		return nil, err
+	}
+	stateTriePeerTracker, err := newTracker("state_trie_peer_tracker")
+	if err != nil {
+		return nil, err
 	}
 
 	const namespace = "network"
@@ -93,15 +112,17 @@ func New(
 		peers,
 		validatorPeers,
 		withFilter(peerTracker, cfg.trackedPeers),
+		withFilter(stateTriePeerTracker, cfg.trackedPeers),
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Network{
-		Network:        network,
-		Peers:          peers,
-		ValidatorPeers: validatorPeers,
-		PeerTracker:    peerTracker,
+		Network:              network,
+		Peers:                peers,
+		ValidatorPeers:       validatorPeers,
+		PeerTracker:          peerTracker,
+		StateTriePeerTracker: stateTriePeerTracker,
 	}, nil
 }
 
