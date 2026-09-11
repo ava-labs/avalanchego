@@ -28,8 +28,8 @@ type StateDBOpener interface {
 	StateDB(root common.Hash) (*state.StateDB, error)
 }
 
-// A ReadOnlyStateDBOpener opens state at the given root that MUST NOT be
-// committed. Only a scheme that can enforce that rejects the commit.
+// ReadOnlyStateDBOpener opens state at the given root that cannot be
+// committed.
 type ReadOnlyStateDBOpener interface {
 	ReadOnlyStateDB(root common.Hash) (*state.StateDB, error)
 }

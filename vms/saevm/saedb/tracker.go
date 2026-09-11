@@ -175,10 +175,6 @@ type Tracker struct {
 	snaps *snapshot.Tree
 	cache state.Database
 
-	// readOnlyCache opens tries that can be hashed but never committed. It is
-	// cache itself for a scheme with no such distinction.
-	readOnlyCache state.Database
-
 	// recent is a ring of the post-execution roots of the most recently
 	// executed blocks, each holding a reference that keeps its trie in memory
 	// for the snapshot generator. Unused when the snapshot is disabled.
@@ -199,11 +195,6 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 	}
 
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig(dataDir, log))
-	readOnlyCache := cache
-	if ro, ok := cache.(firewood.ReadOnlyDatabase); ok {
-		readOnlyCache = ro.ReadOnly()
-	}
-
 	var snaps *snapshot.Tree
 	if snapConf := c.snapConfig(); snapConf != nil {
 		var err error
@@ -215,11 +206,10 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		}
 	}
 	return &Tracker{
-		snaps:         snaps,
-		cache:         cache,
-		readOnlyCache: readOnlyCache,
-		config:        c,
-		log:           log,
+		snaps:  snaps,
+		cache:  cache,
+		config: c,
+		log:    log,
 	}, nil
 }
 
@@ -365,10 +355,9 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 }
 
 // ReadOnlyStateDB is [Tracker.StateDB] for state that MUST NOT be committed.
-// Under Firewood the commit is rejected. HashDB cannot distinguish the two, so
-// there the caller carries the obligation.
+// Committing the result returns [ErrReadOnlyStateDB] whatever the scheme.
 func (t *Tracker) ReadOnlyStateDB(root common.Hash) (*state.StateDB, error) {
-	return state.New(root, t.readOnlyCache, t.snaps)
+	return state.New(root, readOnlyDatabase{t.cache}, t.snaps)
 }
 
 // Close commits the state at root to disk, flattens any snapshot onto it, and

@@ -284,18 +284,6 @@ func (t *TrieDB) newRevision(root common.Hash) (*ffi.Revision, error) {
 	return revision, err
 }
 
-// committed reports whether root is persisted rather than an unpersisted
-// proposal. Only a committed revision can back an [ffi.Reconstructed].
-func (t *TrieDB) committed(root common.Hash) bool {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	if _, queued := t.committable.Get(root); queued {
-		return false
-	}
-	return t.pending == nil || common.Hash(t.pending.Root()) != root
-}
-
 var errNotProposable = errors.New("parent root is not proposable")
 
 // newProposal creates a new proposal from either a committable proposal or the

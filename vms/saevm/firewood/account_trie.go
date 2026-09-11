@@ -40,8 +40,6 @@ type accountTrie struct {
 	revision *ffi.Revision
 	hasher   hasher
 	tdb      *TrieDB
-
-	readOnly bool // rejects [accountTrie.Commit] whatever the hasher permits
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
@@ -51,30 +49,6 @@ func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*ac
 	}
 	hasher := newProposalHasher(db, root, revision)
 	return newAccountTrieWithHasher(revision, hasher, db, currentOps), nil
-}
-
-// newReadOnlyAccountTrie returns a trie that refuses to commit. It hashes via
-// an [ffi.Reconstructed] where root permits one, otherwise via a proposal.
-func newReadOnlyAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
-	// [ffi.Revision.Reconstruct] requires a revision handle taken after root was
-	// committed, so the check precedes the handle and never follows it.
-	committed := db.committed(root)
-
-	revision, err := db.newRevision(root)
-	if err != nil {
-		return nil, err
-	}
-
-	var h hasher
-	if committed {
-		h = newReconstructedHasher(revision)
-	} else {
-		h = newProposalHasher(db, root, revision)
-	}
-
-	tr := newAccountTrieWithHasher(revision, h, db, currentOps)
-	tr.readOnly = true
-	return tr, nil
 }
 
 func newAccountTrieWithHasher(revision *ffi.Revision, h hasher, db *TrieDB, currentOps []ffi.BatchOp) *accountTrie {
@@ -140,10 +114,6 @@ func (a *accountTrie) hash() (common.Hash, error) {
 // Commit returns an error if the parent root cannot be proposed on, since such
 // state can never be committed.
 func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
-	if a.readOnly {
-		return common.Hash{}, nil, ErrReadOnlyNotCommittable
-	}
-
 	root, err := a.hash()
 	if err != nil {
 		return common.Hash{}, nil, err
@@ -163,7 +133,5 @@ func (a *accountTrie) Copy() *accountTrie {
 		a.tdb.log.Error("copying account trie", zap.Error(err))
 		return nil
 	}
-	cp := newAccountTrieWithHasher(a.revision, h, a.tdb, slices.Clone(a.updateOps))
-	cp.readOnly = a.readOnly
-	return cp
+	return newAccountTrieWithHasher(a.revision, h, a.tdb, slices.Clone(a.updateOps))
 }
