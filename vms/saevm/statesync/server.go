@@ -8,42 +8,41 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state/snapshot"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
-// RegisterHandlers registers the handlers for the state sync protocol.
+// RegisterServer registers the handlers for the state sync protocol, counting
+// the requests they serve under the [Handler]'s metrics namespace.
 //
 // TODO(alarso16): Find a way to wire through Firewood.
-func RegisterHandlers(
-	log logging.Logger,
-	network *p2p.Network,
-	db ethdb.Database,
-	tdb *triedb.Database,
-	snap *snapshot.Tree,
-) error {
-	if err := block.RegisterHandler(log, network, db); err != nil {
+func (h *Handler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tree) error {
+	var (
+		log    = h.snowCtx.Log
+		p2pNet = h.network.Network
+		db     = h.db
+	)
+	if err := block.RegisterHandler(log, p2pNet, db, h.reg); err != nil {
 		return fmt.Errorf("registering block handler: %w", err)
 	}
 
 	if err := hashdb.RegisterHandler(
 		log,
-		network,
+		p2pNet,
 		p2p.EVMLeafRequestHandlerID,
 		tdb,
 		common.HashLength,
+		h.reg,
 		hashdbOptions(snap)...,
 	); err != nil {
 		return fmt.Errorf("registering hashdb handler: %w", err)
 	}
 
-	if err := code.RegisterHandler(log, network, db); err != nil {
+	if err := code.RegisterHandler(log, p2pNet, db, h.reg); err != nil {
 		return fmt.Errorf("registering code handler: %w", err)
 	}
 
