@@ -54,6 +54,11 @@ func (kc *KeyChain) SignTx(tb testing.TB, signer types.Signer, account int, data
 	return tx
 }
 
+// PrivateKey returns the respective account's private key.
+func (kc *KeyChain) PrivateKey(account int) *ecdsa.PrivateKey {
+	return kc.keys[account]
+}
+
 // A Wallet manages a set of private keys (suitable only for tests) and nonces
 // to sign transactions.
 type Wallet struct {

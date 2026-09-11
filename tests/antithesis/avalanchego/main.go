@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
@@ -40,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -47,7 +49,6 @@ import (
 
 	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 	xtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
@@ -88,7 +89,8 @@ func main() {
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
-	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: c.URIs[0]})
+	setupURI := c.URIs[0]
+	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: setupURI})
 	tc.Log().Info("synced wallet",
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
 	)
@@ -169,15 +171,46 @@ func main() {
 		workloads[i] = worker
 	}
 
+	upgrades, err := info.NewClient(setupURI).Upgrades(ctx)
+	require.NoError(err, "failed to fetch the upgrade schedule")
+	timeUntilHelicon := time.Until(upgrades.HeliconTime)
+	assert.Always(
+		timeUntilHelicon > 0,
+		"Helicon activates after worker initialization",
+		map[string]any{
+			"heliconTime":      upgrades.HeliconTime,
+			"timeUntilHelicon": timeUntilHelicon.String(),
+		},
+	)
+
 	lifecycle.SetupComplete(map[string]any{
-		"msg":        "initialized workers",
-		"numWorkers": NumKeys,
+		"msg":              "initialized workers",
+		"numWorkers":       NumKeys,
+		"timeUntilHelicon": timeUntilHelicon.String(),
 	})
+
+	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
+}
+
+// awaitHeliconActivation reports that Helicon activated. Nothing is reported if
+// ctx is canceled first, failing the reachability assertion for runs that end
+// before the activation.
+func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
+	timer := time.NewTimer(time.Until(heliconTime))
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		assert.Reachable("Helicon activating", map[string]any{
+			"heliconTime": heliconTime,
+		})
+	case <-ctx.Done():
+	}
 }
 
 type workload struct {
@@ -786,7 +819,7 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 	return nil
 }
 
-func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
+func (w *workload) confirmPChainTx(ctx context.Context, tx *platform.Tx) error {
 	ctx, cancel := context.WithTimeout(ctx, txConfirmationTimeout)
 	defer cancel()
 
@@ -861,7 +894,7 @@ func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx)
 	)
 }
 
-func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx) {
+func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *platform.Tx) {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
@@ -871,7 +904,7 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 			ctx,
 			utxos,
 			client,
-			ptxs.Codec,
+			platform.Codec,
 			constants.PlatformChainID,
 			constants.PlatformChainID,
 			w.addrs.List(),

@@ -60,8 +60,9 @@
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
-            # JSON processing
-            jq
+            # Config processing
+            jq                                         # JSON
+            yq                                         # YAML
 
             # Linters
             shellcheck

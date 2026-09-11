@@ -71,9 +71,10 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// AfterExecutingTransaction is a no-op.
-func (RulesExtra) AfterExecutingTransaction(sdb libevm.StateDB, bf *big.Int, gasUsed uint64) {
-	(ethparams.NOOPHooks{}).AfterExecutingTransaction(sdb, bf, gasUsed)
+// ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
+// implementation of core for message or transaction execution.
+func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }
 
 // AccessListGas computes the intrinsic gas for an access list.

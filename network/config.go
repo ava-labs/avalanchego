@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -118,6 +119,7 @@ type Config struct {
 	MyNodeID           ids.NodeID                    `json:"myNodeID"`
 	MyIPPort           *utils.Atomic[netip.AddrPort] `json:"myIP"`
 	NetworkID          uint32                        `json:"networkID"`
+	UpgradeConfig      upgrade.Config                `json:"-"`
 	MaxClockDifference time.Duration                 `json:"maxClockDifference"`
 	PingFrequency      time.Duration                 `json:"pingFrequency"`
 	AllowPrivateIPs    bool                          `json:"allowPrivateIPs"`

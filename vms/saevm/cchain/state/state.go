@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -31,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // These prefixes and keys are byte-compatible with the indices written by
@@ -82,7 +81,7 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
 		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
-			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
+			saetypes.NewEthDB(prefixdb.NewNested(triePrefix, db)),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
@@ -148,28 +147,56 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err != nil {
 		return fmt.Errorf("merging atomic ops: %w", err)
 	}
-	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
-	if err != nil {
-		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
-	}
 
-	batch := s.db.NewBatch()
+	var (
+		isBonus = isBonusBlock(s.snowCtx.NetworkID, height)
+		batch   = s.db.NewBatch()
+	)
 	for _, t := range txs {
+		if isBonus {
+			// To provide consistent API behavior with databases made by Coreth,
+			// we report the first height a transaction was accepted at as the
+			// canonical height.
+			txID := t.ID()
+			has, err := s.db.Has(txKey(txID))
+			if err != nil {
+				return fmt.Errorf("checking for existing tx %s: %w", txID, err)
+			}
+			if has {
+				continue
+			}
+		}
 		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
 	}
+	return s.commit(batch, height, ops)
+}
+
+// commit inserts keys and values for a height to the [triedb.Database] and to
+// shared memory.
+func (s *State) commit(batch database.Batch, height uint64, ops map[ids.ID]*chainsatomic.Requests) error {
+	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
+	if err != nil {
+		return fmt.Errorf("applying trie at height %d: %w", height, err)
+	}
+
 	if err := database.PutUInt64(batch, lastHeightKey, height); err != nil {
 		return fmt.Errorf("writing last height: %w", err)
 	}
 	if err := database.PutID(batch, rootKey(height), ids.ID(newRoot)); err != nil {
 		return fmt.Errorf("writing root: %w", err)
 	}
+
+	// Applying the same operation multiple times to shared memory MAY result in
+	// an error. Since bonus blocks consume the same UTXOs multiple times, we
+	// MUST skip applying their operations to shared memory.
+	if isBonusBlock(s.snowCtx.NetworkID, height) {
+		ops = nil
+	}
+
 	// Committing the batch atomically with shared memory prevents duplicate
 	// shared memory operations in the event of a crash.
-	//
-	// TODO(StephenButtolph): Skip applying shared memory operations for bonus
-	// blocks.
 	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
 		return fmt.Errorf("applying shared memory: %w", err)
 	}
@@ -212,6 +239,25 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	return ops, nil
 }
 
+const keyLength = state.TrieKeyLength
+
+// encodeTrieKey returns the atomic trie key for height and chainID: the 8-byte
+// big-endian height followed by the 32-byte chainID.
+func encodeTrieKey(height uint64, chainID ids.ID) []byte {
+	k := make([]byte, keyLength)
+	binary.BigEndian.PutUint64(k, height)
+	copy(k[wrappers.LongLen:], chainID[:])
+	return k
+}
+
+// decodeTrieKey splits an atomic trie key into its height and chainID.
+func decodeTrieKey(key []byte) (uint64, ids.ID, error) {
+	if len(key) != keyLength {
+		return 0, ids.ID{}, fmt.Errorf("invalid trie key length: expected %d, got %d", keyLength, len(key))
+	}
+	return binary.BigEndian.Uint64(key[:wrappers.LongLen]), ids.ID(key[wrappers.LongLen:]), nil
+}
+
 var errCleanTrieAfterUpdates = errors.New("clean trie after updates")
 
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
@@ -236,12 +282,8 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
 
-		const keyLength = state.TrieKeyLength
-		k := make([]byte, keyLength)
-		binary.BigEndian.PutUint64(k, height)
-		copy(k[wrappers.LongLen:], chainID[:])
-		if err := tr.Update(k, v); err != nil {
-			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
+		if err := tr.Update(encodeTrieKey(height, chainID), v); err != nil {
+			return common.Hash{}, fmt.Errorf("inserting trie key: %w", err)
 		}
 	}
 

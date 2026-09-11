@@ -166,6 +166,7 @@ func NewTestNetworkConfig(
 			1,
 		)),
 		NetworkID:                    networkID,
+		UpgradeConfig:                upgrade.GetConfig(networkID),
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
@@ -222,7 +223,7 @@ func NewTestNetwork(
 
 	return NewNetwork(
 		cfg,
-		upgrade.GetConfig(cfg.NetworkID).GraniteTime, // Must be updated for each network upgrade
+		upgrade.GetConfig(cfg.NetworkID).HeliconTime, // Must be updated for each network upgrade
 		msgCreator,
 		metrics,
 		log,

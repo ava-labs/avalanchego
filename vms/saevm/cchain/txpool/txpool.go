@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
@@ -167,10 +168,14 @@ var (
 	ErrAlreadyKnown = errors.New("transaction already in pool")
 
 	errSanityCheck       = errors.New("sanity check")
+	errExcessGas         = errors.New("gas exceeds minimum gas target")
 	errVerifyCredentials = errors.New("credential verification")
 	errVerifyState       = errors.New("state verification")
 	errInsufficientFee   = errors.New("insufficient fee")
 )
+
+// Each tx byte must cost at least one gas.
+const _ uint = tx.GasPerByte - 1
 
 // Add validates tx and inserts it into the pool.
 //
@@ -189,7 +194,19 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 		return err
 	}
 
-	// TODO:(StephenButtolph): Should we enforce a maximum gas amount here?
+	// Cap admitted-tx gas at MinTarget, the floor of the dynamic target, so
+	// every admitted tx stays includable. An unincludable tx never pays its
+	// fee, so an attacker could pin it with a free, arbitrarily high GasFeeCap
+	// and fill the pool.
+	//
+	// Since each tx byte costs at least one gas, this also caps tx size at
+	// MinTarget bytes, bounding the pool's memory.
+	if t.op.Gas > dynamic.MinTarget {
+		return fmt.Errorf("%w: %d > %d", errExcessGas, t.op.Gas, dynamic.MinTarget)
+	}
+
+	// TODO(JonathanOppenheimer): Consider raising the gas per byte of
+	// cross-chain txs so that byte-heavy txs pay their fair share.
 
 	// We must verify the tx against a state that is at least as high as the
 	// last block processed by the pool subscription.

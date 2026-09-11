@@ -54,7 +54,7 @@ type blockBuilderG[T hook.Transaction] struct {
 }
 
 func (b *blockBuilderG[_]) new(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error) {
-	return blocks.New(eth, parent, lastSettled, b.log)
+	return blocks.New(eth, parent, lastSettled, b.hooks, b.log)
 }
 
 func (b *blockBuilderG[_]) build(
@@ -68,6 +68,7 @@ func (b *blockBuilderG[_]) build(
 		parent,
 		b.mempool.TransactionsByPriority,
 		b.hooks,
+		saeparams.TargetBlockBytes,
 	)
 }
 
@@ -120,6 +121,7 @@ func (b *blockBuilderG[_]) rebuild(
 		parent,
 		func(txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
 		rebuilder,
+		saeparams.MaxBlockBytes,
 	)
 }
 
@@ -128,16 +130,21 @@ var (
 	errBlockTimeBeforeParent = errors.New("block time before parent time")
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
+	errZeroSettledMarker     = errors.New("all-zero settlement marker indistinguishable from a synchronous block")
 )
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
 // and [blockBuilder.rebuild]. The block context MAY be nil.
+//
+// blockByteBudget caps the cumulative serialized size of included
+// transactions and end-of-block ops.
 func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
 	builder hook.BlockBuilder[T],
+	blockByteBudget uint64,
 ) (*blocks.Block, error) {
 	hdr, err := builder.BuildHeader(parent.Header())
 	if err != nil {
@@ -245,7 +252,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
 		})
-		included []*types.Transaction
+		included      []*types.Transaction
+		includedBytes uint64
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -265,6 +273,19 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
+		// Skip transactions that would push the block past its serialized-byte
+		// budget, even if mempool admission accepted more bytes than the
+		// gas-per-byte rule intends. The budget is shared with the
+		// end-of-block ops appended below.
+		txBytes := tx.Size()
+		if includedBytes+txBytes > blockByteBudget {
+			txLog.Debug("Skipping transaction: block byte budget reached",
+				zap.Uint64("tx_bytes", txBytes),
+				zap.Uint64("included_bytes", includedBytes),
+			)
+			continue
+		}
+
 		// The [saexec.Executor] checks the worst-case balance before tx
 		// execution so we MUST record it at the equivalent point, before
 		// ApplyTx().
@@ -274,6 +295,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		txLog.Trace("Including transaction")
 		included = append(included, tx)
+		includedBytes += txBytes
 	}
 	var includedOps []T
 	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {
@@ -287,12 +309,24 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			zap.Int("op_index", len(includedOps)),
 		)
 
+		// Ops are carried in the built block, so they consume the same byte
+		// budget as the transactions included above.
+		opBytes := tx.Size()
+		if includedBytes+opBytes > blockByteBudget {
+			opLog.Debug("Skipping op: block byte budget reached",
+				zap.Uint64("op_bytes", opBytes),
+				zap.Uint64("included_bytes", includedBytes),
+			)
+			continue
+		}
+
 		if err := state.Apply(op); err != nil {
 			opLog.Debug("Could not apply op", zap.Error(err))
 			continue
 		}
 		opLog.Trace("Including op")
 		includedOps = append(includedOps, tx)
+		includedBytes += opBytes
 	}
 	hdr.GasUsed = state.GasUsed()
 
@@ -313,19 +347,20 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	// All fields of [hook.Settled] MUST be populated, otherwise state sync
 	// and recovery will not function correctly.
 	settledGasTime := lastSettled.ExecutedByGasTime()
-	ethB, err := builder.BuildBlock(
-		hdr,
-		bCtx,
-		included,
-		receipts,
-		includedOps,
-		hook.Settled{
-			Height:       lastSettled.NumberU64(),
-			GasUnix:      settledGasTime.Unix(),
-			GasNumerator: settledGasTime.Fraction().Numerator,
-			Excess:       settledGasTime.Excess(),
-		},
-	)
+	settled := hook.Settled{
+		Height:       lastSettled.NumberU64(),
+		GasUnix:      settledGasTime.Unix(),
+		GasNumerator: settledGasTime.Fraction().Numerator,
+		Excess:       settledGasTime.Excess(),
+	}
+	if settled == (hook.Settled{}) {
+		// An all-zero marker implies pre-SAE (see [hook.Synchronous]),
+		// executing the block with the worst-case fee in its header.
+		log.Error("Settlement marker would indicate synchronous execution")
+		return nil, errZeroSettledMarker
+	}
+
+	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +372,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	block.SetWorstCaseBounds(bounds)
 	return block, nil
 }
+
+// maxFutureBlockDuration is the maximum time from the current time allowed for
+// blocks before they're considered future blocks and fail parsing or
+// verification.
+const (
+	maxFutureBlockSeconds  uint64 = 10
+	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
+)
 
 func lastToSettle(
 	hooks hook.Points,
@@ -363,7 +406,7 @@ func lastToSettle(
 	}
 
 	// Underflow of Add(-tau) is prevented by the above check.
-	lastSettled, ok, err := blocks.LastToSettleAt(hooks, bTime.Add(-saeparams.Tau), parent)
+	lastSettled, ok, err := blocks.LastToSettleAt(bTime.Add(-saeparams.Tau), parent)
 	if err != nil {
 		return nil, err
 	}

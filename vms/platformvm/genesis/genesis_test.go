@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -210,7 +210,7 @@ func TestGenesis(t *testing.T) {
 	// Validate validator
 	require.Len(genesis.Validators, 1)
 	validator := genesis.Validators[0]
-	txValidator, ok := validator.Unsigned.(*txs.AddValidatorTx)
+	txValidator, ok := validator.Unsigned.(*platform.AddValidatorTx)
 	require.True(ok)
 	require.Equal(nodeID, txValidator.Validator.NodeID)
 	require.Equal(uint64(20), txValidator.Validator.End)

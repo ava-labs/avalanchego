@@ -12,14 +12,9 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/holiman/uint256"
 )
-
-func unix(t time.Time) uint64 {
-	return uint64(t.Unix()) //#nosec G115 -- Guaranteed to be positive
-}
 
 // uint256FromBig is a wrapper around [uint256.FromBig] with extra checks, for
 // nil input and for overflow.

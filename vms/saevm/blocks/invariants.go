@@ -23,7 +23,6 @@ import (
 // WorstCaseBounds define the limits of certain values, predicted by the block
 // builder, that a [Block] will encounter when eventually executed.
 type WorstCaseBounds struct {
-	MaxBaseFee *uint256.Int
 	// LatestEndTime is the worst-case [gastime.Time] after this block's gas has been
 	// consumed and the target updated. Its [gastime.Time.BaseFee] is an upper
 	// bound on the next block's base fee because the next block's
@@ -45,22 +44,27 @@ func (b *Block) WorstCaseBounds() *WorstCaseBounds {
 	return b.bounds
 }
 
-// CheckBaseFeeBound logs at ERROR if the `actual` base fee is greater than the
-// predicted upper bound passed to [Block.SetWorstCaseBounds].
+// CheckBaseFeeBound logs at ERROR if the `actual` base fee is greater than
+// [Block.WorstCaseBaseFee].
 //
 // Such a violation, while potentially critical, might not result in failed
 // execution so no error is returned and execution MUST continue optimistically.
 // Any such log in development will cause tests to fail.
 func (b *Block) CheckBaseFeeBound(actual *uint256.Int) {
+	// TODO(JonathanOppenheimer): I believe the header's bound is valid even
+	// for blocks that we did not verify locally (so blocks we got from
+	// bootstrapping) but our test blocks have a zero base fee, which means
+	// if we get rid of this check, all of the tests fail. fix this in the tests
 	if b.bounds == nil {
 		return
 	}
 
-	switch actual.Cmp(b.bounds.MaxBaseFee) {
+	predicted := b.WorstCaseBaseFee()
+	switch actual.Cmp(predicted) {
 	case 1:
 		b.log.Error("Actual base fee > predicted worst case",
 			zap.Stringer("actual", actual),
-			zap.Stringer("predicted", b.bounds.MaxBaseFee),
+			zap.Stringer("predicted", predicted),
 		)
 
 	case 0: // Coverage visualisation
@@ -199,7 +203,10 @@ func (b *Block) CheckInvariants(expect LifeCycleStage) error {
 		if expect >= Settled {
 			return b.brokenInvariantErr("expected to be settled")
 		}
-		if b.SettledStateRoot() != b.LastSettled().PostExecutionStateRoot() {
+		// Although execution is a pre-requisite for settlement, execution
+		// artefacts aren't always restored during database recovery. In these
+		// cases, [Block.PostExecutionStateRoot] would block forever.
+		if s := b.LastSettled(); s.Executed() && b.SettledStateRoot() != s.PostExecutionStateRoot() {
 			return b.brokenInvariantErr("state root does not match last-settled post execution")
 		}
 	}

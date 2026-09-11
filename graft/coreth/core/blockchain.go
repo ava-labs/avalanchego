@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
@@ -761,6 +762,21 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return fmt.Errorf("could not load last accepted block")
 	}
 
+	// SAE requires these values to be set to the last accepted hash on
+	// transition. Nodes that do not accept any blocks after upgrading before
+	// transition wouldn't otherwise correctly set these values.
+	{
+		lastAcceptedHash := bc.lastAccepted.Hash()
+		if finalized := rawdb.ReadFinalizedBlockHash(bc.db); finalized != lastAcceptedHash {
+			log.Info("Repairing finalized block hash", "from", finalized, "to", lastAcceptedHash)
+			rawdb.WriteFinalizedBlockHash(bc.db, lastAcceptedHash)
+		}
+		if headFast := rawdb.ReadHeadFastBlockHash(bc.db); headFast != lastAcceptedHash {
+			log.Info("Repairing head fast block hash", "from", headFast, "to", lastAcceptedHash)
+			rawdb.WriteHeadFastBlockHash(bc.db, lastAcceptedHash)
+		}
+	}
+
 	// This ensures that the head block is updated to the last accepted block on startup
 	if err := bc.setPreference(bc.lastAccepted); err != nil {
 		return fmt.Errorf("failed to set preference to last accepted block while loading last state: %w", err)
@@ -1387,7 +1403,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	blockStateInitTimer.Inc(time.Since(substart).Milliseconds())
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process block using the parent state as reference point
@@ -1750,7 +1766,7 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	}
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process previously stored block

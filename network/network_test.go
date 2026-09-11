@@ -109,6 +109,7 @@ var (
 		DialerConfig: defaultDialerConfig,
 
 		NetworkID:          49463,
+		UpgradeConfig:      upgrade.Default,
 		MaxClockDifference: time.Minute,
 		PingFrequency:      constants.DefaultPingFrequency,
 		AllowPrivateIPs:    true,
@@ -207,9 +208,17 @@ func newMessageCreator(t *testing.T) message.Creator {
 }
 
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
+	return newFullyConnectedTestNetworkWithConfig(t, handlers, defaultConfig)
+}
+
+func newFullyConnectedTestNetworkWithConfig(
+	t *testing.T,
+	handlers []router.InboundHandler,
+	baseConfig Config,
+) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers), defaultConfig)
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers), baseConfig)
 
 	var (
 		networks = make([]*network, len(configs))
@@ -305,6 +314,83 @@ func TestNewNetwork(t *testing.T) {
 		net.StartClose()
 	}
 	require.NoError(eg.Wait())
+}
+
+func TestNodeUptimeACP267Requirement(t *testing.T) {
+	heliconTime := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name       string
+		startTime  time.Time
+		peerUptime float64
+		want       float64
+	}{
+		{
+			name:       "started_before_helicon",
+			startTime:  heliconTime.Add(-time.Second),
+			peerUptime: .85,
+			want:       100,
+		},
+		{
+			name:       "started_at_helicon_below_requirement",
+			startTime:  heliconTime,
+			peerUptime: .85,
+			want:       50, // only the local validator's half of total stake qualifies
+		},
+		{
+			name:       "started_at_helicon_at_requirement",
+			startTime:  heliconTime,
+			peerUptime: .9,
+			want:       100,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := defaultConfig
+			// Set the ping frequency to one hour so the explicit ping below should be the only
+			// ping sent during the test. Multiple in-flight pings can make a pong appear unexpected
+			// and disconnect the peer.
+			config.PingFrequency = time.Hour
+			config.UptimeCalculator = uptime.TestCalculator{StartTime: tt.startTime}
+			config.UpgradeConfig.HeliconTime = heliconTime
+
+			nodeIDs, networks, eg := newFullyConnectedTestNetworkWithConfig(
+				t,
+				[]router.InboundHandler{nil, nil},
+				config,
+			)
+			t.Cleanup(func() {
+				for _, network := range networks {
+					network.StartClose()
+				}
+				require.NoError(t, eg.Wait())
+			})
+
+			sender := networks[1]
+			peers := sender.getPeers(
+				set.Of(nodeIDs[0]),
+				constants.PrimaryNetworkID,
+				subnets.NoOpAllower,
+			)
+			require.Len(t, peers, 1)
+
+			peerUptime := uint32(tt.peerUptime * 100)
+
+			// Send the uptime explicitly instead of relying on a periodic ping.
+			ping, err := sender.peerConfig.MessageCreator.Ping(peerUptime)
+			require.NoError(t, err)
+			require.True(t, peers[0].Send(t.Context(), ping))
+
+			require.Eventually(t, func() bool {
+				peers := networks[0].PeerInfo(nil)
+				return len(peers) == 1 && uint32(peers[0].ObservedUptime) == peerUptime
+			}, 10*time.Second, 10*time.Millisecond)
+
+			uptime, err := networks[0].NodeUptime()
+			require.NoError(t, err)
+			require.Equal(t, tt.want, uptime.RewardingStakePercentage)
+		})
+	}
 }
 
 func TestIngressConnCount(t *testing.T) {

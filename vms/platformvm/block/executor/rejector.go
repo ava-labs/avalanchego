@@ -6,10 +6,10 @@ package executor
 import (
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
-var _ block.Visitor = (*rejector)(nil)
+var _ platform.BlockVisitor = (*rejector)(nil)
 
 // rejector handles the logic for rejecting a block.
 // All errors returned by this struct are fatal and should result in the chain
@@ -19,43 +19,43 @@ type rejector struct {
 	addTxsToMempool bool
 }
 
-func (r *rejector) BanffAbortBlock(b *block.BanffAbortBlock) error {
+func (r *rejector) BanffAbortBlock(b *platform.BanffAbortBlock) error {
 	return r.rejectBlock(b, "banff abort")
 }
 
-func (r *rejector) BanffCommitBlock(b *block.BanffCommitBlock) error {
+func (r *rejector) BanffCommitBlock(b *platform.BanffCommitBlock) error {
 	return r.rejectBlock(b, "banff commit")
 }
 
-func (r *rejector) BanffProposalBlock(b *block.BanffProposalBlock) error {
+func (r *rejector) BanffProposalBlock(b *platform.BanffProposalBlock) error {
 	return r.rejectBlock(b, "banff proposal")
 }
 
-func (r *rejector) BanffStandardBlock(b *block.BanffStandardBlock) error {
+func (r *rejector) BanffStandardBlock(b *platform.BanffStandardBlock) error {
 	return r.rejectBlock(b, "banff standard")
 }
 
-func (r *rejector) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
+func (r *rejector) ApricotAbortBlock(b *platform.ApricotAbortBlock) error {
 	return r.rejectBlock(b, "apricot abort")
 }
 
-func (r *rejector) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
+func (r *rejector) ApricotCommitBlock(b *platform.ApricotCommitBlock) error {
 	return r.rejectBlock(b, "apricot commit")
 }
 
-func (r *rejector) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
+func (r *rejector) ApricotProposalBlock(b *platform.ApricotProposalBlock) error {
 	return r.rejectBlock(b, "apricot proposal")
 }
 
-func (r *rejector) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
+func (r *rejector) ApricotStandardBlock(b *platform.ApricotStandardBlock) error {
 	return r.rejectBlock(b, "apricot standard")
 }
 
-func (r *rejector) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
+func (r *rejector) ApricotAtomicBlock(b *platform.ApricotAtomicBlock) error {
 	return r.rejectBlock(b, "apricot atomic")
 }
 
-func (r *rejector) rejectBlock(b block.Block, blockType string) error {
+func (r *rejector) rejectBlock(b platform.Block, blockType string) error {
 	blkID := b.ID()
 	defer r.free(blkID)
 

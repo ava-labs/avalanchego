@@ -46,6 +46,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/stretchr/testify/require"
+
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -1388,4 +1390,52 @@ func TestEIP3651(t *testing.T) {
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
+}
+
+func TestLegacyMarkersRepairedOnStartup(t *testing.T) {
+	key, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+	db := rawdb.NewMemoryDatabase()
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  types.GenesisAlloc{addr: {Balance: big.NewInt(1000000)}},
+	}
+
+	blockchain, err := createBlockChain(db, pruningConfig, gspec, common.Hash{})
+	require.NoError(t, err, "createBlockChain()")
+
+	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 3, 10, func(int, *BlockGen) {})
+	require.NoError(t, err, "GenerateChainWithGenesis()")
+
+	_, err = blockchain.InsertChain(chain)
+	require.NoErrorf(t, err, "%T.InsertChain()", blockchain)
+	lastAccepted := chain[1]
+	for _, b := range chain[:2] {
+		require.NoErrorf(t, blockchain.Accept(b), "%T.Accept()", blockchain)
+	}
+	blockchain.DrainAcceptorQueue()
+	genesisHash := blockchain.genesisBlock.Hash()
+	lastAcceptedHash := lastAccepted.Hash()
+	lastVerifiedHash := chain[len(chain)-1].Hash()
+	blockchain.Stop()
+
+	require.Equal(t, lastAcceptedHash, rawdb.ReadFinalizedBlockHash(db), "finalized block hash after normal shutdown")
+	require.Equal(t, lastVerifiedHash, rawdb.ReadHeadFastBlockHash(db), "head fast block hash after normal shutdown")
+
+	// Emulate legacy markers
+	legacyFinalizedBlockKey := []byte("LastFinalized") // mirrors the unexported [rawdb] schema key
+	require.NoErrorf(t, db.Delete(legacyFinalizedBlockKey), "%T.Delete(%q)", db, legacyFinalizedBlockKey)
+	require.Equal(t, common.Hash{}, rawdb.ReadFinalizedBlockHash(db), "finalized block hash after simulating a legacy database")
+	rawdb.WriteHeadFastBlockHash(db, genesisHash)
+
+	restarted, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
+	require.NoError(t, err, "createBlockChain() on restart")
+	defer restarted.Stop()
+
+	require.Equal(t, lastAcceptedHash, rawdb.ReadFinalizedBlockHash(db), "repaired finalized block hash")
+	require.Equal(t, lastAcceptedHash, rawdb.ReadHeadFastBlockHash(db), "repaired head fast block hash")
+
+	// The repair must use the last accepted block, whose state [BlockChain.Stop]
+	// commits, because the block settled from must have its state on disk.
+	require.True(t, restarted.HasState(lastAccepted.Root()), "state of repaired marker block is on disk")
 }

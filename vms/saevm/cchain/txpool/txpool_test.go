@@ -326,6 +326,14 @@ func TestAdd(t *testing.T) {
 		missingCreds = newExport(t, []*secp256k1.PrivateKey{alice}, withCredentials(nil))
 	)
 
+	// Each single-sig input costs 1000 gas of signature verification alone, so
+	// 1000 of them exceed the 1M minimum gas target.
+	manySigKeys := make([]*secp256k1.PrivateKey, 1_000)
+	for i := range manySigKeys {
+		manySigKeys[i] = newKey(t)
+	}
+	manySigs := newExport(t, manySigKeys)
+
 	allKeys := []*secp256k1.PrivateKey{alice, bob, charles}
 	maxSizeTxs := make([]*tx.Tx, maxSize)
 	for i := range maxSizeTxs {
@@ -353,6 +361,11 @@ func TestAdd(t *testing.T) {
 			name:    "as_op_failure",
 			toAdd:   unmarshalable,
 			wantErr: errAsOp,
+		},
+		{
+			name:    "gas_over_minimum_target",
+			toAdd:   manySigs,
+			wantErr: errExcessGas,
 		},
 		{
 			name:    "verify_credentials_failure",
