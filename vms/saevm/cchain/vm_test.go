@@ -268,8 +268,7 @@ func withCommitInterval(n uint64) sutOption {
 	})
 }
 
-// withFirewood selects Firewood as the trie database instead of the default
-// HashDB.
+// withFirewood selects Firewood as the trie database
 func withFirewood() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.StateScheme = customrawdb.FirewoodScheme

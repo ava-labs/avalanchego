@@ -913,7 +913,7 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 				withDB(saetest.CopyDB(t, srcDB)),
 			)...)
 
-			for height := uint64(1); height <= numBlocks; height++ {
+			for height := range uint64(numBlocks) + 1 {
 				t.Run(fmt.Sprintf("block_%02d", height), func(t *testing.T) {
 					got, err := sut.NonceAt(ctx, sender, new(big.Int).SetUint64(height))
 					require.NoError(t, err, "NonceAt()")

@@ -37,15 +37,14 @@ The linear invariant means:
 
 ### Re-execution on Historical State
 
-Firewood can only propose on top of its most recent revision or a not-yet-committed proposal, so a `state.StateDB` opened at any older root could historically be read but not hashed. To allow hashing changes on historical roots, Firewood added `ffi.Reconstructed`, a Rust-side view that applies a batch on top of an `ffi.Revision` and can be read and re-hashed, but never committed.
+Firewood can only propose on top of its most recent revision or a not-yet-committed proposal, so a `state.StateDB` opened at any older root could be read but not hashed. To allow hashing historic state, Firewood added `ffi.Reconstructed`, a Rust-side view that applies a batch on top of an `ffi.Revision` and can be read and hashed, but never committed.
 
 The `state.StateDB` never knows whether it's being used for canonical execution or for an RPC call, so we can't determine which hashable structure to create at construction time. Additionally, the tip state change during use, so it must be updated accordingly at every hash.
 
 Some differences between the proposal and reconstructed implementations:
 
-- **Reconstructions are incremental, proposals are not.** A proposal is rebuilt from the full op list every time the ops grow, whereas a reconstruction only applies the ops added since the last hash. Re-executing many transactions with `IntermediateRoot` between them is therefore comparatively cheap on historical state. A failed `Reconstruct` releases the Rust view, and the next `Hash()` starts over from the revision.
+- **Incremental building** A proposal is rebuilt from the full op list every time the ops grow, whereas a reconstruction can apply the ops added since the last hash. Re-executing many transactions with `IntermediateRoot` between them is therefore comparatively cheap on historical state.
 - **`Copy()` differs by backing.** A proposal-backed copy re-proposes from the parent revision on its next hash, because the pending proposal is invalidated when the original commits it. A reconstruction-backed copy clones the Rust view so it starts from the already-hashed state; the two views then diverge independently.
-- **Which roots are available depends on Firewood's persistence, not on the commit interval alone.** With archival Firewood and a commit interval of `N`, the RPC layer walks back from the requested height until `state.New` succeeds and re-executes the intervening blocks. After a restart, only revisions Firewood actually persisted are available; Firewood persists at least every `N/2` commits and the root at shutdown, so up to roughly `N/2` blocks may need re-execution on a cold node. Blocks are re-executed with `saexec.SkipEndOfBlockOps()` and finalised without committing, and because the reconstruction is never committed, none of this touches disk.
 - **A pending proposal that is never consumed blocks the chain.** `trieCommit` refuses to overwrite `TrieDB.pending`, so if `state.StateDB.Commit` hands a proposal to the `TrieDB` and `TrieDB.Update` then rejects it (for example the parent was no longer the newest root), the next `Commit` from any trie fails with `errProposalPending`. Since there is only one execution thread, this should never be an issue. However, one must never call `state.StateDB.Commit` if it's not canonical execution. If the underlying hasher is a reconstruction, it will also return an error.
 
 ## SELFDESTRUCT Handling
