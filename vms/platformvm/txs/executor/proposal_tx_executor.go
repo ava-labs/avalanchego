@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -44,6 +45,7 @@ var (
 	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
 	errInvalidTimestamp              = errors.New("invalid timestamp")
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
+	errWrongTxType                   = errors.New("wrong transaction type")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -78,7 +80,7 @@ func ProposalTx(
 }
 
 type proposalTxExecutor struct {
-	unsupportedTxVisitor
+	txs.UnsupportedTxVisitor
 
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend

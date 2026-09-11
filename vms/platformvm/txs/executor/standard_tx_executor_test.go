@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
@@ -5000,7 +5001,7 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
 		diff,
 	)
-	require.ErrorIs(t, err, errWrongTxType)
+	require.ErrorIs(t, err, txs.ErrUnsupportedTxType)
 }
 
 func must[T any](t require.TestingT) func(T, error) T {

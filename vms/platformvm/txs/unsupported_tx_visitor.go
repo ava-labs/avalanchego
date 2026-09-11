@@ -5,107 +5,109 @@ package txs
 
 import (
 	"errors"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 var (
-	_ Visitor = (*unsupportedTxVisitor)(nil)
+	_ platform.TxVisitor = (*UnsupportedTxVisitor)(nil)
 
-	errUnsupportedTxType = errors.New("unsupported transaction type")
+	ErrUnsupportedTxType = errors.New("unsupported transaction type")
 )
 
-// unsupportedTxVisitor is embedded by executors to reject, by default, tx types that
+// UnsupportedTxVisitor is embedded by executors to reject, by default, tx types that
 // they do not execute. Executors override the methods for the tx types they
 // support.
-type unsupportedTxVisitor struct{}
+type UnsupportedTxVisitor struct{}
 
-func (unsupportedTxVisitor) AddValidatorTx(*AddValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddValidatorTx(*platform.AddValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AddSubnetValidatorTx(*AddSubnetValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddSubnetValidatorTx(*platform.AddSubnetValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AddDelegatorTx(*AddDelegatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddDelegatorTx(*platform.AddDelegatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) CreateChainTx(*CreateChainTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) CreateChainTx(*platform.CreateChainTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) CreateSubnetTx(*CreateSubnetTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) CreateSubnetTx(*platform.CreateSubnetTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) ImportTx(*ImportTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) ImportTx(*platform.ImportTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) ExportTx(*ExportTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) ExportTx(*platform.ExportTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AdvanceTimeTx(*AdvanceTimeTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) RewardValidatorTx(*RewardValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) RewardValidatorTx(*platform.RewardValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) TransformSubnetTx(*TransformSubnetTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) TransformSubnetTx(*platform.TransformSubnetTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) TransferSubnetOwnershipTx(*TransferSubnetOwnershipTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) BaseTx(*BaseTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) BaseTx(*platform.BaseTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) RegisterL1ValidatorTx(*RegisterL1ValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) DisableL1ValidatorTx(*DisableL1ValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) AddAutoRenewedValidatorTx(*AddAutoRenewedValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) SetAutoRenewedValidatorConfigTx(*SetAutoRenewedValidatorConfigTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
+	return ErrUnsupportedTxType
 }
 
-func (unsupportedTxVisitor) RewardAutoRenewedValidatorTx(*RewardAutoRenewedValidatorTx) error {
-	return errUnsupportedTxType
+func (UnsupportedTxVisitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
+	return ErrUnsupportedTxType
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -95,7 +96,7 @@ func StandardTx(
 }
 
 type standardTxExecutor struct {
-	unsupportedTxVisitor
+	txs.UnsupportedTxVisitor
 
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
