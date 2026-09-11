@@ -86,9 +86,17 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return root, err
 	}
 
+	// A revision handle can only reconstruct if it was taken after its root was
+	// committed, so it is re-taken here rather than reused.
+	revision, err := a.tdb.newRevision(common.Hash(a.revision.Root()))
+	if err != nil {
+		return common.Hash{}, err
+	}
+	a.revision = revision
+
 	// Reads by the shared [baseTrie] (and so by every [storageTrie]) MUST
 	// follow the new hasher.
-	a.hasher = newReconstructedHasher(a.revision)
+	a.hasher = newReconstructedHasher(revision)
 	a.reader = a.hasher
 	return a.hasher.hash(a.updateOps)
 }
