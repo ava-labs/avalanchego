@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
@@ -272,6 +273,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	vm, err := sae.NewVM(ctx, s.hooks, sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig:      s.cfg.syncConfig.DBConfig,
+		RPCConfig:     rpc.Config{StateReplayConcurrency: rpc.DefaultStateReplayConcurrency},
 		Now:           s.clock.Now,
 	}, s.snowCtx, chainConfig, s.db, s.network)
 	require.NoError(t, err, "NewVM()")
