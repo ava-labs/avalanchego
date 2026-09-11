@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 

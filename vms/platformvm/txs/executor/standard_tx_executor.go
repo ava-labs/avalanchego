@@ -1290,7 +1290,7 @@ func applySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
-	tx *txs.Tx,
+	tx *platform.Tx,
 	creds []verify.Verifiable,
 ) error {
 	unsignedTx := tx.Unsigned
