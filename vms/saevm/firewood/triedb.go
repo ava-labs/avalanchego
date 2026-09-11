@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -27,74 +28,77 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var (
-	_ triedb.DBConstructor = Config{}.BackendConstructor
-	_ triedb.HashDB        = (*TrieDB)(nil)
-)
+// NewTrieDB opens, or creates, the Firewood database at path and returns it
+// wrapped as a [triedb.Database], which MUST be closed by the caller. This is
+// the only way to construct a [TrieDB].
+func NewTrieDB(db ethdb.Database, config Config, path string, log logging.Logger) (*triedb.Database, error) {
+	// A [triedb.DBConstructor] cannot return an error, so Firewood is opened
+	// beforehand and merely returned by the constructor.
+	fw, err := newTrieDB(config, path, log)
+	if err != nil {
+		return nil, err
+	}
+	return triedb.NewDatabase(db, &triedb.Config{
+		DBOverride: func(ethdb.Database) triedb.DBOverride { return fw },
+	}), nil
+}
 
 // Config holds the configuration for creating a [TrieDB].
 type Config struct {
-	Path              string
-	Log               logging.Logger
-	CacheSizeBytes    uint
-	RevisionsInMemory uint // must be >= 2
-	Archive           bool
-	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
+	CacheSizeMiB uint64
+	// RevisionsInMemory controls the minimum number of revisions available at
+	// all times.
+	RevisionsInMemory uint64 // must be >= 2
+	// RootStore adds support to forever read from any revision persisted to
+	// disk. This is recommended for API providers.
+	RootStore bool
+	// MaxPersistGap must be < RevisionsInMemory as otherwise, it's
 	// possible to reap the latest persisted revision.
-	DeferredCommitInterval uint64
+	MaxPersistGap uint64
 	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
 
-// DefaultConfig returns a sensible Config with the given directory.
-func DefaultConfig(path string, log logging.Logger) Config {
+// DefaultConfig returns a sensible [Config] with the given directory.
+func DefaultConfig() Config {
 	return Config{
-		Path:                   path,
-		Log:                    log,
-		CacheSizeBytes:         1024 * 1024,
-		RevisionsInMemory:      128,
-		DeferredCommitInterval: 64,
+		CacheSizeMiB:      1,
+		RevisionsInMemory: 128,
+		MaxPersistGap:     64,
 	}
 }
 
-// BackendConstructor can be supplied as a [triedb.DBConstructor].  It creates a
-// new Firewood database with the given configuration.  If no logger is
-// provided, it will panic. If any other error occurs, the error will be logged
-// as [logging.Fatal] and will return nil.
-func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
-	db, err := New(c)
-	if err != nil {
-		if c.Log == nil {
-			panic(fmt.Errorf("creating firewood database: %w", err))
-		} else {
-			c.Log.Fatal("creating firewood database", zap.Error(err))
-		}
-	}
-	return db
-}
+// maxCacheMiB is the largest [Config.CacheSizeMiB] whose size in bytes fits in
+// the uint required by [ffi.WithNodeCacheSizeInBytes].
+const maxCacheMiB = math.MaxUint / units.MiB
 
 var (
-	errNoLogger             = errors.New("Log must be provided")  //nolint:staticcheck // false positive
-	errPathNotProvided      = errors.New("Path must be provided") //nolint:staticcheck // false positive
-	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
-	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errTooFewRevisions  = errors.New("RevisionsInMemory must be >= 2")
+	errPersistGapTooBig = errors.New("MaxPersistGap must be < RevisionsInMemory")
+	errTooManyRevisions = fmt.Errorf("RevisionsInMemory must be <= %d", uint(math.MaxUint))
+	errCacheTooLarge    = fmt.Errorf("CacheSizeMiB must be <= %d", maxCacheMiB)
 )
 
-func (c Config) validate() error {
+// Verify checks the configuration invariants.
+func (c Config) Verify() error {
 	switch {
-	case c.Log == nil:
-		return errNoLogger
-	case c.Path == "":
-		return errPathNotProvided
 	case c.RevisionsInMemory < 2:
 		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
-	case c.DeferredCommitInterval >= uint64(c.RevisionsInMemory):
-		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	case c.RevisionsInMemory > math.MaxUint:
+		// Can only happen on 32-bit platforms.
+		return fmt.Errorf("%w: got %d", errTooManyRevisions, c.RevisionsInMemory)
+	case c.MaxPersistGap >= c.RevisionsInMemory:
+		return fmt.Errorf("%w: %d >= %d", errPersistGapTooBig, c.MaxPersistGap, c.RevisionsInMemory)
+	case c.CacheSizeMiB > maxCacheMiB:
+		return fmt.Errorf("%w: got %d", errCacheTooLarge, c.CacheSizeMiB)
 	default:
 		return nil
 	}
 }
+
+var _ triedb.HashDB = (*TrieDB)(nil)
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
 // It acts as HashDB for backwards compatibility with most of our code.
@@ -121,37 +125,38 @@ type TrieDB struct {
 	log logging.Logger
 }
 
-func New(config Config) (*TrieDB, error) {
-	if err := config.validate(); err != nil {
+// newTrieDB opens, or creates, the Firewood database at path.
+func newTrieDB(config Config, path string, log logging.Logger) (*TrieDB, error) {
+	if err := config.Verify(); err != nil {
 		return nil, err
 	}
 
 	options := []ffi.Option{
-		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
-		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
-		ffi.WithRevisions(config.RevisionsInMemory),
-		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
+		ffi.WithReadCacheStrategy(ffi.CacheAllReads),                        // Based on benchmarking, highest cache hit rate
+		ffi.WithNodeCacheSizeInBytes(uint(config.CacheSizeMiB) * units.MiB), // overflow checked in [Config.Verify]
+		ffi.WithRevisions(uint(config.RevisionsInMemory)),                   // overflow checked in [Config.Verify]
+		ffi.WithDeferredPersistenceCommitCount(config.MaxPersistGap),
 		ffi.WithExpensiveMetrics(),
 	}
-	if config.Archive {
+	if config.RootStore {
 		options = append(options, ffi.WithRootStore())
 	}
 
-	fw, err := ffi.New(config.Path, ffi.EthereumNodeHashing, options...)
+	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	if root := common.Hash(fw.Root()); root == types.EmptyRootHash {
-		config.Log.Info("empty firewood database opened", zap.String("path", config.Path))
+		log.Info("empty firewood database opened", zap.String("path", path))
 	} else {
-		config.Log.Info("firewood database opened", zap.Stringer("root", root), zap.String("path", config.Path))
+		log.Info("firewood database opened", zap.Stringer("root", root), zap.String("path", path))
 	}
 
 	return &TrieDB{
 		Firewood:    fw,
 		committable: linked.NewHashmap[common.Hash, *ffi.Proposal](),
-		log:         config.Log,
+		log:         log,
 	}, nil
 }
 

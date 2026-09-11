@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"go.uber.org/zap"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -139,7 +141,10 @@ func defaultConfig() config {
 	}
 }
 
-var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+var (
+	errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+	errUnknownScheme            = errors.New("unknown trie database scheme")
+)
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values. Options
@@ -179,6 +184,12 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 		)
 	}
 
+	switch c.StateScheme {
+	case "", rawdb.HashScheme, customrawdb.FirewoodScheme:
+	default:
+		return config{}, fmt.Errorf("%w: %q", errUnknownScheme, c.StateScheme)
+	}
+
 	saeCfg := c.saeConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
 		return config{}, err
@@ -186,11 +197,10 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := saeCfg.DBConfig.Verify(); err != nil {
 		return config{}, err
 	}
-	ci := saeCfg.DBConfig.CommitInterval
 	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
 		c.StateScheme != customrawdb.FirewoodScheme &&
-		ci != saedb.DefaultCommitInterval {
-		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
+		c.CommitInterval != saedb.DefaultCommitInterval {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, c.CommitInterval)
 	}
 	return c, nil
 }
@@ -227,14 +237,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			Archival:          !c.Pruning,
-			Scheme:            c.StateScheme,
-			TrieCacheMiB:      c.TrieCleanCache,
-			CommitInterval:    c.CommitInterval,
-			SnapshotCacheMiB:  c.SnapshotCache,
-			AllowMissingTries: c.AllowMissingTries,
-		},
+		DBConfig:      c.dbConfig(),
 		RPCConfig: rpc.Config{
 			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
@@ -251,17 +254,43 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	}
 }
 
+// dbConfig translates the operator-supplied state options into the
+// [saedb.Config] for the selected [config.StateScheme]. The meaning of
+// [config.CommitInterval] and [config.Pruning] depends on the scheme; see
+// config.md.
+func (c config) dbConfig() saedb.Config {
+	switch c.StateScheme {
+	case customrawdb.FirewoodScheme:
+		return saedb.FirewoodConfig{
+			Config: firewood.Config{
+				CacheSizeMiB:      c.TrieCleanCache,
+				MaxPersistGap:     c.CommitInterval,
+				RevisionsInMemory: 2 * c.CommitInterval,
+				RootStore:         !c.Pruning,
+			},
+		}
+	default: // hash; [parseConfig] rejects unknown schemes
+		return saedb.HashDBConfig{
+			TrieCacheMiB:      c.TrieCleanCache,
+			SnapshotCacheMiB:  c.SnapshotCache,
+			CommitInterval:    c.CommitInterval,
+			Archival:          !c.Pruning,
+			AllowMissingTries: c.AllowMissingTries,
+		}
+	}
+}
+
 func (c config) stateSyncConfig(networkID uint32) statesync.Config {
-	saeCfg := c.saeConfig(nil)
 	// All nodes in production networks MUST agree which state summaries to
 	// serve to ensure the state sync engine can hit the required quorum to
 	// accept the summaries.
+	summaryInterval := c.CommitInterval
 	if constants.ProductionNetworkIDs.Contains(networkID) {
-		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
+		summaryInterval = saedb.DefaultCommitInterval
 	}
 	return statesync.Config{
-		DBConfig: saeCfg.DBConfig,
-		Enabled:  c.StateSyncEnabled,
+		SummaryInterval: summaryInterval,
+		Enabled:         c.StateSyncEnabled,
 	}
 }
 

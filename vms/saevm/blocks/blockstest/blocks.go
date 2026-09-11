@@ -132,9 +132,9 @@ func WithLogger(l logging.Logger) BlockOption {
 }
 
 // NewGenesis constructs a new [core.Genesis], writes it to the database, and
-// returns wraps [core.Genesis.ToBlock] with [NewBlock]. It assumes a nil
-// [triedb.Config] unless overridden by a [WithTrieDBConfig]. The block is
-// marked as both executed and synchronous.
+// returns wraps [core.Genesis.ToBlock] with [NewBlock]. It opens a default
+// [triedb.Database] unless one is provided by [WithTrieDB], and closes it before
+// returning. The block is marked as both executed and synchronous.
 func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
 	tb.Helper()
 	conf := &genesisConfig{
@@ -150,7 +150,10 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 		BaseFee:   new(big.Int).SetUint64(conf.baseFee),
 	}
 
-	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	tdb := conf.tdb
+	if tdb == nil {
+		tdb = triedb.NewDatabase(db, nil)
+	}
 	defer func() {
 		// Close the trie database to prevent memory leak and guarantee all
 		// state changes are flushed to disk.
@@ -167,7 +170,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 }
 
 type genesisConfig struct {
-	tdbConfig *triedb.Config
+	tdb       *triedb.Database
 	timestamp uint64
 	gasTarget gas.Gas
 	baseFee   uint64
@@ -176,10 +179,11 @@ type genesisConfig struct {
 // A GenesisOption configures [NewGenesis].
 type GenesisOption = options.Option[genesisConfig]
 
-// WithTrieDBConfig override the [triedb.Config] used by [NewGenesis].
-func WithTrieDBConfig(tc *triedb.Config) GenesisOption {
+// WithTrieDB overrides the [triedb.Database] used by [NewGenesis], which takes
+// ownership of and closes it.
+func WithTrieDB(tdb *triedb.Database) GenesisOption {
 	return options.Func[genesisConfig](func(gc *genesisConfig) {
-		gc.tdbConfig = tc
+		gc.tdb = tdb
 	})
 }
 

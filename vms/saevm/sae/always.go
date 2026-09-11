@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -61,8 +61,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	appSender snowcommon.AppSender,
 ) error {
 	db := types.NewEthDB(avaDB)
-	tdbCfg := vm.config.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
-	config, err := setupGenesis(db, tdbCfg, genesisBytes)
+
+	config, err := setupGenesis(db, vm.config.DBConfig, snowCtx, genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -75,8 +75,12 @@ func (vm *SinceGenesis[_]) Initialize(
 	return err
 }
 
-func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *params.ChainConfig, retErr error) {
-	tdb := triedb.NewDatabase(db, tdbConfig)
+// setupGenesis writes the genesis block and state, closing tdb when done.
+func setupGenesis(db ethdb.Database, cfg saedb.Config, snowCtx *snow.Context, genesisBytes []byte) (_ *params.ChainConfig, retErr error) {
+	tdb, err := cfg.Open(db, snowCtx.ChainDataDir, snowCtx.Log)
+	if err != nil {
+		return nil, fmt.Errorf("opening trie database: %w", err)
+	}
 	defer func() {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
