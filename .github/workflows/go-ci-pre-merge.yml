@@ -12,6 +12,7 @@ on:
     types: [checks_requested]
 
 permissions:
+  actions: write
   contents: read
 
 # Cancel ongoing workflow runs if a new one is started
@@ -514,6 +515,7 @@ jobs:
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
+      cache_validation: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
     secrets: inherit
 
   upgrade:
