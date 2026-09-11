@@ -62,12 +62,7 @@ type Network interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// RegisterResponse records a successful response from nodeID with the
-	// observed bandwidth. Used to prioritize more responsive peers.
-	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
-
-	// RegisterFailure records a failed response from nodeID.
-	RegisterFailure(nodeID ids.NodeID)
+	PeerTracker() *p2p.PeerTracker
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
 	P2PNetwork() *p2p.Network
@@ -87,8 +82,7 @@ type Client interface {
 	// GetCode synchronously retrieves code associated with the given hashes
 	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
 
-	// AddClient creates a separate client on the underlying [p2p.Network].
-	AddClient(handlerID uint64) *p2p.Client
+	Network() Network
 
 	// StateSyncNodes returns the list of nodes provided via config.
 	StateSyncNodes() []ids.NodeID
@@ -107,6 +101,7 @@ type client struct {
 	stateSyncNodeIdx uint32
 	stats            stats.ClientSyncerStats
 	blockParser      EthBlockParser
+	pt               *p2p.PeerTracker
 }
 
 type Config struct {
@@ -128,11 +123,12 @@ func New(config *Config) *client {
 		stats:          config.Stats,
 		stateSyncNodes: config.StateSyncNodeIDs,
 		blockParser:    config.BlockParser,
+		pt:             config.Network.PeerTracker(),
 	}
 }
 
-func (c *client) AddClient(handlerID uint64) *p2p.Client {
-	return c.network.P2PNetwork().NewClient(handlerID, c.network)
+func (c *client) Network() Network {
+	return c.network
 }
 
 func (c *client) StateSyncNodes() []ids.NodeID {
@@ -365,6 +361,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			response, err = c.network.SendSyncedAppRequest(ctx, nodeID, requestBytes)
 		}
 		metric.UpdateRequestLatency(time.Since(start))
+		c.pt.RegisterRequest(nodeID)
 
 		if err != nil {
 			logCtx := make([]any, 0, 8)
@@ -374,7 +371,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			logCtx = append(logCtx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", logCtx...)
 			metric.IncFailed()
-			c.network.RegisterFailure(nodeID)
+			c.pt.RegisterFailure(nodeID)
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -382,14 +379,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if err != nil {
 				lastErr = err
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
-				c.network.RegisterFailure(nodeID)
+				c.pt.RegisterFailure(nodeID)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
 			}
 
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
-			c.network.RegisterResponse(nodeID, bandwidth)
+			c.pt.RegisterResponse(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil
