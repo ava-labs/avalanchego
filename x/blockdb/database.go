@@ -841,7 +841,7 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 			currentFileEnd = fileEnd
 		}
 		if currentScanOffset >= currentFileEnd {
-			// A block that crosses a file boundary leaves this file's remaining range unused.
+			// When a block does not fit, writing continues in the next file.
 			nextIdx, err := safemath.Add(uint64(currentFileIndex), 1)
 			if err != nil {
 				return fmt.Errorf("recovery: overflow in file index calculation: %w", err)
