@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 )
@@ -33,13 +34,7 @@ func storageKey(addr common.Address, key []byte) []byte {
 
 type trieReader interface {
 	Get([]byte) ([]byte, error)
-	Drop() error
 }
-
-var (
-	_ trieReader = (*ffi.Revision)(nil)
-	_ trieReader = (*ffi.Proposal)(nil)
-)
 
 // baseTrie contains the shared state and methods for all Firewood
 // trie implementations. It provides the read/write operations that are
@@ -144,4 +139,10 @@ var (
 // snapshots or offline pruning.
 func (*baseTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errNodeIteratorNotImplemented
+}
+
+// Prove writes the inclusion or exclusion proof for the already hashed key to
+// the provided writer.
+func (*baseTrie) Prove([]byte, ethdb.KeyValueWriter) error {
+	return errProveNotImplemented
 }

@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -264,6 +265,13 @@ func withArchival() sutOption {
 func withCommitInterval(n uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withFirewood selects Firewood as the trie database
+func withFirewood() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
 	})
 }
 
@@ -1033,6 +1041,57 @@ func TestImport(t *testing.T) {
 	)
 	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
+}
+
+func TestStatefulRPCsReconstructExtraState(t *testing.T) {
+	const (
+		commitInterval = 4
+		numBlocks      = 2*commitInterval + 3
+	)
+
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb_pruning",
+			opts: []sutOption{withCommitInterval(commitInterval)},
+		},
+		{
+			name: "firewood_commit_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			sender := key.EthAddress()
+			timeOpt, clock := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(sender), timeOpt, withDB(memdb.New()), withChainDataDir(t.TempDir())}
+			opts = append(opts, tt.opts...)
+
+			ctx, node := newSUT(t, opts...)
+			w := newWallet(key, node.ctx, node.Client)
+			for range numBlocks {
+				blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				clock.AdvanceToSettle(ctx, t, blk)
+			}
+
+			// Restarting the VM clears all caches so that every uncommitted
+			// state root MUST be reconstructed by re-execution.
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+			t.Run("restart", func(t *testing.T) {
+				ctx, sut := newSUT(t, opts...)
+
+				for h := uint64(1); h <= numBlocks; h++ {
+					got, err := sut.ethclient.NonceAt(ctx, sender, new(big.Int).SetUint64(h))
+					require.NoErrorf(t, err, "%T.NonceAt(%d)", sut.ethclient, h)
+					assert.Equalf(t, h, got, "%T.NonceAt(%d): one export per block", sut.ethclient, h)
+				}
+			})
+		})
+	}
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool

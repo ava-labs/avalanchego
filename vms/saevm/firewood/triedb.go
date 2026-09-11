@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -15,15 +16,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
 	"go.uber.org/zap"
 
-	// comment resolution
-	_ "github.com/ava-labs/libevm/core/state"
-	_ "github.com/ava-labs/libevm/trie"
+	_ "github.com/ava-labs/libevm/core/state" // comment resolution
 
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -114,6 +114,7 @@ type TrieDB struct {
 	// and the latest state can be modified at any time during execution.
 	Firewood *ffi.Database
 
+	mu          sync.RWMutex
 	pending     *ffi.Proposal
 	committable *linked.Hashmap[common.Hash, *ffi.Proposal]
 
@@ -160,6 +161,8 @@ func New(config Config) (*TrieDB, error) {
 func (t *TrieDB) Close() error {
 	// The force close below will iterate through all open handles and free
 	// their Rust-side memory explicitly
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.committable.Clear()
 	t.pending = nil
 
@@ -184,6 +187,8 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 	return common.Hash(t.Firewood.Root()) != types.EmptyRootHash
 }
 
+var errParentNotLatest = errors.New("proposal parent is not the latest root")
+
 // Update considers the given root as the new head of tracked roots.  This root,
 // if different than parent, must have been created via [state.Trie.Commit] with
 // a Firewood-backed [state.StateDB]. After Update returns, the user can call
@@ -191,10 +196,23 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 //
 //nolint:revive // removing names loses context.
 func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	possible := t.pending
 	if possible == nil {
 		// Update will never be called if no state change is proposed.
 		return fmt.Errorf("no pending proposal to update for root %s", root)
+	}
+
+	// Proposals form a linear chain, so the parent MUST be the newest root
+	// tracked here.
+	latest, _, ok := t.committable.Newest()
+	if !ok {
+		latest = common.Hash(t.Firewood.Root())
+	}
+	if parent != latest {
+		return fmt.Errorf("%w: parent %s, latest %s", errParentNotLatest, parent, latest)
 	}
 
 	if gotRoot := common.Hash(possible.Root()); gotRoot != root {
@@ -215,6 +233,9 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 //
 // Any error returned from this function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if _, ok := t.committable.Get(root); !ok {
 		// Ideally, one would check that the root is on disk, since one should
 		// never pass a non-existent root to Commit. However, Firewood loses
@@ -253,24 +274,57 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	return nil
 }
 
-// newProposal creates a new proposal from either a committable proposal or the tip of the database.
+// newRevision returns the [ffi.Revision] at root, or a [trie.MissingNodeError]
+// if Firewood has no revision for root.
+func (t *TrieDB) newRevision(root common.Hash) (*ffi.Revision, error) {
+	revision, err := t.Firewood.Revision(ffi.Hash(root))
+	if errors.Is(err, ffi.ErrRevisionNotFound) {
+		return nil, &trie.MissingNodeError{NodeHash: root}
+	}
+	return revision, err
+}
+
+var errNotProposable = errors.New("parent root is not proposable")
+
+// newProposal creates a new proposal from either a committable proposal or the
+// tip of the database. Returns an error wrapping [errNotProposable] otherwise.
 func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*ffi.Proposal, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	switch parent, foundProposal := t.committable.Get(parentRoot); {
 	case foundProposal:
 		return parent.Propose(batchOps)
 	case parentRoot == common.Hash(t.Firewood.Root()):
 		return t.Firewood.Propose(batchOps)
 	default:
-		return nil, fmt.Errorf("parent root %+x is not proposable", parentRoot)
+		return nil, fmt.Errorf("%w: %+x", errNotProposable, parentRoot)
 	}
 }
 
-// trieCommit considers the provided proposal as canonical.
-// Should be called on [state.Trie.Commit].
+func (t *TrieDB) newReconstructed(root common.Hash) (*ffi.Reconstructed, error) {
+	rev, err := t.newRevision(root)
+	if err != nil {
+		return nil, err
+	}
+	return rev.Reconstruct(nil)
+}
+
+var errProposalPending = errors.New("a proposal is already pending")
+
+// trieCommit considers the provided proposal as canonical, to be consumed by
+// the next call to [TrieDB.Update]. Should be called on [state.Trie.Commit].
 //
-// p MUST not be nil.
-func (t *TrieDB) trieCommit(p *ffi.Proposal) {
+// Returns an error wrapping [errProposalPending] if a previous proposal would
+// be lost. p MUST not be nil.
+func (t *TrieDB) trieCommit(p *ffi.Proposal) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.pending != nil {
+		return fmt.Errorf("%w: root %s", errProposalPending, common.Hash(t.pending.Root()))
+	}
 	t.pending = p
+	return nil
 }
 
 // Scheme returns [rawdb.HashScheme] to identify the database.

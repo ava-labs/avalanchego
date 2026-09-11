@@ -17,11 +17,11 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 ## Rust Memory Management
 
-Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both should be explicitly freed to avoid leaking Rust memory - otherwise we must rely on Go's garbage collector to eventually call `runtime.AddCleanup`.
+Firewood's CGo FFI exposes three types of Rust-owned heap objects: `ffi.Revision`, `ffi.Proposal`, and `ffi.Reconstructed`. In most cases, we must rely on Go's garbage collector. If possible, these should be explicitly freed.
 
-Proposals tracked by the `TrieDB` are freed when committed. Any remaining handles (pending or committable proposals, and revisions held by tries) are force-closed on the Rust side by `TrieDB.Close`, which calls `ffi.Close` with `ffi.WithForceCloseHandles()`.
+Proposals tracked by the `TrieDB` are freed when committed. Any remaining handles (pending/committable proposals, and revisions/reconstructions held by tries) are force-closed on the Rust side by `TrieDB.Close`, which calls `ffi.Close` with `ffi.WithForceCloseHandles()`.
 
-Revisions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Outstanding trie references need not be garbage collected before `TrieDB.Close()`, but they are invalid afterward and must not be used. Users must be conscious that holding a `state.Trie` for longer than necessary can easily lead to a memory leak within Firewood.
+Revisions and reconstructions are, in general, freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Outstanding trie references need not be garbage collected before `TrieDB.Close()`, but they are invalid afterward and must not be used. Users must be conscious that holding a `state.Trie` for longer than necessary can easily lead to a memory leak within Firewood.
 
 ## Operation Model
 
@@ -33,7 +33,19 @@ The linear invariant means:
 
 - Any proposal created via `accountTrie.Hash()` will be tracked in `accountTrie.Commit()`, and **must** then be moved to the committable map in `TrieDB.Update`.
 - The parent of each new proposal must be either the current committed tip of the Firewood database or the most recent uncommitted proposal in the chain.
-- Branching — creating two proposals from the same parent — is not supported.
+- Any revision can have arbitrarily many hashable items (i.e. either `ffi.Reconstructed` or `ffi.Proposal`) built on top of it, but only a single proposal can ever be committed.
+
+### Re-execution on Historical State
+
+Firewood can only propose on top of its most recent revision or a not-yet-committed proposal, so a `state.StateDB` opened at any older root can be read but not hashed. To allow hashing historic state, Firewood has `ffi.Reconstructed`, a Rust-side view that applies a batch on top of an `ffi.Revision` and can be read and hashed, but never committed.
+
+The `state.StateDB` never knows whether it's being used for canonical execution or for an RPC call, so we can't determine which hashable structure to create at construction time. Additionally, the tip state change during use, so it must be updated accordingly at every hash.
+
+Some differences between the proposal and reconstructed implementations:
+
+- **Incremental building** A proposal is rebuilt from the full op list every time the ops grow, whereas a reconstruction can apply the ops added since the last hash. Re-executing many transactions with `IntermediateRoot` between them is therefore comparatively cheap on historical state.
+- **`Copy()` semantics** A proposal-backed copy re-proposes from the parent revision on its next hash, because the pending proposal is invalidated when the original commits it. A reconstruction-backed can directly clone the reconstruction, avoiding re-hashing in the future.
+- **`state.Trie.Commit` impacts** `trieCommit` refuses to overwrite `TrieDB.pending`, so if `state.StateDB.Commit` hands a proposal to the `TrieDB` and `TrieDB.Update` then rejects it (for example the parent was no longer the newest root), the next `Commit` from any trie fails with `errProposalPending`. Since there is only one execution thread, this should never be an issue. However, one must never call `state.StateDB.Commit` if it's not canonical execution. If the underlying hasher is a reconstruction, it will also return an error.
 
 ## SELFDESTRUCT Handling
 
