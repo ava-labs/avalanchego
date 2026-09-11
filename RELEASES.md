@@ -6,6 +6,12 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 
+### Configs
+
+#### New
+
+- `state-replay-concurrency` for C-Chain. Limits how many historical state requests may re-execute blocks at once. Defaults to `1`.
+
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
 This release schedules the activation of the Helicon network upgrade at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
