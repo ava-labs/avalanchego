@@ -2,7 +2,11 @@
 
 ## Pending (v1.15.1)
 
-- None (delete and fill in as you work)
+### Configs
+
+#### New
+
+- `state-replay-concurrency` for C-Chain. Limits how many historical state requests may re-execute blocks at once. Defaults to `1`.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
