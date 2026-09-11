@@ -75,8 +75,9 @@ type config struct {
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
-	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Pruning Firewood: max unpersisted revisions.
+	Pruning           bool   `json:"pruning-enabled"`     // If enabled, trie roots are only persisted every commit-interval blocks.
+	CommitInterval    uint64 `json:"commit-interval"`     // HashDB: blocks between trie persistence. Pruning Firewood: max unpersisted revisions.
+	RevisionsInMemory uint64 `json:"revisions-in-memory"` // Firewood only: revisions kept in memory and servable to state-syncing peers. 0 = 2*commit-interval.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
@@ -232,6 +233,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			Scheme:            c.StateScheme,
 			TrieCacheMiB:      c.TrieCleanCache,
 			CommitInterval:    c.CommitInterval,
+			RevisionsInMemory: c.RevisionsInMemory,
 			SnapshotCacheMiB:  c.SnapshotCache,
 			AllowMissingTries: c.AllowMissingTries,
 		},

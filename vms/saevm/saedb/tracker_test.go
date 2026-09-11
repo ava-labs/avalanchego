@@ -69,6 +69,21 @@ func TestNewTracker(t *testing.T) {
 			with:    func(c *Config) { c.Scheme = rawdb.PathScheme },
 			wantErr: errUnknownScheme,
 		},
+		{
+			name: "firewood_revisions_in_memory",
+			with: func(c *Config) {
+				c.Scheme = customrawdb.FirewoodScheme
+				c.RevisionsInMemory = 4
+			},
+		},
+		{
+			name: "firewood_too_few_revisions_in_memory",
+			with: func(c *Config) {
+				c.Scheme = customrawdb.FirewoodScheme
+				c.RevisionsInMemory = 1 // == CommitInterval
+			},
+			wantErr: ErrTooFewRevisions,
+		},
 	}
 
 	for _, tt := range tests {
@@ -94,6 +109,41 @@ func TestNewTracker(t *testing.T) {
 			}
 			gotRoot := rawdb.ReadSnapshotRoot(db)
 			require.Equal(t, wantRoot, gotRoot, "rawdb.ReadSnapshotRoot()")
+		})
+	}
+}
+
+func TestConfigFirewoodConfig(t *testing.T) {
+	const commitInterval = 4
+
+	tests := []struct {
+		name              string
+		revisionsInMemory uint64
+		want              uint
+	}{
+		{
+			name: "default_twice_commit_interval",
+			want: 2 * commitInterval,
+		},
+		{
+			name:              "explicit",
+			revisionsInMemory: 32,
+			want:              32,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Scheme:            customrawdb.FirewoodScheme,
+				CommitInterval:    commitInterval,
+				RevisionsInMemory: tt.revisionsInMemory,
+			}
+			require.NoErrorf(t, cfg.Verify(), "%T.Verify()", cfg)
+
+			got := cfg.FirewoodConfig(t.TempDir(), logging.NoLog{})
+			require.Equalf(t, tt.want, got.RevisionsInMemory, "%T.FirewoodConfig().RevisionsInMemory", cfg)
+			require.Equalf(t, uint64(commitInterval), got.DeferredCommitInterval, "%T.FirewoodConfig().DeferredCommitInterval", cfg)
 		})
 	}
 }

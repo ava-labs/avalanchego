@@ -124,6 +124,19 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "state/revisions_in_memory",
+			json: `{"state-scheme":"firewood","revisions-in-memory":16384}`,
+			want: with(func(c *config) {
+				c.StateScheme = customrawdb.FirewoodScheme
+				c.RevisionsInMemory = 16384
+			}),
+		},
+		{
+			name:    "state/revisions_in_memory_not_above_commit_interval",
+			json:    `{"state-scheme":"firewood","commit-interval":256,"revisions-in-memory":256}`,
+			wantErr: testerr.Is(saedb.ErrTooFewRevisions),
+		},
+		{
 			name: "state/trie_clean_cache",
 			json: `{"trie-clean-cache":256}`,
 			want: with(func(c *config) { c.TrieCleanCache = 256 }),
@@ -265,6 +278,7 @@ func TestParseConfig(t *testing.T) {
 				"pruning-enabled":false,
 				"state-scheme":"firewood",
 				"commit-interval":256,
+				"revisions-in-memory":512,
 				"trie-clean-cache":256,
 				"snapshot-cache":128,
 				"allow-missing-tries":true,
@@ -287,6 +301,7 @@ func TestParseConfig(t *testing.T) {
 				Pruning:                      false,
 				StateScheme:                  customrawdb.FirewoodScheme,
 				CommitInterval:               256,
+				RevisionsInMemory:            512,
 				TrieCleanCache:               256,
 				SnapshotCache:                128,
 				AllowMissingTries:            true,

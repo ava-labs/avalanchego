@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -23,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
+
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 )
 
 var _ adaptor.SyncableVM[*summary] = (*Handler)(nil)
@@ -41,6 +44,8 @@ type Handler struct {
 	network *network.Network
 	ethDB   ethdb.Database
 	snowCtx *snow.Context
+	// syncClientReg receives metrics from the state trie syncer.
+	syncClientReg prometheus.Registerer
 
 	// Lifecycle management
 	mu      sync.Mutex
@@ -70,15 +75,22 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)
 	}
+	// Kept separate from the "sync_server" registry as the client and server
+	// halves of the Firewood syncer share a metrics namespace.
+	syncClientReg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sync_client")
+	if err != nil {
+		return nil, fmt.Errorf("registering state sync client metrics: %w", err)
+	}
 	return &Handler{
-		Handler: inner,
-		cfg:     cfg,
-		state:   state,
-		hooks:   hooks,
-		network: network,
-		ethDB:   db,
-		snowCtx: snowCtx,
-		done:    make(chan struct{}),
+		Handler:       inner,
+		cfg:           cfg,
+		state:         state,
+		hooks:         hooks,
+		network:       network,
+		ethDB:         db,
+		snowCtx:       snowCtx,
+		syncClientReg: syncClientReg,
+		done:          make(chan struct{}),
 	}, nil
 }
 

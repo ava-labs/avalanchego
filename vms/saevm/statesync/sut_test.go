@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -230,6 +231,7 @@ func (s *sut) syncer() *Syncer {
 		s.snowCtx,
 		s.Network,
 		s.db,
+		prometheus.NewRegistry(),
 	)
 }
 
@@ -282,7 +284,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps), "RegisterHandlers")
+	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
 
 	return &vmSUT{
 		sut:    s,

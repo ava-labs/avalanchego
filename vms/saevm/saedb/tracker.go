@@ -63,6 +63,10 @@ type Config struct {
 	Archival          bool   // if true, will store every state on disk
 	CommitInterval    uint64 // MUST be set to a non-zero value
 	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
+	// RevisionsInMemory is Firewood-only: the number of revisions kept in
+	// memory, each of which can be served to state-syncing peers. If zero,
+	// 2*CommitInterval is used. If non-zero it MUST exceed CommitInterval.
+	RevisionsInMemory uint64
 
 	// only configurable for tests
 	maxCapBytes       common.StorageSize
@@ -71,13 +75,20 @@ type Config struct {
 
 var (
 	errZeroCommitInterval = errors.New("commit interval must be non-zero")
-	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
-	errUnknownScheme      = errors.New("unknown trie database scheme")
+	// ErrTooFewRevisions is returned by [Config.Verify] when
+	// [Config.RevisionsInMemory] is set but does not exceed
+	// [Config.CommitInterval].
+	ErrTooFewRevisions = errors.New("revisions in memory must exceed commit interval")
+	errCacheTooLarge   = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
+	errUnknownScheme   = errors.New("unknown trie database scheme")
 )
 
 func (c Config) Verify() error {
 	if c.CommitInterval == 0 {
 		return errZeroCommitInterval
+	}
+	if c.RevisionsInMemory != 0 && c.RevisionsInMemory <= c.CommitInterval {
+		return fmt.Errorf("%w: RevisionsInMemory (%d) <= CommitInterval (%d)", ErrTooFewRevisions, c.RevisionsInMemory, c.CommitInterval)
 	}
 	if c.TrieCacheMiB > maxCacheMiB {
 		return fmt.Errorf("%w: TrieCacheMiB (%d)", errCacheTooLarge, c.TrieCacheMiB)
@@ -101,23 +112,8 @@ func (c Config) Verify() error {
 func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config {
 	switch c.Scheme {
 	case customrawdb.FirewoodScheme:
-		if c.TrieCacheMiB == 0 {
-			// Firewood doesn't allow memory-only operation
-			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
-		}
-		if c.Archival {
-			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
-			c.CommitInterval = 1
-		}
 		return &triedb.Config{
-			DBOverride: firewood.Config{
-				Path:                   filepath.Join(dataDir, graftfw.Directory),
-				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
-				RevisionsInMemory:      uint(2 * c.CommitInterval),
-				DeferredCommitInterval: c.CommitInterval,
-				Archive:                c.Archival,
-				Log:                    log,
-			}.BackendConstructor,
+			DBOverride: c.FirewoodConfig(dataDir, log).BackendConstructor,
 		}
 	case rawdb.HashScheme, "":
 		return &triedb.Config{
@@ -132,6 +128,38 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 		)
 		return nil
 	}
+}
+
+// FirewoodConfig returns the [firewood.Config] used to open the Firewood
+// database under dataDir. It is used by [Config.TrieDBConfig] and by state
+// sync, which MUST open the same database with the same options. The result
+// is only meaningful when [Config.Scheme] is [customrawdb.FirewoodScheme].
+func (c Config) FirewoodConfig(dataDir string, log logging.Logger) firewood.Config {
+	if c.TrieCacheMiB == 0 {
+		// Firewood doesn't allow memory-only operation
+		c.TrieCacheMiB = DefaultTrieCacheSizeMiB
+	}
+	if c.Archival {
+		// TODO(alarso16): Allow arbitrary values when re-execution is enabled
+		c.CommitInterval = 1
+	}
+	return firewood.Config{
+		Path:                   filepath.Join(dataDir, graftfw.Directory),
+		CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+		RevisionsInMemory:      uint(c.revisionsInMemory()),
+		DeferredCommitInterval: c.CommitInterval,
+		Archive:                c.Archival,
+		Log:                    log,
+	}
+}
+
+// revisionsInMemory resolves [Config.RevisionsInMemory], defaulting to
+// 2*CommitInterval when unset.
+func (c Config) revisionsInMemory() uint64 {
+	if c.RevisionsInMemory != 0 {
+		return c.RevisionsInMemory
+	}
+	return 2 * c.CommitInterval
 }
 
 func (c Config) snapConfig() *snapshot.Config {

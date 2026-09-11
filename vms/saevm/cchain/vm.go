@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
@@ -140,6 +141,14 @@ func (vm *VM) Initialize(
 	vm.metrics, err = newMetrics(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
+	}
+	if userConfig.StateScheme == customrawdb.FirewoodScheme {
+		// Firewood records its metrics process-wide in Rust, started by
+		// [ffi.StartMetrics] on import of graft/evm/firewood; the gatherer
+		// exposes them like any other registry.
+		if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+			return fmt.Errorf("registering firewood metrics: %w", err)
+		}
 	}
 
 	vm.pending = txpool.NewPending()
@@ -294,17 +303,22 @@ func (vm *VM) Initialize(
 
 		// Register state sync server
 		{
-			// TODO(alarso16): Find a way to wire in Firewood.
+			syncServerReg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sync_server")
+			if err != nil {
+				return fmt.Errorf("registering state sync server metrics: %w", err)
+			}
+			tdb, snaps := vm.VM.EVMState()
 			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
-				// The triedb shouldn't share a cache with execution.
-				tdb := triedb.NewDatabase(ethDB, tdbConfig)
+				// The HashDB triedb shouldn't share a cache with execution.
+				// Firewood holds a file lock so can't be opened twice and MUST
+				// share the execution handle.
+				tdb = triedb.NewDatabase(ethDB, tdbConfig)
 				vm.onClose = append(vm.onClose, func(context.Context) error {
 					return tdb.Close()
 				})
-				_, snaps := vm.VM.EVMState()
-				if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
-					return fmt.Errorf("registering state sync server: %w", err)
-				}
+			}
+			if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state, syncServerReg); err != nil {
+				return fmt.Errorf("registering state sync server: %w", err)
 			}
 		}
 		return nil
