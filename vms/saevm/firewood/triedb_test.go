@@ -813,3 +813,38 @@ func TestCopyClonesReconstruction(t *testing.T) {
 	_, err = cp.Commit(2, true)
 	require.ErrorIs(t, err, errHistoricalNotCommittable, "copy Commit()")
 }
+
+// TestHashAfterTipMovesPastParent verifies that a trie whose parent stops being
+// proposable still hashes, which needs its revision handle re-taken.
+func TestHashAfterTipMovesPastParent(t *testing.T) {
+	db := newDB(t)
+	tdb := db.TrieDB()
+
+	blk1 := newStateDB(t, db, types.EmptyRootHash)
+	blk1.SetNonce(addr1, 1)
+	root1, err := blk1.Commit(1, true)
+	require.NoError(t, err, "blk1.Commit()")
+
+	// Opened while root1 is still an unpersisted proposal.
+	sdb := newStateDB(t, db, root1)
+	sdb.SetNonce(addr2, 1)
+	require.NotEqual(t, common.Hash{}, sdb.IntermediateRoot(true), "first root")
+
+	// Persist root1 and then move the tip past it, which makes root1
+	// unproposable and forces the reconstruction fallback.
+	require.NoErrorf(t, tdb.Commit(root1, false), "triedb.Commit(%s)", root1)
+	blk2 := newStateDB(t, db, root1)
+	blk2.SetNonce(addr3, 1)
+	root2, err := blk2.Commit(2, true)
+	require.NoError(t, err, "blk2.Commit()")
+	require.NoErrorf(t, tdb.Commit(root2, false), "triedb.Commit(%s)", root2)
+
+	sdb.SetNonce(addr2, 2)
+	got := sdb.IntermediateRoot(true)
+	require.NotEqual(t, common.Hash{}, got, "root after the tip moved past the parent")
+	require.NoError(t, sdb.Error(), "StateDB.Error()")
+
+	want := newStateDB(t, db, root1)
+	want.SetNonce(addr2, 2)
+	require.Equal(t, want.IntermediateRoot(true), got, "root matches a freshly opened trie")
+}

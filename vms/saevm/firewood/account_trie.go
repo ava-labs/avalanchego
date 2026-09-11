@@ -86,9 +86,11 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return root, err
 	}
 
-	// Reads by the shared [baseTrie] (and so by every [storageTrie]) MUST
-	// follow the new hasher.
-	a.hasher = newReconstructedHasher(a.revision)
+	recon, err := a.tdb.newReconstructed(common.Hash(a.revision.Root()))
+	if err != nil {
+		return common.Hash{}, err
+	}
+	a.hasher = newReconstructedHasher(recon)
 	a.reader = a.hasher
 	return a.hasher.hash(a.updateOps)
 }

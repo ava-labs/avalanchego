@@ -154,6 +154,20 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 		parent = stored // The stored block is marked as executed.
 	}
 
+	// TODO(alarso16): Hashing is an expensive operation and is only used here
+	// to check if there was an error during re-execution. Add metrics to
+	// determine whether this check is prohibitively expensive.
+	got := sdb.IntermediateRoot(true)
+	want := parent.PostExecutionStateRoot()
+	if got != want {
+		return nil, nil, fmt.Errorf(
+			"incorrect state root on reconstruction: block %d produced %s, want %s",
+			parent.NumberU64(),
+			got,
+			want,
+		)
+	}
+
 	return sdb, parent, nil
 }
 

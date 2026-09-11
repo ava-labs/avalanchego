@@ -10,8 +10,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-var errHistoricalNotCommittable = errors.New("state built on a historical revision cannot be committed")
-
 // hasher serves reads from, and computes the root of, a parent state with the
 // trie's pending updates applied. Exactly one hasher backs each [accountTrie].
 //
@@ -36,9 +34,9 @@ type proposalHasher struct {
 	parentRoot common.Hash
 	revision   *ffi.Revision
 
-	pending  *ffi.Proposal
-	proposed int         // len(ops) reflected by pending
-	root     common.Hash // root of pending, or parentRoot if pending is nil
+	pending  *ffi.Proposal // MAY be nil
+	proposed int           // len(ops) reflected by pending
+	root     common.Hash   // root of pending, or parentRoot if pending is nil
 }
 
 func newProposalHasher(tdb *TrieDB, parentRoot common.Hash, revision *ffi.Revision) *proposalHasher {
@@ -96,54 +94,32 @@ func (p *proposalHasher) copy() (hasher, error) {
 // reconstructedHasher hashes by building an [ffi.Reconstructed] view on top of
 // a historical revision that can no longer be proposed on.
 type reconstructedHasher struct {
-	revision *ffi.Revision
-
 	view    *ffi.Reconstructed
 	applied int // len(ops) reflected by view
 }
 
-func newReconstructedHasher(revision *ffi.Revision) *reconstructedHasher {
-	return &reconstructedHasher{revision: revision}
+func newReconstructedHasher(recon *ffi.Reconstructed) *reconstructedHasher {
+	return &reconstructedHasher{view: recon}
 }
 
 func (r *reconstructedHasher) Get(key []byte) ([]byte, error) {
-	if r.view != nil {
-		return r.view.Get(key)
-	}
-	return r.revision.Get(key)
+	return r.view.Get(key)
 }
 
 func (r *reconstructedHasher) hash(ops []ffi.BatchOp) (common.Hash, error) {
 	if len(ops) == r.applied {
-		return r.root(), nil
-	}
-
-	if r.view == nil {
-		view, err := r.revision.Reconstruct(nil)
-		if err != nil {
-			return common.Hash{}, err
-		}
-		r.view = view
+		return common.Hash(r.view.Root()), nil
 	}
 
 	if err := r.view.Reconstruct(ops[r.applied:]); err != nil {
-		// On error, the [ffi.Reconstructed] has released its resources and is no longer
-		// usable.
-		r.view = nil
-		r.applied = 0
 		return common.Hash{}, err
 	}
 
 	r.applied = len(ops)
-	return r.root(), nil
+	return common.Hash(r.view.Root()), nil
 }
 
-func (r *reconstructedHasher) root() common.Hash {
-	if r.view != nil {
-		return common.Hash(r.view.Root())
-	}
-	return common.Hash(r.revision.Root())
-}
+var errHistoricalNotCommittable = errors.New("state built on a historical revision cannot be committed")
 
 func (*reconstructedHasher) commit() error {
 	return errHistoricalNotCommittable
@@ -152,16 +128,12 @@ func (*reconstructedHasher) commit() error {
 // copy clones the reconstructed view, if any, so the copy starts from the
 // already-hashed state instead of replaying every op.
 func (r *reconstructedHasher) copy() (hasher, error) {
-	cp := newReconstructedHasher(r.revision)
-	if r.view == nil {
-		return cp, nil
-	}
-
-	view, err := r.view.Clone()
+	recon, err := r.view.Clone()
 	if err != nil {
 		return nil, err
 	}
-	cp.view = view
+
+	cp := newReconstructedHasher(recon)
 	cp.applied = r.applied
 	return cp, nil
 }

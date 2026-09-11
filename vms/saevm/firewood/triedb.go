@@ -302,6 +302,14 @@ func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*f
 	}
 }
 
+func (t *TrieDB) newReconstructed(root common.Hash) (*ffi.Reconstructed, error) {
+	rev, err := t.newRevision(root)
+	if err != nil {
+		return nil, err
+	}
+	return rev.Reconstruct(nil)
+}
+
 var errProposalPending = errors.New("a proposal is already pending")
 
 // trieCommit considers the provided proposal as canonical, to be consumed by
