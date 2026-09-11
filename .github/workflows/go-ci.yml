@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       cache_validation:
-        description: 'Enable PR-scoped Go unit-cache validation'
+        description: 'Enable PR-scoped Go cache validation'
         required: false
         type: boolean
         default: false
@@ -30,7 +30,28 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+      # Validation keys are fixed to bound PR cache storage. Clear prior entries
+      # before each new attempt so the run can warm entries for its revision.
+      - name: Clear Go validation caches
+        if: ${{ inputs.cache_validation && github.run_attempt == 1 }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          keys=(
+            "task-validation-${RUNNER_OS}-${RUNNER_ARCH}"
+            "go-mod-validation-${RUNNER_OS}"
+            "go-unit-validation-${RUNNER_OS}-${RUNNER_ARCH}"
+          )
+          for key in "${keys[@]}"; do
+            cache_ids="$(gh cache list --ref "$GITHUB_REF" --key "$key" --limit 100 --json id --jq '.[].id')"
+            for cache_id in $cache_ids; do
+              gh cache delete "$cache_id"
+            done
+          done
       - uses: ./.github/actions/setup-go-dependencies
+        with:
+          cache-validation: ${{ inputs.cache_validation }}
 
   unit:
     needs: setup
@@ -39,17 +60,8 @@ jobs:
       - uses: actions/checkout@v5
       - id: setup-go
         uses: ./.github/actions/setup-go-for-project
-      # A validation run uses one fixed key in its PR merge-ref scope. Its first
-      # attempt removes that key so later pushes do not accumulate entries.
-      - name: Clear Go unit-test validation cache
-        if: ${{ inputs.cache_validation && github.run_attempt == 1 }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ref="${GITHUB_REF//\//%2F}"
-          gh api --method DELETE \
-            "repos/${GITHUB_REPOSITORY}/actions/caches?key=go-unit-validation-${RUNNER_OS}-${RUNNER_ARCH}&ref=${ref}"
+        with:
+          cache-validation: ${{ inputs.cache_validation }}
       - id: unit-cache
         name: Restore Go unit-test cache
         uses: actions/cache/restore@v5
@@ -58,9 +70,14 @@ jobs:
           key: ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
           restore-keys: |
             ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-', runner.os, runner.arch) }}
-      - name: Record Go unit-test cache restore result
+      - name: Record Go cache restore results
         shell: bash
-        run: echo "go-unit-cache-hit=${{ steps.unit-cache.outputs.cache-hit }}" > "$RUNNER_TEMP/go-unit-cache-validation.log"
+        run: |
+          {
+            echo "task-cache-hit=${{ steps.setup-go.outputs.task-cache-hit }}"
+            echo "go-mod-cache-hit=${{ steps.setup-go.outputs.go-mod-cache-hit }}"
+            echo "go-unit-cache-hit=${{ steps.unit-cache.outputs.cache-hit }}"
+          } > "$RUNNER_TEMP/go-unit-cache-validation.log"
       # actions/cache saves in its post step, after the unit tests complete.
       # Validation runs save only to their PR merge-ref scope.
       - name: Save Go unit-test cache
@@ -84,6 +101,8 @@ jobs:
         shell: bash
         run: |
           go run ./tools/cache-check \
+            --check task-cache-restore \
+            --check go-mod-cache-restore \
             --check go-unit-cache-restore \
             --check go-unit-test-results \
             --log "$RUNNER_TEMP/go-unit-cache-validation.log"

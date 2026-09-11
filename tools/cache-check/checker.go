@@ -1,4 +1,4 @@
-// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	taskCacheRestoreCheck   = "task-cache-restore"
+	goModCacheRestoreCheck  = "go-mod-cache-restore"
 	goUnitCacheRestoreCheck = "go-unit-cache-restore"
 	goUnitTestResultsCheck  = "go-unit-test-results"
 )
@@ -20,6 +22,8 @@ var (
 )
 
 var knownChecks = []string{
+	taskCacheRestoreCheck,
+	goModCacheRestoreCheck,
 	goUnitCacheRestoreCheck,
 	goUnitTestResultsCheck,
 }
