@@ -237,6 +237,7 @@ func New(
 			TransactionHistory:              config.TransactionHistory,
 			SkipTxIndexing:                  config.SkipTxIndexing,
 			StateHistory:                    config.StateHistory,
+			StateHistoryEnabled:             config.StateHistoryEnabled,
 			StateScheme:                     scheme,
 			ChainDataDir:                    chainDataDir,
 		}
