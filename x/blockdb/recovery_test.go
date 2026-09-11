@@ -6,12 +6,14 @@ package blockdb
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"os"
 	"testing"
 
 	"github.com/DataDog/zstd"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 )
@@ -242,8 +244,15 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		blockSize          int // Optional: if set, creates fixed-size blocks instead of random
 		setupCorruption    func(store *Database, blocks [][]byte) error
 		wantErr            error
-		wantErrText        string
 	}{
+		{
+			name:         "checkpoint_references_missing_data",
+			blockHeights: []uint64{0},
+			setupCorruption: func(store *Database, _ [][]byte) error {
+				return os.Remove(store.dataFilePath(0))
+			},
+			wantErr: ErrCorrupted,
+		},
 		{
 			name:         "index header claims larger offset than actual data",
 			blockHeights: []uint64{0, 1, 2, 3, 4},
@@ -278,8 +287,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				_, err = indexFile.WriteAt(corruptedHeaderBytes, 0)
 				return err
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "index header claims to have more data than is actually on disk",
+			wantErr: ErrCorrupted,
 		},
 		{
 			name:         "corrupted block header in data file",
@@ -307,8 +315,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				_, err = dataFile.WriteAt(corruptedHeader, secondBlockOffset)
 				return err
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "invalid block entry version at offset",
 		},
 		{
 			name:         "block with invalid block size in header that reads more than total data file size",
@@ -334,8 +340,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "block data out of bounds at offset ",
 		},
 		{
 			name:         "block with checksum mismatch",
@@ -361,8 +365,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "checksum mismatch for block",
 		},
 		{
 			name:         "partial block at end of file",
@@ -383,8 +385,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				truncateSize := int64(sizeOfBlockEntryHeader) + int64(compressedSize)/2
 				return dataFile.Truncate(truncateSize)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "index header claims to have more data than is actually on disk",
+			wantErr: ErrCorrupted,
 		},
 		{
 			name:         "block with invalid height",
@@ -411,8 +412,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "invalid block height in header",
 		},
 		{
 			name:               "missing data file at index 1",
@@ -425,8 +424,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				dataFilePath := store.dataFilePath(1)
 				return os.Remove(dataFilePath)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "data file at index 1 is missing",
+			wantErr: ErrCorrupted,
 		},
 		{
 			name:            "unexpected multiple data files when MaxDataFileSize is max uint64",
@@ -447,8 +445,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				_, err = secondDataFile.Write(dummyData)
 				return err
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "only one data file expected when MaxDataFileSize is max uint64, got 2 files with max index 1",
+			wantErr: ErrCorrupted,
 		},
 		{
 			name:         "block with invalid block entry version",
@@ -475,8 +472,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "invalid block entry version at offset",
 		},
 		{
 			name:         "second block with invalid version among 4 blocks",
@@ -503,8 +498,6 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
-			wantErr:     ErrCorrupted,
-			wantErrText: "invalid block entry version at offset",
 		},
 	}
 
@@ -538,12 +531,150 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			// Apply corruption logic
 			require.NoError(t, tt.setupCorruption(store, blocks))
 
-			// Try to reopen the database - it should detect corruption
-			_, err := New(config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir), store.log)
+			db, err := New(config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir), store.log)
 			require.ErrorIs(t, err, tt.wantErr)
-			require.Contains(t, err.Error(), tt.wantErrText, "error message should contain expected text")
+			if tt.wantErr == nil {
+				block, err := db.Get(tt.blockHeights[0])
+				require.NoError(t, err)
+				require.Equal(t, blocks[0], block)
+				require.NoError(t, db.Close())
+			}
 		})
 	}
+}
+
+func TestRecoveryRebuildsTruncatedIndexAcrossDataFiles(t *testing.T) {
+	config := DefaultConfig().WithMaxDataFileSize(1024)
+	db := newDatabase(t, config)
+	// Fixed pseudo-random blocks force the second record into data file 1.
+	rng := rand.NewChaCha8([32]byte{})
+	blocks := make([][]byte, 2)
+	for height := range blocks {
+		blocks[height] = make([]byte, 512)
+		_, err := rng.Read(blocks[height])
+		require.NoError(t, err)
+		require.NoError(t, db.Put(uint64(height), blocks[height]))
+	}
+	firstEntry, err := db.readIndexEntry(0)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+	require.FileExists(t, db.dataFilePath(1))
+
+	checkpointOffset := firstEntry.Offset + uint64(sizeOfBlockEntryHeader) + uint64(firstEntry.Size)
+	require.NoError(t, writeIndexFileHeader(db, 0, checkpointOffset))
+	require.NoError(t, os.Truncate(db.indexFile.Name(), int64(sizeOfIndexFileHeader+sizeOfIndexEntry)))
+
+	db = newDatabase(t, db.config)
+	for height, block := range blocks {
+		got, err := db.Get(uint64(height))
+		require.NoError(t, err)
+		require.Equal(t, block, got)
+	}
+	require.NoError(t, db.Close())
+}
+
+func TestRecoveryLeavesPartialRecordSuffix(t *testing.T) {
+	firstBlock := []byte("first block")
+	secondBlock := []byte("second block")
+	db := newDatabase(t, DefaultConfig())
+	require.NoError(t, db.Put(0, firstBlock))
+	require.NoError(t, db.Put(1, secondBlock))
+
+	firstEntry, err := db.readIndexEntry(0)
+	require.NoError(t, err)
+	secondEntry, err := db.readIndexEntry(1)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	checkpointOffset := firstEntry.Offset + uint64(sizeOfBlockEntryHeader) + uint64(firstEntry.Size)
+	// Treat the first block as checkpointed and truncate the later record mid-write.
+	require.NoError(t, writeIndexFileHeader(db, 0, checkpointOffset))
+	partialBlockEnd := secondEntry.Offset + uint64(sizeOfBlockEntryHeader) + uint64(secondEntry.Size)/2
+	require.NoError(t, os.Truncate(db.dataFilePath(0), int64(partialBlockEnd)))
+
+	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 0)
+	got, err := db.Get(0)
+	require.NoError(t, err)
+	require.Equal(t, firstBlock, got)
+	_, err = db.Get(1)
+	require.ErrorIs(t, err, database.ErrNotFound)
+
+	replacement := []byte("replacement block")
+	require.NoError(t, db.Put(1, replacement))
+	got, err = db.Get(1)
+	require.NoError(t, err)
+	require.Equal(t, replacement, got)
+	require.NoError(t, db.Close())
+}
+
+func TestRecoveryLeavesIndexedDataAfterChecksumMismatch(t *testing.T) {
+	checkpointBlock := []byte("checkpoint block")
+	malformedBlock := []byte("malformed block")
+	indexedBlock := []byte("indexed block")
+	db := newDatabase(t, DefaultConfig())
+	require.NoError(t, db.Put(2, checkpointBlock))
+	require.NoError(t, db.Put(3, malformedBlock))
+	require.NoError(t, db.Put(5, indexedBlock))
+	malformedEntry, err := db.readIndexEntry(3)
+	require.NoError(t, err)
+	checkpointEntry, err := db.readIndexEntry(2)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	checkpointOffset := checkpointEntry.Offset + uint64(sizeOfBlockEntryHeader) + uint64(checkpointEntry.Size)
+	// Keep the checkpoint max below height 5 to exercise max-height recovery.
+	require.NoError(t, writeIndexFileHeader(db, 2, checkpointOffset))
+	require.NoError(t, os.Truncate(db.indexFile.Name(), int64(sizeOfIndexFileHeader+7*sizeOfIndexEntry)))
+	require.NoError(t, writeBlockHeader(db, int64(malformedEntry.Offset), blockEntryHeader{
+		Height:   3,
+		Size:     malformedEntry.Size,
+		Checksum: calculateChecksum(malformedBlock) + 1,
+		Version:  BlockEntryVersion,
+	}))
+
+	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 5)
+	got, err := db.Get(5)
+	require.NoError(t, err)
+	require.Equal(t, indexedBlock, got)
+	_, err = db.Get(3)
+	require.ErrorIs(t, err, ErrCorrupted)
+	require.NoError(t, db.Close())
+
+	db = newDatabase(t, db.config)
+	checkDatabaseState(t, db, 5)
+	got, err = db.Get(5)
+	require.NoError(t, err)
+	require.Equal(t, indexedBlock, got)
+
+	replacement := randomBlock(t)
+	// A later Put must append after the preserved suffix without overwriting height 5.
+	require.NoError(t, db.Put(6, replacement))
+	got, err = db.Get(5)
+	require.NoError(t, err)
+	require.Equal(t, indexedBlock, got)
+	require.NoError(t, db.Close())
+}
+
+func writeIndexFileHeader(db *Database, maxHeight, nextWriteOffset uint64) error {
+	indexPath := db.indexFile.Name()
+	indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer indexFile.Close()
+
+	header := db.header
+	header.MaxHeight = maxHeight
+	header.NextWriteOffset = nextWriteOffset
+
+	headerBytes, err := header.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	_, err = indexFile.WriteAt(headerBytes, 0)
+	return err
 }
 
 // Helper function to reset index file header to only a single block

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/heightindexdb/dbtest"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestInterface(t *testing.T) {
@@ -559,4 +562,16 @@ func TestCloseRejectsCheckpointPastPhysicalData(t *testing.T) {
 
 	require.NoError(t, os.Truncate(db.dataFilePath(0), info.Size()))
 	require.ErrorIs(t, db.Close(), ErrCorrupted)
+}
+
+func TestGetRejectsUnrepresentableDataFileIndex(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithMaxDataFileSize(1))
+	indexOffset, err := db.indexEntryOffset(0)
+	require.NoError(t, err)
+	require.NoError(t, db.writeIndexEntryAt(indexOffset, uint64(math.MaxInt)+1, 1))
+	db.maxBlockHeight.Store(0)
+
+	_, err = db.Get(0)
+	require.ErrorIs(t, err, ErrCorrupted)
+	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
