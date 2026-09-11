@@ -1086,7 +1086,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return fmt.Errorf("getting current supply: %w", err)
 	}
 
-	rewards, err := getRewardsCalculator(
+	rewards, err := GetRewardsCalculator(
 		e.backend.Config.RewardConfig,
 		e.backend.Config.UpgradeConfig,
 		e.state,
@@ -1208,7 +1208,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 				return err
 			}
 
-			rewards, err := getRewardsCalculator(
+			rewards, err := GetRewardsCalculator(
 				e.backend.Config.RewardConfig,
 				e.backend.Config.UpgradeConfig,
 				e.state,

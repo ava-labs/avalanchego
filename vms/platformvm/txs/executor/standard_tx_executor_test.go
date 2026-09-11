@@ -4480,7 +4480,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
-	rewards, err := getRewardsCalculator(
+	rewards, err := GetRewardsCalculator(
 		env.config.RewardConfig,
 		env.config.UpgradeConfig,
 		env.state,

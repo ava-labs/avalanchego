@@ -173,7 +173,7 @@ func advanceTimeTo(
 				return nil, false, err
 			}
 
-			rewards, err := getRewardsCalculator(
+			rewards, err := GetRewardsCalculator(
 				backend.Config.RewardConfig,
 				backend.Config.UpgradeConfig,
 				parentState,
@@ -389,9 +389,9 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
-// getRewardsCalculator returns the reward calculator for a staker on subnetID.
+// GetRewardsCalculator returns the reward calculator for a staker on subnetID.
 // Non-primary network stakers use their subnet's transformation config.
-func getRewardsCalculator(
+func GetRewardsCalculator(
 	rewardConfig reward.Config,
 	upgradeConfig upgrade.Config,
 	parentState state.Chain,
