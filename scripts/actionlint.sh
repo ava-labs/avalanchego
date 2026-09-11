@@ -3,7 +3,11 @@
 set -euo pipefail
 
 AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
-"${AVALANCHE_PATH}"/scripts/run_tool.sh actionlint "${@}"
+# actionlint v1.7.12 predates GitHub's cache-mode workflow key. Keep linting
+# all other workflow syntax until actionlint supports the key.
+"${AVALANCHE_PATH}"/scripts/run_tool.sh actionlint \
+  -ignore 'unexpected key "cache-mode" for "job" section' \
+  "${@}"
 
 echo "Checking use of scripts/* in GitHub Actions workflows..."
 SCRIPT_USAGE=
