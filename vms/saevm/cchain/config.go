@@ -103,6 +103,7 @@ type config struct {
 	// Non-positive values result in no limit. Defaults to no limit.
 	APIMaxDuration               duration `json:"api-max-duration"`
 	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
+	StateReplayConcurrency       uint64   `json:"state-replay-concurrency"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -136,6 +137,7 @@ func defaultConfig() config {
 		APIs:                         rpc.DefaultAPIs(),
 		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
 		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
+		StateReplayConcurrency:       rpc.DefaultStateReplayConcurrency,
 	}
 }
 
@@ -246,6 +248,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			GasCap:                       50_000_000,
 			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
+			StateReplayConcurrency:       c.StateReplayConcurrency,
 		},
 		Now: now,
 	}

@@ -67,10 +67,11 @@ type Config struct {
 	APIs set.Set[API]
 
 	// Resource limits
-	BlocksPerBloomSection uint64
-	EVMTimeout            time.Duration
-	GasCap                uint64
-	BatchRequestLimit     uint64 // 0 = no limit
+	BlocksPerBloomSection  uint64
+	EVMTimeout             time.Duration
+	GasCap                 uint64
+	BatchRequestLimit      uint64 // 0 = no limit
+	StateReplayConcurrency uint64 // max concurrent historical state requests re-executing blocks
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
@@ -79,11 +80,17 @@ type Config struct {
 	ResolvePendingToLastExecuted bool
 }
 
+const DefaultStateReplayConcurrency = 1
+
 var (
 	// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
 	ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
 	// ErrUnknownAPI means [Config.APIs] contains an API that doesn't exist.
 	ErrUnknownAPI = errors.New("unknown API")
+	// ErrZeroStateReplayConcurrency means [Config.StateReplayConcurrency] is 0.
+	ErrZeroStateReplayConcurrency = errors.New("state replay concurrency must be non-zero")
+	// ErrStateReplayConcurrencyTooLarge means [Config.StateReplayConcurrency] overflows an int.
+	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
 )
 
 // Verify checks that all values in c are within usable bounds.
@@ -96,6 +103,12 @@ func (c Config) Verify() error {
 		if !known.Contains(a) {
 			return fmt.Errorf("%w: %q", ErrUnknownAPI, a)
 		}
+	}
+	if c.StateReplayConcurrency == 0 {
+		return ErrZeroStateReplayConcurrency
+	}
+	if c.StateReplayConcurrency > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
 	}
 	return nil
 }
@@ -133,6 +146,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		chain.Mempool(),
 		chainIdx,
 		override,
+		make(chan struct{}, config.StateReplayConcurrency),
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via
