@@ -35,7 +35,6 @@ jobs:
   unit:
     needs: setup
     runs-on: ${{ inputs.runner }}
-    cache-mode: ${{ (inputs.cache_validation || github.ref == 'refs/heads/master') && 'write' || 'read' }}
     steps:
       - uses: actions/checkout@v5
       - id: setup-go
