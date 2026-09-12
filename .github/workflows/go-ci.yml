@@ -30,25 +30,6 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      # Validation keys are fixed to bound PR cache storage. Clear prior entries
-      # before each new attempt so the run can warm entries for its revision.
-      - name: Clear Go validation caches
-        if: ${{ inputs.cache_validation && github.run_attempt == 1 }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          keys=(
-            "task-validation-${RUNNER_OS}-${RUNNER_ARCH}"
-            "go-mod-validation-${RUNNER_OS}"
-            "go-unit-validation-${RUNNER_OS}-${RUNNER_ARCH}"
-          )
-          for key in "${keys[@]}"; do
-            cache_ids="$(gh cache list --ref "$GITHUB_REF" --key "$key" --limit 100 --json id --jq '.[].id')"
-            for cache_id in $cache_ids; do
-              gh cache delete "$cache_id"
-            done
-          done
       - uses: ./.github/actions/setup-go-dependencies
         with:
           cache-validation: ${{ inputs.cache_validation }}
@@ -78,8 +59,7 @@ jobs:
             echo "go-mod-cache-hit=${{ steps.setup-go.outputs.go-mod-cache-hit }}"
             echo "go-unit-cache-hit=${{ steps.unit-cache.outputs.cache-hit }}"
           } > "$RUNNER_TEMP/go-unit-cache-validation.log"
-      # actions/cache saves in its post step, after the unit tests complete.
-      # Validation runs save only to their PR merge-ref scope.
+      # actions/cache saves in its post step after successful warm jobs.
       - name: Save Go unit-test cache
         if: ${{ (github.ref == 'refs/heads/master' || inputs.cache_validation) && steps.unit-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache@v5
@@ -94,10 +74,10 @@ jobs:
           set -o pipefail
           ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }} 2>&1 | tee -a "$RUNNER_TEMP/go-unit-cache-validation.log"
         env:
-          GOPROXY: ${{ github.ref == 'refs/heads/master' && 'off' || '' }}
+          GOPROXY: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'off' || '' }}
           TIMEOUT: 900s
       - name: Validate Go unit-test cache
-        if: ${{ always() && inputs.cache_validation }}
+        if: ${{ always() && (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) }}
         shell: bash
         run: |
           go run ./tools/cache-check \
